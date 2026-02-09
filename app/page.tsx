@@ -1,21 +1,26 @@
 import Link from "next/link";
+import ValueCard from "@/components/home/ValueCard";
+import { AutonomousIcon, ScalableIcon, SecureIcon } from "@/components/icons/valueIcons";
 import { site } from "@/lib/site";
 
-const workflowCards = [
+const valueCards = [
   {
-    title: "Inbox → Routing",
+    title: "Secure",
     description:
-      "Automatically triage incoming requests and route every task to the right owner with clear priority.",
+      "Enterprise-grade data handling with validation, auditability, and controlled workflow approvals. Your business processes run safely and predictably.",
+    icon: <SecureIcon />,
   },
   {
-    title: "Documents → JSON",
+    title: "Scalable",
     description:
-      "Convert unstructured business documents into reliable, structured outputs for downstream workflows.",
+      "Automations designed to grow with your operations — from a few requests per week to thousands per day without rewriting your process.",
+    icon: <ScalableIcon />,
   },
   {
-    title: "JSON → Systems",
+    title: "Autonomous",
     description:
-      "Trigger updates across your systems with approvals and controls aligned to your operating model.",
+      "Systems understand incoming information and trigger the correct actions automatically, reducing manual work and operational overhead.",
+    icon: <AutonomousIcon />,
   },
 ];
 
@@ -43,13 +48,10 @@ export default function Home() {
       </section>
 
       <section>
-        <h2 className="sr-only">Core workflow patterns</h2>
+        <h2 className="sr-only">Platform value propositions</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {workflowCards.map((card) => (
-            <article key={card.title} className="bubble p-5 sm:p-6">
-              <h3 className="text-lg font-semibold text-[var(--text)]">{card.title}</h3>
-              <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">{card.description}</p>
-            </article>
+          {valueCards.map((card) => (
+            <ValueCard key={card.title} title={card.title} description={card.description} icon={card.icon} />
           ))}
         </div>
       </section>
