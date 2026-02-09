@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ProcessStepsSection from "@/components/home/ProcessStepsSection";
 import ValueCard from "@/components/home/ValueCard";
 import { AutonomousIcon, ScalableIcon, SecureIcon } from "@/components/icons/valueIcons";
 import { site } from "@/lib/site";
@@ -45,6 +46,10 @@ export default function Home() {
             Contact Us
           </Link>
         </div>
+      </section>
+
+      <section>
+        <ProcessStepsSection />
       </section>
 
       <section>
