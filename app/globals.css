@@ -38,15 +38,25 @@ body {
 .bubble {
   border-radius: 2rem;
   border: 1px solid var(--ring);
-  background: linear-gradient(165deg, #f9fcff 0%, #eef6ff 100%);
+  background: linear-gradient(165deg, #f1f8ff 0%, #e3efff 100%);
   box-shadow: 0 10px 30px rgba(47, 98, 170, 0.08);
+  transition: transform 180ms ease, box-shadow 180ms ease;
 }
 
 .bubble-soft {
   border-radius: 2rem;
   border: 1px solid rgba(217, 231, 255, 0.95);
-  background: linear-gradient(165deg, rgba(249, 252, 255, 0.95) 0%, rgba(238, 246, 255, 0.85) 100%);
+  background: linear-gradient(165deg, rgba(241, 248, 255, 0.96) 0%, rgba(227, 239, 255, 0.88) 100%);
   backdrop-filter: blur(8px);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+@media (hover: hover) {
+  .bubble:hover,
+  .bubble-soft:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 38px rgba(47, 98, 170, 0.16);
+  }
 }
 
 .btn-primary,
