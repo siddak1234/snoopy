@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #eef6ff;
+  --bg: #ffffff;
   --surface: #f7fbff;
   --card: #ffffff;
   --text: #12233f;
@@ -30,7 +30,7 @@ body {
 
 body {
   margin: 0;
-  background: radial-gradient(circle at 15% 5%, #f9fcff 0%, var(--bg) 52%, #eaf3ff 100%);
+  background: var(--bg);
   color: var(--text);
   font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -38,14 +38,14 @@ body {
 .bubble {
   border-radius: 2rem;
   border: 1px solid var(--ring);
-  background: var(--card);
+  background: linear-gradient(165deg, #f9fcff 0%, #eef6ff 100%);
   box-shadow: 0 10px 30px rgba(47, 98, 170, 0.08);
 }
 
 .bubble-soft {
   border-radius: 2rem;
   border: 1px solid rgba(217, 231, 255, 0.95);
-  background: rgba(247, 251, 255, 0.86);
+  background: linear-gradient(165deg, rgba(249, 252, 255, 0.95) 0%, rgba(238, 246, 255, 0.85) 100%);
   backdrop-filter: blur(8px);
 }
 
