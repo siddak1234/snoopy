@@ -1,5 +1,5 @@
 export const site = {
   name: "Aural",
-  tagline: "GenAI automation systems for modern operations.",
+  tagline: "Automation with AI workflows for modern operations.",
   email: "hello@aural.example",
 } as const;

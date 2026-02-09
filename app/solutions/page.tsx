@@ -2,27 +2,27 @@ import Link from "next/link";
 
 const solutions = [
   {
-    title: "Intake and Triage",
+    title: "Industry Workflow Design",
     bullets: [
-      "Normalize requests from email, forms, and shared inboxes.",
-      "Auto-tag urgency, team, and policy category.",
-      "Route to the correct queue with full context.",
+      "Map your current process and identify manual task bottlenecks.",
+      "Design AI workflow steps aligned to your compliance and operating rules.",
+      "Tailor automations to your industry's terminology and outcomes.",
     ],
   },
   {
-    title: "Document Intelligence",
+    title: "Task Automation Pipelines",
     bullets: [
-      "Capture fields from PDFs and operational documents.",
-      "Flag missing or low-confidence values before handoff.",
-      "Output consistent JSON schemas for downstream systems.",
+      "Automate repetitive actions from inboxes, forms, and business documents.",
+      "Transform unstructured inputs into structured outputs and decisions.",
+      "Route work into the right systems without adding manual handoffs.",
     ],
   },
   {
-    title: "System Actions",
+    title: "Human-in-the-Loop Controls",
     bullets: [
-      "Trigger updates in CRM, ticketing, and internal tools.",
-      "Apply approval gates for sensitive actions.",
-      "Track execution status and exceptions in one view.",
+      "Add review checkpoints where confidence or risk is high.",
+      "Apply approval gates before sensitive updates are executed.",
+      "Track quality, exceptions, and throughput for continuous improvement.",
     ],
   },
 ];
@@ -33,7 +33,7 @@ export default function SolutionsPage() {
       <section className="bubble p-6 sm:p-8">
         <h1 className="text-3xl font-semibold sm:text-4xl">Solutions</h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">
-          Practical GenAI workflows designed to reduce manual work, increase consistency, and support daily operational decisions.
+          We build AI workflow automations for manual business tasks, tailored to your industry, systems, and team structure.
         </p>
       </section>
 
@@ -59,7 +59,7 @@ export default function SolutionsPage() {
       <section className="bubble-soft p-6 sm:p-7">
         <h2 className="text-2xl font-semibold">Discuss your workflow priorities</h2>
         <p className="mt-3 text-[var(--muted)]">
-          We can map your process and identify the fastest path to production impact.
+          Share your use case and industry context, and we will shape a workflow plan around your specific needs.
         </p>
         <Link href="/contact" className="btn-primary mt-5 px-5">
           Go to Contact

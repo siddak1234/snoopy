@@ -5,17 +5,17 @@ const workflowCards = [
   {
     title: "Inbox → Routing",
     description:
-      "Classify incoming requests and route each item to the right team with clear priority and ownership.",
+      "Automatically triage incoming requests and route every task to the right owner with clear priority.",
   },
   {
     title: "Documents → JSON",
     description:
-      "Extract key fields from contracts, forms, and policies into structured data your team can trust.",
+      "Convert unstructured business documents into reliable, structured outputs for downstream workflows.",
   },
   {
     title: "JSON → Systems",
     description:
-      "Push validated outputs into ticketing, CRM, and internal tools with controlled approval steps.",
+      "Trigger updates across your systems with approvals and controls aligned to your operating model.",
   },
 ];
 
@@ -24,13 +24,13 @@ export default function Home() {
     <div className="space-y-6 sm:space-y-8">
       <section className="bubble p-6 sm:p-8 lg:p-10">
         <p className="mb-3 inline-flex rounded-full bg-[#e7f1ff] px-3 py-1 text-xs font-semibold tracking-wide text-[#21549c]">
-          GenAI Automation Workflows
+          Automation With AI Workflows
         </p>
         <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">
-          Build reliable AI workflows for modern operations teams.
+          Automate manual business tasks with AI workflows.
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)] sm:text-lg">
-          {site.name} designs practical systems that turn everyday inputs into consistent outputs, so teams move faster without adding manual overhead.
+          {site.name} builds practical automation workflows that reduce repetitive effort, improve consistency, and adapt to your industry operational needs.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="/solutions" className="btn-primary px-5">
@@ -57,7 +57,7 @@ export default function Home() {
       <section className="bubble-soft p-6 sm:p-7">
         <h2 className="text-2xl font-semibold">Ready to streamline operations?</h2>
         <p className="mt-3 max-w-xl text-[var(--muted)]">
-          Start with one high-impact workflow and expand from there with measurable outcomes.
+          Start with one business-critical process, then expand to tailored AI workflows across teams.
         </p>
         <Link href="/contact" className="btn-primary mt-5 px-5">
           Start a Conversation

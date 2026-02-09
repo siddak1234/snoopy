@@ -6,7 +6,7 @@ export default function ContactPage() {
       <section className="bubble p-6 sm:p-8 lg:col-span-3">
         <h1 className="text-3xl font-semibold sm:text-4xl">Contact</h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">
-          Share your current operations workflow and where manual effort is slowing your team down.
+          Tell us which manual tasks consume the most time today, and we will design an AI workflow tailored to your business.
         </p>
       </section>
 
@@ -25,7 +25,7 @@ export default function ContactPage() {
         <ul className="mt-3 space-y-2 text-sm text-[var(--muted)] sm:text-base">
           <li className="flex items-start gap-2">
             <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#4e8fe6]" />
-            <span>Your current process and key bottlenecks.</span>
+            <span>Your industry, current process, and key bottlenecks.</span>
           </li>
           <li className="flex items-start gap-2">
             <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#4e8fe6]" />
@@ -41,7 +41,7 @@ export default function ContactPage() {
       <aside className="bubble-soft p-6 sm:p-7">
         <h2 className="text-xl font-semibold">Fastest way to start</h2>
         <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
-          Send 2 to 3 sample inputs plus your expected output format. We will propose a scoped pilot workflow.
+          Send 2 to 3 sample tasks plus expected outcomes. We will propose a scoped, industry-fit automation pilot.
         </p>
       </aside>
     </div>
