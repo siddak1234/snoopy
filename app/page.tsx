@@ -29,7 +29,7 @@ export default function Home() {
   return (
     <div className="space-y-6 sm:space-y-8">
       <section className="bubble p-6 sm:p-8 lg:p-10">
-        <p className="mb-3 inline-flex rounded-full bg-[#e7f1ff] px-3 py-1 text-xs font-semibold tracking-wide text-[#21549c]">
+        <p className="mb-3 inline-flex rounded-full bg-[var(--chip-bg)] px-3 py-1 text-xs font-semibold tracking-wide text-[var(--chip-text)]">
           Automation With AI Workflows
         </p>
         <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">

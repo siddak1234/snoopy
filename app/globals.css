@@ -3,12 +3,57 @@
 :root {
   --bg: #ffffff;
   --surface: #f7fbff;
+  --surface-strong: #e3efff;
+  --surface-hover: #e8f2ff;
   --card: #ffffff;
   --text: #12233f;
   --muted: #50637f;
   --accent: #8ebcff;
   --accent-strong: #5f9eff;
   --ring: #d9e7ff;
+  --toggle-bg: rgba(255, 255, 255, 0.92);
+  --brand-pill-border: #b7d2ff;
+  --brand-pill-bg: #dcebff;
+  --brand-pill-text: #245196;
+  --chip-bg: #e7f1ff;
+  --chip-text: #21549c;
+  --icon-border: #cfe0ff;
+  --icon-bg: #ecf4ff;
+  --icon-text: #3f7fd3;
+  --step-pill-border: #bdd7ff;
+  --step-pill-bg: #e7f1ff;
+  --step-pill-text: #245196;
+  --tagline: #2e5f9f;
+  --bullet: #4e8fe6;
+  --link: #1c4f96;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f141a;
+  --surface: #262c34;
+  --surface-strong: #1f242b;
+  --surface-hover: #343b45;
+  --card: #2b313a;
+  --text: #e9eef8;
+  --muted: #b9c2d4;
+  --accent: #6b93cc;
+  --accent-strong: #7aa2de;
+  --ring: #495464;
+  --toggle-bg: rgba(27, 33, 41, 0.95);
+  --brand-pill-border: #647186;
+  --brand-pill-bg: #313844;
+  --brand-pill-text: #dce7fb;
+  --chip-bg: #313a47;
+  --chip-text: #d4e3ff;
+  --icon-border: #616d80;
+  --icon-bg: #343c48;
+  --icon-text: #d8e5ff;
+  --step-pill-border: #5c6880;
+  --step-pill-bg: #323b49;
+  --step-pill-text: #d7e5ff;
+  --tagline: #cddfff;
+  --bullet: #8eb3e8;
+  --link: #c6dbff;
 }
 
 @theme inline {
@@ -38,15 +83,15 @@ body {
 .bubble {
   border-radius: 2rem;
   border: 1px solid var(--ring);
-  background: linear-gradient(165deg, #f1f8ff 0%, #e3efff 100%);
-  box-shadow: 0 10px 30px rgba(47, 98, 170, 0.08);
+  background: linear-gradient(165deg, var(--surface) 0%, var(--surface-strong) 100%);
+  box-shadow: 0 10px 30px rgba(12, 24, 40, 0.14);
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
 
 .bubble-soft {
   border-radius: 2rem;
-  border: 1px solid rgba(217, 231, 255, 0.95);
-  background: linear-gradient(165deg, rgba(241, 248, 255, 0.96) 0%, rgba(227, 239, 255, 0.88) 100%);
+  border: 1px solid color-mix(in srgb, var(--ring) 90%, transparent);
+  background: linear-gradient(165deg, color-mix(in srgb, var(--surface) 95%, transparent) 0%, color-mix(in srgb, var(--surface-strong) 88%, transparent) 100%);
   backdrop-filter: blur(8px);
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
@@ -84,10 +129,10 @@ body {
 
 .btn-secondary {
   border: 1px solid var(--ring);
-  background: rgba(255, 255, 255, 0.95);
+  background: color-mix(in srgb, var(--card) 95%, transparent);
   color: var(--text);
 }
 
 .btn-secondary:hover {
-  background: #ffffff;
+  background: var(--card);
 }

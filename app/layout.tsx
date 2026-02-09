@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
+import ThemeToggle from "@/components/theme/ThemeToggle";
 import { site } from "@/lib/site";
 import "./globals.css";
 
@@ -44,7 +45,7 @@ export default function RootLayout({
           <header className="bubble-soft sticky top-3 z-50 mt-3 px-4 py-3 sm:px-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <Link href="/" className="flex items-center gap-2 text-base font-semibold text-[var(--text)]">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#b7d2ff] bg-[#dcebff] text-sm font-bold text-[#245196]">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--brand-pill-border)] bg-[var(--brand-pill-bg)] text-sm font-bold text-[var(--brand-pill-text)]">
                   {site.name.slice(0, 1)}
                 </span>
                 <span>{site.name}</span>
@@ -54,11 +55,12 @@ export default function RootLayout({
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="rounded-full px-4 py-2 text-[var(--text)] transition hover:bg-[#e8f2ff]"
+                    className="rounded-full px-4 py-2 text-[var(--text)] transition hover:bg-[var(--surface-hover)]"
                   >
                     {link.label}
                   </Link>
                 ))}
+                <ThemeToggle />
               </nav>
             </div>
           </header>

@@ -15,7 +15,7 @@ export default function ContactPage() {
         <p className="mt-3 text-[var(--muted)]">
           Reach us at
           {" "}
-          <a href={`mailto:${site.email}`} className="font-semibold text-[#1c4f96] underline underline-offset-4">
+          <a href={`mailto:${site.email}`} className="font-semibold text-[var(--link)] underline underline-offset-4">
             {site.email}
           </a>
           .
@@ -24,15 +24,15 @@ export default function ContactPage() {
         <h3 className="mt-6 text-lg font-semibold">What to include</h3>
         <ul className="mt-3 space-y-2 text-sm text-[var(--muted)] sm:text-base">
           <li className="flex items-start gap-2">
-            <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#4e8fe6]" />
+            <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bullet)]" />
             <span>Your industry, current process, and key bottlenecks.</span>
           </li>
           <li className="flex items-start gap-2">
-            <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#4e8fe6]" />
+            <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bullet)]" />
             <span>The systems involved (ticketing, CRM, docs, or internal tools).</span>
           </li>
           <li className="flex items-start gap-2">
-            <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#4e8fe6]" />
+            <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bullet)]" />
             <span>The outcome you want in the first 30 to 60 days.</span>
           </li>
         </ul>

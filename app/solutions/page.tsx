@@ -46,7 +46,7 @@ export default function SolutionsPage() {
               <ul className="mt-4 space-y-2 text-sm text-[var(--muted)] sm:text-base">
                 {solution.bullets.map((bullet) => (
                   <li key={bullet} className="flex items-start gap-2">
-                    <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#4e8fe6]" />
+                    <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bullet)]" />
                     <span>{bullet}</span>
                   </li>
                 ))}

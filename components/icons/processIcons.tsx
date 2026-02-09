@@ -2,7 +2,7 @@ import type { SVGProps } from "react";
 
 type IconProps = SVGProps<SVGSVGElement>;
 
-const iconClasses = "h-10 w-10 rounded-2xl border border-[#cfe0ff] bg-[#ecf4ff] p-2 text-[#3f7fd3]";
+const iconClasses = "h-10 w-10 rounded-2xl border border-[var(--icon-border)] bg-[var(--icon-bg)] p-2 text-[var(--icon-text)]";
 
 export function TriggerIcon(props: IconProps) {
   return (
