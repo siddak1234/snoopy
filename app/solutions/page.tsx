@@ -59,13 +59,17 @@ export default function SolutionsPage() {
       <section className="bubble p-6 sm:p-8">
         <h1 className="text-3xl font-semibold sm:text-4xl">Solutions</h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">
-          We build AI workflow automations for manual business tasks, tailored to your industry, systems, and team structure.
+          We build AI workflow automations for manual business tasks.
         </p>
       </section>
 
       <section>
         <h2 className="sr-only">Industry-specific solutions</h2>
         <div className="space-y-4">
+          <article className="bubble p-5 sm:p-6">
+            <h3 className="text-2xl font-semibold sm:text-3xl">Pick your industry</h3>
+          </article>
+
           <Link
             href="/solutions/healthcare"
             className="bubble group block p-5 transition duration-200 hover:-translate-y-1 hover:shadow-xl focus-visible:-translate-y-1 focus-visible:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:p-6"
