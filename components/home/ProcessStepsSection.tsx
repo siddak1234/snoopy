@@ -1,19 +1,20 @@
 import ProcessStepCard from "@/components/home/ProcessStepCard";
-import { ProcessingIcon, ResultIcon, TriggerIcon } from "@/components/icons/processIcons";
+import {
+  FileSignalIcon,
+  MailSignalIcon,
+  ProcessingIcon,
+  ResultIcon,
+  StopwatchSignalIcon,
+  TriggerIcon,
+} from "@/components/icons/processIcons";
 
 const steps = [
   {
     stepNumber: 1,
     title: "Step 1 — Trigger",
     tagline: "Work starts anywhere.",
-    description:
-      "When something happens — a message arrives, a file is received, or a request is submitted — the workflow begins with full context.",
-    bullets: [
-      "Messages & communication",
-      "Files & documents",
-      "Forms & portals",
-      "System events",
-    ],
+    description: "A message arrives, a file is received, or a scheduled event",
+    visualTiles: [<MailSignalIcon key="mail" />, <FileSignalIcon key="file" />, <StopwatchSignalIcon key="stopwatch" />],
     icon: <TriggerIcon />,
   },
   {
@@ -67,6 +68,7 @@ export default function ProcessStepsSection() {
             tagline={step.tagline}
             description={step.description}
             bullets={step.bullets}
+            visualTiles={step.visualTiles}
             icon={step.icon}
           />
         ))}
