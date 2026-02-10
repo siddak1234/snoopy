@@ -81,7 +81,7 @@ export default function SolutionsDropdown() {
   return (
     <div
       ref={containerRef}
-      className="relative"
+      className="relative pb-2"
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
       onFocus={() => setOpen(true)}
@@ -114,7 +114,7 @@ export default function SolutionsDropdown() {
           id="solutions-dropdown-menu"
           role="menu"
           aria-label="Solutions submenu"
-          className="absolute left-0 top-full z-50 mt-2 min-w-48 rounded-2xl border border-[var(--ring)] bg-[var(--surface)] p-2 shadow-[0_12px_24px_rgba(12,24,40,0.14)]"
+          className="absolute left-0 top-full z-50 min-w-48 rounded-2xl border border-[var(--ring)] bg-[var(--surface)] p-2 shadow-[0_12px_24px_rgba(12,24,40,0.14)]"
           onKeyDown={onMenuKeyDown}
         >
           {items.map((item, index) => (
