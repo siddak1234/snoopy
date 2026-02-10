@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
+import SolutionsDropdown from "@/components/navigation/SolutionsDropdown";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 import { site } from "@/lib/site";
 import "./globals.css";
@@ -25,7 +26,6 @@ export const metadata: Metadata = {
 
 const navLinks = [
   { href: "/", label: "Home" },
-  { href: "/solutions", label: "Solutions" },
   { href: "/contact", label: "Contact" },
 ];
 
@@ -51,7 +51,17 @@ export default function RootLayout({
                 <span>{site.name}</span>
               </Link>
               <nav aria-label="Main navigation" className="flex items-center gap-2 text-sm font-medium sm:gap-3">
-                {navLinks.map((link) => (
+                {navLinks.slice(0, 1).map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="rounded-full px-4 py-2 text-[var(--text)] transition hover:bg-[var(--surface-hover)]"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+                <SolutionsDropdown />
+                {navLinks.slice(1).map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}

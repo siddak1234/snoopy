@@ -1,0 +1,8 @@
+export default function HealthcareSolutionsPage() {
+  return (
+    <section className="bubble p-6 sm:p-8">
+      <h1 className="text-3xl font-semibold sm:text-4xl">Healthcare</h1>
+      <p className="mt-4 text-base text-[var(--muted)]">Industry solutions coming soon.</p>
+    </section>
+  );
+}

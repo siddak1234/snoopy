@@ -26,6 +26,7 @@
   --tagline: #2e5f9f;
   --bullet: #4e8fe6;
   --link: #1c4f96;
+  --signal-divider: #245196;
 }
 
 :root[data-theme="dark"] {
@@ -54,6 +55,7 @@
   --tagline: #cddfff;
   --bullet: #8eb3e8;
   --link: #c6dbff;
+  --signal-divider: #9fbce6;
 }
 
 @theme inline {

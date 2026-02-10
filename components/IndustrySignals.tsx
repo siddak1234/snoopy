@@ -55,7 +55,7 @@ function SignalItem({ quote, attribution, href }: IndustrySignal) {
 function ItemSeparator() {
   return (
     <div aria-hidden className="mx-6 flex shrink-0 items-center justify-center md:mx-8">
-      <div className="h-10 w-[2px] rounded-full bg-[#245196] opacity-40" />
+      <div className="h-10 w-[2px] rounded-full bg-[var(--signal-divider)] opacity-40" />
     </div>
   );
 }
