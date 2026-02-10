@@ -1,32 +1,5 @@
 import Link from "next/link";
 
-const solutions = [
-  {
-    title: "Industry Workflow Design",
-    bullets: [
-      "Map your current process and identify manual task bottlenecks.",
-      "Design AI workflow steps aligned to your compliance and operating rules.",
-      "Tailor automations to your industry's terminology and outcomes.",
-    ],
-  },
-  {
-    title: "Task Automation Pipelines",
-    bullets: [
-      "Automate repetitive actions from inboxes, forms, and business documents.",
-      "Transform unstructured inputs into structured outputs and decisions.",
-      "Route work into the right systems without adding manual handoffs.",
-    ],
-  },
-  {
-    title: "Human-in-the-Loop Controls",
-    bullets: [
-      "Add review checkpoints where confidence or risk is high.",
-      "Apply approval gates before sensitive updates are executed.",
-      "Track quality, exceptions, and throughput for continuous improvement.",
-    ],
-  },
-];
-
 function HealthcareIconCluster() {
   return (
     <div className="relative h-20 w-20 shrink-0">
@@ -91,54 +64,51 @@ export default function SolutionsPage() {
       </section>
 
       <section>
-        <h2 className="sr-only">Solution categories</h2>
-        <div className="grid gap-4 lg:grid-cols-3">
-          {solutions.map((solution) => (
-            <article key={solution.title} className="bubble p-5 sm:p-6">
-              <h3 className="text-xl font-semibold">{solution.title}</h3>
-              <ul className="mt-4 space-y-2 text-sm text-[var(--muted)] sm:text-base">
-                {solution.bullets.map((bullet) => (
-                  <li key={bullet} className="flex items-start gap-2">
-                    <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bullet)]" />
-                    <span>{bullet}</span>
-                  </li>
-                ))}
-              </ul>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section>
         <h2 className="sr-only">Industry-specific solutions</h2>
         <div className="space-y-4">
-          <article className="bubble p-5 sm:p-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="max-w-3xl">
-                <h3 className="text-xl font-semibold">Healthcare</h3>
-                <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">
-                  Modernize clinic operations with secure automation for intake, documentation, care coordination, and patient follow-ups.
-                </p>
+          <Link
+            href="/solutions/healthcare"
+            className="bubble group block p-5 transition duration-200 hover:-translate-y-1 hover:shadow-xl focus-visible:-translate-y-1 focus-visible:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:p-6"
+          >
+            <article>
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="max-w-3xl">
+                  <h3 className="text-xl font-semibold">Healthcare</h3>
+                  <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">
+                    Modernize clinic operations with secure automation for intake, documentation, care coordination, and patient follow-ups.
+                  </p>
+                  <span className="mt-4 inline-flex rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-semibold text-[var(--text)] transition group-hover:bg-[var(--surface-hover)]">
+                    Learn more
+                  </span>
+                </div>
+                <div className="self-end md:self-auto">
+                  <HealthcareIconCluster />
+                </div>
               </div>
-              <div className="self-end md:self-auto">
-                <HealthcareIconCluster />
-              </div>
-            </div>
-          </article>
+            </article>
+          </Link>
 
-          <article className="bubble p-5 sm:p-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="max-w-3xl">
-                <h3 className="text-xl font-semibold">Financial Services</h3>
-                <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">
-                  Streamline reviews, reporting, and client operations with compliant workflow automation for finance and investment teams.
-                </p>
+          <Link
+            href="/solutions/finance"
+            className="bubble group block p-5 transition duration-200 hover:-translate-y-1 hover:shadow-xl focus-visible:-translate-y-1 focus-visible:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:p-6"
+          >
+            <article>
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="max-w-3xl">
+                  <h3 className="text-xl font-semibold">Financial Services</h3>
+                  <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">
+                    Streamline reviews, reporting, and client operations with compliant workflow automation for finance and investment teams.
+                  </p>
+                  <span className="mt-4 inline-flex rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-semibold text-[var(--text)] transition group-hover:bg-[var(--surface-hover)]">
+                    Learn more
+                  </span>
+                </div>
+                <div className="self-end md:self-auto">
+                  <FinanceIconCluster />
+                </div>
               </div>
-              <div className="self-end md:self-auto">
-                <FinanceIconCluster />
-              </div>
-            </div>
-          </article>
+            </article>
+          </Link>
         </div>
       </section>
 
