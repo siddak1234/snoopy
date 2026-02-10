@@ -11,14 +11,14 @@ import {
 const steps = [
   {
     stepNumber: 1,
-    title: "Step 1 — Trigger",
+    title: "Trigger",
     tagline: "Work starts anywhere.",
     description: "A message arrives, a file is received, or a scheduled event",
     icon: <TriggerIcon />,
   },
   {
     stepNumber: 2,
-    title: "Step 2 — AI Processing",
+    title: "AI Processing",
     tagline: "AI completes the work.",
     description:
       "AI interprets the request, extracts key details, and recreates the manual steps your team normally performs — with rules and approvals when needed.",
@@ -32,7 +32,7 @@ const steps = [
   },
   {
     stepNumber: 3,
-    title: "Step 3 — Result",
+    title: "Result",
     tagline: "Outcomes delivered automatically.",
     description:
       "Verified results are delivered to the next step in your process — updates, notifications, records, or reports — without manual handoffs.",

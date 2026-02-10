@@ -19,14 +19,16 @@ export default function ProcessStepCard({
 }: ProcessStepCardProps) {
   return (
     <article className={`bubble flex h-full flex-col p-5 sm:p-6 ${bullets && bullets.length > 0 ? "min-h-[24rem]" : ""}`}>
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full border border-[var(--step-pill-border)] bg-[var(--step-pill-bg)] px-2 text-xs font-semibold text-[var(--step-pill-text)]">
-          {stepNumber}
-        </span>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-[var(--step-pill-border)] bg-[var(--step-pill-bg)] px-2 text-sm font-semibold text-[var(--step-pill-text)]">
+            {stepNumber}
+          </span>
+          <h3 className="text-xl font-semibold text-[var(--text)]">{title}</h3>
+        </div>
         {icon}
       </div>
 
-      <h3 className="text-lg font-semibold text-[var(--text)]">{title}</h3>
       <p className="mt-2 text-sm font-medium text-[var(--tagline)]">{tagline}</p>
       <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">{description}</p>
 
