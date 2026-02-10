@@ -14,7 +14,6 @@ const steps = [
     title: "Step 1 — Trigger",
     tagline: "Work starts anywhere.",
     description: "A message arrives, a file is received, or a scheduled event",
-    visualTiles: [<MailSignalIcon key="mail" />, <FileSignalIcon key="file" />, <StopwatchSignalIcon key="stopwatch" />],
     icon: <TriggerIcon />,
   },
   {
@@ -48,6 +47,8 @@ const steps = [
 ];
 
 export default function ProcessStepsSection() {
+  const [triggerStep, ...otherSteps] = steps;
+
   return (
     <section aria-labelledby="process-steps-title" className="space-y-4">
       <div className="bubble p-5 sm:p-6">
@@ -60,7 +61,29 @@ export default function ProcessStepsSection() {
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        {steps.map((step) => (
+        <ProcessStepCard
+          key={triggerStep.stepNumber}
+          stepNumber={triggerStep.stepNumber}
+          title={triggerStep.title}
+          tagline={triggerStep.tagline}
+          description={triggerStep.description}
+          bullets={triggerStep.bullets}
+          icon={triggerStep.icon}
+        />
+
+        <div className="grid grid-cols-3 gap-3">
+          <article className="bubble flex aspect-square items-center justify-center p-3 sm:p-4" aria-label="Email trigger">
+            <MailSignalIcon />
+          </article>
+          <article className="bubble flex aspect-square items-center justify-center p-3 sm:p-4" aria-label="File trigger">
+            <FileSignalIcon />
+          </article>
+          <article className="bubble flex aspect-square items-center justify-center p-3 sm:p-4" aria-label="Scheduled event trigger">
+            <StopwatchSignalIcon />
+          </article>
+        </div>
+
+        {otherSteps.map((step) => (
           <ProcessStepCard
             key={step.stepNumber}
             stepNumber={step.stepNumber}
@@ -68,7 +91,6 @@ export default function ProcessStepsSection() {
             tagline={step.tagline}
             description={step.description}
             bullets={step.bullets}
-            visualTiles={step.visualTiles}
             icon={step.icon}
           />
         ))}

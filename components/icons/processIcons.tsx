@@ -64,7 +64,7 @@ export function ResultIcon(props: IconProps) {
   );
 }
 
-const triggerTileIconClasses = "h-6 w-6 text-[var(--icon-text)]";
+const triggerTileIconClasses = "h-12 w-12 text-[var(--icon-text)] sm:h-14 sm:w-14";
 
 export function MailSignalIcon(props: IconProps) {
   return (
@@ -72,7 +72,7 @@ export function MailSignalIcon(props: IconProps) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.8"
+      strokeWidth="2"
       className={triggerTileIconClasses}
       aria-hidden="true"
       {...props}
@@ -89,7 +89,7 @@ export function FileSignalIcon(props: IconProps) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.8"
+      strokeWidth="2"
       className={triggerTileIconClasses}
       aria-hidden="true"
       {...props}
@@ -108,7 +108,7 @@ export function StopwatchSignalIcon(props: IconProps) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.8"
+      strokeWidth="2"
       className={triggerTileIconClasses}
       aria-hidden="true"
       {...props}
