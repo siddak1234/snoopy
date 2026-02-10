@@ -29,21 +29,33 @@ const signals: IndustrySignal[] = [
 function SignalItem({ quote, attribution, href }: IndustrySignal) {
   return (
     <article className="w-[85vw] max-w-[90vw] shrink-0 py-1 text-[var(--text)] md:w-[74vw] md:min-w-[70vw] md:max-w-[80vw]">
-      <p className="truncate text-[15px] leading-6 tracking-[0.01em]">{quote}</p>
-      <div className="mt-0.5 flex items-center gap-2 text-xs text-[var(--muted)]">
-        <p className="min-w-0 flex-1 truncate">{attribution}</p>
-        <span aria-hidden className="text-[var(--muted)]">•</span>
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="shrink-0 font-semibold text-[var(--link)] underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]"
-          aria-label={`Open source for ${attribution}`}
-        >
-          Source
-        </a>
+      <div className="flex min-w-0 flex-col gap-1">
+        <p className="truncate overflow-hidden text-ellipsis whitespace-nowrap text-[15px] leading-5 tracking-[0.01em]">{quote}</p>
+        <div className="flex min-w-0 items-center gap-2 text-[11px]">
+          <p className="min-w-0 flex-1 truncate overflow-hidden text-ellipsis whitespace-nowrap text-[var(--muted)] opacity-70">
+            {attribution}
+          </p>
+          <span aria-hidden className="text-[var(--muted)] opacity-70">•</span>
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 font-semibold text-[var(--link)] underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]"
+            aria-label={`Open source for ${attribution}`}
+          >
+            Source
+          </a>
+        </div>
       </div>
     </article>
+  );
+}
+
+function ItemSeparator() {
+  return (
+    <div aria-hidden className="mx-6 flex shrink-0 items-center justify-center md:mx-8">
+      <div className="h-10 w-0.5 rounded-full bg-[#3f7fd3] opacity-40" />
+    </div>
   );
 }
 
@@ -55,27 +67,27 @@ export default function IndustrySignals() {
       <h2 className="px-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">INDUSTRY SIGNALS</h2>
 
       <div className="hidden md:block">
-        <div className="group relative overflow-hidden rounded-2xl border border-[var(--ring)] bg-[var(--surface)] px-3 py-2">
+        <div className="group relative overflow-hidden rounded-2xl border border-[var(--ring)] bg-[var(--surface)] px-3 py-3 transition duration-200 hover:-translate-y-1 hover:shadow-xl focus-within:-translate-y-1 focus-within:shadow-xl">
           <ul
             aria-label="Industry research excerpts"
-            className="hidden w-max items-center gap-4 motion-safe:flex motion-safe:[animation:industry-signals-marquee_76s_linear_infinite] motion-safe:group-hover:[animation-play-state:paused] motion-safe:group-focus-within:[animation-play-state:paused]"
+            className="hidden w-max items-center motion-safe:flex motion-safe:[animation:industry-signals-marquee_92s_linear_infinite] motion-safe:group-hover:[animation-play-state:paused] motion-safe:group-focus-within:[animation-play-state:paused]"
           >
             {loopedSignals.map((signal, index) => (
-              <li key={`${signal.attribution}-${index}`} className="flex items-center gap-4">
+              <li key={`${signal.attribution}-${index}`} className="flex items-center">
                 <SignalItem quote={signal.quote} attribution={signal.attribution} href={signal.href} />
-                <span aria-hidden className="text-[var(--muted)]">|</span>
+                <ItemSeparator />
               </li>
             ))}
           </ul>
 
           <ul
             aria-label="Industry research excerpts"
-            className="hidden items-center gap-4 overflow-x-auto py-1 motion-reduce:flex [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            className="hidden items-center overflow-x-auto py-1 motion-reduce:flex [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           >
-            {signals.map((signal) => (
-              <li key={`reduced-${signal.attribution}`} className="flex items-center gap-4">
+            {signals.map((signal, index) => (
+              <li key={`reduced-${signal.attribution}`} className="flex items-center">
                 <SignalItem quote={signal.quote} attribution={signal.attribution} href={signal.href} />
-                <span aria-hidden className="text-[var(--muted)]">|</span>
+                {index < signals.length - 1 ? <ItemSeparator /> : null}
               </li>
             ))}
           </ul>
@@ -83,7 +95,7 @@ export default function IndustrySignals() {
       </div>
 
       <div
-        className="md:hidden overflow-x-auto rounded-2xl border border-[var(--ring)] bg-[var(--surface)] px-2 py-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        className="md:hidden overflow-x-auto rounded-2xl border border-[var(--ring)] bg-[var(--surface)] px-2 py-3 transition duration-200 hover:-translate-y-1 hover:shadow-xl focus-within:-translate-y-1 focus-within:shadow-xl [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
         aria-label="Swipeable industry signals feed"
       >
         <ul className="flex snap-x snap-mandatory gap-3">
