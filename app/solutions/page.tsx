@@ -67,7 +67,7 @@ export default function SolutionsPage() {
         <h2 className="sr-only">Industry-specific solutions</h2>
         <div className="space-y-4">
           <article className="bubble p-5 sm:p-6">
-            <h3 className="text-2xl font-semibold sm:text-3xl">Pick your industry</h3>
+            <h3 className="text-2xl font-semibold sm:text-3xl">Pick Your Industry</h3>
           </article>
 
           <article className="bubble group p-5 transition duration-200 hover:-translate-y-1 hover:shadow-xl sm:p-6">
@@ -113,7 +113,7 @@ export default function SolutionsPage() {
       </section>
 
       <section className="bubble p-5 sm:p-6">
-        <h2 className="text-2xl font-semibold sm:text-3xl">Industry not included</h2>
+        <h2 className="text-2xl font-semibold sm:text-3xl">Industry Not Included?</h2>
       </section>
 
       <section className="bubble-soft p-6 sm:p-7">
