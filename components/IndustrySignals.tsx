@@ -21,22 +21,23 @@ const signals: IndustrySignal[] = [
   {
     quote:
       "“Generative AI (gen AI) is more than a new technology—it represents a fundamentally different way of working.”",
-    attribution: "Accenture — “Gen AI: Reinventing enterprise models”",
+    attribution: "Accenture — “Reinventing Enterprise Models in the Age of Generative AI”",
     href: "https://www.accenture.com/us-en/insights/consulting/gen-ai-reinventing-enterprise-models",
   },
 ];
 
 function SignalItem({ quote, attribution, href }: IndustrySignal) {
   return (
-    <article className="flex max-w-[34rem] shrink-0 items-center gap-3 rounded-xl border border-[#cddded] bg-[#eef5fc] px-3 py-2 text-sm text-[#1f3a57] shadow-[0_2px_12px_rgba(29,67,107,0.08)]">
-      <p className="line-clamp-2 leading-5">{quote}</p>
-      <div className="shrink-0 text-right">
-        <p className="max-w-[15rem] truncate text-[11px] font-medium uppercase tracking-wide text-[#31557b]">{attribution}</p>
+    <article className="w-[85vw] max-w-[90vw] shrink-0 py-1 text-[var(--text)] md:w-[74vw] md:min-w-[70vw] md:max-w-[80vw]">
+      <p className="truncate text-[15px] leading-6 tracking-[0.01em]">{quote}</p>
+      <div className="mt-0.5 flex items-center gap-2 text-xs text-[var(--muted)]">
+        <p className="min-w-0 flex-1 truncate">{attribution}</p>
+        <span aria-hidden className="text-[var(--muted)]">•</span>
         <a
           href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-0.5 inline-block text-xs font-semibold text-[#204f86] underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#70a2da] focus-visible:ring-offset-2 focus-visible:ring-offset-[#eef5fc]"
+          className="shrink-0 font-semibold text-[var(--link)] underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]"
           aria-label={`Open source for ${attribution}`}
         >
           Source
@@ -51,28 +52,30 @@ export default function IndustrySignals() {
 
   return (
     <section aria-label="Industry signals from published research" className="space-y-2">
-      <h2 className="px-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#365b82]">INDUSTRY SIGNALS</h2>
+      <h2 className="px-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">INDUSTRY SIGNALS</h2>
 
       <div className="hidden md:block">
-        <div className="relative overflow-hidden rounded-2xl border border-[#d5e2f0] bg-[#f3f8fd] p-2 shadow-[0_4px_18px_rgba(37,73,112,0.08)]">
+        <div className="group relative overflow-hidden rounded-2xl border border-[var(--ring)] bg-[var(--surface)] px-3 py-2">
           <ul
             aria-label="Industry research excerpts"
-            className="hidden w-max items-center gap-3 signal-marquee motion-safe:flex motion-safe:[animation:industry-signals-marquee_52s_linear_infinite] motion-safe:hover:[animation-play-state:paused] motion-safe:focus-within:[animation-play-state:paused]"
+            className="hidden w-max items-center gap-4 motion-safe:flex motion-safe:[animation:industry-signals-marquee_76s_linear_infinite] motion-safe:group-hover:[animation-play-state:paused] motion-safe:group-focus-within:[animation-play-state:paused]"
           >
             {loopedSignals.map((signal, index) => (
-              <li key={`${signal.attribution}-${index}`}>
+              <li key={`${signal.attribution}-${index}`} className="flex items-center gap-4">
                 <SignalItem quote={signal.quote} attribution={signal.attribution} href={signal.href} />
+                <span aria-hidden className="text-[var(--muted)]">|</span>
               </li>
             ))}
           </ul>
 
           <ul
             aria-label="Industry research excerpts"
-            className="hidden items-center gap-3 overflow-x-auto py-0.5 motion-reduce:flex [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            className="hidden items-center gap-4 overflow-x-auto py-1 motion-reduce:flex [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           >
             {signals.map((signal) => (
-              <li key={`reduced-${signal.attribution}`}>
+              <li key={`reduced-${signal.attribution}`} className="flex items-center gap-4">
                 <SignalItem quote={signal.quote} attribution={signal.attribution} href={signal.href} />
+                <span aria-hidden className="text-[var(--muted)]">|</span>
               </li>
             ))}
           </ul>
@@ -80,31 +83,19 @@ export default function IndustrySignals() {
       </div>
 
       <div
-        className="md:hidden overflow-x-auto rounded-2xl border border-[#d5e2f0] bg-[#f3f8fd] px-2 py-2 shadow-[0_4px_16px_rgba(37,73,112,0.08)] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        className="md:hidden overflow-x-auto rounded-2xl border border-[var(--ring)] bg-[var(--surface)] px-2 py-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
         aria-label="Swipeable industry signals feed"
       >
         <ul className="flex snap-x snap-mandatory gap-3">
           {signals.map((signal) => (
-            <li key={`mobile-${signal.attribution}`} className="snap-center">
-              <article className="flex w-[86vw] max-w-[22rem] shrink-0 flex-col gap-2 rounded-xl border border-[#cddded] bg-[#eef5fc] p-3 text-[#1f3a57]">
-                <p className="text-[14px] leading-5">{signal.quote}</p>
-                <p className="text-[11px] font-medium uppercase tracking-wide text-[#31557b]">{signal.attribution}</p>
-                <a
-                  href={signal.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-fit text-xs font-semibold text-[#204f86] underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#70a2da] focus-visible:ring-offset-2 focus-visible:ring-offset-[#eef5fc]"
-                  aria-label={`Open source for ${signal.attribution}`}
-                >
-                  Source
-                </a>
-              </article>
+            <li key={`mobile-${signal.attribution}`} className="snap-center min-w-[85vw] shrink-0">
+              <SignalItem quote={signal.quote} attribution={signal.attribution} href={signal.href} />
             </li>
           ))}
         </ul>
       </div>
 
-      <p className="px-1 text-xs text-[#47678a]">Quotes are excerpts from the linked sources.</p>
+      <p className="px-1 text-xs text-[var(--muted)]">Quotes are excerpts from the linked sources.</p>
 
       <style jsx>{`
         @keyframes industry-signals-marquee {
