@@ -64,7 +64,7 @@ export function ResultIcon(props: IconProps) {
   );
 }
 
-const triggerTileIconClasses = "h-12 w-12 text-[var(--icon-text)] sm:h-14 sm:w-14";
+const triggerTileIconClasses = "h-[80%] w-[80%] text-[var(--icon-text)]";
 
 export function MailSignalIcon(props: IconProps) {
   return (
