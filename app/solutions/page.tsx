@@ -70,50 +70,50 @@ export default function SolutionsPage() {
             <h3 className="text-2xl font-semibold sm:text-3xl">Pick your industry</h3>
           </article>
 
-          <Link
-            href="/solutions/healthcare"
-            className="bubble group block p-5 transition duration-200 hover:-translate-y-1 hover:shadow-xl focus-visible:-translate-y-1 focus-visible:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:p-6"
-          >
-            <article>
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="max-w-3xl">
-                  <h3 className="text-xl font-semibold">Healthcare</h3>
-                  <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">
-                    Modernize clinic operations with secure automation for intake, documentation, care coordination, and patient follow-ups.
-                  </p>
-                  <span className="mt-4 inline-flex rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-semibold text-[var(--text)] transition group-hover:bg-[var(--surface-hover)]">
-                    Learn more
-                  </span>
-                </div>
-                <div className="self-end md:self-auto">
-                  <HealthcareIconCluster />
-                </div>
+          <article className="bubble group p-5 transition duration-200 hover:-translate-y-1 hover:shadow-xl sm:p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="max-w-3xl">
+                <h3 className="text-xl font-semibold">Healthcare</h3>
+                <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">
+                  Modernize clinic operations with secure automation for intake, documentation, care coordination, and patient follow-ups.
+                </p>
+                <Link
+                  href="/solutions/healthcare"
+                  className="mt-4 inline-flex rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                >
+                  Learn more
+                </Link>
               </div>
-            </article>
-          </Link>
+              <div className="self-end md:self-auto">
+                <HealthcareIconCluster />
+              </div>
+            </div>
+          </article>
 
-          <Link
-            href="/solutions/finance"
-            className="bubble group block p-5 transition duration-200 hover:-translate-y-1 hover:shadow-xl focus-visible:-translate-y-1 focus-visible:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] sm:p-6"
-          >
-            <article>
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="max-w-3xl">
-                  <h3 className="text-xl font-semibold">Financial Services</h3>
-                  <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">
-                    Streamline reviews, reporting, and client operations with compliant workflow automation for finance and investment teams.
-                  </p>
-                  <span className="mt-4 inline-flex rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-semibold text-[var(--text)] transition group-hover:bg-[var(--surface-hover)]">
-                    Learn more
-                  </span>
-                </div>
-                <div className="self-end md:self-auto">
-                  <FinanceIconCluster />
-                </div>
+          <article className="bubble group p-5 transition duration-200 hover:-translate-y-1 hover:shadow-xl sm:p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="max-w-3xl">
+                <h3 className="text-xl font-semibold">Financial Services</h3>
+                <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">
+                  Streamline reviews, reporting, and client operations with compliant workflow automation for finance and investment teams.
+                </p>
+                <Link
+                  href="/solutions/finance"
+                  className="mt-4 inline-flex rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                >
+                  Learn more
+                </Link>
               </div>
-            </article>
-          </Link>
+              <div className="self-end md:self-auto">
+                <FinanceIconCluster />
+              </div>
+            </div>
+          </article>
         </div>
+      </section>
+
+      <section className="bubble p-5 sm:p-6">
+        <h2 className="text-2xl font-semibold sm:text-3xl">Industry not included</h2>
       </section>
 
       <section className="bubble-soft p-6 sm:p-7">
