@@ -86,12 +86,24 @@ export default function SolutionsDropdown() {
     }
   };
 
+  const onPointerEnter = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse") {
+      setOpen(true);
+    }
+  };
+
+  const onPointerLeave = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse") {
+      setOpen(false);
+    }
+  };
+
   return (
     <div
       ref={containerRef}
       className="relative"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
       onBlur={onBlur}
     >
       <div className="inline-flex items-center rounded-full px-4 py-2 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-within:bg-[var(--surface-hover)]">
