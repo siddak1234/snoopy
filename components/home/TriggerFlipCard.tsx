@@ -1,0 +1,357 @@
+"use client";
+
+import { useState } from "react";
+import { TriggerIcon } from "@/components/icons/processIcons";
+
+export default function TriggerFlipCard() {
+  const [flipped, setFlipped] = useState(false);
+  const [sceneRunId, setSceneRunId] = useState(0);
+
+  const onToggleFlip = () => {
+    setFlipped((previous) => {
+      const next = !previous;
+      if (next) {
+        setSceneRunId((current) => current + 1);
+      }
+      return next;
+    });
+  };
+
+  return (
+    <div className="trigger-flip-shell">
+      <button
+        type="button"
+        className="trigger-flip-button"
+        onClick={onToggleFlip}
+        aria-pressed={flipped}
+        aria-label={flipped ? "Show trigger overview" : "Show trigger animation"}
+      >
+        <span className={`trigger-flip-inner ${flipped ? "is-flipped" : ""}`}>
+          <span className="trigger-face trigger-front bubble">
+            <span className="mb-4 flex items-center justify-between gap-3">
+              <span className="flex items-center gap-3">
+                <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-[var(--step-pill-border)] bg-[var(--step-pill-bg)] px-2 text-sm font-semibold text-[var(--step-pill-text)]">
+                  1
+                </span>
+                <span className="text-xl font-semibold text-[var(--text)]">Trigger</span>
+              </span>
+              <TriggerIcon />
+            </span>
+
+            <span className="mt-2 text-sm font-medium text-[var(--tagline)]">Work starts anywhere.</span>
+            <span className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
+              A message arrives, a file is received, or a scheduled event.
+            </span>
+            <span className="mt-5 inline-flex w-fit rounded-full border border-[var(--ring)] bg-[var(--surface)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+              Tap card to flip
+            </span>
+          </span>
+
+          <span className="trigger-face trigger-back bubble">
+            <span className="trigger-back-title">Work Starts Anywhere</span>
+
+            <span className="trigger-scene" key={sceneRunId}>
+              <span className="scene-envelope">
+                <span className="scene-letter" />
+                <span className="scene-flap" />
+              </span>
+
+              <span className="scene-mailbox">
+                <span className="scene-mailbox-post" />
+                <span className="scene-mailbox-body" />
+                <span className="scene-mailbox-door" />
+                <span className="scene-mailbox-flag" />
+              </span>
+            </span>
+
+            <span className="mt-4 text-sm leading-6 text-[var(--muted)] sm:text-base">
+              Envelope delivered. Mailbox closes and the flag rises.
+            </span>
+          </span>
+        </span>
+      </button>
+
+      <style jsx>{`
+        .trigger-flip-shell {
+          perspective: 1500px;
+        }
+
+        .trigger-flip-button {
+          width: 100%;
+          display: block;
+          border: 0;
+          background: transparent;
+          padding: 0;
+          cursor: pointer;
+          text-align: left;
+        }
+
+        .trigger-flip-button:focus-visible {
+          outline: 2px solid var(--accent-strong);
+          outline-offset: 5px;
+          border-radius: 2rem;
+        }
+
+        .trigger-flip-inner {
+          position: relative;
+          display: block;
+          min-height: 24rem;
+          transform-style: preserve-3d;
+          transition: transform 760ms cubic-bezier(0.2, 0.68, 0.1, 1);
+        }
+
+        .trigger-flip-inner.is-flipped {
+          transform: rotateY(180deg);
+        }
+
+        .trigger-face {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          flex-direction: column;
+          padding: 1.25rem;
+          backface-visibility: hidden;
+        }
+
+        .trigger-front {
+          z-index: 2;
+        }
+
+        .trigger-back {
+          transform: rotateY(180deg);
+        }
+
+        .trigger-back-title {
+          font-size: clamp(1.15rem, 2.6vw, 1.6rem);
+          line-height: 1.15;
+          font-weight: 700;
+          letter-spacing: 0.01em;
+          text-transform: uppercase;
+          color: var(--text);
+          width: fit-content;
+          border-bottom: 2px solid color-mix(in srgb, var(--accent-strong) 56%, transparent);
+          padding-bottom: 0.3rem;
+        }
+
+        .trigger-scene {
+          --travel: clamp(7.25rem, 34vw, 13rem);
+          position: relative;
+          margin-top: 1.15rem;
+          flex: 1;
+          border-radius: 1.25rem;
+          border: 1px solid color-mix(in srgb, var(--ring) 88%, transparent);
+          background: linear-gradient(
+            145deg,
+            color-mix(in srgb, var(--surface) 92%, white 8%) 0%,
+            color-mix(in srgb, var(--surface-strong) 90%, transparent) 100%
+          );
+          overflow: hidden;
+          min-height: 13rem;
+        }
+
+        .scene-envelope {
+          position: absolute;
+          left: 1rem;
+          top: 50%;
+          width: 3.3rem;
+          height: 2.15rem;
+          border: 1.5px solid color-mix(in srgb, var(--icon-text) 75%, white 10%);
+          border-radius: 0.25rem;
+          background: color-mix(in srgb, var(--card) 90%, white 10%);
+          transform: translateY(-50%) rotate(-6deg);
+          animation: envelope-travel 2200ms cubic-bezier(0.22, 0.82, 0.18, 1) forwards;
+          box-shadow: 0 6px 12px rgba(20, 40, 70, 0.1);
+          z-index: 5;
+        }
+
+        .scene-letter {
+          position: absolute;
+          left: 0.4rem;
+          bottom: 1.45rem;
+          width: 2.45rem;
+          height: 1.28rem;
+          border-radius: 0.2rem;
+          border: 1px solid color-mix(in srgb, var(--ring) 72%, transparent);
+          background: linear-gradient(180deg, #ffffff 0%, #edf4ff 100%);
+          animation: letter-settle 1200ms ease forwards;
+        }
+
+        .scene-flap {
+          position: absolute;
+          left: -1px;
+          top: -1px;
+          width: calc(100% + 2px);
+          height: 56%;
+          border-left: 1.5px solid color-mix(in srgb, var(--icon-text) 75%, white 10%);
+          border-right: 1.5px solid color-mix(in srgb, var(--icon-text) 75%, white 10%);
+          border-top: 1.5px solid color-mix(in srgb, var(--icon-text) 75%, white 10%);
+          clip-path: polygon(0 0, 50% 100%, 100% 0);
+          transform-origin: top;
+          transform: rotateX(-70deg);
+          background: color-mix(in srgb, var(--surface) 85%, white 15%);
+          animation: flap-move 1000ms ease forwards;
+        }
+
+        .scene-mailbox {
+          position: absolute;
+          right: 0.85rem;
+          bottom: 1rem;
+          width: 5.6rem;
+          height: 8.2rem;
+        }
+
+        .scene-mailbox-post {
+          position: absolute;
+          left: 2.4rem;
+          bottom: 0;
+          width: 0.72rem;
+          height: 3.5rem;
+          border-radius: 0.5rem;
+          background: color-mix(in srgb, var(--muted) 50%, var(--surface-strong) 50%);
+        }
+
+        .scene-mailbox-body {
+          position: absolute;
+          left: 0;
+          top: 1.35rem;
+          width: 5.2rem;
+          height: 3.35rem;
+          border-radius: 1.35rem 1.35rem 0.65rem 0.65rem;
+          border: 1.5px solid color-mix(in srgb, var(--icon-text) 68%, transparent);
+          background: linear-gradient(180deg, color-mix(in srgb, var(--surface-strong) 84%, white 16%) 0%, color-mix(in srgb, var(--surface) 95%, transparent) 100%);
+          box-shadow: 0 8px 14px rgba(30, 54, 90, 0.16);
+        }
+
+        .scene-mailbox-door {
+          position: absolute;
+          left: 0.2rem;
+          top: 3.54rem;
+          width: 4.8rem;
+          height: 1.05rem;
+          border-radius: 0.45rem;
+          border: 1.5px solid color-mix(in srgb, var(--icon-text) 65%, transparent);
+          background: color-mix(in srgb, var(--surface) 90%, white 10%);
+          transform-origin: top;
+          transform: rotateX(72deg);
+          animation: door-close 2200ms ease forwards;
+        }
+
+        .scene-mailbox-flag {
+          position: absolute;
+          right: -0.2rem;
+          top: 1.66rem;
+          width: 1.5rem;
+          height: 0.32rem;
+          border-radius: 999px;
+          background: color-mix(in srgb, #ef4f4f 85%, white 15%);
+          transform-origin: left center;
+          transform: rotate(4deg);
+          animation: flag-raise 2200ms ease forwards;
+        }
+
+        @keyframes flap-move {
+          0% {
+            transform: rotateX(-70deg);
+          }
+          60% {
+            transform: rotateX(-32deg);
+          }
+          100% {
+            transform: rotateX(-45deg);
+          }
+        }
+
+        @keyframes letter-settle {
+          0% {
+            transform: translateY(-0.95rem);
+            opacity: 1;
+          }
+          65% {
+            transform: translateY(0);
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(0);
+            opacity: 0.65;
+          }
+        }
+
+        @keyframes envelope-travel {
+          0% {
+            transform: translateY(-50%) translateX(0) rotate(-6deg) scale(1);
+            opacity: 1;
+          }
+          28% {
+            transform: translateY(-50%) translateX(0.3rem) rotate(-5deg) scale(1);
+            opacity: 1;
+          }
+          72% {
+            transform: translateY(-50%) translateX(calc(var(--travel) - 1rem)) rotate(2deg) scale(0.96);
+            opacity: 1;
+          }
+          88% {
+            transform: translateY(-50%) translateX(var(--travel)) rotate(3deg) scale(0.93);
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(-50%) translateX(var(--travel)) rotate(3deg) scale(0.92);
+            opacity: 0;
+          }
+        }
+
+        @keyframes door-close {
+          0%,
+          76% {
+            transform: rotateX(72deg);
+          }
+          100% {
+            transform: rotateX(0deg);
+          }
+        }
+
+        @keyframes flag-raise {
+          0%,
+          80% {
+            transform: rotate(4deg);
+          }
+          100% {
+            transform: rotate(-68deg);
+          }
+        }
+
+        @media (min-width: 640px) {
+          .trigger-face {
+            padding: 1.5rem;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .trigger-flip-inner {
+            transition-duration: 0.01ms;
+          }
+
+          .scene-envelope,
+          .scene-letter,
+          .scene-flap,
+          .scene-mailbox-door,
+          .scene-mailbox-flag {
+            animation: none;
+          }
+
+          .scene-envelope {
+            opacity: 0;
+            transform: translateY(-50%) translateX(var(--travel));
+          }
+
+          .scene-mailbox-door {
+            transform: rotateX(0deg);
+          }
+
+          .scene-mailbox-flag {
+            transform: rotate(-68deg);
+          }
+        }
+      `}</style>
+    </div>
+  );
+}

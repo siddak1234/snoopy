@@ -1,4 +1,5 @@
 import ProcessStepCard from "@/components/home/ProcessStepCard";
+import TriggerFlipCard from "@/components/home/TriggerFlipCard";
 import {
   FileSignalIcon,
   MailSignalIcon,
@@ -47,7 +48,7 @@ const steps = [
 ];
 
 export default function ProcessStepsSection() {
-  const [triggerStep, ...otherSteps] = steps;
+  const [, ...otherSteps] = steps;
 
   return (
     <section aria-labelledby="process-steps-title" className="space-y-4">
@@ -61,15 +62,7 @@ export default function ProcessStepsSection() {
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        <ProcessStepCard
-          key={triggerStep.stepNumber}
-          stepNumber={triggerStep.stepNumber}
-          title={triggerStep.title}
-          tagline={triggerStep.tagline}
-          description={triggerStep.description}
-          bullets={triggerStep.bullets}
-          icon={triggerStep.icon}
-        />
+        <TriggerFlipCard />
 
         <div className="grid grid-cols-3 gap-3">
           <article className="bubble flex aspect-square items-center justify-center p-3 sm:p-4" aria-label="Email trigger">
