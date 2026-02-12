@@ -42,9 +42,6 @@ export default function TriggerFlipCard() {
             <span className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
               A message arrives, a file is received, or a scheduled event.
             </span>
-            <span className="mt-5 inline-flex w-fit rounded-full border border-[var(--ring)] bg-[var(--surface)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
-              Tap card to flip
-            </span>
           </span>
 
           <span className="trigger-face trigger-back bubble">
@@ -59,13 +56,10 @@ export default function TriggerFlipCard() {
               <span className="scene-mailbox">
                 <span className="scene-mailbox-post" />
                 <span className="scene-mailbox-body" />
+                <span className="scene-mailbox-slot" />
                 <span className="scene-mailbox-door" />
                 <span className="scene-mailbox-flag" />
               </span>
-            </span>
-
-            <span className="mt-4 text-sm leading-6 text-[var(--muted)] sm:text-base">
-              Envelope delivered. Mailbox closes and the flag rises.
             </span>
           </span>
         </span>
@@ -95,13 +89,13 @@ export default function TriggerFlipCard() {
         .trigger-flip-inner {
           position: relative;
           display: block;
-          min-height: 24rem;
+          min-height: clamp(15rem, 48vw, 17.4rem);
           transform-style: preserve-3d;
           transition: transform 760ms cubic-bezier(0.2, 0.68, 0.1, 1);
         }
 
         .trigger-flip-inner.is-flipped {
-          transform: rotateY(180deg);
+          transform: rotateX(180deg);
         }
 
         .trigger-face {
@@ -111,6 +105,7 @@ export default function TriggerFlipCard() {
           flex-direction: column;
           padding: 1.25rem;
           backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
         }
 
         .trigger-front {
@@ -118,7 +113,7 @@ export default function TriggerFlipCard() {
         }
 
         .trigger-back {
-          transform: rotateY(180deg);
+          transform: rotateX(180deg);
         }
 
         .trigger-back-title {
@@ -134,10 +129,10 @@ export default function TriggerFlipCard() {
         }
 
         .trigger-scene {
-          --travel: clamp(7.25rem, 34vw, 13rem);
+          --travel: clamp(6.2rem, 28vw, 11.2rem);
           position: relative;
           margin-top: 1.15rem;
-          flex: 1;
+          flex: 1 1 auto;
           border-radius: 1.25rem;
           border: 1px solid color-mix(in srgb, var(--ring) 88%, transparent);
           background: linear-gradient(
@@ -146,20 +141,20 @@ export default function TriggerFlipCard() {
             color-mix(in srgb, var(--surface-strong) 90%, transparent) 100%
           );
           overflow: hidden;
-          min-height: 13rem;
+          min-height: 8.8rem;
         }
 
         .scene-envelope {
           position: absolute;
           left: 1rem;
-          top: 50%;
+          top: 58%;
           width: 3.3rem;
           height: 2.15rem;
           border: 1.5px solid color-mix(in srgb, var(--icon-text) 75%, white 10%);
           border-radius: 0.25rem;
           background: color-mix(in srgb, var(--card) 90%, white 10%);
-          transform: translateY(-50%) rotate(-6deg);
-          animation: envelope-travel 2200ms cubic-bezier(0.22, 0.82, 0.18, 1) forwards;
+          transform: translateY(-50%) rotate(-4deg);
+          animation: envelope-travel 3200ms cubic-bezier(0.2, 0.75, 0.2, 1) 380ms forwards;
           box-shadow: 0 6px 12px rgba(20, 40, 70, 0.1);
           z-index: 5;
         }
@@ -173,7 +168,6 @@ export default function TriggerFlipCard() {
           border-radius: 0.2rem;
           border: 1px solid color-mix(in srgb, var(--ring) 72%, transparent);
           background: linear-gradient(180deg, #ffffff 0%, #edf4ff 100%);
-          animation: letter-settle 1200ms ease forwards;
         }
 
         .scene-flap {
@@ -187,9 +181,8 @@ export default function TriggerFlipCard() {
           border-top: 1.5px solid color-mix(in srgb, var(--icon-text) 75%, white 10%);
           clip-path: polygon(0 0, 50% 100%, 100% 0);
           transform-origin: top;
-          transform: rotateX(-70deg);
+          transform: rotateX(-62deg);
           background: color-mix(in srgb, var(--surface) 85%, white 15%);
-          animation: flap-move 1000ms ease forwards;
         }
 
         .scene-mailbox {
@@ -222,6 +215,17 @@ export default function TriggerFlipCard() {
           box-shadow: 0 8px 14px rgba(30, 54, 90, 0.16);
         }
 
+        .scene-mailbox-slot {
+          position: absolute;
+          left: 0.64rem;
+          top: 2.15rem;
+          width: 4.12rem;
+          height: 0.38rem;
+          border-radius: 999px;
+          background: color-mix(in srgb, #0f233f 65%, var(--surface-strong) 35%);
+          z-index: 2;
+        }
+
         .scene-mailbox-door {
           position: absolute;
           left: 0.2rem;
@@ -233,7 +237,7 @@ export default function TriggerFlipCard() {
           background: color-mix(in srgb, var(--surface) 90%, white 10%);
           transform-origin: top;
           transform: rotateX(72deg);
-          animation: door-close 2200ms ease forwards;
+          animation: door-close 3200ms ease 380ms forwards;
         }
 
         .scene-mailbox-flag {
@@ -246,62 +250,39 @@ export default function TriggerFlipCard() {
           background: color-mix(in srgb, #ef4f4f 85%, white 15%);
           transform-origin: left center;
           transform: rotate(4deg);
-          animation: flag-raise 2200ms ease forwards;
-        }
-
-        @keyframes flap-move {
-          0% {
-            transform: rotateX(-70deg);
-          }
-          60% {
-            transform: rotateX(-32deg);
-          }
-          100% {
-            transform: rotateX(-45deg);
-          }
-        }
-
-        @keyframes letter-settle {
-          0% {
-            transform: translateY(-0.95rem);
-            opacity: 1;
-          }
-          65% {
-            transform: translateY(0);
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(0);
-            opacity: 0.65;
-          }
+          animation: flag-raise 3200ms ease 380ms forwards;
         }
 
         @keyframes envelope-travel {
           0% {
-            transform: translateY(-50%) translateX(0) rotate(-6deg) scale(1);
+            transform: translateY(-50%) translateX(0) rotate(-4deg) scale(1);
             opacity: 1;
           }
-          28% {
-            transform: translateY(-50%) translateX(0.3rem) rotate(-5deg) scale(1);
+          16% {
+            transform: translateY(-50%) translateX(0) rotate(-4deg) scale(1);
             opacity: 1;
           }
-          72% {
-            transform: translateY(-50%) translateX(calc(var(--travel) - 1rem)) rotate(2deg) scale(0.96);
+          62% {
+            transform: translateY(-50%) translateX(calc(var(--travel) - 1rem)) rotate(1deg) scale(0.97);
             opacity: 1;
           }
-          88% {
-            transform: translateY(-50%) translateX(var(--travel)) rotate(3deg) scale(0.93);
+          80% {
+            transform: translateY(-50%) translateX(var(--travel)) rotate(2deg) scale(0.95);
             opacity: 1;
+          }
+          90% {
+            transform: translateY(-50%) translateX(calc(var(--travel) + 0.28rem)) rotate(2deg) scale(0.88);
+            opacity: 0.92;
           }
           100% {
-            transform: translateY(-50%) translateX(var(--travel)) rotate(3deg) scale(0.92);
+            transform: translateY(-50%) translateX(calc(var(--travel) + 0.4rem)) rotate(2deg) scale(0.8);
             opacity: 0;
           }
         }
 
         @keyframes door-close {
           0%,
-          76% {
+          78% {
             transform: rotateX(72deg);
           }
           100% {
@@ -311,7 +292,7 @@ export default function TriggerFlipCard() {
 
         @keyframes flag-raise {
           0%,
-          80% {
+          82% {
             transform: rotate(4deg);
           }
           100% {
@@ -340,7 +321,7 @@ export default function TriggerFlipCard() {
 
           .scene-envelope {
             opacity: 0;
-            transform: translateY(-50%) translateX(var(--travel));
+            transform: translateY(-50%) translateX(calc(var(--travel) + 0.4rem));
           }
 
           .scene-mailbox-door {
