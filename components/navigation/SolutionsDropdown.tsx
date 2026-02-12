@@ -92,7 +92,6 @@ export default function SolutionsDropdown() {
       className="relative"
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
-      onFocus={() => setOpen(true)}
       onBlur={onBlur}
     >
       <div className="inline-flex items-center rounded-full px-4 py-2 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-within:bg-[var(--surface-hover)]">
