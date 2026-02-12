@@ -34,7 +34,7 @@ export default function Home() {
           Automation With AI Workflows
         </p>
         <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">
-          Automate manual business tasks with AI workflows.
+          Automate repetitive tasks with AI workflows
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)] sm:text-lg">
           {site.name} builds practical automation workflows that reduce repetitive effort, improve consistency, and adapt to your industry operational needs.
