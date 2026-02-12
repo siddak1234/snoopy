@@ -30,16 +30,15 @@ export default function TriggerFlipCard() {
           <span className="trigger-face trigger-front bubble">
             <span className="mb-4 flex items-center justify-between gap-3">
               <span className="flex items-center gap-3">
-                <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-[var(--step-pill-border)] bg-[var(--step-pill-bg)] px-2 text-sm font-semibold text-[var(--step-pill-text)]">
+                <span className="inline-flex h-10 min-w-10 items-center justify-center rounded-full border border-[var(--step-pill-border)] bg-[var(--step-pill-bg)] px-3 text-base font-semibold text-[var(--step-pill-text)] sm:h-11 sm:min-w-11 sm:text-lg">
                   1
                 </span>
-                <span className="text-xl font-semibold text-[var(--text)]">Trigger</span>
+                <span className="text-2xl font-semibold text-[var(--text)] sm:text-3xl">Trigger</span>
               </span>
-              <TriggerIcon />
+              <TriggerIcon style={{ width: "3rem", height: "3rem" }} />
             </span>
 
-            <span className="mt-2 text-sm font-medium text-[var(--tagline)]">Work starts anywhere.</span>
-            <span className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
+            <span className="mt-3 text-base leading-7 text-[var(--muted)] sm:text-lg">
               A message arrives, a file is received, or a scheduled event.
             </span>
           </span>
@@ -129,7 +128,6 @@ export default function TriggerFlipCard() {
         }
 
         .trigger-scene {
-          --travel: clamp(6.2rem, 28vw, 11.2rem);
           position: relative;
           margin-top: 1.15rem;
           flex: 1 1 auto;
@@ -141,30 +139,31 @@ export default function TriggerFlipCard() {
             color-mix(in srgb, var(--surface-strong) 90%, transparent) 100%
           );
           overflow: hidden;
-          min-height: 8.8rem;
+          min-height: 10.6rem;
         }
 
         .scene-envelope {
           position: absolute;
           left: 1rem;
-          top: 58%;
-          width: 3.3rem;
-          height: 2.15rem;
+          top: 60%;
+          width: 3.9rem;
+          height: 2.55rem;
           border: 1.5px solid color-mix(in srgb, var(--icon-text) 75%, white 10%);
-          border-radius: 0.25rem;
+          border-radius: 0.32rem;
           background: color-mix(in srgb, var(--card) 90%, white 10%);
-          transform: translateY(-50%) rotate(-4deg);
-          animation: envelope-travel 3200ms cubic-bezier(0.2, 0.75, 0.2, 1) 380ms forwards;
+          transform: translateY(-50%) rotate(-3deg);
+          animation: envelope-travel 1900ms linear forwards;
           box-shadow: 0 6px 12px rgba(20, 40, 70, 0.1);
+          overflow: hidden;
           z-index: 5;
         }
 
         .scene-letter {
           position: absolute;
-          left: 0.4rem;
-          bottom: 1.45rem;
-          width: 2.45rem;
-          height: 1.28rem;
+          left: 0.52rem;
+          bottom: 0.68rem;
+          width: 2.82rem;
+          height: 1.36rem;
           border-radius: 0.2rem;
           border: 1px solid color-mix(in srgb, var(--ring) 72%, transparent);
           background: linear-gradient(180deg, #ffffff 0%, #edf4ff 100%);
@@ -183,22 +182,23 @@ export default function TriggerFlipCard() {
           transform-origin: top;
           transform: rotateX(-62deg);
           background: color-mix(in srgb, var(--surface) 85%, white 15%);
+          animation: flap-close 1900ms linear forwards;
         }
 
         .scene-mailbox {
           position: absolute;
           right: 0.85rem;
-          bottom: 1rem;
-          width: 5.6rem;
-          height: 8.2rem;
+          bottom: 0.65rem;
+          width: 6.7rem;
+          height: 9.7rem;
         }
 
         .scene-mailbox-post {
           position: absolute;
-          left: 2.4rem;
+          left: 2.9rem;
           bottom: 0;
-          width: 0.72rem;
-          height: 3.5rem;
+          width: 0.8rem;
+          height: 4.1rem;
           border-radius: 0.5rem;
           background: color-mix(in srgb, var(--muted) 50%, var(--surface-strong) 50%);
         }
@@ -206,9 +206,9 @@ export default function TriggerFlipCard() {
         .scene-mailbox-body {
           position: absolute;
           left: 0;
-          top: 1.35rem;
-          width: 5.2rem;
-          height: 3.35rem;
+          top: 1.45rem;
+          width: 6.2rem;
+          height: 3.95rem;
           border-radius: 1.35rem 1.35rem 0.65rem 0.65rem;
           border: 1.5px solid color-mix(in srgb, var(--icon-text) 68%, transparent);
           background: linear-gradient(180deg, color-mix(in srgb, var(--surface-strong) 84%, white 16%) 0%, color-mix(in srgb, var(--surface) 95%, transparent) 100%);
@@ -217,10 +217,10 @@ export default function TriggerFlipCard() {
 
         .scene-mailbox-slot {
           position: absolute;
-          left: 0.64rem;
-          top: 2.15rem;
-          width: 4.12rem;
-          height: 0.38rem;
+          left: 0.76rem;
+          top: 2.35rem;
+          width: 4.86rem;
+          height: 0.44rem;
           border-radius: 999px;
           background: color-mix(in srgb, #0f233f 65%, var(--surface-strong) 35%);
           z-index: 2;
@@ -228,62 +228,68 @@ export default function TriggerFlipCard() {
 
         .scene-mailbox-door {
           position: absolute;
-          left: 0.2rem;
-          top: 3.54rem;
-          width: 4.8rem;
-          height: 1.05rem;
+          left: 0.25rem;
+          top: 4.16rem;
+          width: 5.7rem;
+          height: 1.18rem;
           border-radius: 0.45rem;
           border: 1.5px solid color-mix(in srgb, var(--icon-text) 65%, transparent);
           background: color-mix(in srgb, var(--surface) 90%, white 10%);
           transform-origin: top;
           transform: rotateX(72deg);
-          animation: door-close 3200ms ease 380ms forwards;
+          animation: door-close 1900ms ease forwards;
         }
 
         .scene-mailbox-flag {
           position: absolute;
-          right: -0.2rem;
-          top: 1.66rem;
-          width: 1.5rem;
-          height: 0.32rem;
+          right: -0.24rem;
+          top: 1.78rem;
+          width: 1.9rem;
+          height: 0.36rem;
           border-radius: 999px;
           background: color-mix(in srgb, #ef4f4f 85%, white 15%);
           transform-origin: left center;
           transform: rotate(4deg);
-          animation: flag-raise 3200ms ease 380ms forwards;
+          animation: flag-raise 1900ms ease forwards;
+        }
+
+        @keyframes flap-close {
+          0% {
+            transform: rotateX(-62deg);
+          }
+          100% {
+            transform: rotateX(-38deg);
+          }
         }
 
         @keyframes envelope-travel {
           0% {
-            transform: translateY(-50%) translateX(0) rotate(-4deg) scale(1);
+            left: 1rem;
+            transform: translateY(-50%) rotate(-3deg) scale(1);
             opacity: 1;
           }
-          16% {
-            transform: translateY(-50%) translateX(0) rotate(-4deg) scale(1);
+          78% {
+            left: calc(100% - 8.15rem);
+            transform: translateY(-50%) rotate(1deg) scale(1);
             opacity: 1;
           }
-          62% {
-            transform: translateY(-50%) translateX(calc(var(--travel) - 1rem)) rotate(1deg) scale(0.97);
-            opacity: 1;
-          }
-          80% {
-            transform: translateY(-50%) translateX(var(--travel)) rotate(2deg) scale(0.95);
-            opacity: 1;
-          }
-          90% {
-            transform: translateY(-50%) translateX(calc(var(--travel) + 0.28rem)) rotate(2deg) scale(0.88);
-            opacity: 0.92;
+          92% {
+            left: calc(100% - 7.4rem);
+            transform: translateY(-50%) rotate(2deg) scale(0.8);
+            opacity: 0.8;
           }
           100% {
-            transform: translateY(-50%) translateX(calc(var(--travel) + 0.4rem)) rotate(2deg) scale(0.8);
+            left: calc(100% - 7.3rem);
+            transform: translateY(-50%) rotate(2deg) scale(0.72);
             opacity: 0;
           }
         }
 
         @keyframes door-close {
           0%,
-          78% {
+          74% {
             transform: rotateX(72deg);
+            opacity: 1;
           }
           100% {
             transform: rotateX(0deg);
@@ -292,7 +298,7 @@ export default function TriggerFlipCard() {
 
         @keyframes flag-raise {
           0%,
-          82% {
+          76% {
             transform: rotate(4deg);
           }
           100% {
@@ -321,7 +327,8 @@ export default function TriggerFlipCard() {
 
           .scene-envelope {
             opacity: 0;
-            transform: translateY(-50%) translateX(calc(var(--travel) + 0.4rem));
+            left: calc(100% - 7.3rem);
+            transform: translateY(-50%) rotate(2deg) scale(0.72);
           }
 
           .scene-mailbox-door {
