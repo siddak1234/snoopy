@@ -1,11 +1,8 @@
 import ProcessStepCard from "@/components/home/ProcessStepCard";
 import TriggerFlipCard from "@/components/home/TriggerFlipCard";
 import {
-  FileSignalIcon,
-  MailSignalIcon,
   ProcessingIcon,
   ResultIcon,
-  StopwatchSignalIcon,
   TriggerIcon,
 } from "@/components/icons/processIcons";
 
@@ -63,18 +60,6 @@ export default function ProcessStepsSection() {
 
       <div className="grid grid-cols-1 gap-4">
         <TriggerFlipCard />
-
-        <div className="grid grid-cols-3 gap-3">
-          <article className="bubble flex aspect-square items-center justify-center p-3 sm:p-4" aria-label="Email trigger">
-            <MailSignalIcon />
-          </article>
-          <article className="bubble flex aspect-square items-center justify-center p-3 sm:p-4" aria-label="File trigger">
-            <FileSignalIcon />
-          </article>
-          <article className="bubble flex aspect-square items-center justify-center p-3 sm:p-4" aria-label="Scheduled event trigger">
-            <StopwatchSignalIcon />
-          </article>
-        </div>
 
         {otherSteps.map((step) => (
           <ProcessStepCard
