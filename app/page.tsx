@@ -3,7 +3,6 @@ import IndustrySignals from "@/components/IndustrySignals";
 import ProcessStepsSection from "@/components/home/ProcessStepsSection";
 import ValueCard from "@/components/home/ValueCard";
 import { AutonomousIcon, ScalableIcon, SecureIcon } from "@/components/icons/valueIcons";
-import { site } from "@/lib/site";
 
 const valueCards = [
   {
@@ -36,9 +35,6 @@ export default function Home() {
         <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">
           Automate repetitive tasks with AI workflows
         </h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)] sm:text-lg">
-          {site.name} builds practical automation workflows that reduce repetitive effort, improve consistency, and adapt to your industry operational needs.
-        </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="/solutions" className="btn-primary px-5">
             Explore Solutions
