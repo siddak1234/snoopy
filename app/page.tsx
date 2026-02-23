@@ -33,7 +33,7 @@ export default function Home() {
           Automation With AI Workflows
         </p>
         <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">
-          Automate repetitive tasks with AI workflows
+          Automate with AI.
         </h1>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="/solutions" className="btn-primary px-5">

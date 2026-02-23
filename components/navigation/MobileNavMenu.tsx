@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import ThemeToggle from "@/components/theme/ThemeToggle";
 
 const solutionsItems = [
   { href: "/solutions/healthcare", label: "Healthcare" },
@@ -126,10 +125,6 @@ export default function MobileNavMenu() {
             >
               Login / Signup
             </Link>
-
-            <div className="mt-2 flex justify-end border-t border-[var(--ring)] pt-3">
-              <ThemeToggle />
-            </div>
           </nav>
         </div>
       ) : null}
