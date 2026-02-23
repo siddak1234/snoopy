@@ -48,9 +48,9 @@ export default function RootLayout({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <Link href="/" className="flex items-center gap-2 text-base font-semibold text-[var(--text)]">
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--brand-pill-border)] bg-[var(--brand-pill-bg)] text-sm font-bold text-[var(--brand-pill-text)]">
-                  A
+                  {site.name.slice(0, 1)}
                 </span>
-                <span>Automa8x</span>
+                <span>{site.name}</span>
               </Link>
               <nav aria-label="Main navigation" className="hidden items-center gap-2 text-sm font-medium sm:gap-3 md:flex">
                 {navLinks.slice(0, 1).map((link) => (
