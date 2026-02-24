@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { signIn } from "next-auth/react";
 import { useState, FormEvent } from "react";
 
 const inputClassName =
@@ -59,6 +60,23 @@ export default function LoginPage() {
               </p>
             ) : null}
           </form>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center" aria-hidden>
+              <div className="w-full border-t border-[var(--ring)]" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-[var(--surface)] px-3 text-sm text-[var(--muted)]">or</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => signIn("google", { callbackUrl: "/account" })}
+            className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+          >
+            Continue with Google
+          </button>
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2 border-t border-[var(--ring)] pt-5">
             <span className="text-sm text-[var(--muted)]">New here?</span>

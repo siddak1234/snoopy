@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
+import AuthNavLinks from "@/components/navigation/AuthNavLinks";
 import MobileNavMenu from "@/components/navigation/MobileNavMenu";
 import SolutionsDropdown from "@/components/navigation/SolutionsDropdown";
 import ThemeToggle from "@/components/theme/ThemeToggle";
+import SessionProvider from "@/components/providers/SessionProvider";
 import { site } from "@/lib/site";
 import "./globals.css";
 
@@ -43,6 +45,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen antialiased`}
       >
+        <SessionProvider>
         <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-4 pb-6 sm:px-6 lg:px-8">
           <header className="bubble-soft sticky top-3 z-50 mt-3 px-4 py-3 sm:px-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -72,12 +75,7 @@ export default function RootLayout({
                     {link.label}
                   </Link>
                 ))}
-                <Link
-                  href="/login"
-                  className="rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-                >
-                  Login / Signup
-                </Link>
+                <AuthNavLinks />
                 <ThemeToggle />
               </nav>
               <div className="flex md:hidden items-center gap-2">
@@ -95,6 +93,7 @@ export default function RootLayout({
             </p>
           </footer>
         </div>
+        </SessionProvider>
       </body>
     </html>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 
 const solutionsItems = [
@@ -12,6 +13,7 @@ const linkClass =
   "block rounded-xl px-4 py-3 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset";
 
 export default function MobileNavMenu() {
+  const { data: session, status } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
   const [solutionsExpanded, setSolutionsExpanded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -118,13 +120,39 @@ export default function MobileNavMenu() {
             <Link href="/contact" className={linkClass} onClick={closeMenu}>
               Contact
             </Link>
-            <Link
-              href="/login"
-              className="rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
-              onClick={closeMenu}
-            >
-              Login / Signup
-            </Link>
+            {status === "loading" ? (
+              <span className="rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-center text-sm text-[var(--muted)]">
+                …
+              </span>
+            ) : session?.user ? (
+              <>
+                <Link
+                  href="/account"
+                  className="rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                  onClick={closeMenu}
+                >
+                  Account
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeMenu();
+                    signOut({ callbackUrl: "/" });
+                  }}
+                  className={`${linkClass} w-full text-center`}
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/login"
+                className="rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                onClick={closeMenu}
+              >
+                Login / Signup
+              </Link>
+            )}
           </nav>
         </div>
       ) : null}
