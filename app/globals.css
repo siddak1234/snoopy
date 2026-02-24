@@ -459,24 +459,25 @@ body {
   }
 }
 
-/* Edge fade mask for horizontal tickers (e.g., Industry Signals) */
+/* Edge fade mask for horizontal tickers (e.g., Industry Signals).
+   Narrow transparent band + short ramp so the full→transparent transition is visible. */
 .edge-fade-mask {
   -webkit-mask-image: linear-gradient(
     to right,
     transparent 0%,
-    transparent 8%,
-    rgba(0, 0, 0, 1) 14%,
-    rgba(0, 0, 0, 1) 86%,
-    transparent 92%,
+    transparent 2%,
+    rgba(0, 0, 0, 1) 6%,
+    rgba(0, 0, 0, 1) 94%,
+    transparent 98%,
     transparent 100%
   );
   mask-image: linear-gradient(
     to right,
     transparent 0%,
-    transparent 8%,
-    rgba(0, 0, 0, 1) 14%,
-    rgba(0, 0, 0, 1) 86%,
-    transparent 92%,
+    transparent 2%,
+    rgba(0, 0, 0, 1) 6%,
+    rgba(0, 0, 0, 1) 94%,
+    transparent 98%,
     transparent 100%
   );
   -webkit-mask-repeat: no-repeat;
@@ -490,19 +491,19 @@ body {
     -webkit-mask-image: linear-gradient(
       to right,
       transparent 0%,
-      transparent 6%,
-      rgba(0, 0, 0, 1) 12%,
-      rgba(0, 0, 0, 1) 88%,
-      transparent 94%,
+      transparent 1.5%,
+      rgba(0, 0, 0, 1) 5%,
+      rgba(0, 0, 0, 1) 95%,
+      transparent 98.5%,
       transparent 100%
     );
     mask-image: linear-gradient(
       to right,
       transparent 0%,
-      transparent 6%,
-      rgba(0, 0, 0, 1) 12%,
-      rgba(0, 0, 0, 1) 88%,
-      transparent 94%,
+      transparent 1.5%,
+      rgba(0, 0, 0, 1) 5%,
+      rgba(0, 0, 0, 1) 95%,
+      transparent 98.5%,
       transparent 100%
     );
   }
