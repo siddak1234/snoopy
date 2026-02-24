@@ -1,56 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Snoopy — Autom8x website
 
-## Getting Started
+This repository is the **website only**: Next.js app (marketing site, auth, UI).  
+n8n and the database server are separate; see [System architecture](docs/SYSTEM-ARCHITECTURE.md).
 
-First, run the development server:
+## Stack
+
+- **Next.js 16** (App Router), **TypeScript**, **Tailwind 4**
+- **NextAuth** (Google, JWT)
+- **Prisma** + **PostgreSQL** (connection via env; DB is external to this repo)
+
+## Quick start
 
 ```bash
+cp .env.example .env.local   # then fill in values (see below)
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Copy `.env.example` to `.env.local` and set:
 
-## Database & Prisma (Supabase)
+- `POSTGRES_PRISMA_URL` — Postgres connection string (required for Prisma)
+- `NEXTAUTH_URL` — App URL (e.g. `http://localhost:3000`)
+- `NEXTAUTH_SECRET` — Secret for session signing (e.g. `openssl rand -base64 32`)
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google OAuth for sign-in
 
-This project uses Supabase Postgres with Prisma.
+Do **not** commit `.env.local` or any file with real secrets.
 
-### Local environment
+## Scripts
 
-- Create a `.env.local` file (it is gitignored via `.env*`).
-- Add your Prisma connection string, matching the `POSTGRES_PRISMA_URL` value from Vercel/Supabase:
+| Command | Description |
+|--------|-------------|
+| `npm run dev` | Start dev server |
+| `npm run build` | Production build |
+| `npm run start` | Run production server |
+| `npm run lint` | Run ESLint |
+| `npm run typecheck` | TypeScript check (`tsc --noEmit`) |
+| `npm run db:migrate -- --name <name>` | Run Prisma migrations |
+| `npm run db:studio` | Open Prisma Studio |
+| `npm run db:generate` | Regenerate Prisma client |
 
-```bash
-POSTGRES_PRISMA_URL="postgresql://USER:PASSWORD@HOST:PORT/dbname?sslmode=require"
-```
+## Repository layout
 
-> Do **not** commit `.env.local` or any secrets to git.
+- **`app/`** — Next.js routes, pages, API (`/api/auth`, `/api/health`)
+- **`components/`** — React UI components
+- **`lib/`** — Shared logic: `db.ts`, `site.ts`, `env.ts` (validation), `auth.ts` (NextAuth config)
+- **`middleware.ts`** — Protects `/account` (redirect to login when unauthenticated)
+- **`prisma/`** — Schema and migrations (website’s DB access)
+- **`types/`** — TypeScript module augmentation (e.g. NextAuth `Session`)
+- **`docs/`** — Architecture and structure
 
-### Prisma commands
-
-- Run migrations locally:
-
-```bash
-npm run db:migrate -- --name init
-```
-
-- Open Prisma Studio:
-
-```bash
-npm run db:studio
-```
-
-- Regenerate the Prisma Client (if the schema changes):
-
-```bash
-npm run db:generate
-```
+See **[docs/REPO-STRUCTURE.md](docs/REPO-STRUCTURE.md)** for where to put new code.  
+See **[docs/SYSTEM-ARCHITECTURE.md](docs/SYSTEM-ARCHITECTURE.md)** for how this app fits with n8n and the database.

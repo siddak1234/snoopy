@@ -30,9 +30,9 @@ export default function TypingHeadline() {
   // Typing / deleting effect
   useEffect(() => {
     if (prefersReducedMotion) {
-      // Show final phrase without animation
-      setDisplayed(WORDS[WORDS.length - 1]);
-      return;
+      // Show final phrase without animation (defer to avoid synchronous setState in effect)
+      const id = window.setTimeout(() => setDisplayed(WORDS[WORDS.length - 1]), 0);
+      return () => window.clearTimeout(id);
     }
 
     if (isDone) {
