@@ -74,7 +74,13 @@ export default function ProcessStepsSection() {
             backTitle={step.tagline}
             backContent={
               step.bullets && step.bullets.length > 0 ? (
-                <ul className="space-y-2 p-3 text-sm text-[var(--muted)] sm:p-4 sm:text-base">
+                <ul
+                  className={
+                    step.stepNumber === 3
+                      ? "space-y-1.5 p-3 text-xs leading-snug text-[var(--muted)] sm:space-y-2 sm:p-4 sm:text-sm"
+                      : "space-y-2 p-3 text-sm text-[var(--muted)] sm:p-4 sm:text-base"
+                  }
+                >
                   {step.bullets.map((bullet) => (
                     <li key={bullet} className="flex items-start gap-2">
                       <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bullet)]" />

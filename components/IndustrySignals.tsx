@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef, useState, useEffect } from "react";
+
 type IndustrySignal = {
   quote: string;
   attribution: string;
@@ -63,36 +65,70 @@ function ItemSeparator() {
 export default function IndustrySignals() {
   const loopedSignals = [...signals, ...signals];
 
+  const [isPaused, setIsPaused] = useState(false);
+  const resumeTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (resumeTimeoutRef.current !== null) {
+        window.clearTimeout(resumeTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handlePointerDown = () => {
+    if (resumeTimeoutRef.current !== null) {
+      window.clearTimeout(resumeTimeoutRef.current);
+      resumeTimeoutRef.current = null;
+    }
+    setIsPaused(true);
+  };
+
+  const handlePointerEnd = () => {
+    if (!isPaused) return;
+    resumeTimeoutRef.current = window.setTimeout(() => {
+      setIsPaused(false);
+      resumeTimeoutRef.current = null;
+    }, 700);
+  };
+
   return (
     <section aria-label="Industry signals from published research" className="space-y-2">
       <h2 className="px-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">INDUSTRY SIGNALS</h2>
 
       <div className="group relative overflow-hidden rounded-2xl border border-[var(--ring)] bg-[var(--surface)] px-3 py-3 transition duration-200 hover:-translate-y-1 hover:shadow-xl focus-within:-translate-y-1 focus-within:shadow-xl">
-        {/* Animated marquee when motion is allowed (all breakpoints) */}
-        <ul
+        <div
+          className="relative flex items-center overflow-x-auto overflow-y-hidden py-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x"
           aria-label="Industry research excerpts"
-          className="hidden w-max items-center overflow-x-auto py-1 motion-safe:flex motion-safe:[animation:industry-signals-marquee_92s_linear_infinite] motion-safe:group-hover:[animation-play-state:paused] motion-safe:group-focus-within:[animation-play-state:paused] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerEnd}
+          onPointerLeave={handlePointerEnd}
+          onPointerCancel={handlePointerEnd}
         >
-          {loopedSignals.map((signal, index) => (
-            <li key={`${signal.attribution}-${index}`} className="flex items-center">
-              <SignalItem quote={signal.quote} attribution={signal.attribution} href={signal.href} />
-              <ItemSeparator />
-            </li>
-          ))}
-        </ul>
+          {/* Animated marquee when motion is allowed (all breakpoints) */}
+          <ul
+            className={`industry-signals-track hidden w-max items-center motion-safe:flex motion-safe:[animation:industry-signals-marquee_92s_linear_infinite] motion-safe:group-hover:[animation-play-state:paused] motion-safe:group-focus-within:[animation-play-state:paused]${
+              isPaused ? " motion-safe:[animation-play-state:paused]" : ""
+            }`}
+          >
+            {loopedSignals.map((signal, index) => (
+              <li key={`${signal.attribution}-${index}`} className="flex items-center">
+                <SignalItem quote={signal.quote} attribution={signal.attribution} href={signal.href} />
+                <ItemSeparator />
+              </li>
+            ))}
+          </ul>
 
-        {/* Static, scrollable list when user prefers reduced motion */}
-        <ul
-          aria-label="Industry research excerpts"
-          className="hidden items-center overflow-x-auto py-1 motion-reduce:flex [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {signals.map((signal, index) => (
-            <li key={`reduced-${signal.attribution}`} className="flex items-center">
-              <SignalItem quote={signal.quote} attribution={signal.attribution} href={signal.href} />
-              {index < signals.length - 1 ? <ItemSeparator /> : null}
-            </li>
-          ))}
-        </ul>
+          {/* Static list when user prefers reduced motion */}
+          <ul className="hidden w-max items-center motion-reduce:flex">
+            {signals.map((signal, index) => (
+              <li key={`reduced-${signal.attribution}`} className="flex items-center">
+                <SignalItem quote={signal.quote} attribution={signal.attribution} href={signal.href} />
+                {index < signals.length - 1 ? <ItemSeparator /> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
 
       <p className="px-1 text-xs text-[var(--muted)]">Quotes are excerpts from the linked sources.</p>
