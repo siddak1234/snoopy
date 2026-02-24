@@ -98,7 +98,7 @@ export default function IndustrySignals() {
 
       <div className="group relative overflow-hidden rounded-2xl border border-[var(--ring)] bg-[var(--surface)] px-3 py-3 transition duration-200 hover:-translate-y-1 hover:shadow-xl focus-within:-translate-y-1 focus-within:shadow-xl">
         <div
-          className="relative flex items-center overflow-x-auto overflow-y-hidden py-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x"
+          className="edge-fade-mask relative flex items-center overflow-x-auto overflow-y-hidden py-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x"
           aria-label="Industry research excerpts"
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerEnd}
