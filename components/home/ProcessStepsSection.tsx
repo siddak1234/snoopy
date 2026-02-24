@@ -1,4 +1,5 @@
-import ProcessStepCard from "@/components/home/ProcessStepCard";
+import { cloneElement } from "react";
+import ProcessStepFlipCard from "@/components/home/ProcessStepFlipCard";
 import TriggerFlipCard from "@/components/home/TriggerFlipCard";
 import {
   ProcessingIcon,
@@ -44,6 +45,8 @@ const steps = [
   },
 ];
 
+const iconSize = { width: "3rem", height: "3rem" };
+
 export default function ProcessStepsSection() {
   const [, ...otherSteps] = steps;
 
@@ -62,14 +65,25 @@ export default function ProcessStepsSection() {
         <TriggerFlipCard />
 
         {otherSteps.map((step) => (
-          <ProcessStepCard
+          <ProcessStepFlipCard
             key={step.stepNumber}
             stepNumber={step.stepNumber}
             title={step.title}
-            tagline={step.tagline}
             description={step.description}
-            bullets={step.bullets}
-            icon={step.icon}
+            icon={cloneElement(step.icon, { style: iconSize })}
+            backTitle={step.tagline}
+            backContent={
+              step.bullets && step.bullets.length > 0 ? (
+                <ul className="space-y-2 p-4 text-sm text-[var(--muted)] sm:text-base">
+                  {step.bullets.map((bullet) => (
+                    <li key={bullet} className="flex items-start gap-2">
+                      <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bullet)]" />
+                      <span>{bullet}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null
+            }
           />
         ))}
       </div>

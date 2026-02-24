@@ -2,148 +2,46 @@
 
 import { useState } from "react";
 import { TriggerIcon } from "@/components/icons/processIcons";
+import ProcessStepFlipCard from "@/components/home/ProcessStepFlipCard";
+
+function TriggerBackScene() {
+  return (
+    <>
+      <span className="scene-envelope">
+        <span className="scene-flap" />
+        <span className="scene-fold-left" />
+        <span className="scene-fold-right" />
+      </span>
+
+      <span className="scene-mailbox">
+        <span className="scene-mailbox-post" />
+        <span className="scene-mailbox-body" />
+        <span className="scene-mailbox-slot" />
+        <span className="scene-mailbox-mouth" />
+        <span className="scene-mailbox-door" />
+        <span className="scene-mailbox-flag" />
+      </span>
+    </>
+  );
+}
 
 export default function TriggerFlipCard() {
-  const [flipped, setFlipped] = useState(false);
   const [sceneRunId, setSceneRunId] = useState(0);
 
-  const onToggleFlip = () => {
-    setFlipped((previous) => {
-      const next = !previous;
-      if (next) {
-        setSceneRunId((current) => current + 1);
-      }
-      return next;
-    });
-  };
-
   return (
-    <div className="trigger-flip-shell">
-      <button
-        type="button"
-        className="trigger-flip-button"
-        onClick={onToggleFlip}
-        aria-pressed={flipped}
-        aria-label={flipped ? "Show trigger overview" : "Show trigger animation"}
-      >
-        <span className={`trigger-flip-inner ${flipped ? "is-flipped" : ""}`}>
-          <span className="trigger-face trigger-front bubble">
-            <span className="mb-4 flex items-center justify-between gap-3">
-              <span className="flex items-center gap-3">
-                <span className="inline-flex h-10 min-w-10 items-center justify-center rounded-full border border-[var(--step-pill-border)] bg-[var(--step-pill-bg)] px-3 text-base font-semibold text-[var(--step-pill-text)] sm:h-11 sm:min-w-11 sm:text-lg">
-                  1
-                </span>
-                <span className="text-2xl font-semibold text-[var(--text)] sm:text-3xl">Trigger</span>
-              </span>
-              <TriggerIcon style={{ width: "3rem", height: "3rem" }} />
-            </span>
-
-            <span className="mt-3 text-base leading-7 text-[var(--muted)] sm:text-lg">
-              A message arrives, a file is received, or a scheduled event.
-            </span>
-          </span>
-
-          <span className="trigger-face trigger-back bubble">
-            <span className="trigger-back-title">Work Starts Anywhere</span>
-
-            <span className="trigger-scene" key={sceneRunId}>
-              <span className="scene-envelope">
-                <span className="scene-flap" />
-                <span className="scene-fold-left" />
-                <span className="scene-fold-right" />
-              </span>
-
-              <span className="scene-mailbox">
-                <span className="scene-mailbox-post" />
-                <span className="scene-mailbox-body" />
-                <span className="scene-mailbox-slot" />
-                <span className="scene-mailbox-mouth" />
-                <span className="scene-mailbox-door" />
-                <span className="scene-mailbox-flag" />
-              </span>
-            </span>
-          </span>
-        </span>
-      </button>
+    <>
+      <ProcessStepFlipCard
+        stepNumber={1}
+        title="Trigger"
+        description="A message arrives, a file is received, or a scheduled event."
+        icon={<TriggerIcon style={{ width: "3rem", height: "3rem" }} />}
+        backTitle="Work Starts Anywhere"
+        backContent={<TriggerBackScene />}
+        backKey={sceneRunId}
+        onFlipToBack={() => setSceneRunId((current) => current + 1)}
+      />
 
       <style jsx>{`
-        .trigger-flip-shell {
-          perspective: 1500px;
-        }
-
-        .trigger-flip-button {
-          width: 100%;
-          display: block;
-          border: 0;
-          background: transparent;
-          padding: 0;
-          cursor: pointer;
-          text-align: left;
-        }
-
-        .trigger-flip-button:focus-visible {
-          outline: 2px solid var(--accent-strong);
-          outline-offset: 5px;
-          border-radius: 2rem;
-        }
-
-        .trigger-flip-inner {
-          position: relative;
-          display: block;
-          min-height: clamp(15rem, 48vw, 17.4rem);
-          transform-style: preserve-3d;
-          transition: transform 760ms cubic-bezier(0.2, 0.68, 0.1, 1);
-        }
-
-        .trigger-flip-inner.is-flipped {
-          transform: rotateX(180deg);
-        }
-
-        .trigger-face {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          flex-direction: column;
-          padding: 1.25rem;
-          backface-visibility: hidden;
-          -webkit-backface-visibility: hidden;
-        }
-
-        .trigger-front {
-          z-index: 2;
-        }
-
-        .trigger-back {
-          transform: rotateX(180deg);
-        }
-
-        .trigger-back-title {
-          font-size: clamp(1.15rem, 2.6vw, 1.6rem);
-          line-height: 1.15;
-          font-weight: 700;
-          letter-spacing: 0.01em;
-          text-transform: uppercase;
-          color: var(--text);
-          width: fit-content;
-          border-bottom: 2px solid color-mix(in srgb, var(--accent-strong) 56%, transparent);
-          padding-bottom: 0.3rem;
-        }
-
-        .trigger-scene {
-          position: relative;
-          margin-top: 1.15rem;
-          flex: 1 1 auto;
-          border-radius: 1.25rem;
-          border: 1px solid color-mix(in srgb, var(--ring) 88%, transparent);
-          background: linear-gradient(
-            145deg,
-            color-mix(in srgb, var(--surface) 92%, white 8%) 0%,
-            color-mix(in srgb, var(--surface-strong) 90%, transparent) 100%
-          );
-          overflow: hidden;
-          min-height: 10.6rem;
-        }
-
         .scene-envelope {
           position: absolute;
           left: 1rem;
@@ -174,7 +72,6 @@ export default function TriggerFlipCard() {
         }
 
         .scene-fold-left {
-          position: absolute;
           position: absolute;
           left: 0.1rem;
           bottom: 0.14rem;
@@ -330,17 +227,7 @@ export default function TriggerFlipCard() {
           }
         }
 
-        @media (min-width: 640px) {
-          .trigger-face {
-            padding: 1.5rem;
-          }
-        }
-
         @media (prefers-reduced-motion: reduce) {
-          .trigger-flip-inner {
-            transition-duration: 0.01ms;
-          }
-
           .scene-envelope,
           .scene-letter,
           .scene-flap,
@@ -364,6 +251,6 @@ export default function TriggerFlipCard() {
           }
         }
       `}</style>
-    </div>
+    </>
   );
 }
