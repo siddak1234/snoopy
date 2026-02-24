@@ -71,7 +71,7 @@ export default function IndustrySignals() {
         {/* Animated marquee when motion is allowed (all breakpoints) */}
         <ul
           aria-label="Industry research excerpts"
-          className="hidden w-max items-center motion-safe:flex motion-safe:[animation:industry-signals-marquee_92s_linear_infinite] motion-safe:group-hover:[animation-play-state:paused] motion-safe:group-focus-within:[animation-play-state:paused]"
+          className="hidden w-max items-center overflow-x-auto py-1 motion-safe:flex motion-safe:[animation:industry-signals-marquee_92s_linear_infinite] motion-safe:group-hover:[animation-play-state:paused] motion-safe:group-focus-within:[animation-play-state:paused] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
         >
           {loopedSignals.map((signal, index) => (
             <li key={`${signal.attribution}-${index}`} className="flex items-center">
