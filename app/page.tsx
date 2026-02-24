@@ -1,6 +1,7 @@
 import Link from "next/link";
 import IndustrySignals from "@/components/IndustrySignals";
 import ProcessStepsSection from "@/components/home/ProcessStepsSection";
+import TypingHeadline from "@/components/home/TypingHeadline";
 import ValueCard from "@/components/home/ValueCard";
 import { AutonomousIcon, ScalableIcon, SecureIcon } from "@/components/icons/valueIcons";
 
@@ -29,12 +30,7 @@ export default function Home() {
   return (
     <div className="space-y-6 sm:space-y-8">
       <section className="bubble p-6 sm:p-8 lg:p-10">
-        <p className="mb-3 inline-flex rounded-full bg-[var(--chip-bg)] px-3 py-1 text-xs font-semibold tracking-wide text-[var(--chip-text)]">
-          Automation With AI Workflows
-        </p>
-        <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">
-          Automate with AI.
-        </h1>
+        <TypingHeadline />
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="/solutions" className="btn-primary px-5">
             Explore Solutions

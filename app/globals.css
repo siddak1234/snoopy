@@ -431,3 +431,17 @@ body {
     transform: rotate(-68deg);
   }
 }
+
+/* Typing headline caret blink */
+.typing-caret {
+  display: inline-block;
+  width: 0.6ch;
+  text-align: center;
+  animation: typing-caret-blink 1s steps(1, start) infinite;
+}
+
+@keyframes typing-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
