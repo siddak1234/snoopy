@@ -12,6 +12,7 @@ export default function TypingHeadline() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [displayed, setDisplayed] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDone, setIsDone] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   // Detect prefers-reduced-motion
@@ -34,6 +35,10 @@ export default function TypingHeadline() {
       return;
     }
 
+    if (isDone) {
+      return;
+    }
+
     const currentWord = WORDS[currentIndex];
     let timeoutId: number | undefined;
 
@@ -43,8 +48,14 @@ export default function TypingHeadline() {
         setDisplayed(currentWord.slice(0, displayed.length + 1));
       }, TYPE_SPEED);
     } else if (!isDeleting && displayed.length === currentWord.length) {
+      const isLastWord = currentIndex === WORDS.length - 1;
+
       // Pause after full word
       timeoutId = window.setTimeout(() => {
+        if (isLastWord) {
+          setIsDone(true);
+          return;
+        }
         setIsDeleting(true);
       }, PAUSE_AFTER_TYPE);
     } else if (isDeleting && displayed.length > 0) {
@@ -65,7 +76,7 @@ export default function TypingHeadline() {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [currentIndex, displayed, isDeleting, prefersReducedMotion]);
+  }, [currentIndex, displayed, isDeleting, isDone, prefersReducedMotion]);
 
   const showCaret = !prefersReducedMotion;
 
