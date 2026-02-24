@@ -67,41 +67,27 @@ export default function IndustrySignals() {
     <section aria-label="Industry signals from published research" className="space-y-2">
       <h2 className="px-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">INDUSTRY SIGNALS</h2>
 
-      <div className="hidden md:block">
-        <div className="group relative overflow-hidden rounded-2xl border border-[var(--ring)] bg-[var(--surface)] px-3 py-3 transition duration-200 hover:-translate-y-1 hover:shadow-xl focus-within:-translate-y-1 focus-within:shadow-xl">
-          <ul
-            aria-label="Industry research excerpts"
-            className="hidden w-max items-center motion-safe:flex motion-safe:[animation:industry-signals-marquee_92s_linear_infinite] motion-safe:group-hover:[animation-play-state:paused] motion-safe:group-focus-within:[animation-play-state:paused]"
-          >
-            {loopedSignals.map((signal, index) => (
-              <li key={`${signal.attribution}-${index}`} className="flex items-center">
-                <SignalItem quote={signal.quote} attribution={signal.attribution} href={signal.href} />
-                <ItemSeparator />
-              </li>
-            ))}
-          </ul>
+      <div className="group relative overflow-hidden rounded-2xl border border-[var(--ring)] bg-[var(--surface)] px-3 py-3 transition duration-200 hover:-translate-y-1 hover:shadow-xl focus-within:-translate-y-1 focus-within:shadow-xl">
+        {/* Animated marquee when motion is allowed (all breakpoints) */}
+        <ul
+          aria-label="Industry research excerpts"
+          className="hidden w-max items-center motion-safe:flex motion-safe:[animation:industry-signals-marquee_92s_linear_infinite] motion-safe:group-hover:[animation-play-state:paused] motion-safe:group-focus-within:[animation-play-state:paused]"
+        >
+          {loopedSignals.map((signal, index) => (
+            <li key={`${signal.attribution}-${index}`} className="flex items-center">
+              <SignalItem quote={signal.quote} attribution={signal.attribution} href={signal.href} />
+              <ItemSeparator />
+            </li>
+          ))}
+        </ul>
 
-          <ul
-            aria-label="Industry research excerpts"
-            className="hidden items-center overflow-x-auto py-1 motion-reduce:flex [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-          >
-            {signals.map((signal, index) => (
-              <li key={`reduced-${signal.attribution}`} className="flex items-center">
-                <SignalItem quote={signal.quote} attribution={signal.attribution} href={signal.href} />
-                {index < signals.length - 1 ? <ItemSeparator /> : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      <div
-        className="md:hidden overflow-x-auto rounded-2xl border border-[var(--ring)] bg-[var(--surface)] px-2 py-3 transition duration-200 hover:-translate-y-1 hover:shadow-xl focus-within:-translate-y-1 focus-within:shadow-xl [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-        aria-label="Swipeable industry signals feed"
-      >
-        <ul className="flex snap-x snap-mandatory items-center">
+        {/* Static, scrollable list when user prefers reduced motion */}
+        <ul
+          aria-label="Industry research excerpts"
+          className="hidden items-center overflow-x-auto py-1 motion-reduce:flex [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        >
           {signals.map((signal, index) => (
-            <li key={`mobile-${signal.attribution}`} className="flex snap-center items-center min-w-[85vw] shrink-0">
+            <li key={`reduced-${signal.attribution}`} className="flex items-center">
               <SignalItem quote={signal.quote} attribution={signal.attribution} href={signal.href} />
               {index < signals.length - 1 ? <ItemSeparator /> : null}
             </li>

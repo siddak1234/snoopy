@@ -230,6 +230,19 @@ body {
   }
 }
 
+/* Ensure flip card faces clip their contents to the rounded bubble */
+.process-step-flip-face.bubble {
+  overflow: hidden;
+}
+
+/* On small screens, let back content scroll inside the card instead of leaking out */
+@media (max-width: 639px) {
+  .process-step-flip-scene {
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+}
+
 /* Bubble hover on flip faces: front lifts when card is not flipped, back lifts while keeping rotation */
 .process-step-flip-inner:not(.is-flipped) .process-step-flip-face-front.bubble:hover {
   transform: translateY(-4px);
