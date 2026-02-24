@@ -64,7 +64,7 @@ Recommended:
 
 1. **Single Dockerfile** for the Next.js app: multi-stage build, `node:*-alpine`, `prisma generate` at build (or via `postinstall`), no `next dev` in production.
 2. **No DB in same container**; always connect to Postgres via env.
-3. **Health check**: e.g. `GET /api/health` returning 200 when app and (optionally) DB are reachable.
+3. **Health vs readiness**: `GET /api/health` = liveness (200, no DB). `GET /api/ready` = readiness (200 when DB ok, 503 when DB down).
 4. **Secrets**: only from env (or your cloud’s secret manager), never committed.
 
 ---
@@ -100,7 +100,7 @@ So: **yes, the architecture is clean and professional enough to deploy in the cl
 | **No tests** | Regressions, harder refactors | Add a few integration tests (e.g. Playwright for critical flows) and/or API route tests; even a small suite helps. |
 | **Auth only in UI** | `/account` (and similar) are protected only client-side; direct URL access still renders then redirects. | Add middleware or `getServerSession` in a server layout for protected routes so unauthenticated users get a redirect before any sensitive UI. |
 | **Env not validated** | Missing `NEXTAUTH_SECRET` or `GOOGLE_*` can fail in subtle ways (e.g. empty string in NextAuth). | At app startup or in a small `lib/env.ts`, validate required env and throw a clear error if missing in production. |
-| **No health endpoint** | Orchestrators (Kubernetes, ECS, etc.) and load balancers need a simple "is this process up?" check. | Add `GET /api/health` that returns 200 (and optionally checks DB connectivity). |
+| **No health/ready endpoints** | Orchestrators need liveness and readiness. | `GET /api/health` = liveness (200, no DB). `GET /api/ready` = readiness (DB check, 200/503). |
 | **Prisma/User unused** | Schema has `User` and you have `lib/db`, but NextAuth uses JWT only (no DB adapter). | Either wire NextAuth to Prisma (e.g. adapter + sync users to DB) or treat User as "for future use" and document it; avoids confusion. |
 
 None of these block deployment; they improve operability and security as you containerize and scale.

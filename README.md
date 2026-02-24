@@ -45,7 +45,7 @@ Do **not** commit `.env.local` or any file with real secrets.
 
 ## Repository layout
 
-- **`app/`** — Next.js routes, pages, API (`/api/auth`, `/api/health`)
+- **`app/`** — Next.js routes, pages, API (`/api/auth`, `/api/health`, `/api/ready`)
 - **`components/`** — React UI components
 - **`lib/`** — Shared logic: `db.ts`, `site.ts`, `env.ts` (validation), `auth.ts` (NextAuth config)
 - **`middleware.ts`** — Protects `/account` (redirect to login when unauthenticated)

@@ -32,7 +32,8 @@ snoopy/
 | Env validation | `lib/env.ts` | `validateEnv()` runs from auth config; in production, throws if required vars missing. |
 | Auth config | `lib/auth.ts` | `getAuthOptions()` — shared NextAuth config for the API route and `getServerSession()`. |
 | Route protection | `middleware.ts` | Protects `/account` (redirects to `/login` if unauthenticated). |
-| Health check | `app/api/health/route.ts` | `GET /api/health` — 200 if app + DB ok, 503 if DB down (for orchestrators). |
+| Liveness | `app/api/health/route.ts` | `GET /api/health` — 200 always; no DB (build-safe). |
+| Readiness | `app/api/ready/route.ts` | `GET /api/ready` — 200 with DB check when env set, or 503 if DB down. |
 | Schema changes | `prisma/schema.prisma` | Then run `npm run db:migrate -- --name <name>`. |
 | Docs / architecture | `docs/` | Keep ARCHITECTURE.md and REPO-STRUCTURE.md up to date. |
 

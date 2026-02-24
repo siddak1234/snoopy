@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 import { defineConfig } from "prisma/config";
 
-// Load local development env first (not committed), then fall back to .env if present.
+// Local dev only: .env.local is gitignored. Production (e.g. Vercel) uses platform env vars only.
 dotenv.config({ path: ".env.local" });
 dotenv.config();
 
