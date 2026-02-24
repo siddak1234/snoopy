@@ -138,3 +138,296 @@ body {
 .btn-secondary:hover {
   background: var(--card);
 }
+
+/* Process step flip card - 3D flip animation */
+.process-step-flip-shell {
+  perspective: 1200px;
+}
+
+.process-step-flip-button {
+  width: 100%;
+  display: block;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.process-step-flip-button:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 5px;
+  border-radius: 2rem;
+}
+
+.process-step-flip-inner {
+  position: relative;
+  display: block;
+  min-height: clamp(15rem, 48vw, 17.4rem);
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+  transition: transform 760ms cubic-bezier(0.2, 0.68, 0.1, 1);
+}
+
+.process-step-flip-inner.is-flipped {
+  transform: rotateY(180deg);
+}
+
+.process-step-flip-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.process-step-flip-face-front {
+  z-index: 2;
+}
+
+.process-step-flip-face-back {
+  transform: rotateY(180deg);
+}
+
+.process-step-flip-back-title {
+  font-size: clamp(1.15rem, 2.6vw, 1.6rem);
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--text);
+  width: fit-content;
+  border-bottom: 2px solid color-mix(in srgb, var(--accent-strong) 56%, transparent);
+  padding-bottom: 0.3rem;
+}
+
+.process-step-flip-scene {
+  position: relative;
+  margin-top: 1.15rem;
+  flex: 1 1 auto;
+  border-radius: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--ring) 88%, transparent);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--surface) 92%, white 8%) 0%,
+    color-mix(in srgb, var(--surface-strong) 90%, transparent) 100%
+  );
+  overflow: hidden;
+  min-height: 10.6rem;
+}
+
+@media (min-width: 640px) {
+  .process-step-flip-face {
+    padding: 1.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .process-step-flip-inner {
+    transition-duration: 0.01ms;
+  }
+}
+
+/* Bubble hover on flip faces: front lifts when card is not flipped, back lifts while keeping rotation */
+.process-step-flip-inner:not(.is-flipped) .process-step-flip-face-front.bubble:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 38px rgba(47, 98, 170, 0.16);
+}
+.process-step-flip-face-back.bubble:hover {
+  transform: rotateY(180deg) translateY(-4px);
+  box-shadow: 0 18px 38px rgba(47, 98, 170, 0.16);
+}
+
+/* Trigger card back: envelope-to-mailbox animation */
+.process-step-flip-scene .scene-envelope {
+  position: absolute;
+  left: 1rem;
+  top: 60%;
+  width: 3.9rem;
+  height: 2.55rem;
+  border: 1.5px solid color-mix(in srgb, var(--icon-text) 70%, white 10%);
+  border-radius: 0.32rem;
+  background: linear-gradient(180deg, color-mix(in srgb, #ffffff 95%, var(--surface) 5%) 0%, color-mix(in srgb, var(--surface) 72%, #ffffff 28%) 100%);
+  transform: translateY(-50%) rotate(-3deg);
+  animation: trigger-scene-envelope-travel 1900ms linear forwards;
+  box-shadow: 0 6px 12px rgba(20, 40, 70, 0.1);
+  overflow: hidden;
+  z-index: 5;
+}
+
+.process-step-flip-scene .scene-flap {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 58%;
+  clip-path: polygon(0 0, 50% 100%, 100% 0);
+  background: color-mix(in srgb, #ffffff 82%, var(--surface-strong) 18%);
+  border-bottom: 1.5px solid color-mix(in srgb, var(--icon-text) 48%, transparent);
+  transform-origin: top center;
+  animation: trigger-scene-flap-close 1900ms linear forwards;
+}
+
+.process-step-flip-scene .scene-fold-left {
+  position: absolute;
+  left: 0.1rem;
+  bottom: 0.14rem;
+  width: 50%;
+  height: 64%;
+  border-right: 1.5px solid color-mix(in srgb, var(--icon-text) 52%, transparent);
+  border-top: 1.5px solid color-mix(in srgb, var(--icon-text) 35%, transparent);
+  clip-path: polygon(0 100%, 100% 0, 100% 100%);
+  background: color-mix(in srgb, #ffffff 90%, var(--surface) 10%);
+}
+
+.process-step-flip-scene .scene-fold-right {
+  position: absolute;
+  right: 0.1rem;
+  bottom: 0.14rem;
+  width: 50%;
+  height: 64%;
+  border-left: 1.5px solid color-mix(in srgb, var(--icon-text) 52%, transparent);
+  border-top: 1.5px solid color-mix(in srgb, var(--icon-text) 35%, transparent);
+  clip-path: polygon(0 0, 100% 100%, 0 100%);
+  background: color-mix(in srgb, #ffffff 90%, var(--surface) 10%);
+}
+
+.process-step-flip-scene .scene-mailbox {
+  position: absolute;
+  right: 0.85rem;
+  bottom: 0.65rem;
+  width: 6.7rem;
+  height: 9.7rem;
+}
+
+.process-step-flip-scene .scene-mailbox-post {
+  position: absolute;
+  left: 2.9rem;
+  bottom: 0;
+  width: 0.8rem;
+  height: 4.1rem;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--muted) 50%, var(--surface-strong) 50%);
+}
+
+.process-step-flip-scene .scene-mailbox-body {
+  position: absolute;
+  left: 0;
+  top: 1.45rem;
+  width: 6.2rem;
+  height: 3.95rem;
+  border-radius: 1.35rem 1.35rem 0.65rem 0.65rem;
+  border: 1.5px solid color-mix(in srgb, var(--icon-text) 68%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-strong) 84%, white 16%) 0%, color-mix(in srgb, var(--surface) 95%, transparent) 100%);
+  box-shadow: 0 8px 14px rgba(30, 54, 90, 0.16);
+}
+
+.process-step-flip-scene .scene-mailbox-slot {
+  position: absolute;
+  left: 1.2rem;
+  top: 2.35rem;
+  width: 4.2rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #0f233f 65%, var(--surface-strong) 35%);
+  z-index: 2;
+}
+
+.process-step-flip-scene .scene-mailbox-mouth {
+  position: absolute;
+  left: 0.12rem;
+  top: 2.42rem;
+  width: 0.62rem;
+  height: 0.27rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #10253f 70%, var(--surface-strong) 30%);
+  z-index: 2;
+}
+
+.process-step-flip-scene .scene-mailbox-door {
+  position: absolute;
+  left: 0.12rem;
+  top: 2.1rem;
+  width: 0.72rem;
+  height: 0.92rem;
+  border-radius: 0.24rem;
+  border: 1.5px solid color-mix(in srgb, var(--icon-text) 65%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 88%, white 12%) 0%, color-mix(in srgb, var(--surface-strong) 92%, transparent) 100%);
+  transform-origin: left center;
+  transform: perspective(20rem) rotateY(-112deg);
+  animation: trigger-scene-door-close 1900ms ease forwards;
+  z-index: 3;
+}
+
+.process-step-flip-scene .scene-mailbox-flag {
+  position: absolute;
+  right: -0.24rem;
+  top: 1.78rem;
+  width: 1.9rem;
+  height: 0.36rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #ef4f4f 85%, white 15%);
+  transform-origin: left center;
+  transform: rotate(4deg);
+  animation: trigger-scene-flag-raise 1900ms ease forwards;
+}
+
+@keyframes trigger-scene-flap-close {
+  0% { transform: rotateX(0deg); }
+  100% { transform: rotateX(0deg); }
+}
+
+@keyframes trigger-scene-envelope-travel {
+  0% {
+    left: 1rem;
+    transform: translateY(-50%) rotate(-3deg) scale(1);
+    opacity: 1;
+  }
+  78% {
+    left: calc(100% - 8.15rem);
+    transform: translateY(-50%) rotate(1deg) scale(1);
+    opacity: 1;
+  }
+  92% {
+    left: calc(100% - 7.4rem);
+    transform: translateY(-50%) rotate(2deg) scale(0.8);
+    opacity: 0.8;
+  }
+  100% {
+    left: calc(100% - 7.3rem);
+    transform: translateY(-50%) rotate(2deg) scale(0.72);
+    opacity: 0;
+  }
+}
+
+@keyframes trigger-scene-door-close {
+  0%, 74% { transform: perspective(20rem) rotateY(-112deg); }
+  100% { transform: perspective(20rem) rotateY(0deg); }
+}
+
+@keyframes trigger-scene-flag-raise {
+  0%, 76% { transform: rotate(4deg); }
+  100% { transform: rotate(-68deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .process-step-flip-scene .scene-envelope,
+  .process-step-flip-scene .scene-flap,
+  .process-step-flip-scene .scene-mailbox-door,
+  .process-step-flip-scene .scene-mailbox-flag {
+    animation: none;
+  }
+  .process-step-flip-scene .scene-envelope {
+    opacity: 0;
+    left: calc(100% - 7.3rem);
+    transform: translateY(-50%) rotate(2deg) scale(0.72);
+  }
+  .process-step-flip-scene .scene-mailbox-door {
+    transform: perspective(20rem) rotateY(0deg);
+  }
+  .process-step-flip-scene .scene-mailbox-flag {
+    transform: rotate(-68deg);
+  }
+}
