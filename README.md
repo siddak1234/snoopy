@@ -20,17 +20,37 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Learn More
+## Database & Prisma (Supabase)
 
-To learn more about Next.js, take a look at the following resources:
+This project uses Supabase Postgres with Prisma.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Local environment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Create a `.env.local` file (it is gitignored via `.env*`).
+- Add your Prisma connection string, matching the `POSTGRES_PRISMA_URL` value from Vercel/Supabase:
 
-## Deploy on Vercel
+```bash
+POSTGRES_PRISMA_URL="postgresql://USER:PASSWORD@HOST:PORT/dbname?sslmode=require"
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+> Do **not** commit `.env.local` or any secrets to git.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Prisma commands
+
+- Run migrations locally:
+
+```bash
+npm run db:migrate -- --name init
+```
+
+- Open Prisma Studio:
+
+```bash
+npm run db:studio
+```
+
+- Regenerate the Prisma Client (if the schema changes):
+
+```bash
+npm run db:generate
+```
