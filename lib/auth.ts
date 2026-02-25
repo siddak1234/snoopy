@@ -91,7 +91,7 @@ async function ensureDefaultWorkspaceForUser(userId: string): Promise<string> {
         : "My Workspace";
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    const workspaceId = await prisma.$transaction(async (tx) => {
       const workspace = await tx.workspace.create({
         data: { name: workspaceName },
       });
@@ -104,7 +104,13 @@ async function ensureDefaultWorkspaceForUser(userId: string): Promise<string> {
       });
       return workspace.id;
     });
-  } catch {
+    console.log("ENSURE_WORKSPACE_OK", { userId, workspaceId });
+    return workspaceId;
+  } catch (error) {
+    console.error("ENSURE_WORKSPACE_FAIL", {
+      userId,
+      message: (error as Error).message,
+    });
     const after = await prisma.membership.findFirst({
       where: { userId },
       orderBy: { createdAt: "asc" },
@@ -140,17 +146,31 @@ export function getAuthOptions(): NextAuthOptions {
     callbacks: {
       async jwt({ token, account, profile }) {
         if (account && profile && "email" in profile && profile.email) {
+          console.log("AUTH_JWT_CALLBACK", {
+            provider: account.provider,
+            hasEmail: Boolean(profile.email),
+          });
           const sub =
             account.provider === "google"
               ? (account.providerAccountId as string)
               : null;
-          const { id } = await provisionUser({
-            sub,
-            email: profile.email,
-            name: "name" in profile ? (profile.name as string | null) : null,
-            image: "picture" in profile ? (profile.picture as string | null) : null,
-          });
-          (token as JWT).userId = id;
+          try {
+            const { id } = await provisionUser({
+              sub,
+              email: profile.email,
+              name: "name" in profile ? (profile.name as string | null) : null,
+              image: "picture" in profile
+                ? (profile.picture as string | null)
+                : null,
+            });
+            (token as JWT).userId = id;
+            console.log("PROVISION_USER_OK", { userId: id });
+          } catch (error) {
+            console.error("PROVISION_USER_FAIL", {
+              message: (error as Error).message,
+            });
+            throw error;
+          }
         }
         const userId = (token as JWT).userId;
         if (userId) {
