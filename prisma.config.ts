@@ -5,6 +5,12 @@ import { defineConfig } from "prisma/config";
 dotenv.config({ path: ".env.local", override: false, quiet: true });
 dotenv.config({ path: ".env", override: false, quiet: true });
 
+if (!process.env.POSTGRES_PRISMA_URL) {
+  throw new Error(
+    "Prisma migrations require POSTGRES_PRISMA_URL pointing to the direct Supabase database (db.<project>.supabase.co)."
+  );
+}
+
 export default defineConfig({
   datasource: {
     url: process.env.POSTGRES_PRISMA_URL,
