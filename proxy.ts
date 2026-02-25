@@ -4,11 +4,11 @@ import type { NextRequest } from "next/server";
 
 const protectedPaths = ["/account", "/dashboard"];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isProtected = protectedPaths.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`)
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
 
   if (!isProtected) {
@@ -32,3 +32,4 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: ["/account", "/account/:path*", "/dashboard", "/dashboard/:path*"],
 };
+

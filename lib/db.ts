@@ -1,17 +1,16 @@
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-if (!process.env.POSTGRES_URL) {
-  throw new Error("POSTGRES_URL is required");
-}
-
-if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = process.env.POSTGRES_URL;
-}
-
-// POSTGRES_PRISMA_URL (direct connection) is used by Prisma migrations
-// POSTGRES_URL (pooled connection) is used by the running application
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+
+const adapter = new PrismaPg({
+  connectionString: process.env.POSTGRES_PRISMA_URL!,
+});
+
 export const prisma =
   globalForPrisma.prisma ??
-  new PrismaClient();
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+  new PrismaClient({ adapter });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+}
