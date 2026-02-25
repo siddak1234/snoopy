@@ -1,6 +1,14 @@
 import NextAuth from "next-auth";
 import { getAuthOptions } from "@/lib/auth";
 
-const handler = NextAuth(getAuthOptions());
+function buildHandler() {
+  return NextAuth(getAuthOptions());
+}
 
-export { handler as GET, handler as POST };
+export async function GET(req: unknown, ctx: unknown) {
+  return buildHandler()(req as never, ctx as never);
+}
+
+export async function POST(req: unknown, ctx: unknown) {
+  return buildHandler()(req as never, ctx as never);
+}

@@ -2,13 +2,13 @@ import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const protectedPaths = ["/account"];
+const protectedPaths = ["/account", "/dashboard"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const isProtected = protectedPaths.some((path) =>
-    pathname === path || pathname.startsWith(`${path}/`)
+  const isProtected = protectedPaths.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`)
   );
 
   if (!isProtected) {
@@ -30,5 +30,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/account", "/account/:path*"],
+  matcher: ["/account", "/account/:path*", "/dashboard", "/dashboard/:path*"],
 };

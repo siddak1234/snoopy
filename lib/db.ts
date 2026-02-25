@@ -1,17 +1,15 @@
 import { PrismaClient } from "@prisma/client";
 
-type PrismaClientSingleton = PrismaClient | undefined;
-
-declare const globalThis: {
-  prisma?: PrismaClientSingleton;
-} & typeof global;
-
-const prismaClient = globalThis.prisma ?? new PrismaClient();
-
-if (process.env.NODE_ENV !== "production") {
-  globalThis.prisma = prismaClient;
+if (!process.env.POSTGRES_URL) {
+  throw new Error("POSTGRES_URL missing: runtime DB connection not configured");
 }
 
-/** Singleton; use only in Node runtime (not Edge). Production gets POSTGRES_PRISMA_URL from Vercel env. */
-export const db = prismaClient;
-
+// POSTGRES_PRISMA_URL (direct connection) is used by Prisma migrations
+// POSTGRES_URL (pooled connection) is used by the running application
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    datasources: { db: { url: process.env.POSTGRES_URL } },
+  } as ConstructorParameters<typeof PrismaClient>[0]);
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
