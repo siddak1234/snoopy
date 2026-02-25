@@ -13,6 +13,11 @@ const adapter = new PrismaPg({
   // clear error. We intentionally avoid custom throws here so Next.js builds
   // are not blocked when env is absent during phase-production-build.
   connectionString: connectionString!,
+  // Explicit SSL config to avoid "self-signed certificate in certificate chain"
+  // errors in some serverless environments when connecting to Supabase.
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
 export const prisma =
