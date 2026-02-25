@@ -8,13 +8,25 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 const connectionString =
   process.env.POSTGRES_URL ?? process.env.POSTGRES_PRISMA_URL;
 
+// Build a pg PoolConfig manually instead of passing the raw connection string,
+// so we can fully control TLS options and avoid sslmode parsing issues.
+if (!connectionString) {
+  throw new Error(
+    "Database connection string is missing. Set POSTGRES_URL (pooled) or POSTGRES_PRISMA_URL (direct)."
+  );
+}
+
+const url = new URL(connectionString);
+
 const adapter = new PrismaPg({
-  // If connectionString is missing, Prisma/pg will throw at runtime with a
-  // clear error. We intentionally avoid custom throws here so Next.js builds
-  // are not blocked when env is absent during phase-production-build.
-  connectionString: connectionString!,
-  // Explicit SSL config to avoid "self-signed certificate in certificate chain"
-  // errors in some serverless environments when connecting to Supabase.
+  host: url.hostname,
+  port: url.port ? Number(url.port) : 5432,
+  database: url.pathname.startsWith("/") ? url.pathname.slice(1) : url.pathname,
+  user: decodeURIComponent(url.username),
+  password: decodeURIComponent(url.password),
+  // Explicit TLS: allow Supabase's managed certificates without strict CA
+  // validation, which avoids "self-signed certificate in certificate chain"
+  // errors in some serverless environments like Vercel.
   ssl: {
     rejectUnauthorized: false,
   },
