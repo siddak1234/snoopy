@@ -7,7 +7,8 @@ const required = [
   "NEXTAUTH_SECRET",
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
-  "POSTGRES_PRISMA_URL",
+  // Runtime should use pooled connection; direct URL is for migrations only.
+  "POSTGRES_URL",
 ] as const;
 
 function isProductionRuntime(): boolean {
