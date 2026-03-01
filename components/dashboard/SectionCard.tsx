@@ -29,7 +29,7 @@ export default function SectionCard({
   const subheaderText = subheader ?? defaultSubheader[title] ?? "";
 
   return (
-    <div className="rounded-2xl border border-[var(--ring)] bg-[var(--surface)]/95 shadow-xl backdrop-blur px-6 py-6 sm:px-8 sm:py-8 [background:linear-gradient(165deg,var(--surface)_0%,var(--surface-strong)_100%)]">
+    <div className="bubble px-6 py-6 sm:px-8 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-[var(--text)]">

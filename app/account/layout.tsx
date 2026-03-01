@@ -19,7 +19,7 @@ export default async function AccountLayout({
       <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
         <DashboardSidebar />
         <div className="min-w-0 flex-1">
-          <header className="mb-4 lg:mb-6">
+          <header className="mb-4 lg:mb-0">
             <DashboardHeader />
           </header>
           <main>{children}</main>

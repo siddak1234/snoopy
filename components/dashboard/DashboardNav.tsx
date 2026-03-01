@@ -53,7 +53,7 @@ export function DashboardSidebar() {
       className="hidden w-64 shrink-0 lg:block"
       aria-label="Dashboard navigation"
     >
-      <nav className="flex flex-col gap-0.5 rounded-2xl border border-[var(--ring)] bg-[var(--surface)]/95 p-4 shadow-lg backdrop-blur [background:linear-gradient(165deg,var(--surface)_0%,var(--surface-strong)_100%)]">
+      <nav className="bubble-soft flex flex-col gap-0.5 p-4">
         <NavLinks currentPath={pathname ?? ""} />
       </nav>
     </aside>
