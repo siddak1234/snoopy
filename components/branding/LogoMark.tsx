@@ -1,6 +1,6 @@
 /**
- * A8X brand mark — geometric sans, optical kerning, interlocked-hoops "8".
- * Grouped glyphs (A, 8, X) for easy kerning tweaks.
+ * A8X brand mark — geometric sans, tight optical kerning, interlocked-hoops "8".
+ * Reference: minimal professional wordmark; top loop slightly smaller than bottom.
  * Use currentColor; works on light or dark backgrounds.
  */
 export default function LogoMark({
@@ -33,15 +33,15 @@ export default function LogoMark({
       aria-hidden
     >
       <defs>
-        {/* Top hoop passes behind bottom at overlap; mask hole in viewBox coords to align with bottom hoop */}
+        {/* Top hoop passes behind bottom at overlap; mask hole in viewBox coords */}
         <mask id="a8x-eight-top-mask" maskUnits="userSpaceOnUse">
           <rect x="-4" y="-4" width="56" height="32" fill="white" />
-          <circle cx={21 + offsetX} cy="14.5" r="5.2" fill="black" />
+          <circle cx={21 + offsetX} cy="14.5" r="5.5" fill="black" />
         </mask>
       </defs>
 
       <g transform={`translate(${offsetX}, 0)`}>
-        {/* Glyph A — geometric sans, apex and crossbar. Visual right edge ~13. */}
+        {/* Glyph A — geometric sans, sharp apex and crossbar. */}
         <g aria-hidden>
           <path
             d="M2 20 6.5 4 11 20M4.5 12h5"
@@ -52,9 +52,9 @@ export default function LogoMark({
           />
         </g>
 
-        {/* Glyph 8 — interlocked hollow hoops (tubing). Center x=21. Bottom hoop raised (y=14.5). */}
+        {/* Glyph 8 — interlocked hollow hoops; top loop slightly smaller than bottom (reference proportion). */}
         <g aria-hidden>
-          {/* Bottom hoop (drawn first = behind) */}
+          {/* Bottom hoop (larger, drawn first = behind) */}
           <path
             d="M25.5 14.5a4.5 4.5 0 0 1-9 0 4.5 4.5 0 0 1 9 0"
             stroke={eightColor}
@@ -63,10 +63,10 @@ export default function LogoMark({
             strokeLinecap="round"
             strokeLinejoin="round"
           />
-          {/* Top hoop (masked so it goes behind at crossing) */}
+          {/* Top hoop (slightly smaller, masked so it goes behind at crossing) */}
           <g mask="url(#a8x-eight-top-mask)">
             <path
-              d="M25.5 8a4.5 4.5 0 0 1-9 0 4.5 4.5 0 0 1 9 0"
+              d="M25 8a4 4 0 0 1-8 0 4 4 0 0 1 8 0"
               stroke={eightColor}
               strokeWidth={strokeW}
               fill="none"

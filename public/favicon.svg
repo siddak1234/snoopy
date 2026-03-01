@@ -3,7 +3,7 @@
     <!-- Mask hole at scaled+translated position so top hoop is clipped over bottom hoop -->
     <mask id="favicon-eight-top-mask" maskUnits="userSpaceOnUse">
       <rect x="-4" y="-4" width="40" height="40" fill="white"/>
-      <circle cx="14.08" cy="17.6" r="3.35" fill="black"/>
+      <circle cx="14.08" cy="17.6" r="3.52" fill="black"/>
     </mask>
   </defs>
   <!-- Content: 48×24 mark; scale 0.64, center in 32×32: tx=(32-30.72)/2=0.64, ty=(32-15.36)/2=8.32 -->
@@ -11,7 +11,7 @@
     <path d="M2 20 6.5 4 11 20M4.5 12h5" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M25.5 14.5a4.5 4.5 0 0 1-9 0 4.5 4.5 0 0 1 9 0" stroke="currentColor" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
     <g mask="url(#favicon-eight-top-mask)">
-      <path d="M25.5 8a4.5 4.5 0 0 1-9 0 4.5 4.5 0 0 1 9 0" stroke="currentColor" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M25 8a4 4 0 0 1-8 0 4 4 0 0 1 8 0" stroke="currentColor" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
     <path d="M29 4l16 16M45 4 29 20" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
