@@ -42,19 +42,30 @@ export default function RootLayout({
         <SessionProvider>
         <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-4 pb-6 sm:px-6 lg:px-8">
           <header className="bubble-soft sticky top-3 z-50 mt-3 px-4 py-3 sm:px-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <Link href="/" className="flex items-center gap-2 text-base font-semibold text-[var(--text)]">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--brand-pill-border)] bg-[var(--brand-pill-bg)] text-sm font-bold text-[var(--brand-pill-text)]">
+            <div className="flex w-full items-center gap-4 sm:gap-6">
+              {/* Left: brand */}
+              <Link
+                href="/"
+                className="flex shrink-0 items-center gap-2.5 text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] rounded-full"
+              >
+                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--brand-pill-border)] bg-[var(--brand-pill-bg)] text-sm font-bold text-[var(--brand-pill-text)]">
                   {site.name.slice(0, 1)}
                 </span>
-                <span>{site.name}</span>
+                <span className="text-lg font-bold tracking-tight sm:text-xl">
+                  {site.name}
+                </span>
               </Link>
-              <nav aria-label="Main navigation" className="hidden items-center gap-2 text-sm font-medium sm:gap-3 md:flex">
+
+              {/* Center: main nav — evenly distributed */}
+              <nav
+                aria-label="Main navigation"
+                className="hidden min-w-0 flex-1 md:flex md:justify-evenly md:gap-2"
+              >
                 {navLinks.slice(0, 1).map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="rounded-full px-4 py-2 text-[var(--text)] transition hover:bg-[var(--surface-hover)]"
+                    className="rounded-full px-4 py-2.5 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)]"
                   >
                     {link.label}
                   </Link>
@@ -64,15 +75,21 @@ export default function RootLayout({
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="rounded-full px-4 py-2 text-[var(--text)] transition hover:bg-[var(--surface-hover)]"
+                    className="rounded-full px-4 py-2.5 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)]"
                   >
                     {link.label}
                   </Link>
                 ))}
+              </nav>
+
+              {/* Right: account + theme (desktop) */}
+              <div className="hidden shrink-0 items-center gap-2 md:flex">
                 <AuthNavLinks />
                 <ThemeToggle />
-              </nav>
-              <div className="flex md:hidden items-center gap-2">
+              </div>
+
+              {/* Right: theme + mobile menu (mobile only) */}
+              <div className="flex shrink-0 items-center gap-2 md:hidden">
                 <ThemeToggle />
                 <MobileNavMenu />
               </div>

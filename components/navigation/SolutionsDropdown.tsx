@@ -106,7 +106,7 @@ export default function SolutionsDropdown() {
       onPointerLeave={onPointerLeave}
       onBlur={onBlur}
     >
-      <div className="inline-flex items-center rounded-full px-4 py-2 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-within:bg-[var(--surface-hover)]">
+      <div className="inline-flex items-center rounded-full px-4 py-2.5 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-within:bg-[var(--surface-hover)]">
         <Link href="/solutions" className="focus-visible:outline-none" onKeyDown={onSolutionsLinkKeyDown}>
           Solutions
         </Link>
