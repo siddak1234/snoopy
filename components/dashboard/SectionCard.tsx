@@ -21,7 +21,7 @@ export default function SectionCard({
   const defaultSubheader: Record<string, string> = {
     Dashboard: "Your automation workspace",
     Projects: "Manage your projects",
-    Workflow Design: "Design and manage workflows",
+    "Workflow Design": "Design and manage workflows",
     Billing: "Billing and subscription",
     Settings: "Account and workspace settings",
     Support: "Help and support",
