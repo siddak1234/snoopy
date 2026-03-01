@@ -47,7 +47,7 @@ export default function RootLayout({
         <SessionProvider>
         <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-4 pb-6 sm:px-6 lg:px-8">
           <header className="bubble-soft sticky top-3 z-50 mt-3 px-4 py-3 sm:px-5">
-            <div className="flex w-full items-center gap-4 sm:gap-6">
+            <div className="flex min-h-12 w-full items-center gap-4 sm:gap-6">
               {/* Left: brand — full logo on desktop, mark only on mobile */}
               <div className="flex shrink-0 items-center">
                 <div className="hidden md:block">
@@ -55,7 +55,7 @@ export default function RootLayout({
                 </div>
                 <Link
                   href="/"
-                  className="flex items-center md:hidden text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] rounded-full"
+                  className="flex min-h-12 flex-shrink-0 items-center justify-center md:hidden text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] rounded-full"
                   aria-label="Autom8x"
                 >
                   <LogoMark width={48} height={19} />
@@ -94,8 +94,8 @@ export default function RootLayout({
                 <ThemeToggle />
               </div>
 
-              {/* Right: theme + mobile menu (mobile only) */}
-              <div className="flex shrink-0 items-center gap-2 md:hidden">
+              {/* Right: theme + mobile menu (mobile only) — stable height, same baseline as brand */}
+              <div className="flex min-h-12 shrink-0 items-center gap-2 md:hidden">
                 <ThemeToggle />
                 <MobileNavMenu />
               </div>
