@@ -1,9 +1,10 @@
 /**
- * A8X brand mark — geometric sans construction.
+ * A8X brand mark — geometric sans, tight wordmark spacing.
+ * "8" = interlocked hollow hoops (stroke-based, mask for over-under).
  * Use currentColor; works on light or dark backgrounds.
  */
 export default function LogoMark({
-  width = 60,
+  width = 50,
   height = 24,
   className = "",
   accentEight = false,
@@ -11,41 +12,66 @@ export default function LogoMark({
   width?: number;
   height?: number;
   className?: string;
-  /** Optional: use accent color on the 8 (e.g. teal). Requires CSS var --brand-accent. */
+  /** Optional: use accent color on the 8. Requires CSS var --brand-accent. */
   accentEight?: boolean;
 }) {
+  const strokeW = 2.5;
+  const eightColor = accentEight ? "var(--brand-accent, currentColor)" : "currentColor";
+
   return (
     <svg
       width={width}
       height={height}
-      viewBox="0 0 60 24"
+      viewBox="0 0 50 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       aria-hidden
     >
-      {/* A — geometric sans, apex and crossbar */}
+      <defs>
+        {/* Top loop passes behind bottom at overlap; mask hides top stroke inside bottom circle */}
+        <mask id="a8x-eight-top-mask">
+          <rect x="-2" y="-2" width="54" height="28" fill="white" />
+          <circle cx="21" cy="16" r="5.2" fill="black" />
+        </mask>
+      </defs>
+
+      {/* A — geometric sans, apex and crossbar; tightened */}
       <path
-        d="M3 20 9 4l6 16M6 12h6"
+        d="M2 20 6.5 4 11 20M4.5 12h5"
         stroke="currentColor"
-        strokeWidth="2.5"
+        strokeWidth={strokeW}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      {/* 8 — two circles (loops / process cycles), clearly reads as 8 */}
+
+      {/* 8 — interlocked hollow hoops: bottom loop full, top loop masked so it goes "behind" */}
+      {/* Bottom loop (drawn first = behind) */}
       <path
-        d="M33 8a5 5 0 0 1-10 0 5 5 0 0 1 10 0M33 16a5 5 0 0 1-10 0 5 5 0 0 1 10 0"
-        stroke={accentEight ? "var(--brand-accent, currentColor)" : "currentColor"}
-        strokeWidth="2.5"
+        d="M25.5 16a4.5 4.5 0 0 1-9 0 4.5 4.5 0 0 1 9 0"
+        stroke={eightColor}
+        strokeWidth={strokeW}
         fill="none"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      {/* X — crossing diagonals, same weight as A */}
+      {/* Top loop (masked to appear behind at crossing) */}
+      <g mask="url(#a8x-eight-top-mask)">
+        <path
+          d="M25.5 8a4.5 4.5 0 0 1-9 0 4.5 4.5 0 0 1 9 0"
+          stroke={eightColor}
+          strokeWidth={strokeW}
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </g>
+
+      {/* X — crossing diagonals, same weight; tightened */}
       <path
-        d="M42 4l16 16M58 4 42 20"
+        d="M28 4l16 16M44 4 28 20"
         stroke="currentColor"
-        strokeWidth="2.5"
+        strokeWidth={strokeW}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
