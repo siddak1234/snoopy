@@ -15,12 +15,12 @@ export default function LogoMark({
   /** Optional: use accent color on the 8. Requires CSS var --brand-accent. */
   accentEight?: boolean;
 }) {
-  const strokeW = 2.5;
+  const strokeW = 2;
   const eightColor = accentEight ? "var(--brand-accent, currentColor)" : "currentColor";
 
-  // Content width after optical kerning: 0–45. Center in viewBox 48×24.
-  const contentWidth = 45;
-  const offsetX = (48 - contentWidth) / 2;
+  // Content width 0–46. Center in viewBox 48×24; integer offset for crisp pixel alignment.
+  const contentWidth = 46;
+  const offsetX = Math.round((48 - contentWidth) / 2); // 1
 
   return (
     <svg
@@ -31,9 +31,11 @@ export default function LogoMark({
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       aria-hidden
+      style={{ shapeRendering: "geometricPrecision" }}
+      preserveAspectRatio="xMidYMid meet"
     >
       <defs>
-        {/* Top hoop passes behind bottom at overlap; mask hole in viewBox coords */}
+        {/* Top hoop passes behind bottom at overlap; mask hole at pixel-aligned position */}
         <mask id="a8x-eight-top-mask" maskUnits="userSpaceOnUse">
           <rect x="-4" y="-4" width="56" height="32" fill="white" />
           <circle cx={21 + offsetX} cy="14.5" r="5.5" fill="black" />
@@ -76,10 +78,10 @@ export default function LogoMark({
           </g>
         </g>
 
-        {/* Glyph X — crossing diagonals. Starts at 29 so A–8 and 8–X gaps are equal (~3.5). */}
+        {/* Glyph X — crossing diagonals. Starts at 30 for even optical gap with 8. */}
         <g aria-hidden>
           <path
-            d="M29 4l16 16M45 4 29 20"
+            d="M30 4l16 16M46 4 30 20"
             stroke="currentColor"
             strokeWidth={strokeW}
             strokeLinecap="round"

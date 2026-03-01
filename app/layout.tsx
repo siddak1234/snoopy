@@ -58,7 +58,7 @@ export default function RootLayout({
                   className="flex min-h-12 flex-shrink-0 items-center justify-center md:hidden text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] rounded-full"
                   aria-label="Autom8x"
                 >
-                  <LogoMark width={48} height={19} />
+                  <LogoMark width={48} height={24} />
                 </Link>
               </div>
 
@@ -94,8 +94,8 @@ export default function RootLayout({
                 <ThemeToggle />
               </div>
 
-              {/* Right: theme + mobile menu (mobile only) — stable height, same baseline as brand */}
-              <div className="flex min-h-12 shrink-0 items-center gap-2 md:hidden">
+              {/* Right: theme + mobile menu (mobile only) — pinned to far right */}
+              <div className="ml-auto flex min-h-12 shrink-0 items-center gap-2 md:ml-0 md:hidden">
                 <ThemeToggle />
                 <MobileNavMenu />
               </div>
