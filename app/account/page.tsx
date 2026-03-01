@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { getAuthOptions } from "@/lib/auth";
+import { getProjectsForUser } from "@/lib/projects";
 import SectionCard from "@/components/dashboard/SectionCard";
 
 function getFirstName(name?: string | null): string | null {
@@ -15,6 +16,11 @@ export default async function AccountDashboardPage() {
   const greeting = firstName
     ? `Welcome, ${firstName}!`
     : "Welcome back!";
+
+  const projects = session?.user?.id
+    ? await getProjectsForUser(session.user.id)
+    : [];
+  const topProjects = projects.slice(0, 3);
 
   return (
     <SectionCard
@@ -92,15 +98,51 @@ export default async function AccountDashboardPage() {
         <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
           Projects
         </h2>
-        <p className="mt-3 text-sm text-[var(--muted)]">No projects yet.</p>
-        <div className="mt-3">
-          <Link
-            href="/automation-builder"
-            className="inline-flex rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-          >
-            Start with a template
-          </Link>
-        </div>
+        {topProjects.length === 0 ? (
+          <>
+            <p className="mt-3 text-sm text-[var(--muted)]">No projects yet.</p>
+            <div className="mt-3">
+              <Link
+                href="/account/projects"
+                className="btn-secondary inline-flex px-4 py-2 text-sm"
+              >
+                Create project
+              </Link>
+            </div>
+          </>
+        ) : (
+          <>
+            <ul className="mt-3 space-y-2">
+              {topProjects.map((p) => (
+                <li key={p.id}>
+                  <Link
+                    href={`/account/projects/${p.id}`}
+                    className="flex flex-wrap items-center gap-2 rounded-xl px-2 py-2 transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                  >
+                    <span className="font-medium text-[var(--text)]">{p.name}</span>
+                    <span className="inline-flex rounded-full bg-[var(--chip-bg)] px-2.5 py-0.5 text-xs font-medium text-[var(--chip-text)]">
+                      {p.status === "active"
+                        ? "Active"
+                        : p.status === "paused"
+                          ? "Paused"
+                          : p.status === "draft"
+                            ? "Draft"
+                            : "Archived"}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-3">
+              <Link
+                href="/account/projects"
+                className="text-sm font-medium text-[var(--link)] transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+              >
+                View all projects
+              </Link>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="py-5">

@@ -39,7 +39,8 @@ Do **not** commit `.env.local` or any file with real secrets.
 | `npm run start` | Run production server |
 | `npm run lint` | Run ESLint |
 | `npm run typecheck` | TypeScript check (`tsc --noEmit`) |
-| `npm run db:migrate -- --name <name>` | Run Prisma migrations |
+| `npm run db:migrate -- --name <name>` | Create and run migrations (interactive; can hang with pooler) |
+| `npm run db:deploy` | Apply pending migrations only (non-interactive; use if migrate hangs) |
 | `npm run db:studio` | Open Prisma Studio |
 | `npm run db:generate` | Regenerate Prisma client |
 

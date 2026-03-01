@@ -7,7 +7,7 @@
 ## Prisma
 
 - **Schema:** No `url` in `datasource` (Prisma 7). Connection URL comes from **`prisma.config.ts` only:** `process.env.POSTGRES_PRISMA_URL`.
-- **Config:** `prisma.config.ts` loads env with dotenv: `.env.local` then `.env`, `override: false`, `quiet: true`.
+- **Config:** `prisma.config.ts` loads env with dotenv: `.env.local` then `.env`, `override: false`, `quiet: true`. Uses **POSTGRES_URL** (pooler) for migrate so CLI can connect; direct (POSTGRES_PRISMA_URL) often unreachable from local (P1001).
 - **Client:** From `@prisma/client`; **singleton in `lib/db.ts`**. No custom output; `postinstall` runs `prisma generate`.
 - **Usage:** Use `db` only in Node runtime (not Edge). No top-level `db` import in route files so build does not require DB.
 
