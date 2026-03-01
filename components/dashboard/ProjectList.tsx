@@ -2,13 +2,24 @@ import Link from "next/link";
 import type { ProjectStatus } from "@prisma/client";
 import { DeleteProjectButton } from "./DeleteProjectButton";
 
-type Project = {
+export type MyProjectItem = {
   id: string;
   name: string;
   description: string | null;
   status: ProjectStatus;
   createdAt: Date;
-  user: { name: string | null };
+  ownerName: string | null;
+  accessCodePrefix?: string | null;
+};
+
+export type TeamProjectItem = {
+  id: string;
+  name: string;
+  description: string | null;
+  status: ProjectStatus;
+  createdAt: Date;
+  ownerName: string | null;
+  projectMemberships: { createdAt: Date }[];
 };
 
 const statusLabel: Record<ProjectStatus, string> = {
@@ -36,10 +47,8 @@ function StatusPill({ status }: { status: ProjectStatus }) {
   );
 }
 
-export function ProjectList({ projects }: { projects: Project[] }) {
-  if (projects.length === 0) {
-    return null;
-  }
+export function ProjectList({ projects }: { projects: MyProjectItem[] }) {
+  if (projects.length === 0) return null;
 
   return (
     <ul className="divide-y divide-[var(--ring)]">
@@ -59,13 +68,42 @@ export function ProjectList({ projects }: { projects: Project[] }) {
                   new Date(project.createdAt).toLocaleDateString(undefined, {
                     dateStyle: "medium",
                   })}
-                {project.user?.name ? ` · Owner: ${project.user.name}` : null}
+                {project.ownerName ? ` · Owner: ${project.ownerName}` : null}
               </span>
             </Link>
             <DeleteProjectButton projectId={project.id} projectName={project.name} />
           </div>
         </li>
       ))}
+    </ul>
+  );
+}
+
+export function TeamProjectList({ projects }: { projects: TeamProjectItem[] }) {
+  if (projects.length === 0) return null;
+
+  return (
+    <ul className="divide-y divide-[var(--ring)]">
+      {projects.map((project) => {
+        const joinedAt = project.projectMemberships[0]?.createdAt;
+        return (
+          <li key={project.id}>
+            <Link
+              href={`/account/projects/${project.id}`}
+              className="flex flex-wrap items-center gap-2 rounded-xl px-2 py-3 transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset block"
+            >
+              <span className="font-medium text-[var(--text)]">{project.name}</span>
+              <StatusPill status={project.status} />
+              <span className="block w-full text-sm text-[var(--muted)]">
+                {project.ownerName ? `Owner: ${project.ownerName}` : null}
+                {joinedAt
+                  ? ` · Joined ${new Date(joinedAt).toLocaleDateString(undefined, { dateStyle: "medium" })}`
+                  : null}
+              </span>
+            </Link>
+          </li>
+        );
+      })}
     </ul>
   );
 }

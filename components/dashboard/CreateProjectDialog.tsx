@@ -12,12 +12,14 @@ type Props = {
 export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [accessCode, setAccessCode] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const reset = useCallback(() => {
     setError(null);
     setPending(false);
+    setAccessCode(null);
     formRef.current?.reset();
   }, []);
 
@@ -51,10 +53,23 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
     const result = await createProjectAction(formData);
     setPending(false);
     if (result.ok) {
-      onClose();
+      setAccessCode(result.accessCode);
       onSuccess?.();
     } else {
       setError(result.error);
+    }
+  }
+
+  function handleClose() {
+    if (accessCode) {
+      onSuccess?.();
+    }
+    onClose();
+  }
+
+  function copyCode() {
+    if (accessCode && typeof navigator?.clipboard?.writeText === "function") {
+      navigator.clipboard.writeText(accessCode);
     }
   }
 
@@ -68,7 +83,7 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
         aria-hidden
-        onClick={onClose}
+        onClick={handleClose}
       />
       <div
         role="dialog"
@@ -83,6 +98,31 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
         <p id="create-project-desc" className="mt-1 text-sm text-[var(--muted)]">
           Add a new project to your workspace.
         </p>
+        {accessCode ? (
+          <div className="mt-6 space-y-4">
+            <p className="text-sm text-[var(--text)]">
+              Project created. Share this access code with your team so they can join:
+            </p>
+            <div className="flex items-center gap-2 rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-3">
+              <code className="flex-1 font-mono text-lg tracking-wider text-[var(--text)]">
+                {accessCode}
+              </code>
+              <button
+                type="button"
+                onClick={copyCode}
+                className="btn-secondary shrink-0 px-3 py-1.5 text-sm"
+              >
+                Copy
+              </button>
+            </div>
+            <p className="text-xs text-[var(--muted)]">
+              This code is shown once. Store it securely; you can generate a new one later from the project.
+            </p>
+            <button type="button" onClick={handleClose} className="btn-primary inline-flex px-5">
+              Done
+            </button>
+          </div>
+        ) : (
         <form ref={formRef} onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
             <label htmlFor="project-name" className="block text-sm font-medium text-[var(--text)]">
@@ -138,6 +178,7 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );

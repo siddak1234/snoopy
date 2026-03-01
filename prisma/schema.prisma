@@ -13,15 +13,19 @@ datasource db {
 }
 
 model User {
-  id           String       @id @default(uuid())
-  email        String       @unique
-  googleSub    String?      @unique
-  name         String?
-  image        String?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  memberships  Membership[]
-  projects     Project[]
+  id                 String             @id @default(uuid())
+  email              String             @unique
+  googleSub          String?            @unique
+  name               String?
+  image              String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  memberships        Membership[]
+  projects           Project[]
+  tenantMemberships  TenantMembership[]
+  ownedTenants       Tenant[]           @relation("TenantOwner")
+  ownedProjects      Project[]          @relation("ProjectOwner")
+  projectMemberships ProjectMembership[]
 
   @@map("users")
 }
@@ -33,19 +37,83 @@ enum ProjectStatus {
   archived
 }
 
+enum TenantRole {
+  org_owner
+  org_admin
+  org_user
+}
+
+enum ProjectMemberRole {
+  project_user
+}
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  ownerUserId String
+  createdAt DateTime @default(now())
+
+  owner   User               @relation("TenantOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  members TenantMembership[]
+  projects Project[]
+
+  @@map("tenants")
+}
+
+model TenantMembership {
+  id        String    @id @default(uuid())
+  tenantId  String
+  userId    String
+  role      TenantRole @default(org_user)
+  createdAt DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId])
+  @@index([tenantId])
+  @@map("tenant_memberships")
+}
+
 model Project {
-  id          String        @id @default(uuid())
-  userId      String
-  name        String
-  description String?
-  status      ProjectStatus @default(active)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id               String        @id @default(uuid())
+  tenantId         String?
+  name             String
+  description      String?
+  status           ProjectStatus @default(active)
+  userId           String?
+  ownerUserId      String?
+  ownerName        String?
+  accessCodeHash   String?
+  accessCodePrefix String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant   Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  owner    User?     @relation("ProjectOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  projectMemberships ProjectMembership[]
 
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([ownerUserId, createdAt(sort: Desc)])
+  @@index([tenantId, accessCodePrefix])
   @@index([userId, createdAt(sort: Desc)])
   @@map("projects")
+}
+
+model ProjectMembership {
+  id        String            @id @default(uuid())
+  projectId String
+  userId    String
+  role      ProjectMemberRole @default(project_user)
+  createdAt DateTime          @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_memberships")
 }
 
 model Workspace {

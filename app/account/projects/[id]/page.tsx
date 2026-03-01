@@ -2,7 +2,8 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { notFound } from "next/navigation";
 import { getAuthOptions } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { getTenantForUser } from "@/lib/tenant";
+import { getProjectForUser } from "@/lib/projects";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { DeleteProjectButton } from "@/components/dashboard/DeleteProjectButton";
 
@@ -24,13 +25,17 @@ export default async function ProjectDetailPage({
   }
 
   const { id } = await params;
-  const project = await prisma.project.findFirst({
-    where: { id, userId: session.user.id },
-  });
+  const project = await getProjectForUser(id, session.user.id);
 
   if (!project) {
     notFound();
   }
+
+  const tenant = await getTenantForUser(session.user.id);
+  const isOwner =
+    project.ownerUserId === session.user.id || project.userId === session.user.id;
+  const isOrgOwner = tenant?.role === "org_owner";
+  const canDelete = isOwner || isOrgOwner;
 
   return (
     <SectionCard
@@ -42,11 +47,13 @@ export default async function ProjectDetailPage({
         </Link>
       }
       secondaryAction={
-        <DeleteProjectButton
-          projectId={project.id}
-          projectName={project.name}
-          redirectAfterDelete="/account/projects"
-        />
+        canDelete ? (
+          <DeleteProjectButton
+            projectId={project.id}
+            projectName={project.name}
+            redirectAfterDelete="/account/projects"
+          />
+        ) : null
       }
     >
       <div className="py-5 first:pt-0">

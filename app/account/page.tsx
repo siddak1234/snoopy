@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { getAuthOptions } from "@/lib/auth";
-import { getProjectsForUser } from "@/lib/projects";
+import { getAccessibleProjects } from "@/lib/projects";
 import SectionCard from "@/components/dashboard/SectionCard";
 
 function getFirstName(name?: string | null): string | null {
@@ -17,10 +17,9 @@ export default async function AccountDashboardPage() {
     ? `Welcome, ${firstName}!`
     : "Welcome back!";
 
-  const projects = session?.user?.id
-    ? await getProjectsForUser(session.user.id)
+  const topProjects = session?.user?.id
+    ? await getAccessibleProjects(session.user.id, 3)
     : [];
-  const topProjects = projects.slice(0, 3);
 
   return (
     <SectionCard
@@ -129,6 +128,9 @@ export default async function AccountDashboardPage() {
                             ? "Draft"
                             : "Archived"}
                     </span>
+                    {p.ownerName ? (
+                      <span className="text-xs text-[var(--muted)]">· {p.ownerName}</span>
+                    ) : null}
                   </Link>
                 </li>
               ))}

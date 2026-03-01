@@ -2,25 +2,29 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CreateProjectDialog } from "./CreateProjectDialog";
+import { JoinProjectDialog } from "./JoinProjectDialog";
 
-export function CreateProjectButton() {
+export function JoinProjectButton() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+
+  function handleSuccess() {
+    router.refresh();
+  }
 
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="btn-primary inline-flex px-5"
+        className="btn-secondary inline-flex px-5"
       >
-        Create project
+        Join team project
       </button>
-      <CreateProjectDialog
+      <JoinProjectDialog
         open={open}
         onClose={() => setOpen(false)}
-        onSuccess={() => router.refresh()}
+        onSuccess={handleSuccess}
       />
     </>
   );

@@ -2,17 +2,23 @@
 
 import { getServerSession } from "next-auth";
 import { getAuthOptions } from "@/lib/auth";
-import { createProject as createProjectDb, deleteProject as deleteProjectDb } from "@/lib/projects";
+import {
+  createProject as createProjectDb,
+  deleteProject as deleteProjectDb,
+  joinProjectByCode as joinProjectByCodeDb,
+} from "@/lib/projects";
 import { revalidatePath } from "next/cache";
 
 const NAME_MIN = 2;
 const NAME_MAX = 60;
 
 export type CreateProjectResult =
-  | { ok: true; projectId: string }
+  | { ok: true; projectId: string; accessCode: string }
   | { ok: false; error: string };
 
-export async function createProjectAction(formData: FormData): Promise<CreateProjectResult> {
+export async function createProjectAction(
+  formData: FormData
+): Promise<CreateProjectResult> {
   const session = await getServerSession(getAuthOptions());
   if (!session?.user?.id) {
     return { ok: false, error: "You must be signed in to create a project." };
@@ -32,20 +38,40 @@ export async function createProjectAction(formData: FormData): Promise<CreatePro
 
   const description = formData.get("description");
   const descriptionStr =
-    typeof description === "string" && description.trim() ? description.trim() : null;
+    typeof description === "string" && description.trim()
+      ? description.trim()
+      : null;
 
   try {
-    const project = await createProjectDb(session.user.id, {
+    const { project, accessCode } = await createProjectDb(session.user.id, {
       name: trimmed,
       description: descriptionStr,
     });
     revalidatePath("/account");
     revalidatePath("/account/projects");
-    return { ok: true, projectId: project.id };
+    return { ok: true, projectId: project.id, accessCode };
   } catch (e) {
     console.error("createProjectAction", e);
     return { ok: false, error: "Failed to create project. Please try again." };
   }
+}
+
+export type JoinProjectResult =
+  | { ok: true; projectId: string }
+  | { ok: false; error: string };
+
+export async function joinProjectByCodeAction(
+  code: string
+): Promise<JoinProjectResult> {
+  const session = await getServerSession(getAuthOptions());
+  if (!session?.user?.id) {
+    return { ok: false, error: "You must be signed in to join a project." };
+  }
+  const result = await joinProjectByCodeDb(session.user.id, code);
+  if (!result.ok) return result;
+  revalidatePath("/account");
+  revalidatePath("/account/projects");
+  return { ok: true, projectId: result.projectId };
 }
 
 export type DeleteProjectResult = { ok: true } | { ok: false; error: string };
