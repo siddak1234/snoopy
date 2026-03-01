@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getAuthOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import SectionCard from "@/components/dashboard/SectionCard";
+import { DeleteProjectButton } from "@/components/dashboard/DeleteProjectButton";
 
 const statusLabel: Record<string, string> = {
   active: "Active",
@@ -39,6 +40,13 @@ export default async function ProjectDetailPage({
         <Link href="/account/projects" className="btn-secondary inline-flex px-5">
           Back to projects
         </Link>
+      }
+      secondaryAction={
+        <DeleteProjectButton
+          projectId={project.id}
+          projectName={project.name}
+          redirectAfterDelete="/account/projects"
+        />
       }
     >
       <div className="py-5 first:pt-0">

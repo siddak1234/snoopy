@@ -3,7 +3,7 @@ import type { ProjectStatus } from "@prisma/client";
 
 /**
  * Server-only: list projects for a user (ordered by created desc).
- * Caller must pass the authenticated user id; never accept user_id from client.
+ * Includes owner (user) for display. Caller must pass the authenticated user id.
  */
 export async function getProjectsForUser(userId: string) {
   return prisma.project.findMany({
@@ -15,8 +15,23 @@ export async function getProjectsForUser(userId: string) {
       description: true,
       status: true,
       createdAt: true,
+      user: { select: { name: true } },
     },
   });
+}
+
+/**
+ * Server-only: delete a project in the database. Only deletes if project belongs to the given user.
+ * Returns true if a row was deleted, false otherwise (e.g. not found or not owner).
+ */
+export async function deleteProject(
+  userId: string,
+  projectId: string
+): Promise<boolean> {
+  const result = await prisma.project.deleteMany({
+    where: { id: projectId, userId },
+  });
+  return result.count > 0;
 }
 
 /**

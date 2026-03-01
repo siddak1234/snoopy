@@ -2,7 +2,7 @@
 
 import { getServerSession } from "next-auth";
 import { getAuthOptions } from "@/lib/auth";
-import { createProject as createProjectDb } from "@/lib/projects";
+import { createProject as createProjectDb, deleteProject as deleteProjectDb } from "@/lib/projects";
 import { revalidatePath } from "next/cache";
 
 const NAME_MIN = 2;
@@ -45,5 +45,29 @@ export async function createProjectAction(formData: FormData): Promise<CreatePro
   } catch (e) {
     console.error("createProjectAction", e);
     return { ok: false, error: "Failed to create project. Please try again." };
+  }
+}
+
+export type DeleteProjectResult = { ok: true } | { ok: false; error: string };
+
+export async function deleteProjectAction(projectId: string): Promise<DeleteProjectResult> {
+  const session = await getServerSession(getAuthOptions());
+  if (!session?.user?.id) {
+    return { ok: false, error: "You must be signed in to delete a project." };
+  }
+  if (!projectId || typeof projectId !== "string" || !projectId.trim()) {
+    return { ok: false, error: "Project ID is required." };
+  }
+  try {
+    const deleted = await deleteProjectDb(session.user.id, projectId.trim());
+    if (!deleted) {
+      return { ok: false, error: "Project not found or you don't have permission to delete it." };
+    }
+    revalidatePath("/account");
+    revalidatePath("/account/projects");
+    return { ok: true };
+  } catch (e) {
+    console.error("deleteProjectAction", e);
+    return { ok: false, error: "Failed to delete project. Please try again." };
   }
 }
