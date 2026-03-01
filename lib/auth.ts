@@ -66,8 +66,9 @@ async function provisionUser(params: {
  * Ensure user has a default workspace (create if none). Returns workspaceId.
  * Idempotent: re-fetches first membership after create to handle concurrent logins.
  * No top-level prisma import; called only from jwt callback.
+ * Exported for use by lib/tenant (workspace-as-org).
  */
-async function ensureDefaultWorkspaceForUser(userId: string): Promise<string> {
+export async function ensureDefaultWorkspaceForUser(userId: string): Promise<string> {
   const { prisma } = await import("@/lib/db");
 
   const first = await prisma.membership.findFirst({

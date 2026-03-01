@@ -22,8 +22,6 @@ model User {
   updatedAt          DateTime           @updatedAt
   memberships        Membership[]
   projects           Project[]
-  tenantMemberships  TenantMembership[]
-  ownedTenants       Tenant[]           @relation("TenantOwner")
   ownedProjects      Project[]          @relation("ProjectOwner")
   projectMemberships ProjectMembership[]
 
@@ -47,37 +45,9 @@ enum ProjectMemberRole {
   project_user
 }
 
-model Tenant {
-  id        String   @id @default(uuid())
-  name      String
-  ownerUserId String
-  createdAt DateTime @default(now())
-
-  owner   User               @relation("TenantOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
-  members TenantMembership[]
-  projects Project[]
-
-  @@map("tenants")
-}
-
-model TenantMembership {
-  id        String    @id @default(uuid())
-  tenantId  String
-  userId    String
-  role      TenantRole @default(org_user)
-  createdAt DateTime  @default(now())
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId])
-  @@index([tenantId])
-  @@map("tenant_memberships")
-}
-
 model Project {
   id               String        @id @default(uuid())
-  tenantId         String?
+  workspaceId      String?
   name             String
   description      String?
   status           ProjectStatus @default(active)
@@ -89,14 +59,14 @@ model Project {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  tenant   Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  owner    User?     @relation("ProjectOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  owner     User?      @relation("ProjectOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
   projectMemberships ProjectMembership[]
 
-  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([workspaceId, createdAt(sort: Desc)])
   @@index([ownerUserId, createdAt(sort: Desc)])
-  @@index([tenantId, accessCodePrefix])
+  @@index([workspaceId, accessCodePrefix])
   @@index([userId, createdAt(sort: Desc)])
   @@map("projects")
 }
@@ -122,6 +92,7 @@ model Workspace {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   memberships Membership[]
+  projects    Project[]
 
   @@map("workspaces")
 }

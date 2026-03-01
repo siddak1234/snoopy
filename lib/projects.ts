@@ -17,17 +17,18 @@ function generateAccessCode(): string {
 }
 
 /**
- * Server-only: list projects owned by the user (in their tenant). Uses tenant from session; never from client.
- * Includes legacy projects (tenantId null, userId = me) until backfilled.
+ * Server-only: list projects owned by the user (in their workspace). Uses workspace from session; never from client.
+ * Includes legacy projects (workspaceId/tenantId null, userId = me) until backfilled.
  */
 export async function getMyProjects(userId: string) {
-  const tenant = await getTenantForUser(userId);
+  if (!userId) return [];
+  const workspace = await getTenantForUser(userId);
   return prisma.project.findMany({
-    where: tenant
+    where: workspace
       ? {
           OR: [
-            { tenantId: tenant.tenantId, OR: [{ ownerUserId: userId }, { userId: userId }] },
-            { tenantId: null, userId },
+            { workspaceId: workspace.tenantId, OR: [{ ownerUserId: userId }, { userId: userId }] },
+            { workspaceId: null, userId },
           ],
         }
       : { userId },
@@ -50,6 +51,7 @@ export async function getMyProjects(userId: string) {
  * Server-only: list team projects (projects the user joined via access code, not owned by them).
  */
 export async function getTeamProjects(userId: string) {
+  if (!userId) return [];
   const memberships = await prisma.projectMembership.findMany({
     where: { userId },
     select: { projectId: true },
@@ -94,6 +96,7 @@ export async function getAccessibleProjects(
   userId: string,
   limit: number = 10
 ): Promise<ProjectSummary[]> {
+  if (!userId) return [];
   const [owned, team] = await Promise.all([
     getMyProjects(userId),
     getTeamProjects(userId),
@@ -141,7 +144,7 @@ export async function createProject(
   userId: string,
   data: { name: string; description?: string | null; status?: ProjectStatus }
 ) {
-  const tenantId = await ensureTenantForUser(userId);
+  const workspaceId = await ensureTenantForUser(userId);
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { name: true },
@@ -154,7 +157,7 @@ export async function createProject(
 
   const project = await prisma.project.create({
     data: {
-      tenantId,
+      workspaceId,
       name: data.name.trim(),
       description: data.description?.trim() || null,
       status: data.status ?? "active",
@@ -178,7 +181,7 @@ export async function createProject(
 }
 
 /**
- * Server-only: delete a project. Allowed if user is project owner OR org_owner for the project's tenant.
+ * Server-only: delete a project. Allowed if user is project owner OR org_owner (OWNER) in the project's workspace.
  */
 export async function deleteProject(
   userId: string,
@@ -186,17 +189,18 @@ export async function deleteProject(
 ): Promise<boolean> {
   const project = await prisma.project.findFirst({
     where: { id: projectId },
-    select: { tenantId: true, ownerUserId: true, userId: true },
+    select: { workspaceId: true, ownerUserId: true, userId: true },
   });
   if (!project) return false;
 
-  const tenant = await getTenantForUser(userId);
-  if (!tenant) return false;
+  const workspace = await getTenantForUser(userId);
+  if (!workspace) return false;
 
-  const isSameTenant = project.tenantId === tenant.tenantId;
+  const projectWorkspaceId = project.workspaceId;
+  const isSameWorkspace = projectWorkspaceId === workspace.tenantId;
   const isOwner =
     project.ownerUserId === userId || project.userId === userId;
-  const isOrgOwner = isSameTenant && tenant.role === "org_owner";
+  const isOrgOwner = isSameWorkspace && workspace.role === "org_owner";
 
   if (!isOwner && !isOrgOwner) return false;
 
@@ -207,8 +211,8 @@ export async function deleteProject(
 }
 
 /**
- * Server-only: join a project by access code. Verifies code server-side; user must be in same tenant as project.
- * Never trust client for tenant_id or project_id; lookup by code only.
+ * Server-only: join a project by access code. Verifies code server-side; user must be in same workspace as project.
+ * Never trust client for workspace_id or project_id; lookup by code only.
  */
 export async function joinProjectByCode(
   userId: string,
@@ -219,14 +223,14 @@ export async function joinProjectByCode(
     return { ok: false, error: "Invalid access code." };
   }
 
-  const tenant = await getTenantForUser(userId);
-  if (!tenant) {
+  const workspace = await getTenantForUser(userId);
+  if (!workspace) {
     return { ok: false, error: "You are not in an organization. Please refresh and try again." };
   }
 
   const prefix = trimmed.slice(0, ACCESS_CODE_PREFIX_LENGTH);
   const projects = await prisma.project.findMany({
-    where: { tenantId: tenant.tenantId, accessCodePrefix: prefix },
+    where: { workspaceId: workspace.tenantId, accessCodePrefix: prefix },
     select: {
       id: true,
       name: true,
@@ -252,8 +256,8 @@ export async function joinProjectByCode(
 }
 
 /**
- * Server-only: get project for display. Allowed if user owns it, is in project_memberships, or is org_owner.
- * Also allows legacy projects (tenantId null) where userId = me.
+ * Server-only: get project for display. Allowed if user owns it, is in project_memberships, or is org_owner in project's workspace.
+ * Also allows legacy projects (workspaceId/tenantId null) where userId = me.
  */
 export async function getProjectForUser(projectId: string, userId: string) {
   const project = await prisma.project.findFirst({
@@ -268,11 +272,12 @@ export async function getProjectForUser(projectId: string, userId: string) {
     project.ownerUserId === userId || project.userId === userId;
   const isMember = project.projectMemberships.length > 0;
 
-  if (project.tenantId) {
-    const tenant = await getTenantForUser(userId);
-    if (!tenant) return isOwner || isMember ? project : null;
-    const isOrgOwner = tenant.role === "org_owner";
-    if (tenant.tenantId !== project.tenantId && !isOwner && !isMember)
+  const projectWorkspaceId = project.workspaceId;
+  if (projectWorkspaceId) {
+    const workspace = await getTenantForUser(userId);
+    if (!workspace) return isOwner || isMember ? project : null;
+    const isOrgOwner = workspace.role === "org_owner";
+    if (workspace.tenantId !== projectWorkspaceId && !isOwner && !isMember)
       return null;
     if (isOwner || isMember || isOrgOwner) return project;
   } else {

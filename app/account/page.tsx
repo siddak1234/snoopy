@@ -17,9 +17,11 @@ export default async function AccountDashboardPage() {
     ? `Welcome, ${firstName}!`
     : "Welcome back!";
 
-  const topProjects = session?.user?.id
-    ? await getAccessibleProjects(session.user.id, 3)
-    : [];
+  const userId = session?.user?.id;
+  const topProjects =
+    userId != null
+      ? await getAccessibleProjects(userId, 3)
+      : [];
 
   return (
     <SectionCard

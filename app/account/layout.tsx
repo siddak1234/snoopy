@@ -10,7 +10,7 @@ export default async function AccountLayout({
 }) {
   const session = await getServerSession(getAuthOptions());
 
-  if (!session?.user?.email) {
+  if (!session?.user?.email || !session?.user?.id) {
     redirect("/login?callbackUrl=/account");
   }
 
