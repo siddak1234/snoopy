@@ -6,7 +6,6 @@ import MobileNavMenu from "@/components/navigation/MobileNavMenu";
 import SolutionsDropdown from "@/components/navigation/SolutionsDropdown";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 import SessionProvider from "@/components/providers/SessionProvider";
-import LogoFull from "@/components/branding/LogoFull";
 import LogoMark from "@/components/branding/LogoMark";
 import { site } from "@/lib/site";
 import "./globals.css";
@@ -48,19 +47,14 @@ export default function RootLayout({
         <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-4 pb-6 sm:px-6 lg:px-8">
           <header className="bubble-soft sticky top-3 z-50 mt-3 px-4 py-3 sm:px-5">
             <div className="flex min-h-12 w-full items-center gap-4 sm:gap-6">
-              {/* Left: brand — full logo on desktop, mark only on mobile */}
-              <div className="flex shrink-0 items-center">
-                <div className="hidden md:block">
-                  <LogoFull width={60} height={24} />
-                </div>
-                <Link
-                  href="/"
-                  className="flex min-h-12 flex-shrink-0 items-center justify-center md:hidden text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] rounded-full"
-                  aria-label="Autom8x"
-                >
-                  <LogoMark width={48} height={24} />
-                </Link>
-              </div>
+              {/* Left: brand — A8X logo mark only */}
+              <Link
+                href="/"
+                className="flex min-h-12 flex-shrink-0 items-center justify-center text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] rounded-full"
+                aria-label="Autom8x"
+              >
+                <LogoMark width={48} height={24} />
+              </Link>
 
               {/* Center: main nav — evenly distributed */}
               <nav

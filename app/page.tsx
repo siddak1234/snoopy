@@ -29,6 +29,13 @@ const valueCards = [
 export default function Home() {
   return (
     <div className="space-y-6 sm:space-y-8">
+      {/* Brand pill — home only, above hero */}
+      <div className="flex justify-center pt-2 pb-2">
+        <div className="w-fit rounded-full border border-[var(--ring)] bg-[var(--surface)]/90 px-6 py-2.5 text-sm font-medium tracking-[0.3em] text-[var(--muted)] shadow-lg backdrop-blur">
+          AUTOM8X
+        </div>
+      </div>
+
       <section className="bubble p-6 sm:p-8 lg:p-10">
         <TypingHeadline />
         <div className="mt-6 flex flex-wrap gap-3">
