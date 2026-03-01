@@ -1,10 +1,13 @@
+import SectionCard from "@/components/dashboard/SectionCard";
+
 export default function AccountBillingPage() {
   return (
-    <div className="bubble p-6 sm:p-8">
-      <h2 className="text-lg font-semibold text-[var(--text)]">Billing</h2>
-      <p className="mt-2 text-sm text-[var(--muted)]">
-        Billing and subscription settings. This page is a placeholder.
-      </p>
-    </div>
+    <SectionCard title="Billing">
+      <div className="py-5 first:pt-0">
+        <p className="text-sm text-[var(--muted)]">
+          Billing and subscription settings. This page is a placeholder.
+        </p>
+      </div>
+    </SectionCard>
   );
 }

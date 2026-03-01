@@ -15,13 +15,15 @@ export default async function AccountLayout({
   }
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
-      <DashboardSidebar />
-      <div className="min-w-0 flex-1">
-        <header className="mb-6">
-          <DashboardHeader />
-        </header>
-        <main>{children}</main>
+    <div className="mx-auto max-w-6xl px-4 md:px-6">
+      <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
+        <DashboardSidebar />
+        <div className="min-w-0 flex-1">
+          <header className="mb-4 lg:mb-6">
+            <DashboardHeader />
+          </header>
+          <main>{children}</main>
+        </div>
       </div>
     </div>
   );
