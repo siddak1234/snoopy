@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { getAuthOptions } from "@/lib/auth";
 import { DashboardSidebar, DashboardHeader } from "@/components/dashboard/DashboardNav";
+import { ProjectAccessCodeDialog } from "@/components/dashboard/ProjectAccessCodeDialog";
 
 export default async function AccountLayout({
   children,
@@ -15,16 +16,19 @@ export default async function AccountLayout({
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 md:px-6">
-      <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
-        <DashboardSidebar />
-        <div className="min-w-0 flex-1">
-          <header className="mb-4 lg:mb-0">
-            <DashboardHeader />
-          </header>
-          <main>{children}</main>
+    <>
+      <div className="mx-auto max-w-6xl px-4 md:px-6">
+        <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
+          <DashboardSidebar />
+          <div className="min-w-0 flex-1">
+            <header className="mb-4 lg:mb-0">
+              <DashboardHeader />
+            </header>
+            <main>{children}</main>
+          </div>
         </div>
       </div>
-    </div>
+      <ProjectAccessCodeDialog />
+    </>
   );
 }
