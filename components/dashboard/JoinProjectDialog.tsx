@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { joinProjectByCodeAction } from "@/app/account/projects/actions";
 
 type Props = {
@@ -47,13 +48,13 @@ export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
     setError(null);
     setPending(true);
     const form = e.currentTarget;
-    const code = (form.elements.namedItem("code") as HTMLInputElement)?.value?.trim();
-    if (!code) {
+    const code = (form.elements.namedItem("code") as HTMLInputElement)?.value;
+    if (code == null || String(code).trim() === "") {
       setError("Enter the access code.");
       setPending(false);
       return;
     }
-    const result = await joinProjectByCodeAction(code);
+    const result = await joinProjectByCodeAction(String(code));
     setPending(false);
     if (result.ok) {
       onClose();
@@ -65,13 +66,13 @@ export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
 
   if (!open) return null;
 
-  return (
+  const dialogContent = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
       role="presentation"
     >
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
+        className="fixed inset-0 bg-black/50 backdrop-blur-[2px]"
         aria-hidden
         onClick={onClose}
       />
@@ -80,7 +81,8 @@ export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
         aria-modal
         aria-labelledby="join-project-title"
         aria-describedby="join-project-desc"
-        className="relative w-full max-w-md rounded-3xl border border-[var(--ring)] bg-[var(--surface)] p-6 shadow-xl [background:linear-gradient(165deg,var(--surface)_0%,var(--surface-strong)_100%)]"
+        className="fixed left-1/2 top-1/2 z-[101] w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-[var(--ring)] bg-[var(--surface)] p-6 shadow-xl [background:linear-gradient(165deg,var(--surface)_0%,var(--surface-strong)_100%)]"
+        onClick={(e) => e.stopPropagation()}
       >
         <h2 id="join-project-title" className="text-xl font-semibold text-[var(--text)]">
           Join team project
@@ -127,4 +129,8 @@ export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
       </div>
     </div>
   );
+
+  return typeof document !== "undefined"
+    ? createPortal(dialogContent, document.body)
+    : null;
 }

@@ -7,6 +7,17 @@ const ACCESS_CODE_LENGTH = 8;
 const ACCESS_CODE_PREFIX_LENGTH = 4;
 const BCRYPT_ROUNDS = 10;
 
+/**
+ * Single normalization for access codes. Used on create (before hash/prefix) and join (before lookup/compare).
+ * Ensures pasted codes with spaces/hyphens (e.g. "LB4C-7HR8") match the stored hash.
+ */
+export function normalizeAccessCode(input: string): string {
+  return input
+    .trim()
+    .toUpperCase()
+    .replace(/[\s\-]/g, "");
+}
+
 function generateAccessCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
@@ -151,7 +162,8 @@ export async function createProject(
   });
   const ownerName = user?.name?.trim() || "Unknown";
 
-  const accessCode = generateAccessCode();
+  const rawCode = generateAccessCode();
+  const accessCode = normalizeAccessCode(rawCode);
   const accessCodeHash = await bcrypt.hash(accessCode, BCRYPT_ROUNDS);
   const accessCodePrefix = accessCode.slice(0, ACCESS_CODE_PREFIX_LENGTH);
 
@@ -218,17 +230,17 @@ export async function joinProjectByCode(
   userId: string,
   code: string
 ): Promise<{ ok: true; projectId: string } | { ok: false; error: string }> {
-  const trimmed = code.trim().toUpperCase();
-  if (trimmed.length < ACCESS_CODE_PREFIX_LENGTH) {
+  const normalized = normalizeAccessCode(code);
+  if (normalized.length < ACCESS_CODE_PREFIX_LENGTH) {
     return { ok: false, error: "Invalid access code." };
   }
 
   const workspace = await getTenantForUser(userId);
   if (!workspace) {
-    return { ok: false, error: "You are not in an organization. Please refresh and try again." };
+    return { ok: false, error: "No organization found for user. Please refresh and try again." };
   }
 
-  const prefix = trimmed.slice(0, ACCESS_CODE_PREFIX_LENGTH);
+  const prefix = normalized.slice(0, ACCESS_CODE_PREFIX_LENGTH);
   const projects = await prisma.project.findMany({
     where: { workspaceId: workspace.tenantId, accessCodePrefix: prefix },
     select: {
@@ -240,7 +252,7 @@ export async function joinProjectByCode(
 
   for (const p of projects) {
     if (!p.accessCodeHash) continue;
-    const match = await bcrypt.compare(trimmed, p.accessCodeHash);
+    const match = await bcrypt.compare(normalized, p.accessCodeHash);
     if (match) {
       await prisma.projectMembership.upsert({
         where: {
@@ -252,7 +264,7 @@ export async function joinProjectByCode(
       return { ok: true, projectId: p.id };
     }
   }
-  return { ok: false, error: "Invalid or expired access code." };
+  return { ok: false, error: "Invalid access code." };
 }
 
 /**
