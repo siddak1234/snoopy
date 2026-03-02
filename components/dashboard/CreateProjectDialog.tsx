@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { createProjectAction } from "@/app/account/projects/actions";
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
+  /** Called when user closes the access-code view; use to revalidate + router.refresh(). */
+  onSuccess?: () => void | Promise<void>;
 };
 
 export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
@@ -34,9 +36,9 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
     return () => clearTimeout(t);
   }, [open, reset]);
 
-  const handleClose = useCallback(() => {
+  const handleClose = useCallback(async () => {
     if (accessCode) {
-      onSuccess?.();
+      await Promise.resolve(onSuccess?.());
     }
     onClose();
   }, [accessCode, onClose, onSuccess]);
@@ -97,13 +99,13 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
 
   if (!open) return null;
 
-  return (
+  const dialogContent = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
       role="presentation"
     >
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
+        className="fixed inset-0 bg-black/50 backdrop-blur-[2px]"
         aria-hidden
         onClick={handleClose}
       />
@@ -112,7 +114,7 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
         aria-modal
         aria-labelledby="create-project-title"
         aria-describedby={accessCode ? "create-project-access-code-desc" : "create-project-desc"}
-        className="relative w-full max-w-md rounded-3xl border border-[var(--ring)] bg-[var(--surface)] p-6 shadow-xl [background:linear-gradient(165deg,var(--surface)_0%,var(--surface-strong)_100%)]"
+        className="fixed left-1/2 top-1/2 z-[101] w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-[var(--ring)] bg-[var(--surface)] p-6 shadow-xl [background:linear-gradient(165deg,var(--surface)_0%,var(--surface-strong)_100%)]"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="create-project-title" className="text-xl font-semibold text-[var(--text)]">
@@ -245,4 +247,8 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
       </div>
     </div>
   );
+
+  return typeof document !== "undefined"
+    ? createPortal(dialogContent, document.body)
+    : null;
 }

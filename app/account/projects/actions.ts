@@ -12,6 +12,12 @@ import { revalidatePath } from "next/cache";
 const NAME_MIN = 2;
 const NAME_MAX = 60;
 
+/** Call after the user closes the access-code dialog so the projects list refreshes. */
+export async function revalidateAccountProjectsAction(): Promise<void> {
+  revalidatePath("/account");
+  revalidatePath("/account/projects");
+}
+
 export type CreateProjectResult =
   | { ok: true; projectId: string; accessCode: string }
   | { ok: false; error: string };
@@ -47,8 +53,8 @@ export async function createProjectAction(
       name: trimmed,
       description: descriptionStr,
     });
-    revalidatePath("/account");
-    revalidatePath("/account/projects");
+    // Do NOT revalidate here: it can refresh the RSC tree and unmount the success modal.
+    // Revalidation is done when the user closes the access-code dialog (see CreateProjectButton).
     return { ok: true, projectId: project.id, accessCode };
   } catch (e) {
     console.error("createProjectAction", e);

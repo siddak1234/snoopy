@@ -3,10 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CreateProjectDialog } from "./CreateProjectDialog";
+import { revalidateAccountProjectsAction } from "@/app/account/projects/actions";
 
 export function CreateProjectButton() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+
+  const handleSuccess = async () => {
+    await revalidateAccountProjectsAction();
+    router.refresh();
+  };
 
   return (
     <>
@@ -20,7 +26,7 @@ export function CreateProjectButton() {
       <CreateProjectDialog
         open={open}
         onClose={() => setOpen(false)}
-        onSuccess={() => router.refresh()}
+        onSuccess={handleSuccess}
       />
     </>
   );
