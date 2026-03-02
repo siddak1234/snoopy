@@ -13,6 +13,7 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [accessCode, setAccessCode] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -20,6 +21,7 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
     setError(null);
     setPending(false);
     setAccessCode(null);
+    setCopied(false);
     formRef.current?.reset();
   }, []);
 
@@ -67,9 +69,30 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
     onClose();
   }
 
-  function copyCode() {
-    if (accessCode && typeof navigator?.clipboard?.writeText === "function") {
-      navigator.clipboard.writeText(accessCode);
+  async function copyCode(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!accessCode) return;
+    try {
+      if (typeof navigator?.clipboard?.writeText === "function") {
+        await navigator.clipboard.writeText(accessCode);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } else {
+        const input = document.createElement("input");
+        input.value = accessCode;
+        input.readOnly = true;
+        input.style.position = "fixed";
+        input.style.opacity = "0";
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        document.body.removeChild(input);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+    } catch {
+      setCopied(false);
     }
   }
 
@@ -91,6 +114,7 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
         aria-labelledby="create-project-title"
         aria-describedby="create-project-desc"
         className="relative w-full max-w-md rounded-3xl border border-[var(--ring)] bg-[var(--surface)] p-6 shadow-xl [background:linear-gradient(165deg,var(--surface)_0%,var(--surface-strong)_100%)]"
+        onClick={(e) => e.stopPropagation()}
       >
         <h2 id="create-project-title" className="text-xl font-semibold text-[var(--text)]">
           Create project
@@ -100,6 +124,16 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
         </p>
         {accessCode ? (
           <div className="mt-6 space-y-4">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="absolute right-4 top-4 rounded-lg p-1.5 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+              aria-label="Close"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
             <p className="text-sm text-[var(--text)]">
               Project created. Share this access code with your team so they can join:
             </p>
@@ -112,15 +146,25 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
                 onClick={copyCode}
                 className="btn-secondary shrink-0 px-3 py-1.5 text-sm"
               >
-                Copy
+                {copied ? "Copied!" : "Copy"}
               </button>
             </div>
             <p className="text-xs text-[var(--muted)]">
               This code is shown once. Store it securely; you can generate a new one later from the project.
             </p>
-            <button type="button" onClick={handleClose} className="btn-primary inline-flex px-5">
-              Done
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={handleClose} className="btn-primary inline-flex px-5">
+                Done
+              </button>
+              <button
+                type="button"
+                onClick={handleClose}
+                className="text-sm text-[var(--muted)] underline hover:text-[var(--text)]"
+                aria-label="Close"
+              >
+                Close
+              </button>
+            </div>
           </div>
         ) : (
         <form ref={formRef} onSubmit={handleSubmit} className="mt-6 space-y-4">
