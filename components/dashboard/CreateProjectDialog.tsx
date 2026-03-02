@@ -56,7 +56,6 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
     setPending(false);
     if (result.ok) {
       setAccessCode(result.accessCode);
-      onSuccess?.();
     } else {
       setError(result.error);
     }
