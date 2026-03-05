@@ -5,8 +5,9 @@ import { signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 
 const solutionsItems = [
+  { href: "/solutions/use-cases", label: "Use Cases" },
   { href: "/solutions/healthcare", label: "Healthcare" },
-  { href: "/solutions/finance", label: "Finance" },
+  { href: "/solutions/finance", label: "Finance & Accounting" },
 ];
 
 const linkClass =
