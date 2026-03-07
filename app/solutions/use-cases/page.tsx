@@ -14,17 +14,37 @@ export default function UseCasesSolutionsPage() {
         <h2 className="sr-only">Example use cases</h2>
         <Link
           href="/solutions/use-cases/legal-billing-compliance"
-          className="bubble group block p-6 transition duration-200 hover:-translate-y-1 hover:shadow-xl sm:p-8"
+          className="bubble group flex flex-col gap-4 p-6 transition duration-200 hover:-translate-y-1 hover:shadow-xl sm:flex-row sm:items-center sm:justify-between sm:p-8"
         >
-          <span className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
-            Accounting & Legal
-          </span>
-          <h3 className="mt-2 text-xl font-semibold text-[var(--text)] sm:text-2xl">
-            Reducing Revenue Leakage in Legal Billing Through Automation
-          </h3>
-          <time dateTime="2026-02-25" className="mt-2 block text-sm text-[var(--muted)]">
-            February 25, 2026
-          </time>
+          <div className="min-w-0 flex-1">
+            <span className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+              Accounting & Legal
+            </span>
+            <h3 className="mt-2 text-xl font-semibold text-[var(--text)] sm:text-2xl">
+              Reducing Revenue Leakage in Legal Billing Through Automation
+            </h3>
+            <time dateTime="2026-02-25" className="mt-2 block text-sm text-[var(--muted)]">
+              February 25, 2026
+            </time>
+          </div>
+          <div className="flex shrink-0 items-center justify-end sm:pl-4">
+            <span
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--muted)] transition group-hover:bg-[var(--surface-hover)] group-hover:text-[var(--accent-strong)]"
+              aria-hidden
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </span>
+          </div>
         </Link>
       </section>
     </div>
