@@ -14,7 +14,7 @@ export default function LegalBillingComplianceUseCasePage() {
           Accounting & Legal
         </p>
         <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">
-          Improving Revenue Realization in Legal Billing Through Automated Billing Compliance
+          Reducing Revenue Leakage in Legal Billing Through Automation
         </h1>
         <time dateTime="2026-02-25" className="mt-2 block text-sm text-[var(--muted)]">
           February 25, 2026

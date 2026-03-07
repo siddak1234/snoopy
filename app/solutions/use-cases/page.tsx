@@ -20,7 +20,7 @@ export default function UseCasesSolutionsPage() {
             Accounting & Legal
           </span>
           <h3 className="mt-2 text-xl font-semibold text-[var(--text)] sm:text-2xl">
-            Improving Revenue Realization in Legal Billing Through Automated Billing Compliance
+            Reducing Revenue Leakage in Legal Billing Through Automation
           </h3>
           <time dateTime="2026-02-25" className="mt-2 block text-sm text-[var(--muted)]">
             February 25, 2026
