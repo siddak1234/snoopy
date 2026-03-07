@@ -9,7 +9,7 @@ export default function PerformanceIntelligenceUseCasePage() {
           href="/solutions/use-cases"
           className="text-sm font-medium text-[var(--muted)] transition hover:text-[var(--text)]"
         >
-          ← Case Study
+          ← Case Studies
         </Link>
         <p className="mt-3 text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
           Human Resources & Governance

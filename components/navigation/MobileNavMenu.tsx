@@ -115,7 +115,7 @@ export default function MobileNavMenu() {
             </div>
 
             <Link href="/solutions/use-cases" className={linkClass} onClick={closeMenu}>
-              Case Study
+              Case Studies
             </Link>
 
             <Link href="/automation-builder" className={linkClass} onClick={closeMenu}>

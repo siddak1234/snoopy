@@ -4,7 +4,7 @@ export default function CaseStudyPage() {
   return (
     <div className="space-y-6 sm:space-y-8">
       <section className="bubble p-6 sm:p-8">
-        <h1 className="text-3xl font-semibold sm:text-4xl">Case Study</h1>
+        <h1 className="text-3xl font-semibold sm:text-4xl">Case Studies</h1>
         <p className="mt-4 text-base text-[var(--muted)]">
           Explore case studies on automation tailored to your workflows.
         </p>
