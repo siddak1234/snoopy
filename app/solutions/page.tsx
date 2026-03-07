@@ -1,30 +1,5 @@
 import Link from "next/link";
 
-function UseCasesIconCluster() {
-  return (
-    <div className="relative h-20 w-20 shrink-0">
-      <svg
-        viewBox="0 0 48 48"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        className="absolute inset-0 h-20 w-20 text-[var(--icon-text)]"
-        aria-hidden
-      >
-        <rect x="8" y="8" width="14" height="14" rx="2" />
-        <rect x="26" y="8" width="14" height="14" rx="2" />
-        <rect x="8" y="26" width="14" height="14" rx="2" />
-        <rect x="26" y="26" width="14" height="14" rx="2" />
-        <path d="M15 15h8M15 18h5M15 21h6" />
-        <path d="M33 15h6M33 18h4M33 21h5" />
-      </svg>
-      <span className="absolute left-1 top-2 h-2 w-2 rounded-full bg-[var(--bullet)] opacity-80" />
-      <span className="absolute right-2 top-1 h-1.5 w-1.5 rounded-full bg-[var(--bullet)] opacity-75" />
-      <span className="absolute bottom-2 left-2 h-1.5 w-1.5 rounded-full bg-[var(--bullet)] opacity-70" />
-    </div>
-  );
-}
-
 function HealthcareIconCluster() {
   return (
     <div className="relative h-20 w-20 shrink-0">
@@ -93,26 +68,6 @@ export default function SolutionsPage() {
         <div className="space-y-4">
           <article className="bubble p-5 sm:p-6">
             <h3 className="text-2xl font-semibold sm:text-3xl">Pick Your Industry</h3>
-          </article>
-
-          <article className="bubble group p-5 transition duration-200 hover:-translate-y-1 hover:shadow-xl sm:p-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="max-w-3xl">
-                <h3 className="text-xl font-semibold">Use Cases</h3>
-                <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">
-                  Explore automation use cases tailored to your workflows—from document processing to approvals and reporting.
-                </p>
-                <Link
-                  href="/solutions/use-cases"
-                  className="mt-4 inline-flex rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-                >
-                  Learn more
-                </Link>
-              </div>
-              <div className="self-end md:self-auto">
-                <UseCasesIconCluster />
-              </div>
-            </div>
           </article>
 
           <article className="bubble group p-5 transition duration-200 hover:-translate-y-1 hover:shadow-xl sm:p-6">

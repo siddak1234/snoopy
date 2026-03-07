@@ -27,6 +27,7 @@ export const metadata: Metadata = {
 
 const navLinks = [
   { href: "/", label: "Home" },
+  { href: "/solutions/use-cases", label: "Case Study" },
   { href: "/automation-builder", label: "Automation Builder" },
   { href: "/contact", label: "Contact" },
 ];
@@ -61,15 +62,12 @@ export default function RootLayout({
                 aria-label="Main navigation"
                 className="hidden min-w-0 flex-1 md:flex md:justify-evenly md:gap-2"
               >
-                {navLinks.slice(0, 1).map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="rounded-full px-4 py-2.5 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)]"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
+                <Link
+                  href={navLinks[0].href}
+                  className="rounded-full px-4 py-2.5 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)]"
+                >
+                  {navLinks[0].label}
+                </Link>
                 <SolutionsDropdown />
                 {navLinks.slice(1).map((link) => (
                   <Link

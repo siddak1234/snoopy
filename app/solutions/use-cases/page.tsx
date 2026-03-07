@@ -1,17 +1,17 @@
 import Link from "next/link";
 
-export default function UseCasesSolutionsPage() {
+export default function CaseStudyPage() {
   return (
     <div className="space-y-6 sm:space-y-8">
       <section className="bubble p-6 sm:p-8">
-        <h1 className="text-3xl font-semibold sm:text-4xl">Use Cases</h1>
+        <h1 className="text-3xl font-semibold sm:text-4xl">Case Study</h1>
         <p className="mt-4 text-base text-[var(--muted)]">
-          Explore automation use cases tailored to your workflows.
+          Explore case studies on automation tailored to your workflows.
         </p>
       </section>
 
       <section>
-        <h2 className="sr-only">Example use cases</h2>
+        <h2 className="sr-only">Case studies</h2>
         <Link
           href="/solutions/use-cases/legal-billing-compliance"
           className="bubble group flex flex-col gap-4 p-6 transition duration-200 hover:-translate-y-1 hover:shadow-xl sm:flex-row sm:items-center sm:justify-between sm:p-8"

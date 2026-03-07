@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 const items = [
-  { href: "/solutions/use-cases", label: "Use Cases" },
   { href: "/solutions/healthcare", label: "Healthcare" },
   { href: "/solutions/finance", label: "Finance & Accounting" },
 ];
