@@ -1,6 +1,5 @@
 import Link from "next/link";
 import IndustrySignals from "@/components/IndustrySignals";
-import ProcessStepsSection from "@/components/home/ProcessStepsSection";
 import TypingHeadline from "@/components/home/TypingHeadline";
 import ValueCard from "@/components/home/ValueCard";
 import { AutonomousIcon, ScalableIcon, SecureIcon } from "@/components/icons/valueIcons";
@@ -49,10 +48,6 @@ export default function Home() {
       </section>
 
       <IndustrySignals />
-
-      <section>
-        <ProcessStepsSection />
-      </section>
 
       <section>
         <h2 className="sr-only">Platform value propositions</h2>
