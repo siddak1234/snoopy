@@ -23,24 +23,11 @@ function SignupForm() {
     e.preventDefault();
     setStatus(null);
     const form = e.currentTarget;
-    const fullName = (form.elements.namedItem("fullName") as HTMLInputElement | null)?.value?.trim();
     const emailInput = form.elements.namedItem("email") as HTMLInputElement | null;
-    const passwordInput = form.elements.namedItem("password") as HTMLInputElement | null;
-    const confirmInput = form.elements.namedItem("confirmPassword") as HTMLInputElement | null;
     const email = emailInput?.value;
-    const password = passwordInput?.value;
-    const confirmPassword = confirmInput?.value;
 
     if (!email?.trim()) {
       setStatus("Please enter your email.");
-      return;
-    }
-    if (!password) {
-      setStatus("Please choose a password.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setStatus("Passwords do not match.");
       return;
     }
 
@@ -48,7 +35,21 @@ function SignupForm() {
     if (isGmailAddress(normalizedEmail)) {
       setLoading(true);
       await signIn("google", { callbackUrl });
-      setLoading(false);
+      return;
+    }
+
+    const fullName = (form.elements.namedItem("fullName") as HTMLInputElement | null)?.value?.trim();
+    const passwordInput = form.elements.namedItem("password") as HTMLInputElement | null;
+    const confirmInput = form.elements.namedItem("confirmPassword") as HTMLInputElement | null;
+    const password = passwordInput?.value;
+    const confirmPassword = confirmInput?.value;
+
+    if (!password) {
+      setStatus("Please choose a password.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setStatus("Passwords do not match.");
       return;
     }
 

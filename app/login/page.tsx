@@ -49,16 +49,10 @@ function LoginForm() {
     setStatus(null);
     const form = e.currentTarget;
     const emailInput = form.elements.namedItem("email") as HTMLInputElement | null;
-    const passwordInput = form.elements.namedItem("password") as HTMLInputElement | null;
     const email = emailInput?.value;
-    const password = passwordInput?.value;
 
     if (!email?.trim()) {
       setStatus("Please enter your email.");
-      return;
-    }
-    if (!password) {
-      setStatus("Please enter your password.");
       return;
     }
 
@@ -66,7 +60,13 @@ function LoginForm() {
     if (isGmailAddress(normalizedEmail)) {
       setLoading(true);
       await signIn("google", { callbackUrl });
-      setLoading(false);
+      return;
+    }
+
+    const passwordInput = form.elements.namedItem("password") as HTMLInputElement | null;
+    const password = passwordInput?.value;
+    if (!password) {
+      setStatus("Please enter your password.");
       return;
     }
 
