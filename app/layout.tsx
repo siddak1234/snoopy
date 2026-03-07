@@ -5,7 +5,6 @@ import AuthNavLinks from "@/components/navigation/AuthNavLinks";
 import MobileNavMenu from "@/components/navigation/MobileNavMenu";
 import SolutionsDropdown from "@/components/navigation/SolutionsDropdown";
 import ThemeToggle from "@/components/theme/ThemeToggle";
-import SessionProvider from "@/components/providers/SessionProvider";
 import LogoMark from "@/components/branding/LogoMark";
 import { site } from "@/lib/site";
 import "./globals.css";
@@ -44,7 +43,6 @@ export default function RootLayout({
       <body
         className={`${inter.className} min-h-screen antialiased`}
       >
-        <SessionProvider>
         <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-4 pb-6 sm:px-6 lg:px-8">
           <header className="bubble-soft sticky top-3 z-50 mt-3 px-4 py-3 sm:px-5">
             <div className="flex min-h-12 w-full items-center gap-4 sm:gap-6">
@@ -102,7 +100,6 @@ export default function RootLayout({
             </p>
           </footer>
         </div>
-        </SessionProvider>
       </body>
     </html>
   );

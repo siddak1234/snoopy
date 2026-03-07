@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { getAuthOptions } from "@/lib/auth";
+import { getAppSession } from "@/lib/auth-supabase";
 import { prisma } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -10,7 +9,7 @@ export const runtime = "nodejs";
  * Deletes the current user's account and related data. Call only when user has confirmed.
  */
 export async function DELETE() {
-  const session = await getServerSession(getAuthOptions());
+  const session = await getAppSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }

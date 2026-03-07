@@ -1,6 +1,5 @@
-import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { getAuthOptions } from "@/lib/auth";
+import { getAppSession } from "@/lib/auth-supabase";
 import { DashboardSidebar, DashboardHeader } from "@/components/dashboard/DashboardNav";
 
 export default async function AccountLayout({
@@ -8,7 +7,7 @@ export default async function AccountLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getServerSession(getAuthOptions());
+  const session = await getAppSession();
 
   if (!session?.user?.email || !session?.user?.id) {
     redirect("/login?callbackUrl=/account");

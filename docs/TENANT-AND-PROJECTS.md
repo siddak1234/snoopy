@@ -3,7 +3,7 @@
 ## Tenant derivation (never from client)
 
 - **tenant_id** and **owner_user_id** are **never** accepted from the client. They are always derived server-side from the authenticated session.
-- **getTenantForUser(userId)** returns the user’s single tenant from `tenant_memberships` where `userId = session.user.id` (from `getServerSession(getAuthOptions())`).
+- **getTenantForUser(userId)** returns the user’s single tenant from `tenant_memberships` where `userId = session.user.id` (from `getAppSession()`).
 - **ensureTenantForUser(userId)** creates a default tenant and `tenant_memberships` row (org_owner) if the user has none; used when loading the Projects page or creating a project.
 - **createProject**: `tenantId` = result of `ensureTenantForUser(session.user.id)`; `ownerUserId` and `ownerName` = session user. No client input for tenant or owner.
 - **joinProjectByCode**: Lookup by access code only; tenant is derived via `getTenantForUser(session.user.id)`. Projects are filtered by `tenantId = user's tenant` before verifying the code. Cross-tenant join is impossible.
@@ -15,4 +15,4 @@
 
 ## RLS
 
-- This app uses **NextAuth + Prisma**. Supabase RLS with `auth.uid()` is not in use unless you switch to Supabase Auth. Isolation is enforced in application code: all project and tenant queries filter by `session.user.id` and server-derived `tenantId`.
+- This app uses **Supabase Auth + Prisma**. Supabase RLS with `auth.uid()` is not in use; isolation is enforced in application code: all project and tenant queries filter by `session.user.id` and server-derived `tenantId`.

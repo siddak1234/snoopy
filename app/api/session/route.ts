@@ -4,11 +4,8 @@ import { getAppSession } from "@/lib/auth-supabase";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/** TEMPORARY: verify session has userId + workspaceId. DELETE this route after verification. */
+/** Returns app session for client-side auth UI. */
 export async function GET() {
   const session = await getAppSession();
-  return NextResponse.json({
-    userId: session?.user?.id ?? null,
-    workspaceId: session?.user?.workspaceId ?? null,
-  });
+  return NextResponse.json(session);
 }

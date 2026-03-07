@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState, FormEvent } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { isGmailAddress } from "@/lib/email";
 
 const inputClassName =
@@ -34,7 +34,13 @@ function SignupForm() {
     const normalizedEmail = normalizeEmail(email);
     if (isGmailAddress(normalizedEmail)) {
       setLoading(true);
-      await signIn("google", { callbackUrl });
+      const supabase = createClient();
+      await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(callbackUrl)}`,
+        },
+      });
       return;
     }
 
@@ -78,23 +84,17 @@ function SignupForm() {
         return;
       }
 
-      const signInResult = await signIn("credentials", {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
         password,
-        redirect: false,
-        callbackUrl,
       });
-
-      if (signInResult?.error) {
+      if (error) {
         setStatus("Account created. Please log in with your email and password.");
         setLoading(false);
         return;
       }
-      if (signInResult?.ok && signInResult?.url) {
-        window.location.href = signInResult.url;
-        return;
-      }
-      setStatus("Account created. Please log in.");
+      window.location.href = callbackUrl;
     } catch {
       setStatus("Something went wrong. Please try again.");
     }
@@ -184,13 +184,38 @@ function SignupForm() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => signIn("google", { callbackUrl: "/account" })}
-            className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-          >
-            Sign up with Google
-          </button>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={async () => {
+                const supabase = createClient();
+                await supabase.auth.signInWithOAuth({
+                  provider: "google",
+                  options: {
+                    redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/account")}`,
+                  },
+                });
+              }}
+              className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            >
+              Sign up with Google
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                const supabase = createClient();
+                await supabase.auth.signInWithOAuth({
+                  provider: "azure",
+                  options: {
+                    redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/account")}`,
+                  },
+                });
+              }}
+              className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            >
+              Sign up with Microsoft
+            </button>
+          </div>
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2 border-t border-[var(--ring)] pt-5">
             <span className="text-sm text-[var(--muted)]">Already have an account?</span>

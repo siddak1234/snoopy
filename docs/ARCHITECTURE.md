@@ -11,7 +11,7 @@ Minimal overview for cloud deployment: single app, containerized, ready for serv
 | Layer        | Technology        | Purpose                          |
 |-------------|--------------------|----------------------------------|
 | **App**     | Next.js 16 (App Router) | Web UI, SSR, API routes          |
-| **Auth**    | NextAuth (Google, JWT)  | Sign-in, session, no DB adapter yet |
+| **Auth**    | Supabase Auth (Google, Microsoft OAuth; email/password) | Sign-in, session, user provisioning to Prisma |
 | **Data**    | Prisma + PostgreSQL    | ORM + database (via `lib/db.ts`) |
 | **Config**  | `prisma.config.ts`     | DB URL from env (`POSTGRES_PRISMA_URL`) |
 | **Styling** | Tailwind 4              | UI                                |
@@ -25,7 +25,8 @@ Single Node process: Next.js serves pages and API routes; Prisma talks to Postgr
 ```
 snoopy/
 ├── app/                    # Next.js App Router
-│   ├── api/auth/[...nextauth]/route.ts   # Auth API (NextAuth)
+│   ├── api/auth/signup/route.ts          # Email/password signup
+│   ├── auth/callback/route.ts            # OAuth callback (Supabase)
 │   ├── page.tsx, layout.tsx, globals.css
 │   ├── login, signup, account, contact, automation-builder, solutions/
 │   └── ...
@@ -47,8 +48,7 @@ snoopy/
 ## External Boundaries
 
 - **PostgreSQL**: URL from `POSTGRES_PRISMA_URL` (set in env at deploy time; not in repo).
-- **Google OAuth**: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` for NextAuth.
-- **Next.js**: Needs `NEXTAUTH_URL` and `NEXTAUTH_SECRET` in production.
+- **Supabase Auth**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Configure Google and Azure providers in Supabase Dashboard.
 
 All config via environment variables; no hardcoded URLs or secrets.
 
@@ -71,7 +71,7 @@ Recommended:
 
 ## API Surface (current and future)
 
-- **Existing**: `app/api/auth/[...nextauth]` — NextAuth handles sign-in, callback, session.
+- **Existing**: `app/auth/callback` — Supabase OAuth callback; `app/api/auth/signup` — email/password signup. Session via Supabase cookies.
 - **Future**: Add routes under `app/api/` for any logic you want to call from other services (e.g. `app/api/jobs/route.ts`). Use `Authorization` headers or internal API keys for server-to-server calls; keep this app as the only thing that talks to Prisma/DB if you stay minimal.
 
 ---
@@ -84,9 +84,9 @@ Recommended:
 
 | Area | Status | Notes |
 |------|--------|--------|
-| **Stack choice** | OK | Next.js App Router, TypeScript strict, Prisma, Postgres, NextAuth — standard, well-supported, cloud-friendly. |
+| **Stack choice** | OK | Next.js App Router, TypeScript strict, Prisma, Postgres, Supabase Auth — standard, well-supported, cloud-friendly. |
 | **Structure** | OK | Clear separation: `app/` (routes + API), `components/`, `lib/` (db, config). Path alias `@/*` used consistently. |
-| **Config** | OK | No hardcoded secrets or DB URLs. `prisma.config.ts` and NextAuth read from env. Ready for 12-factor deployment. |
+| **Config** | OK | No hardcoded secrets or DB URLs. `prisma.config.ts` and Supabase client read from env. Ready for 12-factor deployment. |
 | **Database** | OK | Single Prisma client via `lib/db.ts` (singleton), migrations in repo, `postinstall` runs `prisma generate`. |
 | **Scalability** | OK | Stateless app; horizontal scaling is "run more containers." DB is the only stateful piece; use managed Postgres or connection pooling when needed. |
 | **Containerization** | OK | One service, env-driven, no embedded DB. Straightforward to put in a single Docker image and scale behind a load balancer. |
@@ -98,10 +98,10 @@ So: **yes, the architecture is clean and professional enough to deploy in the cl
 | Gap | Risk | Fix (minimal) |
 |-----|------|----------------|
 | **No tests** | Regressions, harder refactors | Add a few integration tests (e.g. Playwright for critical flows) and/or API route tests; even a small suite helps. |
-| **Auth only in UI** | `/account` (and similar) are protected only client-side; direct URL access still renders then redirects. | Add middleware or `getServerSession` in a server layout for protected routes so unauthenticated users get a redirect before any sensitive UI. |
-| **Env not validated** | Missing `NEXTAUTH_SECRET` or `GOOGLE_*` can fail in subtle ways (e.g. empty string in NextAuth). | At app startup or in a small `lib/env.ts`, validate required env and throw a clear error if missing in production. |
+| **Auth only in UI** | `/account` (and similar) are protected only client-side; direct URL access still renders then redirects. | Middleware protects `/account` and `/dashboard`; redirects unauthenticated users to `/login`. |
+| **Env not validated** | Missing Supabase env can fail in subtle ways. | `lib/env.ts` validates required env in production (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, POSTGRES_URL). |
 | **No health/ready endpoints** | Orchestrators need liveness and readiness. | `GET /api/health` = liveness (200, no DB). `GET /api/ready` = readiness (DB check, 200/503). |
-| **Prisma/User unused** | Schema has `User` and you have `lib/db`, but NextAuth uses JWT only (no DB adapter). | Either wire NextAuth to Prisma (e.g. adapter + sync users to DB) or treat User as "for future use" and document it; avoids confusion. |
+| **Prisma/User unused** | N/A. | Supabase Auth provisions users into Prisma `User` via `provisionUserFromSupabaseAuth()` in `lib/auth-supabase.ts`. |
 
 None of these block deployment; they improve operability and security as you containerize and scale.
 

@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { getServerSession } from "next-auth";
 import { notFound } from "next/navigation";
-import { getAuthOptions } from "@/lib/auth";
+import { getAppSession } from "@/lib/auth-supabase";
 import { getTenantForUser } from "@/lib/tenant";
 import { getProjectForUser } from "@/lib/projects";
 import SectionCard from "@/components/dashboard/SectionCard";
@@ -19,7 +18,7 @@ export default async function ProjectDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await getServerSession(getAuthOptions());
+  const session = await getAppSession();
   if (!session?.user?.id) {
     notFound();
   }

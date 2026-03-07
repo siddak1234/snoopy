@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState, FormEvent, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { isGmailAddress } from "@/lib/email";
 
 const inputClassName =
@@ -11,6 +11,35 @@ const inputClassName =
 
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function OAuthButton({
+  provider,
+  label,
+  callbackUrl,
+}: {
+  provider: "google" | "azure";
+  label: string;
+  callbackUrl: string;
+}) {
+  async function handleClick() {
+    const supabase = createClient();
+    await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(callbackUrl)}`,
+      },
+    });
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+    >
+      {label}
+    </button>
+  );
 }
 
 function LoginForm() {
@@ -59,7 +88,17 @@ function LoginForm() {
     const normalizedEmail = normalizeEmail(email);
     if (isGmailAddress(normalizedEmail)) {
       setLoading(true);
-      await signIn("google", { callbackUrl });
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(callbackUrl)}`,
+        },
+      });
+      if (error) {
+        setStatus(error.message ?? "Sign in failed. Please try again.");
+        setLoading(false);
+      }
       return;
     }
 
@@ -72,27 +111,21 @@ function LoginForm() {
 
     setLoading(true);
     try {
-      const result = await signIn("credentials", {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
         password,
-        redirect: false,
-        callbackUrl,
       });
-
-      if (result?.error) {
+      if (error) {
         setStatus("Invalid email or password. Please try again.");
         setLoading(false);
         return;
       }
-      if (result?.ok && result?.url) {
-        window.location.href = result.url;
-        return;
-      }
-      setStatus("Something went wrong. Please try again.");
+      window.location.href = callbackUrl;
     } catch {
       setStatus("Something went wrong. Please try again.");
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   return (
@@ -152,13 +185,10 @@ function LoginForm() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => signIn("google", { callbackUrl: "/account" })}
-            className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-          >
-            Continue with Google
-          </button>
+          <div className="flex flex-col gap-2">
+            <OAuthButton provider="google" label="Continue with Google" callbackUrl={callbackUrl} />
+            <OAuthButton provider="azure" label="Continue with Microsoft" callbackUrl={callbackUrl} />
+          </div>
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2 border-t border-[var(--ring)] pt-5">
             <span className="text-sm text-[var(--muted)]">New here?</span>

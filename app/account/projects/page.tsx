@@ -1,6 +1,5 @@
-import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { getAuthOptions } from "@/lib/auth";
+import { getAppSession } from "@/lib/auth-supabase";
 import { ensureTenantForUser } from "@/lib/tenant";
 import { getMyProjects, getTeamProjects } from "@/lib/projects";
 import SectionCard from "@/components/dashboard/SectionCard";
@@ -9,7 +8,7 @@ import { CreateProjectButton } from "@/components/dashboard/CreateProjectButton"
 import { JoinProjectButton } from "@/components/dashboard/JoinProjectButton";
 
 export default async function AccountProjectsPage() {
-  const session = await getServerSession(getAuthOptions());
+  const session = await getAppSession();
   if (!session?.user?.id) {
     redirect("/login?callbackUrl=/account/projects");
   }

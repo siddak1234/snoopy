@@ -1,6 +1,6 @@
 "use client";
 
-import { signOut } from "next-auth/react";
+import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 
 export default function DeleteAccountButton() {
@@ -17,7 +17,8 @@ export default function DeleteAccountButton() {
         setLoading(false);
         return;
       }
-      await signOut({ redirect: false });
+      const supabase = createClient();
+      await supabase.auth.signOut();
       window.location.replace("/login?deleted=1");
     } catch {
       alert("Something went wrong. Please try again.");

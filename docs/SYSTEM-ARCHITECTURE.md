@@ -13,7 +13,7 @@ High-level view of how the **website** (this repo), **n8n**, and the **database 
 │  │  (this repo) │     │  (separate   │     │   (PostgreSQL)   │   │
 │  │              │     │   repo)      │     │                  │   │
 │  │  Next.js +   │     │              │     │  Single source   │   │
-│  │  NextAuth +  │────▶│  Workflows   │────▶│  of truth for    │   │
+│  │  Supabase    │────▶│  Workflows   │────▶│  of truth for    │   │
 │  │  Prisma      │     │  Automation  │     │  persisted data  │   │
 │  │              │◀────│  Webhooks    │     │                  │   │
 │  └──────────────┘     └──────────────┘     └──────────────────┘   │
@@ -26,7 +26,7 @@ High-level view of how the **website** (this repo), **n8n**, and the **database 
 
 | Component | Repo / location | Role |
 |-----------|------------------|------|
-| **Website** | This repo (snoopy) | Marketing site, auth (NextAuth), user-facing UI. Reads/writes DB via Prisma for website-specific data (e.g. users, preferences). |
+| **Website** | This repo (snoopy) | Marketing site, auth (Supabase Auth), user-facing UI. Reads/writes DB via Prisma for website-specific data (e.g. users, preferences). |
 | **n8n** | Separate n8n repository | Workflows, automations, internal or external triggers. Can read/write the same DB or call website APIs. |
 | **Database server** | Managed Postgres or own container | Single PostgreSQL instance. Website and n8n each use their own connection URL (same DB or separate DBs, your choice). |
 
@@ -38,7 +38,7 @@ High-level view of how the **website** (this repo), **n8n**, and the **database 
 
 ## Deployment (containerized)
 
-- **Website**: One container (Next.js). Env: `POSTGRES_PRISMA_URL`, NextAuth vars, optional `N8N_BASE_URL`.
+- **Website**: One container (Next.js). Env: `POSTGRES_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, optional `N8N_BASE_URL`.
 - **n8n**: One or more containers (n8n’s official image). Env: its own DB URL and config.
 - **Database**: One Postgres instance (managed or container). Both website and n8n point at it (or at separate DBs on the same server).
 

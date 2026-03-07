@@ -6,7 +6,7 @@ n8n and the database server are separate; see [System architecture](docs/SYSTEM-
 ## Stack
 
 - **Next.js 16** (App Router), **TypeScript**, **Tailwind 4**
-- **NextAuth** (Google, JWT)
+- **Supabase Auth** (Google, Microsoft OAuth; email/password)
 - **Prisma** + **PostgreSQL** (connection via env; DB is external to this repo)
 
 ## Quick start
@@ -23,10 +23,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Copy `.env.example` to `.env.local` and set:
 
-- `POSTGRES_PRISMA_URL` — Postgres connection string (required for Prisma)
-- `NEXTAUTH_URL` — App URL (e.g. `http://localhost:3000`)
-- `NEXTAUTH_SECRET` — Secret for session signing (e.g. `openssl rand -base64 32`)
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google OAuth for sign-in
+- `POSTGRES_URL` — Postgres connection string (required for Prisma)
+- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase Auth (OAuth + email/password). Configure Google and Azure in Supabase Dashboard → Authentication → Providers. Add redirect URLs: `https://yourdomain.com/auth/callback`, `http://localhost:3000/auth/callback`
 
 Do **not** commit `.env.local` or any file with real secrets.
 
@@ -46,12 +44,12 @@ Do **not** commit `.env.local` or any file with real secrets.
 
 ## Repository layout
 
-- **`app/`** — Next.js routes, pages, API (`/api/auth`, `/api/health`, `/api/ready`)
+- **`app/`** — Next.js routes, pages, API (`/api/auth/signup`, `/api/health`, `/api/ready`, `/auth/callback`)
 - **`components/`** — React UI components
-- **`lib/`** — Shared logic: `db.ts`, `site.ts`, `env.ts` (validation), `auth.ts` (NextAuth config)
+- **`lib/`** — Shared logic: `db.ts`, `site.ts`, `env.ts` (validation), `auth.ts` (workspace provisioning), `auth-supabase.ts` (session + user provisioning)
 - **`middleware.ts`** — Protects `/account` (redirect to login when unauthenticated)
 - **`prisma/`** — Schema and migrations (website’s DB access)
-- **`types/`** — TypeScript module augmentation (e.g. NextAuth `Session`)
+- **`types/`** — TypeScript module augmentation (if needed)
 - **`docs/`** — Architecture and structure
 
 See **[docs/REPO-STRUCTURE.md](docs/REPO-STRUCTURE.md)** for where to put new code.  

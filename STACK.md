@@ -1,6 +1,6 @@
 # Stack summary (for agents)
 
-**Stack:** Next.js (App Router), NextAuth (Google, JWT), Prisma 7.4.1, Supabase Postgres. Repo = website only; n8n and DB are separate.
+**Stack:** Next.js (App Router), Supabase Auth (Google, Microsoft OAuth; email/password), Prisma 7.4.1, Supabase Postgres. Repo = website only; n8n and DB are separate.
 
 ---
 
@@ -23,9 +23,10 @@
 
 ## Auth
 
-- NextAuth provisions **User** on Google sign-in via `provisionUser()` in `lib/auth.ts` (upsert by `googleSub` then email). DB access only inside jwt callback via **dynamic** `import("@/lib/db")`.
-- `session.user.id` and `token.userId` hold DB user id; types in `types/next-auth.d.ts`.
-- Env validated in prod in `lib/env.ts` (required: NEXTAUTH_URL, NEXTAUTH_SECRET, GOOGLE_*, POSTGRES_PRISMA_URL).
+- **Supabase Auth** is the source of truth. OAuth (Google, Azure) via `supabase.auth.signInWithOAuth()`. Email/password via `signInWithPassword` and `/api/auth/signup`.
+- **User provisioning:** After Supabase auth, `provisionUserFromSupabaseAuth()` in `lib/auth-supabase.ts` upserts Prisma `User` by `supabaseUserId` or email, creates default workspace via `ensureDefaultWorkspaceForUser()`.
+- **Session:** `getAppSession()` (server) and `useAppSession()` (client via `/api/session`) return `{ user: { id, email, name, image } }` from Prisma User.
+- **Env:** `lib/env.ts` validates in production: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `POSTGRES_URL`.
 
 ---
 
@@ -33,14 +34,14 @@
 
 - **`/api/health`** — Liveness; no DB.
 - **`/api/ready`** — Readiness; dynamic import of db, `SELECT 1` when `POSTGRES_PRISMA_URL` set; otherwise 200 + `database: "skipped"`.
-- **`/account`** and **`/dashboard`** — Protected in `middleware.ts` (redirect to `/login` if no JWT). Dashboard layout also checks `session?.user?.id` server-side and redirects if missing.
+- **`/account`** and **`/dashboard`** — Protected in `middleware.ts` (redirect to `/login` if no Supabase session). Dashboard layout also checks `session?.user?.id` server-side and redirects if missing.
 
 ---
 
 ## Schema
 
-- **User:** `id`, `email`, `googleSub` String? @unique, `name`, `image`, `createdAt`, `updatedAt`; table `users`.
-- Migrations in `prisma/migrations/`: `init` + `add_google_sub_to_user`; safe for existing rows.
+- **User:** `id`, `email`, `googleSub` String? @unique, `supabaseUserId` String? @unique, `name`, `image`, `createdAt`, `updatedAt`; table `users`.
+- Migrations in `prisma/migrations/`: `init`, `add_google_sub_to_user`, `add_supabase_user_id`, etc.
 
 ---
 
@@ -48,3 +49,4 @@
 
 - **Vercel does not run migrations.** Run `prisma migrate deploy` (or equivalent) against prod DB separately.
 - Build does not need DB; no top-level db import in routes.
+- **Supabase Dashboard:** Add redirect URLs (`https://yourdomain.com/auth/callback`, `http://localhost:3000/auth/callback`). Enable Google and Azure providers.

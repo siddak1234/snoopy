@@ -1,7 +1,6 @@
 "use server";
 
-import { getServerSession } from "next-auth";
-import { getAuthOptions } from "@/lib/auth";
+import { getAppSession } from "@/lib/auth-supabase";
 import {
   createProject as createProjectDb,
   deleteProject as deleteProjectDb,
@@ -25,7 +24,7 @@ export type CreateProjectResult =
 export async function createProjectAction(
   formData: FormData
 ): Promise<CreateProjectResult> {
-  const session = await getServerSession(getAuthOptions());
+  const session = await getAppSession();
   if (!session?.user?.id) {
     return { ok: false, error: "You must be signed in to create a project." };
   }
@@ -69,7 +68,7 @@ export type JoinProjectResult =
 export async function joinProjectByCodeAction(
   code: string
 ): Promise<JoinProjectResult> {
-  const session = await getServerSession(getAuthOptions());
+  const session = await getAppSession();
   if (!session?.user?.id) {
     return { ok: false, error: "You must be signed in to join a project." };
   }
@@ -83,7 +82,7 @@ export async function joinProjectByCodeAction(
 export type DeleteProjectResult = { ok: true } | { ok: false; error: string };
 
 export async function deleteProjectAction(projectId: string): Promise<DeleteProjectResult> {
-  const session = await getServerSession(getAuthOptions());
+  const session = await getAppSession();
   if (!session?.user?.id) {
     return { ok: false, error: "You must be signed in to delete a project." };
   }

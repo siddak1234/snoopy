@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { signOut, useSession } from "next-auth/react";
+import { createClient } from "@/lib/supabase/client";
+import { useAppSession } from "@/hooks/use-app-session";
 import { useEffect, useRef, useState } from "react";
 
 const solutionsItems = [
@@ -13,7 +14,7 @@ const linkClass =
   "block rounded-xl px-4 py-3 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset";
 
 export default function MobileNavMenu() {
-  const { data: session, status } = useSession();
+  const { data: session, status } = useAppSession();
   const [menuOpen, setMenuOpen] = useState(false);
   const [solutionsExpanded, setSolutionsExpanded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -139,9 +140,11 @@ export default function MobileNavMenu() {
                 </Link>
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     closeMenu();
-                    signOut({ callbackUrl: "/" });
+                    const supabase = createClient();
+                    await supabase.auth.signOut();
+                    window.location.href = "/";
                   }}
                   className={`${linkClass} w-full text-center`}
                 >

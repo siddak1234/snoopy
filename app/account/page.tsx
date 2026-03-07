@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { getServerSession } from "next-auth";
-import { getAuthOptions } from "@/lib/auth";
+import { getAppSession } from "@/lib/auth-supabase";
 import { getAccessibleProjects } from "@/lib/projects";
 import SectionCard from "@/components/dashboard/SectionCard";
 
@@ -11,7 +10,7 @@ function getFirstName(name?: string | null): string | null {
 }
 
 export default async function AccountDashboardPage() {
-  const session = await getServerSession(getAuthOptions());
+  const session = await getAppSession();
   const firstName = getFirstName(session?.user?.name);
   const greeting = firstName
     ? `Welcome, ${firstName}!`
