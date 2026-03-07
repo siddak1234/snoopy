@@ -2,17 +2,103 @@
 
 import Link from "next/link";
 import { signIn } from "next-auth/react";
-import { useState, FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState, FormEvent } from "react";
+import { isGmailAddress } from "@/lib/email";
 
 const inputClassName =
   "mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] transition focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]";
 
-export default function SignupPage() {
-  const [status, setStatus] = useState<string | null>(null);
+function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase();
+}
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+function SignupForm() {
+  const [status, setStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/account";
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setStatus("Email signup coming soon — you can sign up instantly with Google below.");
+    setStatus(null);
+    const form = e.currentTarget;
+    const fullName = (form.elements.namedItem("fullName") as HTMLInputElement | null)?.value?.trim();
+    const emailInput = form.elements.namedItem("email") as HTMLInputElement | null;
+    const passwordInput = form.elements.namedItem("password") as HTMLInputElement | null;
+    const confirmInput = form.elements.namedItem("confirmPassword") as HTMLInputElement | null;
+    const email = emailInput?.value;
+    const password = passwordInput?.value;
+    const confirmPassword = confirmInput?.value;
+
+    if (!email?.trim()) {
+      setStatus("Please enter your email.");
+      return;
+    }
+    if (!password) {
+      setStatus("Please choose a password.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setStatus("Passwords do not match.");
+      return;
+    }
+
+    const normalizedEmail = normalizeEmail(email);
+    if (isGmailAddress(normalizedEmail)) {
+      setLoading(true);
+      await signIn("google", { callbackUrl });
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: normalizedEmail,
+          password,
+          fullName: fullName || undefined,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setStatus(data?.error ?? "Sign up failed. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      if (data.requiresConfirmation) {
+        setStatus("Please check your email to confirm your account, then log in.");
+        setLoading(false);
+        return;
+      }
+
+      const signInResult = await signIn("credentials", {
+        email: normalizedEmail,
+        password,
+        redirect: false,
+        callbackUrl,
+      });
+
+      if (signInResult?.error) {
+        setStatus("Account created. Please log in with your email and password.");
+        setLoading(false);
+        return;
+      }
+      if (signInResult?.ok && signInResult?.url) {
+        window.location.href = signInResult.url;
+        return;
+      }
+      setStatus("Account created. Please log in.");
+    } catch {
+      setStatus("Something went wrong. Please try again.");
+    }
+    setLoading(false);
   }
 
   return (
@@ -78,12 +164,12 @@ export default function SignupPage() {
               />
             </div>
 
-            <button type="submit" className="btn-primary w-full px-5">
-              Create Account
+            <button type="submit" className="btn-primary w-full px-5" disabled={loading}>
+              {loading ? "Creating account…" : "Create Account"}
             </button>
 
             {status ? (
-              <p className="text-center text-sm text-[var(--muted)]" role="status">
+              <p className="text-center text-sm text-[var(--muted)]" role="alert">
                 {status}
               </p>
             ) : null}
@@ -118,5 +204,13 @@ export default function SignupPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-[60vh] items-center justify-center px-4 py-8"><div className="bubble p-6 sm:p-8">Loading…</div></div>}>
+      <SignupForm />
+    </Suspense>
   );
 }

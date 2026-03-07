@@ -2,17 +2,72 @@
 
 import Link from "next/link";
 import { signIn } from "next-auth/react";
-import { useState, FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState, FormEvent } from "react";
+import { isGmailAddress } from "@/lib/email";
 
 const inputClassName =
   "mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] transition focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]";
 
-export default function LoginPage() {
-  const [status, setStatus] = useState<string | null>(null);
+function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase();
+}
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+function LoginForm() {
+  const [status, setStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/account";
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setStatus("Auth coming soon.");
+    setStatus(null);
+    const form = e.currentTarget;
+    const emailInput = form.elements.namedItem("email") as HTMLInputElement | null;
+    const passwordInput = form.elements.namedItem("password") as HTMLInputElement | null;
+    const email = emailInput?.value;
+    const password = passwordInput?.value;
+
+    if (!email?.trim()) {
+      setStatus("Please enter your email.");
+      return;
+    }
+    if (!password) {
+      setStatus("Please enter your password.");
+      return;
+    }
+
+    const normalizedEmail = normalizeEmail(email);
+    if (isGmailAddress(normalizedEmail)) {
+      setLoading(true);
+      await signIn("google", { callbackUrl });
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await signIn("credentials", {
+        email: normalizedEmail,
+        password,
+        redirect: false,
+        callbackUrl,
+      });
+
+      if (result?.error) {
+        setStatus("Invalid email or password. Please try again.");
+        setLoading(false);
+        return;
+      }
+      if (result?.ok && result?.url) {
+        window.location.href = result.url;
+        return;
+      }
+      setStatus("Something went wrong. Please try again.");
+    } catch {
+      setStatus("Something went wrong. Please try again.");
+    }
+    setLoading(false);
   }
 
   return (
@@ -23,16 +78,17 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-5">
             <div>
-              <label htmlFor="user-id" className="block text-sm font-medium text-[var(--text)]">
-                User ID
+              <label htmlFor="email" className="block text-sm font-medium text-[var(--text)]">
+                Email
               </label>
               <input
-                id="user-id"
-                type="text"
-                name="userId"
-                autoComplete="username"
-                placeholder="Enter your user ID"
+                id="email"
+                type="email"
+                name="email"
+                autoComplete="email"
+                placeholder="Enter your email"
                 className={inputClassName}
+                required
               />
             </div>
 
@@ -47,15 +103,16 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 placeholder="Enter your password"
                 className={inputClassName}
+                required
               />
             </div>
 
-            <button type="submit" className="btn-primary w-full px-5">
-              Log In
+            <button type="submit" className="btn-primary w-full px-5" disabled={loading}>
+              {loading ? "Signing in…" : "Log In"}
             </button>
 
             {status ? (
-              <p className="text-center text-sm text-[var(--muted)]" role="status">
+              <p className="text-center text-sm text-[var(--muted)]" role="alert">
                 {status}
               </p>
             ) : null}
@@ -90,5 +147,13 @@ export default function LoginPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-[60vh] items-center justify-center px-4 py-8"><div className="bubble p-6 sm:p-8">Loading…</div></div>}>
+      <LoginForm />
+    </Suspense>
   );
 }
