@@ -73,8 +73,7 @@ function SignupForm() {
       }
 
       if (data.requiresConfirmation) {
-        setStatus("Please check your email to confirm your account, then log in.");
-        setLoading(false);
+        window.location.replace("/login?verify=1");
         return;
       }
 

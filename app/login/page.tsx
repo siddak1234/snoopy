@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState, FormEvent } from "react";
+import { Suspense, useState, FormEvent, useEffect } from "react";
 import { isGmailAddress } from "@/lib/email";
 
 const inputClassName =
@@ -18,6 +18,31 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/account";
+
+  useEffect(() => {
+    if (searchParams.get("verify") === "1") {
+      window.location.replace("/verify-email");
+      return;
+    }
+    if (searchParams.get("deleted") === "1") {
+      window.location.replace("/account-deleted");
+    }
+  }, [searchParams]);
+
+  if (searchParams.get("verify") === "1") {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center px-4 py-8">
+        <div className="bubble p-6 sm:p-8">Redirecting…</div>
+      </div>
+    );
+  }
+  if (searchParams.get("deleted") === "1") {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center px-4 py-8">
+        <div className="bubble p-6 sm:p-8">Redirecting…</div>
+      </div>
+    );
+  }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
