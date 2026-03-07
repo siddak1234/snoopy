@@ -286,26 +286,26 @@ export default function ExpenseClassificationUseCasePage() {
         </div>
       </section>
 
-      {/* Footnotes */}
+      {/* Sources */}
       <section className="bubble p-6 sm:p-8" id="footnotes">
         <h2 className="text-xl font-semibold text-[var(--text)] sm:text-2xl">
-          Footnotes
+          Sources
         </h2>
         <ol className="mt-6 space-y-4 text-sm leading-relaxed text-[var(--muted)]">
           <li id="footnote-1">
-            McKinsey & Company — <em>What an AI-powered finance function of the future looks like</em>{" "}
+            McKinsey & Company — <em>What an AI-powered finance function of the future looks like</em>{" | "}
             <a href="https://www.mckinsey.com/capabilities/tech-and-ai/our-insights/what-an-ai-powered-finance-function-of-the-future-looks-like" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-strong)] hover:underline">
               View source
             </a>
           </li>
           <li id="footnote-2">
-            PwC — <em>How AI agents help drive a new finance operating model</em>{" "}
+            PwC — <em>How AI agents help drive a new finance operating model</em>{" | "}
             <a href="https://www.pwc.com/us/en/tech-effect/ai-analytics/ai-agents-for-finance.html" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-strong)] hover:underline">
               View source
             </a>
           </li>
           <li id="footnote-3">
-            Deloitte — <em>Automating finance operations</em>{" "}
+            Deloitte — <em>Automating finance operations</em>{" | "}
             <a href="https://www.deloitte.com/us/en/services/audit-assurance/blogs/accounting-finance/automating-finance-operations.html" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-strong)] hover:underline">
               View source
             </a>

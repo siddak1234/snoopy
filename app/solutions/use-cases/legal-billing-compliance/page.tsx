@@ -328,57 +328,57 @@ export default function LegalBillingComplianceUseCasePage() {
         </h2>
         <ol className="mt-6 space-y-4 text-sm leading-relaxed text-[var(--muted)]">
           <li id="source-1">
-            <em>Thomson Reuters — Report on the State of the Legal Market</em>{" "}
+            <em>Thomson Reuters — Report on the State of the Legal Market</em>{" | "}
             <a href="https://www.thomsonreuters.com/en-us/posts/legal/state-of-the-legal-market/" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-strong)] hover:underline">
-              https://www.thomsonreuters.com/en-us/posts/legal/state-of-the-legal-market/
+              View source
             </a>
           </li>
           <li id="source-2">
-            <em>Georgetown Law Center on Ethics & Thomson Reuters — State of the Legal Market Report</em>{" "}
+            <em>Georgetown Law Center on Ethics & Thomson Reuters — State of the Legal Market Report</em>{" | "}
             <a href="https://www.law.georgetown.edu/center-on-ethics-and-the-legal-profession/reports/" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-strong)] hover:underline">
-              https://www.law.georgetown.edu/center-on-ethics-and-the-legal-profession/reports/
+              View source
             </a>
           </li>
           <li id="source-3">
-            <em>National Association for Law Placement (NALP)</em>{" "}
+            <em>National Association for Law Placement (NALP)</em>{" | "}
             <a href="https://www.nalp.org/" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-strong)] hover:underline">
-              https://www.nalp.org/
+              View source
             </a>
           </li>
           <li id="source-4">
-            <em>Bloomberg Law — Attorney Workload Survey</em>{" "}
+            <em>Bloomberg Law — Attorney Workload Survey</em>{" | "}
             <a href="https://news.bloomberglaw.com/business-and-practice" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-strong)] hover:underline">
-              https://news.bloomberglaw.com/business-and-practice
+              View source
             </a>
           </li>
           <li id="source-5">
-            <em>Clio — Legal Trends Report</em>{" "}
+            <em>Clio — Legal Trends Report</em>{" | "}
             <a href="https://www.clio.com/resources/legal-trends/" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-strong)] hover:underline">
-              https://www.clio.com/resources/legal-trends/
+              View source
             </a>
           </li>
           <li id="source-6">
-            <em>Thomson Reuters — Practice Innovation Report</em>{" "}
+            <em>Thomson Reuters — Practice Innovation Report</em>{" | "}
             <a href="https://www.thomsonreuters.com/en-us/posts/legal/practice-innovation/" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-strong)] hover:underline">
-              https://www.thomsonreuters.com/en-us/posts/legal/practice-innovation/
+              View source
             </a>
           </li>
           <li id="source-7">
-            <em>Association of Corporate Counsel — Billing Guidelines Resources</em>{" "}
+            <em>Association of Corporate Counsel — Billing Guidelines Resources</em>{" | "}
             <a href="https://www.acc.com/" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-strong)] hover:underline">
-              https://www.acc.com/
+              View source
             </a>
           </li>
           <li id="source-8">
-            <em>Thomson Reuters Peer Monitor — Law Firm Financial Benchmarking</em>{" "}
+            <em>Thomson Reuters Peer Monitor — Law Firm Financial Benchmarking</em>{" | "}
             <a href="https://legal.thomsonreuters.com/en/products/peer-monitor" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-strong)] hover:underline">
-              https://legal.thomsonreuters.com/en/products/peer-monitor
+              View source
             </a>
           </li>
           <li id="source-9">
-            <em>Deloitte — Generative AI: A guide for corporate legal departments</em>{" "}
+            <em>Deloitte — Generative AI: A guide for corporate legal departments</em>{" | "}
             <a href="https://www.deloitte.com/content/dam/assets-shared/docs/services/legal/2023/dttl-legal-generative-ai-guide-jun23.pdf" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-strong)] hover:underline">
-              https://www.deloitte.com/content/dam/assets-shared/docs/services/legal/2023/dttl-legal-generative-ai-guide-jun23.pdf
+              View source
             </a>
           </li>
         </ol>
