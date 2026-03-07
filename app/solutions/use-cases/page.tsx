@@ -29,7 +29,7 @@ export default function UseCasesSolutionsPage() {
           </div>
           <div className="flex shrink-0 items-center justify-end sm:pl-4">
             <span
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--muted)] transition group-hover:bg-[var(--surface-hover)] group-hover:text-[var(--accent-strong)]"
+              className="inline-flex text-[var(--muted)] transition group-hover:text-[var(--accent-strong)] group-hover:scale-110"
               aria-hidden
             >
               <svg
@@ -39,7 +39,7 @@ export default function UseCasesSolutionsPage() {
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="h-5 w-5"
+                className="h-8 w-8 sm:h-10 sm:w-10"
               >
                 <path d="M9 18l6-6-6-6" />
               </svg>

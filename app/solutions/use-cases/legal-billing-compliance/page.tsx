@@ -376,9 +376,9 @@ export default function LegalBillingComplianceUseCasePage() {
             </a>
           </li>
           <li id="source-9">
-            <em>Deloitte — Future of the Legal Industry</em>{" "}
-            <a href="https://www2.deloitte.com/us/en/pages/legal/articles/future-of-legal-services.html" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-strong)] hover:underline">
-              https://www2.deloitte.com/us/en/pages/legal/articles/future-of-legal-services.html
+            <em>Deloitte — Generative AI: A guide for corporate legal departments</em>{" "}
+            <a href="https://www.deloitte.com/content/dam/assets-shared/docs/services/legal/2023/dttl-legal-generative-ai-guide-jun23.pdf" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-strong)] hover:underline">
+              https://www.deloitte.com/content/dam/assets-shared/docs/services/legal/2023/dttl-legal-generative-ai-guide-jun23.pdf
             </a>
           </li>
         </ol>
