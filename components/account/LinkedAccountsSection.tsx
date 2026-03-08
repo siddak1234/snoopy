@@ -19,25 +19,10 @@ function normalizeProviderId(provider: string | null | undefined): ProviderId | 
   return null;
 }
 
-/** Read provider from session JWT (provider_id claim) so we show the actual sign-in method, not the first sign-up provider. */
-function getSessionProviderId(accessToken: string | undefined): ProviderId | null {
-  if (!accessToken) return null;
-  try {
-    const parts = accessToken.split(".");
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))) as { provider_id?: string };
-    return normalizeProviderId(payload.provider_id ?? null) ?? null;
-  } catch {
-    return null;
-  }
-}
-
 type State = {
   linked: Set<ProviderId>;
   /** Provider used to create the account (first sign-up). */
   primaryProvider: ProviderId | null;
-  /** Provider used for this session. */
-  currentProvider: ProviderId | null;
   loading: boolean;
   linking: ProviderId | null;
   error: string | null;
@@ -47,7 +32,6 @@ export default function LinkedAccountsSection() {
   const [state, setState] = useState<State>({
     linked: new Set(),
     primaryProvider: null,
-    currentProvider: null,
     loading: true,
     linking: null,
     error: null,
@@ -65,7 +49,6 @@ export default function LinkedAccountsSection() {
         loading: false,
         linked: new Set(),
         primaryProvider: null,
-        currentProvider: null,
       }));
       return;
     }
@@ -92,34 +75,11 @@ export default function LinkedAccountsSection() {
     const appProvider = (user.app_metadata as { provider?: string })?.provider;
     const primaryProvider = normalizeProviderId(appProvider ?? undefined);
 
-    // Current = provider used for this session. Prefer JWT provider_id; if missing (e.g. Azure),
-    // use the identity with the most recent last_sign_in_at so it updates when they sign in with the linked account.
-    const fromJwt = getSessionProviderId(session.access_token);
-    type IdentityWithProvider = { provider?: string; last_sign_in_at?: string };
-    const fromLastSignIn =
-      list.length > 0
-        ? (() => {
-            const supported = list.filter(
-              (i: IdentityWithProvider) => normalizeProviderId(i.provider) != null
-            ) as IdentityWithProvider[];
-            if (supported.length === 0) return null;
-            const latest = supported.reduce((a, b) => {
-              const aAt = a.last_sign_in_at ?? "";
-              const bAt = b.last_sign_in_at ?? "";
-              return aAt >= bAt ? a : b;
-            });
-            return normalizeProviderId(latest.provider);
-          })()
-        : null;
-    const currentProvider =
-      fromJwt ?? fromLastSignIn ?? (list.length === 1 ? normalizeProviderId(list[0].provider) : null);
-
     setState((s) => ({
       ...s,
       loading: false,
       linked,
       primaryProvider,
-      currentProvider,
     }));
   }, []);
 
@@ -177,16 +137,11 @@ export default function LinkedAccountsSection() {
       <ul className="mt-4 space-y-2">
         {PROVIDERS.map(({ id, label }) => {
           const isLinked = state.linked.has(id);
-          const isCurrent = state.currentProvider === id;
           const isPrimary = state.primaryProvider === id;
           const isLinking = state.linking === id;
           const disabled = isLinked;
 
-          const roleLabel = isPrimary ? "Primary" : isLinked ? "Secondary" : null;
-          const statusParts = [roleLabel, isCurrent ? "Current sign-in" : null].filter(
-            (s): s is string => s != null
-          );
-          const statusText = statusParts.length > 0 ? statusParts.join(" · ") : null;
+          const statusText = isPrimary ? "Primary" : isLinked ? "Secondary" : null;
 
           return (
             <li key={id}>
@@ -200,7 +155,7 @@ export default function LinkedAccountsSection() {
                 <span className="text-sm font-medium text-[var(--text)]">{label}</span>
                 {disabled ? (
                   <span className="text-xs text-[var(--muted)]">
-                    {statusText ?? "Connected"}
+                    {statusText ?? "Linked"}
                   </span>
                 ) : (
                   <button
