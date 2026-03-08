@@ -92,11 +92,27 @@ export default function LinkedAccountsSection() {
     const appProvider = (user.app_metadata as { provider?: string })?.provider;
     const primaryProvider = normalizeProviderId(appProvider ?? undefined);
 
-    // Current = provider used for this session. JWT provider_id > fallbacks.
+    // Current = provider used for this session. Prefer JWT provider_id; if missing (e.g. Azure),
+    // use the identity with the most recent last_sign_in_at so it updates when they sign in with the linked account.
+    const fromJwt = getSessionProviderId(session.access_token);
+    type IdentityWithProvider = { provider?: string; last_sign_in_at?: string };
+    const fromLastSignIn =
+      list.length > 0
+        ? (() => {
+            const supported = list.filter(
+              (i: IdentityWithProvider) => normalizeProviderId(i.provider) != null
+            ) as IdentityWithProvider[];
+            if (supported.length === 0) return null;
+            const latest = supported.reduce((a, b) => {
+              const aAt = a.last_sign_in_at ?? "";
+              const bAt = b.last_sign_in_at ?? "";
+              return aAt >= bAt ? a : b;
+            });
+            return normalizeProviderId(latest.provider);
+          })()
+        : null;
     const currentProvider =
-      getSessionProviderId(session.access_token) ??
-      normalizeProviderId(appProvider ?? undefined) ??
-      (list.length === 1 ? normalizeProviderId(list[0].provider) : null);
+      fromJwt ?? fromLastSignIn ?? (list.length === 1 ? normalizeProviderId(list[0].provider) : null);
 
     setState((s) => ({
       ...s,
