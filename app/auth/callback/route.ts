@@ -13,7 +13,7 @@ const DEFAULT_NEXT = "/account";
 
 function getSafeNext(raw: string | null): string {
   const trimmed = raw?.trim();
-  if (!trimmed) return DEFAULT_NEXT;
+  if (!trimmed || trimmed === "/") return DEFAULT_NEXT;
   if (!trimmed.startsWith("/")) return DEFAULT_NEXT;
   return trimmed;
 }
