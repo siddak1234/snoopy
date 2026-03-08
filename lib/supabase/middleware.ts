@@ -7,7 +7,27 @@ const supabaseAnonKey =
 
 const protectedPaths = ["/account", "/dashboard"];
 
+/** OAuth callback params that indicate the provider redirected to the wrong path (e.g. Site URL "/" instead of "/auth/callback"). */
+function hasOAuthCallbackParams(searchParams: URLSearchParams): boolean {
+  return (
+    searchParams.has("code") ||
+    (searchParams.has("error") && searchParams.has("error_description"))
+  );
+}
+
 export async function updateSession(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  const searchParams = request.nextUrl.searchParams;
+
+  // If OAuth redirected to "/" (e.g. Supabase Site URL is root), forward to the auth callback
+  // so the session can be exchanged and the user sent to the dashboard.
+  if (pathname === "/" && hasOAuthCallbackParams(searchParams)) {
+    const callbackUrl = new URL("/auth/callback", request.url);
+    searchParams.forEach((value, key) => callbackUrl.searchParams.set(key, value));
+    if (!callbackUrl.searchParams.has("next")) callbackUrl.searchParams.set("next", "/account");
+    return NextResponse.redirect(callbackUrl);
+  }
+
   let response = NextResponse.next({
     request: { headers: request.headers },
   });
@@ -29,7 +49,6 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const pathname = request.nextUrl.pathname;
   const isProtected = protectedPaths.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`)
   );

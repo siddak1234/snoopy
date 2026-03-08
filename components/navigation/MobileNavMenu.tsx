@@ -10,6 +10,11 @@ const solutionsItems = [
   { href: "/solutions/finance", label: "Finance & Accounting" },
 ];
 
+const insightsItems = [
+  { href: "/solutions/use-cases", label: "Case Studies" },
+  { href: "/use-cases", label: "Use Cases" },
+];
+
 const linkClass =
   "block rounded-xl px-4 py-3 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset";
 
@@ -17,6 +22,7 @@ export default function MobileNavMenu() {
   const { data: session, status } = useAppSession();
   const [menuOpen, setMenuOpen] = useState(false);
   const [solutionsExpanded, setSolutionsExpanded] = useState(false);
+  const [insightsExpanded, setInsightsExpanded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -115,9 +121,42 @@ export default function MobileNavMenu() {
               ) : null}
             </div>
 
-            <Link href="/solutions/use-cases" className={linkClass} onClick={closeMenu}>
-              Case Studies
-            </Link>
+            <div>
+              <button
+                type="button"
+                onClick={() => setInsightsExpanded((prev) => !prev)}
+                aria-expanded={insightsExpanded}
+                className={`${linkClass} w-full text-left`}
+              >
+                <span className="flex items-center justify-between">
+                  Insights
+                  <svg
+                    aria-hidden
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    className={`h-4 w-4 transition ${insightsExpanded ? "rotate-180" : ""}`}
+                  >
+                    <path d="M5 7.5L10 12.5L15 7.5" />
+                  </svg>
+                </span>
+              </button>
+              {insightsExpanded ? (
+                <div className="ml-3 mt-0.5 flex flex-col gap-0.5 border-l-2 border-[var(--ring)] pl-3">
+                  {insightsItems.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className="block rounded-lg py-2.5 pl-1 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                      onClick={closeMenu}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+            </div>
 
             <Link href="/automation-builder" className={linkClass} onClick={closeMenu}>
               Automation Builder
