@@ -10,6 +10,21 @@ const PROVIDERS: { id: ProviderId; label: string }[] = [
   { id: "azure", label: "Microsoft" },
 ];
 
+/** Read provider from session JWT (provider_id claim) so we show the actual sign-in method, not the first sign-up provider. */
+function getSessionProviderId(accessToken: string | undefined): ProviderId | null {
+  if (!accessToken) return null;
+  try {
+    const parts = accessToken.split(".");
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))) as { provider_id?: string };
+    const id = payload.provider_id;
+    if (id === "google" || id === "azure") return id;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 type State = {
   linked: Set<ProviderId>;
   currentProvider: ProviderId | null;
@@ -31,7 +46,8 @@ export default function LinkedAccountsSection() {
     const supabase = createClient();
     setState((s) => ({ ...s, loading: true, error: null }));
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
     if (!user) {
       setState((s) => ({
         ...s,
@@ -42,8 +58,11 @@ export default function LinkedAccountsSection() {
       return;
     }
 
-    const appMeta = user.app_metadata as { provider?: string; providers?: string[] } | undefined;
-    const currentProvider = (appMeta?.provider as ProviderId) ?? null;
+    // Prefer provider from this session's JWT (who you signed in with now), fallback to app_metadata.provider (first sign-up).
+    const currentProvider =
+      getSessionProviderId(session.access_token) ??
+      ((user.app_metadata as { provider?: string })?.provider as ProviderId) ||
+      null;
 
     const { data: identitiesData, error: identitiesError } = await supabase.auth.getUserIdentities();
 
