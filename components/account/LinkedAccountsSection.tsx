@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { useCallback, useEffect, useState } from "react";
+import Modal from "@/components/ui/Modal";
 
 type ProviderId = "google" | "azure";
 
@@ -26,6 +27,8 @@ type State = {
   loading: boolean;
   linking: ProviderId | null;
   error: string | null;
+  /** Show "user account already existing" bubble (from linkError=already_exists in URL). */
+  showAlreadyExistsModal: boolean;
 };
 
 export default function LinkedAccountsSection() {
@@ -35,6 +38,7 @@ export default function LinkedAccountsSection() {
     loading: true,
     linking: null,
     error: null,
+    showAlreadyExistsModal: false,
   });
 
   const loadIdentities = useCallback(async () => {
@@ -87,6 +91,18 @@ export default function LinkedAccountsSection() {
     loadIdentities();
   }, [loadIdentities]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("linkError") === "already_exists") {
+      params.delete("linkError");
+      const newUrl =
+        window.location.pathname + (params.toString() ? `?${params.toString()}` : "");
+      window.history.replaceState(null, "", newUrl);
+      setState((s) => ({ ...s, showAlreadyExistsModal: true }));
+    }
+  }, []);
+
   async function handleLink(provider: ProviderId) {
     const supabase = createClient();
     setState((s) => ({ ...s, linking: provider, error: null }));
@@ -133,6 +149,29 @@ export default function LinkedAccountsSection() {
         <p className="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">
           {state.error}
         </p>
+      ) : null}
+      {state.showAlreadyExistsModal ? (
+        <Modal
+          onClose={() => setState((s) => ({ ...s, showAlreadyExistsModal: false }))}
+          ariaLabelledBy="link-error-title"
+          bubble
+        >
+          <h2 id="link-error-title" className="text-xl font-semibold text-[var(--text)]">
+            User account already existing
+          </h2>
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            That sign-in option is already used by another account. Use a different Google or Microsoft account that isn’t already in use.
+          </p>
+          <div className="mt-6">
+            <button
+              type="button"
+              onClick={() => setState((s) => ({ ...s, showAlreadyExistsModal: false }))}
+              className="btn-primary px-4 py-2 text-sm"
+            >
+              OK
+            </button>
+          </div>
+        </Modal>
       ) : null}
       <ul className="mt-4 space-y-2">
         {PROVIDERS.map(({ id, label }) => {

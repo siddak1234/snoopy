@@ -94,6 +94,15 @@ export async function GET(request: Request) {
       return response;
     }
     console.error("AUTH_CALLBACK_EXCHANGE_FAIL", { message: error.message });
+    const msg = (error.message ?? "").toLowerCase();
+    const isLinkAlreadyExists =
+      msg.includes("already") &&
+      (msg.includes("linked") || msg.includes("exists") || msg.includes("registered") || msg.includes("user"));
+    if (isLinkAlreadyExists && next === "/account/settings") {
+      const settings = new URL("/account/settings", requestUrl.origin);
+      settings.searchParams.set("linkError", "already_exists");
+      return NextResponse.redirect(settings.toString());
+    }
     const login = new URL("/login", requestUrl.origin);
     login.searchParams.set("error", "auth_callback");
     login.searchParams.set("error_description", error.message);
