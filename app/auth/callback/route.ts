@@ -18,6 +18,20 @@ function getSafeNext(raw: string | null): string {
   return trimmed;
 }
 
+/** True if the error indicates the identity is already linked to another user (link flow). */
+function isLinkAlreadyExistsError(message: string | null | undefined): boolean {
+  const msg = (message ?? "").toLowerCase();
+  return (
+    msg.length > 0 &&
+    msg.includes("already") &&
+    (msg.includes("linked") ||
+      msg.includes("exists") ||
+      msg.includes("registered") ||
+      msg.includes("user") ||
+      msg.includes("account"))
+  );
+}
+
 /**
  * When Supabase (or the provider) redirects with the code in the URL fragment
  * (#code=...), the server never receives it. This HTML runs in the browser and
@@ -59,6 +73,18 @@ export async function GET(request: Request) {
   const errorDescription = searchParams.get("error_description");
 
   if (errorParam) {
+    const isLinkFlow =
+      next === "/account/settings" ||
+      searchParams.get("flow") === "link";
+    if (
+      isLinkFlow &&
+      (isLinkAlreadyExistsError(errorDescription) ||
+        isLinkAlreadyExistsError(errorParam))
+    ) {
+      const settings = new URL("/account/settings", requestUrl.origin);
+      settings.searchParams.set("linkError", "already_exists");
+      return NextResponse.redirect(settings.toString());
+    }
     const login = new URL("/login", requestUrl.origin);
     login.searchParams.set("error", "auth_callback");
     if (errorDescription) login.searchParams.set("error_description", errorDescription);
@@ -94,11 +120,7 @@ export async function GET(request: Request) {
       return response;
     }
     console.error("AUTH_CALLBACK_EXCHANGE_FAIL", { message: error.message });
-    const msg = (error.message ?? "").toLowerCase();
-    const isLinkAlreadyExists =
-      msg.includes("already") &&
-      (msg.includes("linked") || msg.includes("exists") || msg.includes("registered") || msg.includes("user"));
-    if (isLinkAlreadyExists && next === "/account/settings") {
+    if (isLinkAlreadyExistsError(error.message) && next === "/account/settings") {
       const settings = new URL("/account/settings", requestUrl.origin);
       settings.searchParams.set("linkError", "already_exists");
       return NextResponse.redirect(settings.toString());

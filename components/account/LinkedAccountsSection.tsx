@@ -107,7 +107,7 @@ export default function LinkedAccountsSection() {
     const supabase = createClient();
     setState((s) => ({ ...s, linking: provider, error: null }));
 
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/account/settings")}`;
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/account/settings")}&flow=link`;
     const options: { redirectTo: string; scopes?: string } = { redirectTo };
     if (provider === "azure") options.scopes = "email openid";
     const { error } = await supabase.auth.linkIdentity({
