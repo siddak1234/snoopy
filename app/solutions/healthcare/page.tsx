@@ -106,10 +106,7 @@ export default function HealthcareSolutionsPage() {
           <Link href="/contact" className="btn-primary px-5">
             Book a demo
           </Link>
-          <Link
-            href="/solutions/use-cases/healthcare-documentation"
-            className="rounded-full border border-[var(--ring)] bg-[var(--card)] px-5 py-2.5 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-          >
+          <Link href="/solutions/use-cases/healthcare-documentation" className="btn-secondary px-5">
             Read case study
           </Link>
         </div>
@@ -223,10 +220,7 @@ export default function HealthcareSolutionsPage() {
           <Link href="/contact" className="btn-primary px-5">
             Get in touch
           </Link>
-          <Link
-            href="/solutions"
-            className="rounded-full border border-[var(--ring)] bg-[var(--card)] px-5 py-2.5 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-          >
+          <Link href="/solutions" className="btn-secondary px-5">
             Explore all solutions
           </Link>
         </div>
