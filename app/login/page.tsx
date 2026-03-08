@@ -48,6 +48,10 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/account";
 
+  const authCallbackError = searchParams.get("error") === "auth_callback";
+  const authReason = searchParams.get("reason");
+  const authErrorDescription = searchParams.get("error_description");
+
   useEffect(() => {
     if (searchParams.get("verify") === "1") {
       window.location.replace("/verify-email");
@@ -57,6 +61,16 @@ function LoginForm() {
       window.location.replace("/account-deleted");
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (authCallbackError && !status) {
+      const msg =
+        authReason === "no_code"
+          ? "Sign-in did not complete. Add your production URL to Supabase Dashboard → Authentication → URL Configuration → Redirect URLs (e.g. https://your-domain.com/auth/callback)."
+          : authErrorDescription ?? "Sign-in failed or was cancelled. Please try again.";
+      setStatus(msg);
+    }
+  }, [authCallbackError, authReason, authErrorDescription, status]);
 
   if (searchParams.get("verify") === "1") {
     return (
