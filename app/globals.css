@@ -69,6 +69,10 @@
   box-sizing: border-box;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 html,
 body {
   max-width: 100%;
@@ -101,11 +105,25 @@ body {
 /**
  * Modal dialog card: same look as .bubble but no transition and no hover.
  * Used only inside Modal so the card never moves when the cursor moves.
+ * Centering is done here (not Tailwind) so no hover/parallax can override it.
  */
 .modal-card {
   border-radius: 2rem;
   border: 1px solid var(--ring);
   background: linear-gradient(165deg, var(--surface) 0%, var(--surface-strong) 100%);
+  box-shadow: 0 10px 30px rgba(12, 24, 40, 0.14);
+  transition: none;
+  transform: translate(-50%, -50%);
+}
+
+/* Prevent any nested .bubble / .bubble-soft from moving the modal when hovered */
+.modal-card .bubble,
+.modal-card .bubble-soft {
+  transition: none;
+}
+.modal-card .bubble:hover,
+.modal-card .bubble-soft:hover {
+  transform: none;
   box-shadow: 0 10px 30px rgba(12, 24, 40, 0.14);
 }
 

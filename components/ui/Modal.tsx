@@ -7,8 +7,9 @@ import { useEffect } from "react";
  * shifts when the cursor moves (e.g. to screen edges). Use for all button-triggered
  * popups (confirmations, dialogs, etc.).
  *
- * Structure: backdrop (fixed inset-0) + content (fixed left-1/2 top-1/2 -translate).
+ * Structure: backdrop (fixed inset-0) + content (fixed left-1/2 top-1/2, transform in CSS for bubble).
  * Backdrop click calls onClose. Content click is stopped so it doesn’t close.
+ * Modal content has no hover/parallax/tilt—position is fixed and stable.
  */
 export default function Modal({
   onClose,
@@ -23,7 +24,7 @@ export default function Modal({
   children: React.ReactNode;
   ariaLabelledBy?: string;
   ariaDescribedBy?: string;
-  /** Use .bubble styling and hover effect on the content card */
+  /** Use .modal-card styling (bubble look, no hover/transform) so the card stays fixed */
   bubble?: boolean;
   /** Extra classes for the content panel (e.g. max-w-md, p-6) */
   contentClassName?: string;
@@ -33,7 +34,7 @@ export default function Modal({
   const baseContent =
     "fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-[var(--ring)] bg-[var(--surface)] p-6 shadow-xl [background:linear-gradient(165deg,var(--surface)_0%,var(--surface-strong)_100%)]";
   const contentClass = bubble
-    ? `modal-card fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 p-6 sm:p-8 ${contentClassName}`.trim()
+    ? `modal-card fixed left-1/2 top-1/2 w-full max-w-md p-6 sm:p-8 ${contentClassName}`.trim()
     : `${baseContent} ${contentClassName}`.trim();
 
   useEffect(() => {
