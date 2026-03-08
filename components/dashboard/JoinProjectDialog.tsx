@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { joinProjectByCodeAction } from "@/app/account/projects/actions";
+import Modal from "@/components/ui/Modal";
 
 type Props = {
   open: boolean;
@@ -67,24 +68,13 @@ export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
   if (!open) return null;
 
   const dialogContent = (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      role="presentation"
+    <Modal
+      onClose={onClose}
+      ariaLabelledBy="join-project-title"
+      ariaDescribedBy="join-project-desc"
+      zIndex={100}
     >
-      <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-[2px]"
-        aria-hidden
-        onClick={onClose}
-      />
-      <div
-        role="dialog"
-        aria-modal
-        aria-labelledby="join-project-title"
-        aria-describedby="join-project-desc"
-        className="fixed left-1/2 top-1/2 z-[101] w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-[var(--ring)] bg-[var(--surface)] p-6 shadow-xl [background:linear-gradient(165deg,var(--surface)_0%,var(--surface-strong)_100%)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 id="join-project-title" className="text-xl font-semibold text-[var(--text)]">
+      <h2 id="join-project-title" className="text-xl font-semibold text-[var(--text)]">
           Join team project
         </h2>
         <p id="join-project-desc" className="mt-1 text-sm text-[var(--muted)]">
@@ -126,8 +116,7 @@ export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 
   return typeof document !== "undefined"

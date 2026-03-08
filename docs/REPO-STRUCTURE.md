@@ -26,6 +26,7 @@ snoopy/
 | New page or route | `app/<path>/page.tsx` | One `page.tsx` (or `layout.tsx`) per route segment. |
 | New API endpoint | `app/api/<name>/route.ts` | Export `GET`, `POST`, etc. |
 | Shared UI (buttons, cards, nav) | `components/` | Use subfolders by domain: `components/navigation/`, `components/home/`, `components/theme/`. |
+| Modal / popup dialog (button-triggered) | `components/ui/Modal.tsx` | Use `<Modal onClose={...} ariaLabelledBy="...">` so the card is viewport-anchored and does not shift when the cursor moves. Do not build custom fixed overlays for new dialogs. |
 | Icons / small assets | `components/icons/` or `public/` | Icons as React components in `components/icons/`; static SVGs in `public/`. |
 | Database access | Use `lib/db.ts` | Import `db` from `@/lib/db`; do not create new Prisma client instances. |
 | App/site config (name, tagline) | `lib/site.ts` | Constants used across the app. |

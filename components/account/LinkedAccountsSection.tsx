@@ -59,10 +59,9 @@ export default function LinkedAccountsSection() {
     }
 
     // Prefer provider from this session's JWT (who you signed in with now), fallback to app_metadata.provider (first sign-up).
+    const appProvider = (user.app_metadata as { provider?: string })?.provider as ProviderId | undefined;
     const currentProvider =
-      getSessionProviderId(session.access_token) ??
-      ((user.app_metadata as { provider?: string })?.provider as ProviderId) ||
-      null;
+      getSessionProviderId(session.access_token) ?? (appProvider === "google" || appProvider === "azure" ? appProvider : null);
 
     const { data: identitiesData, error: identitiesError } = await supabase.auth.getUserIdentities();
 
