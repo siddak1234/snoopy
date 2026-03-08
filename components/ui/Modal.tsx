@@ -31,7 +31,7 @@ export default function Modal({
   const baseContent =
     "fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-[var(--ring)] bg-[var(--surface)] p-6 shadow-xl [background:linear-gradient(165deg,var(--surface)_0%,var(--surface-strong)_100%)]";
   const contentClass = bubble
-    ? `bubble fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 p-6 sm:p-8 ${contentClassName}`.trim()
+    ? `bubble bubble-modal fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 p-6 sm:p-8 ${contentClassName}`.trim()
     : `${baseContent} ${contentClassName}`.trim();
 
   return (
