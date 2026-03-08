@@ -128,7 +128,7 @@ export default function InsightsDropdown() {
           id="insights-dropdown-menu"
           role="menu"
           aria-label="Insights submenu"
-          className="absolute left-0 top-full z-50 mt-1 min-w-48 rounded-2xl border border-[var(--ring)] bg-[var(--surface)] p-2 shadow-[0_12px_24px_rgba(12,24,40,0.14)]"
+          className="absolute left-0 top-full z-50 min-w-48 rounded-2xl border border-[var(--ring)] bg-[var(--surface)] p-2 shadow-[0_12px_24px_rgba(12,24,40,0.14)]"
           onKeyDown={onMenuKeyDown}
         >
           {items.map((item, index) => (
