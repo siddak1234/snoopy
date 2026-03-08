@@ -34,6 +34,9 @@ function getSessionProviderId(accessToken: string | undefined): ProviderId | nul
 
 type State = {
   linked: Set<ProviderId>;
+  /** Provider used to create the account (first sign-up). */
+  primaryProvider: ProviderId | null;
+  /** Provider used for this session. */
   currentProvider: ProviderId | null;
   loading: boolean;
   linking: ProviderId | null;
@@ -43,6 +46,7 @@ type State = {
 export default function LinkedAccountsSection() {
   const [state, setState] = useState<State>({
     linked: new Set(),
+    primaryProvider: null,
     currentProvider: null,
     loading: true,
     linking: null,
@@ -60,6 +64,7 @@ export default function LinkedAccountsSection() {
         ...s,
         loading: false,
         linked: new Set(),
+        primaryProvider: null,
         currentProvider: null,
       }));
       return;
@@ -83,8 +88,11 @@ export default function LinkedAccountsSection() {
       if (ourId) linked.add(ourId);
     }
 
-    // Who signed in right now: JWT provider_id (normalized) > app_metadata.provider (normalized) > single identity if only one linked.
+    // Primary = account was created with this provider (first sign-up). From app_metadata.
     const appProvider = (user.app_metadata as { provider?: string })?.provider;
+    const primaryProvider = normalizeProviderId(appProvider ?? undefined);
+
+    // Current = provider used for this session. JWT provider_id > fallbacks.
     const currentProvider =
       getSessionProviderId(session.access_token) ??
       normalizeProviderId(appProvider ?? undefined) ??
@@ -94,6 +102,7 @@ export default function LinkedAccountsSection() {
       ...s,
       loading: false,
       linked,
+      primaryProvider,
       currentProvider,
     }));
   }, []);
@@ -153,8 +162,15 @@ export default function LinkedAccountsSection() {
         {PROVIDERS.map(({ id, label }) => {
           const isLinked = state.linked.has(id);
           const isCurrent = state.currentProvider === id;
+          const isPrimary = state.primaryProvider === id;
           const isLinking = state.linking === id;
           const disabled = isLinked;
+
+          const roleLabel = isPrimary ? "Primary" : isLinked ? "Secondary" : null;
+          const statusParts = [roleLabel, isCurrent ? "Current sign-in" : null].filter(
+            (s): s is string => s != null
+          );
+          const statusText = statusParts.length > 0 ? statusParts.join(" · ") : null;
 
           return (
             <li key={id}>
@@ -168,7 +184,7 @@ export default function LinkedAccountsSection() {
                 <span className="text-sm font-medium text-[var(--text)]">{label}</span>
                 {disabled ? (
                   <span className="text-xs text-[var(--muted)]">
-                    {isCurrent ? "Current sign-in" : "Connected"}
+                    {statusText ?? "Connected"}
                   </span>
                 ) : (
                   <button
