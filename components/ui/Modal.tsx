@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 /**
  * Full-screen modal with a viewport-anchored content card so the card never
  * shifts when the cursor moves (e.g. to screen edges). Use for all button-triggered
@@ -31,12 +33,20 @@ export default function Modal({
   const baseContent =
     "fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-[var(--ring)] bg-[var(--surface)] p-6 shadow-xl [background:linear-gradient(165deg,var(--surface)_0%,var(--surface-strong)_100%)]";
   const contentClass = bubble
-    ? `bubble bubble-modal fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 p-6 sm:p-8 ${contentClassName}`.trim()
+    ? `modal-card fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 p-6 sm:p-8 ${contentClassName}`.trim()
     : `${baseContent} ${contentClassName}`.trim();
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center p-4"
+      className="fixed inset-0"
       style={{ zIndex }}
       role="presentation"
     >

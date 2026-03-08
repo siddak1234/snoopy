@@ -98,16 +98,22 @@ body {
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
 
+/**
+ * Modal dialog card: same look as .bubble but no transition and no hover.
+ * Used only inside Modal so the card never moves when the cursor moves.
+ */
+.modal-card {
+  border-radius: 2rem;
+  border: 1px solid var(--ring);
+  background: linear-gradient(165deg, var(--surface) 0%, var(--surface-strong) 100%);
+  box-shadow: 0 10px 30px rgba(12, 24, 40, 0.14);
+}
+
 @media (hover: hover) {
   .bubble:hover,
   .bubble-soft:hover {
     transform: translateY(-4px);
     box-shadow: 0 18px 38px rgba(47, 98, 170, 0.16);
-  }
-  /* Modal dialogs: keep card fixed and centered; do not apply hover lift (prevents card from moving when cursor moves). */
-  .bubble-modal:hover {
-    transform: translate(-50%, -50%);
-    box-shadow: 0 10px 30px rgba(12, 24, 40, 0.14);
   }
 }
 

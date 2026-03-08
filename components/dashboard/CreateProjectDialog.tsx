@@ -105,6 +105,7 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
       onClose={handleClose}
       ariaLabelledBy="create-project-title"
       ariaDescribedBy={accessCode ? "create-project-access-code-desc" : "create-project-desc"}
+      bubble
       zIndex={100}
     >
       <h2 id="create-project-title" className="text-xl font-semibold text-[var(--text)]">

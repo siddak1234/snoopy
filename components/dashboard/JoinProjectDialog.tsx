@@ -72,6 +72,7 @@ export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
       onClose={onClose}
       ariaLabelledBy="join-project-title"
       ariaDescribedBy="join-project-desc"
+      bubble
       zIndex={100}
     >
       <h2 id="join-project-title" className="text-xl font-semibold text-[var(--text)]">
