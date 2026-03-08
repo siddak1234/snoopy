@@ -49,4 +49,4 @@
 
 - **Vercel does not run migrations.** Run `prisma migrate deploy` (or equivalent) against prod DB separately.
 - Build does not need DB; no top-level db import in routes.
-- **Supabase Dashboard:** Add redirect URLs (`https://yourdomain.com/auth/callback`, `http://localhost:3000/auth/callback`). Enable Google and Azure providers.
+- **Supabase Dashboard:** Add redirect URLs (`https://yourdomain.com/auth/callback`, `http://localhost:3000/auth/callback`). Enable Google and Azure providers. For Microsoft use tenant "common" and required scopes; see **docs/AUTH-MICROSOFT-AZURE.md**.

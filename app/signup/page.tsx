@@ -208,6 +208,7 @@ function SignupForm() {
                   provider: "azure",
                   options: {
                     redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/account")}`,
+                    scopes: "email openid",
                   },
                 });
               }}

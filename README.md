@@ -24,7 +24,7 @@ Open [http://localhost:3000](http://localhost:3000).
 Copy `.env.example` to `.env.local` and set:
 
 - `POSTGRES_URL` — Postgres connection string (required for Prisma)
-- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase Auth (OAuth + email/password). Configure Google and Azure in Supabase Dashboard → Authentication → Providers. Add redirect URLs: `https://yourdomain.com/auth/callback`, `http://localhost:3000/auth/callback`
+- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase Auth (OAuth + email/password). Configure Google and Azure in Dashboard → Authentication → Providers. For Microsoft use tenant "common" and add redirect URLs; see **docs/AUTH-MICROSOFT-AZURE.md**.
 
 Do **not** commit `.env.local` or any file with real secrets.
 

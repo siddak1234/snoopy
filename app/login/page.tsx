@@ -24,12 +24,11 @@ function OAuthButton({
 }) {
   async function handleClick() {
     const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(callbackUrl)}`,
-      },
-    });
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(callbackUrl)}`;
+    const options: { redirectTo: string; scopes?: string } = { redirectTo };
+    // Supabase Auth requires Azure to return a valid email to create the user; use tenant "common" in Dashboard.
+    if (provider === "azure") options.scopes = "email openid";
+    await supabase.auth.signInWithOAuth({ provider, options });
   }
   return (
     <button

@@ -66,13 +66,14 @@
 
 ### Microsoft login
 
-- **Login page:** `OAuthButton` with `provider="azure"` → `supabase.auth.signInWithOAuth({ provider: "azure", options: { redirectTo: ... } })`.
-- **Signup page:** "Sign up with Microsoft" uses `provider: "azure"` and same `redirectTo` pattern.
+- **Login page:** `OAuthButton` with `provider="azure"` → `supabase.auth.signInWithOAuth({ provider: "azure", options: { redirectTo: ..., scopes: "email openid" } })`.
+- **Signup page:** "Sign up with Microsoft" uses `provider: "azure"`, same `redirectTo`, and `scopes: "email openid"` (required so Supabase can create the user).
+- **Tenant:** Use `common` in Supabase Dashboard (Azure Tenant URL empty or `https://login.microsoftonline.com/common`). See **docs/AUTH-MICROSOFT-AZURE.md** for protocol and Azure app registration.
 
 ### Redirect handling
 
 - All OAuth flows use: `redirectTo: \`${window.location.origin}/auth/callback?next=${encodeURIComponent(callbackUrl)}\``.
-- **Callback route** (`app/auth/callback/route.ts`): `exchangeCodeForSession(code)` via `createClient()` from `@/lib/supabase/server` (cookie-aware), then redirect to `next` or `/account`. No provisioning in callback; provisioning runs on first use of `getAppSession()`.
+- **Callback** (`app/auth/callback/route.ts`): When `code` is in the query, server exchanges and redirects (cookies set). When the code is only in the URL fragment (Supabase/Azure can do this), the route returns HTML that moves fragment params into the query and reloads; the second request has `code` in the query so the server exchanges and sets cookies. No provisioning in callback; provisioning runs on first use of `getAppSession()`.
 
 ### Supabase client initialization
 
