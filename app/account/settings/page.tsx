@@ -1,5 +1,6 @@
 import SectionCard from "@/components/dashboard/SectionCard";
 import DeleteAccountButton from "@/components/account/DeleteAccountButton";
+import LinkedAccountsSection from "@/components/account/LinkedAccountsSection";
 
 export default function AccountSettingsPage() {
   return (
@@ -9,6 +10,7 @@ export default function AccountSettingsPage() {
           Account and workspace settings. Connect integrations here.
         </p>
       </div>
+      <LinkedAccountsSection />
       <div className="border-t border-[var(--ring)] pt-5">
         <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
           Danger zone
