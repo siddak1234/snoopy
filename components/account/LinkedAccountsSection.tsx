@@ -10,6 +10,15 @@ const PROVIDERS: { id: ProviderId; label: string }[] = [
   { id: "azure", label: "Microsoft" },
 ];
 
+/** Supabase may return "azure", "azure_ad", or "microsoft" for Microsoft. Normalize to our ProviderId. */
+function normalizeProviderId(provider: string | null | undefined): ProviderId | null {
+  if (provider == null || provider === "") return null;
+  const p = provider.toLowerCase();
+  if (p === "google") return "google";
+  if (p === "azure" || p === "azure_ad" || p === "microsoft") return "azure";
+  return null;
+}
+
 /** Read provider from session JWT (provider_id claim) so we show the actual sign-in method, not the first sign-up provider. */
 function getSessionProviderId(accessToken: string | undefined): ProviderId | null {
   if (!accessToken) return null;
@@ -17,9 +26,7 @@ function getSessionProviderId(accessToken: string | undefined): ProviderId | nul
     const parts = accessToken.split(".");
     if (parts.length !== 3) return null;
     const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))) as { provider_id?: string };
-    const id = payload.provider_id;
-    if (id === "google" || id === "azure") return id;
-    return null;
+    return normalizeProviderId(payload.provider_id ?? null) ?? null;
   } catch {
     return null;
   }
@@ -58,11 +65,6 @@ export default function LinkedAccountsSection() {
       return;
     }
 
-    // Prefer provider from this session's JWT (who you signed in with now), fallback to app_metadata.provider (first sign-up).
-    const appProvider = (user.app_metadata as { provider?: string })?.provider as ProviderId | undefined;
-    const currentProvider =
-      getSessionProviderId(session.access_token) ?? (appProvider === "google" || appProvider === "azure" ? appProvider : null);
-
     const { data: identitiesData, error: identitiesError } = await supabase.auth.getUserIdentities();
 
     if (identitiesError) {
@@ -77,10 +79,16 @@ export default function LinkedAccountsSection() {
     const linked = new Set<ProviderId>();
     const list = identitiesData?.identities ?? [];
     for (const identity of list) {
-      if (identity.provider === "google" || identity.provider === "azure") {
-        linked.add(identity.provider as ProviderId);
-      }
+      const ourId = normalizeProviderId(identity.provider);
+      if (ourId) linked.add(ourId);
     }
+
+    // Who signed in right now: JWT provider_id (normalized) > app_metadata.provider (normalized) > single identity if only one linked.
+    const appProvider = (user.app_metadata as { provider?: string })?.provider;
+    const currentProvider =
+      getSessionProviderId(session.access_token) ??
+      normalizeProviderId(appProvider ?? undefined) ??
+      (list.length === 1 ? normalizeProviderId(list[0].provider) : null);
 
     setState((s) => ({
       ...s,

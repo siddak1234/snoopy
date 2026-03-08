@@ -3,10 +3,21 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
+/** Default post-login destination so all account types (Google, Microsoft, etc.) behave the same. */
+const DEFAULT_NEXT = "/account";
+
+function getSafeNext(raw: string | null): string {
+  const trimmed = raw?.trim();
+  if (!trimmed) return DEFAULT_NEXT;
+  // Only allow relative paths to avoid open redirect
+  if (!trimmed.startsWith("/")) return DEFAULT_NEXT;
+  return trimmed;
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/account";
+  const next = getSafeNext(searchParams.get("next"));
   const errorParam = searchParams.get("error");
   const errorDescription = searchParams.get("error_description");
 
