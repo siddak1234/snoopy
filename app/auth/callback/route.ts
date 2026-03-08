@@ -33,6 +33,24 @@ function isLinkAlreadyExistsError(message: string | null | undefined): boolean {
 }
 
 /**
+ * After successful code exchange we return 200 + HTML with Set-Cookie instead of
+ * a 302 redirect. The browser commits the session cookies when it processes this
+ * response; the script then does a client-side redirect. That way the next request
+ * (to /account) includes the cookies, avoiding a race where the account layout
+ * runs before the session is visible and redirects back to /login.
+ */
+function successRedirectHtml(destinationUrl: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Signing in…</title></head>
+<body>
+  <p>Completing sign-in…</p>
+  <script>window.location.replace(${JSON.stringify(destinationUrl)});</script>
+</body>
+</html>`;
+}
+
+/**
  * When Supabase (or the provider) redirects with the code in the URL fragment
  * (#code=...), the server never receives it. This HTML runs in the browser and
  * rewrites the URL so the code is in the query; a reload then hits the server
@@ -92,8 +110,14 @@ export async function GET(request: Request) {
   }
 
   if (code) {
-    const redirectTo = new URL(next, requestUrl.origin);
-    const response = NextResponse.redirect(redirectTo.toString());
+    const destinationUrl = new URL(next, requestUrl.origin).toString();
+    // Use 200 + HTML with client redirect so the browser commits Set-Cookie before
+    // navigating. A 302 would let the browser follow the redirect before cookies
+    // are always visible on the next request (e.g. first load after deploy).
+    const response = new NextResponse(successRedirectHtml(destinationUrl), {
+      status: 200,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
 
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {

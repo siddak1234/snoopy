@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState, FormEvent, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useAppSession } from "@/hooks/use-app-session";
 import { isGmailAddress } from "@/lib/email";
 
 const inputClassName =
@@ -46,6 +47,7 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/account";
+  const { data: session, status: authStatus } = useAppSession();
 
   const authCallbackError = searchParams.get("error") === "auth_callback";
   const authReason = searchParams.get("reason");
@@ -60,6 +62,14 @@ function LoginForm() {
       window.location.replace("/account-deleted");
     }
   }, [searchParams]);
+
+  // If already authenticated (e.g. session resolved after a wrong redirect here),
+  // send user to dashboard. Prevents flicker when auth state was still loading.
+  useEffect(() => {
+    if (authStatus === "authenticated" && session?.user) {
+      window.location.replace(callbackUrl);
+    }
+  }, [authStatus, session?.user, callbackUrl]);
 
   useEffect(() => {
     if (authCallbackError && !status) {
@@ -82,6 +92,16 @@ function LoginForm() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-4 py-8">
         <div className="bubble p-6 sm:p-8">Redirecting…</div>
+      </div>
+    );
+  }
+
+  // Wait for auth to resolve before showing form. Avoids showing login then
+  // redirecting when session was still loading (e.g. first load after deploy).
+  if (authStatus === "loading") {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center px-4 py-8">
+        <div className="bubble p-6 sm:p-8">Checking authentication…</div>
       </div>
     );
   }
