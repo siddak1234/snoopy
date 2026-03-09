@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState, FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { buildAuthCallbackUrl } from "@/lib/auth-oauth";
 import { isGmailAddress } from "@/lib/email";
 
 const inputClassName =
@@ -34,22 +33,8 @@ function SignupForm() {
 
     const normalizedEmail = normalizeEmail(email);
     if (isGmailAddress(normalizedEmail)) {
-      setLoading(true);
-      const supabase = createClient();
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: buildAuthCallbackUrl(callbackUrl) },
-      });
-      if (error) {
-        setStatus(error.message ?? "Sign-in could not start. Please try again.");
-        setLoading(false);
-        return;
-      }
-      if (data?.url) {
-        setTimeout(() => {
-          window.location.href = data.url;
-        }, 100);
-      }
+      const next = callbackUrl.startsWith("/") ? callbackUrl : `/${callbackUrl}`;
+      window.location.href = `/api/auth/oauth?provider=google&next=${encodeURIComponent(next)}`;
       return;
     }
 
@@ -194,45 +179,18 @@ function SignupForm() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={async () => {
-                const supabase = createClient();
-                const { data } = await supabase.auth.signInWithOAuth({
-                  provider: "google",
-                  options: { redirectTo: buildAuthCallbackUrl("/account") },
-                });
-                if (data?.url) {
-                  setTimeout(() => {
-                    window.location.href = data.url;
-                  }, 100);
-                }
-              }}
-              className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            <a
+              href="/api/auth/oauth?provider=google&next=%2Faccount"
+              className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
             >
               Sign up with Google
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                const supabase = createClient();
-                const { data } = await supabase.auth.signInWithOAuth({
-                  provider: "azure",
-                  options: {
-                    redirectTo: buildAuthCallbackUrl("/account"),
-                    scopes: "email openid",
-                  },
-                });
-                if (data?.url) {
-                  setTimeout(() => {
-                    window.location.href = data.url;
-                  }, 100);
-                }
-              }}
-              className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            </a>
+            <a
+              href="/api/auth/oauth?provider=azure&next=%2Faccount"
+              className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
             >
               Sign up with Microsoft
-            </button>
+            </a>
           </div>
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2 border-t border-[var(--ring)] pt-5">

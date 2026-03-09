@@ -65,6 +65,7 @@ async function provisionUserFromSupabaseAuth(supabaseUser: SupabaseUser): Promis
 /**
  * Get app session from Supabase Auth. Provisions user if needed, ensures workspace.
  * Returns same shape as legacy getServerSession for drop-in replacement.
+ * All Supabase calls are awaited so we only return after confirmation from the server.
  */
 export async function getAppSession(): Promise<AppSession | null> {
   const supabase = await createClient();

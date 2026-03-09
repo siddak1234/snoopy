@@ -24,12 +24,33 @@ function isLinkAlreadyExistsError(message: string | null | undefined): boolean {
   const msg = (message ?? "").toLowerCase();
   return (
     msg.length > 0 &&
-    msg.includes("already") &&
-    (msg.includes("linked") ||
-      msg.includes("exists") ||
-      msg.includes("registered") ||
-      msg.includes("user") ||
-      msg.includes("account"))
+    (msg.includes("already") &&
+      (msg.includes("linked") ||
+        msg.includes("exists") ||
+        msg.includes("registered") ||
+        msg.includes("user") ||
+        msg.includes("account")) ||
+      msg.includes("linked to another") ||
+      msg.includes("registered to another"))
+  );
+}
+
+/**
+ * True if the error indicates the auth code was already exchanged (e.g. two tabs
+ * hit the callback; the second gets "code already used" / "invalid grant").
+ */
+function isCodeAlreadyUsedOrInvalidGrant(message: string | null | undefined): boolean {
+  const msg = (message ?? "").toLowerCase();
+  return (
+    msg.length > 0 &&
+    (msg.includes("already been used") ||
+      msg.includes("already used") ||
+      msg.includes("invalid grant") ||
+      msg.includes("invalid_grant") ||
+      msg.includes("authorization code has expired") ||
+      msg.includes("code has expired") ||
+      msg.includes("code was already used") ||
+      msg.includes("reused"))
   );
 }
 
@@ -171,6 +192,7 @@ export async function GET(request: Request) {
       },
     });
 
+    // Wait for Supabase to confirm the code exchange before sending response
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (debug) {
       console.log("AUTH_CALLBACK_EXCHANGE_RESULT", {
@@ -195,11 +217,6 @@ export async function GET(request: Request) {
       console.error("AUTH_CALLBACK_EXCHANGE_FAIL", { message: error.message });
     }
 
-    if (isLinkAlreadyExistsError(error.message) && next === "/account/settings") {
-      const settings = new URL("/account/settings", requestUrl.origin);
-      settings.searchParams.set("linkError", "already_exists");
-      return NextResponse.redirect(settings.toString());
-    }
     // On any exchange failure, if we already have a valid session (e.g. duplicate
     // callback, or code verifier was missing but session exists from a prior flow),
     // redirect to account home instead of showing login with an error.
@@ -212,9 +229,36 @@ export async function GET(request: Request) {
     if (sessionData?.session?.user) {
       return NextResponse.redirect(destinationUrl);
     }
+
+    // Identity already linked to another user: send to settings in link flow, else friendly login message
+    if (isLinkAlreadyExistsError(error.message)) {
+      if (next === "/account/settings" || searchParams.get("flow") === "link") {
+        const settings = new URL("/account/settings", requestUrl.origin);
+        settings.searchParams.set("linkError", "already_exists");
+        return NextResponse.redirect(settings.toString());
+      }
+      const loginLink = new URL("/login", requestUrl.origin);
+      loginLink.searchParams.set("error", "auth_callback");
+      loginLink.searchParams.set(
+        "error_description",
+        "This sign-in method is linked to another account. Sign in with your primary method or use account settings to manage linked accounts."
+      );
+      return NextResponse.redirect(loginLink.toString());
+    }
+
+    // Code already used (e.g. two tabs hit callback): friendly message so user can try again
+    if (isCodeAlreadyUsedOrInvalidGrant(error.message)) {
+      const loginReused = new URL("/login", requestUrl.origin);
+      loginReused.searchParams.set("error", "auth_callback");
+      loginReused.searchParams.set(
+        "error_description",
+        "Sign-in was completed in another tab or window. If you need to sign in here, click Continue with Google again."
+      );
+      return NextResponse.redirect(loginReused.toString());
+    }
+
     const login = new URL("/login", requestUrl.origin);
     login.searchParams.set("error", "auth_callback");
-    // User-friendly message for PKCE verifier missing; login page shows specific copy for this case
     const description = isPkceVerifierMissing
       ? "PKCE code verifier not found. Try again in this browser. If it keeps happening, in Supabase Dashboard set Authentication → URL Configuration so Site URL and Redirect URLs use this site’s exact URL (e.g. " +
         requestUrl.origin +

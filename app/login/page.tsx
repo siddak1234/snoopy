@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState, FormEvent, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { buildAuthCallbackUrl } from "@/lib/auth-oauth";
 import { useAppSession } from "@/hooks/use-app-session";
 import { isGmailAddress } from "@/lib/email";
 
@@ -19,58 +18,26 @@ function OAuthButton({
   provider,
   label,
   callbackUrl,
-  onOAuthError,
 }: {
   provider: "google" | "azure";
   label: string;
   callbackUrl: string;
-  onOAuthError?: (message: string | undefined) => void;
 }) {
-  const [loading, setLoading] = useState(false);
-  async function handleClick() {
-    setLoading(true);
-    onOAuthError?.(undefined);
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: buildAuthCallbackUrl(callbackUrl),
-          ...(provider === "azure" && { scopes: "email openid" }),
-        },
-      });
-      if (error) {
-        onOAuthError?.(error.message ?? "Sign-in failed.");
-        return;
-      }
-      // Library stores PKCE verifier when building the URL; redirect so cookie is sent on callback.
-      // Small delay so cookie write is committed before navigation (avoids "verifier not found").
-      if (data?.url) {
-        setTimeout(() => {
-          window.location.href = data.url;
-        }, 100);
-        return;
-      }
-    } finally {
-      setLoading(false);
-    }
-  }
+  const next = callbackUrl.startsWith("/") ? callbackUrl : `/${callbackUrl}`;
+  const href = `/api/auth/oauth?provider=${provider}&next=${encodeURIComponent(next)}`;
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={loading}
-      className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-70"
+    <a
+      href={href}
+      className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
     >
-      {loading ? "Starting…" : label}
-    </button>
+      {label}
+    </a>
   );
 }
 
 function LoginForm() {
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [oauthError, setOAuthError] = useState<string | undefined>(undefined);
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/account";
   const authCallbackError = searchParams.get("error") === "auth_callback";
@@ -147,7 +114,6 @@ function LoginForm() {
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setStatus(null);
-    setOAuthError(undefined);
     const form = e.currentTarget;
     const emailInput = form.elements.namedItem("email") as HTMLInputElement | null;
     const email = emailInput?.value;
@@ -159,22 +125,8 @@ function LoginForm() {
 
     const normalizedEmail = normalizeEmail(email);
     if (isGmailAddress(normalizedEmail)) {
-      setLoading(true);
-      const supabase = createClient();
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: buildAuthCallbackUrl(callbackUrl) },
-      });
-      if (error) {
-        setStatus(error.message ?? "Sign in failed. Please try again.");
-        setLoading(false);
-        return;
-      }
-      if (data?.url) {
-        setTimeout(() => {
-          window.location.href = data.url;
-        }, 100);
-      }
+      const next = callbackUrl.startsWith("/") ? callbackUrl : `/${callbackUrl}`;
+      window.location.href = `/api/auth/oauth?provider=google&next=${encodeURIComponent(next)}`;
       return;
     }
 
@@ -270,20 +222,13 @@ function LoginForm() {
               provider="google"
               label="Continue with Google"
               callbackUrl={callbackUrl}
-              onOAuthError={setOAuthError}
             />
             <OAuthButton
               provider="azure"
               label="Continue with Microsoft"
               callbackUrl={callbackUrl}
-              onOAuthError={setOAuthError}
             />
           </div>
-          {oauthError ? (
-            <p className="mt-2 text-center text-sm text-[var(--muted)]" role="alert">
-              {oauthError}
-            </p>
-          ) : null}
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2 border-t border-[var(--ring)] pt-5">
             <span className="text-sm text-[var(--muted)]">New here?</span>
