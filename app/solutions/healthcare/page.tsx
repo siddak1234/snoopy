@@ -99,9 +99,6 @@ export default function HealthcareSolutionsPage() {
         <p className="mt-4 max-w-2xl text-lg leading-7 text-[var(--muted)] sm:text-xl">
           Reduce administrative burden and automate document-heavy processes so teams focus on high-value work.
         </p>
-        <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--muted)]">
-          AI + automation for intake, authorization, billing, records, and back-office—with human-in-the-loop control.
-        </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/contact" className="btn-primary px-5">
             Book a demo

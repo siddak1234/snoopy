@@ -118,9 +118,6 @@ export default function FinanceSolutionsPage() {
         <p className="mt-4 max-w-2xl text-lg leading-7 text-[var(--muted)] sm:text-xl">
           Automate document-heavy back-office work so teams focus on analysis, control, and scale.
         </p>
-        <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--muted)]">
-          AI + automation for AP, expenses, controllership, and shared services—human-in-the-loop and audit-ready.
-        </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/contact" className="btn-primary px-5">
             Book a demo
