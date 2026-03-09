@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ProjectStatus } from "@prisma/client";
+import { formatDateMediumUTC } from "@/lib/date";
 import { DeleteProjectButton } from "./DeleteProjectButton";
 
 export type MyProjectItem = {
@@ -64,10 +65,7 @@ export function ProjectList({ projects }: { projects: MyProjectItem[] }) {
                 <StatusPill status={project.status} />
               </div>
               <span className="block text-sm text-[var(--muted)] mt-0.5">
-                {project.description?.trim() ||
-                  new Date(project.createdAt).toLocaleDateString(undefined, {
-                    dateStyle: "medium",
-                  })}
+                {project.description?.trim() || formatDateMediumUTC(project.createdAt)}
                 {project.ownerName ? ` · Owner: ${project.ownerName}` : null}
               </span>
             </Link>
@@ -96,9 +94,7 @@ export function TeamProjectList({ projects }: { projects: TeamProjectItem[] }) {
               <StatusPill status={project.status} />
               <span className="block w-full text-sm text-[var(--muted)]">
                 {project.ownerName ? `Owner: ${project.ownerName}` : null}
-                {joinedAt
-                  ? ` · Joined ${new Date(joinedAt).toLocaleDateString(undefined, { dateStyle: "medium" })}`
-                  : null}
+                {joinedAt ? ` · Joined ${formatDateMediumUTC(joinedAt)}` : null}
               </span>
             </Link>
           </li>

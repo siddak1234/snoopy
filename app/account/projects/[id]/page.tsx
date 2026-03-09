@@ -5,6 +5,7 @@ import { getTenantForUser } from "@/lib/tenant";
 import { getProjectForUser } from "@/lib/projects";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { DeleteProjectButton } from "@/components/dashboard/DeleteProjectButton";
+import { formatDateMediumUTC } from "@/lib/date";
 
 const statusLabel: Record<string, string> = {
   active: "Active",
@@ -65,9 +66,7 @@ export default async function ProjectDetailPage({
           </dd>
           <dt className="text-[var(--muted)]">Created</dt>
           <dd className="text-[var(--text)]">
-            {new Date(project.createdAt).toLocaleDateString(undefined, {
-              dateStyle: "medium",
-            })}
+            {formatDateMediumUTC(project.createdAt)}
           </dd>
         </dl>
         <p className="mt-4 text-sm text-[var(--muted)]">
