@@ -71,15 +71,16 @@ function LoginForm() {
     }
   }, [authStatus, session?.user, callbackUrl]);
 
+  // Only show auth_callback error once we know user is unauthenticated. Avoids
+  // flashing PKCE/code-reuse errors while session is still loading or resolving.
   useEffect(() => {
-    if (authCallbackError && !status) {
-      const msg =
-        authReason === "no_code"
-          ? "Sign-in did not complete. Add your production URL to Supabase Dashboard → Authentication → URL Configuration → Redirect URLs (e.g. https://your-domain.com/auth/callback)."
-          : authErrorDescription ?? "Sign-in failed or was cancelled. Please try again.";
-      setStatus(msg);
-    }
-  }, [authCallbackError, authReason, authErrorDescription, status]);
+    if (authStatus !== "unauthenticated" || !authCallbackError || status) return;
+    const msg =
+      authReason === "no_code"
+        ? "Sign-in did not complete. Add your production URL to Supabase Dashboard → Authentication → URL Configuration → Redirect URLs (e.g. https://your-domain.com/auth/callback)."
+        : authErrorDescription ?? "Sign-in failed or was cancelled. Please try again.";
+    setStatus(msg);
+  }, [authStatus, authCallbackError, authReason, authErrorDescription, status]);
 
   if (searchParams.get("verify") === "1") {
     return (

@@ -149,6 +149,16 @@ export async function GET(request: Request) {
       settings.searchParams.set("linkError", "already_exists");
       return NextResponse.redirect(settings.toString());
     }
+    // PKCE / "code already used" can happen on duplicate callback (e.g. refresh).
+    // If we already have a session, send user to account instead of login with error.
+    const isPkceOrCodeReuse =
+      /pkce|code verifier|already been used|invalid.*code/i.test(error.message);
+    if (isPkceOrCodeReuse) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData?.session?.user) {
+        return NextResponse.redirect(destinationUrl);
+      }
+    }
     const login = new URL("/login", requestUrl.origin);
     login.searchParams.set("error", "auth_callback");
     login.searchParams.set("error_description", error.message);
