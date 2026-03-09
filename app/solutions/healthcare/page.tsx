@@ -4,22 +4,22 @@ const painPoints = [
   {
     title: "Administrative burden",
     description:
-      "Staff spend hours on repetitive data entry, form-filling, and chasing information across systems instead of focusing on patient-facing and high-value work.",
+      "Hours lost to data entry, form-filling, and chasing information instead of patient-facing work.",
   },
   {
     title: "Document overload",
     description:
-      "PDFs, faxes, scanned forms, and emails pile up. Extracting and routing the right information to the right place still depends on manual review and re-keying.",
+      "PDFs, faxes, and emails pile up; extraction and routing still depend on manual review.",
   },
   {
     title: "Disconnected workflows",
     description:
-      "Intake, authorization, billing, and records live in different tools. Moving data between them creates delays, errors, and visibility gaps.",
+      "Intake, auth, billing, and records live in different tools—delays and visibility gaps follow.",
   },
   {
     title: "Slow processing & exceptions",
     description:
-      "Backlogs grow when every exception or edge case needs a human to read, decide, and act. Speed and consistency suffer without structured automation.",
+      "Every exception needs a human; backlogs grow and consistency suffers without automation.",
   },
 ];
 
@@ -27,32 +27,32 @@ const useCases = [
   {
     title: "Patient intake and registration",
     description:
-      "Automate capture and validation of patient information from forms, portals, and documents. Route completed packets for review and reduce manual data entry into your EHR or practice management system.",
+      "Capture and validate patient data from forms and documents; route to EHR with less manual entry.",
   },
   {
     title: "Prior authorization support",
     description:
-      "Ingest authorization requests and supporting documentation, extract key clinical and payer criteria, and structure data for staff review and submission—reducing turnaround time and manual lookups.",
+      "Ingest auth requests and docs; extract clinical and payer criteria for faster review and submission.",
   },
   {
     title: "Claims and billing documentation",
     description:
-      "Process encounter notes, superbills, and supporting documentation. Extract and validate codes and data for billing workflows while keeping human review in the loop for accuracy and compliance.",
+      "Process notes and superbills; extract and validate codes for billing with human review in the loop.",
   },
   {
     title: "Medical records processing",
     description:
-      "Handle requests for records, release forms, and external documentation. Classify, summarize, and route records for review and fulfillment with consistent audit trails.",
+      "Classify, summarize, and route records and release forms with consistent audit trails.",
   },
   {
     title: "Referral and order management",
     description:
-      "Ingest referrals and orders from multiple channels, parse requirements and patient details, and route to the right team with structured data—reducing delays and lost or incomplete referrals.",
+      "Ingest referrals from multiple channels; parse and route to the right team with structured data.",
   },
   {
     title: "Back-office and internal operations",
     description:
-      "Automate internal workflows: vendor and credentialing documents, policy acknowledgments, internal reporting, and cross-team handoffs that today rely on email and spreadsheets.",
+      "Automate vendor docs, policy acknowledgments, and cross-team handoffs beyond email and spreadsheets.",
   },
 ];
 
@@ -60,22 +60,22 @@ const howItWorksSteps = [
   {
     step: "1",
     title: "Ingest",
-    description: "Connect PDFs, forms, email, spreadsheets, and systems. We pull in the documents and data your teams work with every day.",
+    description: "Connect PDFs, forms, email, and systems. We pull in the documents your teams use daily.",
   },
   {
     step: "2",
     title: "Understand",
-    description: "AI extracts and structures information—dates, codes, entities, and intent—so it can be validated and used downstream without manual re-entry.",
+    description: "AI extracts and structures dates, codes, and intent for validation without re-entry.",
   },
   {
     step: "3",
     title: "Route",
-    description: "Workflows send the right items to the right people or systems. Rules and exceptions are configurable; human review stays where you need it.",
+    description: "Send the right items to the right people or systems. Human review where you need it.",
   },
   {
     step: "4",
     title: "Track",
-    description: "Visibility into status, bottlenecks, and throughput. Know what’s in progress, what’s stuck, and where to focus capacity.",
+    description: "Visibility into status and bottlenecks. See what’s in progress and where to focus.",
   },
 ];
 
@@ -97,10 +97,10 @@ export default function HealthcareSolutionsPage() {
           AI-powered workflows for healthcare operations
         </h1>
         <p className="mt-4 max-w-2xl text-lg leading-7 text-[var(--muted)] sm:text-xl">
-          Reduce administrative burden and automate document-heavy processes—so your teams spend less time on repetitive manual work and more on what requires human judgment and care.
+          Reduce administrative burden and automate document-heavy processes so teams focus on high-value work.
         </p>
         <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--muted)]">
-          Autom8x combines AI and automation to structure unstructured workflows across PDFs, forms, email, and systems. Built for intake, authorization, billing support, records, referrals, and back-office operations—with human-in-the-loop control where it matters.
+          AI + automation for intake, authorization, billing, records, and back-office—with human-in-the-loop control.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/contact" className="btn-primary px-5">
@@ -162,10 +162,7 @@ export default function HealthcareSolutionsPage() {
           Why AI + automation matters for healthcare operations
         </h2>
         <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--muted)]">
-          Healthcare runs on documents and data that are often unstructured: PDFs, scanned forms, faxes, emails, and spreadsheets. Moving that information into the right systems and workflows has traditionally required manual reading, re-keying, and routing—which slows processing, creates backlogs, and makes it hard to see where work stands.
-        </p>
-        <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--muted)]">
-          Autom8x uses AI to understand and structure this content, then automation to route it and track it. The result is fewer manual touchpoints, faster turnaround, consistent handling of high-volume work, and clear visibility into operational flow. We focus on administrative and operational workflows—intake, authorization, billing support, records, referrals, and back-office—with human review built in where your policies and risk tolerance require it.
+          Unstructured docs and data slow processing and create backlogs. Autom8x structures content with AI, then routes and tracks it—fewer touchpoints, faster turnaround, full visibility. Human review stays where your policies require it.
         </p>
         <ul className="mt-6 flex flex-wrap gap-3">
           {["Operational control", "End-to-end visibility", "Faster processing", "Scalable workflows"].map((item) => (
@@ -214,7 +211,7 @@ export default function HealthcareSolutionsPage() {
           Ready to reduce administrative burden?
         </h2>
         <p className="mt-4 max-w-xl text-base leading-7 text-[var(--muted)]">
-          See how Autom8x can structure your document-heavy workflows and scale your operations without scaling headcount. We’ll walk you through a tailored view of your use case.
+          Scale operations without scaling headcount. We’ll walk you through a tailored view of your use case.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="/contact" className="btn-primary px-5">

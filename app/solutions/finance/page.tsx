@@ -4,22 +4,22 @@ const painPoints = [
   {
     title: "Manual invoice and document handling",
     description:
-      "High volume of invoices, receipts, and financial documents still requires manual data entry, re-keying into ERPs, and chasing down approvals across email and spreadsheets.",
+      "High volume still means manual entry, re-keying into ERPs, and chasing approvals across email and spreadsheets.",
   },
   {
     title: "Fragmented approvals and routing",
     description:
-      "Multi-step approval workflows span systems and people. Delays and visibility gaps appear when work moves between tools, geographies, or departments.",
+      "Multi-step workflows span systems and people; delays and visibility gaps when work moves between tools.",
   },
   {
     title: "Repetitive data entry and coding",
     description:
-      "Expense categorization, GL coding, and vendor matching consume time and introduce inconsistency when done manually at scale across locations or entities.",
+      "Expense categorization, GL coding, and vendor matching consume time and introduce inconsistency at scale.",
   },
   {
     title: "Exception-heavy back-office volume",
     description:
-      "Non-standard documents, mismatched line items, and one-off cases create backlogs. Every exception needs human review, slowing turnaround and increasing risk.",
+      "Non-standard docs and one-off cases create backlogs; every exception needs human review.",
   },
 ];
 
@@ -27,42 +27,42 @@ const useCases = [
   {
     title: "Invoice processing automation",
     description:
-      "Ingest invoices from email, portals, and scans. Extract line items, amounts, and vendor data with AI, then route for validation and posting—reducing manual entry and speeding cycle time.",
+      "Ingest from email, portals, and scans; extract line items and vendor data; route for validation and posting.",
   },
   {
     title: "Expense and receipt classification",
     description:
-      "Process expense reports and receipts at scale. Classify and suggest GL codes, enforce policy rules, and route for approval with consistent audit trails and fewer manual touchpoints.",
+      "Process at scale with GL suggestions and policy rules; route for approval with audit trails.",
   },
   {
     title: "AP intake and routing",
     description:
-      "Centralize AP intake from multiple channels. Parse and validate document types, match to POs or contracts where applicable, and route to the right approvers or systems with clear status visibility.",
+      "Centralize intake; parse and validate docs, match to POs where applicable; route to the right approvers.",
   },
   {
     title: "Financial document extraction",
     description:
-      "Extract structured data from PDFs, spreadsheets, and scanned packets—invoices, statements, contracts—so downstream systems and reviewers get clean, validated data without re-keying.",
+      "Extract structured data from PDFs and scans so downstream systems get clean data without re-keying.",
   },
   {
     title: "Exception handling workflows",
     description:
-      "Route exceptions and edge cases to the right reviewers with context. Standardize how discrepancies, duplicates, and non-standard items are triaged and resolved while keeping full traceability.",
+      "Route exceptions to the right reviewers with context; standardize triage and resolution with full traceability.",
   },
   {
     title: "Approval workflow automation",
     description:
-      "Orchestrate multi-step approvals across thresholds, delegations, and systems. Keep workflows configurable, human-in-the-loop where required, and visible so bottlenecks are easy to spot.",
+      "Orchestrate multi-step approvals across thresholds and systems; human-in-the-loop where required.",
   },
   {
     title: "Audit support and traceable history",
     description:
-      "Maintain audit-ready process standardization with clear lineage from source document to posting. Support compliance and controllership with consistent, traceable workflow history.",
+      "Audit-ready process with clear lineage from source to posting; consistent workflow history for compliance.",
   },
   {
     title: "Reconciliation and matching support",
     description:
-      "Support reconciliation and matching workflows by structuring data from statements, ledgers, and external feeds so finance teams can focus on exceptions and judgment instead of manual prep.",
+      "Structure data from statements and feeds so teams focus on exceptions and judgment, not manual prep.",
   },
 ];
 
@@ -79,22 +79,22 @@ const howItWorksSteps = [
   {
     step: "1",
     title: "Ingest",
-    description: "Connect invoices, receipts, spreadsheets, email, and systems. We pull in the documents and data your finance teams work with every day.",
+    description: "Connect invoices, receipts, spreadsheets, and systems. We pull in the docs your teams use daily.",
   },
   {
     step: "2",
     title: "Understand",
-    description: "AI extracts and structures information—amounts, dates, vendors, line items, and intent—so it can be validated and used downstream without manual re-entry.",
+    description: "AI extracts amounts, dates, vendors, and line items for validation without re-entry.",
   },
   {
     step: "3",
     title: "Route",
-    description: "Workflows send the right items to the right people or systems. Rules and exceptions are configurable; human review stays where you need it.",
+    description: "Send the right items to the right people or systems. Human review where you need it.",
   },
   {
     step: "4",
     title: "Track",
-    description: "Visibility into status, bottlenecks, and throughput. Know what’s in progress, what’s stuck, and where to focus capacity.",
+    description: "Visibility into status and bottlenecks. See what’s in progress and where to focus.",
   },
 ];
 
@@ -116,10 +116,10 @@ export default function FinanceSolutionsPage() {
           AI-powered workflows for finance and accounting operations
         </h1>
         <p className="mt-4 max-w-2xl text-lg leading-7 text-[var(--muted)] sm:text-xl">
-          Automate document-heavy back-office work—invoices, expenses, approvals, and extraction—so your teams spend less time on repetitive manual work and more on analysis, control, and scale.
+          Automate document-heavy back-office work so teams focus on analysis, control, and scale.
         </p>
         <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--muted)]">
-          Autom8x combines AI and automation to structure unstructured financial workflows across PDFs, email, spreadsheets, and systems. Built for AP, expense management, controllership, and shared services—with human-in-the-loop control and audit-ready process standardization.
+          AI + automation for AP, expenses, controllership, and shared services—human-in-the-loop and audit-ready.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/contact" className="btn-primary px-5">
@@ -181,10 +181,7 @@ export default function FinanceSolutionsPage() {
           Why AI + automation matters for finance operations
         </h2>
         <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--muted)]">
-          Finance and accounting run on documents and data that are often unstructured: invoices, receipts, spreadsheets, and emails. Moving that information into the right systems and workflows has traditionally required manual reading, re-keying, and routing—which slows processing, creates backlogs, and makes it hard to see where work stands.
-        </p>
-        <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--muted)]">
-          Autom8x uses AI to understand and structure this content, then automation to route it and track it. This is not generic chat AI—it’s operational workflow automation: orchestration, AI-assisted extraction, human-in-the-loop review, and process standardization. The result is fewer manual touchpoints, faster turnaround, consistent handling of high-volume work, and clear visibility into operational flow.
+          Unstructured docs slow processing and create backlogs. Autom8x structures content with AI, then routes and tracks it—operational workflow automation, not chat AI. Fewer touchpoints, faster turnaround, full visibility. Human review and audit-ready process where you need it.
         </p>
         <ul className="mt-6 flex flex-wrap gap-3">
           {["Operational control", "End-to-end visibility", "Faster processing", "Audit-ready workflows"].map((item) => (
@@ -251,7 +248,7 @@ export default function FinanceSolutionsPage() {
           Ready to streamline finance operations?
         </h2>
         <p className="mt-4 max-w-xl text-base leading-7 text-[var(--muted)]">
-          See how Autom8x can structure your document-heavy workflows and scale your finance operations without scaling headcount. We’ll walk you through a tailored view of your use case.
+          Scale finance operations without scaling headcount. We’ll walk you through a tailored view of your use case.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="/contact" className="btn-primary px-5">
