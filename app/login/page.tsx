@@ -45,8 +45,8 @@ function OAuthButton({
     });
     if (error) return;
     if (data?.url) {
-      await waitForVerifierCookie(400, 25);
-      logPkceClientSnapshot(redirectTo);
+      await waitForVerifierCookie(600, 30);
+      if (process.env.NEXT_PUBLIC_AUTH_DEBUG === "1") logPkceClientSnapshot(redirectTo);
       window.location.href = data.url;
     }
   }
@@ -166,8 +166,9 @@ function LoginForm() {
         return;
       }
       if (data?.url) {
-        await waitForVerifierCookie(400, 25);
-        logPkceClientSnapshot(buildAuthCallbackUrl(callbackUrl));
+        await waitForVerifierCookie(600, 30);
+        if (process.env.NEXT_PUBLIC_AUTH_DEBUG === "1")
+          logPkceClientSnapshot(buildAuthCallbackUrl(callbackUrl));
         window.location.href = data.url;
       }
       return;

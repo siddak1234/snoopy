@@ -100,16 +100,18 @@ export async function GET(request: Request) {
     n.toLowerCase().includes("supabase")
   );
   const hasAuthToken = callbackCookieNames.some((n) => n.includes("auth-token"));
-  console.log("PKCE_DEBUG_SERVER", {
-    requestUrl: request.url,
-    host: requestUrl.host,
-    cookieNames: callbackCookieNames,
-    hasVerifier,
-    hasSupabase,
-    hasAuthToken,
-  });
 
   const debug = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
+  if (debug) {
+    console.log("PKCE_DEBUG_SERVER", {
+      requestUrl: request.url,
+      host: requestUrl.host,
+      cookieNames: callbackCookieNames,
+      hasVerifier,
+      hasSupabase,
+      hasAuthToken,
+    });
+  }
   if (debug) {
     console.log("AUTH_CALLBACK_HIT", { url: request.url });
   }
