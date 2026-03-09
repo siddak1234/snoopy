@@ -36,7 +36,7 @@ function SignupForm() {
     if (isGmailAddress(normalizedEmail)) {
       setLoading(true);
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo: buildAuthCallbackUrl(callbackUrl) },
       });
@@ -45,7 +45,11 @@ function SignupForm() {
         setLoading(false);
         return;
       }
-      // Supabase performs the redirect and writes the PKCE verifier cookie before navigating.
+      if (data?.url) {
+        setTimeout(() => {
+          window.location.href = data.url;
+        }, 100);
+      }
       return;
     }
 
@@ -194,10 +198,15 @@ function SignupForm() {
               type="button"
               onClick={async () => {
                 const supabase = createClient();
-                await supabase.auth.signInWithOAuth({
+                const { data } = await supabase.auth.signInWithOAuth({
                   provider: "google",
                   options: { redirectTo: buildAuthCallbackUrl("/account") },
                 });
+                if (data?.url) {
+                  setTimeout(() => {
+                    window.location.href = data.url;
+                  }, 100);
+                }
               }}
               className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
             >
@@ -207,13 +216,18 @@ function SignupForm() {
               type="button"
               onClick={async () => {
                 const supabase = createClient();
-                await supabase.auth.signInWithOAuth({
+                const { data } = await supabase.auth.signInWithOAuth({
                   provider: "azure",
                   options: {
                     redirectTo: buildAuthCallbackUrl("/account"),
                     scopes: "email openid",
                   },
                 });
+                if (data?.url) {
+                  setTimeout(() => {
+                    window.location.href = data.url;
+                  }, 100);
+                }
               }}
               className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
             >

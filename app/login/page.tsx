@@ -32,7 +32,7 @@ function OAuthButton({
     onOAuthError?.(undefined);
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: buildAuthCallbackUrl(callbackUrl),
@@ -43,7 +43,14 @@ function OAuthButton({
         onOAuthError?.(error.message ?? "Sign-in failed.");
         return;
       }
-      // Supabase performs the redirect and writes the PKCE verifier cookie before navigating.
+      // Library stores PKCE verifier when building the URL; redirect so cookie is sent on callback.
+      // Small delay so cookie write is committed before navigation (avoids "verifier not found").
+      if (data?.url) {
+        setTimeout(() => {
+          window.location.href = data.url;
+        }, 100);
+        return;
+      }
     } finally {
       setLoading(false);
     }
@@ -154,7 +161,7 @@ function LoginForm() {
     if (isGmailAddress(normalizedEmail)) {
       setLoading(true);
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo: buildAuthCallbackUrl(callbackUrl) },
       });
@@ -163,7 +170,11 @@ function LoginForm() {
         setLoading(false);
         return;
       }
-      // Supabase performs the redirect and writes the PKCE verifier cookie before navigating.
+      if (data?.url) {
+        setTimeout(() => {
+          window.location.href = data.url;
+        }, 100);
+      }
       return;
     }
 
