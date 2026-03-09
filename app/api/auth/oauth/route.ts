@@ -28,7 +28,13 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const provider = requestUrl.searchParams.get("provider");
   const nextPath = getSafeNext(requestUrl.searchParams.get("next"));
-  const redirectTo = `${requestUrl.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
+  const isRetry = requestUrl.searchParams.get("retry") === "1";
+  const callbackParams = new URLSearchParams({
+    next: nextPath,
+    provider: provider ?? "google",
+  });
+  if (isRetry) callbackParams.set("retry", "1");
+  const redirectTo = `${requestUrl.origin}/auth/callback?${callbackParams.toString()}`;
 
   if (!provider || !PROVIDERS.includes(provider as (typeof PROVIDERS)[number])) {
     const login = new URL("/login", requestUrl.origin);

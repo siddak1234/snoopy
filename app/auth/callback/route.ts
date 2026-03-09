@@ -257,6 +257,13 @@ export async function GET(request: Request) {
       return NextResponse.redirect(loginReused.toString());
     }
 
+    // PKCE verifier missing: auto-retry OAuth start once (cookie may not have been sent on first redirect)
+    if (isPkceVerifierMissing && !searchParams.get("retry")) {
+      const provider = searchParams.get("provider") || "google";
+      const retryUrl = `/api/auth/oauth?provider=${encodeURIComponent(provider)}&next=${encodeURIComponent(next)}&retry=1`;
+      return NextResponse.redirect(new URL(retryUrl, requestUrl.origin).toString());
+    }
+
     const login = new URL("/login", requestUrl.origin);
     login.searchParams.set("error", "auth_callback");
     const description = isPkceVerifierMissing
