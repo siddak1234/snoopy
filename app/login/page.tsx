@@ -75,10 +75,18 @@ function LoginForm() {
   // flashing PKCE/code-reuse errors while session is still loading or resolving.
   useEffect(() => {
     if (authStatus !== "unauthenticated" || !authCallbackError || status) return;
+    const desc = (authErrorDescription ?? "").toLowerCase();
+    const isPkceOrVerifier =
+      authReason === "no_code" ||
+      desc.includes("pkce") ||
+      desc.includes("code verifier") ||
+      desc.includes("storage");
     const msg =
       authReason === "no_code"
         ? "Sign-in did not complete. Add your production URL to Supabase Dashboard → Authentication → URL Configuration → Redirect URLs (e.g. https://your-domain.com/auth/callback)."
-        : authErrorDescription ?? "Sign-in failed or was cancelled. Please try again.";
+        : isPkceOrVerifier
+          ? "Sign-in could not be completed. Please try again in this browser and avoid opening the sign-in link in a different tab or device."
+          : authErrorDescription ?? "Sign-in failed or was cancelled. Please try again.";
     setStatus(msg);
   }, [authStatus, authCallbackError, authReason, authErrorDescription, status]);
 

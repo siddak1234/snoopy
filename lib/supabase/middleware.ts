@@ -59,5 +59,20 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(login);
   }
 
+  // Authenticated users must never see the login page; send them to account home.
+  if (pathname === "/login" && user) {
+    const callbackUrl = request.nextUrl.searchParams.get("callbackUrl");
+    const safePath =
+      callbackUrl &&
+      callbackUrl.startsWith("/") &&
+      (callbackUrl === "/account" ||
+        callbackUrl.startsWith("/account/") ||
+        callbackUrl === "/dashboard" ||
+        callbackUrl.startsWith("/dashboard/"))
+        ? callbackUrl
+        : "/account";
+    return NextResponse.redirect(new URL(safePath, request.url));
+  }
+
   return response;
 }

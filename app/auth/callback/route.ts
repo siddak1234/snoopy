@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -119,17 +120,11 @@ export async function GET(request: Request) {
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
 
+    const cookieStore = await cookies();
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() {
-          const raw = request.headers.get("cookie");
-          if (!raw) return [];
-          return raw.split(";").map((c) => {
-            const trimmed = c.trim();
-            const eq = trimmed.indexOf("=");
-            if (eq < 0) return { name: trimmed, value: "" };
-            return { name: trimmed.slice(0, eq), value: trimmed.slice(eq + 1) };
-          });
+          return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) =>
@@ -149,15 +144,12 @@ export async function GET(request: Request) {
       settings.searchParams.set("linkError", "already_exists");
       return NextResponse.redirect(settings.toString());
     }
-    // PKCE / "code already used" can happen on duplicate callback (e.g. refresh).
-    // If we already have a session, send user to account instead of login with error.
-    const isPkceOrCodeReuse =
-      /pkce|code verifier|already been used|invalid.*code/i.test(error.message);
-    if (isPkceOrCodeReuse) {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (sessionData?.session?.user) {
-        return NextResponse.redirect(destinationUrl);
-      }
+    // On any exchange failure, if we already have a valid session (e.g. duplicate
+    // callback, or code verifier was missing but session exists from a prior flow),
+    // redirect to account home instead of showing login with an error.
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData?.session?.user) {
+      return NextResponse.redirect(destinationUrl);
     }
     const login = new URL("/login", requestUrl.origin);
     login.searchParams.set("error", "auth_callback");
