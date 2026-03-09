@@ -24,5 +24,8 @@ function getCookieOptions(): { path: string; sameSite: "lax"; secure?: boolean }
 export function createClient() {
   return createBrowserClient(supabaseUrl, supabaseAnonKey, {
     cookieOptions: getCookieOptions(),
+    // Each OAuth start gets a fresh client so the first signInWithOAuth writes the
+    // PKCE verifier cookie; the singleton can defer the write until a second use.
+    isSingleton: false,
   });
 }

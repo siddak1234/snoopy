@@ -6,8 +6,7 @@ import { Suspense, useState, FormEvent, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   buildAuthCallbackUrl,
-  logPkceClientSnapshot,
-  waitForVerifierCookie,
+  ensureVerifierThenRedirect,
 } from "@/lib/auth-oauth";
 import { useAppSession } from "@/hooks/use-app-session";
 import { isGmailAddress } from "@/lib/email";
@@ -23,40 +22,57 @@ function OAuthButton({
   provider,
   label,
   callbackUrl,
+  onOAuthError,
 }: {
   provider: "google" | "azure";
   label: string;
   callbackUrl: string;
+  onOAuthError?: (message: string) => void;
 }) {
+  const [loading, setLoading] = useState(false);
   async function handleClick() {
-    const supabase = createClient();
-    const redirectTo = buildAuthCallbackUrl(callbackUrl);
-    const options: {
-      redirectTo: string;
-      scopes?: string;
-      skipBrowserRedirect?: boolean;
-    } = { redirectTo, skipBrowserRedirect: true };
-    // Supabase Auth requires Azure to return a valid email to create the user; use tenant "common" in Dashboard.
-    if (provider === "azure") options.scopes = "email openid";
+    setLoading(true);
+    onOAuthError?.(undefined);
+    try {
+      const supabase = createClient();
+      const redirectTo = buildAuthCallbackUrl(callbackUrl);
+      const options: {
+        redirectTo: string;
+        scopes?: string;
+        skipBrowserRedirect?: boolean;
+      } = { redirectTo, skipBrowserRedirect: true };
+      if (provider === "azure") options.scopes = "email openid";
 
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options,
-    });
-    if (error) return;
-    if (data?.url) {
-      await waitForVerifierCookie(600, 30);
-      if (process.env.NEXT_PUBLIC_AUTH_DEBUG === "1") logPkceClientSnapshot(redirectTo);
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options,
+      });
+      if (error) {
+        onOAuthError?.(error.message ?? "Sign-in failed.");
+        return;
+      }
+      if (!data?.url) return;
+
+      const hasVerifier = await ensureVerifierThenRedirect(data.url);
+      if (!hasVerifier) {
+        onOAuthError?.(
+          "Sign-in could not start. Please refresh the page and try again."
+        );
+        return;
+      }
       window.location.href = data.url;
+    } finally {
+      setLoading(false);
     }
   }
   return (
     <button
       type="button"
       onClick={handleClick}
-      className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+      disabled={loading}
+      className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-70"
     >
-      {label}
+      {loading ? "Starting…" : label}
     </button>
   );
 }
@@ -64,6 +80,7 @@ function OAuthButton({
 function LoginForm() {
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [oauthError, setOAuthError] = useState<string | undefined>(undefined);
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/account";
   const authCallbackError = searchParams.get("error") === "auth_callback";
@@ -140,6 +157,7 @@ function LoginForm() {
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setStatus(null);
+    setOAuthError(undefined);
     const form = e.currentTarget;
     const emailInput = form.elements.namedItem("email") as HTMLInputElement | null;
     const email = emailInput?.value;
@@ -166,9 +184,12 @@ function LoginForm() {
         return;
       }
       if (data?.url) {
-        await waitForVerifierCookie(600, 30);
-        if (process.env.NEXT_PUBLIC_AUTH_DEBUG === "1")
-          logPkceClientSnapshot(buildAuthCallbackUrl(callbackUrl));
+        const hasVerifier = await ensureVerifierThenRedirect(data.url);
+        if (!hasVerifier) {
+          setStatus("Sign-in could not start. Please refresh the page and try again.");
+          setLoading(false);
+          return;
+        }
         window.location.href = data.url;
       }
       return;
@@ -262,9 +283,24 @@ function LoginForm() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <OAuthButton provider="google" label="Continue with Google" callbackUrl={callbackUrl} />
-            <OAuthButton provider="azure" label="Continue with Microsoft" callbackUrl={callbackUrl} />
+            <OAuthButton
+              provider="google"
+              label="Continue with Google"
+              callbackUrl={callbackUrl}
+              onOAuthError={setOAuthError}
+            />
+            <OAuthButton
+              provider="azure"
+              label="Continue with Microsoft"
+              callbackUrl={callbackUrl}
+              onOAuthError={setOAuthError}
+            />
           </div>
+          {oauthError ? (
+            <p className="mt-2 text-center text-sm text-[var(--muted)]" role="alert">
+              {oauthError}
+            </p>
+          ) : null}
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2 border-t border-[var(--ring)] pt-5">
             <span className="text-sm text-[var(--muted)]">New here?</span>

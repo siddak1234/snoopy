@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState, FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { buildAuthCallbackUrl, waitForVerifierCookie } from "@/lib/auth-oauth";
+import { buildAuthCallbackUrl, ensureVerifierThenRedirect } from "@/lib/auth-oauth";
 import { isGmailAddress } from "@/lib/email";
 
 const inputClassName =
@@ -44,7 +44,12 @@ function SignupForm() {
         },
       });
       if (!error && data?.url) {
-        await waitForVerifierCookie(600, 30);
+        const hasVerifier = await ensureVerifierThenRedirect(data.url);
+        if (!hasVerifier) {
+          setStatus("Sign-in could not start. Please refresh the page and try again.");
+          setLoading(false);
+          return;
+        }
         window.location.href = data.url;
       }
       return;
@@ -203,8 +208,8 @@ function SignupForm() {
                   },
                 });
                 if (!error && data?.url) {
-                  await new Promise((r) => setTimeout(r, 0));
-                  window.location.href = data.url;
+                  const hasVerifier = await ensureVerifierThenRedirect(data.url);
+                  if (hasVerifier) window.location.href = data.url;
                 }
               }}
               className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
@@ -224,8 +229,8 @@ function SignupForm() {
                   },
                 });
                 if (!error && data?.url) {
-                  await new Promise((r) => setTimeout(r, 0));
-                  window.location.href = data.url;
+                  const hasVerifier = await ensureVerifierThenRedirect(data.url);
+                  if (hasVerifier) window.location.href = data.url;
                 }
               }}
               className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"

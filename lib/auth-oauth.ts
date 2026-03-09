@@ -44,8 +44,13 @@ function getSupabaseVerifierCookieNames(): string[] {
   if (typeof document === "undefined") return [];
   return document.cookie
     .split(";")
-    .map((s) => s.trim().split("=")[0] ?? "")
-    .filter((name) => name.includes("verifier") || name.includes("auth-token"));
+    .map((s) => (s.trim().split("=")[0] ?? "").trim())
+    .filter(
+      (name) =>
+        name.includes("verifier") ||
+        name.includes("auth-token") ||
+        name.startsWith("sb-")
+    );
 }
 
 /** True if at least one Supabase verifier/auth cookie is present (for diagnostics). */
@@ -54,20 +59,58 @@ export function hasSupabaseVerifierCookie(): boolean {
 }
 
 /**
+ * Yield to the event loop so any async cookie write from the auth library
+ * (e.g. PKCE verifier) can run before we check document.cookie.
+ * First signInWithOAuth often resolves before storage.setItem completes.
+ */
+function yieldEventLoop(times: number = 3): Promise<void> {
+  let chain: Promise<void> = Promise.resolve();
+  for (let i = 0; i < times; i++) {
+    chain = chain.then(() => new Promise((r) => setTimeout(r, 0)));
+  }
+  return chain;
+}
+
+/**
+ * Log cookie state for first vs second attempt comparison.
+ * label: "AFTER_SIGNIN" | "BEFORE_NAV"
+ */
+export function logOAuthCookieState(
+  label: "AFTER_SIGNIN" | "BEFORE_NAV",
+  dataUrl: string | undefined
+): void {
+  if (typeof document === "undefined") return;
+  const raw = document.cookie;
+  const names = raw
+    ? raw.split(";").map((s) => (s.trim().split("=")[0] ?? "").trim())
+    : [];
+  const hasSb = names.some((n) => n.startsWith("sb-"));
+  const hasAuthToken = names.some((n) => n.includes("auth-token"));
+  const hasVerifier = names.some((n) => n.includes("verifier"));
+  console.log(`PKCE_${label}`, {
+    dataUrlPresent: Boolean(dataUrl),
+    documentCookie: raw,
+    cookieNames: names,
+    hasSb,
+    hasAuthToken,
+    hasVerifier,
+  });
+}
+
+/**
  * Wait for the Supabase PKCE verifier cookie to appear before redirecting.
  * signInWithOAuth can resolve before the cookie is committed; this avoids
  * the callback request missing the verifier.
  *
- * Uses a short minimum delay so the auth library has a tick to write the cookie,
- * then polls for the cookie name. Increase maxMs if the callback still misses
- * the verifier on slow devices.
+ * Uses a minimum delay so the auth library has time to write the cookie,
+ * then polls. Do not redirect to the provider until this returns true.
  */
 export function waitForVerifierCookie(
-  maxMs: number = 600,
-  intervalMs: number = 30
+  maxMs: number = 1200,
+  intervalMs: number = 50
 ): Promise<boolean> {
   return new Promise((resolve) => {
-    const minDelayMs = 80;
+    const minDelayMs = 200;
     const started = Date.now();
 
     function check() {
@@ -85,6 +128,19 @@ export function waitForVerifierCookie(
 
     setTimeout(check, minDelayMs);
   });
+}
+
+/**
+ * Run after signInWithOAuth: log state, yield so auth library can write cookie,
+ * wait for verifier cookie, log again. Returns true only if cookie is present.
+ * Use this so the first OAuth click creates the cookie before redirect.
+ */
+export async function ensureVerifierThenRedirect(dataUrl: string | undefined): Promise<boolean> {
+  logOAuthCookieState("AFTER_SIGNIN", dataUrl);
+  await yieldEventLoop(3);
+  const hasVerifier = await waitForVerifierCookie(1200, 50);
+  logOAuthCookieState("BEFORE_NAV", dataUrl);
+  return hasVerifier;
 }
 
 /**
