@@ -35,12 +35,17 @@ function SignupForm() {
     if (isGmailAddress(normalizedEmail)) {
       setLoading(true);
       const supabase = createClient();
-      await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(callbackUrl)}`,
+          skipBrowserRedirect: true,
         },
       });
+      if (!error && data?.url) {
+        await new Promise((r) => setTimeout(r, 150));
+        window.location.href = data.url;
+      }
       return;
     }
 
@@ -189,12 +194,17 @@ function SignupForm() {
               type="button"
               onClick={async () => {
                 const supabase = createClient();
-                await supabase.auth.signInWithOAuth({
+                const { data, error } = await supabase.auth.signInWithOAuth({
                   provider: "google",
                   options: {
                     redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/account")}`,
+                    skipBrowserRedirect: true,
                   },
                 });
+                if (!error && data?.url) {
+                  await new Promise((r) => setTimeout(r, 150));
+                  window.location.href = data.url;
+                }
               }}
               className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
             >
@@ -204,13 +214,18 @@ function SignupForm() {
               type="button"
               onClick={async () => {
                 const supabase = createClient();
-                await supabase.auth.signInWithOAuth({
+                const { data, error } = await supabase.auth.signInWithOAuth({
                   provider: "azure",
                   options: {
                     redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/account")}`,
                     scopes: "email openid",
+                    skipBrowserRedirect: true,
                   },
                 });
+                if (!error && data?.url) {
+                  await new Promise((r) => setTimeout(r, 150));
+                  window.location.href = data.url;
+                }
               }}
               className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
             >

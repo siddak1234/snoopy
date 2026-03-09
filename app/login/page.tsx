@@ -26,10 +26,25 @@ function OAuthButton({
   async function handleClick() {
     const supabase = createClient();
     const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(callbackUrl)}`;
-    const options: { redirectTo: string; scopes?: string } = { redirectTo };
+    const options: {
+      redirectTo: string;
+      scopes?: string;
+      skipBrowserRedirect?: boolean;
+    } = { redirectTo, skipBrowserRedirect: true };
     // Supabase Auth requires Azure to return a valid email to create the user; use tenant "common" in Dashboard.
     if (provider === "azure") options.scopes = "email openid";
-    await supabase.auth.signInWithOAuth({ provider, options });
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options,
+    });
+    if (error) return;
+    if (data?.url) {
+      // Delay redirect so the PKCE code verifier cookie is committed before we
+      // navigate away. First-time OAuth often fails otherwise.
+      await new Promise((r) => setTimeout(r, 150));
+      window.location.href = data.url;
+    }
   }
   return (
     <button
@@ -156,15 +171,21 @@ function LoginForm() {
     if (isGmailAddress(normalizedEmail)) {
       setLoading(true);
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(callbackUrl)}`,
+          skipBrowserRedirect: true,
         },
       });
       if (error) {
         setStatus(error.message ?? "Sign in failed. Please try again.");
         setLoading(false);
+        return;
+      }
+      if (data?.url) {
+        await new Promise((r) => setTimeout(r, 150));
+        window.location.href = data.url;
       }
       return;
     }
