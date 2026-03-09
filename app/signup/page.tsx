@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState, FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { buildAuthCallbackUrl } from "@/lib/auth-oauth";
+import { buildAuthCallbackUrl, waitForVerifierCookie } from "@/lib/auth-oauth";
 import { isGmailAddress } from "@/lib/email";
 
 const inputClassName =
@@ -44,7 +44,7 @@ function SignupForm() {
         },
       });
       if (!error && data?.url) {
-        await new Promise((r) => setTimeout(r, 0));
+        await waitForVerifierCookie(400, 25);
         window.location.href = data.url;
       }
       return;

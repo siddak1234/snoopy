@@ -29,13 +29,16 @@ function SunIcon() {
 }
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window === "undefined") {
-      return "light";
-    }
+  // Always start with "light" so server and client initial render match (avoids hydration error #418).
+  const [theme, setTheme] = useState<Theme>("light");
+
+  useEffect(() => {
     const storedTheme = localStorage.getItem("theme");
-    return storedTheme === "dark" || storedTheme === "light" ? storedTheme : "light";
-  });
+    const initial =
+      storedTheme === "dark" || storedTheme === "light" ? storedTheme : "light";
+    setTheme(initial);
+    document.documentElement.dataset.theme = initial;
+  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;

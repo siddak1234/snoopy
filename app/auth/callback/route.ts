@@ -128,9 +128,16 @@ export async function GET(request: Request) {
     });
 
     const cookieStore = await cookies();
+    const cookieNames = cookieStore.getAll().map((c) => c.name);
+    const hasVerifierCookie = cookieNames.some(
+      (n) => n.includes("verifier") || n.includes("auth-token")
+    );
     if (debug) {
-      const cookieNames = cookieStore.getAll().map((c) => c.name);
-      console.log("AUTH_CALLBACK_COOKIES", { names: cookieNames });
+      console.log("AUTH_CALLBACK_COOKIES", {
+        names: cookieNames,
+        hasVerifierCookie,
+        host: requestUrl.host,
+      });
     }
     // Server client must read request cookies so the PKCE code verifier (set by
     // the browser client via document.cookie) is available for exchangeCodeForSession.

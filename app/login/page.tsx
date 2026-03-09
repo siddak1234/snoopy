@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState, FormEvent, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { buildAuthCallbackUrl } from "@/lib/auth-oauth";
+import {
+  buildAuthCallbackUrl,
+  hasSupabaseVerifierCookie,
+  waitForVerifierCookie,
+} from "@/lib/auth-oauth";
 import { useAppSession } from "@/hooks/use-app-session";
 import { isGmailAddress } from "@/lib/email";
 
@@ -41,8 +45,20 @@ function OAuthButton({
     });
     if (error) return;
     if (data?.url) {
-      // Yield so PKCE verifier cookie (async in @supabase/ssr) is committed before navigation.
-      await new Promise((r) => setTimeout(r, 0));
+      // Wait for PKCE verifier cookie so the callback request includes it.
+      const found = await waitForVerifierCookie(400, 25);
+      if (process.env.NEXT_PUBLIC_AUTH_DEBUG === "1") {
+        const cookieSnapshot =
+          typeof document !== "undefined" ? document.cookie : "";
+        console.log("OAUTH_PRE_REDIRECT", {
+          redirectTo: redirectTo,
+          origin: typeof window !== "undefined" ? window.location.origin : "",
+          verifierCookiePresent: found || hasSupabaseVerifierCookie(),
+          cookieNames: cookieSnapshot
+            ? cookieSnapshot.split(";").map((s) => s.trim().split("=")[0])
+            : [],
+        });
+      }
       window.location.href = data.url;
     }
   }
@@ -162,7 +178,7 @@ function LoginForm() {
         return;
       }
       if (data?.url) {
-        await new Promise((r) => setTimeout(r, 0));
+        await waitForVerifierCookie(400, 25);
         window.location.href = data.url;
       }
       return;
