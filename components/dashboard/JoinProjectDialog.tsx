@@ -25,7 +25,8 @@ export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
 
   useEffect(() => {
     if (!open) {
-      reset();
+      // Defer to avoid synchronous state updates inside the effect body.
+      queueMicrotask(() => reset());
       return;
     }
     const t = setTimeout(() => inputRef.current?.focus(), 0);

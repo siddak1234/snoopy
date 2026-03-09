@@ -43,7 +43,6 @@ function SignupForm() {
         },
       });
       if (!error && data?.url) {
-        await new Promise((r) => setTimeout(r, 150));
         window.location.href = data.url;
       }
       return;
@@ -202,7 +201,6 @@ function SignupForm() {
                   },
                 });
                 if (!error && data?.url) {
-                  await new Promise((r) => setTimeout(r, 150));
                   window.location.href = data.url;
                 }
               }}
@@ -223,7 +221,6 @@ function SignupForm() {
                   },
                 });
                 if (!error && data?.url) {
-                  await new Promise((r) => setTimeout(r, 150));
                   window.location.href = data.url;
                 }
               }}

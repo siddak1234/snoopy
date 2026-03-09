@@ -88,7 +88,10 @@ export default function LinkedAccountsSection() {
   }, []);
 
   useEffect(() => {
-    loadIdentities();
+    // Defer to avoid synchronous state updates inside the effect body.
+    queueMicrotask(() => {
+      void loadIdentities();
+    });
   }, [loadIdentities]);
 
   useEffect(() => {
@@ -99,7 +102,10 @@ export default function LinkedAccountsSection() {
       const newUrl =
         window.location.pathname + (params.toString() ? `?${params.toString()}` : "");
       window.history.replaceState(null, "", newUrl);
-      setState((s) => ({ ...s, showAlreadyExistsModal: true }));
+      // Defer to avoid synchronous state updates inside the effect body.
+      queueMicrotask(() => {
+        setState((s) => ({ ...s, showAlreadyExistsModal: true }));
+      });
     }
   }, []);
 

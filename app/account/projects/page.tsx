@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/auth-supabase";
 import { ensureTenantForUser } from "@/lib/tenant";
@@ -6,10 +7,18 @@ import SectionCard from "@/components/dashboard/SectionCard";
 import { ProjectList, TeamProjectList } from "@/components/dashboard/ProjectList";
 import { CreateProjectButton } from "@/components/dashboard/CreateProjectButton";
 import { JoinProjectButton } from "@/components/dashboard/JoinProjectButton";
+import { AuthHydrationGate } from "@/components/auth/AuthHydrationGate";
 
 export default async function AccountProjectsPage() {
   const session = await getAppSession();
   if (!session?.user?.id) {
+    const cookieStore = await cookies();
+    const hasSupabaseAuthCookies = cookieStore
+      .getAll()
+      .some((c) => c.name.includes("auth-token"));
+    if (hasSupabaseAuthCookies) {
+      return <AuthHydrationGate destination="/account/projects" />;
+    }
     redirect("/login?callbackUrl=/account/projects");
   }
 

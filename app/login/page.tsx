@@ -40,9 +40,6 @@ function OAuthButton({
     });
     if (error) return;
     if (data?.url) {
-      // Delay redirect so the PKCE code verifier cookie is committed before we
-      // navigate away. First-time OAuth often fails otherwise.
-      await new Promise((r) => setTimeout(r, 150));
       window.location.href = data.url;
     }
   }
@@ -57,12 +54,9 @@ function OAuthButton({
   );
 }
 
-const AUTH_BUFFER_MS = 2500;
-
 function LoginForm() {
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [bufferElapsed, setBufferElapsed] = useState(false);
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/account";
   const authCallbackError = searchParams.get("error") === "auth_callback";
@@ -72,17 +66,6 @@ function LoginForm() {
 
   const authReason = searchParams.get("reason");
   const authErrorDescription = searchParams.get("error_description");
-
-  // When returning from OAuth, keep "Checking authentication..." visible for a
-  // minimum duration so the session has time to settle before we show any error.
-  useEffect(() => {
-    if (!authCallbackError) {
-      setBufferElapsed(true);
-      return;
-    }
-    const t = setTimeout(() => setBufferElapsed(true), AUTH_BUFFER_MS);
-    return () => clearTimeout(t);
-  }, [authCallbackError]);
 
   useEffect(() => {
     if (searchParams.get("verify") === "1") {
@@ -102,30 +85,23 @@ function LoginForm() {
     }
   }, [authStatus, session?.user, callbackUrl]);
 
-  // Only show auth_callback error once we know user is unauthenticated AND the
-  // buffer has elapsed. Avoids flashing errors while session is still settling.
-  useEffect(() => {
-    if (
-      authStatus !== "unauthenticated" ||
-      !authCallbackError ||
-      !bufferElapsed ||
-      status
-    )
-      return;
-    const desc = (authErrorDescription ?? "").toLowerCase();
-    const isPkceOrVerifier =
-      authReason === "no_code" ||
-      desc.includes("pkce") ||
-      desc.includes("code verifier") ||
-      desc.includes("storage");
-    const msg =
-      authReason === "no_code"
-        ? "Sign-in did not complete. Add your production URL to Supabase Dashboard → Authentication → URL Configuration → Redirect URLs (e.g. https://your-domain.com/auth/callback)."
-        : isPkceOrVerifier
-          ? "Sign-in could not be completed. Please try again in this browser and avoid opening the sign-in link in a different tab or device."
-          : authErrorDescription ?? "Sign-in failed or was cancelled. Please try again.";
-    setStatus(msg);
-  }, [authStatus, authCallbackError, bufferElapsed, authReason, authErrorDescription, status]);
+  // Derive OAuth callback error message (don't set state in an effect).
+  const derivedAuthError =
+    authCallbackError && authStatus === "unauthenticated" && !status
+      ? (() => {
+          const desc = (authErrorDescription ?? "").toLowerCase();
+          const isPkceOrVerifier =
+            authReason === "no_code" ||
+            desc.includes("pkce") ||
+            desc.includes("code verifier") ||
+            desc.includes("storage");
+          return authReason === "no_code"
+            ? "Sign-in did not complete. Add your production URL to Supabase Dashboard → Authentication → URL Configuration → Redirect URLs (e.g. https://your-domain.com/auth/callback)."
+            : isPkceOrVerifier
+              ? "Sign-in could not be completed. Please try again in this browser and avoid opening the sign-in link in a different tab or device."
+              : authErrorDescription ?? "Sign-in failed or was cancelled. Please try again.";
+        })()
+      : null;
 
   if (searchParams.get("verify") === "1") {
     return (
@@ -145,8 +121,7 @@ function LoginForm() {
   // Show "Checking authentication..." while session is loading or during the
   // post-OAuth buffer. Acts as a buffer so we don't flash errors before the
   // session has time to settle.
-  const isCheckingAuth =
-    authStatus === "loading" || (authCallbackError && !bufferElapsed);
+  const isCheckingAuth = authStatus === "loading";
   if (isCheckingAuth) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-4 py-8">
@@ -184,7 +159,6 @@ function LoginForm() {
         return;
       }
       if (data?.url) {
-        await new Promise((r) => setTimeout(r, 150));
         window.location.href = data.url;
       }
       return;
@@ -260,6 +234,10 @@ function LoginForm() {
             {status ? (
               <p className="text-center text-sm text-[var(--muted)]" role="alert">
                 {status}
+              </p>
+            ) : derivedAuthError ? (
+              <p className="text-center text-sm text-[var(--muted)]" role="alert">
+                {derivedAuthError}
               </p>
             ) : null}
           </form>

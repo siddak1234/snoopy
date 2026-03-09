@@ -17,7 +17,6 @@ type LogoFullProps = {
 export default function LogoFull({
   width = 60,
   height = 24,
-  className = "",
   markOnly = false,
   asLink = true,
   accentEight = false,
