@@ -41,6 +41,8 @@ function OAuthButton({
     });
     if (error) return;
     if (data?.url) {
+      // Yield so PKCE verifier cookie (async in @supabase/ssr) is committed before navigation.
+      await new Promise((r) => setTimeout(r, 0));
       window.location.href = data.url;
     }
   }
@@ -160,6 +162,7 @@ function LoginForm() {
         return;
       }
       if (data?.url) {
+        await new Promise((r) => setTimeout(r, 0));
         window.location.href = data.url;
       }
       return;

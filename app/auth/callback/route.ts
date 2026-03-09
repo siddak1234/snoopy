@@ -132,6 +132,8 @@ export async function GET(request: Request) {
       const cookieNames = cookieStore.getAll().map((c) => c.name);
       console.log("AUTH_CALLBACK_COOKIES", { names: cookieNames });
     }
+    // Server client must read request cookies so the PKCE code verifier (set by
+    // the browser client via document.cookie) is available for exchangeCodeForSession.
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() {

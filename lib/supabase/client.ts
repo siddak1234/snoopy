@@ -5,14 +5,24 @@ const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
 
 /**
- * Browser Supabase client. Uses cookies (via document.cookie) so the PKCE code
- * verifier is available when the OAuth callback runs on the server.
+ * Cookie options for PKCE/session storage. Must be consistent so the server
+ * callback can read the code verifier. Secure in HTTPS so production sends the cookie.
+ */
+function getCookieOptions(): { path: string; sameSite: "lax"; secure?: boolean } {
+  const base = { path: "/", sameSite: "lax" as const };
+  if (typeof window !== "undefined" && window.location?.protocol === "https:") {
+    return { ...base, secure: true };
+  }
+  return base;
+}
+
+/**
+ * Browser Supabase client from @supabase/ssr. Uses cookies (document.cookie)
+ * so the PKCE code verifier is available when the OAuth callback runs on the server.
+ * Do not use the non-SSR createClient from @supabase/supabase-js in the browser.
  */
 export function createClient() {
   return createBrowserClient(supabaseUrl, supabaseAnonKey, {
-    cookieOptions: {
-      path: "/",
-      sameSite: "lax",
-    },
+    cookieOptions: getCookieOptions(),
   });
 }
