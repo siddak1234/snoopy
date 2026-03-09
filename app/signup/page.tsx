@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState, FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { buildAuthCallbackUrl, ensureVerifierThenRedirect } from "@/lib/auth-oauth";
+import { buildAuthCallbackUrl } from "@/lib/auth-oauth";
 import { isGmailAddress } from "@/lib/email";
 
 const inputClassName =
@@ -36,22 +36,16 @@ function SignupForm() {
     if (isGmailAddress(normalizedEmail)) {
       setLoading(true);
       const supabase = createClient();
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: {
-          redirectTo: buildAuthCallbackUrl(callbackUrl),
-          skipBrowserRedirect: true,
-        },
+        options: { redirectTo: buildAuthCallbackUrl(callbackUrl) },
       });
-      if (!error && data?.url) {
-        const hasVerifier = await ensureVerifierThenRedirect(data.url);
-        if (!hasVerifier) {
-          setStatus("Sign-in could not start. Please refresh the page and try again.");
-          setLoading(false);
-          return;
-        }
-        window.location.href = data.url;
+      if (error) {
+        setStatus(error.message ?? "Sign-in could not start. Please try again.");
+        setLoading(false);
+        return;
       }
+      // Supabase performs the redirect and writes the PKCE verifier cookie before navigating.
       return;
     }
 
@@ -200,17 +194,10 @@ function SignupForm() {
               type="button"
               onClick={async () => {
                 const supabase = createClient();
-                const { data, error } = await supabase.auth.signInWithOAuth({
+                await supabase.auth.signInWithOAuth({
                   provider: "google",
-                  options: {
-                    redirectTo: buildAuthCallbackUrl("/account"),
-                    skipBrowserRedirect: true,
-                  },
+                  options: { redirectTo: buildAuthCallbackUrl("/account") },
                 });
-                if (!error && data?.url) {
-                  const hasVerifier = await ensureVerifierThenRedirect(data.url);
-                  if (hasVerifier) window.location.href = data.url;
-                }
               }}
               className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
             >
@@ -220,18 +207,13 @@ function SignupForm() {
               type="button"
               onClick={async () => {
                 const supabase = createClient();
-                const { data, error } = await supabase.auth.signInWithOAuth({
+                await supabase.auth.signInWithOAuth({
                   provider: "azure",
                   options: {
                     redirectTo: buildAuthCallbackUrl("/account"),
                     scopes: "email openid",
-                    skipBrowserRedirect: true,
                   },
                 });
-                if (!error && data?.url) {
-                  const hasVerifier = await ensureVerifierThenRedirect(data.url);
-                  if (hasVerifier) window.location.href = data.url;
-                }
               }}
               className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
             >

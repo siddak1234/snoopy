@@ -4,10 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState, FormEvent, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import {
-  buildAuthCallbackUrl,
-  ensureVerifierThenRedirect,
-} from "@/lib/auth-oauth";
+import { buildAuthCallbackUrl } from "@/lib/auth-oauth";
 import { useAppSession } from "@/hooks/use-app-session";
 import { isGmailAddress } from "@/lib/email";
 
@@ -35,32 +32,18 @@ function OAuthButton({
     onOAuthError?.(undefined);
     try {
       const supabase = createClient();
-      const redirectTo = buildAuthCallbackUrl(callbackUrl);
-      const options: {
-        redirectTo: string;
-        scopes?: string;
-        skipBrowserRedirect?: boolean;
-      } = { redirectTo, skipBrowserRedirect: true };
-      if (provider === "azure") options.scopes = "email openid";
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider,
-        options,
+        options: {
+          redirectTo: buildAuthCallbackUrl(callbackUrl),
+          ...(provider === "azure" && { scopes: "email openid" }),
+        },
       });
       if (error) {
         onOAuthError?.(error.message ?? "Sign-in failed.");
         return;
       }
-      if (!data?.url) return;
-
-      const hasVerifier = await ensureVerifierThenRedirect(data.url);
-      if (!hasVerifier) {
-        onOAuthError?.(
-          "Sign-in could not start. Please refresh the page and try again."
-        );
-        return;
-      }
-      window.location.href = data.url;
+      // Supabase performs the redirect and writes the PKCE verifier cookie before navigating.
     } finally {
       setLoading(false);
     }
@@ -122,7 +105,7 @@ function LoginForm() {
           return authReason === "no_code"
             ? "Sign-in did not complete. Add your production URL to Supabase Dashboard → Authentication → URL Configuration → Redirect URLs (e.g. https://your-domain.com/auth/callback)."
             : isPkceOrVerifier
-              ? "Sign-in could not be completed. Please try again in this browser and avoid opening the sign-in link in a different tab or device."
+              ? "Sign-in could not be completed. This usually means the callback URL in Supabase doesn’t match this site. In Supabase Dashboard → Authentication → URL Configuration, set Redirect URLs to this site’s exact address (e.g. http://localhost:3000/auth/callback for local dev)."
               : authErrorDescription ?? "Sign-in failed or was cancelled. Please try again.";
         })()
       : null;
@@ -171,27 +154,16 @@ function LoginForm() {
     if (isGmailAddress(normalizedEmail)) {
       setLoading(true);
       const supabase = createClient();
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: {
-          redirectTo: buildAuthCallbackUrl(callbackUrl),
-          skipBrowserRedirect: true,
-        },
+        options: { redirectTo: buildAuthCallbackUrl(callbackUrl) },
       });
       if (error) {
         setStatus(error.message ?? "Sign in failed. Please try again.");
         setLoading(false);
         return;
       }
-      if (data?.url) {
-        const hasVerifier = await ensureVerifierThenRedirect(data.url);
-        if (!hasVerifier) {
-          setStatus("Sign-in could not start. Please refresh the page and try again.");
-          setLoading(false);
-          return;
-        }
-        window.location.href = data.url;
-      }
+      // Supabase performs the redirect and writes the PKCE verifier cookie before navigating.
       return;
     }
 

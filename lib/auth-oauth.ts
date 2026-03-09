@@ -100,17 +100,17 @@ export function logOAuthCookieState(
 /**
  * Wait for the Supabase PKCE verifier cookie to appear before redirecting.
  * signInWithOAuth can resolve before the cookie is committed; this avoids
- * the callback request missing the verifier.
+ * the callback request missing the verifier (AUTH_CALLBACK_EXCHANGE_FAIL).
  *
  * Uses a minimum delay so the auth library has time to write the cookie,
  * then polls. Do not redirect to the provider until this returns true.
  */
 export function waitForVerifierCookie(
-  maxMs: number = 1200,
+  maxMs: number = 1800,
   intervalMs: number = 50
 ): Promise<boolean> {
   return new Promise((resolve) => {
-    const minDelayMs = 200;
+    const minDelayMs = 300;
     const started = Date.now();
 
     function check() {
@@ -138,7 +138,7 @@ export function waitForVerifierCookie(
 export async function ensureVerifierThenRedirect(dataUrl: string | undefined): Promise<boolean> {
   logOAuthCookieState("AFTER_SIGNIN", dataUrl);
   await yieldEventLoop(3);
-  const hasVerifier = await waitForVerifierCookie(1200, 50);
+  const hasVerifier = await waitForVerifierCookie(1800, 50);
   logOAuthCookieState("BEFORE_NAV", dataUrl);
   return hasVerifier;
 }

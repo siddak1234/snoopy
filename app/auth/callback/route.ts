@@ -181,7 +181,20 @@ export async function GET(request: Request) {
     if (!error) {
       return response;
     }
-    console.error("AUTH_CALLBACK_EXCHANGE_FAIL", { message: error.message });
+
+    const isPkceVerifierMissing =
+      /PKCE code verifier not found|code verifier|verifier.*storage/i.test(
+        error.message ?? ""
+      );
+    if (isPkceVerifierMissing) {
+      console.error("AUTH_CALLBACK_EXCHANGE_FAIL", {
+        message: error.message,
+        hint: "Ensure Supabase Dashboard → Authentication → URL Configuration uses the same origin (Site URL and Redirect URLs) as the page where sign-in was started (e.g. both https://this-site.com or both http://localhost:3000).",
+      });
+    } else {
+      console.error("AUTH_CALLBACK_EXCHANGE_FAIL", { message: error.message });
+    }
+
     if (isLinkAlreadyExistsError(error.message) && next === "/account/settings") {
       const settings = new URL("/account/settings", requestUrl.origin);
       settings.searchParams.set("linkError", "already_exists");
@@ -201,7 +214,13 @@ export async function GET(request: Request) {
     }
     const login = new URL("/login", requestUrl.origin);
     login.searchParams.set("error", "auth_callback");
-    login.searchParams.set("error_description", error.message);
+    // User-friendly message for PKCE verifier missing; login page shows specific copy for this case
+    const description = isPkceVerifierMissing
+      ? "PKCE code verifier not found. Try again in this browser. If it keeps happening, in Supabase Dashboard set Authentication → URL Configuration so Site URL and Redirect URLs use this site’s exact URL (e.g. " +
+        requestUrl.origin +
+        "/auth/callback)."
+      : error.message;
+    login.searchParams.set("error_description", description);
     return NextResponse.redirect(login.toString());
   }
 
