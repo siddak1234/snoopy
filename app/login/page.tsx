@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState, FormEvent, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { buildAuthCallbackUrl } from "@/lib/auth-oauth";
 import { useAppSession } from "@/hooks/use-app-session";
 import { isGmailAddress } from "@/lib/email";
 
@@ -25,7 +26,7 @@ function OAuthButton({
 }) {
   async function handleClick() {
     const supabase = createClient();
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(callbackUrl)}`;
+    const redirectTo = buildAuthCallbackUrl(callbackUrl);
     const options: {
       redirectTo: string;
       scopes?: string;
@@ -149,7 +150,7 @@ function LoginForm() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(callbackUrl)}`,
+          redirectTo: buildAuthCallbackUrl(callbackUrl),
           skipBrowserRedirect: true,
         },
       });

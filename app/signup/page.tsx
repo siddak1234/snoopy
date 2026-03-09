@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState, FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { buildAuthCallbackUrl } from "@/lib/auth-oauth";
 import { isGmailAddress } from "@/lib/email";
 
 const inputClassName =
@@ -38,7 +39,7 @@ function SignupForm() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(callbackUrl)}`,
+          redirectTo: buildAuthCallbackUrl(callbackUrl),
           skipBrowserRedirect: true,
         },
       });
@@ -196,7 +197,7 @@ function SignupForm() {
                 const { data, error } = await supabase.auth.signInWithOAuth({
                   provider: "google",
                   options: {
-                    redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/account")}`,
+                    redirectTo: buildAuthCallbackUrl("/account"),
                     skipBrowserRedirect: true,
                   },
                 });
@@ -215,7 +216,7 @@ function SignupForm() {
                 const { data, error } = await supabase.auth.signInWithOAuth({
                   provider: "azure",
                   options: {
-                    redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/account")}`,
+                    redirectTo: buildAuthCallbackUrl("/account"),
                     scopes: "email openid",
                     skipBrowserRedirect: true,
                   },

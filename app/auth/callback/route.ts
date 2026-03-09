@@ -93,6 +93,11 @@ export async function GET(request: Request) {
   const errorParam = searchParams.get("error");
   const errorDescription = searchParams.get("error_description");
 
+  const debug = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
+  if (debug) {
+    console.log("AUTH_CALLBACK_HIT", { url: request.url });
+  }
+
   if (errorParam) {
     const isLinkFlow =
       next === "/account/settings" ||
@@ -123,6 +128,10 @@ export async function GET(request: Request) {
     });
 
     const cookieStore = await cookies();
+    if (debug) {
+      const cookieNames = cookieStore.getAll().map((c) => c.name);
+      console.log("AUTH_CALLBACK_COOKIES", { names: cookieNames });
+    }
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() {
@@ -137,6 +146,12 @@ export async function GET(request: Request) {
     });
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (debug) {
+      console.log("AUTH_CALLBACK_EXCHANGE_RESULT", {
+        ok: !error,
+        message: error?.message ?? null,
+      });
+    }
     if (!error) {
       return response;
     }
@@ -150,6 +165,11 @@ export async function GET(request: Request) {
     // callback, or code verifier was missing but session exists from a prior flow),
     // redirect to account home instead of showing login with an error.
     const { data: sessionData } = await supabase.auth.getSession();
+    if (debug) {
+      console.log("AUTH_CALLBACK_POST_SESSION", {
+        hasSession: !!sessionData?.session?.user,
+      });
+    }
     if (sessionData?.session?.user) {
       return NextResponse.redirect(destinationUrl);
     }

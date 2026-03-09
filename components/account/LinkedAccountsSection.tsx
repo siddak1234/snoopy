@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import { buildAuthCallbackUrl } from "@/lib/auth-oauth";
 import { useCallback, useEffect, useState } from "react";
 import Modal from "@/components/ui/Modal";
 
@@ -113,7 +114,9 @@ export default function LinkedAccountsSection() {
     const supabase = createClient();
     setState((s) => ({ ...s, linking: provider, error: null }));
 
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/account/settings")}&flow=link`;
+    const redirectTo = `${buildAuthCallbackUrl(
+      "/account/settings",
+    )}&flow=link`;
     const options: { redirectTo: string; scopes?: string } = { redirectTo };
     if (provider === "azure") options.scopes = "email openid";
     const { error } = await supabase.auth.linkIdentity({
