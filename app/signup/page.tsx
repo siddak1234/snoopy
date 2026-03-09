@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState, FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { buildAuthCallbackUrl, waitForVerifierCookie } from "@/lib/auth-oauth";
+import {
+  buildAuthCallbackUrl,
+  logPkceClientSnapshot,
+  waitForVerifierCookie,
+} from "@/lib/auth-oauth";
 import { isGmailAddress } from "@/lib/email";
 
 const inputClassName =
@@ -45,6 +49,7 @@ function SignupForm() {
       });
       if (!error && data?.url) {
         await waitForVerifierCookie(400, 25);
+        logPkceClientSnapshot(buildAuthCallbackUrl(callbackUrl));
         window.location.href = data.url;
       }
       return;

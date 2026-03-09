@@ -93,6 +93,22 @@ export async function GET(request: Request) {
   const errorParam = searchParams.get("error");
   const errorDescription = searchParams.get("error_description");
 
+  const cookieStore = await cookies();
+  const callbackCookieNames = cookieStore.getAll().map((c) => c.name);
+  const hasVerifier = callbackCookieNames.some((n) => n.includes("verifier"));
+  const hasSupabase = callbackCookieNames.some((n) =>
+    n.toLowerCase().includes("supabase")
+  );
+  const hasAuthToken = callbackCookieNames.some((n) => n.includes("auth-token"));
+  console.log("PKCE_DEBUG_SERVER", {
+    requestUrl: request.url,
+    host: requestUrl.host,
+    cookieNames: callbackCookieNames,
+    hasVerifier,
+    hasSupabase,
+    hasAuthToken,
+  });
+
   const debug = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
   if (debug) {
     console.log("AUTH_CALLBACK_HIT", { url: request.url });
@@ -127,7 +143,6 @@ export async function GET(request: Request) {
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
 
-    const cookieStore = await cookies();
     const cookieNames = cookieStore.getAll().map((c) => c.name);
     const hasVerifierCookie = cookieNames.some(
       (n) => n.includes("verifier") || n.includes("auth-token")

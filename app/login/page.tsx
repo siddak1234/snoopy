@@ -6,7 +6,7 @@ import { Suspense, useState, FormEvent, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   buildAuthCallbackUrl,
-  hasSupabaseVerifierCookie,
+  logPkceClientSnapshot,
   waitForVerifierCookie,
 } from "@/lib/auth-oauth";
 import { useAppSession } from "@/hooks/use-app-session";
@@ -45,20 +45,8 @@ function OAuthButton({
     });
     if (error) return;
     if (data?.url) {
-      // Wait for PKCE verifier cookie so the callback request includes it.
-      const found = await waitForVerifierCookie(400, 25);
-      if (process.env.NEXT_PUBLIC_AUTH_DEBUG === "1") {
-        const cookieSnapshot =
-          typeof document !== "undefined" ? document.cookie : "";
-        console.log("OAUTH_PRE_REDIRECT", {
-          redirectTo: redirectTo,
-          origin: typeof window !== "undefined" ? window.location.origin : "",
-          verifierCookiePresent: found || hasSupabaseVerifierCookie(),
-          cookieNames: cookieSnapshot
-            ? cookieSnapshot.split(";").map((s) => s.trim().split("=")[0])
-            : [],
-        });
-      }
+      await waitForVerifierCookie(400, 25);
+      logPkceClientSnapshot(redirectTo);
       window.location.href = data.url;
     }
   }
@@ -179,6 +167,7 @@ function LoginForm() {
       }
       if (data?.url) {
         await waitForVerifierCookie(400, 25);
+        logPkceClientSnapshot(buildAuthCallbackUrl(callbackUrl));
         window.location.href = data.url;
       }
       return;

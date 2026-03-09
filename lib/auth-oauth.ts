@@ -82,3 +82,30 @@ export function waitForVerifierCookie(
   });
 }
 
+/**
+ * Temporary diagnostic: snapshot of document.cookie and checks for Supabase
+ * verifier/auth cookies, for comparison with callback request cookies.
+ * Call immediately after signInWithOAuth resolves and before navigation.
+ */
+export function logPkceClientSnapshot(redirectTo: string): void {
+  if (typeof document === "undefined") return;
+  const raw = document.cookie;
+  const names = raw
+    ? raw.split(";").map((s) => (s.trim().split("=")[0] ?? "").trim())
+    : [];
+  const hasVerifier = names.some((n) => n.includes("verifier"));
+  const hasSupabase = names.some((n) => n.toLowerCase().includes("supabase"));
+  const hasAuthToken = names.some((n) => n.includes("auth-token"));
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : "";
+  console.log("PKCE_DEBUG_CLIENT", {
+    documentCookie: raw,
+    cookieNames: names,
+    hasVerifier,
+    hasSupabase,
+    hasAuthToken,
+    redirectTo,
+    windowLocationOrigin: origin,
+  });
+}
+
