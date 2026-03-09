@@ -42,16 +42,32 @@ function OAuthButton({
   );
 }
 
+const AUTH_BUFFER_MS = 2500;
+
 function LoginForm() {
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [bufferElapsed, setBufferElapsed] = useState(false);
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/account";
-  const { data: session, status: authStatus } = useAppSession();
-
   const authCallbackError = searchParams.get("error") === "auth_callback";
+  const { data: session, status: authStatus } = useAppSession({
+    retryIfEmpty: authCallbackError,
+  });
+
   const authReason = searchParams.get("reason");
   const authErrorDescription = searchParams.get("error_description");
+
+  // When returning from OAuth, keep "Checking authentication..." visible for a
+  // minimum duration so the session has time to settle before we show any error.
+  useEffect(() => {
+    if (!authCallbackError) {
+      setBufferElapsed(true);
+      return;
+    }
+    const t = setTimeout(() => setBufferElapsed(true), AUTH_BUFFER_MS);
+    return () => clearTimeout(t);
+  }, [authCallbackError]);
 
   useEffect(() => {
     if (searchParams.get("verify") === "1") {
@@ -71,10 +87,16 @@ function LoginForm() {
     }
   }, [authStatus, session?.user, callbackUrl]);
 
-  // Only show auth_callback error once we know user is unauthenticated. Avoids
-  // flashing PKCE/code-reuse errors while session is still loading or resolving.
+  // Only show auth_callback error once we know user is unauthenticated AND the
+  // buffer has elapsed. Avoids flashing errors while session is still settling.
   useEffect(() => {
-    if (authStatus !== "unauthenticated" || !authCallbackError || status) return;
+    if (
+      authStatus !== "unauthenticated" ||
+      !authCallbackError ||
+      !bufferElapsed ||
+      status
+    )
+      return;
     const desc = (authErrorDescription ?? "").toLowerCase();
     const isPkceOrVerifier =
       authReason === "no_code" ||
@@ -88,7 +110,7 @@ function LoginForm() {
           ? "Sign-in could not be completed. Please try again in this browser and avoid opening the sign-in link in a different tab or device."
           : authErrorDescription ?? "Sign-in failed or was cancelled. Please try again.";
     setStatus(msg);
-  }, [authStatus, authCallbackError, authReason, authErrorDescription, status]);
+  }, [authStatus, authCallbackError, bufferElapsed, authReason, authErrorDescription, status]);
 
   if (searchParams.get("verify") === "1") {
     return (
@@ -105,9 +127,12 @@ function LoginForm() {
     );
   }
 
-  // Wait for auth to resolve before showing form. Avoids showing login then
-  // redirecting when session was still loading (e.g. first load after deploy).
-  if (authStatus === "loading") {
+  // Show "Checking authentication..." while session is loading or during the
+  // post-OAuth buffer. Acts as a buffer so we don't flash errors before the
+  // session has time to settle.
+  const isCheckingAuth =
+    authStatus === "loading" || (authCallbackError && !bufferElapsed);
+  if (isCheckingAuth) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-4 py-8">
         <div className="bubble p-6 sm:p-8">Checking authentication…</div>

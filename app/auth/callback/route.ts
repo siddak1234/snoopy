@@ -46,7 +46,12 @@ function successRedirectHtml(destinationUrl: string): string {
 <head><meta charset="utf-8"><title>Signing in…</title></head>
 <body>
   <p>Completing sign-in…</p>
-  <script>window.location.replace(${JSON.stringify(destinationUrl)});</script>
+  <script>
+    (function(){
+      var dest = ${JSON.stringify(destinationUrl)};
+      setTimeout(function(){ window.location.replace(dest); }, 150);
+    })();
+  </script>
 </body>
 </html>`;
 }
