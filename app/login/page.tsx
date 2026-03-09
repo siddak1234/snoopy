@@ -27,7 +27,7 @@ function OAuthButton({
   provider: "google" | "azure";
   label: string;
   callbackUrl: string;
-  onOAuthError?: (message: string) => void;
+  onOAuthError?: (message: string | undefined) => void;
 }) {
   const [loading, setLoading] = useState(false);
   async function handleClick() {
