@@ -63,10 +63,10 @@ export default function AutomationBuilderPage() {
 
       {/* Canvas — fills from below navbar to bottom of viewport */}
       <div
-        className="relative -mt-8 flex overflow-hidden rounded-2xl border border-[var(--ring)] bg-[var(--card)] shadow-[inset_0_0_60px_rgba(100,140,200,0.04)] sm:-mt-10"
+        className="relative -mt-4 flex overflow-hidden rounded-2xl border border-[var(--ring)] bg-[var(--card)] shadow-[inset_0_0_60px_rgba(100,140,200,0.04)] sm:-mt-6"
         style={{
           width: "calc(100vw - 2rem)",
-          height: "calc(100dvh - 6.5rem)",
+          height: "calc(100dvh - 7.375rem)",
           marginLeft: "calc(-50vw + 50% + 1rem)",
         }}
       >
