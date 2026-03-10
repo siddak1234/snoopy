@@ -1,11 +1,8 @@
 import Link from "next/link";
 
 const caseStudies = [
-  { slug: "healthcare-documentation", category: "Healthcare", title: "From Documentation Burden to Intelligent Care Delivery", date: "2026-03-05", dateLabel: "March 5, 2026" },
   { slug: "expense-classification", category: "Finance & Accounting", title: "Transforming Expense Classification Through AI-Driven Automation", date: "2026-03-01", dateLabel: "March 1, 2026" },
   { slug: "legal-billing-compliance", category: "Accounting & Legal", title: "Reducing Revenue Leakage in Legal Billing Through Automation", date: "2026-02-25", dateLabel: "February 25, 2026" },
-  { slug: "performance-intelligence", category: "Human Resources & Governance", title: "From Performance Reviews to Performance Intelligence", date: "2026-02-22", dateLabel: "February 22, 2026" },
-  { slug: "contracts-financial-truth", category: "Finance & Legal", title: "From Contracts to Financial Truth", date: "2026-02-08", dateLabel: "February 8, 2026" },
 ];
 
 /** Newest first; add new entries anywhere in caseStudies and they will sort by date. */
