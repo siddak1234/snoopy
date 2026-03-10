@@ -54,25 +54,22 @@ export default function AutomationBuilderPage() {
       {/* Lock viewport — no scroll on this page */}
       <style>{`html,body{overflow:hidden!important}`}</style>
 
-      <div
-        className="-mt-8 flex flex-col gap-1.5 sm:-mt-10"
-        style={{ height: "calc(100dvh - 5.5rem)" }}
-      >
-        {/* Workspace title — stays in container flow so it aligns with navbar */}
-        <div className="inline-flex w-fit shrink-0 items-center rounded-2xl border border-[var(--ring)] bg-linear-to-br from-[var(--surface)] to-[var(--surface-strong)] px-6 py-2.5 shadow-sm">
-          <h1 className="text-lg font-semibold tracking-tight text-[var(--text)]">
-            Builder
-          </h1>
-        </div>
+      {/* Workspace title — fixed to top-left, same row as navbar */}
+      <div className="fixed left-4 top-4 z-50 inline-flex items-center rounded-2xl border border-[var(--ring)] bg-linear-to-br from-[var(--surface)] to-[var(--surface-strong)] px-6 py-2.5 shadow-sm">
+        <h1 className="text-lg font-semibold tracking-tight text-[var(--text)]">
+          Builder
+        </h1>
+      </div>
 
-        {/* Unified canvas — breaks out of max-w container to fill viewport */}
-        <div
-          className="relative flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-[var(--ring)] bg-[var(--card)] shadow-[inset_0_0_60px_rgba(100,140,200,0.04)]"
-          style={{
-            width: "calc(100vw - 2rem)",
-            marginLeft: "calc(-50vw + 50% + 1rem)",
-          }}
-        >
+      {/* Canvas — fills from below navbar to bottom of viewport */}
+      <div
+        className="relative -mt-8 flex overflow-hidden rounded-2xl border border-[var(--ring)] bg-[var(--card)] shadow-[inset_0_0_60px_rgba(100,140,200,0.04)] sm:-mt-10"
+        style={{
+          width: "calc(100vw - 2rem)",
+          height: "calc(100dvh - 6rem)",
+          marginLeft: "calc(-50vw + 50% + 1rem)",
+        }}
+      >
           {/* Dot grid */}
           <div
             className="pointer-events-none absolute inset-0"
@@ -132,7 +129,6 @@ export default function AutomationBuilderPage() {
             </div>
           </div>
         </div>
-      </div>
     </>
   );
 }
