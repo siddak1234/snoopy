@@ -1,6 +1,5 @@
 function BlockIcon({ type }: { type: string }) {
-  const shared =
-    "h-4 w-4 text-[var(--icon-text)]";
+  const shared = "h-4 w-4 text-[var(--icon-text)]";
 
   switch (type) {
     case "Trigger":
@@ -51,10 +50,19 @@ const blocks = [
 
 export default function AutomationBuilderPage() {
   return (
-    <div className="-mx-2 -mt-4 flex h-[calc(100vh-10.5rem)] flex-col gap-1.5 sm:-mx-4 sm:-mt-6 lg:-mx-5">
-      {/* Workspace title pill */}
-      <div className="mx-2 inline-flex w-fit shrink-0 items-center rounded-xl border border-[var(--ring)] bg-[var(--surface)] px-4 py-1.5 sm:mx-4 lg:mx-5">
-        <h1 className="text-sm font-semibold text-[var(--text)]">Builder</h1>
+    <div
+      className="-mt-6 flex flex-col gap-2 sm:-mt-8"
+      style={{
+        width: "calc(100vw - 2rem)",
+        height: "calc(100dvh - 7.5rem)",
+        marginLeft: "calc(-50vw + 50% + 1rem)",
+      }}
+    >
+      {/* Workspace title */}
+      <div className="inline-flex w-fit shrink-0 items-center rounded-2xl border border-[var(--ring)] bg-linear-to-br from-[var(--surface)] to-[var(--surface-strong)] px-6 py-2.5 shadow-sm">
+        <h1 className="text-lg font-semibold tracking-tight text-[var(--text)]">
+          Builder
+        </h1>
       </div>
 
       {/* Unified canvas */}
