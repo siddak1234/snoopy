@@ -50,82 +50,89 @@ const blocks = [
 
 export default function AutomationBuilderPage() {
   return (
-    <div
-      className="-mt-6 flex flex-col gap-2 sm:-mt-8"
-      style={{
-        width: "calc(100vw - 2rem)",
-        height: "calc(100dvh - 7.5rem)",
-        marginLeft: "calc(-50vw + 50% + 1rem)",
-      }}
-    >
-      {/* Workspace title */}
-      <div className="inline-flex w-fit shrink-0 items-center rounded-2xl border border-[var(--ring)] bg-linear-to-br from-[var(--surface)] to-[var(--surface-strong)] px-6 py-2.5 shadow-sm">
-        <h1 className="text-lg font-semibold tracking-tight text-[var(--text)]">
-          Builder
-        </h1>
-      </div>
+    <>
+      {/* Lock viewport — no scroll on this page */}
+      <style>{`html,body{overflow:hidden!important}`}</style>
 
-      {/* Unified canvas */}
-      <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-[var(--ring)] bg-[var(--card)] shadow-[inset_0_0_60px_rgba(100,140,200,0.04)]">
-        {/* Dot grid */}
+      <div
+        className="-mt-8 flex flex-col gap-1.5 sm:-mt-10"
+        style={{ height: "calc(100dvh - 5.5rem)" }}
+      >
+        {/* Workspace title — stays in container flow so it aligns with navbar */}
+        <div className="inline-flex w-fit shrink-0 items-center rounded-2xl border border-[var(--ring)] bg-linear-to-br from-[var(--surface)] to-[var(--surface-strong)] px-6 py-2.5 shadow-sm">
+          <h1 className="text-lg font-semibold tracking-tight text-[var(--text)]">
+            Builder
+          </h1>
+        </div>
+
+        {/* Unified canvas — breaks out of max-w container to fill viewport */}
         <div
-          className="pointer-events-none absolute inset-0"
+          className="relative flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-[var(--ring)] bg-[var(--card)] shadow-[inset_0_0_60px_rgba(100,140,200,0.04)]"
           style={{
-            backgroundImage:
-              "radial-gradient(circle, var(--ring) 1px, transparent 1px)",
-            backgroundSize: "28px 28px",
-            opacity: 0.4,
+            width: "calc(100vw - 2rem)",
+            marginLeft: "calc(-50vw + 50% + 1rem)",
           }}
-        />
+        >
+          {/* Dot grid */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle, var(--ring) 1px, transparent 1px)",
+              backgroundSize: "28px 28px",
+              opacity: 0.4,
+            }}
+          />
 
-        {/* Glow ring */}
-        <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-[var(--accent)]/10" />
+          {/* Glow ring */}
+          <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-[var(--accent)]/10" />
 
-        {/* Docked block palette */}
-        <aside className="relative z-10 flex w-44 shrink-0 flex-col border-r border-[var(--ring)]/50 bg-[var(--surface)]/60 px-2.5 py-3 backdrop-blur-sm">
-          <h2 className="px-1 text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--muted)]">
-            Blocks
-          </h2>
-          <div className="mt-2 flex flex-col gap-1">
-            {blocks.map((name) => (
-              <div
-                key={name}
-                className="flex cursor-default items-center gap-2 rounded-lg border border-[var(--ring)] bg-[var(--card)] px-2.5 py-1.5 text-xs font-medium text-[var(--text)] transition hover:border-[var(--accent)] hover:bg-[var(--surface-hover)]"
+          {/* Docked block palette */}
+          <aside className="relative z-10 flex w-44 shrink-0 flex-col border-r border-[var(--ring)]/50 bg-[var(--surface)]/60 px-2.5 py-3 backdrop-blur-sm">
+            <h2 className="px-1 text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--muted)]">
+              Blocks
+            </h2>
+            <div className="mt-2 flex flex-col gap-1">
+              {blocks.map((name) => (
+                <div
+                  key={name}
+                  className="flex cursor-default items-center gap-2 rounded-lg border border-[var(--ring)] bg-[var(--card)] px-2.5 py-1.5 text-xs font-medium text-[var(--text)] transition hover:border-[var(--accent)] hover:bg-[var(--surface-hover)]"
+                >
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                    <BlockIcon type={name} />
+                  </span>
+                  <span>{name}</span>
+                </div>
+              ))}
+            </div>
+          </aside>
+
+          {/* Workflow workspace */}
+          <div className="relative z-10 flex min-w-0 flex-1 items-center justify-center">
+            <div className="flex flex-col items-center gap-2 text-center">
+              <svg
+                viewBox="0 0 48 48"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-9 w-9 text-[var(--accent)]/60"
+                aria-hidden
               >
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-                  <BlockIcon type={name} />
-                </span>
-                <span>{name}</span>
-              </div>
-            ))}
-          </div>
-        </aside>
-
-        {/* Workflow workspace */}
-        <div className="relative z-10 flex min-w-0 flex-1 items-center justify-center">
-          <div className="flex flex-col items-center gap-2 text-center">
-            <svg
-              viewBox="0 0 48 48"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-9 w-9 text-[var(--accent)]/60"
-              aria-hidden
-            >
-              <rect x="8" y="8" width="32" height="32" rx="8" />
-              <path d="M24 18v12M18 24h12" />
-            </svg>
-            <p className="text-sm font-medium text-[var(--muted)]">
-              Your workflow canvas
-            </p>
-            <p className="max-w-[14rem] text-[0.7rem] leading-relaxed text-[var(--muted)]/70">
-              Drag blocks here to sketch your automation idea.
-            </p>
+                <rect x="8" y="8" width="32" height="32" rx="8" />
+                <path d="M24 18v12M18 24h12" />
+              </svg>
+              <p className="text-sm font-medium text-[var(--muted)]">
+                Your workflow canvas
+              </p>
+              <p className="max-w-[14rem] text-[0.7rem] leading-relaxed text-[var(--muted)]/70">
+                Drag blocks here to sketch your automation idea.
+              </p>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
