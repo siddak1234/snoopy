@@ -66,7 +66,7 @@ export default function AutomationBuilderPage() {
         className="relative -mt-8 flex overflow-hidden rounded-2xl border border-[var(--ring)] bg-[var(--card)] shadow-[inset_0_0_60px_rgba(100,140,200,0.04)] sm:-mt-10"
         style={{
           width: "calc(100vw - 2rem)",
-          height: "calc(100dvh - 6rem)",
+          height: "calc(100dvh - 6.5rem)",
           marginLeft: "calc(-50vw + 50% + 1rem)",
         }}
       >
