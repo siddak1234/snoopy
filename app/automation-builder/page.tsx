@@ -51,12 +51,10 @@ const blocks = [
 
 export default function AutomationBuilderPage() {
   return (
-    <div className="-mx-2 flex h-[calc(100vh-13rem)] flex-col gap-2 sm:-mx-3 lg:-mx-4">
+    <div className="-mx-2 -mt-4 flex h-[calc(100vh-10.5rem)] flex-col gap-1.5 sm:-mx-4 sm:-mt-6 lg:-mx-5">
       {/* Workspace title pill */}
-      <div className="mx-2 inline-flex w-fit shrink-0 items-center rounded-2xl border border-[var(--ring)] bg-[var(--surface)] px-5 py-2 sm:mx-3 lg:mx-4">
-        <h1 className="text-lg font-semibold text-[var(--text)]">
-          Automa8ion Builder
-        </h1>
+      <div className="mx-2 inline-flex w-fit shrink-0 items-center rounded-xl border border-[var(--ring)] bg-[var(--surface)] px-4 py-1.5 sm:mx-4 lg:mx-5">
+        <h1 className="text-sm font-semibold text-[var(--text)]">Builder</h1>
       </div>
 
       {/* Unified canvas */}
