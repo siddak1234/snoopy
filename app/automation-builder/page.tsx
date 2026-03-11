@@ -14,7 +14,21 @@ interface WorkflowNode {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Block icon SVGs                                                    */
+/*  Block metadata — single source of truth                            */
+/* ------------------------------------------------------------------ */
+
+const BLOCKS: readonly { type: string; label: string }[] = [
+  { type: "Trigger", label: "Trigger" },
+  { type: "AI Agent", label: "AI Agent" },
+  { type: "Data Source", label: "Data Source" },
+  { type: "Condition", label: "Condition" },
+  { type: "Action", label: "Action" },
+];
+
+const BLOCK_MAP = new Map(BLOCKS.map((b) => [b.type, b]));
+
+/* ------------------------------------------------------------------ */
+/*  Block icon — shared across palette and canvas                      */
 /* ------------------------------------------------------------------ */
 
 function BlockIcon({ type, className }: { type: string; className?: string }) {
@@ -60,12 +74,26 @@ function BlockIcon({ type, className }: { type: string; className?: string }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Constants                                                          */
+/*  Shared icon tile — used by both palette and canvas node            */
 /* ------------------------------------------------------------------ */
 
-const BLOCK_TYPES = ["Trigger", "AI Agent", "Data Source", "Condition", "Action"];
-const NODE_W = 130;
-const NODE_H = 36;
+function BlockIconTile({ type, size = "md" }: { type: string; size?: "md" | "sm" }) {
+  const dim = size === "md" ? "h-10 w-10" : "h-8 w-8";
+  const icon = size === "md" ? "h-5 w-5 text-[var(--icon-text)]" : "h-4 w-4 text-[var(--icon-text)]";
+
+  return (
+    <span className={`flex ${dim} items-center justify-center rounded-lg border border-[var(--icon-border)] bg-[var(--icon-bg)]`}>
+      <BlockIcon type={type} className={icon} />
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Canvas node dimensions                                             */
+/* ------------------------------------------------------------------ */
+
+const NODE_W = 88;
+const NODE_H = 80;
 const TRASH_SIZE = 56;
 
 /* ------------------------------------------------------------------ */
@@ -249,26 +277,21 @@ export default function AutomationBuilderPage() {
         <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-[var(--accent)]/10" />
 
         {/* Docked block palette */}
-        <aside className="relative z-10 flex w-48 shrink-0 flex-col border-r border-[var(--ring)]/50 bg-[var(--surface)]/60 px-3 py-3 backdrop-blur-sm">
+        <aside className="relative z-10 flex w-28 shrink-0 flex-col border-r border-[var(--ring)]/50 bg-[var(--surface)]/60 px-2.5 py-3 backdrop-blur-sm">
           <h2 className="px-0.5 text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--muted)]">
             Blocks
           </h2>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            {BLOCK_TYPES.map((name) => (
+          <div className="mt-3 flex flex-col gap-2">
+            {BLOCKS.map(({ type, label }) => (
               <div
-                key={name}
+                key={type}
                 draggable
-                onDragStart={(e) => onPaletteDragStart(e, name)}
+                onDragStart={(e) => onPaletteDragStart(e, type)}
                 className="flex cursor-grab flex-col items-center gap-1.5 rounded-xl border border-[var(--ring)] bg-[var(--card)] px-1 py-3 transition hover:border-[var(--accent)] hover:bg-[var(--surface-hover)] active:cursor-grabbing"
               >
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--icon-border)] bg-[var(--icon-bg)]">
-                  <BlockIcon
-                    type={name}
-                    className="h-5 w-5 text-[var(--icon-text)]"
-                  />
-                </span>
+                <BlockIconTile type={type} size="md" />
                 <span className="text-[0.6rem] font-medium leading-tight text-[var(--text)]">
-                  {name}
+                  {label}
                 </span>
               </div>
             ))}
@@ -310,27 +333,30 @@ export default function AutomationBuilderPage() {
           )}
 
           {/* Placed nodes */}
-          {nodes.map((node) => (
-            <div
-              key={node.id}
-              onPointerDown={(e) => onNodePointerDown(e, node.id)}
-              onPointerMove={onNodePointerMove}
-              onPointerUp={onNodePointerUp}
-              className="absolute z-20 flex cursor-grab items-center gap-2 rounded-lg border border-[var(--ring)] bg-[var(--card)] px-2.5 py-1.5 text-xs font-medium text-[var(--text)] shadow-md select-none hover:border-[var(--accent)] active:cursor-grabbing"
-              style={{
-                left: node.x,
-                top: node.y,
-                width: NODE_W,
-                height: NODE_H,
-                touchAction: "none",
-              }}
-            >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-[var(--icon-border)] bg-[var(--icon-bg)]">
-                <BlockIcon type={node.type} />
-              </span>
-              <span className="truncate">{node.type}</span>
-            </div>
-          ))}
+          {nodes.map((node) => {
+            const meta = BLOCK_MAP.get(node.type);
+            return (
+              <div
+                key={node.id}
+                onPointerDown={(e) => onNodePointerDown(e, node.id)}
+                onPointerMove={onNodePointerMove}
+                onPointerUp={onNodePointerUp}
+                className="absolute z-20 flex cursor-grab flex-col items-center justify-center gap-1.5 rounded-xl border border-[var(--ring)] bg-[var(--card)] shadow-md select-none hover:border-[var(--accent)] active:cursor-grabbing"
+                style={{
+                  left: node.x,
+                  top: node.y,
+                  width: NODE_W,
+                  height: NODE_H,
+                  touchAction: "none",
+                }}
+              >
+                <BlockIconTile type={node.type} size="sm" />
+                <span className="text-[0.6rem] font-medium leading-tight text-[var(--text)]">
+                  {meta?.label ?? node.type}
+                </span>
+              </div>
+            );
+          })}
 
           {/* Trash zone — top-right corner of canvas */}
           <div
