@@ -13,6 +13,12 @@ interface WorkflowNode {
   y: number;
 }
 
+interface StickyNote {
+  id: string;
+  x: number;
+  y: number;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Block metadata — single source of truth                            */
 /* ------------------------------------------------------------------ */
@@ -89,11 +95,13 @@ function BlockIconTile({ type, size = "md" }: { type: string; size?: "md" | "sm"
 }
 
 /* ------------------------------------------------------------------ */
-/*  Canvas node dimensions                                             */
+/*  Dimensions                                                         */
 /* ------------------------------------------------------------------ */
 
 const NODE_W = 88;
 const NODE_H = 80;
+const NOTE_W = 96;
+const NOTE_H = 96;
 const TRASH_SIZE = 56;
 
 /* ------------------------------------------------------------------ */
@@ -102,23 +110,31 @@ const TRASH_SIZE = 56;
 
 export default function AutomationBuilderPage() {
   const [nodes, setNodes] = useState<WorkflowNode[]>([]);
+  const [notes, setNotes] = useState<StickyNote[]>([]);
   const [trashHover, setTrashHover] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(0);
+
   const nodesRef = useRef<WorkflowNode[]>([]);
   nodesRef.current = nodes;
+  const notesRef = useRef<StickyNote[]>([]);
+  notesRef.current = notes;
 
   const trashHoverRef = useRef(false);
 
   const dragRef = useRef<{
-    nodeId: string;
+    itemId: string;
+    source: "node" | "note";
     el: HTMLElement;
     rect: DOMRect;
     offsetX: number;
     offsetY: number;
     lastX: number;
     lastY: number;
+    itemW: number;
+    itemH: number;
   } | null>(null);
 
   /* ---- helpers --------------------------------------------------- */
@@ -166,9 +182,13 @@ export default function AutomationBuilderPage() {
     ]);
   }
 
-  /* ---- placed-node drag (pointer events, DOM-direct) ------------- */
+  /* ---- generic item drag (pointer events, DOM-direct) ------------ */
 
-  function onNodePointerDown(e: React.PointerEvent, nodeId: string) {
+  function startItemDrag(
+    e: React.PointerEvent,
+    itemId: string,
+    source: "node" | "note",
+  ) {
     e.preventDefault();
     e.stopPropagation();
     const el = e.currentTarget as HTMLElement;
@@ -176,33 +196,41 @@ export default function AutomationBuilderPage() {
 
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const node = nodesRef.current.find((n) => n.id === nodeId);
-    if (!node) return;
+
+    const items = source === "node" ? nodesRef.current : notesRef.current;
+    const item = items.find((n) => n.id === itemId);
+    if (!item) return;
+
+    const w = source === "node" ? NODE_W : NOTE_W;
+    const h = source === "node" ? NODE_H : NOTE_H;
 
     dragRef.current = {
-      nodeId,
+      itemId,
+      source,
       el,
       rect,
-      offsetX: e.clientX - rect.left - node.x,
-      offsetY: e.clientY - rect.top - node.y,
-      lastX: node.x,
-      lastY: node.y,
+      offsetX: e.clientX - rect.left - item.x,
+      offsetY: e.clientY - rect.top - item.y,
+      lastX: item.x,
+      lastY: item.y,
+      itemW: w,
+      itemH: h,
     };
   }
 
-  function onNodePointerMove(e: React.PointerEvent) {
+  function onItemPointerMove(e: React.PointerEvent) {
     const drag = dragRef.current;
     if (!drag) return;
 
     const x = clamp(
       e.clientX - drag.rect.left - drag.offsetX,
       0,
-      drag.rect.width - NODE_W,
+      drag.rect.width - drag.itemW,
     );
     const y = clamp(
       e.clientY - drag.rect.top - drag.offsetY,
       0,
-      drag.rect.height - NODE_H,
+      drag.rect.height - drag.itemH,
     );
 
     drag.el.style.left = `${x}px`;
@@ -217,16 +245,19 @@ export default function AutomationBuilderPage() {
     }
   }
 
-  function onNodePointerUp(e: React.PointerEvent) {
+  function onItemPointerUp(e: React.PointerEvent) {
     const drag = dragRef.current;
     if (!drag) return;
 
-    if (isOverTrash(e.clientX, e.clientY, drag.rect)) {
-      setNodes((prev) => prev.filter((n) => n.id !== drag.nodeId));
+    const deleteDrag = isOverTrash(e.clientX, e.clientY, drag.rect);
+    const setter = drag.source === "node" ? setNodes : setNotes;
+
+    if (deleteDrag) {
+      setter((prev: any[]) => prev.filter((n: any) => n.id !== drag.itemId));
     } else {
-      setNodes((prev) =>
-        prev.map((n) =>
-          n.id === drag.nodeId
+      setter((prev: any[]) =>
+        prev.map((n: any) =>
+          n.id === drag.itemId
             ? { ...n, x: drag.lastX, y: drag.lastY }
             : n,
         ),
@@ -238,9 +269,22 @@ export default function AutomationBuilderPage() {
     setTrashHover(false);
   }
 
+  /* ---- add note -------------------------------------------------- */
+
+  function addNote() {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = clamp(rect.width / 2 - NOTE_W / 2, 0, rect.width - NOTE_W);
+    const y = clamp(rect.height / 2 - NOTE_H / 2, 0, rect.height - NOTE_H);
+    setNotes((prev) => [
+      ...prev,
+      { id: `note_${nextId.current++}`, x, y },
+    ]);
+  }
+
   /* ---- render ---------------------------------------------------- */
 
-  const hasNodes = nodes.length > 0;
+  const hasItems = nodes.length > 0 || notes.length > 0;
 
   return (
     <>
@@ -305,8 +349,8 @@ export default function AutomationBuilderPage() {
           onDrop={onCanvasDrop}
           className="relative z-10 min-w-0 flex-1"
         >
-          {/* Placeholder — hidden once nodes exist */}
-          {!hasNodes && (
+          {/* Placeholder — hidden once items exist */}
+          {!hasItems && (
             <div className="flex h-full items-center justify-center">
               <div className="flex flex-col items-center gap-2 text-center">
                 <svg
@@ -338,9 +382,9 @@ export default function AutomationBuilderPage() {
             return (
               <div
                 key={node.id}
-                onPointerDown={(e) => onNodePointerDown(e, node.id)}
-                onPointerMove={onNodePointerMove}
-                onPointerUp={onNodePointerUp}
+                onPointerDown={(e) => startItemDrag(e, node.id, "node")}
+                onPointerMove={onItemPointerMove}
+                onPointerUp={onItemPointerUp}
                 className="absolute z-20 flex cursor-grab flex-col items-center justify-center gap-1.5 rounded-xl border border-[var(--ring)] bg-[var(--card)] shadow-md select-none hover:border-[var(--accent)] active:cursor-grabbing"
                 style={{
                   left: node.x,
@@ -358,21 +402,101 @@ export default function AutomationBuilderPage() {
             );
           })}
 
-          {/* Trash zone — top-right corner of canvas */}
-          <div
-            className={`absolute right-3 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-full border transition-all ${
-              trashHover
-                ? "border-red-400 bg-red-500/20 text-red-400 scale-110"
-                : "border-[var(--ring)] bg-[var(--surface)]/80 text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--text)]"
-            }`}
-          >
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-              <path d="M2 4h12M5.333 4V2.667a1.333 1.333 0 0 1 1.334-1.334h2.666a1.333 1.333 0 0 1 1.334 1.334V4M6.667 7.333v4M9.333 7.333v4" />
-              <path d="M3.333 4l.667 9.333a1.333 1.333 0 0 0 1.333 1.334h5.334a1.333 1.333 0 0 0 1.333-1.334L12.667 4" />
-            </svg>
+          {/* Placed notes */}
+          {notes.map((note) => (
+            <div
+              key={note.id}
+              onPointerDown={(e) => startItemDrag(e, note.id, "note")}
+              onPointerMove={onItemPointerMove}
+              onPointerUp={onItemPointerUp}
+              className="absolute z-20 flex cursor-grab flex-col rounded-xl border border-[var(--ring)] bg-[var(--card)] p-2.5 shadow-md select-none hover:border-[var(--accent)] active:cursor-grabbing"
+              style={{
+                left: note.x,
+                top: note.y,
+                width: NOTE_W,
+                height: NOTE_H,
+                touchAction: "none",
+              }}
+            >
+              <div className="flex items-center gap-1">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 text-[var(--muted)]">
+                  <path d="M9.333 1.333H4a1.333 1.333 0 0 0-1.333 1.334v10.666A1.333 1.333 0 0 0 4 14.667h8a1.333 1.333 0 0 0 1.333-1.334V5.333z" />
+                  <path d="M9.333 1.333v4h4" />
+                </svg>
+                <span className="text-[0.55rem] font-medium text-[var(--muted)]">
+                  Note
+                </span>
+              </div>
+              <div className="mt-1 flex-1 rounded border border-dashed border-[var(--ring)]/60" />
+            </div>
+          ))}
+
+          {/* Toolbar — top-right corner of canvas */}
+          <div className="absolute right-3 top-3 z-30 flex flex-col gap-2">
+            {/* Trash */}
+            <div
+              onClick={() => {
+                if (nodes.length > 0 || notes.length > 0)
+                  setShowClearConfirm(true);
+              }}
+              className={`flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border transition-all ${
+                trashHover
+                  ? "border-red-400 bg-red-500/20 text-red-400 scale-110"
+                  : "border-[var(--ring)] bg-[var(--surface)]/80 text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--text)]"
+              }`}
+            >
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <path d="M2 4h12M5.333 4V2.667a1.333 1.333 0 0 1 1.334-1.334h2.666a1.333 1.333 0 0 1 1.334 1.334V4M6.667 7.333v4M9.333 7.333v4" />
+                <path d="M3.333 4l.667 9.333a1.333 1.333 0 0 0 1.333 1.334h5.334a1.333 1.333 0 0 0 1.333-1.334L12.667 4" />
+              </svg>
+            </div>
+
+            {/* Add note */}
+            <div
+              onClick={addNote}
+              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--surface)]/80 text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
+            >
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <path d="M9.333 1.333H4a1.333 1.333 0 0 0-1.333 1.334v10.666A1.333 1.333 0 0 0 4 14.667h8a1.333 1.333 0 0 0 1.333-1.334V5.333z" />
+                <path d="M9.333 1.333v4h4" />
+                <path d="M5.333 8.667h5.334M5.333 11.333h5.334" />
+              </svg>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Clear canvas confirmation modal */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-72 rounded-2xl border border-[var(--ring)] bg-linear-to-br from-[var(--surface)] to-[var(--surface-strong)] p-6 shadow-xl">
+            <p className="text-center text-sm font-semibold text-[var(--text)]">
+              Clear canvas?
+            </p>
+            <p className="mt-1.5 text-center text-xs text-[var(--muted)]">
+              All blocks and notes will be removed.
+            </p>
+            <div className="mt-5 flex gap-2.5">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="flex-1 cursor-pointer rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-xs font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setNodes([]);
+                  setNotes([]);
+                  setShowClearConfirm(false);
+                }}
+                className="flex-1 cursor-pointer rounded-full border border-red-400/50 bg-red-500/15 px-4 py-2 text-xs font-medium text-red-400 transition hover:bg-red-500/25"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
