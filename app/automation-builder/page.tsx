@@ -17,6 +17,9 @@ interface StickyNote {
   id: string;
   x: number;
   y: number;
+  w: number;
+  h: number;
+  text: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -102,6 +105,8 @@ const NODE_W = 88;
 const NODE_H = 80;
 const NOTE_W = 96;
 const NOTE_H = 96;
+const NOTE_MIN_W = 80;
+const NOTE_MIN_H = 80;
 const TRASH_SIZE = 56;
 
 /* ------------------------------------------------------------------ */
@@ -113,6 +118,7 @@ export default function AutomationBuilderPage() {
   const [notes, setNotes] = useState<StickyNote[]>([]);
   const [trashHover, setTrashHover] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(0);
@@ -123,6 +129,16 @@ export default function AutomationBuilderPage() {
   notesRef.current = notes;
 
   const trashHoverRef = useRef(false);
+
+  const resizeRef = useRef<{
+    noteId: string;
+    el: HTMLElement;
+    rect: DOMRect;
+    startW: number;
+    startH: number;
+    startClientX: number;
+    startClientY: number;
+  } | null>(null);
 
   const dragRef = useRef<{
     itemId: string;
@@ -201,8 +217,8 @@ export default function AutomationBuilderPage() {
     const item = items.find((n) => n.id === itemId);
     if (!item) return;
 
-    const w = source === "node" ? NODE_W : NOTE_W;
-    const h = source === "node" ? NODE_H : NOTE_H;
+    const w = source === "node" ? NODE_W : (item as StickyNote).w;
+    const h = source === "node" ? NODE_H : (item as StickyNote).h;
 
     dragRef.current = {
       itemId,
@@ -269,6 +285,64 @@ export default function AutomationBuilderPage() {
     setTrashHover(false);
   }
 
+  /* ---- note resize (pointer events, DOM-direct) ------------------- */
+
+  function onResizePointerDown(e: React.PointerEvent, noteId: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    const handle = e.currentTarget as HTMLElement;
+    handle.setPointerCapture(e.pointerId);
+
+    const noteEl = handle.closest("[data-note-id]") as HTMLElement | null;
+    if (!noteEl) return;
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const note = notesRef.current.find((n) => n.id === noteId);
+    if (!note) return;
+
+    resizeRef.current = {
+      noteId,
+      el: noteEl,
+      rect,
+      startW: note.w,
+      startH: note.h,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+    };
+  }
+
+  function onResizePointerMove(e: React.PointerEvent) {
+    const rs = resizeRef.current;
+    if (!rs) return;
+
+    const dw = e.clientX - rs.startClientX;
+    const dh = e.clientY - rs.startClientY;
+    const newW = Math.max(NOTE_MIN_W, rs.startW + dw);
+    const newH = Math.max(NOTE_MIN_H, rs.startH + dh);
+
+    rs.el.style.width = `${newW}px`;
+    rs.el.style.height = `${newH}px`;
+  }
+
+  function onResizePointerUp() {
+    const rs = resizeRef.current;
+    if (!rs) return;
+
+    const w = parseInt(rs.el.style.width, 10);
+    const h = parseInt(rs.el.style.height, 10);
+
+    setNotes((prev) =>
+      prev.map((n) => (n.id === rs.noteId ? { ...n, w, h } : n)),
+    );
+    resizeRef.current = null;
+  }
+
+  function updateNoteText(noteId: string, text: string) {
+    setNotes((prev) =>
+      prev.map((n) => (n.id === noteId ? { ...n, text } : n)),
+    );
+  }
+
   /* ---- add note -------------------------------------------------- */
 
   function addNote() {
@@ -278,7 +352,7 @@ export default function AutomationBuilderPage() {
     const y = clamp(rect.height / 2 - NOTE_H / 2, 0, rect.height - NOTE_H);
     setNotes((prev) => [
       ...prev,
-      { id: `note_${nextId.current++}`, x, y },
+      { id: `note_${nextId.current++}`, x, y, w: NOTE_W, h: NOTE_H, text: "" },
     ]);
   }
 
@@ -403,33 +477,78 @@ export default function AutomationBuilderPage() {
           })}
 
           {/* Placed notes */}
-          {notes.map((note) => (
-            <div
-              key={note.id}
-              onPointerDown={(e) => startItemDrag(e, note.id, "note")}
-              onPointerMove={onItemPointerMove}
-              onPointerUp={onItemPointerUp}
-              className="absolute z-20 flex cursor-grab flex-col rounded-xl border border-[var(--ring)] bg-[var(--card)] p-2.5 shadow-md select-none hover:border-[var(--accent)] active:cursor-grabbing"
-              style={{
-                left: note.x,
-                top: note.y,
-                width: NOTE_W,
-                height: NOTE_H,
-                touchAction: "none",
-              }}
-            >
-              <div className="flex items-center gap-1">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 text-[var(--muted)]">
-                  <path d="M9.333 1.333H4a1.333 1.333 0 0 0-1.333 1.334v10.666A1.333 1.333 0 0 0 4 14.667h8a1.333 1.333 0 0 0 1.333-1.334V5.333z" />
-                  <path d="M9.333 1.333v4h4" />
-                </svg>
-                <span className="text-[0.55rem] font-medium text-[var(--muted)]">
-                  Note
-                </span>
+          {notes.map((note) => {
+            const isEditing = editingNoteId === note.id;
+            return (
+              <div
+                key={note.id}
+                data-note-id={note.id}
+                onPointerDown={(e) => {
+                  if (!isEditing) startItemDrag(e, note.id, "note");
+                }}
+                onPointerMove={onItemPointerMove}
+                onPointerUp={onItemPointerUp}
+                onDoubleClick={() => setEditingNoteId(note.id)}
+                className={`absolute z-20 flex flex-col rounded-xl border border-[var(--ring)] bg-[var(--card)] p-2.5 shadow-md ${
+                  isEditing
+                    ? "cursor-default"
+                    : "cursor-grab select-none hover:border-[var(--accent)] active:cursor-grabbing"
+                }`}
+                style={{
+                  left: note.x,
+                  top: note.y,
+                  width: note.w,
+                  height: note.h,
+                  touchAction: "none",
+                }}
+              >
+                <div className="flex shrink-0 items-center gap-1">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 text-[var(--muted)]">
+                    <path d="M9.333 1.333H4a1.333 1.333 0 0 0-1.333 1.334v10.666A1.333 1.333 0 0 0 4 14.667h8a1.333 1.333 0 0 0 1.333-1.334V5.333z" />
+                    <path d="M9.333 1.333v4h4" />
+                  </svg>
+                  <span className="text-[0.55rem] font-medium text-[var(--muted)]">
+                    Note
+                  </span>
+                </div>
+                {isEditing ? (
+                  <textarea
+                    autoFocus
+                    value={note.text}
+                    onChange={(e) => updateNoteText(note.id, e.target.value)}
+                    onBlur={() => setEditingNoteId(null)}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className="mt-1 flex-1 resize-none rounded border border-[var(--ring)]/60 bg-transparent p-1 text-[0.6rem] leading-relaxed text-[var(--text)] outline-none placeholder:text-[var(--muted)]/50"
+                    placeholder="Type a note…"
+                  />
+                ) : (
+                  <div className="mt-1 flex-1 overflow-hidden rounded border border-dashed border-[var(--ring)]/60 p-1">
+                    {note.text ? (
+                      <p className="whitespace-pre-wrap text-[0.6rem] leading-relaxed text-[var(--text)]">
+                        {note.text}
+                      </p>
+                    ) : (
+                      <p className="text-[0.55rem] text-[var(--muted)]/40">
+                        Double-click to edit
+                      </p>
+                    )}
+                  </div>
+                )}
+                {/* Resize handle */}
+                <div
+                  onPointerDown={(e) => onResizePointerDown(e, note.id)}
+                  onPointerMove={onResizePointerMove}
+                  onPointerUp={onResizePointerUp}
+                  className="absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize touch-none"
+                >
+                  <svg viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1" className="absolute bottom-1 right-1 h-2.5 w-2.5 text-[var(--muted)]/50">
+                    <path d="M7 1v6H1" />
+                    <path d="M7 4v3H4" />
+                  </svg>
+                </div>
               </div>
-              <div className="mt-1 flex-1 rounded border border-dashed border-[var(--ring)]/60" />
-            </div>
-          ))}
+            );
+          })}
 
           {/* Toolbar — top-right corner of canvas */}
           <div className="absolute right-3 top-3 z-30 flex flex-col gap-2">
