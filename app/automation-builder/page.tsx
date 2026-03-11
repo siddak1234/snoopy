@@ -17,26 +17,26 @@ interface WorkflowNode {
 /*  Block icon SVGs                                                    */
 /* ------------------------------------------------------------------ */
 
-function BlockIcon({ type }: { type: string }) {
-  const shared = "h-4 w-4 text-[var(--icon-text)]";
+function BlockIcon({ type, className }: { type: string; className?: string }) {
+  const base = className ?? "h-4 w-4 text-[var(--icon-text)]";
 
   switch (type) {
     case "Trigger":
       return (
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className={shared}>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className={base}>
           <path d="M9.5 1.5 4 9h4l-1.5 5.5L13 7H9z" />
         </svg>
       );
     case "AI Agent":
       return (
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className={shared}>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className={base}>
           <circle cx="8" cy="8" r="3" />
           <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" />
         </svg>
       );
     case "Data Source":
       return (
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className={shared}>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className={base}>
           <ellipse cx="8" cy="4" rx="5" ry="2" />
           <path d="M3 4v8c0 1.1 2.24 2 5 2s5-.9 5-2V4" />
           <path d="M3 8c0 1.1 2.24 2 5 2s5-.9 5-2" />
@@ -44,13 +44,13 @@ function BlockIcon({ type }: { type: string }) {
       );
     case "Condition":
       return (
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className={shared}>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className={base}>
           <path d="M8 2v4M8 6l4 4M8 6l-4 4M4 10v4M12 10v4" />
         </svg>
       );
     case "Action":
       return (
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className={shared}>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className={base}>
           <path d="M5 2.5v11l8-5.5z" />
         </svg>
       );
@@ -78,29 +78,33 @@ export default function AutomationBuilderPage() {
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(0);
+  const nodesRef = useRef<WorkflowNode[]>([]);
+  nodesRef.current = nodes;
 
-  // Ref-based drag state to avoid re-renders on every pointer move
+  const trashHoverRef = useRef(false);
+
   const dragRef = useRef<{
     nodeId: string;
+    el: HTMLElement;
+    rect: DOMRect;
     offsetX: number;
     offsetY: number;
+    lastX: number;
+    lastY: number;
   } | null>(null);
 
   /* ---- helpers --------------------------------------------------- */
 
-  const canvasRect = useCallback(() => canvasRef.current?.getBoundingClientRect() ?? null, []);
-
-  const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(max, val));
+  const clamp = (val: number, min: number, max: number) =>
+    Math.max(min, Math.min(max, val));
 
   const isOverTrash = useCallback(
-    (clientX: number, clientY: number) => {
-      const rect = canvasRect();
-      if (!rect) return false;
+    (clientX: number, clientY: number, rect: DOMRect) => {
       const x = clientX - rect.left;
       const y = clientY - rect.top;
       return x >= rect.width - TRASH_SIZE - 12 && y <= TRASH_SIZE + 12;
     },
-    [canvasRect],
+    [],
   );
 
   /* ---- palette drag (HTML drag API) ------------------------------ */
@@ -122,7 +126,7 @@ export default function AutomationBuilderPage() {
     if (!type) return;
     e.preventDefault();
 
-    const rect = canvasRect();
+    const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
 
     const x = clamp(e.clientX - rect.left - NODE_W / 2, 0, rect.width - NODE_W);
@@ -134,22 +138,27 @@ export default function AutomationBuilderPage() {
     ]);
   }
 
-  /* ---- placed-node drag (pointer events) ------------------------- */
+  /* ---- placed-node drag (pointer events, DOM-direct) ------------- */
 
   function onNodePointerDown(e: React.PointerEvent, nodeId: string) {
     e.preventDefault();
     e.stopPropagation();
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
 
-    const rect = canvasRect();
+    const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const node = nodes.find((n) => n.id === nodeId);
+    const node = nodesRef.current.find((n) => n.id === nodeId);
     if (!node) return;
 
     dragRef.current = {
       nodeId,
+      el,
+      rect,
       offsetX: e.clientX - rect.left - node.x,
       offsetY: e.clientY - rect.top - node.y,
+      lastX: node.x,
+      lastY: node.y,
     };
   }
 
@@ -157,28 +166,47 @@ export default function AutomationBuilderPage() {
     const drag = dragRef.current;
     if (!drag) return;
 
-    const rect = canvasRect();
-    if (!rect) return;
-
-    const x = clamp(e.clientX - rect.left - drag.offsetX, 0, rect.width - NODE_W);
-    const y = clamp(e.clientY - rect.top - drag.offsetY, 0, rect.height - NODE_H);
-
-    setNodes((prev) =>
-      prev.map((n) => (n.id === drag.nodeId ? { ...n, x, y } : n)),
+    const x = clamp(
+      e.clientX - drag.rect.left - drag.offsetX,
+      0,
+      drag.rect.width - NODE_W,
+    );
+    const y = clamp(
+      e.clientY - drag.rect.top - drag.offsetY,
+      0,
+      drag.rect.height - NODE_H,
     );
 
-    setTrashHover(isOverTrash(e.clientX, e.clientY));
+    drag.el.style.left = `${x}px`;
+    drag.el.style.top = `${y}px`;
+    drag.lastX = x;
+    drag.lastY = y;
+
+    const over = isOverTrash(e.clientX, e.clientY, drag.rect);
+    if (over !== trashHoverRef.current) {
+      trashHoverRef.current = over;
+      setTrashHover(over);
+    }
   }
 
   function onNodePointerUp(e: React.PointerEvent) {
     const drag = dragRef.current;
     if (!drag) return;
 
-    if (isOverTrash(e.clientX, e.clientY)) {
+    if (isOverTrash(e.clientX, e.clientY, drag.rect)) {
       setNodes((prev) => prev.filter((n) => n.id !== drag.nodeId));
+    } else {
+      setNodes((prev) =>
+        prev.map((n) =>
+          n.id === drag.nodeId
+            ? { ...n, x: drag.lastX, y: drag.lastY }
+            : n,
+        ),
+      );
     }
 
     dragRef.current = null;
+    trashHoverRef.current = false;
     setTrashHover(false);
   }
 
@@ -221,22 +249,27 @@ export default function AutomationBuilderPage() {
         <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-[var(--accent)]/10" />
 
         {/* Docked block palette */}
-        <aside className="relative z-10 flex w-44 shrink-0 flex-col border-r border-[var(--ring)]/50 bg-[var(--surface)]/60 px-2.5 py-3 backdrop-blur-sm">
-          <h2 className="px-1 text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--muted)]">
+        <aside className="relative z-10 flex w-48 shrink-0 flex-col border-r border-[var(--ring)]/50 bg-[var(--surface)]/60 px-3 py-3 backdrop-blur-sm">
+          <h2 className="px-0.5 text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--muted)]">
             Blocks
           </h2>
-          <div className="mt-2 flex flex-col gap-1">
+          <div className="mt-3 grid grid-cols-2 gap-2">
             {BLOCK_TYPES.map((name) => (
               <div
                 key={name}
                 draggable
                 onDragStart={(e) => onPaletteDragStart(e, name)}
-                className="flex cursor-grab items-center gap-2 rounded-lg border border-[var(--ring)] bg-[var(--card)] px-2.5 py-1.5 text-xs font-medium text-[var(--text)] transition hover:border-[var(--accent)] hover:bg-[var(--surface-hover)] active:cursor-grabbing"
+                className="flex cursor-grab flex-col items-center gap-1.5 rounded-xl border border-[var(--ring)] bg-[var(--card)] px-1 py-3 transition hover:border-[var(--accent)] hover:bg-[var(--surface-hover)] active:cursor-grabbing"
               >
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-[var(--icon-border)] bg-[var(--icon-bg)]">
-                  <BlockIcon type={name} />
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--icon-border)] bg-[var(--icon-bg)]">
+                  <BlockIcon
+                    type={name}
+                    className="h-5 w-5 text-[var(--icon-text)]"
+                  />
                 </span>
-                <span>{name}</span>
+                <span className="text-[0.6rem] font-medium leading-tight text-[var(--text)]">
+                  {name}
+                </span>
               </div>
             ))}
           </div>
@@ -283,7 +316,7 @@ export default function AutomationBuilderPage() {
               onPointerDown={(e) => onNodePointerDown(e, node.id)}
               onPointerMove={onNodePointerMove}
               onPointerUp={onNodePointerUp}
-              className="absolute z-20 flex cursor-grab items-center gap-2 rounded-lg border border-[var(--ring)] bg-[var(--card)] px-2.5 py-1.5 text-xs font-medium text-[var(--text)] shadow-md transition-shadow select-none hover:border-[var(--accent)] hover:shadow-lg active:cursor-grabbing"
+              className="absolute z-20 flex cursor-grab items-center gap-2 rounded-lg border border-[var(--ring)] bg-[var(--card)] px-2.5 py-1.5 text-xs font-medium text-[var(--text)] shadow-md select-none hover:border-[var(--accent)] active:cursor-grabbing"
               style={{
                 left: node.x,
                 top: node.y,
