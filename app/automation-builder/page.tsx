@@ -95,7 +95,7 @@ export default function AutomationBuilderPage() {
                   key={name}
                   className="flex cursor-default items-center gap-2 rounded-lg border border-[var(--ring)] bg-[var(--card)] px-2.5 py-1.5 text-xs font-medium text-[var(--text)] transition hover:border-[var(--accent)] hover:bg-[var(--surface-hover)]"
                 >
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-[var(--icon-border)] bg-[var(--icon-bg)]">
                     <BlockIcon type={name} />
                   </span>
                   <span>{name}</span>
