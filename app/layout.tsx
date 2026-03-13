@@ -99,7 +99,7 @@ export default function RootLayout({
 
           <footer className="mt-4 py-6 text-center text-sm text-[var(--muted)]">
             <p>
-              © {year} {site.name}. {site.tagline}
+              &copy; {year} {site.name}. {site.legalEntity}
             </p>
           </footer>
         </div>
