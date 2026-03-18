@@ -176,9 +176,76 @@ body {
   animation: typing-caret-blink 1s steps(1, start) infinite;
 }
 
+.interactive-card {
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+@media (hover: hover) {
+  .interactive-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 36px rgba(47, 98, 170, 0.15);
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--ring));
+  }
+}
+
+.flow-node {
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+@media (hover: hover) {
+  .flow-node:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--accent) 60%, var(--ring));
+    box-shadow: 0 12px 26px rgba(47, 98, 170, 0.12);
+  }
+}
+
+.flow-line {
+  position: relative;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 10%, transparent),
+    color-mix(in srgb, var(--accent) 62%, transparent),
+    color-mix(in srgb, var(--accent) 10%, transparent)
+  );
+  overflow: hidden;
+}
+
+.flow-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, #ffffff 75%, var(--accent)),
+    transparent
+  );
+  animation: flow-line-pulse 2.2s ease-in-out infinite;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 360ms ease, transform 360ms ease;
+}
+
+.reveal-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 @keyframes typing-caret-blink {
   50% {
     opacity: 0;
+  }
+}
+
+@keyframes flow-line-pulse {
+  100% {
+    transform: translateX(100%);
   }
 }
 
@@ -229,5 +296,19 @@ body {
       transparent 98.5%,
       transparent 100%
     );
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .reveal-visible {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .flow-line::after,
+  .typing-caret {
+    animation: none;
   }
 }

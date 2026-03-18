@@ -1,65 +1,115 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import IndustrySignals from "@/components/IndustrySignals";
+import AutomationFlowDiagram from "@/components/home/AutomationFlowDiagram";
+import RevealOnScroll from "@/components/home/RevealOnScroll";
 import TypingHeadline from "@/components/home/TypingHeadline";
 import ValueCard from "@/components/home/ValueCard";
 import { AutonomousIcon, ScalableIcon, SecureIcon } from "@/components/icons/valueIcons";
 
-const automationExamples = [
-  "Invoice and receipt processing",
-  "Patient intake and documentation",
-  "Expense classification and GL coding",
-  "Document extraction and routing",
-  "Multi-step approval workflows",
-  "Compliance checks and audit prep",
+type IconCard = {
+  title: string;
+  description: string;
+  icon: ReactNode;
+};
+
+const whatAutom8xDoes: IconCard[] = [
+  {
+    title: "Invoice Processing",
+    description: "Extract line items, match policies, and prepare posting data.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-5 w-5 text-[var(--icon-text)]" aria-hidden>
+        <path d="M7 3h8l4 4v14H7z" />
+        <path d="M15 3v4h4M10 11h6M10 15h6" />
+      </svg>
+    ),
+  },
+  {
+    title: "Document Intelligence",
+    description: "Classify operational documents and route them to the right team.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-5 w-5 text-[var(--icon-text)]" aria-hidden>
+        <path d="M6 4h12v16H6z" />
+        <path d="M9 8h6M9 12h3M9 16h6" />
+      </svg>
+    ),
+  },
+  {
+    title: "Workflow Automation",
+    description: "Connect systems and automate approvals across business operations.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-5 w-5 text-[var(--icon-text)]" aria-hidden>
+        <rect x="3.5" y="4.5" width="6" height="6" rx="1.5" />
+        <rect x="14.5" y="4.5" width="6" height="6" rx="1.5" />
+        <rect x="9" y="13.5" width="6" height="6" rx="1.5" />
+        <path d="M9.5 7.5h5M12 10.5v3" />
+      </svg>
+    ),
+  },
 ];
 
-const howItWorks = [
+const exampleAutomations: IconCard[] = [
   {
-    step: "1",
-    title: "Ingest",
-    description:
-      "Connect your documents, emails, forms, and existing systems. We pull in the data your teams already work with.",
+    title: "Invoice Processing",
+    description: "Capture invoice data and assign GL codes automatically.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-5 w-5 text-[var(--icon-text)]" aria-hidden>
+        <path d="M7 4h10v16H7zM10 9h4M10 13h4M10 17h2" />
+      </svg>
+    ),
   },
   {
-    step: "2",
-    title: "Understand",
-    description:
-      "AI reads each item, extracts the relevant fields — dates, amounts, codes, intent — and structures it for review.",
+    title: "Document Classification",
+    description: "Sort and route contracts, forms, and operational records.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-5 w-5 text-[var(--icon-text)]" aria-hidden>
+        <path d="M5 5h14v14H5zM9 9h6M9 13h6" />
+      </svg>
+    ),
   },
   {
-    step: "3",
-    title: "Route",
-    description:
-      "The right items reach the right people or systems automatically. Human review stays wherever your policies require it.",
-  },
-  {
-    step: "4",
-    title: "Track",
-    description:
-      "Every workflow has a clear status. See what's queued, what's resolved, and where bottlenecks are forming.",
+    title: "Operations Automation",
+    description: "Automate approvals and repetitive back-office tasks.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-5 w-5 text-[var(--icon-text)]" aria-hidden>
+        <circle cx="7.5" cy="7.5" r="2.5" />
+        <circle cx="16.5" cy="7.5" r="2.5" />
+        <circle cx="12" cy="16.5" r="2.5" />
+        <path d="M9.8 8.5h4.4M8.8 9.6l2.1 4.3M15.2 9.6l-2.1 4.3" />
+      </svg>
+    ),
   },
 ];
 
 const valueCards = [
   {
     title: "Secure",
-    description:
-      "Every workflow runs with validation checkpoints, audit trails, and controlled approvals. Your data stays governed and your processes stay predictable.",
+    description: "Audit-ready controls, approvals, and policy checks in every workflow.",
     icon: <SecureIcon />,
   },
   {
     title: "Scalable",
-    description:
-      "Handle ten requests a week or ten thousand a day on the same workflow. Scale operations without scaling headcount or rebuilding your process.",
+    description: "Run the same process at higher volume without adding manual work.",
     icon: <ScalableIcon />,
   },
   {
     title: "Autonomous",
-    description:
-      "Workflows read documents, extract what matters, and route to the right team or system. Your people handle exceptions — the rest runs automatically.",
+    description: "Teams review exceptions while routine work moves automatically.",
     icon: <AutonomousIcon />,
   },
 ];
+
+function IconCard({ title, description, icon }: IconCard) {
+  return (
+    <article className="interactive-card bubble p-5 sm:p-6">
+      <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--icon-border)] bg-[var(--icon-bg)]">
+        {icon}
+      </div>
+      <h3 className="mt-4 text-lg font-semibold text-[var(--text)]">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{description}</p>
+    </article>
+  );
+}
 
 export default function Home() {
   return (
@@ -72,13 +122,12 @@ export default function Home() {
       </div>
 
       {/* Hero */}
+      <RevealOnScroll>
       <section className="bubble p-6 sm:p-8 lg:p-10">
         <TypingHeadline />
         <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)] sm:text-lg">
-          Autom8x turns manual, document-heavy operations into structured
-          workflows that run on their own. Invoice handling, intake routing,
-          approval chains, compliance checks — automated by AI, reviewed by
-          your team.
+          Autom8x automates document-heavy operations.
+          Connect inboxes, files, and systems to run workflows with clear review points.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="/solutions" className="btn-primary px-5">
@@ -89,66 +138,121 @@ export default function Home() {
           </Link>
         </div>
       </section>
+      </RevealOnScroll>
 
-      {/* What you can automate */}
+      {/* What Autom8x does */}
+      <RevealOnScroll>
       <section className="bubble p-6 sm:p-8">
         <h2 className="text-xl font-semibold sm:text-2xl">
-          What teams automate with Autom8x
+          What Autom8x does
         </h2>
-        <div className="mt-4 flex flex-wrap gap-2.5">
-          {automationExamples.map((item) => (
-            <span
-              key={item}
-              className="inline-flex items-center gap-2 rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--text)]"
-            >
-              <span
-                className="h-1.5 w-1.5 rounded-full bg-[var(--bullet)]"
-                aria-hidden
-              />
-              {item}
-            </span>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)] sm:text-base">
+          Replace manual processing with structured automation that your team can trust.
+        </p>
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          {whatAutom8xDoes.map((card) => (
+            <IconCard key={card.title} {...card} />
           ))}
         </div>
-        <p className="mt-4 text-sm text-[var(--muted)]">
-          These are starting points.{" "}
-          <Link
-            href="/solutions"
-            className="font-semibold text-[var(--link)] underline underline-offset-4"
-          >
-            See solutions by industry
-          </Link>
-        </p>
       </section>
+      </RevealOnScroll>
+
+      {/* Example automations */}
+      <RevealOnScroll>
+      <section>
+        <h2 className="mb-4 text-xl font-semibold sm:text-2xl">
+          Example automations
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {exampleAutomations.map((card) => (
+            <IconCard key={card.title} {...card} />
+          ))}
+        </div>
+      </section>
+      </RevealOnScroll>
 
       {/* How it works */}
+      <RevealOnScroll>
+      <section className="bubble p-6 sm:p-8">
+        <h2 className="text-xl font-semibold sm:text-2xl">
+          Automate operational workflows with AI
+        </h2>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)] sm:text-base">
+          Build a workflow once. Autom8x handles extraction, routing, and updates across systems.
+        </p>
+        <AutomationFlowDiagram />
+      </section>
+      </RevealOnScroll>
+
+      {/* Industries */}
+      <RevealOnScroll>
       <section>
         <h2 className="mb-4 text-xl font-semibold sm:text-2xl">
-          How it works
+          Industries
         </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {howItWorks.map((item) => (
-            <article key={item.step} className="bubble flex flex-col p-5 sm:p-6">
-              <span
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--step-pill-bg)] text-sm font-semibold text-[var(--step-pill-text)]"
-                aria-hidden
-              >
-                {item.step}
-              </span>
-              <h3 className="mt-4 text-lg font-semibold text-[var(--text)]">
-                {item.title}
-              </h3>
-              <p className="mt-2 flex-1 text-sm leading-6 text-[var(--muted)]">
-                {item.description}
-              </p>
-            </article>
-          ))}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <article className="interactive-card bubble p-5 sm:p-6">
+            <h3 className="text-lg font-semibold">Healthcare operations</h3>
+            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+              Intake, documentation, and follow-up workflows with clear controls.
+            </p>
+            <Link href="/solutions/healthcare" className="mt-4 inline-flex text-sm font-semibold text-[var(--link)] underline underline-offset-4">
+              View healthcare solutions
+            </Link>
+          </article>
+          <article className="interactive-card bubble p-5 sm:p-6">
+            <h3 className="text-lg font-semibold">Finance and accounting</h3>
+            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+              Invoice, expense, and approval workflows that reduce cycle time.
+            </p>
+            <Link href="/solutions/finance" className="mt-4 inline-flex text-sm font-semibold text-[var(--link)] underline underline-offset-4">
+              View finance solutions
+            </Link>
+          </article>
         </div>
       </section>
+      </RevealOnScroll>
 
-      {/* Why Autom8x */}
+      {/* Automation Builder Preview */}
+      <RevealOnScroll>
+      <section className="bubble p-6 sm:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold sm:text-2xl">
+              Automation Builder Preview
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">
+              Draft workflows visually, then refine logic with your team.
+            </p>
+          </div>
+          <Link href="/automation-builder" className="btn-secondary px-5">
+            Open Builder
+          </Link>
+        </div>
+        <div className="mt-5 rounded-2xl border border-[var(--ring)] bg-[var(--card)] p-4 sm:p-5">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="flow-node rounded-xl border border-[var(--ring)] bg-[var(--surface)] p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Trigger</p>
+              <p className="mt-1 text-sm font-medium">Invoice arrives by email</p>
+            </div>
+            <div className="flow-node rounded-xl border border-[var(--ring)] bg-[var(--surface)] p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">AI Agent</p>
+              <p className="mt-1 text-sm font-medium">Extract and validate fields</p>
+            </div>
+            <div className="flow-node rounded-xl border border-[var(--ring)] bg-[var(--surface)] p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Action</p>
+              <p className="mt-1 text-sm font-medium">Post to accounting system</p>
+            </div>
+          </div>
+        </div>
+      </section>
+      </RevealOnScroll>
+
+      {/* Why teams choose Autom8x */}
+      <RevealOnScroll>
       <section>
         <h2 className="mb-4 text-xl font-semibold sm:text-2xl">
-          Why teams choose Autom8x
+          Built for enterprise operations
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {valueCards.map((card) => (
@@ -156,23 +260,26 @@ export default function Home() {
           ))}
         </div>
       </section>
+      </RevealOnScroll>
 
       {/* Industry signals — credibility element */}
       <IndustrySignals />
 
       {/* Final CTA */}
+      <RevealOnScroll>
       <section className="bubble-soft p-6 sm:p-7">
         <h2 className="text-2xl font-semibold">
-          Ready to automate a workflow?
+          Ready to automate one workflow this quarter?
         </h2>
         <p className="mt-3 max-w-xl text-[var(--muted)]">
-          Tell us about one manual process that slows your team down.
-          We&rsquo;ll show you what an automated version looks like.
+          Tell us which manual process is slowing your team.
+          We will map a practical automation plan.
         </p>
         <Link href="/contact" className="btn-primary mt-5 px-5">
           Start a Conversation
         </Link>
       </section>
+      </RevealOnScroll>
     </div>
   );
 }

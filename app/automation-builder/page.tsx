@@ -629,18 +629,19 @@ export default function AutomationBuilderPage() {
       <style>{`html,body{overflow:hidden!important}`}</style>
 
       {/* Workspace title — hidden on mobile to avoid overlap with nav */}
-      <div className="fixed left-4 top-4 z-50 hidden items-center gap-3 rounded-2xl border border-[var(--ring)] bg-linear-to-br from-[var(--surface)] to-[var(--surface-strong)] px-6 py-2.5 shadow-sm sm:inline-flex">
-        <h1 className="text-lg font-semibold tracking-tight text-[var(--text)]">
-          Automation Builder
+      <div className="fixed left-4 top-[5.2rem] z-40 hidden flex-col items-start gap-1.5 rounded-2xl border border-[var(--ring)] bg-linear-to-br from-[var(--surface)] to-[var(--surface-strong)] px-4 py-2.5 shadow-sm sm:inline-flex">
+        <h1 className="text-sm font-semibold leading-tight tracking-tight text-[var(--text)]">
+          <span className="block">Automation</span>
+          <span className="block">Builder</span>
         </h1>
-        <span className="rounded-full border border-[var(--ring)] bg-[var(--step-pill-bg)] px-2.5 py-0.5 text-[0.65rem] font-semibold text-[var(--step-pill-text)]">
+        <span className="rounded-full border border-[var(--ring)] bg-[var(--step-pill-bg)] px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--step-pill-text)]">
           Preview
         </span>
       </div>
 
       {/* Canvas */}
       <div
-        className="relative -mt-4 flex overflow-hidden rounded-2xl border border-[var(--ring)] bg-[var(--card)] shadow-[inset_0_0_60px_rgba(100,140,200,0.04)] sm:-mt-6"
+        className="relative mt-1 flex overflow-hidden rounded-2xl border border-[var(--ring)] bg-[var(--card)] shadow-[inset_0_0_60px_rgba(100,140,200,0.04)] sm:mt-2"
         style={{
           width: isMobile ? "calc(100vw - 1rem)" : "calc(100vw - 2rem)",
           height: isMobile

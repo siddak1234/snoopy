@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-const WORDS = ["Think", "Build", "Autom8"] as const;
-const SUFFIX = " with AI";
+const WORDS = ["Design", "Run", "Automate"] as const;
+const SUFFIX = " enterprise workflows";
 const TYPE_SPEED = 100;
 const DELETE_SPEED = 60;
 const PAUSE_AFTER_TYPE = 800;
@@ -84,7 +84,7 @@ export default function TypingHeadline() {
 
   return (
     <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">
-      <span className="sr-only">Automate with AI</span>
+      <span className="sr-only">Automate enterprise workflows</span>
       <span aria-hidden="true">
         <span>{visibleText}</span>
         {showCaret ? <span className="typing-caret ml-0.5">|</span> : null}
