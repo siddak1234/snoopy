@@ -85,14 +85,21 @@ export default function MobileNavMenu() {
             </Link>
 
             <div>
-              <button
-                type="button"
-                onClick={() => setSolutionsExpanded((prev) => !prev)}
-                aria-expanded={solutionsExpanded}
-                className={`${linkClass} w-full text-left`}
-              >
-                <span className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Link
+                  href="/solutions"
+                  className="block flex-1 rounded-xl px-4 py-3 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                  onClick={closeMenu}
+                >
                   Solutions
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setSolutionsExpanded((prev) => !prev)}
+                  aria-expanded={solutionsExpanded}
+                  aria-label="Toggle Solutions submenu"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                >
                   <svg
                     aria-hidden
                     viewBox="0 0 20 20"
@@ -103,8 +110,8 @@ export default function MobileNavMenu() {
                   >
                     <path d="M5 7.5L10 12.5L15 7.5" />
                   </svg>
-                </span>
-              </button>
+                </button>
+              </div>
               {solutionsExpanded ? (
                 <div className="ml-3 mt-0.5 flex flex-col gap-0.5 border-l-2 border-[var(--ring)] pl-3">
                   {solutionsItems.map((item) => (
@@ -122,14 +129,21 @@ export default function MobileNavMenu() {
             </div>
 
             <div>
-              <button
-                type="button"
-                onClick={() => setInsightsExpanded((prev) => !prev)}
-                aria-expanded={insightsExpanded}
-                className={`${linkClass} w-full text-left`}
-              >
-                <span className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Link
+                  href="/insights"
+                  className="block flex-1 rounded-xl px-4 py-3 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                  onClick={closeMenu}
+                >
                   Insights
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setInsightsExpanded((prev) => !prev)}
+                  aria-expanded={insightsExpanded}
+                  aria-label="Toggle Insights submenu"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                >
                   <svg
                     aria-hidden
                     viewBox="0 0 20 20"
@@ -140,8 +154,8 @@ export default function MobileNavMenu() {
                   >
                     <path d="M5 7.5L10 12.5L15 7.5" />
                   </svg>
-                </span>
-              </button>
+                </button>
+              </div>
               {insightsExpanded ? (
                 <div className="ml-3 mt-0.5 flex flex-col gap-0.5 border-l-2 border-[var(--ring)] pl-3">
                   {insightsItems.map((item) => (

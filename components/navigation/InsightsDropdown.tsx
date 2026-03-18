@@ -78,6 +78,14 @@ export default function InsightsDropdown() {
     }
   };
 
+  const onInsightsLinkKeyDown = (event: React.KeyboardEvent<HTMLAnchorElement>) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setOpen(true);
+      focusItem(0);
+    }
+  };
+
   const onPointerEnter = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse") {
       setOpen(true);
@@ -99,24 +107,26 @@ export default function InsightsDropdown() {
       onBlur={onBlur}
     >
       <div className="inline-flex items-center rounded-full px-4 py-2.5 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-within:bg-[var(--surface-hover)]">
+        <Link href="/insights" className="focus-visible:outline-none" onKeyDown={onInsightsLinkKeyDown}>
+          Insights
+        </Link>
         <button
           type="button"
           aria-haspopup="menu"
           aria-expanded={open}
           aria-controls="insights-dropdown-menu"
-          aria-label="Open Insights menu"
-          className="inline-flex items-center gap-1 rounded-full py-0.5 pr-1 text-left text-sm font-medium text-[var(--text)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+          aria-label="Toggle Insights submenu"
+          className="ml-1 inline-flex items-center justify-center rounded p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
           onClick={() => setOpen((prev) => !prev)}
           onKeyDown={onButtonKeyDown}
         >
-          Insights
           <svg
             aria-hidden
             viewBox="0 0 20 20"
             fill="none"
             stroke="currentColor"
             strokeWidth="1.8"
-            className={`h-3.5 w-3.5 shrink-0 transition ${open ? "rotate-180" : ""}`}
+            className={`h-3.5 w-3.5 transition ${open ? "rotate-180" : ""}`}
           >
             <path d="M5 7.5L10 12.5L15 7.5" />
           </svg>

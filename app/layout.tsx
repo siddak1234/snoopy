@@ -109,6 +109,12 @@ export default function RootLayout({
                 Solutions
               </Link>
               <Link
+                href="/insights"
+                className="transition hover:text-[var(--text)]"
+              >
+                Insights
+              </Link>
+              <Link
                 href="/automation-builder"
                 className="transition hover:text-[var(--text)]"
               >

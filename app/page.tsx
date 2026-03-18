@@ -4,30 +4,39 @@ import TypingHeadline from "@/components/home/TypingHeadline";
 import ValueCard from "@/components/home/ValueCard";
 import { AutonomousIcon, ScalableIcon, SecureIcon } from "@/components/icons/valueIcons";
 
+const automationExamples = [
+  "Invoice and receipt processing",
+  "Patient intake and documentation",
+  "Expense classification and GL coding",
+  "Document extraction and routing",
+  "Multi-step approval workflows",
+  "Compliance checks and audit prep",
+];
+
 const howItWorks = [
   {
     step: "1",
     title: "Ingest",
     description:
-      "Connect your documents, forms, emails, and existing tools. We pull in the data your teams already work with.",
+      "Connect your documents, emails, forms, and existing systems. We pull in the data your teams already work with.",
   },
   {
     step: "2",
     title: "Understand",
     description:
-      "AI extracts and structures key information — dates, amounts, intent — ready for validation without re-entry.",
+      "AI reads each item, extracts the relevant fields — dates, amounts, codes, intent — and structures it for review.",
   },
   {
     step: "3",
     title: "Route",
     description:
-      "Send the right items to the right people or systems automatically. Human review stays where you need it.",
+      "The right items reach the right people or systems automatically. Human review stays wherever your policies require it.",
   },
   {
     step: "4",
     title: "Track",
     description:
-      "Full visibility into status and bottlenecks. See what's in progress, what's resolved, and where to focus.",
+      "Every workflow has a clear status. See what's queued, what's resolved, and where bottlenecks are forming.",
   },
 ];
 
@@ -35,19 +44,19 @@ const valueCards = [
   {
     title: "Secure",
     description:
-      "Enterprise-grade data handling with validation, auditability, and controlled workflow approvals. Your business processes run safely and predictably.",
+      "Every workflow runs with validation checkpoints, audit trails, and controlled approvals. Your data stays governed and your processes stay predictable.",
     icon: <SecureIcon />,
   },
   {
     title: "Scalable",
     description:
-      "Automations designed to grow with your operations — from a few requests per week to thousands per day without rewriting your process.",
+      "Handle ten requests a week or ten thousand a day on the same workflow. Scale operations without scaling headcount or rebuilding your process.",
     icon: <ScalableIcon />,
   },
   {
     title: "Autonomous",
     description:
-      "Systems understand incoming information and trigger the correct actions automatically, reducing manual work and operational overhead.",
+      "Workflows read documents, extract what matters, and route to the right team or system. Your people handle exceptions — the rest runs automatically.",
     icon: <AutonomousIcon />,
   },
 ];
@@ -55,19 +64,21 @@ const valueCards = [
 export default function Home() {
   return (
     <div className="space-y-6 sm:space-y-8">
-      {/* Brand pill — home only, above hero */}
+      {/* Brand pill */}
       <div className="flex justify-center pt-2 pb-2">
         <div className="w-fit rounded-full border border-[var(--ring)] bg-[var(--surface)]/90 px-6 py-2.5 text-sm font-medium tracking-[0.3em] text-[var(--muted)] shadow-lg backdrop-blur">
           AUTOM8X
         </div>
       </div>
 
+      {/* Hero */}
       <section className="bubble p-6 sm:p-8 lg:p-10">
         <TypingHeadline />
         <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)] sm:text-lg">
-          We build AI-powered workflow automations that replace repetitive manual
-          tasks — from document processing to multi-step approvals — so your
-          teams can focus on higher-value work.
+          Autom8x turns manual, document-heavy operations into structured
+          workflows that run on their own. Invoice handling, intake routing,
+          approval chains, compliance checks — automated by AI, reviewed by
+          your team.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="/solutions" className="btn-primary px-5">
@@ -79,19 +90,37 @@ export default function Home() {
         </div>
       </section>
 
-      <IndustrySignals />
-
-      <section>
-        <h2 className="mb-4 text-xl font-semibold sm:text-2xl">
-          Why teams choose Autom8x
+      {/* What you can automate */}
+      <section className="bubble p-6 sm:p-8">
+        <h2 className="text-xl font-semibold sm:text-2xl">
+          What teams automate with Autom8x
         </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {valueCards.map((card) => (
-            <ValueCard key={card.title} title={card.title} description={card.description} icon={card.icon} />
+        <div className="mt-4 flex flex-wrap gap-2.5">
+          {automationExamples.map((item) => (
+            <span
+              key={item}
+              className="inline-flex items-center gap-2 rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--text)]"
+            >
+              <span
+                className="h-1.5 w-1.5 rounded-full bg-[var(--bullet)]"
+                aria-hidden
+              />
+              {item}
+            </span>
           ))}
         </div>
+        <p className="mt-4 text-sm text-[var(--muted)]">
+          These are starting points.{" "}
+          <Link
+            href="/solutions"
+            className="font-semibold text-[var(--link)] underline underline-offset-4"
+          >
+            See solutions by industry
+          </Link>
+        </p>
       </section>
 
+      {/* How it works */}
       <section>
         <h2 className="mb-4 text-xl font-semibold sm:text-2xl">
           How it works
@@ -116,16 +145,32 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Why Autom8x */}
+      <section>
+        <h2 className="mb-4 text-xl font-semibold sm:text-2xl">
+          Why teams choose Autom8x
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {valueCards.map((card) => (
+            <ValueCard key={card.title} title={card.title} description={card.description} icon={card.icon} />
+          ))}
+        </div>
+      </section>
+
+      {/* Industry signals — credibility element */}
+      <IndustrySignals />
+
+      {/* Final CTA */}
       <section className="bubble-soft p-6 sm:p-7">
         <h2 className="text-2xl font-semibold">
-          Ready to automate your workflows?
+          Ready to automate a workflow?
         </h2>
         <p className="mt-3 max-w-xl text-[var(--muted)]">
           Tell us about one manual process that slows your team down.
-          We&rsquo;ll show you how to automate it.
+          We&rsquo;ll show you what an automated version looks like.
         </p>
         <Link href="/contact" className="btn-primary mt-5 px-5">
-          Schedule a Consultation
+          Start a Conversation
         </Link>
       </section>
     </div>

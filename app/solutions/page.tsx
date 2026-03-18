@@ -59,31 +59,31 @@ export default function SolutionsPage() {
       <section className="bubble p-6 sm:p-8">
         <h1 className="text-3xl font-semibold sm:text-4xl">Solutions</h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">
-          We build AI workflow automations that replace manual, document-heavy
-          business tasks — so your teams spend less time on data entry and more
-          time on work that matters.
+          We automate the manual, document-heavy work that slows operations
+          down. Each solution is scoped to a specific industry and workflow
+          so you see results quickly.
         </p>
       </section>
 
       <section>
-        <h2 className="sr-only">Industry-specific solutions</h2>
+        <h2 className="mb-4 text-xl font-semibold sm:text-2xl">
+          Solutions by industry
+        </h2>
         <div className="space-y-4">
-          <article className="bubble p-5 sm:p-6">
-            <h3 className="text-2xl font-semibold sm:text-3xl">Pick Your Industry</h3>
-          </article>
-
           <article className="bubble group p-5 transition duration-200 hover:-translate-y-1 hover:shadow-xl sm:p-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="max-w-3xl">
                 <h3 className="text-xl font-semibold">Healthcare</h3>
                 <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">
-                  Modernize clinic operations with secure automation for intake, documentation, care coordination, and patient follow-ups.
+                  Automate intake, documentation, care coordination, and
+                  patient follow-ups. Reduce administrative burden so
+                  clinical teams focus on patient care.
                 </p>
                 <Link
                   href="/solutions/healthcare"
                   className="mt-4 inline-flex rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
                 >
-                  Learn more
+                  Healthcare solutions
                 </Link>
               </div>
               <div className="self-end md:self-auto">
@@ -95,15 +95,19 @@ export default function SolutionsPage() {
           <article className="bubble group p-5 transition duration-200 hover:-translate-y-1 hover:shadow-xl sm:p-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="max-w-3xl">
-                <h3 className="text-xl font-semibold">Finance & Accounting</h3>
+                <h3 className="text-xl font-semibold">
+                  Finance &amp; Accounting
+                </h3>
                 <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">
-                  Streamline reviews, reporting, and client operations with compliant workflow automation for finance and investment teams.
+                  Automate invoice processing, expense classification,
+                  approval routing, and audit preparation. Cut manual
+                  processing time without compromising controls.
                 </p>
                 <Link
                   href="/solutions/finance"
                   className="mt-4 inline-flex rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
                 >
-                  Learn more
+                  Finance solutions
                 </Link>
               </div>
               <div className="self-end md:self-auto">
@@ -114,31 +118,18 @@ export default function SolutionsPage() {
         </div>
       </section>
 
-      <section className="bubble p-5 sm:p-6">
-        <h2 className="text-2xl font-semibold sm:text-3xl">
+      <section className="bubble-soft p-6 sm:p-7">
+        <h2 className="text-2xl font-semibold">
           Don&rsquo;t see your industry?
         </h2>
-        <p className="mt-3 text-[var(--muted)]">
-          Our workflow automation platform isn&rsquo;t limited to healthcare and
-          finance. If your team handles repetitive document processing,
-          multi-step approvals, or manual data entry, we can help —
-          regardless of industry.
+        <p className="mt-3 max-w-2xl text-[var(--muted)]">
+          Workflow automation applies wherever teams handle repetitive
+          document processing, multi-step approvals, or manual data entry.
+          Tell us about your operations and we&rsquo;ll scope what an
+          automated version looks like.
         </p>
         <Link href="/contact" className="btn-primary mt-5 px-5">
           Tell Us About Your Workflow
-        </Link>
-      </section>
-
-      <section className="bubble-soft p-6 sm:p-7">
-        <h2 className="text-2xl font-semibold">
-          Ready to discuss your priorities?
-        </h2>
-        <p className="mt-3 text-[var(--muted)]">
-          Share your use case and industry context, and we&rsquo;ll shape a
-          workflow automation plan around your specific needs.
-        </p>
-        <Link href="/contact" className="btn-primary mt-5 px-5">
-          Get in Touch
         </Link>
       </section>
     </div>
