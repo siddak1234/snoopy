@@ -629,10 +629,13 @@ export default function AutomationBuilderPage() {
       <style>{`html,body{overflow:hidden!important}`}</style>
 
       {/* Workspace title — hidden on mobile to avoid overlap with nav */}
-      <div className="fixed left-4 top-4 z-50 hidden items-center rounded-2xl border border-[var(--ring)] bg-linear-to-br from-[var(--surface)] to-[var(--surface-strong)] px-6 py-2.5 shadow-sm sm:inline-flex">
+      <div className="fixed left-4 top-4 z-50 hidden items-center gap-3 rounded-2xl border border-[var(--ring)] bg-linear-to-br from-[var(--surface)] to-[var(--surface-strong)] px-6 py-2.5 shadow-sm sm:inline-flex">
         <h1 className="text-lg font-semibold tracking-tight text-[var(--text)]">
-          Builder
+          Automation Builder
         </h1>
+        <span className="rounded-full border border-[var(--ring)] bg-[var(--step-pill-bg)] px-2.5 py-0.5 text-[0.65rem] font-semibold text-[var(--step-pill-text)]">
+          Preview
+        </span>
       </div>
 
       {/* Canvas */}
@@ -852,12 +855,12 @@ export default function AutomationBuilderPage() {
                   <path d="M24 18v12M18 24h12" />
                 </svg>
                 <p className="text-sm font-medium text-[var(--muted)]">
-                  Your workflow canvas
+                  Sketch your automation workflow
                 </p>
-                <p className="max-w-[14rem] text-[0.7rem] leading-relaxed text-[var(--muted)]/70">
+                <p className="max-w-[16rem] text-[0.7rem] leading-relaxed text-[var(--muted)]/70">
                   {isMobile
-                    ? "Tap a block below to place it on the canvas."
-                    : "Drag blocks here to sketch your automation idea."}
+                    ? "Tap a block below to place it on the canvas. Combine triggers, AI agents, and actions to map your workflow."
+                    : "Drag blocks from the left panel to map out your automation idea. Combine triggers, AI agents, conditions, and actions."}
                 </p>
               </div>
             </div>

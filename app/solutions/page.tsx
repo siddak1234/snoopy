@@ -59,7 +59,9 @@ export default function SolutionsPage() {
       <section className="bubble p-6 sm:p-8">
         <h1 className="text-3xl font-semibold sm:text-4xl">Solutions</h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">
-          We build AI workflow automations for manual business tasks.
+          We build AI workflow automations that replace manual, document-heavy
+          business tasks — so your teams spend less time on data entry and more
+          time on work that matters.
         </p>
       </section>
 
@@ -113,16 +115,30 @@ export default function SolutionsPage() {
       </section>
 
       <section className="bubble p-5 sm:p-6">
-        <h2 className="text-2xl font-semibold sm:text-3xl">Industry Not Included?</h2>
+        <h2 className="text-2xl font-semibold sm:text-3xl">
+          Don&rsquo;t see your industry?
+        </h2>
+        <p className="mt-3 text-[var(--muted)]">
+          Our workflow automation platform isn&rsquo;t limited to healthcare and
+          finance. If your team handles repetitive document processing,
+          multi-step approvals, or manual data entry, we can help —
+          regardless of industry.
+        </p>
+        <Link href="/contact" className="btn-primary mt-5 px-5">
+          Tell Us About Your Workflow
+        </Link>
       </section>
 
       <section className="bubble-soft p-6 sm:p-7">
-        <h2 className="text-2xl font-semibold">Discuss your workflow priorities</h2>
+        <h2 className="text-2xl font-semibold">
+          Ready to discuss your priorities?
+        </h2>
         <p className="mt-3 text-[var(--muted)]">
-          Share your use case and industry context, and we will shape a workflow plan around your specific needs.
+          Share your use case and industry context, and we&rsquo;ll shape a
+          workflow automation plan around your specific needs.
         </p>
         <Link href="/contact" className="btn-primary mt-5 px-5">
-          Go to Contact
+          Get in Touch
         </Link>
       </section>
     </div>

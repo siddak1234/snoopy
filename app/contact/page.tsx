@@ -125,6 +125,58 @@ export default function ContactPage() {
         </ul>
       </section>
 
+      {/* What happens next */}
+      <section className="bubble p-6 sm:p-7 lg:col-span-3">
+        <h2 className="text-xl font-semibold">What happens next</h2>
+        <div className="mt-5 grid gap-4 sm:grid-cols-3">
+          <div className="flex flex-col gap-2">
+            <span
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--step-pill-bg)] text-xs font-semibold text-[var(--step-pill-text)]"
+              aria-hidden
+            >
+              1
+            </span>
+            <h3 className="text-sm font-semibold text-[var(--text)]">
+              We review your workflow
+            </h3>
+            <p className="text-sm leading-6 text-[var(--muted)]">
+              Within 1–2 business days, our team reviews your use case and
+              identifies automation opportunities.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <span
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--step-pill-bg)] text-xs font-semibold text-[var(--step-pill-text)]"
+              aria-hidden
+            >
+              2
+            </span>
+            <h3 className="text-sm font-semibold text-[var(--text)]">
+              We scope a pilot
+            </h3>
+            <p className="text-sm leading-6 text-[var(--muted)]">
+              We propose a focused automation pilot — scoped to one workflow so
+              you see results quickly.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <span
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--step-pill-bg)] text-xs font-semibold text-[var(--step-pill-text)]"
+              aria-hidden
+            >
+              3
+            </span>
+            <h3 className="text-sm font-semibold text-[var(--text)]">
+              You see it working
+            </h3>
+            <p className="text-sm leading-6 text-[var(--muted)]">
+              We build and deploy the workflow. You validate the results with
+              your team before we expand.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Support */}
       <section className="bubble-soft p-6 sm:p-7 lg:col-span-3">
         <h2 className="text-xl font-semibold">Need support?</h2>

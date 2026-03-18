@@ -98,6 +98,29 @@ export default function RootLayout({
           <main className="flex-1 py-8 sm:py-10">{children}</main>
 
           <footer className="mt-4 py-6 text-center text-sm text-[var(--muted)]">
+            <nav
+              aria-label="Footer navigation"
+              className="mb-3 flex flex-wrap justify-center gap-x-6 gap-y-1"
+            >
+              <Link
+                href="/solutions"
+                className="transition hover:text-[var(--text)]"
+              >
+                Solutions
+              </Link>
+              <Link
+                href="/automation-builder"
+                className="transition hover:text-[var(--text)]"
+              >
+                Builder
+              </Link>
+              <Link
+                href="/contact"
+                className="transition hover:text-[var(--text)]"
+              >
+                Contact
+              </Link>
+            </nav>
             <p>
               &copy; {year} {site.name}. {site.legalEntity}
             </p>
