@@ -1,3 +1,7 @@
+"use client";
+
+import { motion, useReducedMotion } from "framer-motion";
+
 const FLOW_STEPS = [
   {
     title: "Email Received",
@@ -18,6 +22,8 @@ const FLOW_STEPS = [
 ] as const;
 
 export default function AutomationFlowDiagram() {
+  const reduceMotion = useReducedMotion();
+
   return (
     <div className="mt-6 grid gap-4 md:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] md:items-center">
       {FLOW_STEPS.map((step, index) => (
@@ -35,10 +41,39 @@ export default function AutomationFlowDiagram() {
           </article>
 
           {index < FLOW_STEPS.length - 1 ? (
-            <div
-              className="flow-line mx-auto hidden h-[2px] w-12 md:block"
-              aria-hidden
-            />
+            <div className="relative mx-auto hidden h-[2px] w-12 md:block" aria-hidden>
+              <div className="flow-line absolute inset-0" />
+              {!reduceMotion ? (
+                <>
+                  {/* Soft traveling signal */}
+                  <motion.span
+                    className="absolute top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-[var(--accent-strong)] shadow-[0_0_14px_rgba(95,158,255,0.65)]"
+                    initial={{ x: "-15%" }}
+                    animate={{ x: "115%" }}
+                    transition={{
+                      duration: 2.2,
+                      ease: "easeInOut",
+                      repeat: Infinity,
+                      repeatDelay: 0.4,
+                      delay: index * 0.15,
+                    }}
+                  />
+                  {/* Secondary faint pulse for depth */}
+                  <motion.span
+                    className="absolute top-1/2 h-1 w-1 -translate-y-1/2 rounded-full bg-[var(--accent)]/70"
+                    initial={{ x: "-10%", opacity: 0 }}
+                    animate={{ x: "110%", opacity: [0, 1, 0] }}
+                    transition={{
+                      duration: 2.2,
+                      ease: "easeInOut",
+                      repeat: Infinity,
+                      repeatDelay: 0.4,
+                      delay: 0.25 + index * 0.15,
+                    }}
+                  />
+                </>
+              ) : null}
+            </div>
           ) : null}
         </div>
       ))}
