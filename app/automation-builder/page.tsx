@@ -628,30 +628,26 @@ export default function AutomationBuilderPage() {
     <>
       <style>{`html,body{overflow:hidden!important}`}</style>
 
-      {/* Workspace title — hidden on mobile to avoid overlap with nav */}
-      <div className="fixed left-4 top-[5.2rem] z-40 hidden flex-col items-start gap-1.5 rounded-2xl border border-[var(--ring)] bg-linear-to-br from-[var(--surface)] to-[var(--surface-strong)] px-4 py-2.5 shadow-sm sm:inline-flex">
-        <h1 className="text-sm font-semibold leading-tight tracking-tight text-[var(--text)]">
-          <span className="block">Automation</span>
-          <span className="block">Builder</span>
-        </h1>
-        <span className="rounded-full border border-[var(--ring)] bg-[var(--step-pill-bg)] px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--step-pill-text)]">
-          Preview
-        </span>
-      </div>
-
-      {/* Canvas */}
+      {/* Canvas — fixed to viewport for reliable full-bleed layout */}
       <div
-        className="relative mt-1 flex overflow-hidden rounded-2xl border border-[var(--ring)] bg-[var(--card)] shadow-[inset_0_0_60px_rgba(100,140,200,0.04)] sm:mt-2"
+        className="fixed z-30 flex overflow-hidden rounded-2xl border border-[var(--ring)] bg-[var(--card)] shadow-[inset_0_0_60px_rgba(100,140,200,0.04)]"
         style={{
-          width: isMobile ? "calc(100vw - 1rem)" : "calc(100vw - 2rem)",
-          height: isMobile
-            ? "calc(100dvh - 6rem)"
-            : "calc(100dvh - 7.375rem)",
-          marginLeft: isMobile
-            ? "calc(-50vw + 50% + 0.5rem)"
-            : "calc(-50vw + 50% + 1rem)",
+          top: "5.5rem",
+          left: isMobile ? "0.5rem" : "1rem",
+          right: isMobile ? "0.5rem" : "1rem",
+          bottom: isMobile ? "3.75rem" : "0.5rem",
         }}
       >
+        {/* Workspace title — positioned inside canvas, right of palette on desktop */}
+        <div className="absolute left-[8rem] top-3 z-30 hidden flex-col items-start gap-1.5 rounded-2xl border border-[var(--ring)] bg-linear-to-br from-[var(--surface)] to-[var(--surface-strong)] px-4 py-2.5 shadow-sm sm:inline-flex">
+          <h1 className="text-sm font-semibold leading-tight tracking-tight text-[var(--text)]">
+            <span className="block">Automation</span>
+            <span className="block">Builder</span>
+          </h1>
+          <span className="rounded-full border border-[var(--ring)] bg-[var(--step-pill-bg)] px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--step-pill-text)]">
+            Preview
+          </span>
+        </div>
         {/* Dot grid — desktop only (mobile version lives inside world div) */}
         {!isMobile && (
           <div
