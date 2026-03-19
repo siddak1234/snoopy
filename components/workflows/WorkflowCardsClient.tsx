@@ -93,11 +93,6 @@ export function WorkflowCardsClient({ workflows }: { workflows: WorkflowListItem
                 <h3 className="text-sm font-semibold text-[var(--text)] group-hover:text-[var(--accent)]">
                   {wf.name}
                 </h3>
-                <span
-                  className={`shrink-0 rounded-full border px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide ${statusColors[wf.status] ?? statusColors.draft}`}
-                >
-                  {wf.status}
-                </span>
               </div>
 
               <div className="mt-3 flex items-center gap-3 text-[0.65rem] text-[var(--muted)]">
@@ -131,6 +126,12 @@ export function WorkflowCardsClient({ workflows }: { workflows: WorkflowListItem
                 </svg>
               </div>
             </Link>
+
+            <span
+              className={`absolute bottom-3 right-3 shrink-0 rounded-full border px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide ${statusColors[wf.status] ?? statusColors.draft}`}
+            >
+              {wf.status}
+            </span>
           </div>
         ))}
       </div>
