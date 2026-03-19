@@ -25,6 +25,7 @@ model User {
   projects           Project[]
   ownedProjects      Project[]          @relation("ProjectOwner")
   projectMemberships ProjectMembership[]
+  workflows          Workflow[]
 
   @@map("users")
 }
@@ -64,6 +65,7 @@ model Project {
   user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   owner     User?      @relation("ProjectOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
   projectMemberships ProjectMembership[]
+  workflows          Workflow[]
 
   @@index([workspaceId, createdAt(sort: Desc)])
   @@index([ownerUserId, createdAt(sort: Desc)])
@@ -94,6 +96,7 @@ model Workspace {
   updatedAt   DateTime     @updatedAt
   memberships Membership[]
   projects    Project[]
+  workflows   Workflow[]
 
   @@map("workspaces")
 }
@@ -116,4 +119,43 @@ model Membership {
   @@unique([userId, workspaceId])
   @@index([workspaceId])
   @@map("memberships")
+}
+
+// ---------------------------------------------------------------------------
+// Workflow persistence
+// ---------------------------------------------------------------------------
+// Single JSONB column holds the full graph (nodes, edges, notes, viewport).
+// This avoids N+1 tables for nodes/edges while keeping metadata in indexed
+// columns for fast listing and filtering. schemaVersion inside the JSON
+// enables forward-compatible migrations without ALTER TABLE.
+// ---------------------------------------------------------------------------
+
+enum WorkflowStatus {
+  draft
+  active
+  archived
+}
+
+model Workflow {
+  id             String         @id @default(uuid())
+  userId         String
+  workspaceId    String
+  projectId      String?
+  name           String
+  description    String?
+  status         WorkflowStatus @default(draft)
+  schemaVersion  Int            @default(1)
+  definition     Json           // JSONB — compact graph: nodes, edges, notes, viewport
+  definitionHash String?        // SHA-256 prefix; skip writes when unchanged
+  nodeCount      Int            @default(0) // denormalized for list views without deserializing JSON
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([workspaceId, updatedAt(sort: Desc)])
+  @@map("workflows")
 }
