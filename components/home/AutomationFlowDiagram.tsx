@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
 const FLOW_STEPS = [
@@ -23,6 +24,17 @@ const FLOW_STEPS = [
 
 export default function AutomationFlowDiagram() {
   const reduceMotion = useReducedMotion();
+  const [isCoarsePointer, setIsCoarsePointer] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(hover: none)");
+    setIsCoarsePointer(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsCoarsePointer(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
+
+  const shouldAnimate = !reduceMotion && !isCoarsePointer;
 
   return (
     <div className="mt-6 grid gap-4 md:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] md:items-center">
@@ -43,7 +55,7 @@ export default function AutomationFlowDiagram() {
           {index < FLOW_STEPS.length - 1 ? (
             <div className="relative mx-auto hidden h-[2px] w-12 md:block" aria-hidden>
               <div className="flow-line absolute inset-0" />
-              {!reduceMotion ? (
+              {shouldAnimate ? (
                 <>
                   {/* Soft traveling signal */}
                   <motion.span

@@ -30,6 +30,8 @@ export default function HeroSection() {
   const onPointerMove = useCallback(
     (e: React.PointerEvent<HTMLElement>) => {
       if (reduceMotion) return;
+      // Avoid pointer-driven updates on coarse pointers / touch.
+      if (e.pointerType !== "mouse") return;
       const rect = e.currentTarget.getBoundingClientRect();
       const dx = (e.clientX - rect.left) / rect.width - 0.5;
       const dy = (e.clientY - rect.top) / rect.height - 0.5;
@@ -47,6 +49,19 @@ export default function HeroSection() {
   const contentVariants = useMemo(
     () =>
       staggerContainer({ stagger: 0.08, delayChildren: 0.05 }),
+    [],
+  );
+
+  const headlineVariants = useMemo(
+    () => fadeInUp({ y: 10, duration: durations.base }),
+    [],
+  );
+  const descriptionVariants = useMemo(
+    () => fadeInUp({ y: 10, duration: durations.base, delay: 0.05 }),
+    [],
+  );
+  const ctasVariants = useMemo(
+    () => fadeInUp({ y: 10, duration: durations.base, delay: 0.1 }),
     [],
   );
 
@@ -99,12 +114,12 @@ export default function HeroSection() {
 
       {/* Content */}
       <div className="relative z-10">
-        <motion.div variants={fadeInUp({ y: 10, duration: durations.base })}>
+        <motion.div variants={headlineVariants}>
           <TypingHeadline />
         </motion.div>
 
         <motion.p
-          variants={fadeInUp({ y: 10, duration: durations.base, delay: 0.05 })}
+          variants={descriptionVariants}
           className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)] sm:text-lg"
         >
           Autom8x automates document-heavy operations. Connect inboxes, files, and
@@ -112,7 +127,7 @@ export default function HeroSection() {
         </motion.p>
 
         <motion.div
-          variants={fadeInUp({ y: 10, duration: durations.base, delay: 0.1 })}
+          variants={ctasVariants}
           className="mt-6 flex flex-wrap gap-3"
         >
           <motion.div

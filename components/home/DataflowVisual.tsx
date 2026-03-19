@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 
 type Node = { x: number; y: number; r: number };
@@ -14,7 +14,16 @@ export default function DataflowVisual({
   density?: "standard" | "dense";
 }) {
   const reduceMotion = useReducedMotion();
+  const [isCoarsePointer, setIsCoarsePointer] = useState(false);
   const uid = useId().replace(/:/g, "");
+
+  useEffect(() => {
+    const mql = window.matchMedia("(hover: none)");
+    setIsCoarsePointer(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsCoarsePointer(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
 
   const { nodes, paths } = useMemo(() => {
     const baseNodes: Node[] = [
@@ -119,7 +128,7 @@ export default function DataflowVisual({
         </g>
 
         {/* Animated signal pulses */}
-        {!reduceMotion ? (
+        {!reduceMotion && !isCoarsePointer ? (
           <g>
             {/* A couple of dots + a small streak, offset in time for \"orchestration\" feel */}
             <circle r="4" fill="rgba(95,158,255,0.9)">
