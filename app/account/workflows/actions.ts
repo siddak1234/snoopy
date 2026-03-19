@@ -235,6 +235,7 @@ export async function deleteWorkflowAction(
     if (!deleted)
       return { ok: false, error: "Workflow not found or access denied." };
     revalidatePath("/account/workflows");
+    revalidatePath("/account/workflow-design");
     return { ok: true };
   } catch (e) {
     console.error("deleteWorkflowAction", e);

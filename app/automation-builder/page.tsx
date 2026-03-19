@@ -482,40 +482,32 @@ function AutomationBuilder() {
               type="button"
               onClick={handleSaveClick}
               disabled={!hasItems || saveStatus === "saving"}
-              className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${
+              className={`flex h-9 w-9 items-center justify-center rounded-full border transition-all ${
                 saveStatus === "saved"
                   ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-400"
                   : saveStatus === "saving"
                     ? "pointer-events-none border-[var(--ring)] bg-[var(--surface)]/80 text-[var(--muted)]"
                     : hasItems
-                      ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 cursor-pointer"
+                      ? "cursor-pointer border-[var(--ring)] bg-[var(--surface)]/80 text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--text)]"
                       : "pointer-events-none border-[var(--ring)] bg-[var(--surface)]/50 text-[var(--muted)]/40"
               }`}
+              aria-label={workflowId ? "Save workflow" : "Save workflow (name required)"}
             >
               {saveStatus === "saving" ? (
-                <>
-                  <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 16 16" fill="none">
-                    <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" opacity="0.3" />
-                    <path d="M14 8a6 6 0 0 0-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                  Saving…
-                </>
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" opacity="0.3" />
+                  <path d="M14 8a6 6 0 0 0-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
               ) : saveStatus === "saved" ? (
-                <>
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                    <path d="M3.5 8.5 6.5 11.5 12.5 4.5" />
-                  </svg>
-                  Saved
-                </>
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <path d="M3.5 8.5 6.5 11.5 12.5 4.5" />
+                </svg>
               ) : (
-                <>
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                    <path d="M12.667 14H3.333A1.333 1.333 0 0 1 2 12.667V3.333A1.333 1.333 0 0 1 3.333 2h7.334L14 5.333v7.334A1.333 1.333 0 0 1 12.667 14z" />
-                    <path d="M11.333 14V9.333H4.667V14" />
-                    <path d="M4.667 2v3.333h5.333" />
-                  </svg>
-                  {workflowId ? "Save" : "Save Workflow"}
-                </>
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <path d="M12.667 14H3.333A1.333 1.333 0 0 1 2 12.667V3.333A1.333 1.333 0 0 1 3.333 2h7.334L14 5.333v7.334A1.333 1.333 0 0 1 12.667 14z" />
+                  <path d="M11.333 14V9.333H4.667V14" />
+                  <path d="M4.667 2v3.333h5.333" />
+                </svg>
               )}
             </button>
 
