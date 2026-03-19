@@ -225,6 +225,10 @@ export async function deleteProject(
 /**
  * Server-only: join a project by access code. Verifies code server-side; user must be in same workspace as project.
  * Never trust client for workspace_id or project_id; lookup by code only.
+ *
+ * NOTE: We intentionally do NOT scope the join lookup to the user's current
+ * workspace/tenant. Users can join a project owned by a different workspace
+ * as long as they have the correct access code.
  */
 export async function joinProjectByCode(
   userId: string,
@@ -235,14 +239,9 @@ export async function joinProjectByCode(
     return { ok: false, error: "Invalid access code." };
   }
 
-  const workspace = await getTenantForUser(userId);
-  if (!workspace) {
-    return { ok: false, error: "No organization found for user. Please refresh and try again." };
-  }
-
   const prefix = normalized.slice(0, ACCESS_CODE_PREFIX_LENGTH);
   const projects = await prisma.project.findMany({
-    where: { workspaceId: workspace.tenantId, accessCodePrefix: prefix },
+    where: { accessCodePrefix: prefix },
     select: {
       id: true,
       name: true,
