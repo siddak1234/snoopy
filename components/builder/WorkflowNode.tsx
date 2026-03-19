@@ -10,11 +10,11 @@ export function WorkflowNode({
   return (
     <div className={`workflow-node${selected ? " selected" : ""}`}>
       <Handle type="target" position={Position.Top} />
-      <div className="flex items-center gap-2.5">
-        <BlockIconTile type={data.blockType} size="sm" />
-        <span className="text-xs font-semibold text-[var(--text)]">
+      <div className="flex flex-col items-center gap-1.5">
+        <span className="text-[0.65rem] font-semibold leading-tight text-[var(--text)]">
           {data.label}
         </span>
+        <BlockIconTile type={data.blockType} size="sm" />
       </div>
       <Handle type="source" position={Position.Bottom} />
     </div>
