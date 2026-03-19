@@ -17,18 +17,21 @@ import {
 import type { Connection, Edge, Node, NodeTypes } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { WorkflowNode } from "@/components/builder/WorkflowNode";
+import { StickyNoteNode } from "@/components/builder/StickyNoteNode";
 import { BlockPalette } from "@/components/builder/BlockPalette";
 import { BlockIconTile } from "@/components/builder/block-icons";
 import {
   BLOCK_DEFS,
   type BlockType,
   type WorkflowNodeData,
+  type StickyNoteData,
 } from "@/components/builder/types";
 
 const MOBILE_BP = 640;
 
 const nodeTypes: NodeTypes = {
   workflow: WorkflowNode,
+  note: StickyNoteNode,
 };
 
 const defaultEdgeOptions = {
@@ -45,13 +48,15 @@ export default function AutomationBuilderPage() {
 }
 
 function AutomationBuilder() {
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node<WorkflowNodeData>>([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [trashHover, setTrashHover] = useState(false);
   const { screenToFlowPosition } = useReactFlow();
   const nextId = useRef(0);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const trashRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const mql = window.matchMedia(`(max-width: ${MOBILE_BP - 1}px)`);
@@ -126,6 +131,58 @@ function AutomationBuilder() {
     [screenToFlowPosition, setNodes],
   );
 
+  const addNote = useCallback(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const position = screenToFlowPosition({
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    });
+    setNodes((nds) => [
+      ...nds,
+      {
+        id: `note_${nextId.current++}`,
+        type: "note",
+        position: { x: position.x - 70, y: position.y - 45 },
+        data: { text: "" } satisfies StickyNoteData,
+      },
+    ]);
+  }, [screenToFlowPosition, setNodes]);
+
+  const isOverTrash = useCallback((event: React.MouseEvent) => {
+    const el = trashRef.current;
+    if (!el) return false;
+    const rect = el.getBoundingClientRect();
+    const pad = 10;
+    return (
+      event.clientX >= rect.left - pad &&
+      event.clientX <= rect.right + pad &&
+      event.clientY >= rect.top - pad &&
+      event.clientY <= rect.bottom + pad
+    );
+  }, []);
+
+  const onNodeDrag = useCallback(
+    (event: React.MouseEvent) => {
+      setTrashHover(isOverTrash(event));
+    },
+    [isOverTrash],
+  );
+
+  const onNodeDragStop = useCallback(
+    (event: React.MouseEvent, node: Node) => {
+      if (isOverTrash(event)) {
+        setNodes((nds) => nds.filter((n) => n.id !== node.id));
+        setEdges((eds) =>
+          eds.filter((e) => e.source !== node.id && e.target !== node.id),
+        );
+      }
+      setTrashHover(false);
+    },
+    [isOverTrash, setNodes, setEdges],
+  );
+
   const clearCanvas = useCallback(() => {
     setNodes([]);
     setEdges([]);
@@ -161,6 +218,8 @@ function AutomationBuilder() {
             onConnect={onConnect}
             onDragOver={onDragOver}
             onDrop={onDrop}
+            onNodeDrag={onNodeDrag}
+            onNodeDragStop={onNodeDragStop}
             nodeTypes={nodeTypes}
             defaultEdgeOptions={defaultEdgeOptions}
             connectionLineType={ConnectionLineType.SmoothStep}
@@ -206,32 +265,60 @@ function AutomationBuilder() {
             </span>
           </div>
 
-          {/* Trash / clear */}
-          <button
-            type="button"
-            onClick={() => {
-              if (hasItems) setShowClearConfirm(true);
-            }}
-            className={`absolute right-3 top-3 z-10 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border transition-all ${
-              hasItems
-                ? "border-[var(--ring)] bg-[var(--surface)]/80 text-[var(--muted)] hover:border-red-400 hover:bg-red-500/10 hover:text-red-400"
-                : "pointer-events-none border-[var(--ring)] bg-[var(--surface)]/50 text-[var(--muted)]/40"
-            }`}
-            aria-label="Clear canvas"
-          >
-            <svg
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-4 w-4"
+          {/* Toolbar — top-right */}
+          <div className="absolute right-3 top-3 z-10 flex flex-col gap-2">
+            {/* Trash / clear */}
+            <button
+              ref={trashRef}
+              type="button"
+              onClick={() => {
+                if (hasItems) setShowClearConfirm(true);
+              }}
+              className={`flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border transition-all ${
+                trashHover
+                  ? "scale-110 border-red-400 bg-red-500/20 text-red-400"
+                  : hasItems
+                    ? "border-[var(--ring)] bg-[var(--surface)]/80 text-[var(--muted)] hover:border-red-400 hover:bg-red-500/10 hover:text-red-400"
+                    : "pointer-events-none border-[var(--ring)] bg-[var(--surface)]/50 text-[var(--muted)]/40"
+              }`}
+              aria-label="Clear canvas"
             >
-              <path d="M2 4h12M5.333 4V2.667a1.333 1.333 0 0 1 1.334-1.334h2.666a1.333 1.333 0 0 1 1.334 1.334V4M6.667 7.333v4M9.333 7.333v4" />
-              <path d="M3.333 4l.667 9.333a1.333 1.333 0 0 0 1.333 1.334h5.334a1.333 1.333 0 0 0 1.333-1.334L12.667 4" />
-            </svg>
-          </button>
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+              >
+                <path d="M2 4h12M5.333 4V2.667a1.333 1.333 0 0 1 1.334-1.334h2.666a1.333 1.333 0 0 1 1.334 1.334V4M6.667 7.333v4M9.333 7.333v4" />
+                <path d="M3.333 4l.667 9.333a1.333 1.333 0 0 0 1.333 1.334h5.334a1.333 1.333 0 0 0 1.333-1.334L12.667 4" />
+              </svg>
+            </button>
+
+            {/* Add note */}
+            <button
+              type="button"
+              onClick={addNote}
+              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--surface)]/80 text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
+              aria-label="Add note"
+            >
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+              >
+                <path d="M9.333 1.333H4a1.333 1.333 0 0 0-1.333 1.334v10.666A1.333 1.333 0 0 0 4 14.667h8a1.333 1.333 0 0 0 1.333-1.334V5.333z" />
+                <path d="M9.333 1.333v4h4" />
+                <path d="M5.333 8.667h5.334M5.333 11.333h5.334" />
+              </svg>
+            </button>
+          </div>
 
           {/* Empty state */}
           {!hasItems && (

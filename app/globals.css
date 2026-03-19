@@ -411,3 +411,25 @@ body {
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   border: 1px solid var(--accent);
 }
+
+.sticky-note-node {
+  width: 140px;
+  padding: 8px 10px;
+  border: 1.5px solid var(--ring);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  cursor: grab;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.sticky-note-node:active {
+  cursor: grabbing;
+}
+
+.sticky-note-node.selected {
+  border-color: var(--accent-strong);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--accent-strong) 25%, transparent),
+    0 4px 12px rgba(0, 0, 0, 0.1);
+}

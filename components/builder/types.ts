@@ -11,6 +11,11 @@ export interface WorkflowNodeData {
   [key: string]: unknown;
 }
 
+export interface StickyNoteData {
+  text: string;
+  [key: string]: unknown;
+}
+
 export const BLOCK_DEFS: { type: BlockType; label: string }[] = [
   { type: "Trigger", label: "Trigger" },
   { type: "AI Agent", label: "AI Agent" },
