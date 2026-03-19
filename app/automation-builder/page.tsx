@@ -14,10 +14,11 @@ import {
   BackgroundVariant,
   ConnectionLineType,
 } from "@xyflow/react";
-import type { Connection, Edge, Node, NodeTypes } from "@xyflow/react";
+import type { Connection, Edge, EdgeTypes, Node, NodeTypes } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { WorkflowNode } from "@/components/builder/WorkflowNode";
 import { StickyNoteNode } from "@/components/builder/StickyNoteNode";
+import { DeletableEdge } from "@/components/builder/DeletableEdge";
 import { BlockPalette } from "@/components/builder/BlockPalette";
 import { BlockIconTile } from "@/components/builder/block-icons";
 import {
@@ -34,8 +35,12 @@ const nodeTypes: NodeTypes = {
   note: StickyNoteNode,
 };
 
+const edgeTypes: EdgeTypes = {
+  deletable: DeletableEdge,
+};
+
 const defaultEdgeOptions = {
-  type: "smoothstep" as const,
+  type: "deletable" as const,
   style: { strokeWidth: 2 },
 };
 
@@ -65,6 +70,11 @@ function AutomationBuilder() {
     mql.addEventListener("change", handler);
     return () => mql.removeEventListener("change", handler);
   }, []);
+
+  const isValidConnection = useCallback(
+    (connection: Edge | Connection) => connection.source !== connection.target,
+    [],
+  );
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -221,7 +231,9 @@ function AutomationBuilder() {
             onNodeDrag={onNodeDrag}
             onNodeDragStop={onNodeDragStop}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             defaultEdgeOptions={defaultEdgeOptions}
+            isValidConnection={isValidConnection}
             connectionLineType={ConnectionLineType.SmoothStep}
             connectionLineStyle={{ stroke: "var(--accent)", strokeWidth: 2 }}
             snapToGrid

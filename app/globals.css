@@ -412,6 +412,31 @@ body {
   border: 1px solid var(--accent);
 }
 
+.edge-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ring);
+  background: var(--card);
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 120ms, background 120ms, color 120ms,
+    box-shadow 120ms;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.edge-delete-btn:hover {
+  border-color: #f87171;
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  box-shadow:
+    0 0 0 3px rgba(239, 68, 68, 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
 .sticky-note-node {
   width: 140px;
   padding: 8px 10px;
