@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import IndustrySignals from "@/components/IndustrySignals";
 import AutomationFlowDiagram from "@/components/home/AutomationFlowDiagram";
 import RevealOnScroll from "@/components/home/RevealOnScroll";
-import TypingHeadline from "@/components/home/TypingHeadline";
+import HeroSection from "@/components/home/HeroSection";
 import ValueCard from "@/components/home/ValueCard";
 import { AutonomousIcon, ScalableIcon, SecureIcon } from "@/components/icons/valueIcons";
 
@@ -122,23 +122,7 @@ export default function Home() {
       </div>
 
       {/* Hero */}
-      <RevealOnScroll>
-      <section className="bubble p-6 sm:p-8 lg:p-10">
-        <TypingHeadline />
-        <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)] sm:text-lg">
-          Autom8x automates document-heavy operations.
-          Connect inboxes, files, and systems to run workflows with clear review points.
-        </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link href="/solutions" className="btn-primary px-5">
-            See How It Works
-          </Link>
-          <Link href="/contact" className="btn-secondary px-5">
-            Talk to Our Team
-          </Link>
-        </div>
-      </section>
-      </RevealOnScroll>
+      <HeroSection />
 
       {/* What Autom8x does */}
       <RevealOnScroll>
