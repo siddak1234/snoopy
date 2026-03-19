@@ -5,6 +5,7 @@ import {
   createProject as createProjectDb,
   deleteProject as deleteProjectDb,
   joinProjectByCode as joinProjectByCodeDb,
+  leaveProject as leaveProjectDb,
 } from "@/lib/projects";
 import { revalidatePath } from "next/cache";
 
@@ -100,5 +101,37 @@ export async function deleteProjectAction(projectId: string): Promise<DeleteProj
   } catch (e) {
     console.error("deleteProjectAction", e);
     return { ok: false, error: "Failed to delete project. Please try again." };
+  }
+}
+
+export type LeaveProjectResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Leave a project by removing the user's membership (team projects only).
+ * This does NOT delete the project itself.
+ */
+export async function leaveProjectAction(
+  projectId: string,
+): Promise<LeaveProjectResult> {
+  const session = await getAppSession();
+  if (!session?.user?.id) {
+    return { ok: false, error: "You must be signed in to leave a project." };
+  }
+
+  if (!projectId || typeof projectId !== "string" || !projectId.trim()) {
+    return { ok: false, error: "Project ID is required." };
+  }
+
+  try {
+    const left = await leaveProjectDb(session.user.id, projectId.trim());
+    if (!left) {
+      return { ok: false, error: "Unable to leave project (not a member or you are the owner)." };
+    }
+    revalidatePath("/account");
+    revalidatePath("/account/projects");
+    return { ok: true };
+  } catch (e) {
+    console.error("leaveProjectAction", e);
+    return { ok: false, error: "Failed to leave project. Please try again." };
   }
 }

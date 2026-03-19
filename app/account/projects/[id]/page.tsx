@@ -5,6 +5,7 @@ import { getTenantForUser } from "@/lib/tenant";
 import { getProjectForUser } from "@/lib/projects";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { DeleteProjectButton } from "@/components/dashboard/DeleteProjectButton";
+import { LeaveProjectButton } from "@/components/dashboard/LeaveProjectButton";
 import { formatDateMediumUTC } from "@/lib/date";
 
 const statusLabel: Record<string, string> = {
@@ -36,6 +37,8 @@ export default async function ProjectDetailPage({
     project.ownerUserId === session.user.id || project.userId === session.user.id;
   const isOrgOwner = tenant?.role === "org_owner";
   const canDelete = isOwner || isOrgOwner;
+  const isMember = project.projectMemberships?.length > 0;
+  const canLeave = !isOwner && isMember;
 
   return (
     <SectionCard
@@ -47,12 +50,23 @@ export default async function ProjectDetailPage({
         </Link>
       }
       secondaryAction={
-        canDelete ? (
-          <DeleteProjectButton
-            projectId={project.id}
-            projectName={project.name}
-            redirectAfterDelete="/account/projects"
-          />
+        canDelete || canLeave ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {canDelete ? (
+              <DeleteProjectButton
+                projectId={project.id}
+                projectName={project.name}
+                redirectAfterDelete="/account/projects"
+              />
+            ) : null}
+            {canLeave ? (
+              <LeaveProjectButton
+                projectId={project.id}
+                projectName={project.name}
+                redirectAfterLeave="/account/projects"
+              />
+            ) : null}
+          </div>
         ) : null
       }
     >

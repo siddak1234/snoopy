@@ -223,6 +223,37 @@ export async function deleteProject(
 }
 
 /**
+ * Server-only: leave a project (remove the user's membership).
+ *
+ * Allowed only when the user is NOT a project owner.
+ * This does NOT delete the project itself.
+ */
+export async function leaveProject(
+  userId: string,
+  projectId: string,
+): Promise<boolean> {
+  if (!userId) return false;
+  if (!projectId) return false;
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId },
+    select: { ownerUserId: true, userId: true },
+  });
+  if (!project) return false;
+
+  const isOwner =
+    project.ownerUserId === userId || project.userId === userId;
+  if (isOwner) return false;
+
+  // Membership unique constraint: @@unique([projectId, userId])
+  const result = await prisma.projectMembership.deleteMany({
+    where: { projectId, userId },
+  });
+
+  return result.count > 0;
+}
+
+/**
  * Server-only: join a project by access code. Verifies code server-side; user must be in same workspace as project.
  * Never trust client for workspace_id or project_id; lookup by code only.
  *
