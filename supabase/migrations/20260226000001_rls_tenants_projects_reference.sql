@@ -1,5 +1,5 @@
 -- RLS reference for tenants, tenant_memberships, projects, project_memberships.
--- This app uses NextAuth + Prisma; tenant_id and user_id are derived server-side only.
+-- This app uses Supabase Auth + Prisma; tenant_id and user_id are derived server-side only.
 -- Run this only if you switch to Supabase Auth (auth.uid() then set). Until then, isolation is enforced in application code.
 
 -- Tenants: org owner can read own tenant

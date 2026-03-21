@@ -48,5 +48,5 @@ snoopy/
 ## What this repo is not
 
 - **Not the n8n app**: Workflow/automation logic and n8n config live in a separate n8n repository.
-- **Not the database server**: Postgres is external (managed or separate container); this app connects via `POSTGRES_PRISMA_URL`.
+- **Not the database server**: Postgres is external (managed or separate container); this app connects via `POSTGRES_URL` at runtime (with `POSTGRES_PRISMA_URL` as optional direct fallback).
 - **Not a monorepo**: One app only. Other services (n8n, future backends) are separate repos or images.

@@ -32,7 +32,7 @@ High-level view of how the **website** (this repo), **n8n**, and the **database 
 
 ## How they interact
 
-- **Website ↔ Database**: Prisma in this repo connects with `POSTGRES_PRISMA_URL`. All website persistence goes through `lib/db.ts`.
+- **Website ↔ Database**: Prisma in this repo uses `POSTGRES_URL` at runtime (with `POSTGRES_PRISMA_URL` as optional direct fallback). All website persistence goes through `lib/db.ts`.
 - **n8n ↔ Database**: n8n uses its own Postgres config (same server or separate DB). No Prisma in n8n unless you add it; n8n typically uses its built-in DB nodes or direct SQL.
 - **Website ↔ n8n**: Optional. The website can call n8n webhooks or REST APIs (e.g. to trigger workflows). n8n can call the website’s API routes (e.g. `POST /api/...`) if you expose them and secure with headers or API keys. Keep base URLs in env (e.g. `N8N_BASE_URL`, `NEXT_PUBLIC_APP_URL`).
 

@@ -13,7 +13,7 @@ Minimal overview for cloud deployment: single app, containerized, ready for serv
 | **App**     | Next.js 16 (App Router) | Web UI, SSR, API routes          |
 | **Auth**    | Supabase Auth (Google, Microsoft OAuth; email/password) | Sign-in, session, user provisioning to Prisma |
 | **Data**    | Prisma + PostgreSQL    | ORM + database (via `lib/db.ts`) |
-| **Config**  | `prisma.config.ts`     | DB URL from env (`POSTGRES_PRISMA_URL`) |
+| **Config**  | `prisma.config.ts`     | DB URLs from env (`POSTGRES_URL` runtime, optional `POSTGRES_PRISMA_URL` direct) |
 | **Styling** | Tailwind 4              | UI                                |
 
 Single Node process: Next.js serves pages and API routes; Prisma talks to Postgres. No separate API server or workers in-repo today.
@@ -47,7 +47,7 @@ snoopy/
 
 ## External Boundaries
 
-- **PostgreSQL**: URL from `POSTGRES_PRISMA_URL` (set in env at deploy time; not in repo).
+- **PostgreSQL**: runtime URL from `POSTGRES_URL` (with optional direct `POSTGRES_PRISMA_URL`); set in env at deploy time, not in repo.
 - **Supabase Auth**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Configure Google and Azure providers in Supabase Dashboard.
 
 All config via environment variables; no hardcoded URLs or secrets.
@@ -57,7 +57,7 @@ All config via environment variables; no hardcoded URLs or secrets.
 ## Deployment Model (minimal, containerized)
 
 - **One container**: the Next.js app (build with `npm run build`, run with `npm run start`).
-- **Postgres**: managed service (e.g. Vercel Postgres, Neon, RDS) or a separate Postgres container; app connects via `POSTGRES_PRISMA_URL`.
+- **Postgres**: managed service (e.g. Vercel Postgres, Neon, RDS) or a separate Postgres container; app connects via `POSTGRES_URL` at runtime.
 - **Service-to-service later**: new backends (Node, Go, etc.) can run in their own containers and call this app’s APIs over HTTP (e.g. `GET/POST /api/...`), or you add dedicated API routes that other services call. Keep URLs in env (e.g. `NEXT_PUBLIC_*` for browser, internal env for server-to-server).
 
 Recommended:

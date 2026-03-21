@@ -1,6 +1,6 @@
 -- Run this in Supabase SQL Editor only if you use Supabase Auth and want RLS on projects.
--- This repo uses NextAuth + Prisma: the app creates the projects table via Prisma (see prisma/schema.prisma).
--- With NextAuth, user isolation is enforced in application code (server-side session). This file is for
+-- This repo uses Supabase Auth + Prisma: the app creates the projects table via Prisma (see prisma/schema.prisma).
+-- User isolation is enforced in application code (server-side session). This file is for
 -- teams that use Supabase Auth and want database-level RLS.
 
 CREATE TABLE IF NOT EXISTS projects (

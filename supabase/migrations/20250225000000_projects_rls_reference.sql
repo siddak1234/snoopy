@@ -1,7 +1,7 @@
 -- Projects table + RLS (Supabase)
 -- Use this in Supabase SQL editor if you use Supabase Auth and want RLS.
--- This repo uses NextAuth + Prisma; the table is created by Prisma (userId -> users.id).
--- With NextAuth, isolation is enforced in the app layer; this file is for reference or migration to Supabase Auth.
+-- This repo uses Supabase Auth + Prisma; the table is created by Prisma (userId -> users.id).
+-- Isolation is enforced in the app layer; this file is for reference when adding DB-level RLS.
 
 -- Table (only run if NOT using Prisma migrations for this table)
 -- CREATE TABLE IF NOT EXISTS projects (

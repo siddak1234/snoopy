@@ -6,7 +6,7 @@
 
 ## Prisma
 
-- **Schema:** No `url` in `datasource` (Prisma 7). Connection URL comes from **`prisma.config.ts` only:** `process.env.POSTGRES_PRISMA_URL`.
+- **Schema:** No `url` in `datasource` (Prisma 7). `prisma.config.ts` resolves DB URL from env (`POSTGRES_URL` first, `POSTGRES_PRISMA_URL` fallback).
 - **Config:** `prisma.config.ts` loads env with dotenv: `.env.local` then `.env`, `override: false`, `quiet: true`. Uses **POSTGRES_URL** (pooler) for migrate so CLI can connect; direct (POSTGRES_PRISMA_URL) often unreachable from local (P1001).
 - **Client:** From `@prisma/client`; **singleton in `lib/db.ts`**. No custom output; `postinstall` runs `prisma generate`.
 - **Usage:** Use `db` only in Node runtime (not Edge). No top-level `db` import in route files so build does not require DB.
@@ -33,7 +33,7 @@
 ## Routes
 
 - **`/api/health`** — Liveness; no DB.
-- **`/api/ready`** — Readiness; dynamic import of db, `SELECT 1` when `POSTGRES_PRISMA_URL` set; otherwise 200 + `database: "skipped"`.
+- **`/api/ready`** — Readiness; dynamic import of db, `SELECT 1` when `POSTGRES_URL` is set; otherwise 200 + `database: "skipped"`.
 - **`/account`** and **`/dashboard`** — Protected in `middleware.ts` (redirect to `/login` if no Supabase session). Dashboard layout also checks `session?.user?.id` server-side and redirects if missing.
 
 ---
