@@ -308,8 +308,6 @@ function AutomationBuilder() {
     setNodes([]);
     setEdges([]);
     setShowClearConfirm(false);
-    setWorkflowId(null);
-    setWorkflowName("");
   }, [setNodes, setEdges]);
 
   // ─── Save flow ──────────────────────────────────────────────────────
@@ -319,7 +317,7 @@ function AutomationBuilder() {
   }, [nodes, edges, getViewport]);
 
   const handleSaveClick = useCallback(() => {
-    if (nodes.length === 0) return;
+    if (nodes.length === 0 && !workflowId) return;
 
     if (authStatus !== "authenticated") {
       setShowAuthPrompt(true);
@@ -392,6 +390,7 @@ function AutomationBuilder() {
   // ─── Render ─────────────────────────────────────────────────────────
 
   const hasItems = nodes.length > 0;
+  const canSave = hasItems || Boolean(workflowId);
 
   return (
     <>
@@ -503,13 +502,13 @@ function AutomationBuilder() {
             <button
               type="button"
               onClick={handleSaveClick}
-              disabled={!hasItems || saveStatus === "saving"}
+              disabled={!canSave || saveStatus === "saving"}
               className={`flex h-9 w-9 items-center justify-center rounded-full border transition-all ${
                 saveStatus === "saved"
                   ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-400"
                   : saveStatus === "saving"
                     ? "pointer-events-none border-[var(--ring)] bg-[var(--surface)]/80 text-[var(--muted)]"
-                    : hasItems
+                    : canSave
                       ? "cursor-pointer border-[var(--ring)] bg-[var(--surface)]/80 text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--text)]"
                       : "pointer-events-none border-[var(--ring)] bg-[var(--surface)]/50 text-[var(--muted)]/40"
               }`}
