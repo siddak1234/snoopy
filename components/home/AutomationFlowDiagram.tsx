@@ -318,8 +318,8 @@ export default function AutomationFlowDiagram() {
   }, [layout, cardStates, progress]);
 
   return (
-    <div ref={sectionRef} className="mt-6 overflow-x-hidden">
-      <div ref={containerRef} className="relative grid gap-4 md:grid-cols-4 md:items-stretch">
+    <div ref={sectionRef} className="mt-6 overflow-hidden">
+      <div ref={containerRef} className="relative grid gap-4 py-1 md:grid-cols-4 md:items-stretch md:gap-5">
         <svg
           aria-hidden
           className="pointer-events-none absolute inset-0 z-[5] h-full w-full overflow-visible"
@@ -380,14 +380,14 @@ export default function AutomationFlowDiagram() {
                 zIndex: state.zIndex,
               }}
             >
-              <article className="flow-node rounded-2xl border border-[var(--ring)] bg-[var(--card)] p-4 shadow-sm">
+              <article className="flow-node min-h-[10.75rem] rounded-2xl border border-[var(--ring)] bg-[var(--card)] p-5 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
                   Step {index + 1}
                 </p>
-                <h3 className="mt-1 text-base font-semibold text-[var(--text)]">
+                <h3 className="mt-1.5 text-lg font-semibold text-[var(--text)] md:text-xl">
                   {step.title}
                 </h3>
-                <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+                <p className="mt-2 text-base leading-7 text-[var(--muted)]">
                   {step.detail}
                 </p>
               </article>

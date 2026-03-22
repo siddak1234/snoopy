@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import { motion } from "framer-motion";
 import RevealOnScroll from "@/components/home/RevealOnScroll";
 import AutomationFlowDiagram from "@/components/home/AutomationFlowDiagram";
-import DataflowVisual from "@/components/home/DataflowVisual";
 import { fadeInUp, staggerContainer } from "@/lib/motion";
 
 type IconCard = {
@@ -192,7 +191,7 @@ export default function HomeAnimatedSections() {
 
       {/* How it works */}
       <RevealOnScroll variants={staggerContainer({ stagger: 0.08 })}>
-        <section className="bubble p-6 sm:p-8">
+        <section className="bubble overflow-hidden p-6 sm:p-8">
           <motion.h2
             variants={fadeInUp({ y: 10 })}
             className="text-xl font-semibold sm:text-2xl"
@@ -205,9 +204,6 @@ export default function HomeAnimatedSections() {
           >
             Build a workflow once. Autom8x handles extraction, routing, and updates across systems.
           </motion.p>
-          <motion.div variants={fadeInUp({ y: 10 })} className="mt-5">
-            <DataflowVisual className="h-[180px] w-full rounded-2xl border border-[var(--ring)] bg-[var(--card)]" />
-          </motion.div>
           <motion.div variants={fadeInUp({ y: 10 })}>
             <AutomationFlowDiagram />
           </motion.div>
@@ -216,4 +212,3 @@ export default function HomeAnimatedSections() {
     </>
   );
 }
-
