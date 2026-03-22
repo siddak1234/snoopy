@@ -64,30 +64,53 @@ export function WorkflowCardsClient({ workflows }: { workflows: WorkflowListItem
             key={wf.id}
             className="group relative flex flex-col gap-3 rounded-xl border border-[var(--ring)] bg-[var(--card)] p-4 transition hover:border-[var(--accent)] hover:shadow-md"
           >
-            <button
-              type="button"
-              onClick={() => {
-                setDeleteError("");
-                setConfirmText("");
-                setDeleteTarget(wf);
-              }}
-              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--surface)]/70 text-[var(--muted)] opacity-0 transition hover:border-red-400 hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
-              aria-label={`Delete workflow ${wf.name}`}
-              title="Delete"
-            >
-              <svg
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
+            <div className="absolute right-3 top-3 flex items-center gap-1.5 opacity-0 transition group-hover:opacity-100">
+              <button
+                type="button"
+                onClick={() => {}}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--surface)]/70 text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
+                aria-label={`Send workflow ${wf.name}`}
+                title="Send workflow"
               >
-                <path d="M2 4h12M5.333 4V2.667a1.333 1.333 0 0 1 1.334-1.334h2.666a1.333 1.333 0 0 1 1.334 1.334V4M6.667 7.333v4M9.333 7.333v4" />
-                <path d="M3.333 4l.667 9.333a1.333 1.333 0 0 0 1.333 1.334h5.334a1.333 1.333 0 0 0 1.333-1.334L12.667 4" />
-              </svg>
-            </button>
+                <svg
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4"
+                >
+                  <path d="M14.5 1.5 7.3 8.7" />
+                  <path d="m14.5 1.5-4 13L7.3 8.7.5 5.5z" />
+                </svg>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteError("");
+                  setConfirmText("");
+                  setDeleteTarget(wf);
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--surface)]/70 text-[var(--muted)] transition hover:border-red-400 hover:bg-red-500/10 hover:text-red-400"
+                aria-label={`Delete workflow ${wf.name}`}
+                title="Delete"
+              >
+                <svg
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4"
+                >
+                  <path d="M2 4h12M5.333 4V2.667a1.333 1.333 0 0 1 1.334-1.334h2.666a1.333 1.333 0 0 1 1.334 1.334V4M6.667 7.333v4M9.333 7.333v4" />
+                  <path d="M3.333 4l.667 9.333a1.333 1.333 0 0 0 1.333 1.334h5.334a1.333 1.333 0 0 0 1.333-1.334L12.667 4" />
+                </svg>
+              </button>
+            </div>
 
             <Link href={`/automation-builder?id=${wf.id}`} className="block">
               <div className="flex items-start justify-between gap-2">
