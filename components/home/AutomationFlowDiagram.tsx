@@ -207,7 +207,13 @@ export default function AutomationFlowDiagram() {
     const count = FLOW_STEPS.length;
     const last = count - 1;
     const p = clamp(progress, 0, 1);
-    const phase = p <= 0.5 ? p / 0.5 : (p - 0.5) / 0.5;
+    const centerHold = clamp(
+      0.12 + count * 0.02 + (layout.height / Math.max(layout.width, 1)) * 0.05,
+      0.16,
+      0.26,
+    );
+    const entryEnd = 0.5 - centerHold;
+    const exitStart = 0.5 + centerHold;
     const start = layout.cards[0];
     const end = layout.cards[last];
     const startCx = start.x + start.width / 2;
@@ -246,13 +252,29 @@ export default function AutomationFlowDiagram() {
       const exitZ = index + 1;
       const spreadZ = 10 + index;
 
-      if (p <= 0.5) {
+      if (p < entryEnd) {
+        const entryPhase = clamp(p / Math.max(entryEnd, 0.001), 0, 1);
         return {
-          tx: lerp(entryTx, 0, phase),
-          ty: lerp(entryTy, 0, phase),
-          scale: lerp(entryScale, 1, phase),
-          opacity: clamp(lerp(entryOpacity, 1, phase), 0.3, 1),
-          zIndex: Math.round(lerp(entryZ, spreadZ, phase)),
+          tx: lerp(entryTx, 0, entryPhase),
+          ty: lerp(entryTy, 0, entryPhase),
+          scale: lerp(entryScale, 1, entryPhase),
+          opacity: clamp(lerp(entryOpacity, 1, entryPhase), 0.3, 1),
+          zIndex: Math.round(lerp(entryZ, spreadZ, entryPhase)),
+          cx,
+          cy,
+          width: card.width,
+          height: card.height,
+        };
+      }
+
+      if (p > exitStart) {
+        const exitPhase = clamp((p - exitStart) / Math.max(1 - exitStart, 0.001), 0, 1);
+        return {
+          tx: lerp(0, exitTx, exitPhase),
+          ty: lerp(0, exitTy, exitPhase),
+          scale: lerp(1, exitScale, exitPhase),
+          opacity: clamp(lerp(1, exitOpacity, exitPhase), 0.3, 1),
+          zIndex: Math.round(lerp(spreadZ, exitZ, exitPhase)),
           cx,
           cy,
           width: card.width,
@@ -261,11 +283,11 @@ export default function AutomationFlowDiagram() {
       }
 
       return {
-        tx: lerp(0, exitTx, phase),
-        ty: lerp(0, exitTy, phase),
-        scale: lerp(1, exitScale, phase),
-        opacity: clamp(lerp(1, exitOpacity, phase), 0.3, 1),
-        zIndex: Math.round(lerp(spreadZ, exitZ, phase)),
+        tx: 0,
+        ty: 0,
+        scale: 1,
+        opacity: 1,
+        zIndex: spreadZ,
         cx,
         cy,
         width: card.width,
@@ -277,7 +299,21 @@ export default function AutomationFlowDiagram() {
   const connectors = useMemo<ConnectorPath[]>(() => {
     if (!layout || cardStates.length !== FLOW_STEPS.length || FLOW_STEPS.length < 2) return [];
 
-    const spread = clamp(1 - Math.abs(progress - 0.5) * 2, 0, 1);
+    const count = FLOW_STEPS.length;
+    const centerHold = clamp(
+      0.12 + count * 0.02 + (layout.height / Math.max(layout.width, 1)) * 0.05,
+      0.16,
+      0.26,
+    );
+    const centerDistance = Math.abs(progress - 0.5);
+    const spread =
+      centerDistance <= centerHold
+        ? 1
+        : clamp(
+            1 - (centerDistance - centerHold) / Math.max(0.5 - centerHold, 0.001),
+            0,
+            1,
+          );
     const activeStep = progress * (FLOW_STEPS.length - 1);
 
     return cardStates.slice(0, -1).map((from, index) => {
@@ -380,7 +416,7 @@ export default function AutomationFlowDiagram() {
                 zIndex: state.zIndex,
               }}
             >
-              <article className="flow-node min-h-[10.75rem] rounded-2xl border border-[var(--ring)] bg-[var(--card)] p-5 shadow-sm">
+              <article className="flow-node h-[12rem] rounded-2xl border border-[var(--ring)] bg-[var(--card)] p-5 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
                   Step {index + 1}
                 </p>
