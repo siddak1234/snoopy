@@ -173,6 +173,18 @@ function AutomationBuilder() {
     setWorkflowOptions(result.workflows);
   }, [authStatus]);
 
+  const toggleWorkflowMenu = useCallback(() => {
+    setWorkflowMenuOpen((open) => {
+      const next = !open;
+      if (next) {
+        setMenuError("");
+        setSwitchError("");
+        void loadWorkflowOptions();
+      }
+      return next;
+    });
+  }, [loadWorkflowOptions]);
+
   useEffect(() => {
     if (authStatus !== "authenticated") return;
     void loadWorkflowOptions();
@@ -411,6 +423,8 @@ function AutomationBuilder() {
     } else {
       // New workflow — ask for name
       setNameInput("");
+      setSaveStatus("idle");
+      setSaveError("");
       setShowSaveModal(true);
     }
   }, [nodes, edges, authStatus, workflowId, getCanvasState]);
@@ -420,7 +434,7 @@ function AutomationBuilder() {
     if (name.length < 2) return;
 
     setSaveStatus("saving");
-    setShowSaveModal(false);
+    setSaveError("");
 
     const result = await createWorkflowAction(name, {
       canvasState: getCanvasState(),
@@ -428,10 +442,24 @@ function AutomationBuilder() {
 
     if (result.ok) {
       const currentSignature = canvasSignature(nodes, edges);
+      const nowIso = new Date().toISOString();
       setWorkflowId(result.workflowId);
       setWorkflowName(name);
       setSaveStatus("saved");
       setLastSavedSignature(currentSignature);
+      setWorkflowOptions((prev) => [
+        {
+          id: result.workflowId,
+          name,
+          description: null,
+          status: "draft",
+          nodeCount: nodes.filter((n) => n.type !== "note").length,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        },
+        ...prev.filter((w) => w.id !== result.workflowId),
+      ]);
+      setShowSaveModal(false);
 
       if (postSaveSwitch) {
         if (postSaveSwitch.kind === "existing") {
@@ -449,9 +477,8 @@ function AutomationBuilder() {
           scroll: false,
         });
       }
-      void loadWorkflowOptions();
+      await loadWorkflowOptions();
     } else {
-      setPostSaveSwitch(null);
       setSaveError(result.error);
       setSaveStatus("error");
     }
@@ -685,7 +712,7 @@ function AutomationBuilder() {
               </h1>
               <button
                 type="button"
-                onClick={() => setWorkflowMenuOpen((open) => !open)}
+                onClick={toggleWorkflowMenu}
                 disabled={authStatus !== "authenticated"}
                 className={`inline-flex h-6 w-6 items-center justify-center rounded-full border transition ${
                   authStatus !== "authenticated"
@@ -985,16 +1012,17 @@ function AutomationBuilder() {
                   setPostSaveSwitch(null);
                   setSaveError("");
                 }}
+                disabled={saveStatus === "saving"}
                 className="flex-1 cursor-pointer rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-xs font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)]"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveConfirm}
-                disabled={nameInput.trim().length < 2}
+                disabled={nameInput.trim().length < 2 || saveStatus === "saving"}
                 className="flex-1 cursor-pointer rounded-full border border-[var(--accent)] bg-[var(--accent)]/10 px-4 py-2 text-xs font-semibold text-[var(--accent)] transition hover:bg-[var(--accent)]/20 disabled:pointer-events-none disabled:opacity-40"
               >
-                Save
+                {saveStatus === "saving" ? "Saving..." : "Save"}
               </button>
             </div>
           </div>

@@ -85,6 +85,26 @@ export async function getWorkflowForUser(
   });
 }
 
+// ─── Name uniqueness ───────────────────────────────────────────────────
+
+export async function workflowNameExistsForUser(
+  userId: string,
+  name: string,
+  opts?: { excludeWorkflowId?: string },
+): Promise<boolean> {
+  const existing = await prisma.workflow.findFirst({
+    where: {
+      userId,
+      name: { equals: name.trim(), mode: "insensitive" },
+      ...(opts?.excludeWorkflowId
+        ? { id: { not: opts.excludeWorkflowId } }
+        : {}),
+    },
+    select: { id: true },
+  });
+  return Boolean(existing);
+}
+
 // ─── Save definition (hash-guarded) ──────────────────────────────────
 
 export type SaveResult =

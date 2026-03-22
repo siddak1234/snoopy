@@ -6,6 +6,7 @@ import {
   createWorkflow as createWorkflowDb,
   getWorkflowsForUser as getWorkflowsDb,
   getWorkflowForUser as getWorkflowDb,
+  workflowNameExistsForUser as workflowNameExistsForUserDb,
   saveWorkflowDefinition as saveDefinitionDb,
   updateWorkflowMetadata as updateMetadataDb,
   deleteWorkflow as deleteWorkflowDb,
@@ -41,6 +42,12 @@ export async function createWorkflowAction(
     return { ok: false, error: `Name must be at least ${NAME_MIN} characters.` };
   if (trimmed.length > NAME_MAX)
     return { ok: false, error: `Name must be at most ${NAME_MAX} characters.` };
+  if (await workflowNameExistsForUserDb(session.user.id, trimmed)) {
+    return {
+      ok: false,
+      error: "Workflow name is already taken. Please choose a different name.",
+    };
+  }
 
   const definition = opts?.canvasState
     ? serializeWorkflowForStorage(opts.canvasState)
@@ -203,6 +210,16 @@ export async function updateWorkflowMetadataAction(
       return { ok: false, error: `Name must be at least ${NAME_MIN} characters.` };
     if (trimmed.length > NAME_MAX)
       return { ok: false, error: `Name must be at most ${NAME_MAX} characters.` };
+    if (
+      await workflowNameExistsForUserDb(session.user.id, trimmed, {
+        excludeWorkflowId: workflowId,
+      })
+    ) {
+      return {
+        ok: false,
+        error: "Workflow name is already taken. Please choose a different name.",
+      };
+    }
   }
 
   try {
