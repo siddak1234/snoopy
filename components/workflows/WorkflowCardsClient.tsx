@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { WorkflowListItem } from "@/app/account/workflows/actions";
 import { deleteWorkflowAction } from "@/app/account/workflows/actions";
+import Modal from "@/components/ui/Modal";
 
 function formatRelative(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -137,9 +138,18 @@ export function WorkflowCardsClient({ workflows }: { workflows: WorkflowListItem
       </div>
 
       {deleteTarget && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-96 max-w-[calc(100vw-2rem)] rounded-2xl border border-[var(--ring)] bg-linear-to-br from-[var(--surface)] to-[var(--surface-strong)] p-6 shadow-xl">
-            <p className="text-center text-sm font-semibold text-[var(--text)]">
+        <Modal
+          onClose={() => {
+            // Keep close behavior explicit via Cancel while preventing close during delete.
+            if (deleting) return;
+          }}
+          ariaLabelledBy="workflow-delete-title"
+          bubble
+          zIndex={100}
+          contentClassName="w-96 max-w-[calc(100vw-2rem)] p-6 sm:p-6"
+        >
+          <div>
+            <p id="workflow-delete-title" className="text-center text-sm font-semibold text-[var(--text)]">
               Delete workflow?
             </p>
             <p className="mt-1.5 text-center text-xs leading-relaxed text-[var(--muted)]">
@@ -184,9 +194,8 @@ export function WorkflowCardsClient({ workflows }: { workflows: WorkflowListItem
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </>
   );
 }
-
