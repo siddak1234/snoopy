@@ -118,6 +118,7 @@ function AutomationBuilder() {
   const trashRef = useRef<HTMLButtonElement>(null);
   const workflowMenuRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
+  const autosaveRequestRef = useRef(0);
 
   // ─── Mobile detection ───────────────────────────────────────────────
 
@@ -621,6 +622,55 @@ function AutomationBuilder() {
     nodes,
     edges,
     executeWorkflowSwitch,
+  ]);
+
+  // ─── Autosave existing workflows on canvas changes ─────────────────
+
+  useEffect(() => {
+    if (!workflowId) return;
+    if (authStatus !== "authenticated") return;
+    if (!hasUnsavedChanges) return;
+    if (showSaveModal || showAuthPrompt || showSwitchConfirm) return;
+    if (saveStatus === "saving") return;
+
+    let active = true;
+    const signatureAtSchedule = currentSignature;
+    const requestId = ++autosaveRequestRef.current;
+    const timer = setTimeout(async () => {
+      if (!active) return;
+
+      setSaveStatus("saving");
+      setSaveError("");
+
+      const result = await saveWorkflowAction(workflowId, getCanvasState());
+      if (!active) return;
+      // Ignore stale responses from older autosave requests.
+      if (requestId !== autosaveRequestRef.current) return;
+
+      if (!result.ok) {
+        setSaveError(result.error);
+        setSaveStatus("error");
+        return;
+      }
+
+      setLastSavedSignature(signatureAtSchedule);
+      setSaveStatus("saved");
+    }, 900);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [
+    workflowId,
+    authStatus,
+    hasUnsavedChanges,
+    currentSignature,
+    showSaveModal,
+    showAuthPrompt,
+    showSwitchConfirm,
+    saveStatus,
+    getCanvasState,
   ]);
 
   // ─── Render ─────────────────────────────────────────────────────────
