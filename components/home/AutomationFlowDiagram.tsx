@@ -252,6 +252,76 @@ export default function AutomationFlowDiagram() {
       const exitZ = index + 1;
       const spreadZ = 10 + index;
 
+      if (!layout.isDesktop) {
+        const revealStart = 0.03;
+        const revealEnd = 0.5;
+        const revealBase = clamp(
+          (p - revealStart) / Math.max(revealEnd - revealStart, 0.001),
+          0,
+          1,
+        );
+        const revealStagger = 0.18;
+        const revealProgress =
+          index === 0
+            ? 1
+            : clamp(
+                (revealBase - (index - 1) * revealStagger) /
+                  Math.max(1 - (index - 1) * revealStagger, 0.001),
+                0,
+                1,
+              );
+
+        const deckPeek = card.height * 0.26;
+        const deckLift = index === 0 ? 0 : -(index * Math.max(card.height - deckPeek, 0));
+        const entryScaleMobile = index === 0 ? 1 : clamp(0.98 - index * 0.02, 0.9, 1);
+        const entryOpacityMobile =
+          index === 0 ? 1 : clamp(0.72 - (index - 1) * 0.1, 0.38, 0.9);
+
+        if (p < 0.5) {
+          return {
+            tx: 0,
+            ty: lerp(deckLift, 0, revealProgress),
+            scale: lerp(entryScaleMobile, 1, revealProgress),
+            opacity: clamp(lerp(entryOpacityMobile, 1, revealProgress), 0.34, 1),
+            zIndex: Math.round(lerp(entryZ, spreadZ, revealProgress)),
+            cx,
+            cy,
+            width: card.width,
+            height: card.height,
+          };
+        }
+
+        if (p > exitStart) {
+          const exitPhase = clamp((p - exitStart) / Math.max(1 - exitStart, 0.001), 0, 1);
+          const exitTyMobile = -(index * card.height * 0.14);
+          const exitScaleMobile = 0.96 + (index / Math.max(last, 1)) * 0.06;
+          const exitOpacityMobile = 0.62 + (index / Math.max(last, 1)) * 0.38;
+          return {
+            tx: 0,
+            ty: lerp(0, exitTyMobile, exitPhase),
+            scale: lerp(1, exitScaleMobile, exitPhase),
+            opacity: clamp(lerp(1, exitOpacityMobile, exitPhase), 0.45, 1),
+            zIndex: Math.round(lerp(spreadZ, exitZ, exitPhase)),
+            cx,
+            cy,
+            width: card.width,
+            height: card.height,
+          };
+        }
+
+        return {
+          tx: 0,
+          ty: 0,
+          scale: 1,
+          opacity: 1,
+          zIndex: spreadZ,
+          cx,
+          cy,
+          width: card.width,
+          height: card.height,
+        };
+      }
+
       if (p < entryEnd) {
         const entryPhase = clamp(p / Math.max(entryEnd, 0.001), 0, 1);
         return {
@@ -349,7 +419,7 @@ export default function AutomationFlowDiagram() {
       const focus = clamp(1 - distance, 0, 1);
       const opacity = clamp(0.26 + spread * 0.46 + focus * 0.2, 0.2, 0.92);
 
-      return { d, opacity };
+      return { d, opacity: layout.isDesktop ? opacity : opacity * 0.42 };
     });
   }, [layout, cardStates, progress]);
 
@@ -383,7 +453,7 @@ export default function AutomationFlowDiagram() {
                 strokeWidth="1.7"
                 strokeLinecap="round"
               />
-              {!reduceMotion ? (
+              {!reduceMotion && layout?.isDesktop ? (
                 <path
                   d={connector.d}
                   fill="none"
