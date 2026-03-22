@@ -477,6 +477,28 @@ function AutomationBuilder() {
 
           {/* Toolbar — top-right */}
           <div className="absolute right-3 top-3 z-10 flex flex-col gap-2">
+            {/* Send (placeholder only) */}
+            <button
+              type="button"
+              onClick={() => {}}
+              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--surface)]/80 text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
+              aria-label="Send workflow"
+              title="Send workflow"
+            >
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+              >
+                <path d="M14.5 1.5 7.3 8.7" />
+                <path d="m14.5 1.5-4 13L7.3 8.7.5 5.5z" />
+              </svg>
+            </button>
+
             {/* Save workflow */}
             <button
               type="button"
