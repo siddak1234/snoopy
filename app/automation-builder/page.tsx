@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   ReactFlow,
@@ -41,8 +41,11 @@ import {
 } from "@/lib/workflow-draft";
 import {
   createWorkflowAction,
+  listWorkflowsAction,
   saveWorkflowAction,
   getWorkflowAction,
+  type WorkflowDetail,
+  type WorkflowListItem,
 } from "@/app/account/workflows/actions";
 
 const MOBILE_BP = 640;
@@ -60,6 +63,14 @@ const defaultEdgeOptions = {
   type: "deletable" as const,
   style: { strokeWidth: 2 },
 };
+
+type PendingSwitchTarget =
+  | { kind: "new" }
+  | { kind: "existing"; workflow: WorkflowDetail };
+
+function canvasSignature(nodes: Node[], edges: Edge[]): string {
+  return JSON.stringify(reactFlowToCanvasState(nodes, edges));
+}
 
 export default function AutomationBuilderPage() {
   return (
@@ -87,15 +98,25 @@ function AutomationBuilder() {
   const [workflowName, setWorkflowName] = useState("");
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
+  const [showSwitchConfirm, setShowSwitchConfirm] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState("");
+  const [switchError, setSwitchError] = useState("");
+  const [isSwitching, setIsSwitching] = useState(false);
   const [nameInput, setNameInput] = useState("");
+  const [workflowMenuOpen, setWorkflowMenuOpen] = useState(false);
+  const [workflowOptions, setWorkflowOptions] = useState<WorkflowListItem[]>([]);
+  const [menuError, setMenuError] = useState("");
+  const [pendingSwitch, setPendingSwitch] = useState<PendingSwitchTarget | null>(null);
+  const [postSaveSwitch, setPostSaveSwitch] = useState<PendingSwitchTarget | null>(null);
+  const [lastSavedSignature, setLastSavedSignature] = useState<string | null>(null);
 
   const { screenToFlowPosition, getViewport } = useReactFlow();
-  const { data: session, status: authStatus } = useAppSession();
+  const { status: authStatus } = useAppSession();
   const nextId = useRef(0);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const trashRef = useRef<HTMLButtonElement>(null);
+  const workflowMenuRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
 
   // ─── Mobile detection ───────────────────────────────────────────────
@@ -107,6 +128,66 @@ function AutomationBuilder() {
     mql.addEventListener("change", handler);
     return () => mql.removeEventListener("change", handler);
   }, []);
+
+  const applyWorkflowToCanvas = useCallback(
+    (workflow: WorkflowDetail) => {
+      const { nodes: rfNodes, edges: rfEdges } = definitionToReactFlow(
+        workflow.definition,
+      );
+      setNodes(rfNodes);
+      setEdges(rfEdges);
+      setWorkflowId(workflow.id);
+      setWorkflowName(workflow.name);
+      setSaveStatus("idle");
+      setSaveError("");
+      setLastSavedSignature(canvasSignature(rfNodes, rfEdges));
+
+      const maxId = rfNodes.reduce((max, n) => {
+        const num = parseInt(n.id.replace(/\D/g, ""), 10);
+        return Number.isNaN(num) ? max : Math.max(max, num + 1);
+      }, 0);
+      nextId.current = maxId;
+    },
+    [setNodes, setEdges],
+  );
+
+  const resetToNewWorkflow = useCallback(() => {
+    setNodes([]);
+    setEdges([]);
+    setWorkflowId(null);
+    setWorkflowName("");
+    setSaveStatus("idle");
+    setSaveError("");
+    setLastSavedSignature(null);
+    nextId.current = 0;
+  }, [setNodes, setEdges]);
+
+  const loadWorkflowOptions = useCallback(async () => {
+    if (authStatus !== "authenticated") return;
+    const result = await listWorkflowsAction();
+    if (!result.ok) {
+      setMenuError(result.error);
+      return;
+    }
+    setMenuError("");
+    setWorkflowOptions(result.workflows);
+  }, [authStatus]);
+
+  useEffect(() => {
+    if (authStatus !== "authenticated") return;
+    void loadWorkflowOptions();
+  }, [authStatus, loadWorkflowOptions]);
+
+  useEffect(() => {
+    if (!workflowMenuOpen) return;
+    const onClickOutside = (event: MouseEvent) => {
+      if (!workflowMenuRef.current) return;
+      if (workflowMenuRef.current.contains(event.target as globalThis.Node)) return;
+      setWorkflowMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [workflowMenuOpen]);
 
   // ─── Load saved workflow from URL param ─────────────────────────────
 
@@ -121,21 +202,9 @@ function AutomationBuilder() {
     (async () => {
       const result = await getWorkflowAction(paramId);
       if (!result.ok) return;
-      const { nodes: rfNodes, edges: rfEdges } = definitionToReactFlow(
-        result.workflow.definition,
-      );
-      setNodes(rfNodes);
-      setEdges(rfEdges);
-      setWorkflowId(result.workflow.id);
-      setWorkflowName(result.workflow.name);
-
-      const maxId = rfNodes.reduce((max, n) => {
-        const num = parseInt(n.id.replace(/\D/g, ""), 10);
-        return Number.isNaN(num) ? max : Math.max(max, num + 1);
-      }, 0);
-      nextId.current = maxId;
+      applyWorkflowToCanvas(result.workflow);
     })();
-  }, [paramId, authStatus, setNodes, setEdges]);
+  }, [paramId, authStatus, applyWorkflowToCanvas]);
 
   // ─── Restore pending draft after auth return ────────────────────────
 
@@ -155,6 +224,7 @@ function AutomationBuilder() {
     const { nodes: rfNodes, edges: rfEdges } = canvasStateToReactFlow(draft.state);
     setNodes(rfNodes);
     setEdges(rfEdges);
+    setLastSavedSignature(null);
 
     const maxId = rfNodes.reduce((max, n) => {
       const num = parseInt(n.id.replace(/\D/g, ""), 10);
@@ -318,6 +388,7 @@ function AutomationBuilder() {
 
   const handleSaveClick = useCallback(() => {
     if (nodes.length === 0 && !workflowId) return;
+    setSaveError("");
 
     if (authStatus !== "authenticated") {
       setShowAuthPrompt(true);
@@ -331,6 +402,7 @@ function AutomationBuilder() {
         const result = await saveWorkflowAction(workflowId, getCanvasState());
         if (result.ok) {
           setSaveStatus("saved");
+          setLastSavedSignature(canvasSignature(nodes, edges));
         } else {
           setSaveError(result.error);
           setSaveStatus("error");
@@ -341,7 +413,7 @@ function AutomationBuilder() {
       setNameInput("");
       setShowSaveModal(true);
     }
-  }, [nodes, authStatus, workflowId, getCanvasState]);
+  }, [nodes, edges, authStatus, workflowId, getCanvasState]);
 
   const handleSaveConfirm = useCallback(async () => {
     const name = nameInput.trim();
@@ -355,17 +427,45 @@ function AutomationBuilder() {
     });
 
     if (result.ok) {
+      const currentSignature = canvasSignature(nodes, edges);
       setWorkflowId(result.workflowId);
       setWorkflowName(name);
       setSaveStatus("saved");
-      router.replace(`/automation-builder?id=${result.workflowId}`, {
-        scroll: false,
-      });
+      setLastSavedSignature(currentSignature);
+
+      if (postSaveSwitch) {
+        if (postSaveSwitch.kind === "existing") {
+          applyWorkflowToCanvas(postSaveSwitch.workflow);
+          router.replace(`/automation-builder?id=${postSaveSwitch.workflow.id}`, {
+            scroll: false,
+          });
+        } else {
+          resetToNewWorkflow();
+          router.replace("/automation-builder", { scroll: false });
+        }
+        setPostSaveSwitch(null);
+      } else {
+        router.replace(`/automation-builder?id=${result.workflowId}`, {
+          scroll: false,
+        });
+      }
+      void loadWorkflowOptions();
     } else {
+      setPostSaveSwitch(null);
       setSaveError(result.error);
       setSaveStatus("error");
     }
-  }, [nameInput, getCanvasState, router]);
+  }, [
+    nameInput,
+    nodes,
+    edges,
+    getCanvasState,
+    postSaveSwitch,
+    applyWorkflowToCanvas,
+    loadWorkflowOptions,
+    resetToNewWorkflow,
+    router,
+  ]);
 
   const handleAuthRedirect = useCallback(() => {
     const canvasState = getCanvasState();
@@ -387,10 +487,132 @@ function AutomationBuilder() {
     window.location.href = `/signup?callbackUrl=${encodeURIComponent("/automation-builder")}`;
   }, [getCanvasState, nameInput]);
 
+  const currentSignature = useMemo(() => canvasSignature(nodes, edges), [nodes, edges]);
+  const hasUnsavedChanges = useMemo(() => {
+    if (workflowId) {
+      if (lastSavedSignature === null) return false;
+      return currentSignature !== lastSavedSignature;
+    }
+    return nodes.length > 0;
+  }, [workflowId, lastSavedSignature, currentSignature, nodes.length]);
+
+  const executeWorkflowSwitch = useCallback(
+    (target: PendingSwitchTarget) => {
+      setShowSwitchConfirm(false);
+      setPendingSwitch(null);
+      setSwitchError("");
+      setSaveStatus("idle");
+      setSaveError("");
+
+      if (target.kind === "existing") {
+        applyWorkflowToCanvas(target.workflow);
+        router.replace(`/automation-builder?id=${target.workflow.id}`, {
+          scroll: false,
+        });
+        return;
+      }
+
+      resetToNewWorkflow();
+      router.replace("/automation-builder", { scroll: false });
+    },
+    [applyWorkflowToCanvas, resetToNewWorkflow, router],
+  );
+
+  const handleWorkflowSelection = useCallback(
+    async (targetId: string | null) => {
+      if (isSwitching) return;
+      setWorkflowMenuOpen(false);
+      setMenuError("");
+      setSwitchError("");
+
+      if (targetId === workflowId) return;
+
+      setIsSwitching(true);
+      try {
+        let target: PendingSwitchTarget;
+
+        if (!targetId) {
+          target = { kind: "new" };
+        } else {
+          const result = await getWorkflowAction(targetId);
+          if (!result.ok) {
+            setSwitchError(result.error);
+            return;
+          }
+          target = { kind: "existing", workflow: result.workflow };
+        }
+
+        if (hasUnsavedChanges) {
+          setPendingSwitch(target);
+          setShowSwitchConfirm(true);
+          return;
+        }
+
+        executeWorkflowSwitch(target);
+      } finally {
+        setIsSwitching(false);
+      }
+    },
+    [executeWorkflowSwitch, hasUnsavedChanges, isSwitching, workflowId],
+  );
+
+  const handleSwitchSave = useCallback(async () => {
+    if (!pendingSwitch) return;
+    setSwitchError("");
+
+    if (!hasUnsavedChanges) {
+      executeWorkflowSwitch(pendingSwitch);
+      return;
+    }
+
+    if (!workflowId) {
+      setPostSaveSwitch(pendingSwitch);
+      setShowSwitchConfirm(false);
+      setNameInput(workflowName || "");
+      setSaveError("");
+      setShowSaveModal(true);
+      return;
+    }
+
+    setSaveStatus("saving");
+    const saveResult = await saveWorkflowAction(workflowId, getCanvasState());
+    if (!saveResult.ok) {
+      setSaveStatus("error");
+      setSwitchError(saveResult.error);
+      return;
+    }
+
+    setSaveStatus("saved");
+    setLastSavedSignature(canvasSignature(nodes, edges));
+    executeWorkflowSwitch(pendingSwitch);
+  }, [
+    pendingSwitch,
+    hasUnsavedChanges,
+    workflowId,
+    workflowName,
+    getCanvasState,
+    nodes,
+    edges,
+    executeWorkflowSwitch,
+  ]);
+
   // ─── Render ─────────────────────────────────────────────────────────
 
   const hasItems = nodes.length > 0;
   const canSave = hasItems || Boolean(workflowId);
+  const statusLabel = workflowId
+    ? hasUnsavedChanges
+      ? "Not saved"
+      : "Saved"
+    : hasItems
+      ? "Not saved"
+      : "Draft";
+  const statusClass =
+    statusLabel === "Saved"
+      ? "border-emerald-400/45 bg-emerald-500/10 text-emerald-300"
+      : statusLabel === "Not saved"
+        ? "border-amber-300/45 bg-amber-500/10 text-amber-200"
+        : "border-[var(--ring)] bg-[var(--step-pill-bg)] text-[var(--step-pill-text)]";
 
   return (
     <>
@@ -453,25 +675,92 @@ function AutomationBuilder() {
           </ReactFlow>
 
           {/* Title badge */}
-          <div className="absolute left-3 top-3 z-10 hidden flex-col items-start gap-1.5 rounded-2xl border border-[var(--ring)] bg-linear-to-br from-[var(--surface)] to-[var(--surface-strong)] px-4 py-2.5 shadow-sm sm:inline-flex">
-            <h1 className="text-sm font-semibold leading-tight tracking-tight text-[var(--text)]">
-              {workflowName ? (
-                <>
-                  <span className="block">{workflowName}</span>
-                  <span className="block text-[0.6rem] font-medium text-[var(--muted)]">
-                    Automation Builder
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="block">Automation</span>
-                  <span className="block">Builder</span>
-                </>
-              )}
-            </h1>
-            <span className="rounded-full border border-[var(--ring)] bg-[var(--step-pill-bg)] px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--step-pill-text)]">
-              {workflowId ? "Saved" : "Draft"}
+          <div
+            ref={workflowMenuRef}
+            className="absolute left-3 top-3 z-10 hidden min-w-[13rem] flex-col items-start gap-1.5 rounded-2xl border border-[var(--ring)] bg-linear-to-br from-[var(--surface)] to-[var(--surface-strong)] px-4 py-2.5 shadow-sm sm:inline-flex"
+          >
+            <div className="flex w-full items-center justify-between gap-2">
+              <h1 className="truncate text-sm font-semibold leading-tight tracking-tight text-[var(--text)]">
+                {workflowName || "Automation Builder"}
+              </h1>
+              <button
+                type="button"
+                onClick={() => setWorkflowMenuOpen((open) => !open)}
+                disabled={authStatus !== "authenticated"}
+                className={`inline-flex h-6 w-6 items-center justify-center rounded-full border transition ${
+                  authStatus !== "authenticated"
+                    ? "pointer-events-none border-[var(--ring)]/60 text-[var(--muted)]/40"
+                    : "border-[var(--ring)] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--text)]"
+                }`}
+                aria-label="Switch workflow"
+                title="Switch workflow"
+              >
+                <svg
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`h-3.5 w-3.5 transition ${workflowMenuOpen ? "rotate-180" : ""}`}
+                >
+                  <path d="m3.5 6 4.5 4 4.5-4" />
+                </svg>
+              </button>
+            </div>
+            <span className="text-[0.6rem] font-medium text-[var(--muted)]">
+              Automation Builder
             </span>
+            <span className={`rounded-full border px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.12em] ${statusClass}`}>
+              {statusLabel}
+            </span>
+
+            {workflowMenuOpen ? (
+              <div className="absolute left-0 top-[calc(100%+0.45rem)] w-[17.5rem] rounded-2xl border border-[var(--ring)] bg-[var(--surface-strong)] p-2 shadow-xl">
+                <button
+                  type="button"
+                  onClick={() => void handleWorkflowSelection(null)}
+                  className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)]"
+                >
+                  <span>New Workflow</span>
+                  <span className="text-[0.6rem] text-[var(--muted)]">Blank</span>
+                </button>
+                <div className="my-1 h-px bg-[var(--ring)]/80" />
+                <div className="max-h-56 overflow-y-auto pr-0.5">
+                  {workflowOptions.map((wf) => (
+                    <button
+                      key={wf.id}
+                      type="button"
+                      onClick={() => void handleWorkflowSelection(wf.id)}
+                      className={`mt-1 flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left transition ${
+                        wf.id === workflowId
+                          ? "bg-[var(--accent)]/14 text-[var(--accent)]"
+                          : "text-[var(--text)] hover:bg-[var(--surface-hover)]"
+                      }`}
+                    >
+                      <span className="truncate text-xs font-medium">{wf.name}</span>
+                      <span className="ml-2 shrink-0 text-[0.6rem] text-[var(--muted)]">
+                        {wf.nodeCount}n
+                      </span>
+                    </button>
+                  ))}
+                  {workflowOptions.length === 0 ? (
+                    <p className="px-2.5 py-2 text-xs text-[var(--muted)]">
+                      No saved workflows yet.
+                    </p>
+                  ) : null}
+                </div>
+                {menuError ? (
+                  <p className="mt-2 px-2.5 text-[0.64rem] text-red-300">{menuError}</p>
+                ) : null}
+                {switchError && !showSwitchConfirm ? (
+                  <p className="mt-1 px-2.5 text-[0.64rem] text-red-300">{switchError}</p>
+                ) : null}
+                {isSwitching ? (
+                  <p className="mt-1 px-2.5 text-[0.64rem] text-[var(--muted)]">Loading workflow...</p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           {/* Toolbar — top-right */}
@@ -618,6 +907,51 @@ function AutomationBuilder() {
         </div>
       )}
 
+      {/* ── Switch workflow confirmation modal ───────────────────────── */}
+      {showSwitchConfirm && pendingSwitch && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-96 max-w-[calc(100vw-2rem)] rounded-2xl border border-[var(--ring)] bg-linear-to-br from-[var(--surface)] to-[var(--surface-strong)] p-6 shadow-xl">
+            <p className="text-center text-sm font-semibold text-[var(--text)]">
+              Save current workflow first?
+            </p>
+            <p className="mt-1.5 text-center text-xs leading-relaxed text-[var(--muted)]">
+              You selected{" "}
+              <span className="font-semibold text-[var(--text)]">
+                {pendingSwitch.kind === "existing" ? pendingSwitch.workflow.name : "New Workflow"}
+              </span>
+              . Save your current canvas before switching?
+            </p>
+            {switchError ? (
+              <p className="mt-3 text-center text-xs text-red-400">{switchError}</p>
+            ) : null}
+            <div className="mt-5 flex gap-2.5">
+              <button
+                onClick={() => {
+                  setShowSwitchConfirm(false);
+                  setPendingSwitch(null);
+                  setSwitchError("");
+                }}
+                className="flex-1 cursor-pointer rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-xs font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => executeWorkflowSwitch(pendingSwitch)}
+                className="flex-1 cursor-pointer rounded-full border border-[var(--ring)]/80 bg-[var(--surface)] px-4 py-2 text-xs font-medium text-[var(--muted)] transition hover:text-[var(--text)]"
+              >
+                Don&apos;t save
+              </button>
+              <button
+                onClick={() => void handleSwitchSave()}
+                className="flex-1 cursor-pointer rounded-full border border-[var(--accent)] bg-[var(--accent)]/10 px-4 py-2 text-xs font-semibold text-[var(--accent)] transition hover:bg-[var(--accent)]/20"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Save naming modal ─────────────────────────────────────────── */}
       {showSaveModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -648,6 +982,7 @@ function AutomationBuilder() {
               <button
                 onClick={() => {
                   setShowSaveModal(false);
+                  setPostSaveSwitch(null);
                   setSaveError("");
                 }}
                 className="flex-1 cursor-pointer rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-xs font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)]"
@@ -674,7 +1009,7 @@ function AutomationBuilder() {
               Sign in to save
             </p>
             <p className="mt-1.5 text-center text-xs leading-relaxed text-[var(--muted)]">
-              Your workflow will be preserved. After signing in you'll return here to name and save it.
+              Your workflow will be preserved. After signing in you&apos;ll return here to name and save it.
             </p>
             <div className="mt-5 flex flex-col gap-2">
               <button
