@@ -633,33 +633,34 @@ function AutomationBuilder() {
     if (showSaveModal || showAuthPrompt || showSwitchConfirm) return;
     if (saveStatus === "saving") return;
 
-    let active = true;
     const signatureAtSchedule = currentSignature;
     const requestId = ++autosaveRequestRef.current;
-    const timer = setTimeout(async () => {
-      if (!active) return;
+    let fired = false;
+    const timer = setTimeout(() => {
+      fired = true;
+      void (async () => {
+        setSaveStatus("saving");
+        setSaveError("");
 
-      setSaveStatus("saving");
-      setSaveError("");
+        const result = await saveWorkflowAction(workflowId, getCanvasState());
+        // Ignore stale responses from older autosave requests.
+        if (requestId !== autosaveRequestRef.current) return;
 
-      const result = await saveWorkflowAction(workflowId, getCanvasState());
-      if (!active) return;
-      // Ignore stale responses from older autosave requests.
-      if (requestId !== autosaveRequestRef.current) return;
+        if (!result.ok) {
+          setSaveError(result.error);
+          setSaveStatus("error");
+          return;
+        }
 
-      if (!result.ok) {
-        setSaveError(result.error);
-        setSaveStatus("error");
-        return;
-      }
-
-      setLastSavedSignature(signatureAtSchedule);
-      setSaveStatus("saved");
+        setLastSavedSignature(signatureAtSchedule);
+        setSaveStatus("saved");
+      })();
     }, 900);
 
     return () => {
-      active = false;
-      clearTimeout(timer);
+      // If the debounce timer has already fired, allow the in-flight save to
+      // complete instead of cancelling state reconciliation.
+      if (!fired) clearTimeout(timer);
     };
   }, [
     workflowId,
