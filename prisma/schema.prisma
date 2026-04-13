@@ -51,6 +51,7 @@ model Project {
   id               String        @id @default(uuid())
   workspaceId      String?
   name             String
+  type             String        @default("")
   description      String?
   status           ProjectStatus @default(active)
   userId           String?

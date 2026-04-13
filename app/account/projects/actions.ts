@@ -42,6 +42,11 @@ export async function createProjectAction(
     return { ok: false, error: `Name must be at most ${NAME_MAX} characters.` };
   }
 
+  const projectType = formData.get("projectType");
+  if (typeof projectType !== "string" || !projectType.trim()) {
+    return { ok: false, error: "Project type is required." };
+  }
+
   const description = formData.get("description");
   const descriptionStr =
     typeof description === "string" && description.trim()
@@ -51,6 +56,7 @@ export async function createProjectAction(
   try {
     const { project, accessCode } = await createProjectDb(session.user.id, {
       name: trimmed,
+      type: projectType.trim(),
       description: descriptionStr,
     });
     // Do NOT revalidate here: it can refresh the RSC tree and unmount the success modal.

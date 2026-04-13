@@ -153,7 +153,7 @@ export async function getAccessibleProjects(
  */
 export async function createProject(
   userId: string,
-  data: { name: string; description?: string | null; status?: ProjectStatus }
+  data: { name: string; type?: string; description?: string | null; status?: ProjectStatus }
 ) {
   const workspaceId = await ensureTenantForUser(userId);
   const user = await prisma.user.findUnique({
@@ -171,6 +171,7 @@ export async function createProject(
     data: {
       workspaceId,
       name: data.name.trim(),
+      type: data.type?.trim() ?? "",
       description: data.description?.trim() || null,
       status: data.status ?? "active",
       userId,

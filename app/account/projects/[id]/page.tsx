@@ -72,6 +72,12 @@ export default async function ProjectDetailPage({
     >
       <div className="py-5 first:pt-0">
         <dl className="grid gap-2 text-sm">
+          {project.type ? (
+            <>
+              <dt className="text-[var(--muted)]">Type</dt>
+              <dd className="text-[var(--text)]">{project.type}</dd>
+            </>
+          ) : null}
           <dt className="text-[var(--muted)]">Status</dt>
           <dd>
             <span className="inline-flex rounded-full bg-[var(--chip-bg)] px-2.5 py-0.5 text-xs font-medium text-[var(--chip-text)]">
