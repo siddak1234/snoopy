@@ -33,45 +33,43 @@ export default async function AccountProjectsPage() {
       title="Projects"
       subheader="Manage your projects"
     >
-      <div className="py-5 first:pt-0">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
-          My projects
-        </h2>
+      <div className=”py-5 first:pt-0”>
+        <div className=”flex items-center justify-between”>
+          <h2 className=”text-xs font-medium uppercase tracking-wide text-[var(--muted)]”>
+            My projects
+          </h2>
+          <CreateProjectButton />
+        </div>
         {myProjects.length === 0 ? (
-          <>
-            <p className="mt-3 text-sm text-[var(--muted)]">No projects yet.</p>
-            <p className="mt-1 text-xs text-[var(--muted)]">
+          <div className=”mt-3”>
+            <p className=”text-sm text-[var(--muted)]”>No projects yet.</p>
+            <p className=”mt-1 text-xs text-[var(--muted)]”>
               Create a project to get started, or join one with an access code.
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <CreateProjectButton />
-            </div>
-          </>
+          </div>
         ) : (
-          <div className="mt-3">
+          <div className=”mt-3”>
             <ProjectList projects={myProjects} />
           </div>
         )}
       </div>
 
-      <div className="py-5">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
-          Team projects
-        </h2>
+      <div className=”py-5”>
+        <div className=”flex items-center justify-between”>
+          <h2 className=”text-xs font-medium uppercase tracking-wide text-[var(--muted)]”>
+            Team projects
+          </h2>
+          <JoinProjectButton />
+        </div>
         {teamProjects.length === 0 ? (
-          <>
-            <p className="mt-3 text-sm text-[var(--muted)]">
-            You haven’t joined any team projects yet.
-          </p>
-          <p className="mt-1 text-xs text-[var(--muted)]">
-            Ask your project owner for an access code, then use “Join team project”.
-          </p>
-          <div className="mt-3">
-            <JoinProjectButton />
+          <div className=”mt-3”>
+            <p className=”text-sm text-[var(--muted)]”>You haven’t joined any team projects yet.</p>
+            <p className=”mt-1 text-xs text-[var(--muted)]”>
+              Ask your project owner for an access code, then use “Join team project”.
+            </p>
           </div>
-          </>
         ) : (
-          <div className="mt-3">
+          <div className=”mt-3”>
             <TeamProjectList projects={teamProjects} />
           </div>
         )}
