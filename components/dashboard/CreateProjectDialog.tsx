@@ -9,6 +9,7 @@ const PROJECT_TYPES = [
   "Invoice Processing",
   "Document Review",
   "Data Entry Automation",
+  "GL Code Classification",
   "Custom Workflow",
 ] as const;
 
@@ -252,7 +253,8 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
                   id="project-description"
                   name="description"
                   rows={3}
-                  placeholder="Brief description"
+                  maxLength={140}
+                  placeholder="Max 140 characters"
                   disabled={pending}
                   className="mt-1.5 w-full resize-none rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60"
                 />
