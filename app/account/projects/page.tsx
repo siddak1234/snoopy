@@ -32,8 +32,6 @@ export default async function AccountProjectsPage() {
     <SectionCard
       title="Projects"
       subheader="Manage your projects"
-      primaryAction={<CreateProjectButton />}
-      secondaryAction={<JoinProjectButton />}
     >
       <div className="py-5 first:pt-0">
         <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
@@ -47,7 +45,6 @@ export default async function AccountProjectsPage() {
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <CreateProjectButton />
-              <JoinProjectButton />
             </div>
           </>
         ) : (
