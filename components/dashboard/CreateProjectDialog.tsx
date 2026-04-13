@@ -5,6 +5,13 @@ import { createPortal } from "react-dom";
 import { createProjectAction } from "@/app/account/projects/actions";
 import Modal from "@/components/ui/Modal";
 
+const PROJECT_TYPES = [
+  "Invoice Processing",
+  "Document Review",
+  "Data Entry Automation",
+  "Custom Workflow",
+] as const;
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -197,6 +204,45 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
                   disabled={pending}
                   className="mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60"
                 />
+              </div>
+              <div>
+                <label htmlFor="project-type" className="block text-sm font-medium text-[var(--text)]">
+                  Project type <span className="text-[var(--muted)]">(required)</span>
+                </label>
+                <div className="relative mt-1.5">
+                  <select
+                    id="project-type"
+                    name="projectType"
+                    required
+                    disabled={pending}
+                    defaultValue=""
+                    className="w-full appearance-none rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60 cursor-pointer"
+                  >
+                    <option value="" disabled className="text-[var(--muted)]">
+                      Select project type
+                    </option>
+                    {PROJECT_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[var(--muted)]"
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </div>
               </div>
               <div>
                 <label htmlFor="project-description" className="block text-sm font-medium text-[var(--text)]">
