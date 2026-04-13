@@ -1,48 +1,45 @@
 import { prisma } from "@/lib/db";
 import type { ProjectStatus } from "@prisma/client";
-import bcrypt from "bcrypt";
 import { ensureTenantForUser, getTenantForUser } from "@/lib/tenant";
+import { canUserPerform, isProjectMember } from "@/lib/project-rbac";
 
-const ACCESS_CODE_LENGTH = 8;
-const ACCESS_CODE_PREFIX_LENGTH = 4;
-const BCRYPT_ROUNDS = 10;
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
-/**
- * Single normalization for access codes. Used on create (before hash/prefix) and join (before lookup/compare).
- * Ensures pasted codes with spaces/hyphens (e.g. "LB4C-7HR8") match the stored hash.
- */
-export function normalizeAccessCode(input: string): string {
-  return input
-    .trim()
-    .toUpperCase()
-    .replace(/[\s\-]/g, "");
-}
+export type ProjectSummary = {
+  id: string;
+  name: string;
+  description: string | null;
+  status: ProjectStatus;
+  createdAt: Date;
+  ownerName: string | null;
+};
 
-function generateAccessCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < ACCESS_CODE_LENGTH; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-}
+// ---------------------------------------------------------------------------
+// Queries
+// ---------------------------------------------------------------------------
 
 /**
- * Server-only: list projects owned by the user (in their workspace). Uses workspace from session; never from client.
- * Includes legacy projects (workspaceId/tenantId null, userId = me) until backfilled.
+ * Server-only: list projects owned by the user.
+ * Queries via projectMemberships (role = "owner") — the canonical source after
+ * the RBAC migration. Falls back to legacy userId/ownerUserId for projects
+ * created before the backfill ran (safety net; should be empty after migration).
  */
 export async function getMyProjects(userId: string) {
   if (!userId) return [];
-  const workspace = await getTenantForUser(userId);
+
+  // Primary: projects where the user has an explicit owner membership row
+  const ownerMemberships = await prisma.projectMembership.findMany({
+    where: { userId, role: "owner" },
+    select: { projectId: true },
+  });
+  const ownedProjectIds = ownerMemberships.map((m) => m.projectId);
+
+  if (ownedProjectIds.length === 0) return [];
+
   return prisma.project.findMany({
-    where: workspace
-      ? {
-          OR: [
-            { workspaceId: workspace.tenantId, OR: [{ ownerUserId: userId }, { userId: userId }] },
-            { workspaceId: null, userId },
-          ],
-        }
-      : { userId },
+    where: { id: { in: ownedProjectIds } },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -59,21 +56,20 @@ export async function getMyProjects(userId: string) {
 }
 
 /**
- * Server-only: list team projects (projects the user joined via access code, not owned by them).
+ * Server-only: list team projects (projects the user joined as member, not owner).
  */
 export async function getTeamProjects(userId: string) {
   if (!userId) return [];
-  const memberships = await prisma.projectMembership.findMany({
-    where: { userId },
+
+  const memberMemberships = await prisma.projectMembership.findMany({
+    where: { userId, role: { in: ["member", "project_user"] } },
     select: { projectId: true },
   });
-  if (memberships.length === 0) return [];
-  const projectIds = memberships.map((m) => m.projectId);
+  if (memberMemberships.length === 0) return [];
+
+  const projectIds = memberMemberships.map((m) => m.projectId);
   return prisma.project.findMany({
-    where: {
-      id: { in: projectIds },
-      OR: [{ ownerUserId: { not: userId } }, { ownerUserId: null }],
-    },
+    where: { id: { in: projectIds } },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -90,15 +86,6 @@ export async function getTeamProjects(userId: string) {
     },
   });
 }
-
-export type ProjectSummary = {
-  id: string;
-  name: string;
-  description: string | null;
-  status: ProjectStatus;
-  createdAt: Date;
-  ownerName: string | null;
-};
 
 /**
  * Server-only: list all projects the user can access (owned + team) for home dashboard.
@@ -148,8 +135,62 @@ export async function getAccessibleProjects(
 }
 
 /**
- * Server-only: create a project. tenant_id and owner are derived from session; never from client.
- * Generates access code (stored as hash + prefix only).
+ * Server-only: get project for display. Any membership role grants access.
+ * Also allows org_owners in the same workspace to see the project.
+ */
+export async function getProjectForUser(projectId: string, userId: string) {
+  const project = await prisma.project.findFirst({
+    where: { id: projectId },
+    include: {
+      projectMemberships: {
+        where: { userId },
+        select: { role: true, createdAt: true },
+      },
+    },
+  });
+  if (!project) return null;
+
+  const hasMembership = project.projectMemberships.length > 0;
+  if (hasMembership) return project;
+
+  // Org-owner bypass: workspace owners can view any project in their workspace
+  const projectWorkspaceId = project.workspaceId;
+  if (projectWorkspaceId) {
+    const workspace = await getTenantForUser(userId);
+    if (workspace?.tenantId === projectWorkspaceId && workspace.role === "org_owner") {
+      return project;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Server-only: get the full member list for a project.
+ * Caller must already have verified the user can view members (project:view_members).
+ */
+export async function getProjectMembers(projectId: string) {
+  return prisma.projectMembership.findMany({
+    where: { projectId },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      role: true,
+      createdAt: true,
+      user: {
+        select: { id: true, name: true, email: true },
+      },
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Mutations
+// ---------------------------------------------------------------------------
+
+/**
+ * Server-only: create a project and immediately create an owner membership row.
+ * Done in a transaction so neither can succeed without the other.
  */
 export async function createProject(
   userId: string,
@@ -162,39 +203,43 @@ export async function createProject(
   });
   const ownerName = user?.name?.trim() || "Unknown";
 
-  const rawCode = generateAccessCode();
-  const accessCode = normalizeAccessCode(rawCode);
-  const accessCodeHash = await bcrypt.hash(accessCode, BCRYPT_ROUNDS);
-  const accessCodePrefix = accessCode.slice(0, ACCESS_CODE_PREFIX_LENGTH);
+  const [project] = await prisma.$transaction(async (tx) => {
+    const created = await tx.project.create({
+      data: {
+        workspaceId,
+        name: data.name.trim(),
+        type: data.type?.trim() ?? "",
+        description: data.description?.trim() || null,
+        status: data.status ?? "active",
+        userId,
+        ownerUserId: userId,
+        ownerName,
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        status: true,
+        createdAt: true,
+        ownerName: true,
+      },
+    });
 
-  const project = await prisma.project.create({
-    data: {
-      workspaceId,
-      name: data.name.trim(),
-      type: data.type?.trim() ?? "",
-      description: data.description?.trim() || null,
-      status: data.status ?? "active",
-      userId,
-      ownerUserId: userId,
-      ownerName,
-      accessCodeHash,
-      accessCodePrefix,
-    },
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      status: true,
-      createdAt: true,
-      ownerName: true,
-      accessCodePrefix: true,
-    },
+    // Create the owner membership row — this is the RBAC source of truth
+    await tx.projectMembership.create({
+      data: { projectId: created.id, userId, role: "owner" },
+    });
+
+    return [created];
   });
-  return { project, accessCode };
+
+  return { project };
 }
 
 /**
- * Server-only: delete a project. Allowed if user is project owner OR org_owner (OWNER) in the project's workspace.
+ * Server-only: delete a project.
+ * Allowed if the user has project:delete permission (owner role) OR is org_owner
+ * in the project's workspace.
  */
 export async function deleteProject(
   userId: string,
@@ -202,134 +247,56 @@ export async function deleteProject(
 ): Promise<boolean> {
   const project = await prisma.project.findFirst({
     where: { id: projectId },
-    select: { workspaceId: true, ownerUserId: true, userId: true },
+    select: { workspaceId: true },
   });
   if (!project) return false;
 
+  const canDelete = await canUserPerform(userId, projectId, "project:delete");
+  if (canDelete) {
+    const result = await prisma.project.deleteMany({ where: { id: projectId } });
+    return result.count > 0;
+  }
+
+  // Org-owner bypass
   const workspace = await getTenantForUser(userId);
-  if (!workspace) return false;
+  const isOrgOwner =
+    workspace?.role === "org_owner" &&
+    workspace.tenantId === project.workspaceId;
+  if (!isOrgOwner) return false;
 
-  const projectWorkspaceId = project.workspaceId;
-  const isSameWorkspace = projectWorkspaceId === workspace.tenantId;
-  const isOwner =
-    project.ownerUserId === userId || project.userId === userId;
-  const isOrgOwner = isSameWorkspace && workspace.role === "org_owner";
-
-  if (!isOwner && !isOrgOwner) return false;
-
-  const result = await prisma.project.deleteMany({
-    where: { id: projectId },
-  });
+  const result = await prisma.project.deleteMany({ where: { id: projectId } });
   return result.count > 0;
 }
 
 /**
  * Server-only: leave a project (remove the user's membership).
- *
- * Allowed only when the user is NOT a project owner.
- * This does NOT delete the project itself.
+ * Only allowed when the user has the project:leave action (member / project_user roles).
+ * Owners lack this action intentionally — they must delete the project instead.
  */
 export async function leaveProject(
   userId: string,
-  projectId: string,
+  projectId: string
 ): Promise<boolean> {
-  if (!userId) return false;
-  if (!projectId) return false;
+  if (!userId || !projectId) return false;
 
-  const project = await prisma.project.findFirst({
-    where: { id: projectId },
-    select: { ownerUserId: true, userId: true },
-  });
-  if (!project) return false;
+  const canLeave = await canUserPerform(userId, projectId, "project:leave");
+  if (!canLeave) return false;
 
-  const isOwner =
-    project.ownerUserId === userId || project.userId === userId;
-  if (isOwner) return false;
-
-  // Membership unique constraint: @@unique([projectId, userId])
   const result = await prisma.projectMembership.deleteMany({
     where: { projectId, userId },
   });
-
   return result.count > 0;
 }
 
-/**
- * Server-only: join a project by access code. Verifies code server-side; user must be in same workspace as project.
- * Never trust client for workspace_id or project_id; lookup by code only.
- *
- * NOTE: We intentionally do NOT scope the join lookup to the user's current
- * workspace/tenant. Users can join a project owned by a different workspace
- * as long as they have the correct access code.
- */
-export async function joinProjectByCode(
-  userId: string,
-  code: string
-): Promise<{ ok: true; projectId: string } | { ok: false; error: string }> {
-  const normalized = normalizeAccessCode(code);
-  if (normalized.length < ACCESS_CODE_PREFIX_LENGTH) {
-    return { ok: false, error: "Invalid access code." };
-  }
-
-  const prefix = normalized.slice(0, ACCESS_CODE_PREFIX_LENGTH);
-  const projects = await prisma.project.findMany({
-    where: { accessCodePrefix: prefix },
-    select: {
-      id: true,
-      name: true,
-      accessCodeHash: true,
-    },
-  });
-
-  for (const p of projects) {
-    if (!p.accessCodeHash) continue;
-    const match = await bcrypt.compare(normalized, p.accessCodeHash);
-    if (match) {
-      await prisma.projectMembership.upsert({
-        where: {
-          projectId_userId: { projectId: p.id, userId },
-        },
-        create: { projectId: p.id, userId, role: "project_user" },
-        update: {},
-      });
-      return { ok: true, projectId: p.id };
-    }
-  }
-  return { ok: false, error: "Invalid access code." };
-}
-
-/**
- * Server-only: get project for display. Allowed if user owns it, is in project_memberships, or is org_owner in project's workspace.
- * Also allows legacy projects (workspaceId/tenantId null) where userId = me.
- */
-export async function getProjectForUser(projectId: string, userId: string) {
-  const project = await prisma.project.findFirst({
-    where: { id: projectId },
-    include: {
-      projectMemberships: { where: { userId }, select: { createdAt: true } },
-    },
-  });
-  if (!project) return null;
-
-  const isOwner =
-    project.ownerUserId === userId || project.userId === userId;
-  const isMember = project.projectMemberships.length > 0;
-
-  const projectWorkspaceId = project.workspaceId;
-  if (projectWorkspaceId) {
-    const workspace = await getTenantForUser(userId);
-    if (!workspace) return isOwner || isMember ? project : null;
-    const isOrgOwner = workspace.role === "org_owner";
-    if (workspace.tenantId !== projectWorkspaceId && !isOwner && !isMember)
-      return null;
-    if (isOwner || isMember || isOrgOwner) return project;
-  } else {
-    if (isOwner || isMember) return project;
-  }
-  return null;
-}
-
-/** Backward compat: list all projects for user (owned only, for callers that don't need my/team split yet). */
+/** Backward compat: list all projects for user (owned only). */
 export async function getProjectsForUser(userId: string) {
   return getMyProjects(userId);
+}
+
+/** @deprecated Use the invite system instead. Kept temporarily for rollback safety. */
+export async function joinProjectByCode(
+  _userId: string,
+  _code: string
+): Promise<{ ok: false; error: string }> {
+  return { ok: false, error: "Access code joining has been replaced by the invite system." };
 }

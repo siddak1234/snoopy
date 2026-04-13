@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAppSession } from "@/lib/auth-supabase";
-import { getTenantForUser } from "@/lib/tenant";
-import { getProjectForUser } from "@/lib/projects";
+import { getProjectForUser, getProjectMembers } from "@/lib/projects";
+import { getProjectRole } from "@/lib/project-rbac";
+import { listPendingInvites } from "@/lib/invites";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { DeleteProjectButton } from "@/components/dashboard/DeleteProjectButton";
 import { LeaveProjectButton } from "@/components/dashboard/LeaveProjectButton";
+import { InviteSection } from "@/components/dashboard/InviteSection";
 import { formatDateMediumUTC } from "@/lib/date";
 
 const statusLabel: Record<string, string> = {
@@ -26,19 +28,27 @@ export default async function ProjectDetailPage({
   }
 
   const { id } = await params;
-  const project = await getProjectForUser(id, session.user.id);
+  const userId = session.user.id;
 
-  if (!project) {
-    notFound();
-  }
+  const [project, role] = await Promise.all([
+    getProjectForUser(id, userId),
+    getProjectRole(userId, id),
+  ]);
 
-  const tenant = await getTenantForUser(session.user.id);
-  const isOwner =
-    project.ownerUserId === session.user.id || project.userId === session.user.id;
-  const isOrgOwner = tenant?.role === "org_owner";
-  const canDelete = isOwner || isOrgOwner;
-  const isMember = project.projectMemberships?.length > 0;
-  const canLeave = !isOwner && isMember;
+  if (!project) notFound();
+
+  const isOwner  = role === "owner";
+  const isMember = role !== null;
+  const canDelete = isOwner;
+  const canLeave  = isMember && !isOwner;
+
+  // Parallel fetch of owner-only data
+  const [members, pendingInvites] = isOwner
+    ? await Promise.all([
+        getProjectMembers(id),
+        listPendingInvites(id, userId),
+      ])
+    : [[], []];
 
   return (
     <SectionCard
@@ -70,6 +80,7 @@ export default async function ProjectDetailPage({
         ) : null
       }
     >
+      {/* ── Project metadata ─────────────────────────────────────────────── */}
       <div className="py-5 first:pt-0">
         <dl className="grid gap-2 text-sm">
           {project.type ? (
@@ -88,11 +99,35 @@ export default async function ProjectDetailPage({
           <dd className="text-[var(--text)]">
             {formatDateMediumUTC(project.createdAt)}
           </dd>
+          {!isOwner && project.ownerName ? (
+            <>
+              <dt className="text-[var(--muted)]">Owner</dt>
+              <dd className="text-[var(--text)]">{project.ownerName}</dd>
+            </>
+          ) : null}
         </dl>
-        <p className="mt-4 text-sm text-[var(--muted)]">
-          Project settings and workflow links will go here.
-        </p>
       </div>
+
+      {/* ── Members + invite management (owner only) ─────────────────────── */}
+      {isOwner ? (
+        <div className="border-t border-[var(--ring)] py-5">
+          <InviteSection
+            projectId={project.id}
+            initialPendingInvites={pendingInvites.map((inv) => ({
+              id: inv.id,
+              token: inv.token,
+              expiresAt: inv.expiresAt,
+              createdAt: inv.createdAt,
+            }))}
+            initialMembers={members.map((m) => ({
+              id: m.id,
+              role: m.role,
+              createdAt: m.createdAt,
+              user: m.user,
+            }))}
+          />
+        </div>
+      ) : null}
     </SectionCard>
   );
 }
