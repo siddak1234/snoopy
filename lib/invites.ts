@@ -33,7 +33,7 @@ function generateInviteCode(): string {
 // ---------------------------------------------------------------------------
 
 export type CreateInviteResult =
-  | { ok: true; token: string; code: string; expiresAt: Date }
+  | { ok: true; id: string; token: string; code: string; expiresAt: Date }
   | { ok: false; error: string };
 
 /**
@@ -52,11 +52,12 @@ export async function createInvite(
   const token = randomUUID();
   const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
 
-  await prisma.projectInvite.create({
+  const created = await prisma.projectInvite.create({
     data: { projectId, createdBy, token, codeHash, expiresAt },
+    select: { id: true },
   });
 
-  return { ok: true, token, code, expiresAt };
+  return { ok: true, id: created.id, token, code, expiresAt };
 }
 
 // ---------------------------------------------------------------------------

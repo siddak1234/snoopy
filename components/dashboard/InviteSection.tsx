@@ -44,12 +44,8 @@ export function InviteSection({
   const [members] = useState(initialMembers);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  function handleInviteCreated(invite: { token: string; expiresAt: Date; createdAt: Date }) {
-    // Optimistically add to the list (server will confirm on next load)
-    setPendingInvites((prev) => [
-      { id: "pending-" + invite.token, ...invite },
-      ...prev,
-    ]);
+  function handleInviteCreated(invite: { id: string; token: string; expiresAt: Date; createdAt: Date }) {
+    setPendingInvites((prev) => [invite, ...prev]);
   }
 
   function handleRevoked(inviteId: string) {
@@ -207,7 +203,7 @@ function CreateInviteModal({
 }: {
   projectId: string;
   onClose: () => void;
-  onCreated: (inv: { token: string; expiresAt: Date; createdAt: Date }) => void;
+  onCreated: (inv: { id: string; token: string; expiresAt: Date; createdAt: Date }) => void;
 }) {
   const [loading, setLoading] = useState(false);
   const [invite, setInvite] = useState<NewInvite | null>(null);
@@ -227,7 +223,7 @@ function CreateInviteModal({
     setLoading(false);
     if (result.ok) {
       setInvite(result);
-      onCreated({ token: result.token, expiresAt: result.expiresAt, createdAt: new Date() });
+      onCreated({ id: result.id, token: result.token, expiresAt: result.expiresAt, createdAt: new Date() });
     } else {
       setError(result.error);
     }

@@ -133,7 +133,7 @@ export async function leaveProjectAction(
 // ---------------------------------------------------------------------------
 
 export type CreateInviteResult =
-  | { ok: true; token: string; code: string; expiresAt: Date }
+  | { ok: true; id: string; token: string; code: string; expiresAt: Date }
   | { ok: false; error: string };
 
 /** Generate a new invite link + code for a project (owner only). */
