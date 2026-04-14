@@ -6,6 +6,7 @@ import {
   createInviteAction,
   revokeInviteAction,
 } from "@/app/account/projects/actions";
+import Modal from "@/components/ui/Modal";
 
 // ---------------------------------------------------------------------------
 // Types (inlined — keep this component self-contained)
@@ -252,26 +253,13 @@ function CreateInviteModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-      onClick={handleClose}
+    <Modal
+      onClose={handleClose}
+      ariaLabelledBy="invite-modal-title"
+      bubble
+      zIndex={100}
     >
-      <div
-        className="relative w-full max-w-md rounded-2xl border border-[var(--ring)] bg-[var(--card)] p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          type="button"
-          onClick={handleClose}
-          className="absolute right-4 top-4 rounded-lg p-1.5 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-          aria-label="Close"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
-        </button>
-
-        <h3 className="text-lg font-semibold text-[var(--text)]">Add team members</h3>
+        <h3 id="invite-modal-title" className="text-lg font-semibold text-[var(--text)]">Add team members</h3>
 
         {!invite ? (
           <>
@@ -352,7 +340,6 @@ function CreateInviteModal({
             </button>
           </>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
