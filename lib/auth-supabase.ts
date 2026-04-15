@@ -78,8 +78,18 @@ export async function getAppSession(): Promise<AppSession | null> {
   if (!supabaseUser?.email) return null;
 
   try {
+    const { prisma: prismaClient } = await import("@/lib/db");
     const { id } = await provisionUserFromSupabaseAuth(supabaseUser);
-    const workspaceId = await ensureDefaultWorkspaceForUser(id);
+
+    // Prefer an org workspace when the user belongs to one.
+    // Falls back to ensureDefaultWorkspaceForUser (oldest/personal) otherwise.
+    const orgMembership = await prismaClient.membership.findFirst({
+      where: { userId: id, workspace: { type: "organization" } },
+      select: { workspaceId: true },
+    });
+    const workspaceId = orgMembership?.workspaceId
+      ?? await ensureDefaultWorkspaceForUser(id);
+
     const name =
       (supabaseUser.user_metadata?.full_name as string | null) ??
       (supabaseUser.user_metadata?.name as string | null) ??

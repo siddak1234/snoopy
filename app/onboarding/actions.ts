@@ -29,13 +29,15 @@ async function getSessionIdentity(): Promise<{ userId: string; email: string }> 
 }
 
 // ---------------------------------------------------------------------------
-// Shared guard — if the user somehow already has a workspace when an action
-// is submitted, redirect them out of onboarding rather than creating a dupe.
+// Shared guard — block org creation/join if the user already has an org
+// workspace. A pre-existing personal workspace is fine: users who signed up
+// before the onboarding flow existed (or who were auto-provisioned with a
+// personal workspace) must still be able to create an org.
 // ---------------------------------------------------------------------------
 
-async function assertNoExistingWorkspace(userId: string): Promise<void> {
+async function assertNoOrgWorkspace(userId: string): Promise<void> {
   const existing = await prisma.membership.findFirst({
-    where: { userId },
+    where: { userId, workspace: { type: "organization" } },
     select: { workspaceId: true },
   });
   if (existing) redirect("/account");
@@ -80,7 +82,7 @@ export async function createOrgWorkspaceAction(
   }
 
   try {
-    await assertNoExistingWorkspace(userId);
+    await assertNoOrgWorkspace(userId);
 
     const workspaceId = await prisma.$transaction(async (tx) => {
       const workspace = await tx.workspace.create({
@@ -114,7 +116,7 @@ export async function createOrgWorkspaceAction(
 
     return { ok: true };
   } catch (e) {
-    // Re-throw Next.js redirects (from assertNoExistingWorkspace)
+    // Re-throw Next.js redirects (from assertNoOrgWorkspace)
     if ((e as { digest?: string }).digest?.startsWith("NEXT_REDIRECT")) throw e;
     console.error("createOrgWorkspaceAction", e);
     return { ok: false, error: "Failed to create organization. Please try again." };
@@ -173,7 +175,7 @@ export async function joinOrgWorkspaceAction(): Promise<JoinOrgResult> {
   }
 
   try {
-    await assertNoExistingWorkspace(userId);
+    await assertNoOrgWorkspace(userId);
 
     // Re-verify server-side: look up the verified workspace by domain.
     // The URL param is never consulted — only the user's own email domain matters.

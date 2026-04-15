@@ -28,8 +28,10 @@ export default async function OnboardingLayout({
 
   const { id: userId } = await provisionUserFromSupabaseAuth(user);
 
+  // Only redirect if the user already has an org workspace — a pre-existing
+  // personal workspace must not block org creation/joining.
   const existing = await prisma.membership.findFirst({
-    where: { userId },
+    where: { userId, workspace: { type: "organization" } },
     select: { workspaceId: true },
   });
 

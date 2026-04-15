@@ -26,17 +26,14 @@ export default async function AccountLayout({
   }
 
   // Determine whether to show the Organization link in the sidebar.
-  // Only org workspace OWNERs get this link.
-  const { id: userId, workspaceId } = session.user;
-  let showOrgSettings = false;
-  if (workspaceId) {
-    const m = await prisma.membership.findUnique({
-      where: { userId_workspaceId: { userId, workspaceId } },
-      select: { role: true, workspace: { select: { type: true } } },
-    });
-    showOrgSettings =
-      m?.role === "OWNER" && m.workspace.type === "organization";
-  }
+  // Check all memberships — the session workspaceId may be a personal workspace
+  // even when the user is also OWNER of an org workspace.
+  const { id: userId } = session.user;
+  const orgOwnerMembership = await prisma.membership.findFirst({
+    where: { userId, role: "OWNER", workspace: { type: "organization" } },
+    select: { workspaceId: true },
+  });
+  const showOrgSettings = !!orgOwnerMembership;
 
   return (
     <div className="mx-auto max-w-6xl px-4 md:px-6">
