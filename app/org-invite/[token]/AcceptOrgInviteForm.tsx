@@ -2,15 +2,14 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { acceptInviteAction } from "@/app/account/projects/actions";
+import { acceptWorkspaceInviteAction } from "@/app/account/workspace-invite-actions";
 import { normalizeInviteCode } from "@/lib/invite-utils";
 
 type Props = {
   token: string;
-  projectId: string;
 };
 
-export function AcceptInviteForm({ token, projectId }: Props) {
+export function AcceptOrgInviteForm({ token }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -22,14 +21,14 @@ export function AcceptInviteForm({ token, projectId }: Props) {
     const raw = inputRef.current?.value ?? "";
     const code = normalizeInviteCode(raw);
     if (code.length < 4) {
-      setError("Enter the invite code shared by the project owner.");
+      setError("Enter the invite code shared by the organization owner.");
       return;
     }
     setPending(true);
-    const result = await acceptInviteAction(token, code);
+    const result = await acceptWorkspaceInviteAction(token, code);
     setPending(false);
     if (result.ok) {
-      router.push(`/account/projects/${result.projectId}`);
+      router.push("/account");
     } else {
       setError(result.error);
     }
@@ -39,14 +38,14 @@ export function AcceptInviteForm({ token, projectId }: Props) {
     <form onSubmit={handleSubmit} className="mt-8 space-y-4">
       <div>
         <label
-          htmlFor="invite-code"
+          htmlFor="org-invite-code"
           className="block text-sm font-medium text-[var(--text)]"
         >
           Invite code
         </label>
         <input
           ref={inputRef}
-          id="invite-code"
+          id="org-invite-code"
           name="code"
           type="text"
           required
@@ -56,7 +55,7 @@ export function AcceptInviteForm({ token, projectId }: Props) {
           className="mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 font-mono uppercase tracking-widest text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60"
         />
         <p className="mt-1 text-xs text-[var(--muted)]">
-          The short code the project owner shared with you alongside this link.
+          The short code the organization owner shared with you alongside this link.
         </p>
       </div>
       {error ? (
@@ -69,7 +68,7 @@ export function AcceptInviteForm({ token, projectId }: Props) {
         disabled={pending}
         className="btn-primary inline-flex w-full justify-center px-5"
       >
-        {pending ? "Joining…" : "Accept invite & join project"}
+        {pending ? "Joining…" : "Accept invite & join organization"}
       </button>
     </form>
   );

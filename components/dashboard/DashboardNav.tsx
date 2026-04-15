@@ -18,9 +18,11 @@ const navLinkClass =
 
 function NavLinks({
   currentPath,
+  showOrgSettings,
   onNavigate,
 }: {
   currentPath: string;
+  showOrgSettings?: boolean;
   onNavigate?: () => void;
 }) {
   return (
@@ -42,11 +44,28 @@ function NavLinks({
           </Link>
         );
       })}
+
+      {showOrgSettings ? (
+        <Link
+          href="/account/organization"
+          onClick={onNavigate}
+          className={`${navLinkClass} ${
+            currentPath.startsWith("/account/organization")
+              ? "bg-[var(--surface-hover)] font-medium"
+              : ""
+          }`}
+          aria-current={
+            currentPath.startsWith("/account/organization") ? "page" : undefined
+          }
+        >
+          Organization
+        </Link>
+      ) : null}
     </>
   );
 }
 
-export function DashboardSidebar() {
+export function DashboardSidebar({ showOrgSettings }: { showOrgSettings?: boolean }) {
   const pathname = usePathname();
   return (
     <aside
@@ -54,7 +73,10 @@ export function DashboardSidebar() {
       aria-label="Dashboard navigation"
     >
       <nav className="bubble-soft flex flex-col gap-0.5 p-4">
-        <NavLinks currentPath={pathname ?? ""} />
+        <NavLinks
+          currentPath={pathname ?? ""}
+          showOrgSettings={showOrgSettings}
+        />
       </nav>
     </aside>
   );
@@ -67,13 +89,16 @@ const pathToTitle: Record<string, string> = {
   "/account/billing": "Billing",
   "/account/settings": "Settings",
   "/account/support": "Support",
+  "/account/organization": "Organization",
 };
 
 function getPageTitle(pathname: string): string {
+  // Project detail pages: /account/projects/[id]
+  if (pathname.startsWith("/account/projects/")) return "Project";
   return pathToTitle[pathname] ?? "Dashboard";
 }
 
-export function DashboardHeader() {
+export function DashboardHeader({ showOrgSettings }: { showOrgSettings?: boolean }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -131,7 +156,11 @@ export function DashboardHeader() {
           className="absolute left-0 top-full z-50 mt-2 min-w-[14rem] rounded-2xl border border-[var(--ring)] bg-[var(--surface)] p-2 shadow-[0_12px_24px_rgba(12,24,40,0.14)] [background:linear-gradient(165deg,var(--surface)_0%,var(--surface-strong)_100%)]"
         >
           <nav className="flex flex-col gap-0.5 py-1">
-            <NavLinks currentPath={pathname ?? ""} onNavigate={() => setMenuOpen(false)} />
+            <NavLinks
+              currentPath={pathname ?? ""}
+              showOrgSettings={showOrgSettings}
+              onNavigate={() => setMenuOpen(false)}
+            />
           </nav>
         </div>
       ) : null}

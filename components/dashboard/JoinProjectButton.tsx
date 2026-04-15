@@ -19,7 +19,7 @@ export function JoinProjectButton() {
         onClick={() => setOpen(true)}
         className="btn-secondary inline-flex px-5"
       >
-        Join team project
+        Join organization
       </button>
       <JoinProjectDialog
         open={open}

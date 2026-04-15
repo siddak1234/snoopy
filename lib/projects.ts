@@ -14,6 +14,8 @@ export type ProjectSummary = {
   status: ProjectStatus;
   createdAt: Date;
   ownerName: string | null;
+  workspaceId: string | null;
+  workspaceName: string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -48,9 +50,9 @@ export async function getMyProjects(userId: string) {
       status: true,
       createdAt: true,
       ownerName: true,
-      accessCodePrefix: true,
       ownerUserId: true,
-      userId: true,
+      workspaceId: true,
+      workspace: { select: { id: true, name: true } },
     },
   });
 }
@@ -62,7 +64,7 @@ export async function getTeamProjects(userId: string) {
   if (!userId) return [];
 
   const memberMemberships = await prisma.projectMembership.findMany({
-    where: { userId, role: { in: ["member", "project_user"] } },
+    where: { userId, role: { in: ["member", "project_user", "admin"] } },
     select: { projectId: true },
   });
   if (memberMemberships.length === 0) return [];
@@ -78,6 +80,8 @@ export async function getTeamProjects(userId: string) {
       status: true,
       createdAt: true,
       ownerName: true,
+      workspaceId: true,
+      workspace: { select: { id: true, name: true } },
       projectMemberships: {
         where: { userId },
         select: { createdAt: true },
@@ -111,6 +115,8 @@ export async function getAccessibleProjects(
         status: p.status,
         createdAt: p.createdAt,
         ownerName: p.ownerName,
+        workspaceId: p.workspaceId ?? null,
+        workspaceName: p.workspace?.name ?? null,
       });
     }
   }
@@ -124,6 +130,8 @@ export async function getAccessibleProjects(
         status: p.status,
         createdAt: p.createdAt,
         ownerName: p.ownerName,
+        workspaceId: p.workspaceId ?? null,
+        workspaceName: p.workspace?.name ?? null,
       });
     }
   }
@@ -184,6 +192,35 @@ export async function getProjectMembers(projectId: string) {
   });
 }
 
+/**
+ * Server-only: return workspace members who are NOT yet members of a given project.
+ * Used to populate the member picker modal for owners and admins.
+ */
+export async function getWorkspaceMembersNotInProject(
+  projectId: string,
+  workspaceId: string
+) {
+  const existing = await prisma.projectMembership.findMany({
+    where: { projectId },
+    select: { userId: true },
+  });
+  const existingIds = existing.map((m) => m.userId);
+
+  return prisma.membership.findMany({
+    where: {
+      workspaceId,
+      ...(existingIds.length > 0 ? { userId: { notIn: existingIds } } : {}),
+    },
+    orderBy: { createdAt: "asc" },
+    select: {
+      userId: true,
+      user: {
+        select: { id: true, name: true, email: true },
+      },
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Mutations
 // ---------------------------------------------------------------------------
@@ -194,9 +231,21 @@ export async function getProjectMembers(projectId: string) {
  */
 export async function createProject(
   userId: string,
-  data: { name: string; type?: string; description?: string | null; status?: ProjectStatus }
+  data: { name: string; type?: string; description?: string | null; status?: ProjectStatus },
+  targetWorkspaceId?: string
 ) {
-  const workspaceId = await ensureTenantForUser(userId);
+  let workspaceId: string;
+  if (targetWorkspaceId) {
+    // Verify the caller is actually a member of this workspace before creating in it
+    const membership = await prisma.membership.findUnique({
+      where: { userId_workspaceId: { userId, workspaceId: targetWorkspaceId } },
+      select: { id: true },
+    });
+    if (!membership) throw new Error("User is not a member of the specified workspace.");
+    workspaceId = targetWorkspaceId;
+  } else {
+    workspaceId = await ensureTenantForUser(userId);
+  }
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { name: true },
@@ -211,7 +260,6 @@ export async function createProject(
         type: data.type?.trim() ?? "",
         description: data.description?.trim() || null,
         status: data.status ?? "active",
-        userId,
         ownerUserId: userId,
         ownerName,
       },

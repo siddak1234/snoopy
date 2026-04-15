@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { acceptInviteAction } from "@/app/account/projects/actions";
+import { acceptWorkspaceInviteAction } from "@/app/account/workspace-invite-actions";
 import { normalizeInviteCode, parseInviteToken } from "@/lib/invite-utils";
 import Modal from "@/components/ui/Modal";
 
@@ -70,13 +70,13 @@ export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
     }
 
     setPending(true);
-    const result = await acceptInviteAction(token, code);
+    const result = await acceptWorkspaceInviteAction(token, code);
     setPending(false);
 
     if (result.ok) {
       onClose();
       onSuccess?.();
-      router.push(`/account/projects/${result.projectId}`);
+      router.push("/account");
     } else {
       setError(result.error);
     }
@@ -93,10 +93,10 @@ export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
       zIndex={100}
     >
       <h2 id="join-project-title" className="text-xl font-semibold text-[var(--text)]">
-        Join team project
+        Join organization
       </h2>
       <p id="join-project-desc" className="mt-1 text-sm text-[var(--muted)]">
-        Paste the invite link and enter the code shared by the project owner.
+        Paste the invite link and enter the code shared by the organization owner.
       </p>
 
       <form ref={formRef} onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -111,7 +111,7 @@ export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
             type="text"
             required
             autoComplete="off"
-            placeholder="https://…/invite/… or paste the token"
+            placeholder="https://…/org-invite/… or paste the token"
             disabled={pending}
             className="mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60"
           />
@@ -142,7 +142,7 @@ export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
 
         <div className="flex flex-wrap gap-2 pt-2">
           <button type="submit" disabled={pending} className="btn-primary inline-flex px-5">
-            {pending ? "Joining…" : "Join project"}
+            {pending ? "Joining…" : "Join organization"}
           </button>
           <button
             type="button"

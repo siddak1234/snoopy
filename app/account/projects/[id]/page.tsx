@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAppSession } from "@/lib/auth-supabase";
-import { getProjectForUser, getProjectMembers } from "@/lib/projects";
+import { getProjectForUser, getProjectMembers, getWorkspaceMembersNotInProject } from "@/lib/projects";
 import { getProjectRole } from "@/lib/project-rbac";
-import { listPendingInvites } from "@/lib/invites";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { DeleteProjectButton } from "@/components/dashboard/DeleteProjectButton";
 import { LeaveProjectButton } from "@/components/dashboard/LeaveProjectButton";
-import { InviteSection } from "@/components/dashboard/InviteSection";
+import { ProjectMemberPicker } from "@/components/dashboard/ProjectMemberPicker";
+import { ProjectMemberList } from "@/components/dashboard/ProjectMemberList";
 import { formatDateMediumUTC } from "@/lib/date";
+import type { MemberRow } from "@/components/dashboard/ProjectMemberList";
+import type { AvailableMember } from "@/components/dashboard/ProjectMemberPicker";
 
 const statusLabel: Record<string, string> = {
   active: "Active",
@@ -37,18 +39,39 @@ export default async function ProjectDetailPage({
 
   if (!project) notFound();
 
-  const isOwner  = role === "owner";
+  const isOwner = role === "owner";
+  const isAdmin = role === "admin";
   const isMember = role !== null;
+  const canViewMembers = isOwner || isAdmin;
+  const canAddMembers = isOwner || isAdmin;
   const canDelete = isOwner;
-  const canLeave  = isMember && !isOwner;
+  const canLeave = isMember && !isOwner;
 
-  // Parallel fetch of owner-only data
-  const [members, pendingInvites] = isOwner
+  // Fetch member data only for users who can view the member section
+  const [membersRaw, availableRaw] = canViewMembers
     ? await Promise.all([
         getProjectMembers(id),
-        listPendingInvites(id, userId),
+        canAddMembers && project.workspaceId
+          ? getWorkspaceMembersNotInProject(id, project.workspaceId)
+          : Promise.resolve([]),
       ])
     : [[], []];
+
+  // Serialize Dates for client component props
+  const members: MemberRow[] = membersRaw.map((m) => ({
+    id: m.id,
+    userId: m.user.id,
+    name: m.user.name,
+    email: m.user.email,
+    role: m.role,
+    createdAt: m.createdAt.toISOString(),
+  }));
+
+  const availableMembers: AvailableMember[] = availableRaw.map((m) => ({
+    userId: m.userId,
+    name: m.user.name,
+    email: m.user.email,
+  }));
 
   return (
     <SectionCard
@@ -108,23 +131,27 @@ export default async function ProjectDetailPage({
         </dl>
       </div>
 
-      {/* ── Members + invite management (owner only) ─────────────────────── */}
-      {isOwner ? (
+      {/* ── Member management (owner and admin) ──────────────────────────── */}
+      {canViewMembers && role ? (
         <div className="border-t border-[var(--ring)] py-5">
-          <InviteSection
+          <div className="flex items-center justify-between gap-4">
+            <h3 className="text-sm font-semibold text-[var(--text)]">
+              Team members
+            </h3>
+            {canAddMembers ? (
+              <ProjectMemberPicker
+                projectId={project.id}
+                availableMembers={availableMembers}
+              />
+            ) : null}
+          </div>
+
+          <ProjectMemberList
             projectId={project.id}
-            initialPendingInvites={pendingInvites.map((inv) => ({
-              id: inv.id,
-              token: inv.token,
-              expiresAt: inv.expiresAt,
-              createdAt: inv.createdAt,
-            }))}
-            initialMembers={members.map((m) => ({
-              id: m.id,
-              role: m.role,
-              createdAt: m.createdAt,
-              user: m.user,
-            }))}
+            viewerUserId={userId}
+            viewerRole={role}
+            members={members}
+            leaveRedirect="/account/projects"
           />
         </div>
       ) : null}

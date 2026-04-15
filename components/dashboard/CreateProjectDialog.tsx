@@ -18,9 +18,11 @@ type Props = {
   onClose: () => void;
   /** Called after the user closes the success view; use to revalidate + router.refresh(). */
   onSuccess?: () => void | Promise<void>;
+  /** When provided, the project is created in this specific workspace. */
+  workspaceId?: string;
 };
 
-export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
+export function CreateProjectDialog({ open, onClose, onSuccess, workspaceId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [created, setCreated] = useState(false);
@@ -192,6 +194,9 @@ export function CreateProjectDialog({ open, onClose, onSuccess }: Props) {
                 className="mt-1.5 w-full resize-none rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60"
               />
             </div>
+            {workspaceId ? (
+              <input type="hidden" name="workspaceId" value={workspaceId} />
+            ) : null}
             {error ? (
               <p className="text-sm text-red-600 dark:text-red-400" role="alert">
                 {error}

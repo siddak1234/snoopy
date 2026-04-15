@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { CreateProjectDialog } from "./CreateProjectDialog";
 import { revalidateAccountProjectsAction } from "@/app/account/projects/actions";
 
-export function CreateProjectButton() {
+export function CreateProjectButton({ workspaceId }: { workspaceId?: string }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
 
@@ -27,6 +27,7 @@ export function CreateProjectButton() {
         open={open}
         onClose={() => setOpen(false)}
         onSuccess={handleSuccess}
+        workspaceId={workspaceId}
       />
     </>
   );

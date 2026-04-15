@@ -6,11 +6,10 @@ import {
   deleteProject as deleteProjectDb,
   leaveProject as leaveProjectDb,
 } from "@/lib/projects";
-import {
-  createInvite as createInviteDb,
-  revokeInvite as revokeInviteDb,
-  acceptInvite as acceptInviteDb,
-} from "@/lib/invites";
+import { canUserPerform, getProjectRole } from "@/lib/project-rbac";
+import { canModifyMember } from "@/lib/project-rbac-pure";
+import { prisma } from "@/lib/db";
+import type { ProjectMemberRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 const NAME_MIN = 2;
@@ -61,12 +60,16 @@ export async function createProjectAction(
       ? description.trim()
       : null;
 
+  const wsId = formData.get("workspaceId");
+  const targetWorkspaceId =
+    typeof wsId === "string" && wsId.trim() ? wsId.trim() : undefined;
+
   try {
-    const { project } = await createProjectDb(session.user.id, {
-      name: trimmed,
-      type: projectType.trim(),
-      description: descriptionStr,
-    });
+    const { project } = await createProjectDb(
+      session.user.id,
+      { name: trimmed, type: projectType.trim(), description: descriptionStr },
+      targetWorkspaceId
+    );
     // Do NOT revalidate here — it can unmount the success state in the dialog.
     return { ok: true, projectId: project.id };
   } catch (e) {
@@ -129,82 +132,170 @@ export async function leaveProjectAction(
 }
 
 // ---------------------------------------------------------------------------
-// Invite system
+// Member management
 // ---------------------------------------------------------------------------
 
-export type CreateInviteResult =
-  | { ok: true; id: string; token: string; code: string; expiresAt: Date }
-  | { ok: false; error: string };
+export type AddMemberResult = { ok: true } | { ok: false; error: string };
 
-/** Generate a new invite link + code for a project (owner only). */
-export async function createInviteAction(
-  projectId: string
-): Promise<CreateInviteResult> {
+/**
+ * Add a workspace member to a project.
+ * Caller must hold project:add_member (owner or admin).
+ * Target must be a workspace member and not already in the project.
+ */
+export async function addMemberToProjectAction(
+  projectId: string,
+  targetUserId: string,
+  role: ProjectMemberRole
+): Promise<AddMemberResult> {
   const session = await getAppSession();
-  if (!session?.user?.id) {
-    return { ok: false, error: "You must be signed in." };
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const [allowed, actorRole] = await Promise.all([
+    canUserPerform(session.user.id, projectId, "project:add_member"),
+    getProjectRole(session.user.id, projectId),
+  ]);
+  if (!allowed || !actorRole) {
+    return { ok: false, error: "You don't have permission to add members." };
   }
-  if (!projectId?.trim()) {
-    return { ok: false, error: "Project ID is required." };
+  if (!canModifyMember(actorRole, null, "add")) {
+    return { ok: false, error: "You don't have permission to add members." };
   }
+
+  // Reject owner role — only one owner is allowed and it's set at creation
+  if (role === "owner" || role === "project_user") {
+    return { ok: false, error: "Invalid role. Choose 'member' or 'admin'." };
+  }
+
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { workspaceId: true },
+  });
+  if (!project?.workspaceId) {
+    return { ok: false, error: "Project has no associated workspace." };
+  }
+
+  const [wsMembership, existing] = await Promise.all([
+    prisma.membership.findUnique({
+      where: {
+        userId_workspaceId: { userId: targetUserId, workspaceId: project.workspaceId },
+      },
+    }),
+    prisma.projectMembership.findUnique({
+      where: { projectId_userId: { projectId, userId: targetUserId } },
+    }),
+  ]);
+
+  if (!wsMembership) {
+    return { ok: false, error: "That user is not a member of this workspace." };
+  }
+  if (existing) {
+    return { ok: false, error: "That user is already in this project." };
+  }
+
   try {
-    return await createInviteDb(projectId.trim(), session.user.id);
+    await prisma.projectMembership.create({
+      data: { projectId, userId: targetUserId, role },
+    });
+    revalidatePath(`/account/projects/${projectId}`);
+    return { ok: true };
   } catch (e) {
-    console.error("createInviteAction", e);
-    return { ok: false, error: "Failed to create invite. Please try again." };
+    console.error("addMemberToProjectAction", e);
+    return { ok: false, error: "Failed to add member. Please try again." };
   }
 }
 
-export type RevokeInviteResult = { ok: true } | { ok: false; error: string };
+export type ChangeMemberRoleResult = { ok: true } | { ok: false; error: string };
 
-/** Revoke a pending invite (owner only). */
-export async function revokeInviteAction(
-  inviteId: string
-): Promise<RevokeInviteResult> {
+/**
+ * Change a project member's role.
+ * Caller must hold project:change_role; canModifyMember enforces admin restrictions.
+ */
+export async function changeMemberRoleAction(
+  projectId: string,
+  targetUserId: string,
+  newRole: ProjectMemberRole
+): Promise<ChangeMemberRoleResult> {
   const session = await getAppSession();
-  if (!session?.user?.id) {
-    return { ok: false, error: "You must be signed in." };
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const [allowed, actorRole] = await Promise.all([
+    canUserPerform(session.user.id, projectId, "project:change_role"),
+    getProjectRole(session.user.id, projectId),
+  ]);
+  if (!allowed || !actorRole) {
+    return { ok: false, error: "You don't have permission to change roles." };
   }
-  if (!inviteId?.trim()) {
-    return { ok: false, error: "Invite ID is required." };
+
+  const targetMembership = await prisma.projectMembership.findUnique({
+    where: { projectId_userId: { projectId, userId: targetUserId } },
+    select: { role: true },
+  });
+  if (!targetMembership) {
+    return { ok: false, error: "Target user is not in this project." };
   }
+
+  if (!canModifyMember(actorRole, targetMembership.role, "change_role", newRole)) {
+    return { ok: false, error: "You are not allowed to change this member's role." };
+  }
+
   try {
-    const result = await revokeInviteDb(inviteId.trim(), session.user.id);
-    if (result.ok) {
-      revalidatePath("/account/projects");
-    }
-    return result;
+    await prisma.projectMembership.update({
+      where: { projectId_userId: { projectId, userId: targetUserId } },
+      data: { role: newRole },
+    });
+    revalidatePath(`/account/projects/${projectId}`);
+    return { ok: true };
   } catch (e) {
-    console.error("revokeInviteAction", e);
-    return { ok: false, error: "Failed to revoke invite. Please try again." };
+    console.error("changeMemberRoleAction", e);
+    return { ok: false, error: "Failed to change role. Please try again." };
   }
 }
 
-export type AcceptInviteResult =
-  | { ok: true; projectId: string }
-  | { ok: false; error: string };
+export type RemoveMemberResult = { ok: true } | { ok: false; error: string };
 
-/** Accept an invite by token + code. Adds the current user to the project. */
-export async function acceptInviteAction(
-  token: string,
-  code: string
-): Promise<AcceptInviteResult> {
+/**
+ * Remove a member from a project.
+ * Caller must hold project:remove_member; canModifyMember enforces admin restrictions.
+ * The project owner cannot be removed.
+ */
+export async function removeMemberFromProjectAction(
+  projectId: string,
+  targetUserId: string
+): Promise<RemoveMemberResult> {
   const session = await getAppSession();
-  if (!session?.user?.id) {
-    return { ok: false, error: "You must be signed in to accept an invite." };
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const [allowed, actorRole] = await Promise.all([
+    canUserPerform(session.user.id, projectId, "project:remove_member"),
+    getProjectRole(session.user.id, projectId),
+  ]);
+  if (!allowed || !actorRole) {
+    return { ok: false, error: "You don't have permission to remove members." };
   }
-  if (!token?.trim() || !code?.trim()) {
-    return { ok: false, error: "Token and code are required." };
+
+  const targetMembership = await prisma.projectMembership.findUnique({
+    where: { projectId_userId: { projectId, userId: targetUserId } },
+    select: { role: true },
+  });
+  if (!targetMembership) {
+    return { ok: false, error: "Target user is not in this project." };
   }
+  if (targetMembership.role === "owner") {
+    return { ok: false, error: "The project owner cannot be removed." };
+  }
+
+  if (!canModifyMember(actorRole, targetMembership.role, "remove")) {
+    return { ok: false, error: "You are not allowed to remove this member." };
+  }
+
   try {
-    const result = await acceptInviteDb(token.trim(), code.trim(), session.user.id);
-    if (result.ok) {
-      revalidatePath("/account");
-      revalidatePath("/account/projects");
-    }
-    return result;
+    await prisma.projectMembership.delete({
+      where: { projectId_userId: { projectId, userId: targetUserId } },
+    });
+    revalidatePath(`/account/projects/${projectId}`);
+    return { ok: true };
   } catch (e) {
-    console.error("acceptInviteAction", e);
-    return { ok: false, error: "Failed to accept invite. Please try again." };
+    console.error("removeMemberFromProjectAction", e);
+    return { ok: false, error: "Failed to remove member. Please try again." };
   }
 }

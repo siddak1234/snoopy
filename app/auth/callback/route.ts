@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { resolvePostSigninDestination } from "@/lib/workspace-onboarding";
 
 export const runtime = "nodejs";
 
@@ -157,14 +158,7 @@ export async function GET(request: Request) {
   }
 
   if (code) {
-    const destinationUrl = new URL(next, requestUrl.origin).toString();
-    // Use 200 + HTML with client redirect so the browser commits Set-Cookie before
-    // navigating. A 302 would let the browser follow the redirect before cookies
-    // are always visible on the next request (e.g. first load after deploy).
-    const response = new NextResponse(successRedirectHtml(destinationUrl), {
-      status: 200,
-      headers: { "Content-Type": "text/html; charset=utf-8" },
-    });
+    const defaultDestinationUrl = new URL(next, requestUrl.origin).toString();
 
     const cookieNames = cookieStore.getAll().map((c) => c.name);
     const hasVerifierCookie = cookieNames.some(
@@ -177,6 +171,13 @@ export async function GET(request: Request) {
         host: requestUrl.host,
       });
     }
+
+    // Collect cookies during exchange so we can apply them to whichever final
+    // response we build (destination may change after onboarding classification).
+    // Cookie options (httpOnly, secure, sameSite, etc.) are preserved this way.
+    type PendingCookie = Parameters<(typeof NextResponse.prototype.cookies)["set"]>;
+    const pendingCookies: PendingCookie[] = [];
+
     // Server client must read request cookies so the PKCE code verifier (set by
     // the browser client via document.cookie) is available for exchangeCodeForSession.
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -186,11 +187,20 @@ export async function GET(request: Request) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options ?? {})
+            pendingCookies.push([name, value, options ?? {}])
           );
         },
       },
     });
+
+    function buildSuccessResponse(destinationUrl: string): NextResponse {
+      const res = new NextResponse(successRedirectHtml(destinationUrl), {
+        status: 200,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+      pendingCookies.forEach((args) => res.cookies.set(...args));
+      return res;
+    }
 
     // Wait for Supabase to confirm the code exchange before sending response
     const { error } = await supabase.auth.exchangeCodeForSession(code);
@@ -201,7 +211,20 @@ export async function GET(request: Request) {
       });
     }
     if (!error) {
-      return response;
+      // Classify the user's email domain and resolve the right onboarding path.
+      // Returning users (existing Membership row) always go to defaultDestinationUrl.
+      let finalDestinationUrl = defaultDestinationUrl;
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+          const resolvedPath = await resolvePostSigninDestination(authUser, next);
+          finalDestinationUrl = new URL(resolvedPath, requestUrl.origin).toString();
+        }
+      } catch (onboardingErr) {
+        console.error("AUTH_CALLBACK_ONBOARDING_RESOLVE", (onboardingErr as Error).message);
+        // Fall through — use defaultDestinationUrl so auth is never blocked
+      }
+      return buildSuccessResponse(finalDestinationUrl);
     }
 
     const isPkceVerifierMissing =
@@ -227,7 +250,7 @@ export async function GET(request: Request) {
       });
     }
     if (sessionData?.session?.user) {
-      return NextResponse.redirect(destinationUrl);
+      return NextResponse.redirect(defaultDestinationUrl);
     }
 
     // Identity already linked to another user: send to settings in link flow, else friendly login message

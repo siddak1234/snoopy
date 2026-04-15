@@ -1,6 +1,10 @@
 import type { ProjectMemberRole } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
+// Re-export pure helpers so server callers can import from one place.
+// Client components must import directly from @/lib/project-rbac-pure.
+export { canModifyMember, type MemberModifyAction } from "@/lib/project-rbac-pure";
+
 // ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
@@ -12,10 +16,10 @@ export type ProjectAction =
   | "project:view"             // view project details
   | "project:delete"           // delete the project entirely
   | "project:manage_settings"  // edit name, type, description, status
-  | "project:create_invite"    // generate an invite link + code
-  | "project:revoke_invite"    // cancel a pending invite
+  | "project:add_member"       // directly add a user as a project member
   | "project:view_members"     // see the member list
-  | "project:remove_member"    // kick another member
+  | "project:remove_member"    // kick another member (see canModifyMember for role-level constraints)
+  | "project:change_role"      // change another member's role (see canModifyMember for role-level constraints)
   | "project:access_workflows" // use workflows linked to this project
   | "project:leave";           // remove own membership
 
@@ -33,10 +37,10 @@ const ROLE_PERMISSIONS: Record<ProjectMemberRole, ReadonlySet<ProjectAction>> =
       "project:view",
       "project:delete",
       "project:manage_settings",
-      "project:create_invite",
-      "project:revoke_invite",
+      "project:add_member",
       "project:view_members",
       "project:remove_member",
+      "project:change_role",
       "project:access_workflows",
       // owners do NOT get "project:leave" — they must delete the project
     ]),
@@ -48,6 +52,20 @@ const ROLE_PERMISSIONS: Record<ProjectMemberRole, ReadonlySet<ProjectAction>> =
     // legacy role — identical permissions to member, kept for backwards compat
     project_user: new Set<ProjectAction>([
       "project:view",
+      "project:access_workflows",
+      "project:leave",
+    ]),
+    // admin: elevated member — can manage project settings and members, cannot delete
+    // Note: admin manages members directly via add_member/remove_member/change_role.
+    // Use canModifyMember() for the second-layer role-level constraints on
+    // remove_member and change_role.
+    admin: new Set<ProjectAction>([
+      "project:view",
+      "project:manage_settings",
+      "project:add_member",
+      "project:view_members",
+      "project:remove_member",
+      "project:change_role",
       "project:access_workflows",
       "project:leave",
     ]),
@@ -91,6 +109,7 @@ export async function getProjectRole(
   });
   return membership?.role ?? null;
 }
+
 
 /**
  * Returns true if the user has any membership in the project (any role).

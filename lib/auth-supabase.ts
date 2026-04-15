@@ -18,8 +18,10 @@ export type AppSession = {
 /**
  * Provision or update User from Supabase Auth (OAuth or email/password).
  * Same logic as legacy provisionUser but keyed by supabaseUserId or email.
+ * Exported so the auth callback and onboarding flows can reuse it without
+ * calling the full getAppSession() (which would create a workspace prematurely).
  */
-async function provisionUserFromSupabaseAuth(supabaseUser: SupabaseUser): Promise<{ id: string }> {
+export async function provisionUserFromSupabaseAuth(supabaseUser: SupabaseUser): Promise<{ id: string }> {
   const { prisma } = await import("@/lib/db");
   const email = normalizeEmail(supabaseUser.email ?? "");
   const supabaseUserId = supabaseUser.id;

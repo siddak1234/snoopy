@@ -5,7 +5,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
 
-const protectedPaths = ["/account", "/dashboard"];
+const protectedPaths = ["/account", "/dashboard", "/onboarding"];
 
 /** OAuth callback params that indicate the provider redirected to the wrong path (e.g. Site URL "/" instead of "/auth/callback"). */
 function hasOAuthCallbackParams(searchParams: URLSearchParams): boolean {
@@ -68,7 +68,8 @@ export async function updateSession(request: NextRequest) {
       (callbackUrl === "/account" ||
         callbackUrl.startsWith("/account/") ||
         callbackUrl === "/dashboard" ||
-        callbackUrl.startsWith("/dashboard/"))
+        callbackUrl.startsWith("/dashboard/") ||
+        callbackUrl.startsWith("/org-invite/"))
         ? callbackUrl
         : "/account";
     return NextResponse.redirect(new URL(safePath, request.url));

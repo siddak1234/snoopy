@@ -10,7 +10,8 @@ export type MyProjectItem = {
   status: ProjectStatus;
   createdAt: Date;
   ownerName: string | null;
-  accessCodePrefix?: string | null;
+  workspaceId?: string | null;
+  workspaceName?: string | null;
 };
 
 export type TeamProjectItem = {
@@ -21,6 +22,8 @@ export type TeamProjectItem = {
   createdAt: Date;
   ownerName: string | null;
   projectMemberships: { createdAt: Date }[];
+  workspaceId?: string | null;
+  workspaceName?: string | null;
 };
 
 const statusLabel: Record<ProjectStatus, string> = {

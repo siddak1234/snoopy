@@ -22,7 +22,6 @@ model User {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   memberships        Membership[]
-  projects           Project[]
   ownedProjects      Project[]          @relation("ProjectOwner")
   projectMemberships ProjectMembership[]
   workflows          Workflow[]
@@ -47,6 +46,12 @@ enum ProjectMemberRole {
   project_user // legacy — treated identically to member
   owner
   member
+  admin
+}
+
+enum WorkspaceType {
+  personal
+  organization
 }
 
 model Project {
@@ -56,45 +61,19 @@ model Project {
   type             String        @default("")
   description      String?
   status           ProjectStatus @default(active)
-  userId           String?
   ownerUserId      String?
   ownerName        String?
-  accessCodeHash   String?
-  accessCodePrefix String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
   workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   owner     User?      @relation("ProjectOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
   projectMemberships ProjectMembership[]
-  invites            ProjectInvite[]
   workflows          Workflow[]
 
   @@index([workspaceId, createdAt(sort: Desc)])
   @@index([ownerUserId, createdAt(sort: Desc)])
-  @@index([workspaceId, accessCodePrefix])
-  @@index([userId, createdAt(sort: Desc)])
   @@map("projects")
-}
-
-model ProjectInvite {
-  id         String    @id @default(uuid())
-  projectId  String
-  createdBy  String                          // userId of the owner who created this invite
-  token      String    @unique               // UUID v4 — goes in the invite URL
-  codeHash   String                          // bcrypt hash of the short code
-  expiresAt  DateTime                        // createdAt + 24 h
-  acceptedAt DateTime?                       // null = pending; set = burned (single-use)
-  acceptedBy String?                         // userId of who accepted
-  revokedAt  DateTime?                       // null = active; set = revoked by owner
-  createdAt  DateTime  @default(now())
-
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([projectId])
-  @@index([token])
-  @@map("project_invites")
 }
 
 model ProjectMembership {
@@ -113,13 +92,19 @@ model ProjectMembership {
 }
 
 model Workspace {
-  id          String       @id @default(uuid())
-  name        String
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  memberships Membership[]
-  projects    Project[]
-  workflows   Workflow[]
+  id                 String        @id @default(uuid())
+  name               String
+  type               WorkspaceType @default(personal)
+  domain             String?
+  domainVerified     Boolean       @default(false)
+  domainVerifiedAt   DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  memberships        Membership[]
+  projects           Project[]
+  workflows          Workflow[]
+  workspaceInvites   WorkspaceInvite[]
+  domainVerTokens    DomainVerificationToken[]
 
   @@map("workspaces")
 }
@@ -142,6 +127,39 @@ model Membership {
   @@unique([userId, workspaceId])
   @@index([workspaceId])
   @@map("memberships")
+}
+
+model WorkspaceInvite {
+  id         String    @id @default(uuid())
+  workspaceId String
+  createdBy  String                          // userId of the OWNER who created this invite
+  token      String    @unique               // UUID v4 — goes in the invite URL
+  codeHash   String                          // bcrypt hash of the short code
+  expiresAt  DateTime                        // createdAt + 24 h
+  acceptedAt DateTime?                       // null = pending; set = burned (single-use)
+  acceptedBy String?                         // userId of who accepted
+  revokedAt  DateTime?                       // null = active; set = revoked by owner
+  createdAt  DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([token])
+  @@map("workspace_invites")
+}
+
+model DomainVerificationToken {
+  id          String    @id @default(uuid())
+  workspaceId String
+  token       String    @unique               // UUID v4
+  expiresAt   DateTime                        // createdAt + 72 h
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@map("domain_verification_tokens")
 }
 
 // ---------------------------------------------------------------------------
