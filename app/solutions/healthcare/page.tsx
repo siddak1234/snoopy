@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { ContentCard } from "@/components/ui/ContentCard";
+import { StepCard } from "@/components/ui/StepCard";
 
 const painPoints = [
   {
@@ -116,17 +118,7 @@ export default function HealthcareSolutionsPage() {
         </h2>
         <div className="grid gap-4 sm:grid-cols-2">
           {painPoints.map((item) => (
-            <article
-              key={item.title}
-              className="bubble p-5 sm:p-6"
-            >
-              <h3 className="text-lg font-semibold text-[var(--text)]">
-                {item.title}
-              </h3>
-              <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">
-                {item.description}
-              </p>
-            </article>
+            <ContentCard key={item.title} title={item.title} description={item.description} />
           ))}
         </div>
       </section>
@@ -138,17 +130,7 @@ export default function HealthcareSolutionsPage() {
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {useCases.map((useCase) => (
-            <article
-              key={useCase.title}
-              className="bubble p-5 sm:p-6"
-            >
-              <h3 className="text-base font-semibold text-[var(--text)] sm:text-lg">
-                {useCase.title}
-              </h3>
-              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-                {useCase.description}
-              </p>
-            </article>
+            <ContentCard key={useCase.title} title={useCase.title} description={useCase.description} />
           ))}
         </div>
       </section>
@@ -181,23 +163,7 @@ export default function HealthcareSolutionsPage() {
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {howItWorksSteps.map((item) => (
-            <article
-              key={item.step}
-              className="bubble flex flex-col p-5 sm:p-6"
-            >
-              <span
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--step-pill-bg)] text-sm font-semibold text-[var(--step-pill-text)]"
-                aria-hidden
-              >
-                {item.step}
-              </span>
-              <h3 className="mt-4 text-lg font-semibold text-[var(--text)]">
-                {item.title}
-              </h3>
-              <p className="mt-2 flex-1 text-sm leading-6 text-[var(--muted)]">
-                {item.description}
-              </p>
-            </article>
+            <StepCard key={item.step} step={item.step} title={item.title} description={item.description} />
           ))}
         </div>
       </section>

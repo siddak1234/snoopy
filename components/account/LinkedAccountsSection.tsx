@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import { buildAuthCallbackUrl } from "@/lib/auth-oauth";
 import { useCallback, useEffect, useState } from "react";
 import Modal from "@/components/ui/Modal";
+import { FormError } from "@/components/ui/FormError";
 
 type ProviderId = "google" | "azure";
 
@@ -155,9 +156,7 @@ export default function LinkedAccountsSection() {
         Link additional sign-in options to this account. You can sign in with any linked provider.
       </p>
       {state.error ? (
-        <p className="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">
-          {state.error}
-        </p>
+        <FormError message={state.error} className="mt-2" />
       ) : null}
       {state.showAlreadyExistsModal ? (
         <Modal

@@ -32,7 +32,7 @@ export default function DeleteAccountButton() {
       <button
         type="button"
         onClick={() => setConfirmOpen(true)}
-        className="rounded-full border border-red-500/70 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:text-red-400"
+        className="rounded-full border border-[var(--error-border-strong)] bg-[var(--error-bg)] px-4 py-2 text-sm font-medium text-[var(--error-text)] transition hover:bg-[var(--error-bg-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--error-text)]"
       >
         Delete Account
       </button>
@@ -54,7 +54,7 @@ export default function DeleteAccountButton() {
               type="button"
               onClick={handleConfirmDelete}
               disabled={loading}
-              className="rounded-full border border-red-500/70 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-500/20 disabled:opacity-50 dark:text-red-400"
+              className="rounded-full border border-[var(--error-border-strong)] bg-[var(--error-bg)] px-4 py-2 text-sm font-medium text-[var(--error-text)] transition hover:bg-[var(--error-bg-strong)] disabled:opacity-50"
             >
               {loading ? "Deleting…" : "Yes, delete my account"}
             </button>

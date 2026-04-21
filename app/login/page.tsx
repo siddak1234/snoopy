@@ -6,9 +6,7 @@ import { Suspense, useState, FormEvent, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAppSession } from "@/hooks/use-app-session";
 import { isGmailAddress } from "@/lib/email";
-
-const inputClassName =
-  "mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] transition focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]";
+import { FormInput } from "@/components/ui/FormInput";
 
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
@@ -163,35 +161,24 @@ function LoginForm() {
           <h1 className="text-3xl font-semibold sm:text-4xl">Login</h1>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-[var(--text)]">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                name="email"
-                autoComplete="email"
-                placeholder="Enter your email"
-                className={inputClassName}
-                required
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-[var(--text)]">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                name="password"
-                autoComplete="current-password"
-                placeholder="Enter your password"
-                className={inputClassName}
-                required
-              />
-            </div>
+            <FormInput
+              id="email"
+              label="Email"
+              type="email"
+              name="email"
+              autoComplete="email"
+              placeholder="Enter your email"
+              required
+            />
+            <FormInput
+              id="password"
+              label="Password"
+              type="password"
+              name="password"
+              autoComplete="current-password"
+              placeholder="Enter your password"
+              required
+            />
 
             <button type="submit" className="btn-primary w-full px-5" disabled={loading}>
               {loading ? "Signing in…" : "Log In"}

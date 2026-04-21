@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { removeWorkspaceMemberAction } from "@/app/account/organization/actions";
 import Modal from "@/components/ui/Modal";
+import { FormError } from "@/components/ui/FormError";
 import { formatDateMediumUTC } from "@/lib/date";
 
 // ---------------------------------------------------------------------------
@@ -107,7 +108,7 @@ export function OrgMemberList({ workspaceId, orgName, viewerUserId, members: ini
                 <button
                   type="button"
                   onClick={() => openConfirm(m)}
-                  className="shrink-0 text-xs text-red-600 underline hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                  className="shrink-0 text-xs text-[var(--error-text)] underline hover:text-[var(--error-text-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--error-text)]"
                 >
                   Remove
                 </button>
@@ -138,11 +139,7 @@ export function OrgMemberList({ workspaceId, orgName, viewerUserId, members: ini
             from all projects in this organization. This cannot be undone.
           </p>
 
-          {removeError ? (
-            <p className="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">
-              {removeError}
-            </p>
-          ) : null}
+          <FormError message={removeError} className="mt-3" />
 
           <div className="mt-6 flex flex-wrap gap-2">
             <button

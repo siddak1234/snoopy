@@ -5,9 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState, FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { isGmailAddress } from "@/lib/email";
-
-const inputClassName =
-  "mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] transition focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]";
+import { FormInput } from "@/components/ui/FormInput";
 
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
@@ -102,61 +100,38 @@ function SignupForm() {
           <h1 className="text-3xl font-semibold sm:text-4xl">Sign Up</h1>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-            <div>
-              <label htmlFor="full-name" className="block text-sm font-medium text-[var(--text)]">
-                Full Name
-              </label>
-              <input
-                id="full-name"
-                type="text"
-                name="fullName"
-                autoComplete="name"
-                placeholder="Enter your full name"
-                className={inputClassName}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-[var(--text)]">
-                Email Address
-              </label>
-              <input
-                id="email"
-                type="email"
-                name="email"
-                autoComplete="email"
-                placeholder="Enter your email"
-                className={inputClassName}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-[var(--text)]">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                name="password"
-                autoComplete="new-password"
-                placeholder="Choose a password"
-                className={inputClassName}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="confirm-password" className="block text-sm font-medium text-[var(--text)]">
-                Confirm Password
-              </label>
-              <input
-                id="confirm-password"
-                type="password"
-                name="confirmPassword"
-                autoComplete="new-password"
-                placeholder="Confirm your password"
-                className={inputClassName}
-              />
-            </div>
+            <FormInput
+              id="full-name"
+              label="Full Name"
+              type="text"
+              name="fullName"
+              autoComplete="name"
+              placeholder="Enter your full name"
+            />
+            <FormInput
+              id="email"
+              label="Email Address"
+              type="email"
+              name="email"
+              autoComplete="email"
+              placeholder="Enter your email"
+            />
+            <FormInput
+              id="password"
+              label="Password"
+              type="password"
+              name="password"
+              autoComplete="new-password"
+              placeholder="Choose a password"
+            />
+            <FormInput
+              id="confirm-password"
+              label="Confirm Password"
+              type="password"
+              name="confirmPassword"
+              autoComplete="new-password"
+              placeholder="Confirm your password"
+            />
 
             <button type="submit" className="btn-primary w-full px-5" disabled={loading}>
               {loading ? "Creating account…" : "Create Account"}

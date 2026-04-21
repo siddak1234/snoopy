@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { acceptWorkspaceInviteAction } from "@/app/account/workspace-invite-actions";
 import { normalizeInviteCode } from "@/lib/invite-utils";
+import { FormError } from "@/components/ui/FormError";
 
 type Props = {
   token: string;
@@ -58,11 +59,7 @@ export function AcceptOrgInviteForm({ token }: Props) {
           The short code the organization owner shared with you alongside this link.
         </p>
       </div>
-      {error ? (
-        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-          {error}
-        </p>
-      ) : null}
+      <FormError message={error} />
       <button
         type="submit"
         disabled={pending}

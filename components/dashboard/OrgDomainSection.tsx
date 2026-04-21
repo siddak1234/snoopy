@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { resendDomainVerificationAction } from "@/app/account/domain-actions";
 import { formatDateMediumUTC } from "@/lib/date";
+import { FormError } from "@/components/ui/FormError";
 
 type Props =
   | { state: "none" }
@@ -23,7 +24,7 @@ export function OrgDomainSection(props: Props) {
       <div className="flex flex-wrap items-center gap-2 text-sm">
         {/* Green dot */}
         <span
-          className="inline-block h-2 w-2 shrink-0 rounded-full bg-green-500"
+          className="inline-block h-2 w-2 shrink-0 rounded-full bg-[var(--success-text)]"
           aria-hidden
         />
         <span className="font-mono text-[var(--text)]">{props.domain}</span>
@@ -59,15 +60,15 @@ function UnverifiedDomain({ domain }: { domain: string }) {
       <div className="flex items-center gap-2 text-sm">
         {/* Amber dot */}
         <span
-          className="inline-block h-2 w-2 shrink-0 rounded-full bg-amber-500"
+          className="inline-block h-2 w-2 shrink-0 rounded-full bg-[var(--warning-text)]"
           aria-hidden
         />
         <span className="font-mono text-[var(--text)]">{domain}</span>
-        <span className="text-amber-500">· Unverified</span>
+        <span className="text-[var(--warning-text)]">· Unverified</span>
       </div>
 
       {status === "sent" ? (
-        <p className="text-sm text-green-500">
+        <p className="text-sm text-[var(--success-text)]">
           Verification email sent — check your inbox.
         </p>
       ) : (
@@ -76,14 +77,12 @@ function UnverifiedDomain({ domain }: { domain: string }) {
             type="button"
             onClick={handleResend}
             disabled={status === "sending"}
-            className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-400 transition hover:bg-amber-500/20 disabled:opacity-60"
+            className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-bg)] px-3 py-1 text-xs font-medium text-[var(--warning-text)] transition hover:bg-[var(--warning-bg)] disabled:opacity-60"
           >
             {status === "sending" ? "Sending…" : "Resend verification email"}
           </button>
           {status === "error" && errorMsg ? (
-            <p className="text-xs text-red-400" role="alert">
-              {errorMsg}
-            </p>
+            <FormError message={errorMsg} className="text-xs" />
           ) : null}
         </>
       )}

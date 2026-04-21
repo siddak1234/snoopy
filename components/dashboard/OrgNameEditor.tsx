@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { updateWorkspaceNameAction } from "@/app/account/organization/actions";
+import { FormError } from "@/components/ui/FormError";
 
 type Props = {
   workspaceId: string;
@@ -73,11 +74,7 @@ export function OrgNameEditor({ workspaceId, initialName }: Props) {
             Cancel
           </button>
         </div>
-        {error ? (
-          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-            {error}
-          </p>
-        ) : null}
+        <FormError message={error} />
       </div>
     );
   }
@@ -86,7 +83,7 @@ export function OrgNameEditor({ workspaceId, initialName }: Props) {
     <div className="flex items-center gap-3">
       <span className="text-sm text-[var(--text)]">{value}</span>
       {saved ? (
-        <span className="text-xs text-green-500">Saved</span>
+        <span className="text-xs text-[var(--success-text)]">Saved</span>
       ) : (
         <button
           type="button"

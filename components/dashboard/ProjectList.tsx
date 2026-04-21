@@ -38,7 +38,7 @@ function StatusPill({ status }: { status: ProjectStatus }) {
     status === "active"
       ? "bg-[var(--chip-bg)] text-[var(--chip-text)]"
       : status === "paused"
-        ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+        ? "bg-[var(--warning-bg)] text-[var(--warning-text)]"
         : status === "draft"
           ? "bg-[var(--muted)]/20 text-[var(--muted)]"
           : "bg-[var(--ring)]/50 text-[var(--muted)]";

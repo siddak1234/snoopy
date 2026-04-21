@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { resendDomainVerificationAction } from "@/app/account/domain-actions";
+import { FormError } from "@/components/ui/FormError";
 
 type Props = {
   domain: string;
@@ -24,10 +25,10 @@ export function DomainVerificationBanner({ domain }: Props) {
   }
 
   return (
-    <div className="mb-5 flex flex-wrap items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 sm:items-center">
+    <div className="mb-5 flex flex-wrap items-start gap-3 rounded-xl border border-[var(--warning-border)] bg-[var(--warning-bg)] px-4 py-3 sm:items-center">
       {/* Icon */}
       <svg
-        className="mt-0.5 h-4 w-4 shrink-0 text-amber-500 sm:mt-0"
+        className="mt-0.5 h-4 w-4 shrink-0 text-[var(--warning-text)] sm:mt-0"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -44,19 +45,19 @@ export function DomainVerificationBanner({ domain }: Props) {
       {/* Text */}
       <div className="min-w-0 flex-1">
         {status === "sent" ? (
-          <p className="text-sm text-amber-400">
+          <p className="text-sm text-[var(--warning-text)]">
             Verification email sent to your inbox. Check your email and click the link to verify{" "}
             <span className="font-mono font-medium">{domain}</span>.
           </p>
         ) : (
           <>
-            <p className="text-sm text-amber-300">
+            <p className="text-sm text-[var(--warning-text-muted)]">
               <span className="font-medium">Verify your domain</span> to enable automatic team
               joining for{" "}
               <span className="font-mono font-medium">@{domain}</span> users.
             </p>
             {status === "error" && errorMsg ? (
-              <p className="mt-0.5 text-xs text-red-400">{errorMsg}</p>
+              <FormError message={errorMsg} className="mt-0.5 text-xs" />
             ) : null}
           </>
         )}
@@ -68,7 +69,7 @@ export function DomainVerificationBanner({ domain }: Props) {
           type="button"
           onClick={handleResend}
           disabled={status === "sending"}
-          className="shrink-0 rounded-full border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-xs font-medium text-amber-300 transition hover:bg-amber-500/25 disabled:opacity-60"
+          className="shrink-0 rounded-full border border-[var(--warning-border)] bg-[var(--warning-bg)] px-3 py-1.5 text-xs font-medium text-[var(--warning-text)] transition hover:bg-[var(--warning-bg)] disabled:opacity-60"
         >
           {status === "sending" ? "Sending…" : "Resend verification email"}
         </button>

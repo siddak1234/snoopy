@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { ProjectMemberRole } from "@prisma/client";
 import { addMemberToProjectAction } from "@/app/account/projects/actions";
 import Modal from "@/components/ui/Modal";
+import { FormError } from "@/components/ui/FormError";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -106,9 +107,7 @@ export function ProjectMemberPicker({ projectId, availableMembers: initial }: Pr
                       </p>
                     ) : null}
                     {errors[m.userId] ? (
-                      <p className="text-xs text-red-600 dark:text-red-400" role="alert">
-                        {errors[m.userId]}
-                      </p>
+                      <FormError message={errors[m.userId]} className="text-xs" />
                     ) : null}
                   </div>
 

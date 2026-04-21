@@ -6,6 +6,7 @@ import {
   joinOrgWorkspaceAction,
   createPersonalWorkspaceAction,
 } from "@/app/onboarding/actions";
+import { FormError } from "@/components/ui/FormError";
 
 export function JoinOrgForm({ workspaceName }: { workspaceName: string }) {
   const [error, setError] = useState<string | null>(null);
@@ -40,11 +41,7 @@ export function JoinOrgForm({ workspaceName }: { workspaceName: string }) {
 
   return (
     <div className="mt-6 space-y-3">
-      {error ? (
-        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-          {error}
-        </p>
-      ) : null}
+      <FormError message={error} />
 
       <button
         type="button"

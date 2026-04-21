@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ProjectMemberRole } from "@prisma/client";
+import { FormError } from "@/components/ui/FormError";
 import { canModifyMember } from "@/lib/project-rbac-pure";
 import {
   changeMemberRoleAction,
@@ -193,9 +194,7 @@ function MemberRowItem({
           Joined {formatDateMediumUTC(m.createdAt)}
         </p>
         {error ? (
-          <p className="text-xs text-red-600 dark:text-red-400" role="alert">
-            {error}
-          </p>
+          <FormError message={error} className="text-xs" />
         ) : null}
       </div>
 
@@ -236,7 +235,7 @@ function MemberRowItem({
           type="button"
           onClick={handleRemove}
           disabled={busy}
-          className="shrink-0 text-xs text-red-600 underline hover:text-red-700 disabled:opacity-60 dark:text-red-400 dark:hover:text-red-300"
+          className="shrink-0 text-xs text-[var(--error-text)] underline hover:text-[var(--error-text-hover)] disabled:opacity-60"
         >
           {busy ? "Removing…" : "Remove"}
         </button>

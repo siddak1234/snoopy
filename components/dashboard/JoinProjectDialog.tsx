@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { acceptWorkspaceInviteAction } from "@/app/account/workspace-invite-actions";
 import { normalizeInviteCode, parseInviteToken } from "@/lib/invite-utils";
 import Modal from "@/components/ui/Modal";
+import { FormInput } from "@/components/ui/FormInput";
+import { FormError } from "@/components/ui/FormError";
 
 type Props = {
   open: boolean;
@@ -100,45 +102,32 @@ export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
       </p>
 
       <form ref={formRef} onSubmit={handleSubmit} className="mt-6 space-y-4">
-        <div>
-          <label htmlFor="join-invite-url" className="block text-sm font-medium text-[var(--text)]">
-            Invite link
-          </label>
-          <input
-            ref={urlRef}
-            id="join-invite-url"
-            name="inviteUrl"
-            type="text"
-            required
-            autoComplete="off"
-            placeholder="https://…/org-invite/… or paste the token"
-            disabled={pending}
-            className="mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60"
-          />
-        </div>
+        <FormInput
+          ref={urlRef}
+          id="join-invite-url"
+          label="Invite link"
+          name="inviteUrl"
+          type="text"
+          required
+          autoComplete="off"
+          placeholder="https://…/org-invite/… or paste the token"
+          disabled={pending}
+        />
 
-        <div>
-          <label htmlFor="join-invite-code" className="block text-sm font-medium text-[var(--text)]">
-            Invite code
-          </label>
-          <input
-            ref={codeRef}
-            id="join-invite-code"
-            name="inviteCode"
-            type="text"
-            required
-            autoComplete="off"
-            placeholder="e.g. K7MN2P"
-            disabled={pending}
-            className="mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 font-mono uppercase tracking-widest text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60"
-          />
-        </div>
+        <FormInput
+          ref={codeRef}
+          id="join-invite-code"
+          label="Invite code"
+          name="inviteCode"
+          type="text"
+          required
+          autoComplete="off"
+          placeholder="e.g. K7MN2P"
+          disabled={pending}
+          className="font-mono uppercase tracking-widest"
+        />
 
-        {error ? (
-          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-            {error}
-          </p>
-        ) : null}
+        <FormError message={error} />
 
         <div className="flex flex-wrap gap-2 pt-2">
           <button type="submit" disabled={pending} className="btn-primary inline-flex px-5">

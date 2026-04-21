@@ -687,9 +687,9 @@ function AutomationBuilder() {
       : "Draft";
   const statusClass =
     statusLabel === "Saved"
-      ? "border-emerald-400/45 bg-emerald-500/10 text-emerald-300"
+      ? "border-[var(--success-border)] bg-[var(--success-bg)] text-[var(--success-text-muted)]"
       : statusLabel === "Not saved"
-        ? "border-amber-300/45 bg-amber-500/10 text-amber-200"
+        ? "border-[var(--warning-border)] bg-[var(--warning-bg)] text-[var(--warning-text-dim)]"
         : "border-[var(--ring)] bg-[var(--step-pill-bg)] text-[var(--step-pill-text)]";
 
   return (
@@ -829,10 +829,10 @@ function AutomationBuilder() {
                   ) : null}
                 </div>
                 {menuError ? (
-                  <p className="mt-2 px-2.5 text-[0.64rem] text-red-300">{menuError}</p>
+                  <p className="mt-2 px-2.5 text-[0.64rem] text-[var(--error-text-muted)]">{menuError}</p>
                 ) : null}
                 {switchError && !showSwitchConfirm ? (
-                  <p className="mt-1 px-2.5 text-[0.64rem] text-red-300">{switchError}</p>
+                  <p className="mt-1 px-2.5 text-[0.64rem] text-[var(--error-text-muted)]">{switchError}</p>
                 ) : null}
                 {isSwitching ? (
                   <p className="mt-1 px-2.5 text-[0.64rem] text-[var(--muted)]">Loading workflow...</p>
@@ -872,7 +872,7 @@ function AutomationBuilder() {
               disabled={!canSave || saveStatus === "saving"}
               className={`flex h-9 w-9 items-center justify-center rounded-full border transition-all ${
                 saveStatus === "saved"
-                  ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-400"
+                  ? "border-[var(--success-border)] bg-[var(--success-bg)] text-[var(--success-text)]"
                   : saveStatus === "saving"
                     ? "pointer-events-none border-[var(--ring)] bg-[var(--surface)]/80 text-[var(--muted)]"
                     : canSave
@@ -908,9 +908,9 @@ function AutomationBuilder() {
               }}
               className={`flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border transition-all ${
                 trashHover
-                  ? "scale-110 border-red-400 bg-red-500/20 text-red-400"
+                  ? "scale-110 border-[var(--error-text)] bg-[var(--error-bg-strong)] text-[var(--error-text)]"
                   : hasItems
-                    ? "border-[var(--ring)] bg-[var(--surface)]/80 text-[var(--muted)] hover:border-red-400 hover:bg-red-500/10 hover:text-red-400"
+                    ? "border-[var(--ring)] bg-[var(--surface)]/80 text-[var(--muted)] hover:border-[var(--error-text)] hover:bg-[var(--error-bg)] hover:text-[var(--error-text)]"
                     : "pointer-events-none border-[var(--ring)] bg-[var(--surface)]/50 text-[var(--muted)]/40"
               }`}
               aria-label="Clear canvas"
@@ -1000,7 +1000,7 @@ function AutomationBuilder() {
               . Save your current canvas before switching?
             </p>
             {switchError ? (
-              <p className="mt-3 text-center text-xs text-red-400">{switchError}</p>
+              <p className="mt-3 text-center text-xs text-[var(--error-text)]">{switchError}</p>
             ) : null}
             <div className="mt-5 flex gap-2.5">
               <button
@@ -1054,7 +1054,7 @@ function AutomationBuilder() {
               maxLength={100}
             />
             {saveError && (
-              <p className="mt-2 text-center text-xs text-red-400">{saveError}</p>
+              <p className="mt-2 text-center text-xs text-[var(--error-text)]">{saveError}</p>
             )}
             <div className="mt-5 flex gap-2.5">
               <button
@@ -1133,7 +1133,7 @@ function AutomationBuilder() {
               </button>
               <button
                 onClick={clearCanvas}
-                className="flex-1 cursor-pointer rounded-full border border-red-400/50 bg-red-500/15 px-4 py-2 text-xs font-medium text-red-400 transition hover:bg-red-500/25"
+                className="flex-1 cursor-pointer rounded-full border border-[var(--error-border-medium)] bg-[var(--error-bg)] px-4 py-2 text-xs font-medium text-[var(--error-text)] transition hover:bg-[var(--error-bg-strong)]"
               >
                 Clear
               </button>

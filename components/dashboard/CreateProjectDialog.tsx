@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { createProjectAction } from "@/app/account/projects/actions";
 import Modal from "@/components/ui/Modal";
+import { FormInput } from "@/components/ui/FormInput";
+import { FormError } from "@/components/ui/FormError";
 
 const PROJECT_TYPES = [
   "Invoice Processing",
@@ -123,24 +125,19 @@ export function CreateProjectDialog({ open, onClose, onSuccess, workspaceId }: P
             Add a new project to your workspace.
           </p>
           <form ref={formRef} onSubmit={handleSubmit} className="mt-6 space-y-4">
-            <div>
-              <label htmlFor="project-name" className="block text-sm font-medium text-[var(--text)]">
-                Project name <span className="text-[var(--muted)]">(required)</span>
-              </label>
-              <input
-                ref={nameInputRef}
-                id="project-name"
-                name="name"
-                type="text"
-                required
-                minLength={2}
-                maxLength={60}
-                placeholder="My project"
-                autoComplete="off"
-                disabled={pending}
-                className="mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60"
-              />
-            </div>
+            <FormInput
+              ref={nameInputRef}
+              id="project-name"
+              label={<>Project name <span className="text-[var(--muted)]">(required)</span></>}
+              name="name"
+              type="text"
+              required
+              minLength={2}
+              maxLength={60}
+              placeholder="My project"
+              autoComplete="off"
+              disabled={pending}
+            />
             <div>
               <label htmlFor="project-type" className="block text-sm font-medium text-[var(--text)]">
                 Project type <span className="text-[var(--muted)]">(required)</span>
@@ -197,11 +194,7 @@ export function CreateProjectDialog({ open, onClose, onSuccess, workspaceId }: P
             {workspaceId ? (
               <input type="hidden" name="workspaceId" value={workspaceId} />
             ) : null}
-            {error ? (
-              <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-                {error}
-              </p>
-            ) : null}
+            <FormError message={error} />
             <div className="flex flex-wrap gap-2 pt-2">
               <button
                 type="submit"

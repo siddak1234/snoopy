@@ -27,6 +27,33 @@
   --bullet: #4e8fe6;
   --link: #1c4f96;
   --signal-divider: #245196;
+
+  /* Semantic state colors */
+  --error-text: #dc2626;
+  --error-text-hover: #b91c1c;
+  --error-bg: rgba(239, 68, 68, 0.10);
+  --error-bg-strong: rgba(239, 68, 68, 0.20);
+  --error-border: rgba(239, 68, 68, 0.30);
+  --error-border-medium: rgba(248, 113, 113, 0.50);
+  --error-border-strong: rgba(239, 68, 68, 0.70);
+
+  --warning-text: #d97706;
+  --warning-bg: rgba(245, 158, 11, 0.12);
+  --warning-border: rgba(245, 158, 11, 0.35);
+
+  --success-text: #059669;
+  --success-bg: rgba(16, 185, 129, 0.12);
+  --success-border: rgba(52, 211, 153, 0.45);
+
+  /* Muted text for dark/tinted surfaces (fixed, not theme-inverted) */
+  --error-text-muted: #fca5a5;
+  --warning-text-muted: #fcd34d;
+  --warning-text-dim: #fde68a;
+  --success-text-muted: #6ee7b7;
+
+  /* Primary button accent colors */
+  --btn-primary-border: #76abff;
+  --btn-primary-text: #0f2242;
 }
 
 :root[data-theme="dark"] {
@@ -56,6 +83,33 @@
   --bullet: #8eb3e8;
   --link: #c6dbff;
   --signal-divider: #9fbce6;
+
+  /* Semantic state colors */
+  --error-text: #f87171;
+  --error-text-hover: #fca5a5;
+  --error-bg: rgba(239, 68, 68, 0.10);
+  --error-bg-strong: rgba(239, 68, 68, 0.20);
+  --error-border: rgba(239, 68, 68, 0.30);
+  --error-border-medium: rgba(248, 113, 113, 0.50);
+  --error-border-strong: rgba(239, 68, 68, 0.70);
+
+  --warning-text: #fbbf24;
+  --warning-bg: rgba(245, 158, 11, 0.10);
+  --warning-border: rgba(245, 158, 11, 0.35);
+
+  --success-text: #34d399;
+  --success-bg: rgba(16, 185, 129, 0.10);
+  --success-border: rgba(52, 211, 153, 0.40);
+
+  /* Muted text for dark/tinted surfaces (fixed, not theme-inverted) */
+  --error-text-muted: #fca5a5;
+  --warning-text-muted: #fcd34d;
+  --warning-text-dim: #fde68a;
+  --success-text-muted: #6ee7b7;
+
+  /* Primary button accent colors */
+  --btn-primary-border: #76abff;
+  --btn-primary-text: #0f2242;
 }
 
 @theme inline {
@@ -158,9 +212,9 @@ body {
 }
 
 .btn-primary {
-  border: 1px solid #76abff;
+  border: 1px solid var(--btn-primary-border);
   background: linear-gradient(180deg, #a8cbff 0%, var(--accent) 100%);
-  color: #0f2242;
+  color: var(--btn-primary-text);
 }
 
 .btn-primary:hover {
@@ -477,11 +531,11 @@ body {
 }
 
 .edge-delete-btn:hover {
-  border-color: #f87171;
-  background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
+  border-color: var(--error-text);
+  background: var(--error-bg-strong);
+  color: var(--error-text);
   box-shadow:
-    0 0 0 3px rgba(239, 68, 68, 0.18),
+    0 0 0 3px var(--error-bg-strong),
     0 2px 6px rgba(0, 0, 0, 0.1);
 }
 

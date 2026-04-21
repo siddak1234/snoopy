@@ -6,9 +6,8 @@ import {
   createOrgWorkspaceAction,
   createPersonalWorkspaceAction,
 } from "@/app/onboarding/actions";
-
-const inputClass =
-  "mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60";
+import { FormInput } from "@/components/ui/FormInput";
+import { FormError } from "@/components/ui/FormError";
 
 export function SetupOrgForm({ domain }: { domain: string }) {
   const [error, setError] = useState<string | null>(null);
@@ -57,31 +56,18 @@ export function SetupOrgForm({ domain }: { domain: string }) {
         </div>
       </div>
 
-      {/* Org name */}
-      <div>
-        <label
-          htmlFor="onboarding-org-name"
-          className="block text-sm font-medium text-[var(--text)]"
-        >
-          Organization name
-        </label>
-        <input
-          id="onboarding-org-name"
-          name="name"
-          type="text"
-          required
-          autoComplete="organization"
-          placeholder="Acme Corp"
-          disabled={busy}
-          className={inputClass}
-        />
-      </div>
+      <FormInput
+        id="onboarding-org-name"
+        label="Organization name"
+        name="name"
+        type="text"
+        required
+        autoComplete="organization"
+        placeholder="Acme Corp"
+        disabled={busy}
+      />
 
-      {error ? (
-        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-          {error}
-        </p>
-      ) : null}
+      <FormError message={error} />
 
       <button
         type="submit"

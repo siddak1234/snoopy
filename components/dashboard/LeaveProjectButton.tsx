@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/ui/Modal";
 import { leaveProjectAction } from "@/app/account/projects/actions";
+import { FormInput } from "@/components/ui/FormInput";
+import { FormError } from "@/components/ui/FormError";
 
 export function LeaveProjectButton({
   projectId,
@@ -80,33 +82,22 @@ export function LeaveProjectButton({
           </p>
 
           <div className="mt-6 space-y-4">
-            <div>
-              <label
-                htmlFor="leave-project-confirm"
-                className="block text-sm font-medium text-[var(--text)]"
-              >
-                Confirmation
-              </label>
-              <input
-                id="leave-project-confirm"
-                type="text"
-                value={confirmText}
-                onChange={(e) => setConfirmText(e.target.value)}
-                autoFocus
-                placeholder="Type DELETE"
-                disabled={pending}
-                className="mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)]/50 outline-none transition focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") onConfirm();
-                }}
-              />
-            </div>
+            <FormInput
+              id="leave-project-confirm"
+              label="Confirmation"
+              type="text"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              autoFocus
+              placeholder="Type DELETE"
+              disabled={pending}
+              className="placeholder:text-[var(--muted)]/50"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onConfirm();
+              }}
+            />
 
-            {error ? (
-              <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-                {error}
-              </p>
-            ) : null}
+            <FormError message={error} />
 
             <div className="flex flex-wrap gap-2 pt-2">
               <button

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Modal from "@/components/ui/Modal";
+import { FormError } from "@/components/ui/FormError";
 import {
   createWorkspaceInviteAction,
   revokeWorkspaceInviteAction,
@@ -99,7 +100,7 @@ export function WorkspaceInviteButton({ workspaceId, initialPendingInvites }: Pr
           {creating ? "Generating…" : "Invite team member"}
         </button>
         {createError ? (
-          <p className="text-sm text-red-600 dark:text-red-400">{createError}</p>
+          <FormError message={createError} />
         ) : null}
       </div>
 
@@ -129,7 +130,7 @@ export function WorkspaceInviteButton({ workspaceId, initialPendingInvites }: Pr
                 type="button"
                 onClick={() => handleRevoke(invite.id)}
                 disabled={revoking === invite.id}
-                className="shrink-0 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-400 transition hover:bg-red-500/20 disabled:opacity-60"
+                className="shrink-0 rounded-full border border-[var(--error-border)] bg-[var(--error-bg)] px-2.5 py-1 text-xs font-medium text-[var(--error-text)] transition hover:bg-[var(--error-bg-strong)] disabled:opacity-60"
               >
                 {revoking === invite.id ? "Revoking…" : "Revoke"}
               </button>

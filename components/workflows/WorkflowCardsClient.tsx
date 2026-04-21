@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { WorkflowListItem } from "@/app/account/workflows/actions";
 import { deleteWorkflowAction } from "@/app/account/workflows/actions";
 import Modal from "@/components/ui/Modal";
+import { FormError } from "@/components/ui/FormError";
 
 function formatRelative(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -22,7 +23,7 @@ function formatRelative(iso: string): string {
 const statusColors: Record<string, string> = {
   draft:
     "border-[var(--ring)] bg-[var(--step-pill-bg)] text-[var(--step-pill-text)]",
-  active: "border-emerald-400/40 bg-emerald-500/10 text-emerald-400",
+  active: "border-[var(--success-border)] bg-[var(--success-bg)] text-[var(--success-text)]",
   archived: "border-[var(--ring)] bg-[var(--surface)] text-[var(--muted)]",
 };
 
@@ -93,7 +94,7 @@ export function WorkflowCardsClient({ workflows }: { workflows: WorkflowListItem
                   setConfirmText("");
                   setDeleteTarget(wf);
                 }}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--surface)]/70 text-[var(--muted)] transition hover:border-red-400 hover:bg-red-500/10 hover:text-red-400"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--surface)]/70 text-[var(--muted)] transition hover:border-[var(--error-text)] hover:bg-[var(--error-bg)] hover:text-[var(--error-text)]"
                 aria-label={`Delete workflow ${wf.name}`}
                 title="Delete"
               >
@@ -189,11 +190,11 @@ export function WorkflowCardsClient({ workflows }: { workflows: WorkflowListItem
                 if (e.key === "Enter") confirmDelete();
               }}
               placeholder="Type DELETE"
-              className="mt-4 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-sm text-[var(--text)] placeholder:text-[var(--muted)]/50 outline-none transition focus:ring-2 focus:ring-red-400/50"
+              className="mt-4 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-sm text-[var(--text)] placeholder:text-[var(--muted)]/50 outline-none transition focus:ring-2 focus:ring-[var(--error-border-medium)]"
             />
 
             {deleteError ? (
-              <p className="mt-2 text-center text-xs text-red-400">{deleteError}</p>
+              <FormError message={deleteError} className="mt-2 text-center text-xs" />
             ) : null}
 
             <div className="mt-5 flex gap-2.5">
@@ -211,7 +212,7 @@ export function WorkflowCardsClient({ workflows }: { workflows: WorkflowListItem
               <button
                 onClick={confirmDelete}
                 disabled={!canDelete || deleting}
-                className="flex-1 cursor-pointer rounded-full border border-red-400/60 bg-red-500/15 px-4 py-2 text-xs font-semibold text-red-400 transition hover:bg-red-500/25 disabled:pointer-events-none disabled:opacity-40"
+                className="flex-1 cursor-pointer rounded-full border border-[var(--error-border-medium)] bg-[var(--error-bg)] px-4 py-2 text-xs font-semibold text-[var(--error-text)] transition hover:bg-[var(--error-bg-strong)] disabled:pointer-events-none disabled:opacity-40"
               >
                 {deleting ? "Deleting…" : "Delete"}
               </button>
