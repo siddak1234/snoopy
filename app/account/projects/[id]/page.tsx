@@ -8,9 +8,12 @@ import { DeleteProjectButton } from "@/components/dashboard/DeleteProjectButton"
 import { LeaveProjectButton } from "@/components/dashboard/LeaveProjectButton";
 import { ProjectMemberPicker } from "@/components/dashboard/ProjectMemberPicker";
 import { ProjectMemberList } from "@/components/dashboard/ProjectMemberList";
+import { GlCodeAllocationDashboard } from "@/components/dashboard/GlCodeAllocationDashboard";
 import { formatDateMediumUTC } from "@/lib/date";
 import type { MemberRow } from "@/components/dashboard/ProjectMemberList";
 import type { AvailableMember } from "@/components/dashboard/ProjectMemberPicker";
+
+const GL_CODE_PROJECT_TYPE = "GL Code Classification";
 
 const statusLabel: Record<string, string> = {
   active: "Active",
@@ -130,6 +133,13 @@ export default async function ProjectDetailPage({
           ) : null}
         </dl>
       </div>
+
+      {/* ── GL Code Allocation dashboard (only for that project type) ────── */}
+      {project.type === GL_CODE_PROJECT_TYPE ? (
+        <div className="py-5">
+          <GlCodeAllocationDashboard />
+        </div>
+      ) : null}
 
       {/* ── Member management (owner and admin) ──────────────────────────── */}
       {canViewMembers && role ? (
