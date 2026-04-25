@@ -205,7 +205,7 @@ export function GlCodeAllocationDashboard() {
               ? "No invoices to download yet"
               : "Download invoice package"
           }
-          className="btn-primary inline-flex !min-h-0 items-center gap-1.5 px-4 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+          className="btn-primary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
         >
           <svg
             width="14"
@@ -327,7 +327,7 @@ export function GlCodeAllocationDashboard() {
             {/* TODO(v2): wire onClick to the upload pipeline (file picker → invoice store). */}
             <button
               type="button"
-              className="btn-primary inline-flex !min-h-0 items-center gap-1.5 px-4 py-1.5 text-sm"
+              className="btn-primary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm"
             >
               <svg
                 width="14"
