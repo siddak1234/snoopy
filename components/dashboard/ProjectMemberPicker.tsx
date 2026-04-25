@@ -66,7 +66,7 @@ export function ProjectMemberPicker({ projectId, availableMembers: initial }: Pr
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="btn-primary inline-flex px-4 py-1.5 text-sm"
+        className="btn-primary inline-flex !min-h-0 px-4 py-1.5 text-sm"
       >
         Add team members
       </button>
