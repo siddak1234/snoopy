@@ -7,13 +7,16 @@ import { createClient } from "@/lib/supabase/client";
 // The Project model currently has no client identifier, and the single
 // onboarded client's rows were inserted with client = NULL. Before
 // onboarding a second client, add a `client` column on Project, populate
-// it on creation, and change the three `.is("client", null)` filters
-// below to `.eq("client", project.client)`.
+// it on creation, and change the `.is("client", null)` filter below to
+// `.eq("client", project.client)`.
+//
+// TODO(v2): The "Spend by GL category", "Top vendors", and per-invoice
+// "Invoices" panels have no data source yet. They render empty states
+// to communicate the eventual scope. Wire each up once line-item /
+// vendor / category data lands in the schema.
 
 type GLCodeAllocationRow = {
   id: string;
-  created_at: string;
-  client: string | null;
   location: string | null;
   total: number | null;
   invoice_count: number | null;
@@ -21,22 +24,12 @@ type GLCodeAllocationRow = {
   period_end: string;
 };
 
-type DateRange = Pick<GLCodeAllocationRow, "period_start" | "period_end">;
-type SummaryRow = Pick<GLCodeAllocationRow, "total" | "invoice_count">;
-
 const TABLE = "GL Code Allocation";
-
-// Match the native <select> styling used on the project type field in
-// CreateProjectDialog.tsx so the dashboard inputs read as native repo UI.
-const SELECT_CLASSES =
-  "w-full appearance-none rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60 cursor-pointer";
-
-const TILE_CLASSES =
-  "rounded-xl border border-[var(--ring)] bg-[var(--card)] p-5";
 
 const currencyFmt = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
+  maximumFractionDigits: 0,
 });
 const integerFmt = new Intl.NumberFormat("en-US");
 
@@ -62,337 +55,447 @@ function formatDateRange(startISO: string, endISO: string): string {
   return `${monthDayYear(start)} – ${monthDayYear(end)}`;
 }
 
-function rangeKey(r: DateRange): string {
-  return `${r.period_start}|${r.period_end}`;
+function periodKey(period_start: string, period_end: string): string {
+  return `${period_start}|${period_end}`;
 }
 
 export function GlCodeAllocationDashboard() {
   const supabase = useMemo(() => createClient(), []);
 
-  const [ranges, setRanges] = useState<DateRange[] | null>(null);
-  const [selectedRangeKey, setSelectedRangeKey] = useState<string>("");
-  const [rangesLoading, setRangesLoading] = useState(true);
-
-  const [locations, setLocations] = useState<string[] | null>(null);
-  const [selectedLocation, setSelectedLocation] = useState<string>("");
-  const [locationsLoading, setLocationsLoading] = useState(false);
-
-  const [row, setRow] = useState<SummaryRow | null>(null);
-  const [rowLoading, setRowLoading] = useState(false);
-
+  const [rows, setRows] = useState<GLCodeAllocationRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Initial: distinct date ranges, newest-first, pre-select top.
+  const [pickedPeriodKey, setPickedPeriodKey] = useState<string>("");
+  const [pickedLocation, setPickedLocation] = useState<string>("");
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setRangesLoading(true);
-      setError(null);
       const { data, error: qError } = await supabase
         .from(TABLE)
-        .select("period_start, period_end")
+        .select("id, location, total, invoice_count, period_start, period_end")
         .is("client", null);
       if (cancelled) return;
       if (qError) {
-        setError("Could not load date ranges.");
-        setRangesLoading(false);
+        setError("Could not load allocation data.");
+        setRows([]);
         return;
       }
-      const seen = new Set<string>();
-      const unique: DateRange[] = [];
-      for (const r of (data ?? []) as DateRange[]) {
-        if (!r.period_start || !r.period_end) continue;
-        const k = rangeKey(r);
-        if (seen.has(k)) continue;
-        seen.add(k);
-        unique.push({ period_start: r.period_start, period_end: r.period_end });
-      }
-      unique.sort((a, b) =>
-        a.period_end < b.period_end ? 1 : a.period_end > b.period_end ? -1 : 0,
-      );
-      setRanges(unique);
-      if (unique.length > 0) {
-        setSelectedRangeKey(rangeKey(unique[0]));
-      }
-      setRangesLoading(false);
+      setRows((data ?? []) as GLCodeAllocationRow[]);
     })();
     return () => {
       cancelled = true;
     };
   }, [supabase]);
 
-  // Range change → clear location, refetch locations for that range.
-  useEffect(() => {
-    if (!selectedRangeKey) return;
-    const [period_start, period_end] = selectedRangeKey.split("|");
-    let cancelled = false;
-    (async () => {
-      setLocationsLoading(true);
-      setSelectedLocation("");
-      setLocations(null);
-      setRow(null);
-      setError(null);
-      const { data, error: qError } = await supabase
-        .from(TABLE)
-        .select("location")
-        .is("client", null)
-        .eq("period_start", period_start)
-        .eq("period_end", period_end);
-      if (cancelled) return;
-      if (qError) {
-        setError("Could not load locations.");
-        setLocationsLoading(false);
-        return;
-      }
-      const seen = new Set<string>();
-      const unique: string[] = [];
-      for (const r of (data ?? []) as { location: string | null }[]) {
-        if (!r.location || seen.has(r.location)) continue;
-        seen.add(r.location);
-        unique.push(r.location);
-      }
-      unique.sort((a, b) => a.localeCompare(b));
-      setLocations(unique);
-      setLocationsLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedRangeKey, supabase]);
+  const periods = useMemo(() => {
+    if (!rows) return [];
+    const seen = new Set<string>();
+    const out: { key: string; period_start: string; period_end: string }[] = [];
+    for (const r of rows) {
+      if (!r.period_start || !r.period_end) continue;
+      const k = periodKey(r.period_start, r.period_end);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push({
+        key: k,
+        period_start: r.period_start,
+        period_end: r.period_end,
+      });
+    }
+    out.sort((a, b) =>
+      a.period_end < b.period_end ? 1 : a.period_end > b.period_end ? -1 : 0,
+    );
+    return out;
+  }, [rows]);
 
-  // Location change → fetch the matching summary row.
-  useEffect(() => {
-    if (!selectedRangeKey || !selectedLocation) return;
-    const [period_start, period_end] = selectedRangeKey.split("|");
-    let cancelled = false;
-    (async () => {
-      setRowLoading(true);
-      setError(null);
-      const { data, error: qError } = await supabase
-        .from(TABLE)
-        .select("total, invoice_count")
-        .is("client", null)
-        .eq("period_start", period_start)
-        .eq("period_end", period_end)
-        .eq("location", selectedLocation)
-        .limit(1);
-      if (cancelled) return;
-      if (qError) {
-        setError("Could not load summary.");
-        setRowLoading(false);
-        return;
-      }
-      const first = (data ?? [])[0] as SummaryRow | undefined;
-      setRow(first ?? { total: null, invoice_count: null });
-      setRowLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedRangeKey, selectedLocation, supabase]);
+  const effectivePeriodKey = pickedPeriodKey || periods[0]?.key || "";
 
-  const noData = !rangesLoading && ranges !== null && ranges.length === 0;
-  const tilesLoading = rangesLoading || rowLoading;
+  const locations = useMemo(() => {
+    if (!rows || !effectivePeriodKey) return [];
+    const [ps, pe] = effectivePeriodKey.split("|");
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const r of rows) {
+      if (r.period_start !== ps || r.period_end !== pe) continue;
+      if (!r.location || seen.has(r.location)) continue;
+      seen.add(r.location);
+      out.push(r.location);
+    }
+    out.sort((a, b) => a.localeCompare(b));
+    return out;
+  }, [rows, effectivePeriodKey]);
+
+  const effectiveLocation = locations.includes(pickedLocation)
+    ? pickedLocation
+    : (locations[0] ?? "");
+
+  const selectedRow = useMemo(() => {
+    if (!rows || !effectivePeriodKey || !effectiveLocation) return null;
+    const [ps, pe] = effectivePeriodKey.split("|");
+    return (
+      rows.find(
+        (r) =>
+          r.period_start === ps &&
+          r.period_end === pe &&
+          r.location === effectiveLocation,
+      ) ?? null
+    );
+  }, [rows, effectivePeriodKey, effectiveLocation]);
+
+  // Period-over-period delta on the same location (when a prior period exists).
+  const priorRow = useMemo(() => {
+    if (!rows || !effectivePeriodKey || !effectiveLocation) return null;
+    const idx = periods.findIndex((p) => p.key === effectivePeriodKey);
+    if (idx < 0 || idx + 1 >= periods.length) return null;
+    const prior = periods[idx + 1];
+    return (
+      rows.find(
+        (r) =>
+          r.period_start === prior.period_start &&
+          r.period_end === prior.period_end &&
+          r.location === effectiveLocation,
+      ) ?? null
+    );
+  }, [rows, periods, effectivePeriodKey, effectiveLocation]);
+
+  const isLoading = rows === null && !error;
+  const hasNoData = !isLoading && (rows?.length ?? 0) === 0;
+
+  const total = selectedRow?.total ?? null;
+  const invoices = selectedRow?.invoice_count ?? null;
+  const priorTotal = priorRow?.total ?? null;
+  const totalDeltaPct =
+    total != null && priorTotal != null && Number(priorTotal) > 0
+      ? ((Number(total) - Number(priorTotal)) / Number(priorTotal)) * 100
+      : null;
 
   return (
-    <section aria-label="Allocation summary">
-      <h3 className="text-sm font-semibold text-[var(--text)]">
-        Allocation summary
-      </h3>
-
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <DropdownField
-          label="Date range"
-          name="gl-date-range"
-          value={selectedRangeKey}
-          onChange={setSelectedRangeKey}
-          disabled={rangesLoading || noData}
-          placeholder={
-            rangesLoading
-              ? "Loading…"
-              : noData
-                ? "No data available"
-                : "Select a date range"
-          }
-          options={(ranges ?? []).map((r) => ({
-            value: rangeKey(r),
-            label: formatDateRange(r.period_start, r.period_end),
-          }))}
-        />
-        <DropdownField
-          label="Location"
-          name="gl-location"
-          value={selectedLocation}
-          onChange={setSelectedLocation}
-          disabled={
-            locationsLoading ||
-            !selectedRangeKey ||
-            (locations !== null && locations.length === 0)
-          }
-          placeholder={
-            locationsLoading
-              ? "Loading…"
-              : !selectedRangeKey
-                ? "Select a date range first"
-                : locations !== null && locations.length === 0
-                  ? "No locations for this range"
-                  : "Select a location"
-          }
-          options={(locations ?? []).map((loc) => ({ value: loc, label: loc }))}
-        />
-      </div>
-
+    <section
+      aria-label="Invoice dashboard"
+      className="flex flex-col gap-5"
+    >
       {error ? (
-        <p className="mt-3 rounded-lg border border-[var(--error-border)] bg-[var(--error-bg)] px-3 py-2 text-sm text-[var(--error-text)]">
+        <p className="rounded-lg border border-[var(--error-border)] bg-[var(--error-bg)] px-3 py-2 text-sm text-[var(--error-text)]">
           {error}
         </p>
       ) : null}
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <SummaryTile
-          label="Total"
-          loading={tilesLoading}
-          value={
-            noData
-              ? "No data yet"
-              : !selectedLocation
-                ? "—"
-                : row?.total == null
-                  ? "—"
-                  : currencyFmt.format(Number(row.total))
+      {/* Dashboard header: title + download */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold text-[var(--text)]">
+            Invoice Dashboard
+          </h3>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">
+            {isLoading
+              ? "Loading…"
+              : hasNoData
+                ? "No invoices processed yet."
+                : `${integerFmt.format(rows!.length)} period record${rows!.length === 1 ? "" : "s"} available`}
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={hasNoData || isLoading}
+          title={
+            hasNoData
+              ? "No invoices to download yet"
+              : "Download invoice package"
           }
-          hint={
-            noData
-              ? "No GL Code Allocation rows for this project yet."
-              : !selectedLocation
-                ? "Select a location to see the total."
-                : null
+          className="btn-primary inline-flex !min-h-0 items-center gap-1.5 px-4 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Download invoice package
+        </button>
+      </div>
+
+      {/* Filter pills */}
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <FilterPill
+          label="Close period"
+          value={effectivePeriodKey}
+          onChange={setPickedPeriodKey}
+          options={periods.map((p) => ({
+            value: p.key,
+            label: formatDateRange(p.period_start, p.period_end),
+          }))}
+          placeholder={
+            isLoading
+              ? "Loading…"
+              : hasNoData
+                ? "No data available"
+                : "Select a period"
           }
-          muted={noData || !selectedLocation}
+          disabled={isLoading || hasNoData}
         />
-        <SummaryTile
-          label="Invoice count"
-          loading={tilesLoading}
-          value={
-            noData
-              ? "No data yet"
-              : !selectedLocation
-                ? "—"
-                : row?.invoice_count == null
-                  ? "—"
-                  : integerFmt.format(Number(row.invoice_count))
+        <FilterPill
+          label="Location"
+          value={effectiveLocation}
+          onChange={setPickedLocation}
+          options={locations.map((loc) => ({ value: loc, label: loc }))}
+          placeholder={
+            isLoading
+              ? "Loading…"
+              : hasNoData
+                ? "No data available"
+                : !effectivePeriodKey
+                  ? "Select a period first"
+                  : locations.length === 0
+                    ? "No locations for this period"
+                    : "Select a location"
           }
-          hint={
-            noData
-              ? "No GL Code Allocation rows for this project yet."
-              : !selectedLocation
-                ? "Select a location to see the invoice count."
-                : null
+          disabled={
+            isLoading ||
+            hasNoData ||
+            !effectivePeriodKey ||
+            locations.length === 0
           }
-          muted={noData || !selectedLocation}
         />
       </div>
+
+      {/* KPI tiles */}
+      <div className="grid gap-2.5 sm:grid-cols-3">
+        <KpiTile
+          label="Total invoiced"
+          value={total == null ? null : currencyFmt.format(Number(total))}
+          delta={
+            totalDeltaPct == null
+              ? null
+              : {
+                  text: `${totalDeltaPct >= 0 ? "↑" : "↓"} ${Math.abs(totalDeltaPct).toFixed(1)}% vs prior`,
+                  positive: totalDeltaPct >= 0,
+                }
+          }
+          subtext={
+            total == null
+              ? hasNoData
+                ? "Awaiting data"
+                : "Select a period and location"
+              : null
+          }
+        />
+        <KpiTile
+          label="Invoices"
+          value={invoices == null ? null : integerFmt.format(Number(invoices))}
+          subtext={
+            invoices == null
+              ? hasNoData
+                ? "No invoices yet"
+                : "Select a period and location"
+              : "Vendor breakdown coming soon"
+          }
+        />
+        <KpiTile
+          label="Flagged for review"
+          value={null}
+          subtext="Confidence scoring coming soon"
+        />
+      </div>
+
+      {/* Side-by-side: GL category breakdown + Top vendors */}
+      <div className="grid gap-2.5 lg:grid-cols-[1.3fr_1fr]">
+        <SectionPanel title="Spend by GL category">
+          <EmptyMessage text="Per-category spend will appear here once line-item ingestion is wired up." />
+        </SectionPanel>
+        <SectionPanel title="Top vendors" rightLabel="By spend">
+          <EmptyMessage text="Vendor breakdown will appear here once invoice metadata is captured." />
+        </SectionPanel>
+      </div>
+
+      {/* Invoices table */}
+      <SectionPanel title="Invoices">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-[10px] uppercase tracking-wide text-[var(--muted)]">
+                <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">
+                  Vendor / Invoice
+                </th>
+                <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">
+                  Date
+                </th>
+                <th className="border-b border-[var(--ring)] px-3 py-2 text-right font-medium">
+                  Amount
+                </th>
+                <th className="border-b border-[var(--ring)] px-3 py-2 text-center font-medium">
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td
+                  colSpan={4}
+                  className="px-3 py-10 text-center text-xs text-[var(--muted)]"
+                >
+                  Per-invoice records will appear here once invoice ingestion is
+                  wired up.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </SectionPanel>
     </section>
   );
 }
 
-function DropdownField({
+function FilterPill({
   label,
-  name,
   value,
   onChange,
-  disabled,
-  placeholder,
   options,
+  placeholder,
+  disabled,
 }: {
   label: string;
-  name: string;
   value: string;
   onChange: (v: string) => void;
-  disabled?: boolean;
-  placeholder: string;
   options: { value: string; label: string }[];
+  placeholder: string;
+  disabled?: boolean;
 }) {
+  const id = `filter-${label.toLowerCase().replace(/\s+/g, "-")}`;
+  const displayed = options.find((o) => o.value === value)?.label;
+
   return (
-    <div>
-      <label
-        htmlFor={name}
-        className="block text-sm font-medium text-[var(--text)]"
+    <div
+      className={`relative flex items-center justify-between gap-3 rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 ${
+        disabled ? "opacity-60" : ""
+      }`}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
+          {label}
+        </div>
+        <div className="mt-0.5 truncate text-sm font-medium text-[var(--text)]">
+          {displayed ?? (
+            <span className="text-[var(--muted)]">{placeholder}</span>
+          )}
+        </div>
+      </div>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+        className="shrink-0 text-[var(--muted)]"
       >
+        <polyline points="6 9 12 15 18 9" />
+      </svg>
+      <label htmlFor={id} className="sr-only">
         {label}
       </label>
-      <div className="relative mt-1.5">
-        <select
-          id={name}
-          name={name}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-          className={SELECT_CLASSES}
-        >
-          <option value="" disabled className="text-[var(--muted)]">
-            {placeholder}
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className="absolute inset-0 cursor-pointer appearance-none bg-transparent text-transparent opacity-0 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] rounded-xl"
+        aria-label={label}
+      >
+        <option value="" disabled>
+          {placeholder}
+        </option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
           </option>
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden
-          className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[var(--muted)]"
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
-      </div>
+        ))}
+      </select>
     </div>
   );
 }
 
-function SummaryTile({
+function KpiTile({
   label,
   value,
-  loading,
-  muted,
-  hint,
+  delta,
+  subtext,
 }: {
   label: string;
-  value: string;
-  loading?: boolean;
-  muted?: boolean;
-  hint?: string | null;
+  value: string | null;
+  delta?: { text: string; positive: boolean } | null;
+  subtext?: string | null;
 }) {
   return (
-    <div className={TILE_CLASSES}>
-      <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+    <div className="rounded-xl border border-[var(--ring)] bg-[var(--card)] p-4">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
         {label}
       </p>
-      {loading ? (
-        <div className="mt-2 h-8 w-32 animate-pulse rounded-md bg-[var(--surface-strong)]" />
-      ) : (
+      <p
+        className={
+          value == null
+            ? "mt-1.5 text-2xl font-semibold text-[var(--muted)]"
+            : "mt-1.5 text-2xl font-semibold text-[var(--text)]"
+        }
+      >
+        {value ?? "—"}
+      </p>
+      {delta ? (
         <p
           className={
-            muted
-              ? "mt-2 text-2xl font-semibold text-[var(--muted)]"
-              : "mt-2 text-2xl font-semibold text-[var(--text)]"
+            delta.positive
+              ? "mt-1 text-[11px] text-[var(--success-text)]"
+              : "mt-1 text-[11px] text-[var(--error-text)]"
           }
         >
-          {value}
+          {delta.text}
         </p>
-      )}
-      {hint && !loading ? (
-        <p className="mt-1 text-xs text-[var(--muted)]">{hint}</p>
+      ) : subtext ? (
+        <p className="mt-1 text-[11px] text-[var(--muted)]">{subtext}</p>
       ) : null}
+    </div>
+  );
+}
+
+function SectionPanel({
+  title,
+  rightLabel,
+  children,
+}: {
+  title: string;
+  rightLabel?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-[var(--ring)] bg-[var(--card)] p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h4 className="text-sm font-semibold text-[var(--text)]">{title}</h4>
+        {rightLabel ? (
+          <span className="text-[11px] text-[var(--muted)]">{rightLabel}</span>
+        ) : null}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function EmptyMessage({ text }: { text: string }) {
+  return (
+    <div className="flex min-h-[140px] items-center justify-center px-4 text-center text-xs text-[var(--muted)]">
+      {text}
     </div>
   );
 }
