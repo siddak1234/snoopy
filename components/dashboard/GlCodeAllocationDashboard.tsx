@@ -67,6 +67,8 @@ export function GlCodeAllocationDashboard() {
 
   const [pickedPeriodKey, setPickedPeriodKey] = useState<string>("");
   const [pickedLocation, setPickedLocation] = useState<string>("");
+  // TODO(v2): wire to actual invoice search once per-invoice rows exist.
+  const [invoiceQuery, setInvoiceQuery] = useState<string>("");
 
   useEffect(() => {
     let cancelled = false;
@@ -318,7 +320,46 @@ export function GlCodeAllocationDashboard() {
       </div>
 
       {/* Invoices table */}
-      <SectionPanel title="Invoices">
+      <SectionPanel
+        title="Invoices"
+        rightContent={
+          <div className="flex flex-wrap items-center gap-2">
+            {/* TODO(v2): wire onClick to the upload pipeline (file picker → invoice store). */}
+            <button
+              type="button"
+              className="btn-primary inline-flex !min-h-0 items-center gap-1.5 px-4 py-1.5 text-sm"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              Upload invoices
+            </button>
+            <label htmlFor="invoice-search" className="sr-only">
+              Search invoices
+            </label>
+            <input
+              id="invoice-search"
+              type="search"
+              value={invoiceQuery}
+              onChange={(e) => setInvoiceQuery(e.target.value)}
+              placeholder="Search vendor or invoice #"
+              className="w-44 rounded-lg border border-[var(--ring)] bg-[var(--bg)] px-3 py-1.5 text-xs text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] sm:w-52"
+            />
+          </div>
+        }
+      >
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -473,19 +514,24 @@ function KpiTile({
 function SectionPanel({
   title,
   rightLabel,
+  rightContent,
   children,
 }: {
   title: string;
   rightLabel?: string;
+  /** Use for richer right-side content (button row, search, etc). Wins over `rightLabel`. */
+  rightContent?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className="rounded-xl border border-[var(--ring)] bg-[var(--card)] p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h4 className="text-sm font-semibold text-[var(--text)]">{title}</h4>
-        {rightLabel ? (
-          <span className="text-[11px] text-[var(--muted)]">{rightLabel}</span>
-        ) : null}
+        {rightContent
+          ? rightContent
+          : rightLabel
+            ? <span className="text-[11px] text-[var(--muted)]">{rightLabel}</span>
+            : null}
       </div>
       {children}
     </div>
