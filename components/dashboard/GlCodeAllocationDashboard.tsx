@@ -7,13 +7,11 @@ import { createClient } from "@/lib/supabase/client";
 // The Project model currently has no client identifier, and the single
 // onboarded client's rows were inserted with client = NULL. Before
 // onboarding a second client, add a `client` column on Project, populate
-// it on creation, and change the three `.is("client", null)` filters
-// below to `.eq("client", project.client)`.
+// it on creation, and change the `.is("client", null)` filter below to
+// `.eq("client", project.client)`.
 
 type GLCodeAllocationRow = {
   id: string;
-  created_at: string;
-  client: string | null;
   location: string | null;
   total: number | null;
   invoice_count: number | null;
@@ -21,18 +19,7 @@ type GLCodeAllocationRow = {
   period_end: string;
 };
 
-type DateRange = Pick<GLCodeAllocationRow, "period_start" | "period_end">;
-type SummaryRow = Pick<GLCodeAllocationRow, "total" | "invoice_count">;
-
 const TABLE = "GL Code Allocation";
-
-// Match the native <select> styling used on the project type field in
-// CreateProjectDialog.tsx so the dashboard inputs read as native repo UI.
-const SELECT_CLASSES =
-  "w-full appearance-none rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60 cursor-pointer";
-
-const TILE_CLASSES =
-  "rounded-xl border border-[var(--ring)] bg-[var(--card)] p-5";
 
 const currencyFmt = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -62,337 +49,230 @@ function formatDateRange(startISO: string, endISO: string): string {
   return `${monthDayYear(start)} – ${monthDayYear(end)}`;
 }
 
-function rangeKey(r: DateRange): string {
-  return `${r.period_start}|${r.period_end}`;
+function periodKey(period_start: string, period_end: string): string {
+  return `${period_start}|${period_end}`;
 }
 
 export function GlCodeAllocationDashboard() {
   const supabase = useMemo(() => createClient(), []);
 
-  const [ranges, setRanges] = useState<DateRange[] | null>(null);
-  const [selectedRangeKey, setSelectedRangeKey] = useState<string>("");
-  const [rangesLoading, setRangesLoading] = useState(true);
-
-  const [locations, setLocations] = useState<string[] | null>(null);
-  const [selectedLocation, setSelectedLocation] = useState<string>("");
-  const [locationsLoading, setLocationsLoading] = useState(false);
-
-  const [row, setRow] = useState<SummaryRow | null>(null);
-  const [rowLoading, setRowLoading] = useState(false);
-
+  const [rows, setRows] = useState<GLCodeAllocationRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Initial: distinct date ranges, newest-first, pre-select top.
+  // User's explicit picks; effective values below derive a valid choice.
+  const [pickedPeriodKey, setPickedPeriodKey] = useState<string>("");
+  const [pickedLocation, setPickedLocation] = useState<string>("");
+
+  // Single query on mount. All interactions are pure in-memory recompute.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setRangesLoading(true);
-      setError(null);
       const { data, error: qError } = await supabase
         .from(TABLE)
-        .select("period_start, period_end")
+        .select("id, location, total, invoice_count, period_start, period_end")
         .is("client", null);
       if (cancelled) return;
       if (qError) {
-        setError("Could not load date ranges.");
-        setRangesLoading(false);
+        setError("Could not load allocation data.");
+        setRows([]);
         return;
       }
-      const seen = new Set<string>();
-      const unique: DateRange[] = [];
-      for (const r of (data ?? []) as DateRange[]) {
-        if (!r.period_start || !r.period_end) continue;
-        const k = rangeKey(r);
-        if (seen.has(k)) continue;
-        seen.add(k);
-        unique.push({ period_start: r.period_start, period_end: r.period_end });
-      }
-      unique.sort((a, b) =>
-        a.period_end < b.period_end ? 1 : a.period_end > b.period_end ? -1 : 0,
-      );
-      setRanges(unique);
-      if (unique.length > 0) {
-        setSelectedRangeKey(rangeKey(unique[0]));
-      }
-      setRangesLoading(false);
+      setRows((data ?? []) as GLCodeAllocationRow[]);
     })();
     return () => {
       cancelled = true;
     };
   }, [supabase]);
 
-  // Range change → clear location, refetch locations for that range.
-  useEffect(() => {
-    if (!selectedRangeKey) return;
-    const [period_start, period_end] = selectedRangeKey.split("|");
-    let cancelled = false;
-    (async () => {
-      setLocationsLoading(true);
-      setSelectedLocation("");
-      setLocations(null);
-      setRow(null);
-      setError(null);
-      const { data, error: qError } = await supabase
-        .from(TABLE)
-        .select("location")
-        .is("client", null)
-        .eq("period_start", period_start)
-        .eq("period_end", period_end);
-      if (cancelled) return;
-      if (qError) {
-        setError("Could not load locations.");
-        setLocationsLoading(false);
-        return;
-      }
-      const seen = new Set<string>();
-      const unique: string[] = [];
-      for (const r of (data ?? []) as { location: string | null }[]) {
-        if (!r.location || seen.has(r.location)) continue;
-        seen.add(r.location);
-        unique.push(r.location);
-      }
-      unique.sort((a, b) => a.localeCompare(b));
-      setLocations(unique);
-      setLocationsLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedRangeKey, supabase]);
+  // Distinct periods, newest first.
+  const periods = useMemo(() => {
+    if (!rows) return [];
+    const seen = new Set<string>();
+    const out: { key: string; period_start: string; period_end: string }[] = [];
+    for (const r of rows) {
+      if (!r.period_start || !r.period_end) continue;
+      const k = periodKey(r.period_start, r.period_end);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push({
+        key: k,
+        period_start: r.period_start,
+        period_end: r.period_end,
+      });
+    }
+    out.sort((a, b) =>
+      a.period_end < b.period_end ? 1 : a.period_end > b.period_end ? -1 : 0,
+    );
+    return out;
+  }, [rows]);
 
-  // Location change → fetch the matching summary row.
-  useEffect(() => {
-    if (!selectedRangeKey || !selectedLocation) return;
-    const [period_start, period_end] = selectedRangeKey.split("|");
-    let cancelled = false;
-    (async () => {
-      setRowLoading(true);
-      setError(null);
-      const { data, error: qError } = await supabase
-        .from(TABLE)
-        .select("total, invoice_count")
-        .is("client", null)
-        .eq("period_start", period_start)
-        .eq("period_end", period_end)
-        .eq("location", selectedLocation)
-        .limit(1);
-      if (cancelled) return;
-      if (qError) {
-        setError("Could not load summary.");
-        setRowLoading(false);
-        return;
-      }
-      const first = (data ?? [])[0] as SummaryRow | undefined;
-      setRow(first ?? { total: null, invoice_count: null });
-      setRowLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedRangeKey, selectedLocation, supabase]);
+  const effectivePeriodKey = pickedPeriodKey || periods[0]?.key || "";
 
-  const noData = !rangesLoading && ranges !== null && ranges.length === 0;
-  const tilesLoading = rangesLoading || rowLoading;
+  // Distinct locations for the effective period, alphabetical.
+  const locations = useMemo(() => {
+    if (!rows || !effectivePeriodKey) return [];
+    const [ps, pe] = effectivePeriodKey.split("|");
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const r of rows) {
+      if (r.period_start !== ps || r.period_end !== pe) continue;
+      if (!r.location || seen.has(r.location)) continue;
+      seen.add(r.location);
+      out.push(r.location);
+    }
+    out.sort((a, b) => a.localeCompare(b));
+    return out;
+  }, [rows, effectivePeriodKey]);
 
-  return (
-    <section aria-label="Allocation summary">
-      <h3 className="text-sm font-semibold text-[var(--text)]">
-        Allocation summary
-      </h3>
+  const effectiveLocation = locations.includes(pickedLocation)
+    ? pickedLocation
+    : (locations[0] ?? "");
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <DropdownField
-          label="Date range"
-          name="gl-date-range"
-          value={selectedRangeKey}
-          onChange={setSelectedRangeKey}
-          disabled={rangesLoading || noData}
-          placeholder={
-            rangesLoading
-              ? "Loading…"
-              : noData
-                ? "No data available"
-                : "Select a date range"
-          }
-          options={(ranges ?? []).map((r) => ({
-            value: rangeKey(r),
-            label: formatDateRange(r.period_start, r.period_end),
-          }))}
-        />
-        <DropdownField
-          label="Location"
-          name="gl-location"
-          value={selectedLocation}
-          onChange={setSelectedLocation}
-          disabled={
-            locationsLoading ||
-            !selectedRangeKey ||
-            (locations !== null && locations.length === 0)
-          }
-          placeholder={
-            locationsLoading
-              ? "Loading…"
-              : !selectedRangeKey
-                ? "Select a date range first"
-                : locations !== null && locations.length === 0
-                  ? "No locations for this range"
-                  : "Select a location"
-          }
-          options={(locations ?? []).map((loc) => ({ value: loc, label: loc }))}
-        />
-      </div>
+  const selectedRow = useMemo(() => {
+    if (!rows || !effectivePeriodKey || !effectiveLocation) return null;
+    const [ps, pe] = effectivePeriodKey.split("|");
+    return (
+      rows.find(
+        (r) =>
+          r.period_start === ps &&
+          r.period_end === pe &&
+          r.location === effectiveLocation,
+      ) ?? null
+    );
+  }, [rows, effectivePeriodKey, effectiveLocation]);
 
-      {error ? (
-        <p className="mt-3 rounded-lg border border-[var(--error-border)] bg-[var(--error-bg)] px-3 py-2 text-sm text-[var(--error-text)]">
+  if (error) {
+    return (
+      <section aria-label="Allocation summary">
+        <p className="rounded-lg border border-[var(--error-border)] bg-[var(--error-bg)] px-3 py-2 text-sm text-[var(--error-text)]">
           {error}
         </p>
-      ) : null}
+      </section>
+    );
+  }
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <SummaryTile
-          label="Total"
-          loading={tilesLoading}
-          value={
-            noData
-              ? "No data yet"
-              : !selectedLocation
-                ? "—"
-                : row?.total == null
-                  ? "—"
-                  : currencyFmt.format(Number(row.total))
-          }
-          hint={
-            noData
-              ? "No GL Code Allocation rows for this project yet."
-              : !selectedLocation
-                ? "Select a location to see the total."
-                : null
-          }
-          muted={noData || !selectedLocation}
-        />
-        <SummaryTile
-          label="Invoice count"
-          loading={tilesLoading}
-          value={
-            noData
-              ? "No data yet"
-              : !selectedLocation
-                ? "—"
-                : row?.invoice_count == null
-                  ? "—"
-                  : integerFmt.format(Number(row.invoice_count))
-          }
-          hint={
-            noData
-              ? "No GL Code Allocation rows for this project yet."
-              : !selectedLocation
-                ? "Select a location to see the invoice count."
-                : null
-          }
-          muted={noData || !selectedLocation}
-        />
+  if (rows === null) {
+    return <DashboardSkeleton />;
+  }
+
+  if (periods.length === 0) {
+    return (
+      <section aria-label="Allocation summary">
+        <p className="text-sm text-[var(--muted)]">
+          No GL Code Allocation rows for this project yet.
+        </p>
+      </section>
+    );
+  }
+
+  const total = selectedRow?.total ?? null;
+  const invoiceCount = selectedRow?.invoice_count ?? null;
+
+  return (
+    <section aria-label="Allocation summary" className="space-y-4">
+      <FilterRow
+        label="Period"
+        options={periods.map((p) => ({
+          value: p.key,
+          label: formatDateRange(p.period_start, p.period_end),
+        }))}
+        value={effectivePeriodKey}
+        onChange={setPickedPeriodKey}
+      />
+      <FilterRow
+        label="Location"
+        options={locations.map((loc) => ({ value: loc, label: loc }))}
+        value={effectiveLocation}
+        onChange={setPickedLocation}
+        emptyMessage="No locations for this period."
+      />
+      <div className="border-t border-[var(--ring)] pt-5">
+        <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+          Total allocated
+        </p>
+        <p className="mt-1 text-3xl font-semibold tracking-tight text-[var(--text)] sm:text-4xl">
+          {total == null ? "—" : currencyFmt.format(Number(total))}
+        </p>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          {invoiceCount == null
+            ? "No invoice count for this row."
+            : `${integerFmt.format(Number(invoiceCount))} invoices`}
+        </p>
       </div>
     </section>
   );
 }
 
-function DropdownField({
+function FilterRow({
   label,
-  name,
+  options,
   value,
   onChange,
-  disabled,
-  placeholder,
-  options,
+  emptyMessage,
 }: {
   label: string;
-  name: string;
+  options: { value: string; label: string }[];
   value: string;
   onChange: (v: string) => void;
-  disabled?: boolean;
-  placeholder: string;
-  options: { value: string; label: string }[];
+  emptyMessage?: string;
 }) {
   return (
-    <div>
-      <label
-        htmlFor={name}
-        className="block text-sm font-medium text-[var(--text)]"
-      >
+    <div className="flex flex-wrap items-end gap-x-3 gap-y-1 border-b border-[var(--ring)]">
+      <span className="shrink-0 pb-2.5 text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
         {label}
-      </label>
-      <div className="relative mt-1.5">
-        <select
-          id={name}
-          name={name}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-          className={SELECT_CLASSES}
-        >
-          <option value="" disabled className="text-[var(--muted)]">
-            {placeholder}
-          </option>
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden
-          className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[var(--muted)]"
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
-      </div>
+      </span>
+      {options.length === 0 ? (
+        <span className="pb-2.5 text-sm text-[var(--muted)]">
+          {emptyMessage ?? "No options."}
+        </span>
+      ) : (
+        <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
+          {options.map((o) => {
+            const active = o.value === value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => onChange(o.value)}
+                aria-pressed={active}
+                className={
+                  active
+                    ? "-mb-px shrink-0 border-b-2 border-[var(--accent-strong)] px-3 pb-2 text-sm font-semibold text-[var(--text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                    : "-mb-px shrink-0 border-b-2 border-transparent px-3 pb-2 text-sm text-[var(--muted)] transition hover:text-[var(--text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                }
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
 
-function SummaryTile({
-  label,
-  value,
-  loading,
-  muted,
-  hint,
-}: {
-  label: string;
-  value: string;
-  loading?: boolean;
-  muted?: boolean;
-  hint?: string | null;
-}) {
+function DashboardSkeleton() {
   return (
-    <div className={TILE_CLASSES}>
-      <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
-        {label}
-      </p>
-      {loading ? (
-        <div className="mt-2 h-8 w-32 animate-pulse rounded-md bg-[var(--surface-strong)]" />
-      ) : (
-        <p
-          className={
-            muted
-              ? "mt-2 text-2xl font-semibold text-[var(--muted)]"
-              : "mt-2 text-2xl font-semibold text-[var(--text)]"
-          }
-        >
-          {value}
+    <section aria-label="Allocation summary" className="space-y-4">
+      <div className="flex items-end gap-3 border-b border-[var(--ring)] pb-2.5">
+        <span className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+          Period
+        </span>
+        <div className="h-5 w-32 animate-pulse rounded bg-[var(--surface-strong)]" />
+      </div>
+      <div className="flex items-end gap-3 border-b border-[var(--ring)] pb-2.5">
+        <span className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+          Location
+        </span>
+        <div className="h-5 w-32 animate-pulse rounded bg-[var(--surface-strong)]" />
+      </div>
+      <div className="border-t border-[var(--ring)] pt-5">
+        <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+          Total allocated
         </p>
-      )}
-      {hint && !loading ? (
-        <p className="mt-1 text-xs text-[var(--muted)]">{hint}</p>
-      ) : null}
-    </div>
+        <div className="mt-1 h-10 w-64 animate-pulse rounded-md bg-[var(--surface-strong)]" />
+        <div className="mt-3 h-4 w-32 animate-pulse rounded bg-[var(--surface-strong)]" />
+      </div>
+    </section>
   );
 }
