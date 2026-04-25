@@ -67,7 +67,7 @@ export default async function ProjectDetailPage({
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/account/projects"
-            className="btn-secondary inline-flex !min-h-0 px-4 py-1.5 text-sm"
+            className="btn-secondary inline-flex !min-h-0 !px-4 !py-1.5 text-sm"
           >
             Back to projects
           </Link>
