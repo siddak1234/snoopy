@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-// TODO(v2): Replace `client IS NULL` with a real project↔client linkage.
-// The Project model currently has no client identifier, and the single
-// onboarded client's rows were inserted with client = NULL. Before
-// onboarding a second client, add a `client` column on Project, populate
-// it on creation, and change the `.is("client", null)` filter below to
-// `.eq("client", project.client)`.
+// TODO(v2): Per-project client scoping.
+// The query below reads every row in `GL Code Allocation` that the
+// authenticated user can see via RLS. With a single onboarded client
+// (currently "Claros") that's exactly the right rows. Before onboarding
+// a second client, add a `client` column on the Project model, populate
+// it on project creation, and add `.eq("client", project.client)` to
+// the query so each project only sees its own client's rows.
 //
 // TODO(v2): The "Spend by GL category", "Top vendors", and per-invoice
 // "Invoices" panels have no data source yet. They render empty states
@@ -75,8 +76,7 @@ export function GlCodeAllocationDashboard() {
     (async () => {
       const { data, error: qError } = await supabase
         .from(TABLE)
-        .select("id, location, total, invoice_count, period_start, period_end")
-        .is("client", null);
+        .select("id, location, total, invoice_count, period_start, period_end");
       if (cancelled) return;
       if (qError) {
         setError("Could not load allocation data.");
