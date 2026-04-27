@@ -23,9 +23,82 @@ type GLCodeAllocationRow = {
   invoice_count: number | null;
   period_start: string;
   period_end: string;
+  // GL category columns — all numeric, may be null/0 when no spend in that category.
+  liquor: number | null;
+  beer: number | null;
+  wine: number | null;
+  non_alcoholic_drinks: number | null;
+  food_costs: number | null;
+  bar_supplies: number | null;
+  office_supplies: number | null;
+  serviceware: number | null;
+  paper_bar_supplies: number | null;
+  cleaning_janitorial_supplies: number | null;
+  non_contracted_repairs_and_maintenance: number | null;
+  maintenance_agreement: number | null;
+  taxes: number | null;
+  travel_others: number | null;
+  parking: number | null;
+  employee_morale: number | null;
+  licenses_and_permits: number | null;
+  badging_and_training: number | null;
+  network_costs: number | null;
+  uniforms: number | null;
+  dues_and_subscriptions: number | null;
+  delivery_and_escort_fees: number | null;
+  staffing_expense: number | null;
+  merchant_deposit_credits: number | null;
+  reimbursements: number | null;
+  other: number | null;
 };
 
 const TABLE = "GL Code Allocation";
+
+// Edit this list when adding/removing GL category columns from the table.
+// `key` matches the Supabase column name; `label` is the human display name.
+// Order here is documentation only — display is sorted by amount descending.
+const GL_CATEGORIES: { key: keyof GLCodeAllocationRow; label: string }[] = [
+  { key: "liquor", label: "Liquor" },
+  { key: "beer", label: "Beer" },
+  { key: "wine", label: "Wine" },
+  { key: "non_alcoholic_drinks", label: "Non-alcoholic drinks" },
+  { key: "food_costs", label: "Food costs" },
+  { key: "bar_supplies", label: "Bar supplies" },
+  { key: "office_supplies", label: "Office supplies" },
+  { key: "serviceware", label: "Serviceware" },
+  { key: "paper_bar_supplies", label: "Paper bar supplies" },
+  { key: "cleaning_janitorial_supplies", label: "Cleaning & janitorial" },
+  { key: "non_contracted_repairs_and_maintenance", label: "Non-contracted R&M" },
+  { key: "maintenance_agreement", label: "Maintenance agreement" },
+  { key: "taxes", label: "Taxes" },
+  { key: "travel_others", label: "Travel & other" },
+  { key: "parking", label: "Parking" },
+  { key: "employee_morale", label: "Employee morale" },
+  { key: "licenses_and_permits", label: "Licenses & permits" },
+  { key: "badging_and_training", label: "Badging & training" },
+  { key: "network_costs", label: "Network costs" },
+  { key: "uniforms", label: "Uniforms" },
+  { key: "dues_and_subscriptions", label: "Dues & subscriptions" },
+  { key: "delivery_and_escort_fees", label: "Delivery & escort fees" },
+  { key: "staffing_expense", label: "Staffing expense" },
+  { key: "merchant_deposit_credits", label: "Merchant deposit credits" },
+  { key: "reimbursements", label: "Reimbursements" },
+  { key: "other", label: "Other" },
+];
+
+// When more than CATEGORY_TOP_N + 1 categories have spend, show the top N
+// distinctly and roll the rest into a single "Other (N categories)" row.
+const CATEGORY_TOP_N = 5;
+
+// Color palette cycled across the top categories. Last entry (--muted) is
+// reserved for the "Other" rollup so it visually recedes.
+const CATEGORY_COLORS = [
+  "var(--accent-strong)",
+  "var(--success-text)",
+  "var(--warning-text)",
+  "var(--accent)",
+  "var(--link)",
+] as const;
 
 const currencyFmt = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -60,6 +133,46 @@ function periodKey(period_start: string, period_end: string): string {
   return `${period_start}|${period_end}`;
 }
 
+type CategoryItem = { key: string; label: string; amount: number };
+type CategoryBreakdown = {
+  items: CategoryItem[];
+  nonZeroCount: number;
+  total: number;
+};
+
+function getCategoryBreakdown(row: GLCodeAllocationRow): CategoryBreakdown {
+  const allNonZero: CategoryItem[] = GL_CATEGORIES
+    .map((cat) => ({
+      key: String(cat.key),
+      label: cat.label,
+      amount: Number(row[cat.key]) || 0,
+    }))
+    .filter((b) => b.amount > 0)
+    .sort((a, b) => b.amount - a.amount);
+
+  const total = Number(row.total) || 0;
+
+  if (allNonZero.length <= CATEGORY_TOP_N + 1) {
+    return { items: allNonZero, nonZeroCount: allNonZero.length, total };
+  }
+
+  const top = allNonZero.slice(0, CATEGORY_TOP_N);
+  const rest = allNonZero.slice(CATEGORY_TOP_N);
+  const restAmount = rest.reduce((s, b) => s + b.amount, 0);
+  return {
+    items: [
+      ...top,
+      {
+        key: "__other",
+        label: `Other (${rest.length} categor${rest.length === 1 ? "y" : "ies"})`,
+        amount: restAmount,
+      },
+    ],
+    nonZeroCount: allNonZero.length,
+    total,
+  };
+}
+
 export function GlCodeAllocationDashboard() {
   const supabase = useMemo(() => createClient(), []);
 
@@ -76,7 +189,7 @@ export function GlCodeAllocationDashboard() {
     (async () => {
       const { data, error: qError } = await supabase
         .from(TABLE)
-        .select("id, location, total, invoice_count, period_start, period_end");
+        .select("*");
       if (cancelled) return;
       if (qError) {
         setError("Could not load allocation data.");
@@ -160,6 +273,11 @@ export function GlCodeAllocationDashboard() {
       ) ?? null
     );
   }, [rows, periods, effectivePeriodKey, effectiveLocation]);
+
+  const categoryBreakdown = useMemo(
+    () => (selectedRow ? getCategoryBreakdown(selectedRow) : null),
+    [selectedRow],
+  );
 
   const isLoading = rows === null && !error;
   const hasNoData = !isLoading && (rows?.length ?? 0) === 0;
@@ -311,8 +429,22 @@ export function GlCodeAllocationDashboard() {
 
       {/* Side-by-side: GL category breakdown + Top vendors */}
       <div className="grid gap-2.5 lg:grid-cols-[1.3fr_1fr]">
-        <SectionPanel title="Spend by GL category">
-          <EmptyMessage text="Per-category spend will appear here once line-item ingestion is wired up." />
+        <SectionPanel
+          title="Spend by GL category"
+          rightLabel={
+            categoryBreakdown && categoryBreakdown.nonZeroCount > 0
+              ? `${categoryBreakdown.nonZeroCount} categor${categoryBreakdown.nonZeroCount === 1 ? "y" : "ies"}`
+              : undefined
+          }
+        >
+          {!categoryBreakdown || categoryBreakdown.items.length === 0 ? (
+            <EmptyMessage text="No category spend recorded for this selection." />
+          ) : (
+            <CategoryBreakdownList
+              items={categoryBreakdown.items}
+              total={categoryBreakdown.total}
+            />
+          )}
         </SectionPanel>
         <SectionPanel title="Top vendors" rightLabel="By spend">
           <EmptyMessage text="Vendor breakdown will appear here once invoice metadata is captured." />
@@ -534,6 +666,54 @@ function SectionPanel({
             : null}
       </div>
       {children}
+    </div>
+  );
+}
+
+function CategoryBreakdownList({
+  items,
+  total,
+}: {
+  items: CategoryItem[];
+  total: number;
+}) {
+  return (
+    <div className="flex flex-col gap-2.5">
+      {items.map((item, i) => {
+        const pct = total > 0 ? (item.amount / total) * 100 : 0;
+        const isOther = item.key === "__other";
+        const color = isOther
+          ? "var(--muted)"
+          : CATEGORY_COLORS[i % CATEGORY_COLORS.length];
+        return (
+          <div key={item.key}>
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <span
+                className={
+                  isOther
+                    ? "truncate text-[var(--muted)]"
+                    : "truncate text-[var(--text)]"
+                }
+              >
+                {item.label}
+              </span>
+              <span className="shrink-0 tabular-nums text-[var(--muted)]">
+                {currencyFmt.format(item.amount)}{" "}
+                <span style={{ color }}>{pct.toFixed(1)}%</span>
+              </span>
+            </div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--surface-strong)]">
+              <div
+                className="h-full"
+                style={{
+                  width: `${Math.min(100, pct)}%`,
+                  backgroundColor: color,
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
