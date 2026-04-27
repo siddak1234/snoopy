@@ -90,6 +90,16 @@ const GL_CATEGORIES: { key: keyof GLCodeAllocationRow; label: string }[] = [
 // distinctly and roll the rest into a single "Other (N categories)" row.
 const CATEGORY_TOP_N = 5;
 
+// Top vendors RPC — see supabase/migrations/20260427000000_top_vendors_rpc.sql.
+// Aggregates the claros-gl-code line items to per-invoice rows, then to per-merchant.
+const TOP_VENDORS_LIMIT = 5;
+
+type TopVendor = {
+  merchant: string | null;
+  invoice_count: number;
+  total_spend: number;
+};
+
 // Color palette cycled across the top categories. Last entry (--muted) is
 // reserved for the "Other" rollup so it visually recedes.
 const CATEGORY_COLORS = [
@@ -183,6 +193,9 @@ export function GlCodeAllocationDashboard() {
   const [pickedLocation, setPickedLocation] = useState<string>("");
   // TODO(v2): wire to actual invoice search once per-invoice rows exist.
   const [invoiceQuery, setInvoiceQuery] = useState<string>("");
+
+  const [vendors, setVendors] = useState<TopVendor[] | null>(null);
+  const [vendorsError, setVendorsError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -278,6 +291,36 @@ export function GlCodeAllocationDashboard() {
     () => (selectedRow ? getCategoryBreakdown(selectedRow) : null),
     [selectedRow],
   );
+
+  // Top vendors via RPC — refetches whenever the period or location changes.
+  // Cleanup flag prevents a stale response from clobbering a newer one.
+  // Stale data stays visible during reload (no flicker, no loading state).
+  useEffect(() => {
+    if (!effectivePeriodKey || !effectiveLocation) return;
+    const [period_start, period_end] = effectivePeriodKey.split("|");
+    let cancelled = false;
+    (async () => {
+      const { data, error: rpcError } = await supabase.rpc(
+        "top_vendors_for_period",
+        {
+          p_lounge_code: effectiveLocation,
+          p_period_start: period_start,
+          p_period_end: period_end,
+          p_limit: TOP_VENDORS_LIMIT,
+        },
+      );
+      if (cancelled) return;
+      if (rpcError) {
+        setVendorsError("Could not load top vendors.");
+        return;
+      }
+      setVendorsError(null);
+      setVendors((data ?? []) as TopVendor[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, effectivePeriodKey, effectiveLocation]);
 
   const isLoading = rows === null && !error;
   const hasNoData = !isLoading && (rows?.length ?? 0) === 0;
@@ -447,7 +490,17 @@ export function GlCodeAllocationDashboard() {
           )}
         </SectionPanel>
         <SectionPanel title="Top vendors" rightLabel="By spend">
-          <EmptyMessage text="Vendor breakdown will appear here once invoice metadata is captured." />
+          {vendorsError ? (
+            <p className="rounded-lg border border-[var(--error-border)] bg-[var(--error-bg)] px-3 py-2 text-xs text-[var(--error-text)]">
+              {vendorsError}
+            </p>
+          ) : vendors === null ? (
+            <EmptyMessage text="Loading vendors…" />
+          ) : vendors.length === 0 ? (
+            <EmptyMessage text="No vendor activity this period." />
+          ) : (
+            <VendorsList vendors={vendors} />
+          )}
         </SectionPanel>
       </div>
 
@@ -667,6 +720,43 @@ function SectionPanel({
       </div>
       {children}
     </div>
+  );
+}
+
+function VendorsList({ vendors }: { vendors: TopVendor[] }) {
+  return (
+    <ul className="flex flex-col gap-3">
+      {vendors.map((v, i) => {
+        const total = Number(v.total_spend);
+        const isNegative = total < 0;
+        const count = Number(v.invoice_count);
+        const merchantLabel = v.merchant ?? "(Unknown vendor)";
+        return (
+          <li
+            key={`${v.merchant ?? "__unknown"}-${i}`}
+            className="flex items-center justify-between gap-3"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-[var(--text)]">
+                {merchantLabel}
+              </p>
+              <p className="text-[10px] text-[var(--muted)]">
+                {count === 1 ? "1 invoice" : `${integerFmt.format(count)} invoices`}
+              </p>
+            </div>
+            <p
+              className={
+                isNegative
+                  ? "shrink-0 text-sm font-semibold tabular-nums text-[var(--error-text-muted)]"
+                  : "shrink-0 text-sm font-semibold tabular-nums text-[var(--text)]"
+              }
+            >
+              {currencyFmt.format(total)}
+            </p>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
