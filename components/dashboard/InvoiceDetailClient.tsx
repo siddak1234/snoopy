@@ -52,11 +52,26 @@ function isValidIsoDate(s: string | null): s is string {
   return !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
 
-// Parse text-stored integer for line_item_index ordering. parseInt avoids
-// the lexicographic '10' < '2' issue.
-function parseIndex(s: string | null): number {
-  if (s == null) return Number.POSITIVE_INFINITY;
-  const n = parseInt(s, 10);
+// Sortable numeric columns. Text columns (Item / GL) stay in document order.
+type SortKey = "index" | "qty" | "unitPrice" | "amount" | "confidence";
+type SortDir = "asc" | "desc";
+
+// Pull a numeric sort value out of a (text-stored) line item field. NaN/null
+// values bubble to the end on asc, top on desc. line_item_index uses parseInt
+// to avoid the lexicographic '10' < '2' problem.
+function getSortValue(item: LineItem, key: SortKey): number {
+  const raw =
+    key === "index"
+      ? item.line_item_index
+      : key === "qty"
+        ? item.QTY
+        : key === "unitPrice"
+          ? item.CU_Price
+          : key === "amount"
+            ? item.Amount
+            : item.Confidence;
+  if (raw == null) return Number.POSITIVE_INFINITY;
+  const n = key === "index" ? parseInt(raw, 10) : Number(raw);
   return isNaN(n) ? Number.POSITIVE_INFINITY : n;
 }
 
@@ -70,6 +85,11 @@ export function InvoiceDetailClient({
   const supabase = useMemo(() => createClient(), []);
   const [items, setItems] = useState<LineItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Default: line item index ascending — matches the order shown on the PDF.
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({
+    key: "index",
+    dir: "asc",
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -86,20 +106,36 @@ export function InvoiceDetailClient({
         setError("Could not load invoice details.");
         return;
       }
-      // line_item_index is text-stored; sort numerically with NaN/null pushed
-      // to the end. Stable tiebreak by id.
-      const sorted = ((data ?? []) as LineItem[]).slice().sort((a, b) => {
-        const ai = parseIndex(a.line_item_index);
-        const bi = parseIndex(b.line_item_index);
-        if (ai !== bi) return ai - bi;
-        return String(a.id).localeCompare(String(b.id));
-      });
-      setItems(sorted);
+      setItems((data ?? []) as LineItem[]);
     })();
     return () => {
       cancelled = true;
     };
   }, [supabase, filename, loungeCode]);
+
+  // Sort runs in render rather than once at fetch — clicking a header should
+  // reorder the visible rows without re-querying.
+  const sortedItems = useMemo(() => {
+    if (!items) return null;
+    const dirMul = sort.dir === "asc" ? 1 : -1;
+    return items.slice().sort((a, b) => {
+      const cmp = getSortValue(a, sort.key) - getSortValue(b, sort.key);
+      if (cmp !== 0) return cmp * dirMul;
+      // Stable tiebreak by id — keeps rows with equal sort keys in a
+      // deterministic order across re-sorts.
+      return String(a.id).localeCompare(String(b.id));
+    });
+  }, [items, sort]);
+
+  // Click on the active column toggles asc⇄desc. Click on a different column
+  // resets to asc — predictable single-step transition.
+  const handleSort = (key: SortKey) => {
+    setSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: "asc" },
+    );
+  };
 
   if (error) {
     return (
@@ -176,17 +212,17 @@ export function InvoiceDetailClient({
           <table className="w-full text-sm">
             <thead>
               <tr className="text-[10px] uppercase tracking-wide text-[var(--muted)]">
-                <th className="border-b border-[var(--ring)] px-3 py-2 text-right font-medium">#</th>
+                <SortableHeader label="#" sortKey="index" align="right" sort={sort} onSort={handleSort} />
                 <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">Item / Notes</th>
                 <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">GL Account / Category</th>
-                <th className="border-b border-[var(--ring)] px-3 py-2 text-right font-medium">Qty</th>
-                <th className="border-b border-[var(--ring)] px-3 py-2 text-right font-medium">Unit Price</th>
-                <th className="border-b border-[var(--ring)] px-3 py-2 text-right font-medium">Amount</th>
-                <th className="border-b border-[var(--ring)] px-3 py-2 text-right font-medium">Conf.</th>
+                <SortableHeader label="Qty" sortKey="qty" align="right" sort={sort} onSort={handleSort} />
+                <SortableHeader label="Unit Price" sortKey="unitPrice" align="right" sort={sort} onSort={handleSort} />
+                <SortableHeader label="Amount" sortKey="amount" align="right" sort={sort} onSort={handleSort} />
+                <SortableHeader label="Conf." sortKey="confidence" align="right" sort={sort} onSort={handleSort} />
               </tr>
             </thead>
             <tbody>
-              {items.map((it) => (
+              {sortedItems?.map((it) => (
                 <LineItemRow key={String(it.id)} item={it} />
               ))}
             </tbody>
@@ -211,6 +247,79 @@ function SummaryField({
       </dt>
       <dd className="mt-0.5">{children}</dd>
     </div>
+  );
+}
+
+// Header for a sortable numeric column. Whole th is clickable; chevron shows
+// the active direction. Inactive columns render a muted up-down indicator so
+// the affordance is visible before any interaction.
+function SortableHeader({
+  label,
+  sortKey,
+  align,
+  sort,
+  onSort,
+}: {
+  label: string;
+  sortKey: SortKey;
+  align: "left" | "right";
+  sort: { key: SortKey; dir: SortDir };
+  onSort: (key: SortKey) => void;
+}) {
+  const isActive = sort.key === sortKey;
+  const ariaSort = isActive
+    ? sort.dir === "asc"
+      ? "ascending"
+      : "descending"
+    : "none";
+  return (
+    <th
+      aria-sort={ariaSort}
+      className={`border-b border-[var(--ring)] px-3 py-2 font-medium ${
+        align === "right" ? "text-right" : "text-left"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`group inline-flex items-center gap-1 text-[10px] uppercase tracking-wide transition hover:text-[var(--text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] rounded ${
+          isActive ? "text-[var(--text)]" : "text-[var(--muted)]"
+        } ${align === "right" ? "flex-row-reverse" : ""}`}
+        aria-label={`Sort by ${label} ${
+          isActive && sort.dir === "asc" ? "descending" : "ascending"
+        }`}
+      >
+        <span>{label}</span>
+        <SortIcon
+          direction={isActive ? sort.dir : null}
+        />
+      </button>
+    </th>
+  );
+}
+
+// Tiny stacked-chevron indicator. Active arrow is full-opacity; the inactive
+// arrow stays at low opacity so users see the column is sortable.
+function SortIcon({ direction }: { direction: SortDir | null }) {
+  return (
+    <svg
+      width="10"
+      height="12"
+      viewBox="0 0 10 12"
+      aria-hidden="true"
+      className="shrink-0"
+    >
+      <path
+        d="M5 1 L8.5 4.5 L1.5 4.5 Z"
+        fill="currentColor"
+        opacity={direction === "asc" ? 1 : 0.3}
+      />
+      <path
+        d="M5 11 L1.5 7.5 L8.5 7.5 Z"
+        fill="currentColor"
+        opacity={direction === "desc" ? 1 : 0.3}
+      />
+    </svg>
   );
 }
 
