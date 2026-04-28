@@ -10,6 +10,10 @@
 --      rows. Per-invoice columns use MIN() because all line items of one
 --      invoice should agree on these values; MIN() is just a deterministic
 --      pick. SUM("Amount"::numeric) cast handles the text storage of Amount.
+--      "Invoice_Date" is stored as text and may contain 'N/A' or other
+--      unparseable values; a regex-guarded CASE converts strict YYYY-MM-DD
+--      strings to dates and falls back to NULL for anything else, so the
+--      cast never crashes the function.
 --   2. Outer SELECT — filters by lounge_code and the createdAt window
 --      converted to UTC via AT TIME ZONE 'America/Chicago' (DST-safe), and
 --      orders newest-first by ingestion time.
@@ -45,7 +49,12 @@ AS $$
       filename,
       MIN("Merchant")        AS merchant,
       MIN("Invoice_Number")  AS invoice_number,
-      MIN("Invoice_Date")    AS invoice_date,
+      MIN(
+        CASE
+          WHEN "Invoice_Date" ~ '^\d{4}-\d{2}-\d{2}$' THEN "Invoice_Date"::date
+          ELSE NULL
+        END
+      )                      AS invoice_date,
       SUM("Amount"::numeric) AS amount,
       MIN("Status")          AS status,
       MIN("createdAt")       AS created_at,
