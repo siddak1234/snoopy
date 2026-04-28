@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { StatusPill } from "@/components/dashboard/StatusPill";
 
 // TODO(v2): Per-project client scoping.
 // The query below reads every row in `GL Code Allocation` that the
@@ -204,7 +207,11 @@ function getCategoryBreakdown(row: GLCodeAllocationRow): CategoryBreakdown {
   };
 }
 
-export function GlCodeAllocationDashboard() {
+export function GlCodeAllocationDashboard({
+  projectId,
+}: {
+  projectId: string;
+}) {
   const supabase = useMemo(() => createClient(), []);
 
   const [rows, setRows] = useState<GLCodeAllocationRow[] | null>(null);
@@ -658,7 +665,11 @@ export function GlCodeAllocationDashboard() {
                 </tr>
               ) : (
                 filteredInvoices?.map((inv) => (
-                  <InvoiceRow key={inv.filename} invoice={inv} />
+                  <InvoiceRow
+                    key={inv.filename}
+                    invoice={inv}
+                    projectId={projectId}
+                  />
                 ))
               )}
             </tbody>
@@ -811,17 +822,38 @@ function SectionPanel({
   );
 }
 
-function InvoiceRow({ invoice }: { invoice: Invoice }) {
+function InvoiceRow({
+  invoice,
+  projectId,
+}: {
+  invoice: Invoice;
+  projectId: string;
+}) {
+  const router = useRouter();
   const amount = Number(invoice.amount);
   const isNegative = amount < 0;
   const merchantLabel = invoice.merchant ?? "(Unknown vendor)";
   const dateLabel = invoice.invoice_date
     ? dateFmt.format(new Date(`${invoice.invoice_date}T00:00:00Z`))
     : "—";
+  const href = `/account/projects/${projectId}/invoices/${encodeURIComponent(invoice.filename)}`;
+
   return (
-    <tr className="border-b border-[var(--ring)]/50 last:border-b-0">
+    <tr
+      onClick={() => router.push(href)}
+      className="cursor-pointer border-b border-[var(--ring)]/50 transition hover:bg-[var(--surface-hover)] last:border-b-0"
+    >
       <td className="px-3 py-2.5">
-        <p className="text-sm font-medium text-[var(--text)]">{merchantLabel}</p>
+        {/* Merchant wraps in a Link so keyboard nav and "open in new tab" work.
+            stopPropagation prevents the row's onClick from also firing on
+            cmd+click (which would open a new tab AND navigate the current). */}
+        <Link
+          href={href}
+          onClick={(e) => e.stopPropagation()}
+          className="text-sm font-medium text-[var(--text)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] rounded"
+        >
+          {merchantLabel}
+        </Link>
         {invoice.invoice_number ? (
           <p className="text-[10px] text-[var(--muted)]">
             {invoice.invoice_number}
@@ -843,24 +875,6 @@ function InvoiceRow({ invoice }: { invoice: Invoice }) {
       </td>
     </tr>
   );
-}
-
-function StatusPill({ status }: { status: string | null }) {
-  const normalized = (status ?? "").toLowerCase();
-  // Color treatment per status. Existing CSS tokens only — no new hex.
-  let cls =
-    "inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium capitalize";
-  if (normalized === "completed") {
-    cls += " bg-[var(--success-bg)] text-[var(--success-text)]";
-  } else if (normalized === "processing" || normalized === "queued") {
-    cls += " bg-[var(--chip-bg)] text-[var(--chip-text)]";
-  } else if (normalized === "review") {
-    cls += " bg-[var(--warning-bg)] text-[var(--warning-text)]";
-  } else {
-    // 'new' or unknown
-    cls += " bg-[var(--surface-strong)] text-[var(--muted)]";
-  }
-  return <span className={cls}>{status ?? "—"}</span>;
 }
 
 function VendorsList({ vendors }: { vendors: TopVendor[] }) {
