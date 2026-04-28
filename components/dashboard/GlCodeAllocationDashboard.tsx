@@ -100,6 +100,18 @@ type TopVendor = {
   total_spend: number;
 };
 
+// One row per invoice from the invoices_for_period RPC — see
+// supabase/migrations/20260427000001_invoices_for_period_rpc.sql.
+type Invoice = {
+  filename: string;
+  merchant: string | null;
+  invoice_number: string | null;
+  invoice_date: string | null; // ISO date "YYYY-MM-DD"
+  amount: number;
+  status: string | null;
+  created_at: string; // ISO timestamp
+};
+
 // Color palette cycled across the top categories. Last entry (--muted) is
 // reserved for the "Other" rollup so it visually recedes.
 const CATEGORY_COLORS = [
@@ -116,6 +128,15 @@ const currencyFmt = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
 const integerFmt = new Intl.NumberFormat("en-US");
+
+// Single-day display formatter: "Apr 28, 2026". Always UTC so date-only
+// strings ("YYYY-MM-DD") don't shift across the local-zone boundary.
+const dateFmt = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
 
 function formatDateRange(startISO: string, endISO: string): string {
   const start = new Date(startISO);
@@ -196,6 +217,9 @@ export function GlCodeAllocationDashboard() {
 
   const [vendors, setVendors] = useState<TopVendor[] | null>(null);
   const [vendorsError, setVendorsError] = useState<string | null>(null);
+
+  const [invoices, setInvoices] = useState<Invoice[] | null>(null);
+  const [invoicesError, setInvoicesError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -322,11 +346,39 @@ export function GlCodeAllocationDashboard() {
     };
   }, [supabase, effectivePeriodKey, effectiveLocation]);
 
+  // Per-invoice rows for the current selection. Same cancellation pattern as
+  // the top vendors effect — stale data stays visible during reload (no flicker).
+  useEffect(() => {
+    if (!effectivePeriodKey || !effectiveLocation) return;
+    const [period_start, period_end] = effectivePeriodKey.split("|");
+    let cancelled = false;
+    (async () => {
+      const { data, error: rpcError } = await supabase.rpc(
+        "invoices_for_period",
+        {
+          p_lounge_code: effectiveLocation,
+          p_period_start: period_start,
+          p_period_end: period_end,
+        },
+      );
+      if (cancelled) return;
+      if (rpcError) {
+        setInvoicesError("Could not load invoices.");
+        return;
+      }
+      setInvoicesError(null);
+      setInvoices((data ?? []) as Invoice[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, effectivePeriodKey, effectiveLocation]);
+
   const isLoading = rows === null && !error;
   const hasNoData = !isLoading && (rows?.length ?? 0) === 0;
 
   const total = selectedRow?.total ?? null;
-  const invoices = selectedRow?.invoice_count ?? null;
+  const invoiceCount = selectedRow?.invoice_count ?? null;
   const priorTotal = priorRow?.total ?? null;
   const totalDeltaPct =
     total != null && priorTotal != null && Number(priorTotal) > 0
@@ -454,9 +506,9 @@ export function GlCodeAllocationDashboard() {
         />
         <KpiTile
           label="Invoices"
-          value={invoices == null ? null : integerFmt.format(Number(invoices))}
+          value={invoiceCount == null ? null : integerFmt.format(Number(invoiceCount))}
           subtext={
-            invoices == null
+            invoiceCount == null
               ? hasNoData
                 ? "No invoices yet"
                 : "Select a period and location"
@@ -545,9 +597,9 @@ export function GlCodeAllocationDashboard() {
           </div>
         }
       >
-        <div className="overflow-x-auto">
+        <div className="max-h-[520px] overflow-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-[var(--card)]">
               <tr className="text-[10px] uppercase tracking-wide text-[var(--muted)]">
                 <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">
                   Vendor / Invoice
@@ -564,15 +616,31 @@ export function GlCodeAllocationDashboard() {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td
-                  colSpan={4}
-                  className="px-3 py-10 text-center text-xs text-[var(--muted)]"
-                >
-                  Per-invoice records will appear here once invoice ingestion is
-                  wired up.
-                </td>
-              </tr>
+              {invoicesError ? (
+                <tr>
+                  <td colSpan={4} className="px-3 py-4">
+                    <p className="rounded-lg border border-[var(--error-border)] bg-[var(--error-bg)] px-3 py-2 text-xs text-[var(--error-text)]">
+                      {invoicesError}
+                    </p>
+                  </td>
+                </tr>
+              ) : invoices === null ? (
+                <tr>
+                  <td colSpan={4} className="px-3 py-10 text-center text-xs text-[var(--muted)]">
+                    Loading invoices…
+                  </td>
+                </tr>
+              ) : invoices.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-3 py-10 text-center text-xs text-[var(--muted)]">
+                    No invoices for this period.
+                  </td>
+                </tr>
+              ) : (
+                invoices.map((inv) => (
+                  <InvoiceRow key={inv.filename} invoice={inv} />
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -721,6 +789,58 @@ function SectionPanel({
       {children}
     </div>
   );
+}
+
+function InvoiceRow({ invoice }: { invoice: Invoice }) {
+  const amount = Number(invoice.amount);
+  const isNegative = amount < 0;
+  const merchantLabel = invoice.merchant ?? "(Unknown vendor)";
+  const dateLabel = invoice.invoice_date
+    ? dateFmt.format(new Date(`${invoice.invoice_date}T00:00:00Z`))
+    : "—";
+  return (
+    <tr className="border-b border-[var(--ring)]/50 last:border-b-0">
+      <td className="px-3 py-2.5">
+        <p className="text-sm font-medium text-[var(--text)]">{merchantLabel}</p>
+        {invoice.invoice_number ? (
+          <p className="text-[10px] text-[var(--muted)]">
+            {invoice.invoice_number}
+          </p>
+        ) : null}
+      </td>
+      <td className="px-3 py-2.5 text-xs text-[var(--muted)]">{dateLabel}</td>
+      <td
+        className={
+          isNegative
+            ? "px-3 py-2.5 text-right text-sm font-medium tabular-nums text-[var(--error-text-muted)]"
+            : "px-3 py-2.5 text-right text-sm font-medium tabular-nums text-[var(--text)]"
+        }
+      >
+        {currencyFmt.format(amount)}
+      </td>
+      <td className="px-3 py-2.5 text-center">
+        <StatusPill status={invoice.status} />
+      </td>
+    </tr>
+  );
+}
+
+function StatusPill({ status }: { status: string | null }) {
+  const normalized = (status ?? "").toLowerCase();
+  // Color treatment per status. Existing CSS tokens only — no new hex.
+  let cls =
+    "inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium capitalize";
+  if (normalized === "completed") {
+    cls += " bg-[var(--success-bg)] text-[var(--success-text)]";
+  } else if (normalized === "processing" || normalized === "queued") {
+    cls += " bg-[var(--chip-bg)] text-[var(--chip-text)]";
+  } else if (normalized === "review") {
+    cls += " bg-[var(--warning-bg)] text-[var(--warning-text)]";
+  } else {
+    // 'new' or unknown
+    cls += " bg-[var(--surface-strong)] text-[var(--muted)]";
+  }
+  return <span className={cls}>{status ?? "—"}</span>;
 }
 
 function VendorsList({ vendors }: { vendors: TopVendor[] }) {
