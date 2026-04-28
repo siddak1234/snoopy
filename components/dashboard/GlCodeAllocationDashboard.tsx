@@ -836,7 +836,13 @@ function InvoiceRow({
   const dateLabel = invoice.invoice_date
     ? dateFmt.format(new Date(`${invoice.invoice_date}T00:00:00Z`))
     : "—";
-  const href = `/account/projects/${projectId}/invoices/${encodeURIComponent(invoice.filename)}`;
+  // Filenames are stored with "/" separators and routed through a catch-all
+  // segment ([...filename]). Encode per-segment so slashes stay as path
+  // separators while special chars within a segment are still escaped.
+  const href = `/account/projects/${projectId}/invoices/${invoice.filename
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/")}`;
 
   return (
     <tr
