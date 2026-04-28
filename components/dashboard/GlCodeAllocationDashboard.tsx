@@ -836,13 +836,12 @@ function InvoiceRow({
   const dateLabel = invoice.invoice_date
     ? dateFmt.format(new Date(`${invoice.invoice_date}T00:00:00Z`))
     : "—";
-  // Filenames are stored with "/" separators and routed through a catch-all
-  // segment ([...filename]). Encode per-segment so slashes stay as path
-  // separators while special chars within a segment are still escaped.
-  const href = `/account/projects/${projectId}/invoices/${invoice.filename
-    .split("/")
-    .map(encodeURIComponent)
-    .join("/")}`;
+  // Filename is passed as a query string (?file=...) rather than a path
+  // segment — the DB key contains literal "%2F" characters and Next.js's
+  // path normalization mangles those. Query strings round-trip cleanly.
+  const href = `/account/projects/${projectId}/invoices/detail?file=${encodeURIComponent(
+    invoice.filename,
+  )}`;
 
   return (
     <tr
