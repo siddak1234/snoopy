@@ -8,13 +8,16 @@ import { InvoiceDetailClient } from "@/components/dashboard/InvoiceDetailClient"
 export default async function InvoiceDetailPage({
   params,
 }: {
-  params: Promise<{ id: string; filename: string }>;
+  params: Promise<{ id: string; filename: string[] }>;
 }) {
   const session = await getAppSession();
   if (!session?.user?.id) notFound();
 
-  const { id, filename: rawFilename } = await params;
-  const filename = decodeURIComponent(rawFilename);
+  const { id, filename: filenameSegments } = await params;
+  // Catch-all route: DB stores filenames with literal "/" separators
+  // (e.g., new_invoices/2026/04/25/<hash>/invoice_0.pdf). Next.js decodes
+  // each segment, so joining reconstructs the DB key.
+  const filename = filenameSegments.join("/");
   const userId = session.user.id;
 
   const project = await getProjectForUser(id, userId);
