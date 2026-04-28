@@ -90,7 +90,7 @@ export default async function ProjectDetailPage({
     >
       {project.type === GL_CODE_PROJECT_TYPE ? (
         <div className="py-5 first:pt-0">
-          <GlCodeAllocationDashboard />
+          <GlCodeAllocationDashboard projectId={project.id} />
         </div>
       ) : null}
     </SectionCard>
