@@ -374,6 +374,20 @@ export function GlCodeAllocationDashboard() {
     };
   }, [supabase, effectivePeriodKey, effectiveLocation]);
 
+  // Client-side filter on the loaded invoices: matches `invoiceQuery` against
+  // merchant or invoice_number (case-insensitive substring). Empty/whitespace
+  // query passes through to show all rows.
+  const filteredInvoices = useMemo(() => {
+    if (!invoices) return null;
+    const q = invoiceQuery.trim().toLowerCase();
+    if (!q) return invoices;
+    return invoices.filter(
+      (inv) =>
+        (inv.merchant ?? "").toLowerCase().includes(q) ||
+        (inv.invoice_number ?? "").toLowerCase().includes(q),
+    );
+  }, [invoices, invoiceQuery]);
+
   const isLoading = rows === null && !error;
   const hasNoData = !isLoading && (rows?.length ?? 0) === 0;
 
@@ -636,8 +650,14 @@ export function GlCodeAllocationDashboard() {
                     No invoices for this period.
                   </td>
                 </tr>
+              ) : filteredInvoices?.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-3 py-10 text-center text-xs text-[var(--muted)]">
+                    No invoices match your search.
+                  </td>
+                </tr>
               ) : (
-                invoices.map((inv) => (
+                filteredInvoices?.map((inv) => (
                   <InvoiceRow key={inv.filename} invoice={inv} />
                 ))
               )}
