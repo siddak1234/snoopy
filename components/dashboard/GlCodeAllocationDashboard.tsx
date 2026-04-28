@@ -669,6 +669,7 @@ export function GlCodeAllocationDashboard({
                     key={inv.filename}
                     invoice={inv}
                     projectId={projectId}
+                    loungeCode={effectiveLocation}
                   />
                 ))
               )}
@@ -825,9 +826,11 @@ function SectionPanel({
 function InvoiceRow({
   invoice,
   projectId,
+  loungeCode,
 }: {
   invoice: Invoice;
   projectId: string;
+  loungeCode: string | null;
 }) {
   const router = useRouter();
   const amount = Number(invoice.amount);
@@ -839,9 +842,12 @@ function InvoiceRow({
   // Filename is passed as a query string (?file=...) rather than a path
   // segment — the DB key contains literal "%2F" characters and Next.js's
   // path normalization mangles those. Query strings round-trip cleanly.
+  // lounge_code is carried through so the detail query can scope to the
+  // same lounge the user was viewing — defense-in-depth in addition to
+  // the (currently globally unique) filename match.
   const href = `/account/projects/${projectId}/invoices/detail?file=${encodeURIComponent(
     invoice.filename,
-  )}`;
+  )}${loungeCode ? `&lounge=${encodeURIComponent(loungeCode)}` : ""}`;
 
   return (
     <tr

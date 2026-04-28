@@ -60,7 +60,13 @@ function parseIndex(s: string | null): number {
   return isNaN(n) ? Number.POSITIVE_INFINITY : n;
 }
 
-export function InvoiceDetailClient({ filename }: { filename: string }) {
+export function InvoiceDetailClient({
+  filename,
+  loungeCode,
+}: {
+  filename: string;
+  loungeCode: string | null;
+}) {
   const supabase = useMemo(() => createClient(), []);
   const [items, setItems] = useState<LineItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,10 +74,13 @@ export function InvoiceDetailClient({ filename }: { filename: string }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data, error: qError } = await supabase
-        .from(TABLE)
-        .select("*")
-        .eq("filename", filename);
+      // filename is globally unique today, but we additionally filter by
+      // lounge_code (when carried through from the dashboard) so the query
+      // stays scoped to the same view the user was looking at — defense in
+      // depth for the eventual project↔lounge scoping work.
+      let query = supabase.from(TABLE).select("*").eq("filename", filename);
+      if (loungeCode) query = query.eq("lounge_code", loungeCode);
+      const { data, error: qError } = await query;
       if (cancelled) return;
       if (qError) {
         setError("Could not load invoice details.");
@@ -90,7 +99,7 @@ export function InvoiceDetailClient({ filename }: { filename: string }) {
     return () => {
       cancelled = true;
     };
-  }, [supabase, filename]);
+  }, [supabase, filename, loungeCode]);
 
   if (error) {
     return (
@@ -156,7 +165,9 @@ export function InvoiceDetailClient({ filename }: { filename: string }) {
         </SummaryField>
       </dl>
 
-      {/* Line item table */}
+      {/* Line item table — text columns are stacked (primary on top, secondary
+          metadata muted below) so long values wrap naturally without forcing
+          the table wider. Numeric columns stay narrow on the right. */}
       <div className="border-t border-[var(--ring)] pt-5">
         <h3 className="mb-3 text-sm font-semibold text-[var(--text)]">
           Line items
@@ -166,14 +177,12 @@ export function InvoiceDetailClient({ filename }: { filename: string }) {
             <thead>
               <tr className="text-[10px] uppercase tracking-wide text-[var(--muted)]">
                 <th className="border-b border-[var(--ring)] px-3 py-2 text-right font-medium">#</th>
-                <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">Item</th>
-                <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">GL Account</th>
-                <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">GL Category</th>
-                <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">Notes</th>
+                <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">Item / Notes</th>
+                <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">GL Account / Category</th>
                 <th className="border-b border-[var(--ring)] px-3 py-2 text-right font-medium">Qty</th>
                 <th className="border-b border-[var(--ring)] px-3 py-2 text-right font-medium">Unit Price</th>
                 <th className="border-b border-[var(--ring)] px-3 py-2 text-right font-medium">Amount</th>
-                <th className="border-b border-[var(--ring)] px-3 py-2 text-right font-medium">Confidence</th>
+                <th className="border-b border-[var(--ring)] px-3 py-2 text-right font-medium">Conf.</th>
               </tr>
             </thead>
             <tbody>
@@ -213,53 +222,49 @@ function LineItemRow({ item }: { item: LineItem }) {
   const isNegative = !isNaN(amount) && amount < 0;
 
   return (
-    <tr className="border-b border-[var(--ring)]/50 last:border-b-0">
+    <tr className="border-b border-[var(--ring)]/50 align-top last:border-b-0">
       <td className="px-3 py-2.5 text-right text-xs tabular-nums text-[var(--muted)]">
         {item.line_item_index ?? "—"}
       </td>
+      {/* Item + Notes stacked: item bold on top, notes muted below.
+          break-words handles long unbroken strings (e.g. SKU codes). */}
       <td className="px-3 py-2.5">
-        <p
-          className="max-w-[22ch] truncate text-sm font-medium text-[var(--text)]"
-          title={item.Item ?? ""}
-        >
+        <p className="text-sm font-medium leading-snug text-[var(--text)] break-words">
           {item.Item ?? "—"}
         </p>
+        {item.line_notes ? (
+          <p className="mt-1 text-xs leading-snug text-[var(--muted)] break-words">
+            {item.line_notes}
+          </p>
+        ) : null}
       </td>
-      <td className="px-3 py-2.5 text-xs tabular-nums text-[var(--muted)]">
-        {item.GL_Account ?? "—"}
-      </td>
+      {/* GL account on top, category beneath in muted. Same stacking pattern. */}
       <td className="px-3 py-2.5">
-        <p
-          className="max-w-[28ch] truncate text-xs text-[var(--text)]"
-          title={item.GL_Category ?? ""}
-        >
-          {item.GL_Category ?? "—"}
+        <p className="text-sm font-medium tabular-nums text-[var(--text)] break-words">
+          {item.GL_Account ?? "—"}
         </p>
+        {item.GL_Category ? (
+          <p className="mt-1 text-xs leading-snug text-[var(--muted)] break-words">
+            {item.GL_Category}
+          </p>
+        ) : null}
       </td>
-      <td className="px-3 py-2.5">
-        <p
-          className="max-w-[24ch] truncate text-xs text-[var(--muted)]"
-          title={item.line_notes ?? ""}
-        >
-          {item.line_notes ?? "—"}
-        </p>
-      </td>
-      <td className="px-3 py-2.5 text-right text-sm tabular-nums text-[var(--text)]">
+      <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm tabular-nums text-[var(--text)]">
         {isNaN(qty) ? "—" : integerFmt.format(qty)}
       </td>
-      <td className="px-3 py-2.5 text-right text-sm tabular-nums text-[var(--text)]">
+      <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm tabular-nums text-[var(--text)]">
         {isNaN(unitPrice) ? "—" : currencyFmt.format(unitPrice)}
       </td>
       <td
         className={
           isNegative
-            ? "px-3 py-2.5 text-right text-sm font-medium tabular-nums text-[var(--error-text-muted)]"
-            : "px-3 py-2.5 text-right text-sm font-medium tabular-nums text-[var(--text)]"
+            ? "whitespace-nowrap px-3 py-2.5 text-right text-sm font-medium tabular-nums text-[var(--error-text-muted)]"
+            : "whitespace-nowrap px-3 py-2.5 text-right text-sm font-medium tabular-nums text-[var(--text)]"
         }
       >
         {isNaN(amount) ? "—" : currencyFmt.format(amount)}
       </td>
-      <td className="px-3 py-2.5 text-right text-xs tabular-nums text-[var(--muted)]">
+      <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs tabular-nums text-[var(--muted)]">
         {isNaN(confidence) ? "—" : `${Math.round(confidence)}%`}
       </td>
     </tr>
