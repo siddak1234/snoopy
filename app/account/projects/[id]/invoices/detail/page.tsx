@@ -10,7 +10,7 @@ export default async function InvoiceDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ file?: string }>;
+  searchParams: Promise<{ file?: string; lounge?: string }>;
 }) {
   const session = await getAppSession();
   if (!session?.user?.id) notFound();
@@ -20,7 +20,9 @@ export default async function InvoiceDetailPage({
   // the DB key contains literal "%2F" characters (not real "/"). Next.js's
   // path normalization decodes %2F into / and re-splits the URL, mangling
   // the value. Query strings are decoded once and pass through verbatim.
-  const { file: filename } = await searchParams;
+  // lounge is carried alongside so the detail query stays scoped to the
+  // same lounge the user was viewing in the dashboard.
+  const { file: filename, lounge: loungeCode } = await searchParams;
   if (!filename) notFound();
   const userId = session.user.id;
 
@@ -41,7 +43,7 @@ export default async function InvoiceDetailPage({
       }
     >
       <div className="py-5 first:pt-0">
-        <InvoiceDetailClient filename={filename} />
+        <InvoiceDetailClient filename={filename} loungeCode={loungeCode ?? null} />
       </div>
     </SectionCard>
   );
