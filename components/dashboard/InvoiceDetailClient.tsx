@@ -204,11 +204,11 @@ export function InvoiceDetailClient({
 
       {/* Split view: PDF on the left (sticky on lg+ so it stays in view as
           line items scroll), line items table on the right. Stacks vertically
-          below lg. The PDF column is only rendered when we have a lounge
-          code — the file route gates access on (filename, lounge_code). */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          below lg. PDF gets 3/5 of the row at lg+ — readable at US-letter
+          aspect — line items get 2/5, since the table is naturally narrow. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         {loungeCode ? (
-          <div className="lg:sticky lg:top-4 self-start">
+          <div className="lg:sticky lg:top-4 self-start lg:col-span-3">
             <InvoiceFileViewer filename={filename} loungeCode={loungeCode} />
           </div>
         ) : null}
@@ -216,7 +216,7 @@ export function InvoiceDetailClient({
         {/* Line item table — text columns are stacked (primary on top,
             secondary metadata muted below) so long values wrap naturally
             without forcing the table wider. Numeric columns stay narrow. */}
-        <div className="border-t border-[var(--ring)] pt-5 lg:border-t-0 lg:pt-0">
+        <div className="border-t border-[var(--ring)] pt-5 lg:border-t-0 lg:pt-0 lg:col-span-2">
           <h3 className="mb-3 text-sm font-semibold text-[var(--text)]">
             Line items
           </h3>

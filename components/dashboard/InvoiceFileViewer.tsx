@@ -98,10 +98,14 @@ export function InvoiceFileViewer({
             </div>
           ) : null}
           {kind === "pdf" ? (
+            // Viewport-relative height with a floor: at typical laptop
+            // viewport heights (≥900px) we get ≥765px of PDF, which renders
+            // a US-letter page comfortably inside the 3/5 column on lg+.
+            // The min-h floor keeps the iframe usable on shorter screens.
             <iframe
               src={url}
               title="Invoice PDF"
-              className="w-full h-[800px] rounded-lg border border-[var(--ring)]/50"
+              className="w-full min-h-[700px] h-[85vh] rounded-lg border border-[var(--ring)]/50"
               onLoad={() => setLoaded(true)}
               onError={() => setErrored(true)}
             />
