@@ -36,7 +36,7 @@ export default async function AccountLayout({
   const showOrgSettings = !!orgOwnerMembership;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 md:px-6">
+    <div className="mx-auto max-w-[1600px] px-4 md:px-6">
       <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
         <DashboardSidebar showOrgSettings={showOrgSettings} />
         <div className="min-w-0 flex-1">
