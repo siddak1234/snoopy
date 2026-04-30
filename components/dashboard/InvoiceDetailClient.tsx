@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { StatusPill } from "@/components/dashboard/StatusPill";
+import { InvoiceFileViewer } from "@/components/dashboard/InvoiceFileViewer";
 
 // One line item from claros-gl-code. All numeric-looking fields are stored as
 // text and cast to numeric for display. Capitalization matches the actual
@@ -201,32 +202,44 @@ export function InvoiceDetailClient({
         </SummaryField>
       </dl>
 
-      {/* Line item table — text columns are stacked (primary on top, secondary
-          metadata muted below) so long values wrap naturally without forcing
-          the table wider. Numeric columns stay narrow on the right. */}
-      <div className="border-t border-[var(--ring)] pt-5">
-        <h3 className="mb-3 text-sm font-semibold text-[var(--text)]">
-          Line items
-        </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-[10px] uppercase tracking-wide text-[var(--muted)]">
-                <SortableHeader label="#" sortKey="index" align="right" sort={sort} onSort={handleSort} />
-                <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">Item / Notes</th>
-                <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">GL Account / Category</th>
-                <SortableHeader label="Qty" sortKey="qty" align="right" sort={sort} onSort={handleSort} />
-                <SortableHeader label="Unit Price" sortKey="unitPrice" align="right" sort={sort} onSort={handleSort} />
-                <SortableHeader label="Amount" sortKey="amount" align="right" sort={sort} onSort={handleSort} />
-                <SortableHeader label="Conf." sortKey="confidence" align="right" sort={sort} onSort={handleSort} />
-              </tr>
-            </thead>
-            <tbody>
-              {sortedItems?.map((it) => (
-                <LineItemRow key={String(it.id)} item={it} />
-              ))}
-            </tbody>
-          </table>
+      {/* Split view: PDF on the left (sticky on lg+ so it stays in view as
+          line items scroll), line items table on the right. Stacks vertically
+          below lg. The PDF column is only rendered when we have a lounge
+          code — the file route gates access on (filename, lounge_code). */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {loungeCode ? (
+          <div className="lg:sticky lg:top-4 self-start">
+            <InvoiceFileViewer filename={filename} loungeCode={loungeCode} />
+          </div>
+        ) : null}
+
+        {/* Line item table — text columns are stacked (primary on top,
+            secondary metadata muted below) so long values wrap naturally
+            without forcing the table wider. Numeric columns stay narrow. */}
+        <div className="border-t border-[var(--ring)] pt-5 lg:border-t-0 lg:pt-0">
+          <h3 className="mb-3 text-sm font-semibold text-[var(--text)]">
+            Line items
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-wide text-[var(--muted)]">
+                  <SortableHeader label="#" sortKey="index" align="right" sort={sort} onSort={handleSort} />
+                  <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">Item / Notes</th>
+                  <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">GL Account / Category</th>
+                  <SortableHeader label="Qty" sortKey="qty" align="right" sort={sort} onSort={handleSort} />
+                  <SortableHeader label="Unit Price" sortKey="unitPrice" align="right" sort={sort} onSort={handleSort} />
+                  <SortableHeader label="Amount" sortKey="amount" align="right" sort={sort} onSort={handleSort} />
+                  <SortableHeader label="Conf." sortKey="confidence" align="right" sort={sort} onSort={handleSort} />
+                </tr>
+              </thead>
+              <tbody>
+                {sortedItems?.map((it) => (
+                  <LineItemRow key={String(it.id)} item={it} />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
