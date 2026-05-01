@@ -2,7 +2,6 @@ import Link from "next/link";
 
 const caseStudies = [
   { slug: "expense-classification", category: "Finance & Accounting", title: "Transforming Expense Classification Through AI-Driven Automation", date: "2026-03-01", dateLabel: "March 1, 2026" },
-  { slug: "legal-billing-compliance", category: "Accounting & Legal", title: "Reducing Revenue Leakage in Legal Billing Through Automation", date: "2026-02-25", dateLabel: "February 25, 2026" },
 ];
 
 /** Newest first; add new entries anywhere in caseStudies and they will sort by date. */
