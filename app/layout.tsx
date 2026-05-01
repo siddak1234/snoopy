@@ -43,7 +43,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${inter.className} min-h-screen antialiased`}
+        className={`${inter.className} min-h-screen overflow-x-clip antialiased`}
       >
         <MotionProvider>
           <OAuthFragmentRedirect />
