@@ -5,9 +5,11 @@ import {
   createProject as createProjectDb,
   deleteProject as deleteProjectDb,
   leaveProject as leaveProjectDb,
+  getUsedProjectTypes,
 } from "@/lib/projects";
 import { canUserPerform, getProjectRole } from "@/lib/project-rbac";
 import { canModifyMember } from "@/lib/project-rbac-pure";
+import { isProjectType } from "@/lib/project-types";
 import { prisma } from "@/lib/db";
 import type { ProjectMemberRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -53,6 +55,18 @@ export async function createProjectAction(
   if (typeof projectType !== "string" || !projectType.trim()) {
     return { ok: false, error: "Project type is required." };
   }
+  const trimmedType = projectType.trim();
+  if (!isProjectType(trimmedType)) {
+    return { ok: false, error: "Invalid project type." };
+  }
+
+  const usedTypes = await getUsedProjectTypes(session.user.id);
+  if (usedTypes.includes(trimmedType)) {
+    return {
+      ok: false,
+      error: `You already have a "${trimmedType}" project. Delete or leave it before creating another.`,
+    };
+  }
 
   const description = formData.get("description");
   const descriptionStr =
@@ -67,7 +81,7 @@ export async function createProjectAction(
   try {
     const { project } = await createProjectDb(
       session.user.id,
-      { name: trimmed, type: projectType.trim(), description: descriptionStr },
+      { name: trimmed, type: trimmedType, description: descriptionStr },
       targetWorkspaceId
     );
     // Do NOT revalidate here — it can unmount the success state in the dialog.
@@ -168,7 +182,7 @@ export async function addMemberToProjectAction(
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { workspaceId: true },
+    select: { workspaceId: true, type: true },
   });
   if (!project?.workspaceId) {
     return { ok: false, error: "Project has no associated workspace." };
@@ -190,6 +204,16 @@ export async function addMemberToProjectAction(
   }
   if (existing) {
     return { ok: false, error: "That user is already in this project." };
+  }
+
+  if (isProjectType(project.type)) {
+    const targetUsedTypes = await getUsedProjectTypes(targetUserId);
+    if (targetUsedTypes.includes(project.type)) {
+      return {
+        ok: false,
+        error: `That user already has a "${project.type}" project.`,
+      };
+    }
   }
 
   try {
