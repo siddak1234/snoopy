@@ -2,13 +2,14 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/auth-supabase";
 import { ensureTenantForUser } from "@/lib/tenant";
-import { getMyProjects, getTeamProjects } from "@/lib/projects";
+import { getMyProjects, getTeamProjects, getUsedProjectTypes } from "@/lib/projects";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { ProjectList, TeamProjectList } from "@/components/dashboard/ProjectList";
 import type { MyProjectItem, TeamProjectItem } from "@/components/dashboard/ProjectList";
 import { CreateProjectButton } from "@/components/dashboard/CreateProjectButton";
 import { JoinProjectButton } from "@/components/dashboard/JoinProjectButton";
 import { AuthHydrationGate } from "@/components/auth/AuthHydrationGate";
+import { PROJECT_TYPES } from "@/lib/project-types";
 
 export default async function AccountProjectsPage() {
   const session = await getAppSession();
@@ -24,9 +25,10 @@ export default async function AccountProjectsPage() {
   }
 
   await ensureTenantForUser(session.user.id);
-  const [rawMyProjects, rawTeamProjects] = await Promise.all([
+  const [rawMyProjects, rawTeamProjects, usedTypes] = await Promise.all([
     getMyProjects(session.user.id),
     getTeamProjects(session.user.id),
+    getUsedProjectTypes(session.user.id),
   ]);
 
   // ---------------------------------------------------------------------------
@@ -95,6 +97,7 @@ export default async function AccountProjectsPage() {
 
   const groups = Array.from(groupMap.values());
   const isMultiWorkspace = groups.length > 1;
+  const allTypesUsed = usedTypes.length >= PROJECT_TYPES.length;
 
   // ---------------------------------------------------------------------------
   // Render: single workspace — identical layout to before
@@ -110,9 +113,14 @@ export default async function AccountProjectsPage() {
             <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
               My projects
             </h2>
-            <CreateProjectButton
-              workspaceId={groups[0]?.workspaceId ?? undefined}
-            />
+            {allTypesUsed ? (
+              <p className="text-sm text-[var(--muted)]">All project types created.</p>
+            ) : (
+              <CreateProjectButton
+                workspaceId={groups[0]?.workspaceId ?? undefined}
+                usedTypes={usedTypes}
+              />
+            )}
           </div>
           {myProjects.length === 0 ? (
             <div className="mt-3">
@@ -176,7 +184,11 @@ export default async function AccountProjectsPage() {
               {group.workspaceName}
             </h2>
             {group.workspaceId ? (
-              <CreateProjectButton workspaceId={group.workspaceId} />
+              allTypesUsed ? (
+                <p className="text-sm text-[var(--muted)]">All project types created.</p>
+              ) : (
+                <CreateProjectButton workspaceId={group.workspaceId} usedTypes={usedTypes} />
+              )
             ) : null}
           </div>
 

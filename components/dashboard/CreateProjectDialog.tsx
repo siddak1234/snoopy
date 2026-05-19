@@ -6,14 +6,7 @@ import { createProjectAction } from "@/app/account/projects/actions";
 import Modal from "@/components/ui/Modal";
 import { FormInput } from "@/components/ui/FormInput";
 import { FormError } from "@/components/ui/FormError";
-
-const PROJECT_TYPES = [
-  "Invoice Processing",
-  "Document Review",
-  "Data Entry Automation",
-  "GL Code Classification",
-  "Custom Workflow",
-] as const;
+import { PROJECT_TYPES, type ProjectType } from "@/lib/project-types";
 
 type Props = {
   open: boolean;
@@ -22,9 +15,13 @@ type Props = {
   onSuccess?: () => void | Promise<void>;
   /** When provided, the project is created in this specific workspace. */
   workspaceId?: string;
+  /** Types the user has already created or joined — disabled in the dropdown. */
+  usedTypes?: ProjectType[];
 };
 
-export function CreateProjectDialog({ open, onClose, onSuccess, workspaceId }: Props) {
+export function CreateProjectDialog({ open, onClose, onSuccess, workspaceId, usedTypes }: Props) {
+  const usedSet = new Set<ProjectType>(usedTypes ?? []);
+  const allUsed = usedSet.size >= PROJECT_TYPES.length;
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [created, setCreated] = useState(false);
@@ -86,7 +83,13 @@ export function CreateProjectDialog({ open, onClose, onSuccess, workspaceId }: P
     <Modal
       onClose={handleClose}
       ariaLabelledBy="create-project-title"
-      ariaDescribedBy={created ? "create-project-success-desc" : "create-project-desc"}
+      ariaDescribedBy={
+        created
+          ? "create-project-success-desc"
+          : allUsed
+            ? "create-project-all-used-desc"
+            : "create-project-desc"
+      }
       bubble
       zIndex={100}
     >
@@ -118,6 +121,21 @@ export function CreateProjectDialog({ open, onClose, onSuccess, workspaceId }: P
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           </button>
+        </>
+      ) : allUsed ? (
+        <>
+          <p id="create-project-all-used-desc" className="mt-1 text-sm text-[var(--muted)]">
+            You&apos;ve already created a project of every available type. Delete or leave one before creating another.
+          </p>
+          <div className="mt-6 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn-secondary inline-flex px-5"
+            >
+              Close
+            </button>
+          </div>
         </>
       ) : (
         <>
@@ -154,11 +172,14 @@ export function CreateProjectDialog({ open, onClose, onSuccess, workspaceId }: P
                   <option value="" disabled className="text-[var(--muted)]">
                     Select project type
                   </option>
-                  {PROJECT_TYPES.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
+                  {PROJECT_TYPES.map((type) => {
+                    const taken = usedSet.has(type);
+                    return (
+                      <option key={type} value={type} disabled={taken}>
+                        {taken ? `${type} — already created` : type}
+                      </option>
+                    );
+                  })}
                 </select>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import type { ProjectStatus } from "@prisma/client";
 import { ensureTenantForUser, getTenantForUser } from "@/lib/tenant";
 import { canUserPerform, isProjectMember } from "@/lib/project-rbac";
+import { isProjectType, type ProjectType } from "@/lib/project-types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -219,6 +220,26 @@ export async function getWorkspaceMembersNotInProject(
       },
     },
   });
+}
+
+/**
+ * Server-only: list the canonical project types the user already "has" —
+ * either as owner or as a project member. Used to disable already-taken
+ * options in the create-project dropdown and to enforce the per-user
+ * one-of-each rule in createProjectAction / addMemberToProjectAction.
+ */
+export async function getUsedProjectTypes(userId: string): Promise<ProjectType[]> {
+  if (!userId) return [];
+  const rows = await prisma.projectMembership.findMany({
+    where: { userId },
+    select: { project: { select: { type: true } } },
+  });
+  const seen = new Set<ProjectType>();
+  for (const r of rows) {
+    const t = r.project?.type;
+    if (t && isProjectType(t)) seen.add(t);
+  }
+  return Array.from(seen);
 }
 
 // ---------------------------------------------------------------------------

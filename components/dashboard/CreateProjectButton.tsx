@@ -4,8 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CreateProjectDialog } from "./CreateProjectDialog";
 import { revalidateAccountProjectsAction } from "@/app/account/projects/actions";
+import type { ProjectType } from "@/lib/project-types";
 
-export function CreateProjectButton({ workspaceId }: { workspaceId?: string }) {
+type Props = {
+  workspaceId?: string;
+  usedTypes?: ProjectType[];
+};
+
+export function CreateProjectButton({ workspaceId, usedTypes }: Props) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
 
@@ -28,6 +34,7 @@ export function CreateProjectButton({ workspaceId }: { workspaceId?: string }) {
         onClose={() => setOpen(false)}
         onSuccess={handleSuccess}
         workspaceId={workspaceId}
+        usedTypes={usedTypes}
       />
     </>
   );
