@@ -5,6 +5,7 @@ import {
   createProject as createProjectDb,
   deleteProject as deleteProjectDb,
   leaveProject as leaveProjectDb,
+  restoreProject as restoreProjectDb,
   getUsedProjectTypesByScope,
 } from "@/lib/projects";
 import { canUserPerform, getProjectRole } from "@/lib/project-rbac";
@@ -121,6 +122,12 @@ export async function createProjectAction(
 
 export type DeleteProjectResult = { ok: true } | { ok: false; error: string };
 
+/**
+ * Archive (soft-delete) the project. Data rows tagged with the project_id
+ * stay intact; the project can be restored later via restoreProjectAction
+ * (offered automatically by the Create dialog when the same scope+type is
+ * picked again).
+ */
 export async function deleteProjectAction(projectId: string): Promise<DeleteProjectResult> {
   const session = await getAppSession();
   if (!session?.user?.id) {
@@ -140,6 +147,39 @@ export async function deleteProjectAction(projectId: string): Promise<DeleteProj
   } catch (e) {
     console.error("deleteProjectAction", e);
     return { ok: false, error: "Failed to delete project. Please try again." };
+  }
+}
+
+export type RestoreProjectResult =
+  | { ok: true; projectId: string }
+  | { ok: false; error: string };
+
+/**
+ * Restore an archived project. Permission check (owner or org_owner) lives in
+ * lib/projects.restoreProject. project_id is unchanged, so every row in the
+ * data tables reattaches automatically the moment status flips to active.
+ */
+export async function restoreProjectAction(
+  projectId: string
+): Promise<RestoreProjectResult> {
+  const session = await getAppSession();
+  if (!session?.user?.id) {
+    return { ok: false, error: "You must be signed in to restore a project." };
+  }
+  if (!projectId || typeof projectId !== "string" || !projectId.trim()) {
+    return { ok: false, error: "Project ID is required." };
+  }
+  try {
+    const restored = await restoreProjectDb(session.user.id, projectId.trim());
+    if (!restored) {
+      return { ok: false, error: "Project not found or cannot be restored." };
+    }
+    revalidatePath("/account");
+    revalidatePath("/account/projects");
+    return { ok: true, projectId: projectId.trim() };
+  } catch (e) {
+    console.error("restoreProjectAction", e);
+    return { ok: false, error: "Failed to restore project. Please try again." };
   }
 }
 

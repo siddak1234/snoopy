@@ -2,7 +2,12 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/auth-supabase";
 import { ensureTenantForUser } from "@/lib/tenant";
-import { getMyProjects, getTeamProjects, getUsedProjectTypesByScope } from "@/lib/projects";
+import {
+  getMyProjects,
+  getTeamProjects,
+  getUsedProjectTypesByScope,
+  getRestorableProjectsByScope,
+} from "@/lib/projects";
 import { prisma } from "@/lib/db";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { ProjectList } from "@/components/dashboard/ProjectList";
@@ -26,10 +31,11 @@ export default async function AccountProjectsPage() {
   }
 
   await ensureTenantForUser(session.user.id);
-  const [rawMyProjects, rawTeamProjects, usedTypesByScope, orgMembership] = await Promise.all([
+  const [rawMyProjects, rawTeamProjects, usedTypesByScope, restorable, orgMembership] = await Promise.all([
     getMyProjects(session.user.id),
     getTeamProjects(session.user.id),
     getUsedProjectTypesByScope(session.user.id),
+    getRestorableProjectsByScope(session.user.id),
     prisma.membership.findFirst({
       where: { userId: session.user.id, workspace: { type: "organization" } },
       select: { workspaceId: true },
@@ -116,6 +122,7 @@ export default async function AccountProjectsPage() {
         ) : (
           <CreateProjectButton
             usedTypesByScope={usedTypesByScope}
+            restorable={restorable}
             hasOrg={hasOrg}
           />
         )}

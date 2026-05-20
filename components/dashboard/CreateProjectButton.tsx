@@ -3,15 +3,17 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CreateProjectDialog } from "./CreateProjectDialog";
+import type { RestorableProject } from "./CreateProjectDialog";
 import { revalidateAccountProjectsAction } from "@/app/account/projects/actions";
 import type { ProjectScope, ProjectType } from "@/lib/project-types";
 
 type Props = {
   usedTypesByScope?: Record<ProjectScope, ProjectType[]>;
+  restorable?: RestorableProject[];
   hasOrg?: boolean;
 };
 
-export function CreateProjectButton({ usedTypesByScope, hasOrg }: Props) {
+export function CreateProjectButton({ usedTypesByScope, restorable, hasOrg }: Props) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
 
@@ -34,6 +36,7 @@ export function CreateProjectButton({ usedTypesByScope, hasOrg }: Props) {
         onClose={() => setOpen(false)}
         onSuccess={handleSuccess}
         usedTypesByScope={usedTypesByScope}
+        restorable={restorable}
         hasOrg={hasOrg}
       />
     </>
