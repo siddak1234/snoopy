@@ -1,16 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { randomUUID } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db";
 import { provisionUserFromSupabaseAuth } from "@/lib/auth-supabase";
 import { ensureDefaultWorkspaceForUser } from "@/lib/auth";
 import { extractDomain } from "@/lib/domain-utils";
-import { sendEmail, buildDomainVerificationEmail } from "@/lib/mailer";
-
-const VERIFY_BASE_URL = "https://www.autom8x.ai/verify-domain";
-const TOKEN_TTL_MS = 72 * 60 * 60 * 1000; // 72 hours
 
 // ---------------------------------------------------------------------------
 // Internal helper — get authenticated user ID + email from active session.
@@ -84,35 +79,32 @@ export async function createOrgWorkspaceAction(
   try {
     await assertNoOrgWorkspace(userId);
 
-    const workspaceId = await prisma.$transaction(async (tx) => {
+    // One-domain-one-org rule: if an org already exists for this email's
+    // domain, refuse to create a duplicate. Defense-in-depth on top of the
+    // DB-level partial unique index on workspaces(domain) WHERE type='organization'.
+    const existing = await prisma.workspace.findFirst({
+      where: { domain, type: "organization" },
+      select: { id: true },
+    });
+    if (existing) {
+      return {
+        ok: false,
+        error: `An organization for ${domain} already exists. You should join it instead of creating a new one.`,
+      };
+    }
+
+    await prisma.$transaction(async (tx) => {
       const workspace = await tx.workspace.create({
         data: {
           name: trimmed,
           type: "organization",
           domain,
-          domainVerified: false,
         },
       });
       await tx.membership.create({
         data: { userId, workspaceId: workspace.id, role: "OWNER" },
       });
-      return workspace.id;
     });
-
-    // Create a domain verification token and send the email.
-    // Failures here are non-fatal — the workspace was already created successfully.
-    try {
-      const token = randomUUID();
-      const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
-      await prisma.domainVerificationToken.create({
-        data: { workspaceId, token, expiresAt },
-      });
-      const verifyUrl = `${VERIFY_BASE_URL}/${token}`;
-      const { subject, html } = buildDomainVerificationEmail(trimmed, domain, verifyUrl);
-      await sendEmail(email, subject, html);
-    } catch (emailErr) {
-      console.error("createOrgWorkspaceAction: failed to send verification email", emailErr);
-    }
 
     return { ok: true };
   } catch (e) {
@@ -177,10 +169,12 @@ export async function joinOrgWorkspaceAction(): Promise<JoinOrgResult> {
   try {
     await assertNoOrgWorkspace(userId);
 
-    // Re-verify server-side: look up the verified workspace by domain.
-    // The URL param is never consulted — only the user's own email domain matters.
+    // Re-verify server-side: look up the org workspace by domain.
+    // The URL param is never consulted — only the user's own email domain
+    // matters (Supabase OAuth already verified that the user reads mail at
+    // that domain).
     const workspace = await prisma.workspace.findFirst({
-      where: { domain, domainVerified: true },
+      where: { domain, type: "organization" },
       select: { id: true, name: true },
     });
 
@@ -188,7 +182,7 @@ export async function joinOrgWorkspaceAction(): Promise<JoinOrgResult> {
       return {
         ok: false,
         error:
-          "No verified organization found for your email domain. It may have been unverified or removed.",
+          "No organization found for your email domain. It may have been removed.",
       };
     }
 

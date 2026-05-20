@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAppSession } from "@/lib/auth-supabase";
-import { getProjectForUser, getWorkspaceMembersNotInProject } from "@/lib/projects";
-import { getProjectRole } from "@/lib/project-rbac";
+import {
+  getProjectForUser,
+  getProjectMembers,
+  getWorkspaceMembersNotInProject,
+} from "@/lib/projects";
+import { canUserPerform, getProjectRole } from "@/lib/project-rbac";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { DeleteProjectButton } from "@/components/dashboard/DeleteProjectButton";
 import { LeaveProjectButton } from "@/components/dashboard/LeaveProjectButton";
 import { ProjectMemberPicker } from "@/components/dashboard/ProjectMemberPicker";
+import { ProjectMemberList } from "@/components/dashboard/ProjectMemberList";
+import type { MemberRow } from "@/components/dashboard/ProjectMemberList";
 import { GlCodeAllocationDashboard } from "@/components/dashboard/GlCodeAllocationDashboard";
 import type { AvailableMember } from "@/components/dashboard/ProjectMemberPicker";
 
@@ -35,7 +41,10 @@ export default async function ProjectDetailPage({
   const isOwner = role === "owner";
   const isAdmin = role === "admin";
   const isMember = role !== null;
-  const canAddMembers = isOwner || isAdmin;
+  const isTeamProject = project.workspace?.type === "organization";
+  // Personal workspaces are solo by construction — no one else can be invited
+  // to them — so the member picker is hidden for personal projects.
+  const canAddMembers = (isOwner || isAdmin) && isTeamProject;
   const canDelete = isOwner;
   const canLeave = isMember && !isOwner;
 
@@ -50,6 +59,22 @@ export default async function ProjectDetailPage({
     name: m.user.name,
     email: m.user.email,
   }));
+
+  // Team member list. Personal projects are solo by design — skip the fetch
+  // and the section. For team projects, gate visibility on project:view_members
+  // (granted to owner / admin / member / project_user).
+  const canViewMembers =
+    isTeamProject && (await canUserPerform(userId, id, "project:view_members"));
+  const memberRows: MemberRow[] = canViewMembers
+    ? (await getProjectMembers(id)).map((m) => ({
+        id: m.id,
+        userId: m.user.id,
+        name: m.user.name,
+        email: m.user.email,
+        role: m.role,
+        createdAt: m.createdAt.toISOString(),
+      }))
+    : [];
 
   return (
     <SectionCard
@@ -91,6 +116,26 @@ export default async function ProjectDetailPage({
       {project.type === GL_CODE_PROJECT_TYPE ? (
         <div className="py-5 first:pt-0">
           <GlCodeAllocationDashboard projectId={project.id} />
+        </div>
+      ) : null}
+
+      {canViewMembers ? (
+        <div className="py-5 first:pt-0 border-t border-[var(--ring)]">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+              Team
+            </h2>
+            <span className="text-xs text-[var(--muted)]">
+              {memberRows.length} {memberRows.length === 1 ? "member" : "members"}
+            </span>
+          </div>
+          <ProjectMemberList
+            projectId={project.id}
+            viewerUserId={userId}
+            viewerRole={role ?? "project_user"}
+            members={memberRows}
+            leaveRedirect="/account/projects"
+          />
         </div>
       ) : null}
     </SectionCard>

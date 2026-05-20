@@ -2,7 +2,11 @@ import { prisma } from "@/lib/db";
 import type { ProjectStatus } from "@prisma/client";
 import { ensureTenantForUser, getTenantForUser } from "@/lib/tenant";
 import { canUserPerform, isProjectMember } from "@/lib/project-rbac";
-import { isProjectType, type ProjectType } from "@/lib/project-types";
+import {
+  isProjectType,
+  type ProjectScope,
+  type ProjectType,
+} from "@/lib/project-types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,11 +53,13 @@ export async function getMyProjects(userId: string) {
       name: true,
       description: true,
       status: true,
+      type: true,
       createdAt: true,
       ownerName: true,
       ownerUserId: true,
+      owner: { select: { name: true, email: true } },
       workspaceId: true,
-      workspace: { select: { id: true, name: true } },
+      workspace: { select: { id: true, name: true, type: true } },
     },
   });
 }
@@ -79,13 +85,15 @@ export async function getTeamProjects(userId: string) {
       name: true,
       description: true,
       status: true,
+      type: true,
       createdAt: true,
       ownerName: true,
+      owner: { select: { name: true, email: true } },
       workspaceId: true,
-      workspace: { select: { id: true, name: true } },
+      workspace: { select: { id: true, name: true, type: true } },
       projectMemberships: {
         where: { userId },
-        select: { createdAt: true },
+        select: { createdAt: true, role: true },
         take: 1,
       },
     },
@@ -155,6 +163,7 @@ export async function getProjectForUser(projectId: string, userId: string) {
         where: { userId },
         select: { role: true, createdAt: true },
       },
+      workspace: { select: { type: true } },
     },
   });
   if (!project) return null;
@@ -222,24 +231,69 @@ export async function getWorkspaceMembersNotInProject(
   });
 }
 
+export type UsedProjectTypesByScope = Record<ProjectScope, ProjectType[]>;
+
 /**
- * Server-only: list the canonical project types the user already "has" —
- * either as owner or as a project member. Used to disable already-taken
- * options in the create-project dropdown and to enforce the per-user
- * one-of-each rule in createProjectAction / addMemberToProjectAction.
+ * Server-only: list the canonical project types already in use, partitioned by
+ * scope (personal vs team). The rules differ between scopes intentionally:
+ *
+ *   personal: per-user. A type is "used" if the user holds a projectMembership
+ *             on a project of that type in a personal workspace. Each user has
+ *             their own personal bucket.
+ *
+ *   team:     per-workspace. A type is "used" if ANY project of that type
+ *             exists in the user's organization workspace. The whole team
+ *             shares the bucket — once one teammate creates a team Document
+ *             Review, no one else in the org can create a duplicate; they get
+ *             added to the existing project instead.
+ *
+ * Used to disable already-taken options in the create-project dropdown and to
+ * enforce the create-project uniqueness rule in createProjectAction.
  */
-export async function getUsedProjectTypes(userId: string): Promise<ProjectType[]> {
-  if (!userId) return [];
-  const rows = await prisma.projectMembership.findMany({
-    where: { userId },
+export async function getUsedProjectTypesByScope(
+  userId: string
+): Promise<UsedProjectTypesByScope> {
+  const result: UsedProjectTypesByScope = { personal: [], team: [] };
+  if (!userId) return result;
+
+  // Personal bucket: walk the user's own membership rows and keep types in
+  // personal workspaces. Other users' personal workspaces never reach this
+  // user (they can't be invited to a personal workspace), so this is naturally
+  // per-user.
+  const personalRows = await prisma.projectMembership.findMany({
+    where: {
+      userId,
+      project: { workspace: { type: "personal" } },
+    },
     select: { project: { select: { type: true } } },
   });
-  const seen = new Set<ProjectType>();
-  for (const r of rows) {
+  const personal = new Set<ProjectType>();
+  for (const r of personalRows) {
     const t = r.project?.type;
-    if (t && isProjectType(t)) seen.add(t);
+    if (t && isProjectType(t)) personal.add(t);
   }
-  return Array.from(seen);
+  result.personal = Array.from(personal);
+
+  // Team bucket: look up the user's org workspace (max one per user invariant)
+  // and read every project type that lives there, regardless of whether the
+  // user is a project member. That makes the bucket per-workspace.
+  const orgMembership = await prisma.membership.findFirst({
+    where: { userId, workspace: { type: "organization" } },
+    select: { workspaceId: true },
+  });
+  if (orgMembership) {
+    const teamProjects = await prisma.project.findMany({
+      where: { workspaceId: orgMembership.workspaceId },
+      select: { type: true },
+    });
+    const team = new Set<ProjectType>();
+    for (const p of teamProjects) {
+      if (p.type && isProjectType(p.type)) team.add(p.type);
+    }
+    result.team = Array.from(team);
+  }
+
+  return result;
 }
 
 // ---------------------------------------------------------------------------

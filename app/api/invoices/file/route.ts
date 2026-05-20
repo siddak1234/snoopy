@@ -39,19 +39,23 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const filename = url.searchParams.get("file");
   const loungeCode = url.searchParams.get("lounge");
-  if (!filename || !loungeCode) {
+  const projectId = url.searchParams.get("project");
+  if (!filename || !loungeCode || !projectId) {
     return NextResponse.json(
-      { error: "Missing file or lounge parameter" },
+      { error: "Missing project, file, or lounge parameter" },
       { status: 400 },
     );
   }
 
-  // Verify a line-item row exists for this (filename, lounge_code) pair before
-  // signing — prevents users from minting URLs for arbitrary GCS objects.
+  // Verify a line-item row exists for this (project_id, filename, lounge_code)
+  // tuple before signing. RLS on gl_code_line_items gates on project_memberships,
+  // so a user who isn't a member of project_id gets zero rows and a 404 here —
+  // they cannot mint URLs for another client's invoice files.
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from("claros-gl-code")
+    .from("gl_code_line_items")
     .select("id")
+    .eq("project_id", projectId)
     .eq("filename", filename)
     .eq("lounge_code", loungeCode)
     .limit(1)

@@ -96,15 +96,12 @@ model Workspace {
   name               String
   type               WorkspaceType @default(personal)
   domain             String?
-  domainVerified     Boolean       @default(false)
-  domainVerifiedAt   DateTime?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   memberships        Membership[]
   projects           Project[]
   workflows          Workflow[]
   workspaceInvites   WorkspaceInvite[]
-  domainVerTokens    DomainVerificationToken[]
 
   @@map("workspaces")
 }
@@ -146,20 +143,6 @@ model WorkspaceInvite {
   @@index([workspaceId])
   @@index([token])
   @@map("workspace_invites")
-}
-
-model DomainVerificationToken {
-  id          String    @id @default(uuid())
-  workspaceId String
-  token       String    @unique               // UUID v4
-  expiresAt   DateTime                        // createdAt + 72 h
-  usedAt      DateTime?
-  createdAt   DateTime  @default(now())
-
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  @@index([workspaceId])
-  @@map("domain_verification_tokens")
 }
 
 // ---------------------------------------------------------------------------

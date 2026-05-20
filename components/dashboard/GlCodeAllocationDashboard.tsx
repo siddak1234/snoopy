@@ -6,18 +6,13 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 
-// TODO(v2): Per-project client scoping.
-// The query below reads every row in `GL Code Allocation` that the
-// authenticated user can see via RLS. With a single onboarded client
-// (currently "Claros") that's exactly the right rows. Before onboarding
-// a second client, add a `client` column on the Project model, populate
-// it on project creation, and add `.eq("client", project.client)` to
-// the query so each project only sees its own client's rows.
-//
-// TODO(v2): The "Spend by GL category", "Top vendors", and per-invoice
-// "Invoices" panels have no data source yet. They render empty states
-// to communicate the eventual scope. Wire each up once line-item /
-// vendor / category data lands in the schema.
+// Per-project scoping is enforced at the database layer:
+//   - Both shadow tables (gl_code_allocations, gl_code_line_items) carry a
+//     project_id column and an RLS policy that gates on project_memberships.
+//   - The RPCs (invoices_for_project, top_vendors_for_project) take
+//     p_project_id and filter on it directly.
+// The .eq("project_id", projectId) below is defense-in-depth on top of RLS,
+// not the primary access control.
 
 type GLCodeAllocationRow = {
   id: string;
@@ -55,7 +50,7 @@ type GLCodeAllocationRow = {
   other: number | null;
 };
 
-const TABLE = "GL Code Allocation";
+const TABLE = "gl_code_allocations";
 
 // Edit this list when adding/removing GL category columns from the table.
 // `key` matches the Supabase column name; `label` is the human display name.
@@ -93,8 +88,9 @@ const GL_CATEGORIES: { key: keyof GLCodeAllocationRow; label: string }[] = [
 // distinctly and roll the rest into a single "Other (N categories)" row.
 const CATEGORY_TOP_N = 5;
 
-// Top vendors RPC — see supabase/migrations/20260427000000_top_vendors_rpc.sql.
-// Aggregates the claros-gl-code line items to per-invoice rows, then to per-merchant.
+// Top vendors RPC (top_vendors_for_project): aggregates gl_code_line_items
+// to per-invoice rows, then to per-merchant. RLS on the table enforces project
+// membership; the p_project_id arg scopes the query.
 const TOP_VENDORS_LIMIT = 5;
 
 type TopVendor = {
@@ -103,8 +99,7 @@ type TopVendor = {
   total_spend: number;
 };
 
-// One row per invoice from the invoices_for_period RPC — see
-// supabase/migrations/20260427000001_invoices_for_period_rpc.sql.
+// One row per invoice from the invoices_for_project RPC.
 type Invoice = {
   filename: string;
   merchant: string | null;
@@ -233,7 +228,8 @@ export function GlCodeAllocationDashboard({
     (async () => {
       const { data, error: qError } = await supabase
         .from(TABLE)
-        .select("*");
+        .select("*")
+        .eq("project_id", projectId);
       if (cancelled) return;
       if (qError) {
         setError("Could not load allocation data.");
@@ -245,7 +241,7 @@ export function GlCodeAllocationDashboard({
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
+  }, [supabase, projectId]);
 
   const periods = useMemo(() => {
     if (!rows) return [];
@@ -332,8 +328,9 @@ export function GlCodeAllocationDashboard({
     let cancelled = false;
     (async () => {
       const { data, error: rpcError } = await supabase.rpc(
-        "top_vendors_for_period",
+        "top_vendors_for_project",
         {
+          p_project_id: projectId,
           p_lounge_code: effectiveLocation,
           p_period_start: period_start,
           p_period_end: period_end,
@@ -351,7 +348,7 @@ export function GlCodeAllocationDashboard({
     return () => {
       cancelled = true;
     };
-  }, [supabase, effectivePeriodKey, effectiveLocation]);
+  }, [supabase, projectId, effectivePeriodKey, effectiveLocation]);
 
   // Per-invoice rows for the current selection. Same cancellation pattern as
   // the top vendors effect — stale data stays visible during reload (no flicker).
@@ -361,8 +358,9 @@ export function GlCodeAllocationDashboard({
     let cancelled = false;
     (async () => {
       const { data, error: rpcError } = await supabase.rpc(
-        "invoices_for_period",
+        "invoices_for_project",
         {
+          p_project_id: projectId,
           p_lounge_code: effectiveLocation,
           p_period_start: period_start,
           p_period_end: period_end,
@@ -379,7 +377,7 @@ export function GlCodeAllocationDashboard({
     return () => {
       cancelled = true;
     };
-  }, [supabase, effectivePeriodKey, effectiveLocation]);
+  }, [supabase, projectId, effectivePeriodKey, effectiveLocation]);
 
   // Client-side filter on the loaded invoices: matches `invoiceQuery` against
   // merchant or invoice_number (case-insensitive substring). Empty/whitespace

@@ -67,10 +67,9 @@ export function isPublicDomain(domain: string): boolean {
 // ---------------------------------------------------------------------------
 
 export type DomainClassification =
-  | "public"                    // consumer provider — cannot claim
-  | "custom_unclaimed"          // custom domain, no workspace has registered it
-  | "custom_claimed_verified"   // another workspace owns + has verified this domain
-  | "custom_claimed_unverified" // another workspace registered but not yet verified
+  | "public"            // consumer provider — cannot claim
+  | "custom_unclaimed"  // custom domain, no organization workspace registered for it
+  | "custom_claimed";   // an organization workspace already exists for this domain
 
 export type DomainClassificationResult = {
   domain: string;
@@ -80,14 +79,15 @@ export type DomainClassificationResult = {
 };
 
 /**
- * Classifies the domain of an email address for workspace auto-join eligibility.
+ * Classifies the domain of an email address for workspace routing.
  *
- * Flow:
- *  1. Extract and validate domain from email.
- *  2. If on public blocklist → "public", no DB lookup.
- *  3. Query workspaces for domain match with domainVerified = true  → "custom_claimed_verified"
- *  4. Query workspaces for domain match with domainVerified = false → "custom_claimed_unverified"
- *  5. No match → "custom_unclaimed"
+ *  - public domain      → "public"
+ *  - org exists for it  → "custom_claimed"
+ *  - no org for it      → "custom_unclaimed"
+ *
+ * Trust model: the joining user's email is verified by Supabase OAuth, which
+ * already proves they read mail at that domain. We no longer maintain a
+ * separate "domain verified" state on the workspace.
  */
 export async function classifyEmailDomain(
   email: string
@@ -112,33 +112,17 @@ export async function classifyEmailDomain(
     };
   }
 
-  // Check for a verified claim first (higher precedence)
-  const verifiedWorkspace = await prisma.workspace.findFirst({
-    where: { domain, domainVerified: true },
+  const existing = await prisma.workspace.findFirst({
+    where: { domain, type: "organization" },
     select: { id: true, name: true },
   });
 
-  if (verifiedWorkspace) {
+  if (existing) {
     return {
       domain,
       isPublic: false,
-      classification: "custom_claimed_verified",
-      existingWorkspace: verifiedWorkspace,
-    };
-  }
-
-  // Check for an unverified claim
-  const unverifiedWorkspace = await prisma.workspace.findFirst({
-    where: { domain, domainVerified: false },
-    select: { id: true, name: true },
-  });
-
-  if (unverifiedWorkspace) {
-    return {
-      domain,
-      isPublic: false,
-      classification: "custom_claimed_unverified",
-      existingWorkspace: unverifiedWorkspace,
+      classification: "custom_claimed",
+      existingWorkspace: existing,
     };
   }
 
@@ -148,30 +132,4 @@ export async function classifyEmailDomain(
     classification: "custom_unclaimed",
     existingWorkspace: null,
   };
-}
-
-// ---------------------------------------------------------------------------
-// checkDuplicateDomain
-// ---------------------------------------------------------------------------
-// Returns true if any workspace OTHER than excludeWorkspaceId has this domain
-// verified. Used before allowing a workspace to claim or re-verify a domain.
-// ---------------------------------------------------------------------------
-
-export async function checkDuplicateDomain(
-  domain: string,
-  excludeWorkspaceId?: string
-): Promise<boolean> {
-  if (!domain) return false;
-  const normalised = domain.trim().toLowerCase();
-
-  const existing = await prisma.workspace.findFirst({
-    where: {
-      domain: normalised,
-      domainVerified: true,
-      ...(excludeWorkspaceId ? { id: { not: excludeWorkspaceId } } : {}),
-    },
-    select: { id: true },
-  });
-
-  return existing !== null;
 }

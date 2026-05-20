@@ -5,8 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { InvoiceFileViewer } from "@/components/dashboard/InvoiceFileViewer";
 
-// One line item from claros-gl-code. All numeric-looking fields are stored as
-// text and cast to numeric for display. Capitalization matches the actual
+// One line item from gl_code_line_items. All numeric-looking fields are stored
+// as text and cast to numeric for display. Capitalization matches the actual
 // Postgres column names exactly.
 type LineItem = {
   id: string | number;
@@ -26,7 +26,7 @@ type LineItem = {
   Status: string | null;
 };
 
-const TABLE = "claros-gl-code";
+const TABLE = "gl_code_line_items";
 
 // Cent-level precision on the line-item page (unit prices commonly carry
 // cents — e.g., $29.19 — and rounding loses meaningful information). The
@@ -48,7 +48,7 @@ const dateFmt = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
 });
 
-// Strict YYYY-MM-DD guard — same convention as the invoices_for_period RPC.
+// Strict YYYY-MM-DD guard — same convention as the invoices_for_project RPC.
 function isValidIsoDate(s: string | null): s is string {
   return !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
@@ -77,9 +77,11 @@ function getSortValue(item: LineItem, key: SortKey): number {
 }
 
 export function InvoiceDetailClient({
+  projectId,
   filename,
   loungeCode,
 }: {
+  projectId: string;
   filename: string;
   loungeCode: string | null;
 }) {
@@ -95,11 +97,14 @@ export function InvoiceDetailClient({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // filename is globally unique today, but we additionally filter by
-      // lounge_code (when carried through from the dashboard) so the query
-      // stays scoped to the same view the user was looking at — defense in
-      // depth for the eventual project↔lounge scoping work.
-      let query = supabase.from(TABLE).select("*").eq("filename", filename);
+      // project_id is the access key (RLS gates on project_memberships). The
+      // additional filename + lounge_code filters scope the result to the
+      // specific invoice the user was viewing in the dashboard.
+      let query = supabase
+        .from(TABLE)
+        .select("*")
+        .eq("project_id", projectId)
+        .eq("filename", filename);
       if (loungeCode) query = query.eq("lounge_code", loungeCode);
       const { data, error: qError } = await query;
       if (cancelled) return;
@@ -112,7 +117,7 @@ export function InvoiceDetailClient({
     return () => {
       cancelled = true;
     };
-  }, [supabase, filename, loungeCode]);
+  }, [supabase, projectId, filename, loungeCode]);
 
   // Sort runs in render rather than once at fetch — clicking a header should
   // reorder the visible rows without re-querying.
@@ -208,7 +213,7 @@ export function InvoiceDetailClient({
           scroll past the PDF to reach them. */}
       <div className="flex flex-col gap-6">
         {loungeCode ? (
-          <InvoiceFileViewer filename={filename} loungeCode={loungeCode} />
+          <InvoiceFileViewer projectId={projectId} filename={filename} loungeCode={loungeCode} />
         ) : null}
 
         {/* Line item table — text columns are stacked (primary on top,

@@ -28,8 +28,6 @@ export default async function OrganizationPage() {
           name: true,
           type: true,
           domain: true,
-          domainVerified: true,
-          domainVerifiedAt: true,
         },
       },
     },
@@ -87,24 +85,13 @@ export default async function OrganizationPage() {
     createdAt: i.createdAt.toISOString(),
   }));
 
-  // Build domain section props
-  type DomainProps =
-    | { state: "none" }
-    | { state: "verified"; domain: string; verifiedAt: string }
-    | { state: "unverified"; domain: string };
-
-  let domainProps: DomainProps;
-  if (!workspace.domain) {
-    domainProps = { state: "none" };
-  } else if (workspace.domainVerified && workspace.domainVerifiedAt) {
-    domainProps = {
-      state: "verified",
-      domain: workspace.domain,
-      verifiedAt: workspace.domainVerifiedAt.toISOString(),
-    };
-  } else {
-    domainProps = { state: "unverified", domain: workspace.domain };
-  }
+  // Build domain section props. Verification was removed (Supabase OAuth
+  // already verifies the user's email at sign-in) so the section only shows
+  // the domain as a static label.
+  type DomainProps = { state: "none" } | { state: "set"; domain: string };
+  const domainProps: DomainProps = workspace.domain
+    ? { state: "set", domain: workspace.domain }
+    : { state: "none" };
 
   return (
     <SectionCard
