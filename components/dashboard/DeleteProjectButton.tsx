@@ -18,7 +18,12 @@ export function DeleteProjectButton({
   const [pending, startTransition] = useTransition();
 
   function handleClick() {
-    if (!confirm(`Delete "${projectName}"? This cannot be undone.`)) return;
+    if (
+      !confirm(
+        `Delete "${projectName}"? You can restore it later by creating a project of the same type — your data will reattach.`
+      )
+    )
+      return;
     startTransition(async () => {
       const result = await deleteProjectAction(projectId);
       if (!result.ok) {

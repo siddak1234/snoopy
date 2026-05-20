@@ -46,7 +46,7 @@ export async function getMyProjects(userId: string) {
   if (ownedProjectIds.length === 0) return [];
 
   return prisma.project.findMany({
-    where: { id: { in: ownedProjectIds } },
+    where: { id: { in: ownedProjectIds }, status: { not: "archived" } },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -78,7 +78,7 @@ export async function getTeamProjects(userId: string) {
 
   const projectIds = memberMemberships.map((m) => m.projectId);
   return prisma.project.findMany({
-    where: { id: { in: projectIds } },
+    where: { id: { in: projectIds }, status: { not: "archived" } },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -157,7 +157,7 @@ export async function getAccessibleProjects(
  */
 export async function getProjectForUser(projectId: string, userId: string) {
   const project = await prisma.project.findFirst({
-    where: { id: projectId },
+    where: { id: projectId, status: { not: "archived" } },
     include: {
       projectMemberships: {
         where: { userId },
@@ -259,11 +259,15 @@ export async function getUsedProjectTypesByScope(
   // Personal bucket: walk the user's own membership rows and keep types in
   // personal workspaces. Other users' personal workspaces never reach this
   // user (they can't be invited to a personal workspace), so this is naturally
-  // per-user.
+  // per-user. Archived projects are skipped so the slot frees up for the user
+  // to recreate or restore.
   const personalRows = await prisma.projectMembership.findMany({
     where: {
       userId,
-      project: { workspace: { type: "personal" } },
+      project: {
+        status: { not: "archived" },
+        workspace: { type: "personal" },
+      },
     },
     select: { project: { select: { type: true } } },
   });
@@ -275,15 +279,20 @@ export async function getUsedProjectTypesByScope(
   result.personal = Array.from(personal);
 
   // Team bucket: look up the user's org workspace (max one per user invariant)
-  // and read every project type that lives there, regardless of whether the
-  // user is a project member. That makes the bucket per-workspace.
+  // and read every active project type that lives there, regardless of whether
+  // the user is a project member. That makes the bucket per-workspace.
+  // Archived projects don't count toward the bucket — they can be restored
+  // instead of creating a new one.
   const orgMembership = await prisma.membership.findFirst({
     where: { userId, workspace: { type: "organization" } },
     select: { workspaceId: true },
   });
   if (orgMembership) {
     const teamProjects = await prisma.project.findMany({
-      where: { workspaceId: orgMembership.workspaceId },
+      where: {
+        workspaceId: orgMembership.workspaceId,
+        status: { not: "archived" },
+      },
       select: { type: true },
     });
     const team = new Set<ProjectType>();
@@ -294,6 +303,76 @@ export async function getUsedProjectTypesByScope(
   }
 
   return result;
+}
+
+export type ArchivedRestorable = {
+  /** Archived project id — same UUID it had before deletion. */
+  id: string;
+  /** Display name to show in the dialog ("Restore <name>?"). */
+  name: string;
+  /** Scope this archived project would restore into. */
+  scope: ProjectScope;
+  /** Canonical project type — drives matching in the dialog. */
+  type: ProjectType;
+};
+
+/**
+ * Server-only: list the archived projects that this user has the right to
+ * restore. The dialog uses this to show "Restore previous project" when the
+ * user picks a scope+type combination that already has an archived match.
+ *
+ * Personal: archived projects the user owns in any personal workspace.
+ * Team: archived projects in the user's org workspace (any owner).
+ */
+export async function getRestorableProjectsByScope(
+  userId: string
+): Promise<ArchivedRestorable[]> {
+  if (!userId) return [];
+
+  const out: ArchivedRestorable[] = [];
+
+  // Personal — owner-only. Archived personal projects belong to one user.
+  const ownedArchived = await prisma.projectMembership.findMany({
+    where: {
+      userId,
+      role: "owner",
+      project: {
+        status: "archived",
+        workspace: { type: "personal" },
+      },
+    },
+    select: {
+      project: {
+        select: { id: true, name: true, type: true },
+      },
+    },
+  });
+  for (const m of ownedArchived) {
+    const p = m.project;
+    if (!p || !isProjectType(p.type)) continue;
+    out.push({ id: p.id, name: p.name, scope: "personal", type: p.type });
+  }
+
+  // Team — anyone in the org sees archived team projects so they can restore.
+  const orgMembership = await prisma.membership.findFirst({
+    where: { userId, workspace: { type: "organization" } },
+    select: { workspaceId: true },
+  });
+  if (orgMembership) {
+    const teamArchived = await prisma.project.findMany({
+      where: {
+        workspaceId: orgMembership.workspaceId,
+        status: "archived",
+      },
+      select: { id: true, name: true, type: true },
+    });
+    for (const p of teamArchived) {
+      if (!isProjectType(p.type)) continue;
+      out.push({ id: p.id, name: p.name, scope: "team", type: p.type });
+    }
+  }
+
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -360,34 +439,77 @@ export async function createProject(
 }
 
 /**
- * Server-only: delete a project.
- * Allowed if the user has project:delete permission (owner role) OR is org_owner
- * in the project's workspace.
+ * Server-only: archive a project (soft-delete). The project row stays alive
+ * along with all its data rows (gl_code_line_items / gl_code_allocations are
+ * FK-restricted to projects.id). project_id is the access key for everything
+ * downstream, so keeping it stable means a future restore brings the data
+ * back exactly as it was.
+ *
+ * Allowed if the user has project:delete permission (owner role) OR is
+ * org_owner in the project's workspace.
  */
 export async function deleteProject(
   userId: string,
   projectId: string
 ): Promise<boolean> {
   const project = await prisma.project.findFirst({
-    where: { id: projectId },
+    where: { id: projectId, status: { not: "archived" } },
     select: { workspaceId: true },
   });
   if (!project) return false;
 
   const canDelete = await canUserPerform(userId, projectId, "project:delete");
-  if (canDelete) {
-    const result = await prisma.project.deleteMany({ where: { id: projectId } });
-    return result.count > 0;
-  }
-
-  // Org-owner bypass
-  const workspace = await getTenantForUser(userId);
+  const workspace = canDelete ? null : await getTenantForUser(userId);
   const isOrgOwner =
+    !canDelete &&
     workspace?.role === "org_owner" &&
     workspace.tenantId === project.workspaceId;
-  if (!isOrgOwner) return false;
+  if (!canDelete && !isOrgOwner) return false;
 
-  const result = await prisma.project.deleteMany({ where: { id: projectId } });
+  const result = await prisma.project.updateMany({
+    where: { id: projectId },
+    data: { status: "archived" },
+  });
+  return result.count > 0;
+}
+
+/**
+ * Server-only: restore an archived project owned by the user. Only the project
+ * owner can restore (matches deleteProject's permission boundary). The
+ * project_id is unchanged, so any rows in shadow tables tagged with it become
+ * visible again the moment the project flips back to active.
+ */
+export async function restoreProject(
+  userId: string,
+  projectId: string
+): Promise<boolean> {
+  if (!userId || !projectId) return false;
+
+  // Must be the owner (or org_owner) of the archived project to restore.
+  const ownerMembership = await prisma.projectMembership.findUnique({
+    where: { projectId_userId: { projectId, userId } },
+    select: { role: true },
+  });
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, status: "archived" },
+    select: { workspaceId: true },
+  });
+  if (!project) return false;
+
+  let allowed = ownerMembership?.role === "owner";
+  if (!allowed) {
+    const workspace = await getTenantForUser(userId);
+    allowed = !!(
+      workspace?.role === "org_owner" &&
+      workspace.tenantId === project.workspaceId
+    );
+  }
+  if (!allowed) return false;
+
+  const result = await prisma.project.updateMany({
+    where: { id: projectId, status: "archived" },
+    data: { status: "active" },
+  });
   return result.count > 0;
 }
 

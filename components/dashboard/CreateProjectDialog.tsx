@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { createProjectAction } from "@/app/account/projects/actions";
+import { useRouter } from "next/navigation";
+import {
+  createProjectAction,
+  restoreProjectAction,
+} from "@/app/account/projects/actions";
 import Modal from "@/components/ui/Modal";
 import { FormInput } from "@/components/ui/FormInput";
 import { FormError } from "@/components/ui/FormError";
@@ -14,6 +18,13 @@ import {
 
 type UsedTypesByScope = Record<ProjectScope, ProjectType[]>;
 
+export type RestorableProject = {
+  id: string;
+  name: string;
+  scope: ProjectScope;
+  type: ProjectType;
+};
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -21,23 +32,39 @@ type Props = {
   onSuccess?: () => void | Promise<void>;
   /** Types the user has already created or joined, partitioned by scope. */
   usedTypesByScope?: UsedTypesByScope;
+  /** Archived projects this user can restore. Shown as "Restore previous project"
+   *  when the selected scope+type matches one of these. */
+  restorable?: RestorableProject[];
   /** Whether the signed-in user belongs to an organization workspace. */
   hasOrg?: boolean;
 };
 
 const EMPTY_USED: UsedTypesByScope = { personal: [], team: [] };
+const EMPTY_RESTORABLE: RestorableProject[] = [];
 
 export function CreateProjectDialog({
   open,
   onClose,
   onSuccess,
   usedTypesByScope,
+  restorable,
   hasOrg = false,
 }: Props) {
   const used = usedTypesByScope ?? EMPTY_USED;
+  const restorables = restorable ?? EMPTY_RESTORABLE;
+  const router = useRouter();
   const [scope, setScope] = useState<ProjectScope>("personal");
+  const [selectedType, setSelectedType] = useState<ProjectType | "">("");
   const usedSet = new Set<ProjectType>(used[scope]);
   const allUsedForScope = usedSet.size >= PROJECT_TYPES.length;
+  // Match an archived project to the current (scope, type) selection so we can
+  // offer Restore instead of/alongside Create. project_id is stable across the
+  // delete→restore cycle, so all data tagged with the matched id reappears.
+  const restorableMatch = selectedType
+    ? restorables.find(
+        (r) => r.scope === scope && r.type === selectedType
+      ) ?? null
+    : null;
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [created, setCreated] = useState(false);
@@ -49,6 +76,7 @@ export function CreateProjectDialog({
     setPending(false);
     setCreated(false);
     setScope("personal");
+    setSelectedType("");
     formRef.current?.reset();
   }, []);
 
@@ -89,6 +117,22 @@ export function CreateProjectDialog({
     setPending(false);
     if (result.ok) {
       setCreated(true);
+    } else {
+      setError(result.error);
+    }
+  }
+
+  async function handleRestore() {
+    if (!restorableMatch) return;
+    setError(null);
+    setPending(true);
+    const result = await restoreProjectAction(restorableMatch.id);
+    setPending(false);
+    if (result.ok) {
+      // Treat restore like a successful create — the dialog shows the success
+      // pane, and the parent page revalidates via onSuccess on close.
+      setCreated(true);
+      router.refresh();
     } else {
       setError(result.error);
     }
@@ -168,7 +212,13 @@ export function CreateProjectDialog({
                         value={value}
                         checked={selected}
                         disabled={isDisabled}
-                        onChange={() => setScope(value)}
+                        onChange={() => {
+                          setScope(value);
+                          // Clear type when scope changes — the dropdown's
+                          // disabled options recompute and the previous pick
+                          // might no longer be valid.
+                          setSelectedType("");
+                        }}
                         className="sr-only"
                       />
                       <span
@@ -240,7 +290,10 @@ export function CreateProjectDialog({
                       name="projectType"
                       required
                       disabled={pending}
-                      defaultValue=""
+                      value={selectedType}
+                      onChange={(e) =>
+                        setSelectedType(e.target.value as ProjectType | "")
+                      }
                       className="w-full appearance-none rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60 cursor-pointer"
                     >
                       <option value="" disabled className="text-[var(--muted)]">
@@ -248,9 +301,17 @@ export function CreateProjectDialog({
                       </option>
                       {PROJECT_TYPES.map((type) => {
                         const taken = usedSet.has(type);
+                        const archived = restorables.some(
+                          (r) => r.scope === scope && r.type === type
+                        );
+                        const label = taken
+                          ? `${type} — already created`
+                          : archived
+                            ? `${type} — restorable`
+                            : type;
                         return (
                           <option key={type} value={type} disabled={taken}>
-                            {taken ? `${type} — already created` : type}
+                            {label}
                           </option>
                         );
                       })}
@@ -286,15 +347,43 @@ export function CreateProjectDialog({
                     className="mt-1.5 w-full resize-none rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60"
                   />
                 </div>
+                {restorableMatch ? (
+                  <div className="rounded-xl border border-[var(--ring)] bg-[var(--surface-hover)] px-4 py-3 text-sm text-[var(--text)]">
+                    <span className="font-medium">{restorableMatch.name}</span>{" "}
+                    <span className="text-[var(--muted)]">
+                      was deleted earlier. Restore it to bring back the project and its data, or create a new one — the archived project stays preserved either way.
+                    </span>
+                  </div>
+                ) : null}
                 <FormError message={error} />
                 <div className="flex flex-wrap gap-2 pt-2">
-                  <button
-                    type="submit"
-                    disabled={pending}
-                    className="btn-primary inline-flex px-5"
-                  >
-                    {pending ? "Creating…" : "Create project"}
-                  </button>
+                  {restorableMatch ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleRestore}
+                        disabled={pending}
+                        className="btn-primary inline-flex px-5"
+                      >
+                        {pending ? "Restoring…" : "Restore project"}
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={pending}
+                        className="btn-secondary inline-flex px-5"
+                      >
+                        {pending ? "Creating…" : "Create new"}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={pending}
+                      className="btn-primary inline-flex px-5"
+                    >
+                      {pending ? "Creating…" : "Create project"}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={onClose}
