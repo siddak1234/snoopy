@@ -19,9 +19,11 @@ function detectKind(filename: string): "pdf" | "image" | "other" {
 }
 
 export function InvoiceFileViewer({
+  projectId,
   filename,
   loungeCode,
 }: {
+  projectId: string;
   filename: string;
   loungeCode: string;
 }) {
@@ -31,10 +33,12 @@ export function InvoiceFileViewer({
   // navigation — sidestepping the 5-min signed-URL expiry for long views.
   const url = useMemo(
     () =>
-      `/api/invoices/file?file=${encodeURIComponent(filename)}&lounge=${encodeURIComponent(
+      `/api/invoices/file?project=${encodeURIComponent(
+        projectId,
+      )}&file=${encodeURIComponent(filename)}&lounge=${encodeURIComponent(
         loungeCode,
       )}`,
-    [filename, loungeCode],
+    [projectId, filename, loungeCode],
   );
   const kind = useMemo(() => detectKind(filename), [filename]);
 

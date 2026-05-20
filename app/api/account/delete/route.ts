@@ -28,13 +28,62 @@ export async function DELETE() {
 
   try {
     await prisma.$transaction(async (tx) => {
+      // 1. Find every workspace the user belongs to (with role + workspace type).
+      //    We need this BEFORE deleting the user, since cascade-deleting the
+      //    user row would remove their memberships and erase the context.
+      const userMemberships = await tx.membership.findMany({
+        where: { userId: appUserId },
+        select: {
+          role: true,
+          workspaceId: true,
+          workspace: { select: { type: true } },
+        },
+      });
+
+      // 2. Decide which workspaces should be removed alongside the user:
+      //    - Personal workspaces always go (they exist only for this user).
+      //    - Org workspaces go only if the user is the LAST remaining OWNER —
+      //      otherwise the org survives and other owners/members keep working.
+      const workspaceIdsToDelete: string[] = [];
+      for (const m of userMemberships) {
+        if (m.workspace.type === "personal") {
+          workspaceIdsToDelete.push(m.workspaceId);
+          continue;
+        }
+        if (m.role === "OWNER") {
+          const otherOwners = await tx.membership.count({
+            where: {
+              workspaceId: m.workspaceId,
+              role: "OWNER",
+              userId: { not: appUserId },
+            },
+          });
+          if (otherOwners === 0) {
+            workspaceIdsToDelete.push(m.workspaceId);
+          }
+        }
+      }
+
+      // 3. Detach project ownership references that survive on workspaces we
+      //    are NOT deleting (the FK on projects.ownerUserId is RESTRICT, so
+      //    we need to null these out before the user goes).
       await tx.project.updateMany({
         where: { ownerUserId: appUserId },
         data: { ownerUserId: null, ownerName: null },
       });
-      await tx.user.delete({
-        where: { id: appUserId },
-      });
+
+      // 4. Delete the user. Cascade clears: memberships, project_memberships,
+      //    workflows. Personal workspaces are NOT cascaded by this delete
+      //    (workspaces have no FK to user), which is why step 5 is separate.
+      await tx.user.delete({ where: { id: appUserId } });
+
+      // 5. Delete the workspaces we marked. Cascade clears the workspace's
+      //    projects + project_memberships + invites + verification tokens.
+      if (workspaceIdsToDelete.length > 0) {
+        await tx.workspace.deleteMany({
+          where: { id: { in: workspaceIdsToDelete } },
+        });
+      }
     });
 
     if (supabaseUserId && process.env.SUPABASE_SERVICE_ROLE_KEY) {

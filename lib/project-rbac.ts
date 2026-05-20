@@ -46,12 +46,14 @@ const ROLE_PERMISSIONS: Record<ProjectMemberRole, ReadonlySet<ProjectAction>> =
     ]),
     member: new Set<ProjectAction>([
       "project:view",
+      "project:view_members",
       "project:access_workflows",
       "project:leave",
     ]),
     // legacy role — identical permissions to member, kept for backwards compat
     project_user: new Set<ProjectAction>([
       "project:view",
+      "project:view_members",
       "project:access_workflows",
       "project:leave",
     ]),

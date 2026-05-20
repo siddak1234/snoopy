@@ -2,10 +2,11 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/auth-supabase";
 import { ensureTenantForUser } from "@/lib/tenant";
-import { getMyProjects, getTeamProjects, getUsedProjectTypes } from "@/lib/projects";
+import { getMyProjects, getTeamProjects, getUsedProjectTypesByScope } from "@/lib/projects";
+import { prisma } from "@/lib/db";
 import SectionCard from "@/components/dashboard/SectionCard";
-import { ProjectList, TeamProjectList } from "@/components/dashboard/ProjectList";
-import type { MyProjectItem, TeamProjectItem } from "@/components/dashboard/ProjectList";
+import { ProjectList } from "@/components/dashboard/ProjectList";
+import type { ProjectListItem } from "@/components/dashboard/ProjectList";
 import { CreateProjectButton } from "@/components/dashboard/CreateProjectButton";
 import { JoinProjectButton } from "@/components/dashboard/JoinProjectButton";
 import { AuthHydrationGate } from "@/components/auth/AuthHydrationGate";
@@ -25,200 +26,130 @@ export default async function AccountProjectsPage() {
   }
 
   await ensureTenantForUser(session.user.id);
-  const [rawMyProjects, rawTeamProjects, usedTypes] = await Promise.all([
+  const [rawMyProjects, rawTeamProjects, usedTypesByScope, orgMembership] = await Promise.all([
     getMyProjects(session.user.id),
     getTeamProjects(session.user.id),
-    getUsedProjectTypes(session.user.id),
+    getUsedProjectTypesByScope(session.user.id),
+    prisma.membership.findFirst({
+      where: { userId: session.user.id, workspace: { type: "organization" } },
+      select: { workspaceId: true },
+    }),
   ]);
+  const hasOrg = orgMembership !== null;
 
   // ---------------------------------------------------------------------------
-  // Shape data into typed items
+  // Shape into a single ProjectListItem stream. Owned projects always carry
+  // viewerRole='owner'; team projects carry the role from the user's
+  // projectMembership row. From here on the UI doesn't care about the split.
   // ---------------------------------------------------------------------------
-  const myProjects: MyProjectItem[] = rawMyProjects.map((p) => ({
+  const ownedItems: ProjectListItem[] = rawMyProjects.map((p) => ({
     id: p.id,
     name: p.name,
-    description: p.description,
     status: p.status,
-    createdAt: p.createdAt,
-    ownerName: p.ownerName,
+    type: p.type,
+    ownerName: p.ownerName ?? p.owner?.name ?? null,
+    ownerEmail: p.owner?.email ?? null,
+    viewerRole: "owner",
     workspaceId: p.workspaceId ?? null,
     workspaceName: p.workspace?.name ?? null,
+    workspaceType: p.workspace?.type ?? null,
   }));
 
-  const teamProjects: TeamProjectItem[] = rawTeamProjects.map((p) => ({
+  const teamItems: ProjectListItem[] = rawTeamProjects.map((p) => ({
     id: p.id,
     name: p.name,
-    description: p.description,
     status: p.status,
-    createdAt: p.createdAt,
-    ownerName: p.ownerName,
-    projectMemberships: p.projectMemberships,
+    type: p.type,
+    ownerName: p.ownerName ?? p.owner?.name ?? null,
+    ownerEmail: p.owner?.email ?? null,
+    viewerRole: p.projectMemberships[0]?.role ?? "project_user",
     workspaceId: p.workspaceId ?? null,
     workspaceName: p.workspace?.name ?? null,
+    workspaceType: p.workspace?.type ?? null,
   }));
 
   // ---------------------------------------------------------------------------
-  // Determine if multi-workspace and build grouped structure
+  // Group by workspace. createdAt order from the query is preserved across the
+  // merge — owned and team items share the same list within a workspace.
   // ---------------------------------------------------------------------------
   type WorkspaceGroup = {
     workspaceId: string | null;
     workspaceName: string;
-    owned: MyProjectItem[];
-    team: TeamProjectItem[];
+    workspaceType: "personal" | "organization" | null;
+    items: ProjectListItem[];
   };
-
-  const groupMap = new Map<string, WorkspaceGroup>();
   const NO_WS = "__none__";
-
-  for (const p of myProjects) {
-    const key = p.workspaceId ?? NO_WS;
+  const groupMap = new Map<string, WorkspaceGroup>();
+  for (const item of [...ownedItems, ...teamItems]) {
+    const key = item.workspaceId ?? NO_WS;
     if (!groupMap.has(key)) {
       groupMap.set(key, {
-        workspaceId: p.workspaceId ?? null,
-        workspaceName: p.workspaceName ?? "Personal",
-        owned: [],
-        team: [],
+        workspaceId: item.workspaceId,
+        workspaceName: item.workspaceName ?? "Personal",
+        workspaceType: item.workspaceType,
+        items: [],
       });
     }
-    groupMap.get(key)!.owned.push(p);
+    groupMap.get(key)!.items.push(item);
   }
-  for (const p of teamProjects) {
-    const key = p.workspaceId ?? NO_WS;
-    if (!groupMap.has(key)) {
-      groupMap.set(key, {
-        workspaceId: p.workspaceId ?? null,
-        workspaceName: p.workspaceName ?? "Personal",
-        owned: [],
-        team: [],
-      });
-    }
-    groupMap.get(key)!.team.push(p);
-  }
-
   const groups = Array.from(groupMap.values());
-  const isMultiWorkspace = groups.length > 1;
-  const allTypesUsed = usedTypes.length >= PROJECT_TYPES.length;
 
-  // ---------------------------------------------------------------------------
-  // Render: single workspace — identical layout to before
-  // ---------------------------------------------------------------------------
-  if (!isMultiWorkspace) {
-    return (
-      <SectionCard
-        title="Projects"
-        subheader="Manage your projects"
-      >
-        <div className="py-5 first:pt-0">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
-              My projects
-            </h2>
-            {allTypesUsed ? (
-              <p className="text-sm text-[var(--muted)]">All project types created.</p>
-            ) : (
-              <CreateProjectButton
-                workspaceId={groups[0]?.workspaceId ?? undefined}
-                usedTypes={usedTypes}
-              />
-            )}
-          </div>
-          {myProjects.length === 0 ? (
-            <div className="mt-3">
-              <p className="text-sm text-[var(--muted)]">No projects yet.</p>
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                Create a project to get started, or join one with an access code.
-              </p>
-            </div>
-          ) : (
-            <div className="mt-3">
-              <ProjectList projects={myProjects} />
-            </div>
-          )}
-        </div>
+  const personalFull = usedTypesByScope.personal.length >= PROJECT_TYPES.length;
+  const teamFull = usedTypesByScope.team.length >= PROJECT_TYPES.length;
+  // Hide the Create button only when every available scope is full: both scopes
+  // for org members, just personal for users with no org.
+  const allScopesFull = hasOrg ? personalFull && teamFull : personalFull;
 
-        <div className="py-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
-              Team projects
-            </h2>
-            <JoinProjectButton />
-          </div>
-          {teamProjects.length === 0 ? (
-            <div className="mt-3">
-              <p className="text-sm text-[var(--muted)]">You haven&apos;t joined any team projects yet.</p>
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                Ask your organization owner for an invite link, then use &ldquo;Join organization&rdquo;.
-              </p>
-            </div>
-          ) : (
-            <div className="mt-3">
-              <TeamProjectList projects={teamProjects} />
-            </div>
-          )}
-        </div>
-      </SectionCard>
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Render: multi-workspace — grouped by organization
-  // ---------------------------------------------------------------------------
   return (
     <SectionCard
       title="Projects"
-      subheader="Manage your projects across all organizations"
+      subheader={
+        groups.length > 1
+          ? "Manage your projects across all organizations"
+          : "Manage your projects"
+      }
     >
-      {/* Join button sits at the top level, applies to all workspaces */}
-      <div className="flex justify-end py-3 first:pt-0">
-        <JoinProjectButton />
+      {/* Top-level controls: Create (scope-aware) + Join. */}
+      <div className="flex flex-wrap items-center justify-end gap-2 py-3 first:pt-0">
+        {allScopesFull ? (
+          <p className="text-sm text-[var(--muted)]">All project types created.</p>
+        ) : (
+          <CreateProjectButton
+            usedTypesByScope={usedTypesByScope}
+            hasOrg={hasOrg}
+          />
+        )}
+        {/* Personal users (no org membership) don't have a workspace to join
+            into via this picker. Org-invite emails still work for them via
+            /org-invite/[token] regardless of this button. */}
+        {hasOrg ? <JoinProjectButton /> : null}
       </div>
 
-      {groups.map((group, idx) => (
-        <div
-          key={group.workspaceId ?? NO_WS}
-          className={idx === 0 ? "py-5 first:pt-0" : "border-t border-[var(--ring)] py-5"}
-        >
-          {/* Workspace heading + create button */}
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-sm font-semibold text-[var(--text)]">
-              {group.workspaceName}
-            </h2>
-            {group.workspaceId ? (
-              allTypesUsed ? (
-                <p className="text-sm text-[var(--muted)]">All project types created.</p>
-              ) : (
-                <CreateProjectButton workspaceId={group.workspaceId} usedTypes={usedTypes} />
-              )
-            ) : null}
-          </div>
-
-          {/* Owned projects */}
-          <div className="mt-4">
-            <h3 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
-              My projects
-            </h3>
-            {group.owned.length === 0 ? (
-              <p className="mt-2 text-sm text-[var(--muted)]">No owned projects in this organization.</p>
-            ) : (
-              <div className="mt-2">
-                <ProjectList projects={group.owned} />
-              </div>
-            )}
-          </div>
-
-          {/* Team projects */}
-          {group.team.length > 0 ? (
-            <div className="mt-4">
-              <h3 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
-                Team projects
-              </h3>
-              <div className="mt-2">
-                <TeamProjectList projects={group.team} />
+      {groups.length === 0 ? (
+        <div className="py-5">
+          <p className="text-sm text-[var(--muted)]">No projects yet.</p>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            Create a project to get started, or join an organization to access team projects.
+          </p>
+        </div>
+      ) : (
+        groups.map((group, idx) => {
+          const isOrg = group.workspaceType === "organization";
+          return (
+            <div
+              key={group.workspaceId ?? NO_WS}
+              className={idx === 0 ? "py-5 first:pt-0" : "border-t border-[var(--ring)] py-5"}
+            >
+              <h2 className="text-sm font-semibold text-[var(--text)]">
+                {isOrg ? `${group.workspaceName} Team Projects` : group.workspaceName}
+              </h2>
+              <div className="mt-3">
+                <ProjectList projects={group.items} />
               </div>
             </div>
-          ) : null}
-        </div>
-      ))}
+          );
+        })
+      )}
     </SectionCard>
   );
 }

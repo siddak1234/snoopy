@@ -26,9 +26,14 @@ export default async function JoinOrgPage({
   // solely to show the org name. The actual join action re-verifies domain
   // server-side and never trusts this ID.
   const workspace = await prisma.workspace.findUnique({
-    where: { id: workspaceId, domainVerified: true },
-    select: { id: true, name: true, domain: true },
+    where: { id: workspaceId },
+    select: { id: true, name: true, domain: true, type: true },
   });
+
+  // Must be an organization workspace; personal workspaces aren't joinable.
+  if (workspace && workspace.type !== "organization") {
+    redirect("/onboarding/setup-org");
+  }
 
   if (!workspace) redirect("/onboarding/setup-org");
 

@@ -4,14 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CreateProjectDialog } from "./CreateProjectDialog";
 import { revalidateAccountProjectsAction } from "@/app/account/projects/actions";
-import type { ProjectType } from "@/lib/project-types";
+import type { ProjectScope, ProjectType } from "@/lib/project-types";
 
 type Props = {
-  workspaceId?: string;
-  usedTypes?: ProjectType[];
+  usedTypesByScope?: Record<ProjectScope, ProjectType[]>;
+  hasOrg?: boolean;
 };
 
-export function CreateProjectButton({ workspaceId, usedTypes }: Props) {
+export function CreateProjectButton({ usedTypesByScope, hasOrg }: Props) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
 
@@ -33,8 +33,8 @@ export function CreateProjectButton({ workspaceId, usedTypes }: Props) {
         open={open}
         onClose={() => setOpen(false)}
         onSuccess={handleSuccess}
-        workspaceId={workspaceId}
-        usedTypes={usedTypes}
+        usedTypesByScope={usedTypesByScope}
+        hasOrg={hasOrg}
       />
     </>
   );

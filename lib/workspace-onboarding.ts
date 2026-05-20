@@ -60,12 +60,12 @@ export async function resolvePostSigninDestination(
       return defaultNext;
 
     case "custom_unclaimed":
-    case "custom_claimed_unverified":
-      // Custom domain but no verified org yet → offer to create one
+      // No org exists for this domain → offer to create one
       return "/onboarding/setup-org";
 
-    case "custom_claimed_verified":
-      // A verified org exists for this domain → offer to join
+    case "custom_claimed":
+      // An org already exists for this domain (one-domain-one-org rule).
+      // Offer the user to Join it or skip to personal.
       return `/onboarding/join-org?w=${result.existingWorkspace!.id}`;
   }
 }

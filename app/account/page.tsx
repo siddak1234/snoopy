@@ -2,8 +2,6 @@ import Link from "next/link";
 import { getAppSession } from "@/lib/auth-supabase";
 import { getAccessibleProjects } from "@/lib/projects";
 import SectionCard from "@/components/dashboard/SectionCard";
-import { DomainVerificationBanner } from "@/components/dashboard/DomainVerificationBanner";
-import { prisma } from "@/lib/db";
 
 function getFirstName(name?: string | null): string | null {
   if (!name?.trim()) return null;
@@ -19,42 +17,15 @@ export default async function AccountDashboardPage() {
     : "Welcome back!";
 
   const userId = session?.user?.id;
-  const workspaceId = session?.user?.workspaceId;
 
-  // Fetch top projects and membership info in parallel
-  const [topProjects, membershipInfo] = await Promise.all([
-    userId != null ? getAccessibleProjects(userId, 3) : Promise.resolve([]),
-    userId && workspaceId
-      ? prisma.membership.findUnique({
-          where: { userId_workspaceId: { userId, workspaceId } },
-          select: {
-            role: true,
-            workspace: {
-              select: { type: true, domain: true, domainVerified: true },
-            },
-          },
-        })
-      : Promise.resolve(null),
-  ]);
-
-  const isOrgOwner =
-    membershipInfo?.role === "OWNER" &&
-    membershipInfo.workspace.type === "organization";
+  const topProjects =
+    userId != null ? await getAccessibleProjects(userId, 3) : [];
 
   // Show workspace name tags when the user's top projects span multiple workspaces
   const uniqueWorkspaceIds = new Set(
     topProjects.map((p) => p.workspaceId).filter(Boolean)
   );
   const isMultiWorkspace = uniqueWorkspaceIds.size > 1;
-
-  // Show domain verification banner if owner of an unverified org workspace
-  const unverifiedDomain =
-    isOrgOwner &&
-    membershipInfo &&
-    !membershipInfo.workspace.domainVerified &&
-    membershipInfo.workspace.domain
-      ? membershipInfo.workspace.domain
-      : null;
 
 
   return (
@@ -76,11 +47,6 @@ export default async function AccountDashboardPage() {
         </Link>
       }
     >
-      {unverifiedDomain ? (
-        <div className="pt-5 first:pt-0">
-          <DomainVerificationBanner domain={unverifiedDomain} />
-        </div>
-      ) : null}
 
       <div className="py-5 first:pt-0">
         <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">

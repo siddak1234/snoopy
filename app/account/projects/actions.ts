@@ -5,11 +5,15 @@ import {
   createProject as createProjectDb,
   deleteProject as deleteProjectDb,
   leaveProject as leaveProjectDb,
-  getUsedProjectTypes,
+  getUsedProjectTypesByScope,
 } from "@/lib/projects";
 import { canUserPerform, getProjectRole } from "@/lib/project-rbac";
 import { canModifyMember } from "@/lib/project-rbac-pure";
-import { isProjectType } from "@/lib/project-types";
+import {
+  isProjectScope,
+  isProjectType,
+  type ProjectScope,
+} from "@/lib/project-types";
 import { prisma } from "@/lib/db";
 import type { ProjectMemberRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -60,11 +64,38 @@ export async function createProjectAction(
     return { ok: false, error: "Invalid project type." };
   }
 
-  const usedTypes = await getUsedProjectTypes(session.user.id);
-  if (usedTypes.includes(trimmedType)) {
+  const scopeRaw = formData.get("scope");
+  if (typeof scopeRaw !== "string" || !isProjectScope(scopeRaw)) {
+    return { ok: false, error: "Project scope is required." };
+  }
+  const scope: ProjectScope = scopeRaw;
+
+  // Resolve the target workspace from scope. Any workspaceId field is ignored
+  // intentionally — scope is the source of truth so the client cannot redirect
+  // a personal create into an org workspace or vice versa.
+  const targetWorkspaceType = scope === "personal" ? "personal" : "organization";
+  const targetMembership = await prisma.membership.findFirst({
+    where: { userId: session.user.id, workspace: { type: targetWorkspaceType } },
+    orderBy: { createdAt: "asc" },
+    select: { workspaceId: true },
+  });
+  if (!targetMembership) {
     return {
       ok: false,
-      error: `You already have a "${trimmedType}" project. Delete or leave it before creating another.`,
+      error:
+        scope === "team"
+          ? "Join an organization to create a team project."
+          : "No personal workspace found. Please sign out and back in.",
+    };
+  }
+  const targetWorkspaceId = targetMembership.workspaceId;
+
+  const usedTypes = await getUsedProjectTypesByScope(session.user.id);
+  if (usedTypes[scope].includes(trimmedType)) {
+    const scopeLabel = scope === "personal" ? "personal" : "team";
+    return {
+      ok: false,
+      error: `You already have a "${trimmedType}" ${scopeLabel} project. Delete or leave it before creating another.`,
     };
   }
 
@@ -73,10 +104,6 @@ export async function createProjectAction(
     typeof description === "string" && description.trim()
       ? description.trim()
       : null;
-
-  const wsId = formData.get("workspaceId");
-  const targetWorkspaceId =
-    typeof wsId === "string" && wsId.trim() ? wsId.trim() : undefined;
 
   try {
     const { project } = await createProjectDb(
@@ -182,10 +209,17 @@ export async function addMemberToProjectAction(
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { workspaceId: true, type: true },
+    select: {
+      workspaceId: true,
+      type: true,
+      workspace: { select: { type: true } },
+    },
   });
   if (!project?.workspaceId) {
     return { ok: false, error: "Project has no associated workspace." };
+  }
+  if (project.workspace?.type !== "organization") {
+    return { ok: false, error: "Cannot add members to a personal project." };
   }
 
   const [wsMembership, existing] = await Promise.all([
@@ -206,15 +240,10 @@ export async function addMemberToProjectAction(
     return { ok: false, error: "That user is already in this project." };
   }
 
-  if (isProjectType(project.type)) {
-    const targetUsedTypes = await getUsedProjectTypes(targetUserId);
-    if (targetUsedTypes.includes(project.type)) {
-      return {
-        ok: false,
-        error: `That user already has a "${project.type}" project.`,
-      };
-    }
-  }
+  // Per-workspace team uniqueness means only one project per type exists in
+  // the org workspace, so adding a teammate never collides with another team
+  // project they hold. Personal scope is unreachable here — personal projects
+  // are rejected earlier by the project.workspace.type guard.
 
   try {
     await prisma.projectMembership.create({
