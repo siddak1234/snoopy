@@ -43,3 +43,10 @@ yarn-error.log*
 next-env.d.ts
 
 /lib/generated/prisma
+
+# Local-only DB recipes that contain client-specific seed data / identifiers.
+# Reference-only: the deploy never runs migrations and the live Supabase DB is
+# the source of truth, so these are not needed by the app or by Vercel. Kept on
+# disk locally for re-provisioning; never published.
+supabase/migrations/20260521000000_invoice_edit_phase1_gl_account_map_and_audit.sql
+supabase/migrations/20260521000001_invoice_edit_phase2_recompute_and_save_fns.sql
