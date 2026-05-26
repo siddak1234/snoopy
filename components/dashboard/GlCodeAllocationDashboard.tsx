@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { StatusPill } from "@/components/dashboard/StatusPill";
+import { UploadInvoiceDialog } from "@/components/dashboard/UploadInvoiceDialog";
 
 // Per-project scoping is enforced at the database layer:
 //   - Both shadow tables (gl_code_allocations, gl_code_line_items) carry a
@@ -222,6 +223,9 @@ export function GlCodeAllocationDashboard({
 
   const [invoices, setInvoices] = useState<Invoice[] | null>(null);
   const [invoicesError, setInvoicesError] = useState<string | null>(null);
+
+  // Upload-invoice popup (frontend only for now; submit is stubbed).
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -580,9 +584,9 @@ export function GlCodeAllocationDashboard({
         title="Invoices"
         rightContent={
           <div className="flex flex-wrap items-center gap-2">
-            {/* TODO(v2): wire onClick to the upload pipeline (file picker → invoice store). */}
             <button
               type="button"
+              onClick={() => setUploadOpen(true)}
               className="btn-primary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm"
             >
               <svg
@@ -675,6 +679,14 @@ export function GlCodeAllocationDashboard({
           </table>
         </div>
       </SectionPanel>
+
+      <UploadInvoiceDialog
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        projectId={projectId}
+        defaultLoungeCode={effectiveLocation || null}
+        locations={locations}
+      />
     </section>
   );
 }
