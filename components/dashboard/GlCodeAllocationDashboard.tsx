@@ -587,29 +587,25 @@ export function GlCodeAllocationDashboard({
             <button
               type="button"
               onClick={() => {
-                // The running-total workflow always adds to the *current*
-                // period for the lounge. If the dashboard is showing an older
-                // period, the new invoice's spend will not land where the user
-                // is looking — warn them so they don't quietly create that
-                // mismatch.
-                const currentKey = periods[0]?.key;
+                // The running-total workflow always adds to whichever period
+                // contains today. If the dashboard is showing a period whose
+                // range ended before today, the new invoice's spend won't land
+                // where the user is looking — warn them so they don't quietly
+                // create that mismatch. Comparing ISO YYYY-MM-DD strings is
+                // safe lexicographically and matches how period_end is stored.
+                const today = new Date().toISOString().slice(0, 10);
+                const selected = periods.find(
+                  (p) => p.key === effectivePeriodKey,
+                );
                 const viewingPast =
-                  !!currentKey &&
-                  !!effectivePeriodKey &&
-                  effectivePeriodKey !== currentKey;
+                  !!selected && selected.period_end < today;
                 if (viewingPast) {
-                  const selected = periods.find(
-                    (p) => p.key === effectivePeriodKey,
+                  const selectedLabel = formatDateRange(
+                    selected.period_start,
+                    selected.period_end,
                   );
-                  const current = periods[0];
-                  const selectedLabel = selected
-                    ? formatDateRange(selected.period_start, selected.period_end)
-                    : "the selected period";
-                  const currentLabel = current
-                    ? formatDateRange(current.period_start, current.period_end)
-                    : "the current period";
                   const ok = window.confirm(
-                    `You're viewing ${selectedLabel}, but new invoices are always added to ${currentLabel} (the current running total). Continue?`,
+                    `You're viewing ${selectedLabel}, but new invoices are always added to the current running total. Continue?`,
                   );
                   if (!ok) return;
                 }
