@@ -586,7 +586,35 @@ export function GlCodeAllocationDashboard({
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => setUploadOpen(true)}
+              onClick={() => {
+                // The running-total workflow always adds to the *current*
+                // period for the lounge. If the dashboard is showing an older
+                // period, the new invoice's spend will not land where the user
+                // is looking — warn them so they don't quietly create that
+                // mismatch.
+                const currentKey = periods[0]?.key;
+                const viewingPast =
+                  !!currentKey &&
+                  !!effectivePeriodKey &&
+                  effectivePeriodKey !== currentKey;
+                if (viewingPast) {
+                  const selected = periods.find(
+                    (p) => p.key === effectivePeriodKey,
+                  );
+                  const current = periods[0];
+                  const selectedLabel = selected
+                    ? formatDateRange(selected.period_start, selected.period_end)
+                    : "the selected period";
+                  const currentLabel = current
+                    ? formatDateRange(current.period_start, current.period_end)
+                    : "the current period";
+                  const ok = window.confirm(
+                    `You're viewing ${selectedLabel}, but new invoices are always added to ${currentLabel} (the current running total). Continue?`,
+                  );
+                  if (!ok) return;
+                }
+                setUploadOpen(true);
+              }}
               className="btn-primary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm"
             >
               <svg
