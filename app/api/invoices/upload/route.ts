@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { Storage, type Bucket } from "@google-cloud/storage";
+import { Storage } from "@google-cloud/storage";
 import { getAppSession } from "@/lib/auth-supabase";
 import { isProjectMember } from "@/lib/project-rbac";
 
 // Manual-upload entry point for the Upload Invoice dialog. Takes a multipart
-// form (file + invoice fields), uploads the PDF to GCS at a manual_uploads/
-// prefix, then POSTs the schema the n8n ingest workflow expects. Mirrors the
-// existing server-side GCS pattern in app/api/invoices/file/route.ts.
+// form (file + invoice fields), routes to one of two GCS bucket / n8n webhook
+// pairs based on whether the projectId is a Claros enterprise project, uploads
+// the PDF, then POSTs the schema the matching n8n workflow expects.
+//
+// Routing summary:
+//   Claros team project  →  GCS_INVOICE_BUCKET   + N8N_INGEST_WEBHOOK_URL
+//   any other project    →  AUTOM8X_GCS_BUCKET   + AUTOM8X_N8N_WEBHOOK_URL
+// Even a Claros employee's personal project routes through the Autom8x flow —
+// the boundary is the project, not the person.
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -15,45 +21,107 @@ export const runtime = "nodejs";
 // Keep in lockstep with MAX_FILE_MB in UploadInvoiceDialog.tsx. 4 MB leaves
 // headroom under Vercel's ~4.5 MB serverless body limit for multipart overhead.
 const MAX_FILE_BYTES = 4 * 1024 * 1024;
+const MAX_DESCRIPTION_LEN = 500;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-// Lazy singleton — same shape as file/route.ts. Module-top init would crash
-// `next build`'s page-data collection where GCP env vars aren't set.
-let cachedBucket: Bucket | null = null;
-function getBucket(): Bucket {
-  if (cachedBucket) return cachedBucket;
+// Claros team project UUIDs. Add to this set if Claros ever stands up another
+// team project that should use the Claros bucket + webhook. Anything not in
+// this set falls through to the Autom8x flow — including personal projects
+// owned by Claros employees.
+const CLAROS_PROJECT_IDS = new Set<string>([
+  "9b5afad3-3ae6-48ba-9e33-648347e81d27",
+]);
+
+// Storage client is shared across both buckets — the service account has
+// object-level access to whichever bucket we name. Lazily initialised so
+// `next build`'s page-data collection (without GCP env vars) doesn't crash.
+let cachedStorage: Storage | null = null;
+function getStorage(): Storage {
+  if (cachedStorage) return cachedStorage;
   const keyB64 = process.env.GCP_SERVICE_ACCOUNT_KEY_BASE64;
-  const bucketName = process.env.GCS_INVOICE_BUCKET;
-  if (!keyB64 || !bucketName) {
-    throw new Error(
-      "Missing GCS env: GCP_SERVICE_ACCOUNT_KEY_BASE64 / GCS_INVOICE_BUCKET",
-    );
+  if (!keyB64) {
+    throw new Error("Missing GCS env: GCP_SERVICE_ACCOUNT_KEY_BASE64");
   }
   const credentials = JSON.parse(
     Buffer.from(keyB64, "base64").toString("utf-8"),
   );
-  const storage = new Storage({
+  cachedStorage = new Storage({
     credentials,
     projectId: credentials.project_id,
   });
-  cachedBucket = storage.bucket(bucketName);
-  return cachedBucket;
+  return cachedStorage;
+}
+
+type IngestConfig = {
+  bucketName: string;
+  webhookUrl: string;
+  webhookSecret: string;
+  // Path prefix under the bucket: Claros keeps the legacy `manual_uploads/...`
+  // layout (matches what the existing Claros workflow already filters on);
+  // Autom8x uploads sit under `<userSlug>/...` so each user's invoices stay
+  // grouped in the new shared bucket.
+  pathPrefix: string;
+};
+
+function resolveIngestConfig(
+  projectId: string,
+  userSlug: string,
+):
+  | { ok: true; config: IngestConfig }
+  | { ok: false; status: number; error: string } {
+  const isClaros = CLAROS_PROJECT_IDS.has(projectId);
+  if (isClaros) {
+    const bucketName = process.env.GCS_INVOICE_BUCKET;
+    const webhookUrl = process.env.N8N_INGEST_WEBHOOK_URL;
+    const webhookSecret = process.env.N8N_INGEST_WEBHOOK_SECRET;
+    if (!bucketName || !webhookUrl || !webhookSecret) {
+      return {
+        ok: false,
+        status: 500,
+        error: "Server not configured for Claros invoice ingest",
+      };
+    }
+    return {
+      ok: true,
+      config: { bucketName, webhookUrl, webhookSecret, pathPrefix: "manual_uploads" },
+    };
+  }
+  const bucketName = process.env.AUTOM8X_GCS_BUCKET;
+  const webhookUrl = process.env.AUTOM8X_N8N_WEBHOOK_URL;
+  const webhookSecret = process.env.AUTOM8X_N8N_WEBHOOK_SECRET;
+  if (!bucketName || !webhookUrl || !webhookSecret) {
+    return {
+      ok: false,
+      status: 503,
+      error: "Workflow not configured for this project",
+    };
+  }
+  return {
+    ok: true,
+    config: { bucketName, webhookUrl, webhookSecret, pathPrefix: userSlug },
+  };
+}
+
+// Build a filesystem-safe folder name from the user's display name, falling
+// back to the email's local-part. Whitespace → underscore; strip anything
+// outside [A-Za-z0-9_-] so the GCS browser stays readable. Final fallback
+// "user" so the path is never empty.
+function buildUserSlug(name: string | null | undefined, email: string): string {
+  const fromName = (name ?? "")
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/[^A-Za-z0-9_-]/g, "");
+  if (fromName) return fromName;
+  const local = (email.split("@")[0] ?? "")
+    .trim()
+    .replace(/[^A-Za-z0-9_-]/g, "_");
+  return local || "user";
 }
 
 export async function POST(req: Request) {
   const session = await getAppSession();
   if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const webhookUrl = process.env.N8N_INGEST_WEBHOOK_URL;
-  const webhookSecret = process.env.N8N_INGEST_WEBHOOK_SECRET;
-  const bucketName = process.env.GCS_INVOICE_BUCKET;
-  if (!webhookUrl || !webhookSecret || !bucketName) {
-    return NextResponse.json(
-      { error: "Server not configured for invoice ingest" },
-      { status: 500 },
-    );
   }
 
   let form: FormData;
@@ -68,7 +136,8 @@ export async function POST(req: Request) {
   const invoiceNumber = String(form.get("invoiceNumber") ?? "").trim();
   const invoiceDate = String(form.get("invoiceDate") ?? "");
   const merchant = String(form.get("merchant") ?? "").trim();
-  const loungeCode = String(form.get("loungeCode") ?? "").trim();
+  const location = String(form.get("location") ?? "").trim();
+  const description = String(form.get("description") ?? "").trim();
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Missing file" }, { status: 400 });
@@ -85,8 +154,14 @@ export async function POST(req: Request) {
   if (!merchant) {
     return NextResponse.json({ error: "Merchant is required" }, { status: 400 });
   }
-  if (!loungeCode) {
-    return NextResponse.json({ error: "Lounge code is required" }, { status: 400 });
+  if (!location) {
+    return NextResponse.json({ error: "Location is required" }, { status: 400 });
+  }
+  if (description.length > MAX_DESCRIPTION_LEN) {
+    return NextResponse.json(
+      { error: `Description must be under ${MAX_DESCRIPTION_LEN} characters` },
+      { status: 400 },
+    );
   }
   if (file.size > MAX_FILE_BYTES) {
     return NextResponse.json({ error: "File must be under 4 MB" }, { status: 400 });
@@ -105,6 +180,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const userSlug = buildUserSlug(session.user.name, session.user.email);
+  const resolved = resolveIngestConfig(projectId, userSlug);
+  if (!resolved.ok) {
+    // Bail before touching GCS — no orphan files when the workflow isn't wired.
+    return NextResponse.json({ error: resolved.error }, { status: resolved.status });
+  }
+  const { bucketName, webhookUrl, webhookSecret, pathPrefix } = resolved.config;
+
   // n8n's schema flows message_id directly into the GCS object path, so it must
   // be unique per upload. internetmessageid mirrors the Outlook Message-ID
   // shape the email pipeline emits so downstream nodes can treat both sources
@@ -117,11 +200,11 @@ export async function POST(req: Request) {
   const yyyy = now.getUTCFullYear();
   const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
   const dd = String(now.getUTCDate()).padStart(2, "0");
-  const objectName = `manual_uploads/${yyyy}/${mm}/${dd}/${messageId}/invoice_0.pdf`;
+  const objectName = `${pathPrefix}/${yyyy}/${mm}/${dd}/${messageId}/invoice_0.pdf`;
   const contentType = "application/pdf";
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const gcsFile = getBucket().file(objectName);
+  const gcsFile = getStorage().bucket(bucketName).file(objectName);
   try {
     await gcsFile.save(buffer, {
       contentType,
@@ -132,7 +215,7 @@ export async function POST(req: Request) {
           uploadedByUserId: session.user.id,
           uploadedByEmail: session.user.email,
           projectId,
-          loungeCode,
+          location,
           merchant,
           invoiceNumber,
           invoiceDate,
@@ -162,7 +245,9 @@ export async function POST(req: Request) {
     internetmessageid: internetMessageId,
     message_id: messageId,
     email: session.user.email,
-    subject: `${loungeCode} - ${merchant} - ${invoiceDate} ${invoiceNumber}`,
+    project_id: projectId,
+    description,
+    subject: `${location} - ${merchant} - ${invoiceDate} ${invoiceNumber}`,
     bucket: bucketName,
     batch_number: 1,
     batch_count: 1,

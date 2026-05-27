@@ -708,7 +708,7 @@ export function GlCodeAllocationDashboard({
         open={uploadOpen}
         onClose={() => setUploadOpen(false)}
         projectId={projectId}
-        defaultLoungeCode={effectiveLocation || null}
+        defaultLocation={effectiveLocation || null}
         locations={locations}
       />
     </section>
