@@ -15,6 +15,7 @@ import { FormError } from "@/components/ui/FormError";
 // overhead doesn't push the request past the limit and the user sees a
 // friendly error instead of a server reject.
 const MAX_FILE_MB = 4;
+const MAX_DESCRIPTION_LEN = 500;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 type CapturedData = {
@@ -22,7 +23,8 @@ type CapturedData = {
   invoiceNumber: string;
   invoiceDate: string;
   merchant: string;
-  loungeCode: string;
+  location: string;
+  description: string;
   fileName: string;
 };
 
@@ -30,32 +32,34 @@ export function UploadInvoiceDialog({
   open,
   onClose,
   projectId,
-  defaultLoungeCode,
+  defaultLocation,
   locations,
 }: {
   open: boolean;
   onClose: () => void;
   projectId: string;
-  /** Pre-selected lounge (the dashboard's current location). */
-  defaultLoungeCode: string | null;
-  /** Known lounges for the dropdown. */
+  /** Pre-selected location (the dashboard's current location filter). */
+  defaultLocation: string | null;
+  /** Known locations surfaced as datalist suggestions. Users can also type a new one. */
   locations: string[];
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
   const [merchant, setMerchant] = useState("");
-  const [loungeCode, setLoungeCode] = useState("");
+  const [location, setLocation] = useState("");
+  const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [captured, setCaptured] = useState<CapturedData | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const firstFieldRef = useRef<HTMLInputElement>(null);
 
-  // Lounge options: known locations plus the default (in case it isn't in the
-  // current period's list), de-duplicated.
-  const loungeOptions = Array.from(
-    new Set([...(defaultLoungeCode ? [defaultLoungeCode] : []), ...locations]),
+  // Suggestions surfaced in the location datalist: known locations plus the
+  // currently-selected one (in case it isn't in the period's list), de-duped.
+  // Free-text input always accepted — the datalist is suggestions only.
+  const locationSuggestions = Array.from(
+    new Set([...(defaultLocation ? [defaultLocation] : []), ...locations]),
   );
 
   const reset = useCallback(() => {
@@ -63,12 +67,13 @@ export function UploadInvoiceDialog({
     setInvoiceNumber("");
     setInvoiceDate("");
     setMerchant("");
-    setLoungeCode(defaultLoungeCode ?? "");
+    setLocation(defaultLocation ?? "");
+    setDescription("");
     setError(null);
     setCaptured(null);
     setSubmitting(false);
     if (fileRef.current) fileRef.current.value = "";
-  }, [defaultLoungeCode]);
+  }, [defaultLocation]);
 
   // Reset on open; focus the first field. reset() is deferred via queueMicrotask
   // so setState isn't called synchronously inside the effect body (matches the
@@ -107,14 +112,17 @@ export function UploadInvoiceDialog({
     if (!invoiceNumber.trim()) return setError("Invoice number is required.");
     if (!ISO_DATE.test(invoiceDate)) return setError("Invoice date is required.");
     if (!merchant.trim()) return setError("Merchant name is required.");
-    if (!loungeCode.trim()) return setError("Lounge code is required.");
+    if (!location.trim()) return setError("Location is required.");
+    if (description.trim().length > MAX_DESCRIPTION_LEN)
+      return setError(`Description must be under ${MAX_DESCRIPTION_LEN} characters.`);
 
     const trimmed: CapturedData = {
       projectId,
       invoiceNumber: invoiceNumber.trim(),
       invoiceDate,
       merchant: merchant.trim(),
-      loungeCode: loungeCode.trim(),
+      location: location.trim(),
+      description: description.trim(),
       fileName: file.name,
     };
 
@@ -124,7 +132,8 @@ export function UploadInvoiceDialog({
     fd.append("invoiceNumber", trimmed.invoiceNumber);
     fd.append("invoiceDate", trimmed.invoiceDate);
     fd.append("merchant", trimmed.merchant);
-    fd.append("loungeCode", trimmed.loungeCode);
+    fd.append("location", trimmed.location);
+    fd.append("description", trimmed.description);
 
     setSubmitting(true);
     try {
@@ -170,7 +179,10 @@ export function UploadInvoiceDialog({
             <Row label="Invoice #" value={captured.invoiceNumber} />
             <Row label="Date" value={captured.invoiceDate} />
             <Row label="Merchant" value={captured.merchant} />
-            <Row label="Lounge" value={captured.loungeCode} />
+            <Row label="Location" value={captured.location} />
+            {captured.description ? (
+              <Row label="Description" value={captured.description} />
+            ) : null}
           </dl>
           <div className="mt-6 flex flex-wrap gap-2">
             <button type="button" onClick={onClose} className="btn-primary inline-flex px-5">
@@ -238,37 +250,50 @@ export function UploadInvoiceDialog({
               autoComplete="off"
             />
 
-            {/* Lounge code — dropdown of known lounges, defaulting to current */}
+            {/* Location — datalist combobox: type free-form or pick from
+                known locations. Browser handles substring filtering as the
+                user types. */}
             <div>
-              <label htmlFor="upload-lounge" className="block text-sm font-medium text-[var(--text)]">
-                Lounge code <span className="text-[var(--muted)]">(required)</span>
+              <label htmlFor="upload-location" className="block text-sm font-medium text-[var(--text)]">
+                Location <span className="text-[var(--muted)]">(required)</span>
               </label>
-              {loungeOptions.length > 0 ? (
-                <select
-                  id="upload-lounge"
-                  value={loungeCode}
-                  onChange={(e) => setLoungeCode(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] cursor-pointer"
-                >
-                  <option value="" disabled>
-                    Select lounge
-                  </option>
-                  {loungeOptions.map((l) => (
-                    <option key={l} value={l}>
-                      {l}
-                    </option>
+              <input
+                id="upload-location"
+                type="text"
+                list="upload-location-options"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                autoComplete="off"
+                className="mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                placeholder="e.g. Air France, Portland, Home Office"
+              />
+              {locationSuggestions.length > 0 ? (
+                <datalist id="upload-location-options">
+                  {locationSuggestions.map((l) => (
+                    <option key={l} value={l} />
                   ))}
-                </select>
-              ) : (
-                <input
-                  id="upload-lounge"
-                  type="text"
-                  value={loungeCode}
-                  onChange={(e) => setLoungeCode(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                  placeholder="e.g. Air France"
-                />
-              )}
+                </datalist>
+              ) : null}
+            </div>
+
+            {/* Description — optional context for the workflow. Capped at
+                MAX_DESCRIPTION_LEN so the n8n payload stays light. */}
+            <div>
+              <label htmlFor="upload-description" className="block text-sm font-medium text-[var(--text)]">
+                Description <span className="text-[var(--muted)]">(optional)</span>
+              </label>
+              <textarea
+                id="upload-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value.slice(0, MAX_DESCRIPTION_LEN))}
+                maxLength={MAX_DESCRIPTION_LEN}
+                rows={3}
+                className="mt-1.5 w-full resize-y rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                placeholder="What is this invoice for? (e.g. client dinner with Acme in Portland)"
+              />
+              <p className="mt-1 text-right text-[11px] text-[var(--muted)] tabular-nums">
+                {description.length}/{MAX_DESCRIPTION_LEN}
+              </p>
             </div>
 
             <FormError message={error} />
