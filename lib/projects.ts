@@ -7,6 +7,7 @@ import {
   type ProjectScope,
   type ProjectType,
 } from "@/lib/project-types";
+import { seedGeneralGlCodesForProject } from "@/lib/gl-codes";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -431,6 +432,13 @@ export async function createProject(
     await tx.projectMembership.create({
       data: { projectId: created.id, userId, role: "owner" },
     });
+
+    // Seed the general 28-row chart of accounts into gl_account_map so the
+    // invoice-detail dropdown has options to choose from out of the box. Skipped
+    // automatically for Claros team project IDs (defensive — they already have
+    // their own 80-row chart). Runs inside the same transaction: if seeding
+    // fails, the whole project create rolls back.
+    await seedGeneralGlCodesForProject(tx, created.id);
 
     return [created];
   });
