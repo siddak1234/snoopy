@@ -1,33 +1,49 @@
 import { NextResponse } from "next/server";
-import { Storage, type Bucket } from "@google-cloud/storage";
+import { Storage } from "@google-cloud/storage";
 import { getAppSession } from "@/lib/auth-supabase";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Lazy singleton. Initialized on first request and reused across warm lambda
-// invocations. Module-top init would crash `next build`'s page-data collection,
-// where GCP env vars aren't set.
-let cachedBucket: Bucket | null = null;
-function getBucket(): Bucket {
-  if (cachedBucket) return cachedBucket;
+// Bucket routing is keyed off the GCS object-key prefix, NOT the project ID.
+// The upload route writes Claros files under these two prefixes; everything
+// else (manual uploads from personal/team projects) lives under the user-slug
+// prefix in the Autom8x bucket. Keeping the routing data-driven means this
+// route needs no awareness of which projects are Claros vs. general.
+const CLAROS_PATH_PREFIXES = ["manual_uploads/", "new_invoices/"];
+
+// Storage client is shared across both buckets — the service account has
+// object-level access to whichever bucket we name. Lazily initialised so
+// `next build`'s page-data collection (without GCP env vars) doesn't crash.
+let cachedStorage: Storage | null = null;
+function getStorage(): Storage {
+  if (cachedStorage) return cachedStorage;
   const keyB64 = process.env.GCP_SERVICE_ACCOUNT_KEY_BASE64;
-  const bucketName = process.env.GCS_INVOICE_BUCKET;
-  if (!keyB64 || !bucketName) {
-    throw new Error(
-      "Missing GCS env: GCP_SERVICE_ACCOUNT_KEY_BASE64 / GCS_INVOICE_BUCKET",
-    );
+  if (!keyB64) {
+    throw new Error("Missing GCS env: GCP_SERVICE_ACCOUNT_KEY_BASE64");
   }
   const credentials = JSON.parse(
     Buffer.from(keyB64, "base64").toString("utf-8"),
   );
-  const storage = new Storage({
+  cachedStorage = new Storage({
     credentials,
     projectId: credentials.project_id,
   });
-  cachedBucket = storage.bucket(bucketName);
-  return cachedBucket;
+  return cachedStorage;
+}
+
+function bucketForObjectKey(objectKey: string): string {
+  const isClarosPath = CLAROS_PATH_PREFIXES.some((p) => objectKey.startsWith(p));
+  const bucketName = isClarosPath
+    ? process.env.GCS_INVOICE_BUCKET
+    : process.env.AUTOM8X_GCS_BUCKET;
+  if (!bucketName) {
+    throw new Error(
+      `Missing GCS bucket env for ${isClarosPath ? "Claros" : "Autom8x"} path`,
+    );
+  }
+  return bucketName;
 }
 
 export async function GET(req: Request) {
@@ -67,13 +83,17 @@ export async function GET(req: Request) {
   // The DB stores filenames URL-encoded (e.g. "new_invoices%2F2026%2F04%2F...").
   // GCS object names use real slashes, so decode once before signing.
   const objectKey = decodeURIComponent(filename);
+  const bucketName = bucketForObjectKey(objectKey);
 
   try {
-    const [signedUrl] = await getBucket().file(objectKey).getSignedUrl({
-      version: "v4",
-      action: "read",
-      expires: Date.now() + 5 * 60 * 1000,
-    });
+    const [signedUrl] = await getStorage()
+      .bucket(bucketName)
+      .file(objectKey)
+      .getSignedUrl({
+        version: "v4",
+        action: "read",
+        expires: Date.now() + 5 * 60 * 1000,
+      });
     return NextResponse.redirect(signedUrl, 307);
   } catch (err) {
     console.error("INVOICE_FILE_SIGN_FAIL", (err as Error).message);
