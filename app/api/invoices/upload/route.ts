@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { Storage } from "@google-cloud/storage";
 import { getAppSession } from "@/lib/auth-supabase";
 import { isProjectMember } from "@/lib/project-rbac";
+import {client-bPROJECT_IDS } from "@/lib/client-b";
 
 // Manual-upload entry point for the Upload Invoice dialog. Takes a multipart
 // form (file + invoice fields), routes to one of two GCS bucket / n8n webhook
@@ -23,14 +24,6 @@ export const runtime = "nodejs";
 const MAX_FILE_BYTES = 4 * 1024 * 1024;
 const MAX_DESCRIPTION_LEN = 500;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
-// client-b team project UUIDs. Add to this set if client-b ever stands up another
-// team project that should use the client-b bucket + webhook. Anything not in
-// this set falls through to the Autom8x flow — including personal projects
-// owned by client-b employees.
-constclient-bPROJECT_IDS = new Set<string>([
-  "9b5afad3-3ae6-48ba-9e33-648347e81d27",
-]);
 
 // Storage client is shared across both buckets — the service account has
 // object-level access to whichever bucket we name. Lazily initialised so
