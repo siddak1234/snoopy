@@ -6,6 +6,9 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { UploadInvoiceDialog } from "@/components/dashboard/UploadInvoiceDialog";
+import { FlaggedItemsModal } from "@/components/dashboard/FlaggedItemsModal";
+import type { FlaggedItem } from "@/lib/flagged-invoices";
+import { summarizeFlagCounts, totalOvercount } from "@/lib/flagged-invoices";
 
 // Per-project scoping is enforced at the database layer:
 //   - Both shadow tables (gl_code_allocations, gl_code_line_items) carry a
@@ -227,6 +230,11 @@ export function GlCodeAllocationDashboard({
   // Upload-invoice popup (frontend only for now; submit is stubbed).
   const [uploadOpen, setUploadOpen] = useState(false);
 
+  // Flagged-for-Review state.
+  const [flagged, setFlagged] = useState<FlaggedItem[] | null>(null);
+  const [flaggedError, setFlaggedError] = useState<string | null>(null);
+  const [flaggedOpen, setFlaggedOpen] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -377,6 +385,36 @@ export function GlCodeAllocationDashboard({
       }
       setInvoicesError(null);
       setInvoices((data ?? []) as Invoice[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, projectId, effectivePeriodKey, effectiveLocation]);
+
+  // Flagged-for-Review items via the flagged_invoices_for_project RPC. Same
+  // cancellation pattern as the other effects. Refetches whenever the period
+  // or location changes; gives the KPI tile a live count.
+  useEffect(() => {
+    if (!effectivePeriodKey || !effectiveLocation) return;
+    const [period_start, period_end] = effectivePeriodKey.split("|");
+    let cancelled = false;
+    (async () => {
+      const { data, error: rpcError } = await supabase.rpc(
+        "flagged_invoices_for_project",
+        {
+          p_project_id: projectId,
+          p_lounge_code: effectiveLocation,
+          p_period_start: period_start,
+          p_period_end: period_end,
+        },
+      );
+      if (cancelled) return;
+      if (rpcError) {
+        setFlaggedError("Could not load flagged items.");
+        return;
+      }
+      setFlaggedError(null);
+      setFlagged((data ?? []) as FlaggedItem[]);
     })();
     return () => {
       cancelled = true;
@@ -538,10 +576,11 @@ export function GlCodeAllocationDashboard({
               : "Vendor breakdown coming soon"
           }
         />
-        <KpiTile
-          label="Flagged for review"
-          value={null}
-          subtext="Confidence scoring coming soon"
+        <FlaggedKpiTile
+          flagged={flagged}
+          error={flaggedError}
+          disabled={!effectivePeriodKey || !effectiveLocation}
+          onClick={() => setFlaggedOpen(true)}
         />
       </div>
 
@@ -711,7 +750,80 @@ export function GlCodeAllocationDashboard({
         defaultLocation={effectiveLocation || null}
         locations={locations}
       />
+
+      {effectivePeriodKey && effectiveLocation ? (
+        <FlaggedItemsModal
+          open={flaggedOpen}
+          onClose={() => setFlaggedOpen(false)}
+          projectId={projectId}
+          loungeCode={effectiveLocation}
+          periodStart={effectivePeriodKey.split("|")[0]}
+          periodEnd={effectivePeriodKey.split("|")[1]}
+          items={flagged ?? []}
+        />
+      ) : null}
     </section>
+  );
+}
+
+// KPI tile for "Flagged for review" — wraps KpiTile with click-to-open
+// behavior and warning-style accents when count > 0. Disabled when there's
+// no period/location selected (so the click does nothing during initial load).
+function FlaggedKpiTile({
+  flagged,
+  error,
+  disabled,
+  onClick,
+}: {
+  flagged: FlaggedItem[] | null;
+  error: string | null;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  if (error) {
+    return (
+      <KpiTile label="Flagged for review" value={null} subtext={error} />
+    );
+  }
+  if (disabled || flagged === null) {
+    return (
+      <KpiTile
+        label="Flagged for review"
+        value={null}
+        subtext={disabled ? "Select a period and location" : "Scanning…"}
+      />
+    );
+  }
+  const count = flagged.length;
+  const subtext = count === 0 ? "All clear" : summarizeFlagCounts(flagged);
+  const over = totalOvercount(flagged);
+  const subtextFull = over > 0 ? `${subtext} · ${currencyFmt.format(over)} over-count` : subtext;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={count === 0}
+      className={
+        count > 0
+          ? "rounded-xl border border-[var(--warning-border)] bg-[var(--warning-bg)] p-4 text-left transition hover:bg-[var(--warning-bg)]/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] cursor-pointer"
+          : "rounded-xl border border-[var(--ring)] bg-[var(--card)] p-4 text-left disabled:cursor-default"
+      }
+    >
+      <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
+        Flagged for review
+      </p>
+      <p
+        className={
+          count > 0
+            ? "mt-1.5 text-2xl font-semibold text-[var(--warning-text)]"
+            : "mt-1.5 text-2xl font-semibold text-[var(--text)]"
+        }
+      >
+        {count}
+      </p>
+      <p className="mt-1 text-[11px] text-[var(--muted)]">{subtextFull}</p>
+    </button>
   );
 }
 
