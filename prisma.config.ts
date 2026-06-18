@@ -24,9 +24,14 @@ dotenv.config({ path: ".env", override: false, quiet: true });
 let raw =
   process.env.POSTGRES_URL?.trim() || process.env.POSTGRES_PRISMA_URL?.trim();
 if (!raw) {
-  throw new Error(
-    "Prisma needs POSTGRES_URL or POSTGRES_PRISMA_URL in .env.local."
-  );
+  // `prisma generate` runs in postinstall on every deploy — including Vercel
+  // Preview / CI environments where the DB connection vars aren't present.
+  // generate only reads schema.prisma; it never connects. So fall back to a
+  // non-routable placeholder instead of throwing, which would otherwise crash
+  // `npm install` before the build even starts. Migration commands run with
+  // the real env set; if one is ever run without it, the placeholder surfaces
+  // a clear connection error rather than a config-load failure.
+  raw = "postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder";
 }
 
 if (raw.includes("pooler.supabase.com") && raw.includes("6543")) {
