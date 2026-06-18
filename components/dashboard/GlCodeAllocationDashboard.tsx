@@ -5,6 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { StatusPill } from "@/components/dashboard/StatusPill";
+import {
+  KpiTile,
+  ClickableKpiTile,
+  FilterPill,
+  SectionPanel,
+  BreakdownList,
+  RankedList,
+  EmptyMessage,
+} from "@/components/dashboard/DashboardKit";
 import { UploadInvoiceDialog } from "@/components/dashboard/UploadInvoiceDialog";
 import { FlaggedItemsModal } from "@/components/dashboard/FlaggedItemsModal";
 import type { FlaggedItem } from "@/lib/flagged-invoices";
@@ -113,16 +122,6 @@ type Invoice = {
   status: string | null;
   created_at: string; // ISO timestamp
 };
-
-// Color palette cycled across the top categories. Last entry (--muted) is
-// reserved for the "Other" rollup so it visually recedes.
-const CATEGORY_COLORS = [
-  "var(--accent-strong)",
-  "var(--success-text)",
-  "var(--warning-text)",
-  "var(--accent)",
-  "var(--link)",
-] as const;
 
 const currencyFmt = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -597,9 +596,10 @@ export function GlCodeAllocationDashboard({
           {!categoryBreakdown || categoryBreakdown.items.length === 0 ? (
             <EmptyMessage text="No category spend recorded for this selection." />
           ) : (
-            <CategoryBreakdownList
+            <BreakdownList
               items={categoryBreakdown.items}
               total={categoryBreakdown.total}
+              formatValue={(n) => currencyFmt.format(n)}
             />
           )}
         </SectionPanel>
@@ -613,7 +613,25 @@ export function GlCodeAllocationDashboard({
           ) : vendors.length === 0 ? (
             <EmptyMessage text="No vendor activity this period." />
           ) : (
-            <VendorsList vendors={vendors} />
+            <RankedList
+              items={vendors.map((v, i) => {
+                const total = Number(v.total_spend);
+                const isNegative = total < 0;
+                const count = Number(v.invoice_count);
+                return {
+                  key: `${v.merchant ?? "__unknown"}-${i}`,
+                  title: v.merchant ?? "(Unknown vendor)",
+                  subtitle:
+                    count === 1
+                      ? "1 invoice"
+                      : `${integerFmt.format(count)} invoices`,
+                  value: currencyFmt.format(total),
+                  valueClassName: isNegative
+                    ? "text-[var(--error-text-muted)]"
+                    : "text-[var(--text)]",
+                };
+              })}
+            />
           )}
         </SectionPanel>
       </div>
@@ -800,172 +818,14 @@ function FlaggedKpiTile({
   const subtextFull = over > 0 ? `${subtext} · ${currencyFmt.format(over)} over-count` : subtext;
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <ClickableKpiTile
+      label="Flagged for review"
+      value={count}
+      subtext={subtextFull}
+      highlighted={count > 0}
       disabled={count === 0}
-      className={
-        count > 0
-          ? "rounded-xl border border-[var(--warning-border)] bg-[var(--warning-bg)] p-4 text-left transition hover:bg-[var(--warning-bg)]/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] cursor-pointer"
-          : "rounded-xl border border-[var(--ring)] bg-[var(--card)] p-4 text-left disabled:cursor-default"
-      }
-    >
-      <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
-        Flagged for review
-      </p>
-      <p
-        className={
-          count > 0
-            ? "mt-1.5 text-2xl font-semibold text-[var(--warning-text)]"
-            : "mt-1.5 text-2xl font-semibold text-[var(--text)]"
-        }
-      >
-        {count}
-      </p>
-      <p className="mt-1 text-[11px] text-[var(--muted)]">{subtextFull}</p>
-    </button>
-  );
-}
-
-function FilterPill({
-  label,
-  value,
-  onChange,
-  options,
-  placeholder,
-  disabled,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-  placeholder: string;
-  disabled?: boolean;
-}) {
-  const id = `filter-${label.toLowerCase().replace(/\s+/g, "-")}`;
-  const displayed = options.find((o) => o.value === value)?.label;
-
-  return (
-    <div
-      className={`relative flex items-center justify-between gap-3 rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 ${
-        disabled ? "opacity-60" : ""
-      }`}
-    >
-      <div className="min-w-0 flex-1">
-        <div className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
-          {label}
-        </div>
-        <div className="mt-0.5 truncate text-sm font-medium text-[var(--text)]">
-          {displayed ?? (
-            <span className="text-[var(--muted)]">{placeholder}</span>
-          )}
-        </div>
-      </div>
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden
-        className="shrink-0 text-[var(--muted)]"
-      >
-        <polyline points="6 9 12 15 18 9" />
-      </svg>
-      <label htmlFor={id} className="sr-only">
-        {label}
-      </label>
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        className="absolute inset-0 cursor-pointer appearance-none bg-transparent text-transparent opacity-0 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] rounded-xl"
-        aria-label={label}
-      >
-        <option value="" disabled>
-          {placeholder}
-        </option>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function KpiTile({
-  label,
-  value,
-  delta,
-  subtext,
-}: {
-  label: string;
-  value: string | null;
-  delta?: { text: string; positive: boolean } | null;
-  subtext?: string | null;
-}) {
-  return (
-    <div className="rounded-xl border border-[var(--ring)] bg-[var(--card)] p-4">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
-        {label}
-      </p>
-      <p
-        className={
-          value == null
-            ? "mt-1.5 text-2xl font-semibold text-[var(--muted)]"
-            : "mt-1.5 text-2xl font-semibold text-[var(--text)]"
-        }
-      >
-        {value ?? "—"}
-      </p>
-      {delta ? (
-        <p
-          className={
-            delta.positive
-              ? "mt-1 text-[11px] text-[var(--success-text)]"
-              : "mt-1 text-[11px] text-[var(--error-text)]"
-          }
-        >
-          {delta.text}
-        </p>
-      ) : subtext ? (
-        <p className="mt-1 text-[11px] text-[var(--muted)]">{subtext}</p>
-      ) : null}
-    </div>
-  );
-}
-
-function SectionPanel({
-  title,
-  rightLabel,
-  rightContent,
-  children,
-}: {
-  title: string;
-  rightLabel?: string;
-  /** Use for richer right-side content (button row, search, etc). Wins over `rightLabel`. */
-  rightContent?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-xl border border-[var(--ring)] bg-[var(--card)] p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h4 className="text-sm font-semibold text-[var(--text)]">{title}</h4>
-        {rightContent
-          ? rightContent
-          : rightLabel
-            ? <span className="text-[11px] text-[var(--muted)]">{rightLabel}</span>
-            : null}
-      </div>
-      {children}
-    </div>
+      onClick={onClick}
+    />
   );
 }
 
@@ -1034,95 +894,3 @@ function InvoiceRow({
   );
 }
 
-function VendorsList({ vendors }: { vendors: TopVendor[] }) {
-  return (
-    <ul className="flex flex-col gap-3">
-      {vendors.map((v, i) => {
-        const total = Number(v.total_spend);
-        const isNegative = total < 0;
-        const count = Number(v.invoice_count);
-        const merchantLabel = v.merchant ?? "(Unknown vendor)";
-        return (
-          <li
-            key={`${v.merchant ?? "__unknown"}-${i}`}
-            className="flex items-center justify-between gap-3"
-          >
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-[var(--text)]">
-                {merchantLabel}
-              </p>
-              <p className="text-[10px] text-[var(--muted)]">
-                {count === 1 ? "1 invoice" : `${integerFmt.format(count)} invoices`}
-              </p>
-            </div>
-            <p
-              className={
-                isNegative
-                  ? "shrink-0 text-sm font-semibold tabular-nums text-[var(--error-text-muted)]"
-                  : "shrink-0 text-sm font-semibold tabular-nums text-[var(--text)]"
-              }
-            >
-              {currencyFmt.format(total)}
-            </p>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function CategoryBreakdownList({
-  items,
-  total,
-}: {
-  items: CategoryItem[];
-  total: number;
-}) {
-  return (
-    <div className="flex flex-col gap-2.5">
-      {items.map((item, i) => {
-        const pct = total > 0 ? (item.amount / total) * 100 : 0;
-        const isOther = item.key === "__other";
-        const color = isOther
-          ? "var(--muted)"
-          : CATEGORY_COLORS[i % CATEGORY_COLORS.length];
-        return (
-          <div key={item.key}>
-            <div className="flex items-center justify-between gap-3 text-xs">
-              <span
-                className={
-                  isOther
-                    ? "truncate text-[var(--muted)]"
-                    : "truncate text-[var(--text)]"
-                }
-              >
-                {item.label}
-              </span>
-              <span className="shrink-0 tabular-nums text-[var(--muted)]">
-                {currencyFmt.format(item.amount)}{" "}
-                <span style={{ color }}>{pct.toFixed(1)}%</span>
-              </span>
-            </div>
-            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--surface-strong)]">
-              <div
-                className="h-full"
-                style={{
-                  width: `${Math.min(100, pct)}%`,
-                  backgroundColor: color,
-                }}
-              />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function EmptyMessage({ text }: { text: string }) {
-  return (
-    <div className="flex min-h-[140px] items-center justify-center px-4 text-center text-xs text-[var(--muted)]">
-      {text}
-    </div>
-  );
-}
