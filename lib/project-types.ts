@@ -1,9 +1,6 @@
 export const PROJECT_TYPES = [
-  "Invoice Processing",
-  "Document Review",
-  "Data Entry Automation",
   "GL Code Classification",
-  "Custom Workflow",
+  "Resume Reviewer",
 ] as const;
 
 export type ProjectType = (typeof PROJECT_TYPES)[number];
