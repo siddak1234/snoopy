@@ -17,6 +17,7 @@ import { GlCodeAllocationDashboard } from "@/components/dashboard/GlCodeAllocati
 import type { AvailableMember } from "@/components/dashboard/ProjectMemberPicker";
 
 const GL_CODE_PROJECT_TYPE = "GL Code Classification";
+const RESUME_REVIEWER_PROJECT_TYPE = "Resume Reviewer";
 
 export default async function ProjectDetailPage({
   params,
@@ -116,6 +117,20 @@ export default async function ProjectDetailPage({
       {project.type === GL_CODE_PROJECT_TYPE ? (
         <div className="py-5 first:pt-0">
           <GlCodeAllocationDashboard projectId={project.id} />
+        </div>
+      ) : null}
+
+      {project.type === RESUME_REVIEWER_PROJECT_TYPE ? (
+        <div className="py-5 first:pt-0">
+          <div className="rounded-xl border border-[var(--ring)] bg-[var(--card)] px-5 py-8 text-center">
+            <h2 className="text-base font-semibold text-[var(--text)]">
+              Resume Reviewer
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--muted)]">
+              This workspace is coming soon. You&apos;ll be able to upload
+              resumes and get structured reviews here.
+            </p>
+          </div>
         </div>
       ) : null}
 
