@@ -88,8 +88,8 @@ export async function POST(req: Request) {
   // Fixed resumes bucket (constant, not env) + the webhook URL/secret, which ARE
   // env vars (a URL and a secret — real config/credentials, unlike a bucket name).
   const bucketName = RESUME_BUCKET;
-  const webhookUrl = process.env.CANDIDATE_N8N_WEBHOOK_URL;
-  const webhookSecret = process.env.CANDIDATE_N8N_WEBHOOK_SECRET;
+  const webhookUrl = process.env.N8N_CANDIDATE_WEBHOOK_URL;
+  const webhookSecret = process.env.N8N_CANDIDATE_WEBHOOK_SECRET;
   if (!webhookUrl || !webhookSecret) {
     // Bail before touching GCS so we never orphan a file when the pipeline
     // isn't fully configured.
