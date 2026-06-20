@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   KpiTile,
   ClickableKpiTile,
@@ -11,19 +13,24 @@ import {
   DecisionPill,
   EmptyMessage,
 } from "@/components/dashboard/DashboardKit";
+import { UploadCandidateDialog } from "@/components/dashboard/UploadCandidateDialog";
+import { CreatePostingDialog } from "@/components/dashboard/CreatePostingDialog";
 import {
   MOCK_CANDIDATES,
   DECISION_ORDER,
   DECISION_BAR_COLOR,
   DECISION_TEXT_CLASS,
   initials,
+  makePendingCandidate,
   type Candidate,
 } from "@/lib/resume-candidates";
+import { MOCK_POSTINGS, makePosting, type Posting } from "@/lib/job-postings";
 
 // Resume Reviewer dashboard. Mirrors the GL Code Allocation dashboard's layout
 // and reuses the same presentational primitives (DashboardKit) — only the data
-// and wiring differ. Data is MOCK for now (see lib/resume-candidates.ts) and
-// the Export / Upload buttons are stubs.
+// and wiring differ. Data is MOCK for now (see lib/resume-candidates.ts): the
+// candidate list lives in local state seeded from MOCK_CANDIDATES so the
+// "Upload candidate" modal can add rows. The Export button is still a stub.
 
 const integerFmt = new Intl.NumberFormat("en-US");
 const dateFmt = new Intl.DateTimeFormat("en-US", {
@@ -39,23 +46,40 @@ function uniqueSorted(values: string[]): string[] {
 export function ResumeReviewerDashboard({
   projectId,
 }: {
-  // Accepted for parity with GlCodeAllocationDashboard and so the real
-  // (project-scoped) data source can drop in later without a signature change.
+  // Used to build candidate-detail hrefs; also keeps parity with
+  // GlCodeAllocationDashboard so the real data source drops in unchanged.
   projectId: string;
 }) {
-  void projectId;
-
+  // Candidate + posting lists in local state, seeded from mocks. The upload /
+  // posting modals prepend to these; the real (project-scoped) source drops in
+  // here later.
+  const [candidates, setCandidates] = useState<Candidate[]>(MOCK_CANDIDATES);
+  const [postings, setPostings] = useState<Posting[]>(MOCK_POSTINGS);
   const [pickedRole, setPickedRole] = useState<string>("");
   const [pickedCompany, setPickedCompany] = useState<string>("");
   const [query, setQuery] = useState<string>("");
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [postingOpen, setPostingOpen] = useState(false);
 
+  // Filter options come from postings AND candidates, so a brand-new posting
+  // with zero candidates is still selectable. Seeded postings match the seeded
+  // candidate combos, so these lists are unchanged until a new posting is added.
   const roles = useMemo(
-    () => uniqueSorted(MOCK_CANDIDATES.map((c) => c.role)),
-    [],
+    () =>
+      uniqueSorted([
+        ...postings.map((p) => p.role),
+        ...candidates.map((c) => c.role),
+      ]),
+    [postings, candidates],
   );
+  // The "department" axis (Candidate.company === Posting.department).
   const companies = useMemo(
-    () => uniqueSorted(MOCK_CANDIDATES.map((c) => c.company)),
-    [],
+    () =>
+      uniqueSorted([
+        ...postings.map((p) => p.department),
+        ...candidates.map((c) => c.company),
+      ]),
+    [postings, candidates],
   );
 
   const effectiveRole = roles.includes(pickedRole) ? pickedRole : roles[0] ?? "";
@@ -66,34 +90,41 @@ export function ResumeReviewerDashboard({
   // Candidates in scope for the current role + company selection.
   const scoped = useMemo(
     () =>
-      MOCK_CANDIDATES.filter(
+      candidates.filter(
         (c) => c.role === effectiveRole && c.company === effectiveCompany,
       ),
-    [effectiveRole, effectiveCompany],
+    [candidates, effectiveRole, effectiveCompany],
   );
 
   const total = scoped.length;
   const newThisWeek = scoped.filter((c) => c.newThisWeek).length;
-  const advanceCount = scoped.filter((c) => c.decision === "Advance").length;
+  // Decision-based aggregates exclude `pending` (not yet scored) candidates so
+  // existing mock output is byte-identical until a pending row is added.
+  const decidedCount = scoped.filter((c) => !c.pending).length;
+  const advanceCount = scoped.filter(
+    (c) => !c.pending && c.decision === "Advance",
+  ).length;
   const needsReview = scoped.filter((c) => c.flagged).length;
   const advancePct = total > 0 ? Math.round((advanceCount / total) * 100) : 0;
 
-  // Decision breakdown — one bar per outcome, colored per decision.
+  // Decision breakdown — one bar per outcome, colored per decision. Percentages
+  // are over decided candidates only (pending excluded from numerator + total).
   const breakdownItems = useMemo(
     () =>
       DECISION_ORDER.map((d) => ({
         key: d,
         label: d,
-        amount: scoped.filter((c) => c.decision === d).length,
+        amount: scoped.filter((c) => !c.pending && c.decision === d).length,
         color: DECISION_BAR_COLOR[d],
       })),
     [scoped],
   );
 
-  // Top candidates by fit score (descending), top 3.
+  // Top candidates by fit score (descending), top 3 — pending excluded.
   const topItems = useMemo(
     () =>
-      [...scoped]
+      scoped
+        .filter((c) => !c.pending)
         .sort((a, b) => b.fitScore - a.fitScore)
         .slice(0, 3)
         .map((c) => ({
@@ -105,6 +136,41 @@ export function ResumeReviewerDashboard({
         })),
     [scoped],
   );
+
+  // Add an uploaded candidate to the current role + company scope (mock).
+  function handleAddCandidate({ name }: { name: string }) {
+    setCandidates((prev) => [
+      makePendingCandidate({
+        id: crypto.randomUUID(),
+        name,
+        role: effectiveRole,
+        company: effectiveCompany,
+        appliedAt: new Date().toISOString().slice(0, 10),
+      }),
+      ...prev,
+    ]);
+  }
+
+  // Create a posting (mock) and jump the filters to it so the user lands on the
+  // new (empty) opening, ready to upload candidates.
+  function handleCreatePosting(input: {
+    role: string;
+    department: string;
+    jobDescriptionFileName: string;
+  }) {
+    setPostings((prev) => [
+      makePosting({
+        id: crypto.randomUUID(),
+        role: input.role,
+        department: input.department,
+        jobDescriptionFileName: input.jobDescriptionFileName,
+        createdAt: new Date().toISOString().slice(0, 10),
+      }),
+      ...prev,
+    ]);
+    setPickedRole(input.role);
+    setPickedCompany(input.department);
+  }
 
   // Table rows: most recent applications first, then client-side search.
   const rows = useMemo(() => {
@@ -123,7 +189,7 @@ export function ResumeReviewerDashboard({
 
   return (
     <section aria-label="Candidate dashboard" className="flex flex-col gap-5">
-      {/* Header: title + export */}
+      {/* Header: title + actions */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold text-[var(--text)]">
@@ -134,29 +200,52 @@ export function ResumeReviewerDashboard({
             available
           </p>
         </div>
-        <button
-          type="button"
-          title="Coming soon"
-          onClick={() => {}}
-          className="btn-primary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPostingOpen(true)}
+            className="btn-primary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm"
           >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          Export shortlist
-        </button>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            New job posting
+          </button>
+          <button
+            type="button"
+            title="Coming soon"
+            onClick={() => {}}
+            className="btn-secondary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Export shortlist
+          </button>
+        </div>
       </div>
 
       {/* Filter pills */}
@@ -169,11 +258,11 @@ export function ResumeReviewerDashboard({
           placeholder="Select a role"
         />
         <FilterPill
-          label="Company / Department"
+          label="Department"
           value={effectiveCompany}
           onChange={setPickedCompany}
           options={companies.map((c) => ({ value: c, label: c }))}
-          placeholder="Select a company"
+          placeholder="Select a department"
         />
       </div>
 
@@ -211,7 +300,7 @@ export function ResumeReviewerDashboard({
           ) : (
             <BreakdownList
               items={breakdownItems}
-              total={total}
+              total={decidedCount}
               formatValue={(n) => integerFmt.format(n)}
               pctDigits={0}
             />
@@ -233,8 +322,7 @@ export function ResumeReviewerDashboard({
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              title="Coming soon"
-              onClick={() => {}}
+              onClick={() => setUploadOpen(true)}
               className="btn-primary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm"
             >
               <svg
@@ -293,27 +381,66 @@ export function ResumeReviewerDashboard({
                     colSpan={4}
                     className="px-3 py-10 text-center text-xs text-[var(--muted)]"
                   >
-                    No candidates match your search.
+                    {query.trim()
+                      ? "No candidates match your search."
+                      : "No candidates yet — upload the first."}
                   </td>
                 </tr>
               ) : (
-                rows.map((c) => <CandidateRow key={c.id} candidate={c} />)
+                rows.map((c) => (
+                  <CandidateRow key={c.id} candidate={c} projectId={projectId} />
+                ))
               )}
             </tbody>
           </table>
         </div>
       </SectionPanel>
+
+      {/* Upload modal — Role + Company/Department are inherited from the current
+          filter selection (read-only in the modal), so only name + resume PDF
+          are asked. */}
+      <UploadCandidateDialog
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        projectId={projectId}
+        role={effectiveRole}
+        company={effectiveCompany}
+        onAdd={handleAddCandidate}
+      />
+
+      {/* New-posting modal — opens a (role, department) scope candidates can be
+          uploaded into. Departments come from the current option list. */}
+      <CreatePostingDialog
+        open={postingOpen}
+        onClose={() => setPostingOpen(false)}
+        departments={companies}
+        onCreate={handleCreatePosting}
+      />
     </section>
   );
 }
 
-function CandidateRow({ candidate }: { candidate: Candidate }) {
+function CandidateRow({
+  candidate,
+  projectId,
+}: {
+  candidate: Candidate;
+  projectId: string;
+}) {
+  const router = useRouter();
   const dateLabel = candidate.appliedAt
     ? dateFmt.format(new Date(`${candidate.appliedAt}T00:00:00Z`))
     : "—";
+  // Candidate id rides in a query string, mirroring the invoice detail route.
+  const href = `/account/projects/${projectId}/candidates/detail?candidate=${encodeURIComponent(
+    candidate.id,
+  )}`;
 
   return (
-    <tr className="border-b border-[var(--ring)]/50 last:border-b-0">
+    <tr
+      onClick={() => router.push(href)}
+      className="cursor-pointer border-b border-[var(--ring)]/50 transition hover:bg-[var(--surface-hover)] last:border-b-0"
+    >
       <td className="px-3 py-2.5">
         <div className="flex items-center gap-2.5">
           <span
@@ -323,21 +450,25 @@ function CandidateRow({ candidate }: { candidate: Candidate }) {
             {initials(candidate.name)}
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-[var(--text)]">
+            <Link
+              href={href}
+              onClick={(e) => e.stopPropagation()}
+              className="truncate text-sm font-medium text-[var(--text)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] rounded"
+            >
               {candidate.name}
-            </p>
+            </Link>
             <p className="truncate text-[10px] text-[var(--muted)]">
-              {candidate.email}
+              {candidate.email || "—"}
             </p>
           </div>
         </div>
       </td>
       <td className="px-3 py-2.5 text-xs text-[var(--muted)]">{dateLabel}</td>
       <td className="px-3 py-2.5 text-right text-sm font-medium tabular-nums text-[var(--text)]">
-        {integerFmt.format(candidate.fitScore)}
+        {candidate.pending ? "—" : integerFmt.format(candidate.fitScore)}
       </td>
       <td className="px-3 py-2.5 text-center">
-        <DecisionPill decision={candidate.decision} />
+        <DecisionPill decision={candidate.pending ? "Pending" : candidate.decision} />
       </td>
     </tr>
   );
