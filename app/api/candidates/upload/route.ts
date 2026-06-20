@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { getAppSession } from "@/lib/auth-supabase";
 import { isProjectMember } from "@/lib/project-rbac";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   getStorage,
   buildUserSlug,
@@ -149,8 +150,32 @@ export async function POST(req: Request) {
     console.warn("CANDIDATE_UPLOAD_META_FAIL", (err as Error).message);
   }
 
+  // Look up the matching job posting (same project + role + department the user
+  // is uploading into) so the webhook can point n8n at the JD to cross-reference
+  // against this candidate. Service role — the route already gated on membership.
+  // A missing posting is fine: the candidate still uploads; jd_* come back null.
+  type PostingRef = {
+    id: string;
+    jd_object_name: string | null;
+    jd_filename: string | null;
+  };
+  let posting: PostingRef | null = null;
+  try {
+    const { data } = await createAdminClient()
+      .from("job_postings")
+      .select("id, jd_object_name, jd_filename")
+      .eq("project_id", projectId)
+      .eq("role", role)
+      .eq("department", department)
+      .maybeSingle();
+    posting = (data as PostingRef | null) ?? null;
+  } catch (err) {
+    console.warn("CANDIDATE_UPLOAD_POSTING_LOOKUP_FAIL", (err as Error).message);
+  }
+
   // Light JSON payload — no file bytes. n8n pulls the resume from GCS using
-  // bucket + object_name. Field names map onto resume_review columns.
+  // bucket + object_name, and the JD (if any) from jd_object_name. Field names
+  // map onto resume_review columns; jd_* identify the posting to cross-reference.
   const payload = {
     candidate_id: candidateId,
     project_id: projectId,
@@ -168,6 +193,10 @@ export async function POST(req: Request) {
     generation,
     source: "manual_upload",
     uploaded_by_email: session.user.email,
+    // Matching posting (null if none exists for this role+department yet)
+    job_posting_id: posting?.id ?? null,
+    jd_object_name: posting?.jd_object_name ?? null,
+    jd_filename: posting?.jd_filename ?? null,
   };
 
   let n8nResp: Response;
