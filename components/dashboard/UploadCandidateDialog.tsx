@@ -34,8 +34,10 @@ export function UploadCandidateDialog({
   role: string;
   /** Inherited from the dashboard's current Company / Department filter — shown read-only. */
   company: string;
-  /** Optimistically add the candidate to the dashboard list on success. */
-  onAdd: (input: { name: string }) => void;
+  /** Optimistically add the candidate to the dashboard list on success. The
+   * candidateId is the resume_review row id the route reserved, so the
+   * optimistic row reconciles with the real (screened) row later. */
+  onAdd: (input: { name: string; candidateId: string }) => void;
 }) {
   const [name, setName] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -104,12 +106,18 @@ export function UploadCandidateDialog({
         method: "POST",
         body: fd,
       });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        candidateId?: string;
+      };
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
         setError(data.error ?? "Upload failed. Please try again.");
         return;
       }
-      onAdd({ name: trimmedName });
+      onAdd({
+        name: trimmedName,
+        candidateId: data.candidateId ?? crypto.randomUUID(),
+      });
       setCaptured({ name: trimmedName, fileName: file.name });
     } catch {
       setError("Network error. Please try again.");

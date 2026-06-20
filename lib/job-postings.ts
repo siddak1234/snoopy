@@ -24,25 +24,6 @@ export type Posting = {
   createdAt: string;
 };
 
-// Seeded to match the existing candidate combos (role × company) in
-// resume-candidates.ts, so role/department filter options stay identical.
-export const MOCK_POSTINGS: Posting[] = [
-  {
-    id: "p01",
-    role: "Senior Data Engineer",
-    department: "Acme Corp",
-    jobDescriptionFileName: "senior-data-engineer.pdf",
-    createdAt: "2026-06-01",
-  },
-  {
-    id: "p02",
-    role: "Senior Data Engineer",
-    department: "Globex Inc",
-    jobDescriptionFileName: "senior-data-engineer.pdf",
-    createdAt: "2026-06-03",
-  },
-];
-
 /**
  * Build a newly-created posting (mock/local-state). This is the seam for the
  * future backend: when the real create lands, the POST → `job_postings` insert

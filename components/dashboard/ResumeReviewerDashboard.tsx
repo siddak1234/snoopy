@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import {
   KpiTile,
   ClickableKpiTile,
@@ -16,7 +17,6 @@ import {
 import { UploadCandidateDialog } from "@/components/dashboard/UploadCandidateDialog";
 import { CreatePostingDialog } from "@/components/dashboard/CreatePostingDialog";
 import {
-  MOCK_CANDIDATES,
   DECISION_ORDER,
   DECISION_BAR_COLOR,
   DECISION_TEXT_CLASS,
@@ -24,13 +24,16 @@ import {
   makePendingCandidate,
   type Candidate,
 } from "@/lib/resume-candidates";
-import { MOCK_POSTINGS, makePosting, type Posting } from "@/lib/job-postings";
+import { mapResumeRow, type ResumeReviewRow } from "@/lib/resume-candidates-data";
+import { makePosting, type Posting } from "@/lib/job-postings";
 
-// Resume Reviewer dashboard. Mirrors the GL Code Allocation dashboard's layout
-// and reuses the same presentational primitives (DashboardKit) — only the data
-// and wiring differ. Data is MOCK for now (see lib/resume-candidates.ts): the
-// candidate list lives in local state seeded from MOCK_CANDIDATES so the
-// "Upload candidate" modal can add rows. The Export button is still a stub.
+// Resume Reviewer dashboard. Mirrors the GL Code Allocation dashboard: reads its
+// rows client-side from `resume_review` (RLS-gated by project membership) and
+// reuses the same presentational primitives (DashboardKit). A freshly uploaded
+// candidate is shown optimistically as "Pending" and reconciled with its real
+// (screened) row — same id — once n8n inserts it.
+
+const TABLE = "resume_review";
 
 const integerFmt = new Intl.NumberFormat("en-US");
 const dateFmt = new Intl.DateTimeFormat("en-US", {
@@ -40,46 +43,103 @@ const dateFmt = new Intl.DateTimeFormat("en-US", {
 });
 
 function uniqueSorted(values: string[]): string[] {
-  return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+  return Array.from(new Set(values.filter(Boolean))).sort((a, b) =>
+    a.localeCompare(b),
+  );
 }
 
 export function ResumeReviewerDashboard({
   projectId,
 }: {
-  // Used to build candidate-detail hrefs; also keeps parity with
-  // GlCodeAllocationDashboard so the real data source drops in unchanged.
   projectId: string;
 }) {
-  // Candidate + posting lists in local state, seeded from mocks. The upload /
-  // posting modals prepend to these; the real (project-scoped) source drops in
-  // here later.
-  const [candidates, setCandidates] = useState<Candidate[]>(MOCK_CANDIDATES);
-  const [postings, setPostings] = useState<Posting[]>(MOCK_POSTINGS);
+  const supabase = useMemo(() => createClient(), []);
+
+  // `candidates` = real rows from the DB (null = loading). `optimistic` = rows
+  // added this session after an upload, before their screened row exists.
+  const [candidates, setCandidates] = useState<Candidate[] | null>(null);
+  const [optimistic, setOptimistic] = useState<Candidate[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Postings created this session (no job_postings table yet — session-local).
+  const [postings, setPostings] = useState<Posting[]>([]);
+
   const [pickedRole, setPickedRole] = useState<string>("");
   const [pickedCompany, setPickedCompany] = useState<string>("");
   const [query, setQuery] = useState<string>("");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [postingOpen, setPostingOpen] = useState(false);
 
-  // Filter options come from postings AND candidates, so a brand-new posting
-  // with zero candidates is still selectable. Seeded postings match the seeded
-  // candidate combos, so these lists are unchanged until a new posting is added.
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Initial load (and on project change). Mirrors the GL dashboard's pattern.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from(TABLE)
+        .select("*")
+        .eq("project_id", projectId);
+      if (cancelled) return;
+      if (error) {
+        setLoadError("Could not load candidates.");
+        setCandidates([]);
+        return;
+      }
+      setLoadError(null);
+      setCandidates(((data ?? []) as unknown as ResumeReviewRow[]).map(mapResumeRow));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, projectId]);
+
+  // Silent refetch used by the post-upload poll; returns the fresh rows.
+  const reload = useCallback(async (): Promise<Candidate[]> => {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select("*")
+      .eq("project_id", projectId);
+    if (error) return [];
+    const mapped = ((data ?? []) as unknown as ResumeReviewRow[]).map(mapResumeRow);
+    setCandidates(mapped);
+    return mapped;
+  }, [supabase, projectId]);
+
+  // Clear any pending poll on unmount.
+  useEffect(
+    () => () => {
+      if (pollRef.current) clearTimeout(pollRef.current);
+    },
+    [],
+  );
+
+  const loading = candidates === null && !loadError;
+
+  // Displayed list = real rows, plus optimistic rows whose real (same-id) row
+  // hasn't landed yet. Once the screened row arrives, the optimistic one drops.
+  const allCandidates = useMemo(() => {
+    const real = candidates ?? [];
+    const realIds = new Set(real.map((c) => c.id));
+    return [...optimistic.filter((o) => !realIds.has(o.id)), ...real];
+  }, [candidates, optimistic]);
+
+  // Filter options come from the candidates plus any session-local postings, so
+  // a just-created posting is selectable before its first candidate exists.
   const roles = useMemo(
     () =>
       uniqueSorted([
         ...postings.map((p) => p.role),
-        ...candidates.map((c) => c.role),
+        ...allCandidates.map((c) => c.role),
       ]),
-    [postings, candidates],
+    [postings, allCandidates],
   );
-  // The "department" axis (Candidate.company === Posting.department).
   const companies = useMemo(
     () =>
       uniqueSorted([
         ...postings.map((p) => p.department),
-        ...candidates.map((c) => c.company),
+        ...allCandidates.map((c) => c.company),
       ]),
-    [postings, candidates],
+    [postings, allCandidates],
   );
 
   const effectiveRole = roles.includes(pickedRole) ? pickedRole : roles[0] ?? "";
@@ -87,19 +147,18 @@ export function ResumeReviewerDashboard({
     ? pickedCompany
     : companies[0] ?? "";
 
-  // Candidates in scope for the current role + company selection.
+  // Candidates in scope for the current role + department selection.
   const scoped = useMemo(
     () =>
-      candidates.filter(
+      allCandidates.filter(
         (c) => c.role === effectiveRole && c.company === effectiveCompany,
       ),
-    [candidates, effectiveRole, effectiveCompany],
+    [allCandidates, effectiveRole, effectiveCompany],
   );
 
   const total = scoped.length;
   const newThisWeek = scoped.filter((c) => c.newThisWeek).length;
-  // Decision-based aggregates exclude `pending` (not yet scored) candidates so
-  // existing mock output is byte-identical until a pending row is added.
+  // Decision-based aggregates exclude `pending` (not yet scored) candidates.
   const decidedCount = scoped.filter((c) => !c.pending).length;
   const advanceCount = scoped.filter(
     (c) => !c.pending && c.decision === "Advance",
@@ -107,8 +166,6 @@ export function ResumeReviewerDashboard({
   const needsReview = scoped.filter((c) => c.flagged).length;
   const advancePct = total > 0 ? Math.round((advanceCount / total) * 100) : 0;
 
-  // Decision breakdown — one bar per outcome, colored per decision. Percentages
-  // are over decided candidates only (pending excluded from numerator + total).
   const breakdownItems = useMemo(
     () =>
       DECISION_ORDER.map((d) => ({
@@ -120,7 +177,6 @@ export function ResumeReviewerDashboard({
     [scoped],
   );
 
-  // Top candidates by fit score (descending), top 3 — pending excluded.
   const topItems = useMemo(
     () =>
       scoped
@@ -137,11 +193,18 @@ export function ResumeReviewerDashboard({
     [scoped],
   );
 
-  // Add an uploaded candidate to the current role + company scope (mock).
-  function handleAddCandidate({ name }: { name: string }) {
-    setCandidates((prev) => [
+  // Optimistically show the uploaded candidate as Pending, then poll for its
+  // real (screened) row. id = the candidate_id the upload route returned.
+  function handleAddCandidate({
+    name,
+    candidateId,
+  }: {
+    name: string;
+    candidateId: string;
+  }) {
+    setOptimistic((prev) => [
       makePendingCandidate({
-        id: crypto.randomUUID(),
+        id: candidateId,
         name,
         role: effectiveRole,
         company: effectiveCompany,
@@ -149,10 +212,19 @@ export function ResumeReviewerDashboard({
       }),
       ...prev,
     ]);
+    let tries = 0;
+    if (pollRef.current) clearTimeout(pollRef.current);
+    const tick = async () => {
+      tries += 1;
+      const rows = await reload();
+      if (rows.some((r) => r.id === candidateId)) return; // reconciled
+      if (tries < 8) pollRef.current = setTimeout(tick, 5000);
+    };
+    pollRef.current = setTimeout(tick, 4000);
   }
 
-  // Create a posting (mock) and jump the filters to it so the user lands on the
-  // new (empty) opening, ready to upload candidates.
+  // Create a session-local posting and jump the filters to it so the user lands
+  // on the new (empty) opening, ready to upload candidates into.
   function handleCreatePosting(input: {
     role: string;
     department: string;
@@ -172,7 +244,7 @@ export function ResumeReviewerDashboard({
     setPickedCompany(input.department);
   }
 
-  // Table rows: most recent applications first, then client-side search.
+  // Table rows: most recent first, then client-side search.
   const rows = useMemo(() => {
     const sorted = [...scoped].sort((a, b) =>
       a.appliedAt < b.appliedAt ? 1 : a.appliedAt > b.appliedAt ? -1 : 0,
@@ -196,8 +268,9 @@ export function ResumeReviewerDashboard({
             Candidate Dashboard
           </h3>
           <p className="mt-0.5 text-xs text-[var(--muted)]">
-            {integerFmt.format(total)} application{total === 1 ? "" : "s"}{" "}
-            available
+            {loading
+              ? "Loading…"
+              : `${integerFmt.format(total)} application${total === 1 ? "" : "s"} available`}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -375,17 +448,18 @@ export function ResumeReviewerDashboard({
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-3 py-10 text-center text-xs text-[var(--muted)]"
-                  >
-                    {query.trim()
+              {loading ? (
+                <StateRow text="Loading candidates…" />
+              ) : loadError ? (
+                <StateRow text={loadError} />
+              ) : rows.length === 0 ? (
+                <StateRow
+                  text={
+                    query.trim()
                       ? "No candidates match your search."
-                      : "No candidates yet — upload the first."}
-                  </td>
-                </tr>
+                      : "No candidates yet — upload the first."
+                  }
+                />
               ) : (
                 rows.map((c) => (
                   <CandidateRow key={c.id} candidate={c} projectId={projectId} />
@@ -396,9 +470,8 @@ export function ResumeReviewerDashboard({
         </div>
       </SectionPanel>
 
-      {/* Upload modal — Role + Company/Department are inherited from the current
-          filter selection (read-only in the modal), so only name + resume PDF
-          are asked. */}
+      {/* Upload modal — Role + Department inherited from the current filter
+          selection (read-only in the modal); only name + resume PDF are asked. */}
       <UploadCandidateDialog
         open={uploadOpen}
         onClose={() => setUploadOpen(false)}
@@ -408,8 +481,7 @@ export function ResumeReviewerDashboard({
         onAdd={handleAddCandidate}
       />
 
-      {/* New-posting modal — opens a (role, department) scope candidates can be
-          uploaded into. Departments come from the current option list. */}
+      {/* New-posting modal — opens a (role, department) scope to upload into. */}
       <CreatePostingDialog
         open={postingOpen}
         onClose={() => setPostingOpen(false)}
@@ -417,6 +489,19 @@ export function ResumeReviewerDashboard({
         onCreate={handleCreatePosting}
       />
     </section>
+  );
+}
+
+function StateRow({ text }: { text: string }) {
+  return (
+    <tr>
+      <td
+        colSpan={4}
+        className="px-3 py-10 text-center text-xs text-[var(--muted)]"
+      >
+        {text}
+      </td>
+    </tr>
   );
 }
 
@@ -431,7 +516,6 @@ function CandidateRow({
   const dateLabel = candidate.appliedAt
     ? dateFmt.format(new Date(`${candidate.appliedAt}T00:00:00Z`))
     : "—";
-  // Candidate id rides in a query string, mirroring the invoice detail route.
   const href = `/account/projects/${projectId}/candidates/detail?candidate=${encodeURIComponent(
     candidate.id,
   )}`;
@@ -468,7 +552,9 @@ function CandidateRow({
         {candidate.pending ? "—" : integerFmt.format(candidate.fitScore)}
       </td>
       <td className="px-3 py-2.5 text-center">
-        <DecisionPill decision={candidate.pending ? "Pending" : candidate.decision} />
+        <DecisionPill
+          decision={candidate.pending ? "Pending" : candidate.decision}
+        />
       </td>
     </tr>
   );
