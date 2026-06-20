@@ -3,15 +3,11 @@ import { notFound } from "next/navigation";
 import { getAppSession } from "@/lib/auth-supabase";
 import { getProjectForUser } from "@/lib/projects";
 import SectionCard from "@/components/dashboard/SectionCard";
-import { CandidateDetail } from "@/components/dashboard/CandidateDetail";
-import {
-  findCandidateById,
-  getCandidateDetail,
-} from "@/lib/resume-candidates";
+import { CandidateDetailClient } from "@/components/dashboard/CandidateDetailClient";
 
-// Per-candidate detail page — mirrors the invoice detail route
-// (app/account/projects/[id]/invoices/detail). The candidate id rides in a
-// query string (?candidate=…) for the same reason the invoice route uses one.
+// Per-candidate detail page — mirrors the invoice detail route. The candidate id
+// rides in a query string (?candidate=…). Auth + project membership are checked
+// here; the row itself is fetched client-side (RLS-gated) by CandidateDetailClient.
 export default async function CandidateDetailPage({
   params,
   searchParams,
@@ -25,16 +21,9 @@ export default async function CandidateDetailPage({
   const { id } = await params;
   const { candidate: candidateId } = await searchParams;
   if (!candidateId) notFound();
-  const userId = session.user.id;
 
-  const project = await getProjectForUser(id, userId);
+  const project = await getProjectForUser(id, session.user.id);
   if (!project) notFound();
-
-  // MOCK lookup. Seeded candidates resolve; freshly-uploaded ones live only in
-  // the dashboard's in-memory state (not persisted yet), so they show a friendly
-  // not-available state instead of a hard 404.
-  const candidate = findCandidateById(candidateId);
-  const detail = candidate ? getCandidateDetail(candidate.id) : null;
 
   return (
     <SectionCard
@@ -50,14 +39,7 @@ export default async function CandidateDetailPage({
       }
     >
       <div className="py-5 first:pt-0">
-        {candidate ? (
-          <CandidateDetail candidate={candidate} detail={detail} />
-        ) : (
-          <div className="rounded-lg border border-[var(--ring)]/50 px-4 py-10 text-center text-sm text-[var(--muted)]">
-            This candidate isn’t available yet. Uploaded candidates aren’t
-            persisted in this preview — they live only in the dashboard session.
-          </div>
-        )}
+        <CandidateDetailClient projectId={project.id} candidateId={candidateId} />
       </div>
     </SectionCard>
   );
