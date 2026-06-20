@@ -20,11 +20,14 @@ const OTHER = "__other__";
 export function CreatePostingDialog({
   open,
   onClose,
+  projectId,
   departments,
   onCreate,
 }: {
   open: boolean;
   onClose: () => void;
+  /** The project the posting belongs to. */
+  projectId: string;
   /** Existing departments in this project — the dropdown options. */
   departments: string[];
   onCreate: (input: {
@@ -38,6 +41,7 @@ export function CreatePostingDialog({
   const [newDepartment, setNewDepartment] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [captured, setCaptured] = useState<{
     role: string;
     department: string;
@@ -51,6 +55,7 @@ export function CreatePostingDialog({
     setNewDepartment("");
     setFile(null);
     setError(null);
+    setSubmitting(false);
     setCaptured(null);
   }, []);
 
@@ -78,8 +83,9 @@ export function CreatePostingDialog({
 
   const creatingNew = departmentChoice === OTHER;
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (submitting) return;
     setError(null);
 
     const trimmedRole = role.trim();
@@ -100,8 +106,30 @@ export function CreatePostingDialog({
     if (file.size > MAX_FILE_MB * 1024 * 1024)
       return setError(`File must be under ${MAX_FILE_MB} MB.`);
 
-    onCreate({ role: trimmedRole, department, jobDescriptionFileName: file.name });
-    setCaptured({ role: trimmedRole, department, fileName: file.name });
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("projectId", projectId);
+    fd.append("role", trimmedRole);
+    fd.append("department", department);
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/job-descriptions/upload", {
+        method: "POST",
+        body: fd,
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(data.error ?? "Upload failed. Please try again.");
+        return;
+      }
+      onCreate({ role: trimmedRole, department, jobDescriptionFileName: file.name });
+      setCaptured({ role: trimmedRole, department, fileName: file.name });
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   if (!open) return null;
@@ -221,13 +249,18 @@ export function CreatePostingDialog({
             <FormError message={error} />
 
             <div className="flex flex-wrap gap-2 pt-2">
-              <button type="submit" className="btn-primary inline-flex px-5">
-                Create posting
+              <button
+                type="submit"
+                disabled={submitting}
+                className="btn-primary inline-flex px-5 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitting ? "Creating…" : "Create posting"}
               </button>
               <button
                 type="button"
                 onClick={onClose}
-                className="btn-secondary inline-flex px-5"
+                disabled={submitting}
+                className="btn-secondary inline-flex px-5 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Cancel
               </button>

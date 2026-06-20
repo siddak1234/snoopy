@@ -1,15 +1,10 @@
 /**
- * Resume Reviewer — job posting data model + helpers.
+ * Resume Reviewer — job posting types + helpers.
  *
- * ⚠️ MOCK DATA, same story as resume-candidates.ts. A posting defines a
- * (role, department) opening that candidates are uploaded into. The seed below
- * mirrors the two seeded candidate combos in resume-candidates.ts so the
- * dashboard's filter options and aggregates are unchanged until a NEW posting
- * is added.
- *
- * Backend seam: makePosting() returns the row shape a future
- * POST → `job_postings` insert would produce (scoped by project_id). The PDF
- * itself isn't persisted yet — only its file name is kept for display.
+ * A posting is one (role, department) opening per project, with an uploaded
+ * job-description PDF. Persisted in the `job_postings` table (via
+ * /api/job-descriptions/upload). The dashboard reads rows and maps them to the
+ * `Posting` UI shape; `makePosting()` builds an optimistic row on create.
  */
 
 export type Posting = {
@@ -18,17 +13,35 @@ export type Posting = {
   role: string;
   /** Drives the DEPARTMENT filter. Same axis as Candidate.company. */
   department: string;
-  /** Mock: uploaded JD file name only; the PDF is not persisted yet. */
+  /** Original JD file name (display). */
   jobDescriptionFileName: string | null;
   /** ISO date "YYYY-MM-DD". */
   createdAt: string;
 };
 
-/**
- * Build a newly-created posting (mock/local-state). This is the seam for the
- * future backend: when the real create lands, the POST → `job_postings` insert
- * returns a row of this exact shape.
- */
+/** A `job_postings` row (only the columns the UI reads). */
+export type JobPostingRow = {
+  id: string;
+  project_id: string | null;
+  role: string | null;
+  department: string | null;
+  jd_object_name: string | null;
+  jd_filename: string | null;
+  recruiter_email: string | null;
+  created_at: string | null;
+};
+
+export function mapJobPostingRow(row: JobPostingRow): Posting {
+  return {
+    id: row.id,
+    role: row.role ?? "",
+    department: row.department ?? "",
+    jobDescriptionFileName: row.jd_filename,
+    createdAt: (row.created_at ?? "").slice(0, 10),
+  };
+}
+
+/** Build an optimistic posting for the dashboard list right after creation. */
 export function makePosting(input: {
   id: string;
   role: string;

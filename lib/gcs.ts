@@ -64,3 +64,23 @@ export function buildResumeObjectName(input: {
   const dd = String(date.getUTCDate()).padStart(2, "0");
   return `resumes/${projectId}/${userSlug}/${yyyy}/${mm}/${dd}/${candidateId}/resume.pdf`;
 }
+
+// Slug for a path segment: spaces → underscore, strip anything outside
+// [A-Za-z0-9_-]. Fallback so a segment is never empty.
+export function slugify(value: string): string {
+  return (
+    value.trim().replace(/\s+/g, "_").replace(/[^A-Za-z0-9_-]/g, "") || "untitled"
+  );
+}
+
+// Job-description object path (same bucket, sibling to resumes/):
+//   job_description/{projectId}/{departmentSlug}/{roleSlug}/jd.pdf
+// Deterministic from (project, department, role) so candidate screening can
+// derive the same path; one JD per opening, so a re-upload overwrites it.
+export function buildJdObjectName(input: {
+  projectId: string;
+  department: string;
+  role: string;
+}): string {
+  return `job_description/${input.projectId}/${slugify(input.department)}/${slugify(input.role)}/jd.pdf`;
+}
