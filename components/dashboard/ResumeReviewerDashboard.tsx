@@ -25,7 +25,12 @@ import {
   type Candidate,
 } from "@/lib/resume-candidates";
 import { mapResumeRow, type ResumeReviewRow } from "@/lib/resume-candidates-data";
-import { makePosting, type Posting } from "@/lib/job-postings";
+import {
+  makePosting,
+  mapJobPostingRow,
+  type Posting,
+  type JobPostingRow,
+} from "@/lib/job-postings";
 
 // Resume Reviewer dashboard. Mirrors the GL Code Allocation dashboard: reads its
 // rows client-side from `resume_review` (RLS-gated by project membership) and
@@ -60,7 +65,8 @@ export function ResumeReviewerDashboard({
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [optimistic, setOptimistic] = useState<Candidate[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
-  // Postings created this session (no job_postings table yet — session-local).
+  // Postings: loaded from job_postings on mount, plus any created this session
+  // (optimistically prepended so the filter jumps to a new posting immediately).
   const [postings, setPostings] = useState<Posting[]>([]);
 
   const [pickedRole, setPickedRole] = useState<string>("");
@@ -87,6 +93,23 @@ export function ResumeReviewerDashboard({
       }
       setLoadError(null);
       setCandidates(((data ?? []) as unknown as ResumeReviewRow[]).map(mapResumeRow));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, projectId]);
+
+  // Load persisted postings for this project (drive the filter options even
+  // before any candidate exists). RLS-gated like the candidates read.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("job_postings")
+        .select("*")
+        .eq("project_id", projectId);
+      if (cancelled || error) return;
+      setPostings(((data ?? []) as unknown as JobPostingRow[]).map(mapJobPostingRow));
     })();
     return () => {
       cancelled = true;
@@ -485,6 +508,7 @@ export function ResumeReviewerDashboard({
       <CreatePostingDialog
         open={postingOpen}
         onClose={() => setPostingOpen(false)}
+        projectId={projectId}
         departments={companies}
         onCreate={handleCreatePosting}
       />
