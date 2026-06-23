@@ -16,6 +16,7 @@ import {
 } from "@/components/dashboard/DashboardKit";
 import { UploadCandidateDialog } from "@/components/dashboard/UploadCandidateDialog";
 import { CreatePostingDialog } from "@/components/dashboard/CreatePostingDialog";
+import { ViewJobDescriptionDialog } from "@/components/dashboard/ViewJobDescriptionDialog";
 import {
   DECISION_ORDER,
   DECISION_BAR_COLOR,
@@ -74,6 +75,7 @@ export function ResumeReviewerDashboard({
   const [query, setQuery] = useState<string>("");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [postingOpen, setPostingOpen] = useState(false);
+  const [viewJdOpen, setViewJdOpen] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -169,6 +171,16 @@ export function ResumeReviewerDashboard({
   const effectiveCompany = companies.includes(pickedCompany)
     ? pickedCompany
     : companies[0] ?? "";
+
+  // The posting (if any) for the current role + department selection — drives
+  // the "View job description" button and which JD the viewer opens.
+  const activePosting = useMemo(
+    () =>
+      postings.find(
+        (p) => p.role === effectiveRole && p.department === effectiveCompany,
+      ) ?? null,
+    [postings, effectiveRole, effectiveCompany],
+  );
 
   // Candidates in scope for the current role + department selection.
   const scoped = useMemo(
@@ -320,9 +332,14 @@ export function ResumeReviewerDashboard({
           </button>
           <button
             type="button"
-            title="Coming soon"
-            onClick={() => {}}
-            className="btn-secondary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm"
+            onClick={() => setViewJdOpen(true)}
+            disabled={!activePosting}
+            title={
+              activePosting
+                ? "View the job description for this role"
+                : "No job posting for this role and department yet"
+            }
+            className="btn-secondary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
             <svg
               width="14"
@@ -335,11 +352,10 @@ export function ResumeReviewerDashboard({
               strokeLinejoin="round"
               aria-hidden
             >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
+              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+              <circle cx="12" cy="12" r="3" />
             </svg>
-            Export shortlist
+            View job description
           </button>
         </div>
       </div>
@@ -511,6 +527,13 @@ export function ResumeReviewerDashboard({
         projectId={projectId}
         departments={companies}
         onCreate={handleCreatePosting}
+      />
+
+      {/* View-job-description modal — JD PDF + the parsed job_postings schema. */}
+      <ViewJobDescriptionDialog
+        open={viewJdOpen}
+        onClose={() => setViewJdOpen(false)}
+        postingId={activePosting?.id ?? null}
       />
     </section>
   );
