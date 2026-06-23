@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import Modal from "@/components/ui/Modal";
 import { createClient } from "@/lib/supabase/client";
 
-// View-job-description popup. Shows the JD PDF (served via the signed-URL
-// redirect route) and, below it, the full parsed schema for the job_postings
-// row. The parsed columns are filled asynchronously by the JD n8n workflow, so
-// the row is fetched fresh each open and re-polled while parse_status='pending'.
+// Job-description detail viewer (full page, not a modal). Shows the JD PDF via
+// the signed-URL redirect route, then the full parsed job_postings schema below.
+// The parsed columns are filled asynchronously by the JD n8n workflow, so the
+// row is fetched fresh on mount and re-polled while parse_status='pending'.
 
 type JobPostingDetail = {
   id: string;
@@ -37,31 +36,22 @@ type JobPostingDetail = {
 const SELECT_COLS =
   "id, role, department, jd_filename, recruiter_email, parse_status, parsed_at, version, quality, quality_notes, role_title, seniority_level, min_years_experience, location_type, location_or_timezone_constraint, compensation_listed, compensation_range, hard_requirements, preferred_requirements, key_responsibilities, created_at, updated_at";
 
-export function ViewJobDescriptionDialog({
-  open,
-  onClose,
+export function JobDescriptionDetailClient({
   postingId,
 }: {
-  open: boolean;
-  onClose: () => void;
-  postingId: string | null;
+  postingId: string;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [row, setRow] = useState<JobPostingDetail | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open || !postingId) return;
     let active = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     async function load(initial: boolean) {
-      if (initial) {
-        setLoading(true);
-        setError(null);
-        setRow(null);
-      }
+      if (initial) setLoading(true);
       const { data, error } = await supabase
         .from("job_postings")
         .select(SELECT_COLS)
@@ -76,7 +66,6 @@ export function ViewJobDescriptionDialog({
       const detail = data as JobPostingDetail;
       setRow(detail);
       setLoading(false);
-      // Keep polling while the workflow is still parsing.
       if (detail.parse_status === "pending") {
         timer = setTimeout(() => load(false), 4000);
       }
@@ -87,47 +76,38 @@ export function ViewJobDescriptionDialog({
       active = false;
       if (timer) clearTimeout(timer);
     };
-  }, [open, postingId, supabase]);
-
-  if (!open || !postingId) return null;
+  }, [postingId, supabase]);
 
   const fileUrl = `/api/job-descriptions/file?postingId=${encodeURIComponent(postingId)}`;
 
   return (
-    <Modal
-      onClose={onClose}
-      ariaLabelledBy="view-jd-title"
-      bubble
-      zIndex={100}
-      contentClassName="max-w-3xl"
-    >
-      <h2 id="view-jd-title" className="text-xl font-semibold text-[var(--text)]">
-        Job description
-      </h2>
-      {row?.role ? (
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          {row.role}
-          {row.department ? ` · ${row.department}` : ""}
-        </p>
-      ) : null}
-
-      <div className="mt-4 flex items-center justify-end">
-        <a
-          href={fileUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-secondary inline-flex !min-h-0 !px-3 !py-1.5 text-xs"
-        >
-          Open in new tab
-        </a>
+    <div className="flex flex-col gap-6">
+      {/* JD PDF */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-[var(--text)]">
+            {row?.role
+              ? `${row.role}${row.department ? ` · ${row.department}` : ""}`
+              : "Job description"}
+          </h3>
+          <a
+            href={fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary inline-flex !min-h-0 !px-3 !py-1.5 text-xs"
+          >
+            Open in new tab
+          </a>
+        </div>
+        <iframe
+          src={fileUrl}
+          title="Job description PDF"
+          className="w-full min-h-[600px] h-[80vh] rounded-lg border border-[var(--ring)]/50"
+        />
       </div>
-      <iframe
-        src={fileUrl}
-        title="Job description PDF"
-        className="mt-2 w-full min-h-[420px] h-[55vh] rounded-lg border border-[var(--ring)]/50"
-      />
 
-      <div className="mt-6">
+      {/* Parsed schema */}
+      <div>
         <h3 className="text-sm font-semibold text-[var(--text)]">Parsed details</h3>
         {loading ? (
           <p className="mt-2 text-sm text-[var(--muted)]">Loading…</p>
@@ -137,7 +117,7 @@ export function ViewJobDescriptionDialog({
           <ParsedTable row={row} />
         ) : null}
       </div>
-    </Modal>
+    </div>
   );
 }
 
