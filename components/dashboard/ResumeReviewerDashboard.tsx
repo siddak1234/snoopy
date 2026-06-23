@@ -16,7 +16,6 @@ import {
 } from "@/components/dashboard/DashboardKit";
 import { UploadCandidateDialog } from "@/components/dashboard/UploadCandidateDialog";
 import { CreatePostingDialog } from "@/components/dashboard/CreatePostingDialog";
-import { ViewJobDescriptionDialog } from "@/components/dashboard/ViewJobDescriptionDialog";
 import {
   DECISION_ORDER,
   DECISION_BAR_COLOR,
@@ -75,7 +74,6 @@ export function ResumeReviewerDashboard({
   const [query, setQuery] = useState<string>("");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [postingOpen, setPostingOpen] = useState(false);
-  const [viewJdOpen, setViewJdOpen] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -330,33 +328,26 @@ export function ResumeReviewerDashboard({
             </svg>
             New job posting
           </button>
-          <button
-            type="button"
-            onClick={() => setViewJdOpen(true)}
-            disabled={!activePosting}
-            title={
-              activePosting
-                ? "View the job description for this role"
-                : "No job posting for this role and department yet"
-            }
-            className="btn-secondary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
+          {activePosting ? (
+            <Link
+              href={`/account/projects/${projectId}/job-description?posting=${activePosting.id}`}
+              title="View the job description for this role"
+              className="btn-secondary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm"
             >
-              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-            View job description
-          </button>
+              <EyeIcon />
+              View job description
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled
+              title="No job posting for this role and department yet"
+              className="btn-secondary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <EyeIcon />
+              View job description
+            </button>
+          )}
         </div>
       </div>
 
@@ -528,14 +519,26 @@ export function ResumeReviewerDashboard({
         departments={companies}
         onCreate={handleCreatePosting}
       />
-
-      {/* View-job-description modal — JD PDF + the parsed job_postings schema. */}
-      <ViewJobDescriptionDialog
-        open={viewJdOpen}
-        onClose={() => setViewJdOpen(false)}
-        postingId={activePosting?.id ?? null}
-      />
     </section>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
   );
 }
 
