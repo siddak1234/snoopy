@@ -13,13 +13,14 @@ import {
   initials,
   type Candidate,
   type CandidateDetail as CandidateDetailData,
+  type CandidateLink,
   type SkillMatch,
 } from "@/lib/resume-candidates";
 
 // Per-candidate detail body. The resume renders on top; the screening output is
-// shown below — a fixed summary (Assessment + Contact), then collapsible groups
-// (Skills, Experience, Gates, Red flags, Recommendation). Groups use native
-// <details>, so opening one pushes siblings DOWN in normal flow — never overlaps.
+// shown below — a fixed summary (Assessment + Contact), then collapsible parent
+// groups, each holding nested sub-dropdowns. All groups use native <details>, so
+// opening one pushes siblings DOWN in normal flow — it can never overlap.
 
 const integerFmt = new Intl.NumberFormat("en-US");
 const dateFmt = new Intl.DateTimeFormat("en-US", {
@@ -141,17 +142,9 @@ export function CandidateDetail({
               <dt className="text-[var(--muted)]">Links</dt>
               <dd className="mt-1.5">
                 {detail?.links?.length ? (
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  <div className="flex flex-wrap gap-2">
                     {detail.links.map((l) => (
-                      <a
-                        key={l.url}
-                        href={l.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-medium text-[var(--link)] hover:underline"
-                      >
-                        {l.label}
-                      </a>
+                      <LinkButton key={l.url} link={l} />
                     ))}
                   </div>
                 ) : (
@@ -182,22 +175,40 @@ export function CandidateDetail({
               }
               defaultOpen
             >
-              <div className="flex flex-col gap-4">
-                <SkillGroup label="Required skills" skills={detail.requiredSkills} />
-                <SkillGroup
-                  label="Preferred skills"
-                  skills={detail.preferredSkills}
-                  coverage={detail.preferredCoveragePct}
-                />
-                <ChipList
-                  label="Transferable skills"
-                  items={detail.transferableSkills}
-                />
-                <ChipList
-                  label="Missing critical skills"
-                  items={detail.missingCriticalSkills}
-                  tone="bad"
-                />
+              <div className="flex flex-col gap-2">
+                {detail.requiredSkills?.length ? (
+                  <SubDisclosure
+                    title="Required skills"
+                    count={detail.requiredSkills.length}
+                    defaultOpen
+                  >
+                    <SkillList skills={detail.requiredSkills} />
+                  </SubDisclosure>
+                ) : null}
+                {detail.preferredSkills?.length ? (
+                  <SubDisclosure
+                    title="Preferred skills"
+                    count={detail.preferredSkills.length}
+                  >
+                    <SkillList skills={detail.preferredSkills} />
+                  </SubDisclosure>
+                ) : null}
+                {detail.transferableSkills?.length ? (
+                  <SubDisclosure
+                    title="Transferable skills"
+                    count={detail.transferableSkills.length}
+                  >
+                    <ChipRow items={detail.transferableSkills} />
+                  </SubDisclosure>
+                ) : null}
+                {detail.missingCriticalSkills?.length ? (
+                  <SubDisclosure
+                    title="Missing critical skills"
+                    count={detail.missingCriticalSkills.length}
+                  >
+                    <ChipRow items={detail.missingCriticalSkills} tone="bad" />
+                  </SubDisclosure>
+                ) : null}
               </div>
             </Disclosure>
           ) : null}
@@ -209,35 +220,58 @@ export function CandidateDetail({
           detail.tenurePattern ||
           detail.domainRelevance ? (
             <Disclosure title="Experience">
-              <dl className="flex flex-col gap-3 text-sm">
-                <Field
-                  label="Years (relevant / total)"
-                  value={
-                    detail.relevantYears != null || detail.totalYears != null
-                      ? `${fmtYears(detail.relevantYears)} relevant · ${fmtYears(detail.totalYears)} total`
-                      : undefined
-                  }
-                />
-                <Field
-                  label="Seniority vs. role"
-                  value={detail.seniorityAssessment}
-                  capitalize
-                  note={detail.seniorityReasoning}
-                />
-                <Field
-                  label="Domain relevance"
-                  value={detail.domainRelevance}
-                  capitalize
-                  note={detail.domainRelevanceNotes}
-                />
-                <Field label="Career trajectory" value={detail.careerTrajectory} />
-                <Field label="Tenure pattern" value={detail.tenurePattern} />
-                <Field
-                  label="Relevant-years basis"
-                  value={detail.relevantYearsReasoning}
-                />
-                <ListField label="Employment gaps" items={detail.employmentGaps} />
-              </dl>
+              <div className="flex flex-col gap-2">
+                <SubDisclosure title="Seniority & domain" defaultOpen>
+                  <dl className="flex flex-col gap-3 text-sm">
+                    <Field
+                      label="Years (relevant / total)"
+                      value={
+                        detail.relevantYears != null || detail.totalYears != null
+                          ? `${fmtYears(detail.relevantYears)} relevant · ${fmtYears(detail.totalYears)} total`
+                          : undefined
+                      }
+                    />
+                    <Field
+                      label="Seniority vs. role"
+                      value={detail.seniorityAssessment}
+                      capitalize
+                      note={detail.seniorityReasoning}
+                    />
+                    <Field
+                      label="Domain relevance"
+                      value={detail.domainRelevance}
+                      capitalize
+                      note={detail.domainRelevanceNotes}
+                    />
+                  </dl>
+                </SubDisclosure>
+                {detail.careerTrajectory || detail.tenurePattern ? (
+                  <SubDisclosure title="Trajectory & tenure">
+                    <dl className="flex flex-col gap-3 text-sm">
+                      <Field
+                        label="Career trajectory"
+                        value={detail.careerTrajectory}
+                      />
+                      <Field label="Tenure pattern" value={detail.tenurePattern} />
+                    </dl>
+                  </SubDisclosure>
+                ) : null}
+                {detail.relevantYearsReasoning ? (
+                  <SubDisclosure title="Relevant-years basis">
+                    <p className="text-sm leading-relaxed text-[var(--text)]">
+                      {detail.relevantYearsReasoning}
+                    </p>
+                  </SubDisclosure>
+                ) : null}
+                {detail.employmentGaps?.length ? (
+                  <SubDisclosure
+                    title="Employment gaps"
+                    count={detail.employmentGaps.length}
+                  >
+                    <BulletList items={detail.employmentGaps} />
+                  </SubDisclosure>
+                ) : null}
+              </div>
             </Disclosure>
           ) : null}
 
@@ -329,19 +363,38 @@ export function CandidateDetail({
                 ) : null
               }
             >
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
                 {detail.recommendedNextStep ? (
-                  <Field
-                    label="Recommended next step"
-                    value={detail.recommendedNextStep}
-                  />
+                  <SubDisclosure title="Recommended next step" defaultOpen>
+                    <p className="text-sm leading-relaxed text-[var(--text)]">
+                      {detail.recommendedNextStep}
+                    </p>
+                  </SubDisclosure>
                 ) : null}
-                <ListField label="Key strengths" items={detail.keyStrengths} />
-                <ListField label="Key concerns" items={detail.keyConcerns} />
-                <ListField
-                  label="Interview focus areas"
-                  items={detail.interviewFocusAreas}
-                />
+                {detail.keyStrengths?.length ? (
+                  <SubDisclosure
+                    title="Key strengths"
+                    count={detail.keyStrengths.length}
+                  >
+                    <BulletList items={detail.keyStrengths} />
+                  </SubDisclosure>
+                ) : null}
+                {detail.keyConcerns?.length ? (
+                  <SubDisclosure
+                    title="Key concerns"
+                    count={detail.keyConcerns.length}
+                  >
+                    <BulletList items={detail.keyConcerns} />
+                  </SubDisclosure>
+                ) : null}
+                {detail.interviewFocusAreas?.length ? (
+                  <SubDisclosure
+                    title="Interview focus areas"
+                    count={detail.interviewFocusAreas.length}
+                  >
+                    <BulletList items={detail.interviewFocusAreas} />
+                  </SubDisclosure>
+                ) : null}
               </div>
             </Disclosure>
           ) : null}
@@ -352,6 +405,8 @@ export function CandidateDetail({
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
+
+type Tone = "good" | "warn" | "bad" | "muted";
 
 function fmtYears(n?: number): string {
   return n != null ? `${Math.round(n * 10) / 10} yrs` : "—";
@@ -379,7 +434,28 @@ function matchTone(match: string): Tone {
   return "muted";
 }
 
-type Tone = "good" | "warn" | "bad" | "muted";
+function Chevron({ group }: { group: "section" | "sub" }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      className={`shrink-0 text-[var(--muted)] transition-transform ${
+        group === "section"
+          ? "group-open/section:rotate-180"
+          : "group-open/sub:rotate-180"
+      }`}
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
 
 function Disclosure({
   title,
@@ -395,29 +471,48 @@ function Disclosure({
   return (
     <details
       open={defaultOpen}
-      className="group rounded-xl border border-[var(--ring)] bg-[var(--card)] [&_summary::-webkit-details-marker]:hidden"
+      className="group/section rounded-xl border border-[var(--ring)] bg-[var(--card)] [&_summary::-webkit-details-marker]:hidden"
     >
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3">
         <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
           {title}
           {badge}
         </span>
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden
-          className="shrink-0 text-[var(--muted)] transition-transform group-open:rotate-180"
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
+        <Chevron group="section" />
       </summary>
       <div className="border-t border-[var(--ring)]/60 px-4 py-3">{children}</div>
+    </details>
+  );
+}
+
+function SubDisclosure({
+  title,
+  count,
+  defaultOpen,
+  children,
+}: {
+  title: string;
+  count?: number;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details
+      open={defaultOpen}
+      className="group/sub rounded-lg border border-[var(--ring)]/60 bg-[var(--surface-strong)] [&_summary::-webkit-details-marker]:hidden"
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2">
+        <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+          {title}
+          {count != null ? (
+            <span className="rounded-full border border-[var(--ring)] px-1.5 text-[10px] text-[var(--muted)]">
+              {count}
+            </span>
+          ) : null}
+        </span>
+        <Chevron group="sub" />
+      </summary>
+      <div className="px-3 pb-3 pt-1">{children}</div>
     </details>
   );
 }
@@ -440,72 +535,85 @@ function Badge({ tone, children }: { tone: Tone; children: ReactNode }) {
   );
 }
 
-function SkillGroup({
-  label,
-  skills,
-  coverage,
-}: {
-  label: string;
-  skills?: SkillMatch[];
-  coverage?: number;
-}) {
-  if (!skills?.length) return null;
+function LinkButton({ link }: { link: CandidateLink }) {
   return (
-    <div>
-      <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
-        {label}
-        {coverage != null ? ` · ${Math.round(coverage)}%` : ""}
-      </p>
-      <ul className="mt-2 flex flex-col gap-2">
-        {skills.map((s, i) => (
-          <li
-            key={`${s.skill}-${i}`}
-            className="rounded-lg border border-[var(--ring)]/60 px-3 py-2"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm text-[var(--text)]">{s.skill}</span>
-              <Badge tone={matchTone(s.match)}>{s.match}</Badge>
-            </div>
-            {s.evidence ? (
-              <p className="mt-1 text-xs text-[var(--muted)]">{s.evidence}</p>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-    </div>
+    <a
+      href={link.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="btn-secondary inline-flex !min-h-0 items-center gap-1.5 !px-3 !py-1.5 text-xs"
+    >
+      {link.label}
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+        className="text-[var(--muted)]"
+      >
+        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+        <polyline points="15 3 21 3 21 9" />
+        <line x1="10" y1="14" x2="21" y2="3" />
+      </svg>
+    </a>
   );
 }
 
-function ChipList({
-  label,
-  items,
-  tone = "muted",
-}: {
-  label: string;
-  items?: string[];
-  tone?: Tone;
-}) {
+function SkillList({ skills }: { skills?: SkillMatch[] }) {
+  if (!skills?.length) return null;
+  return (
+    <ul className="flex flex-col gap-2">
+      {skills.map((s, i) => (
+        <li
+          key={`${s.skill}-${i}`}
+          className="rounded-lg border border-[var(--ring)]/60 bg-[var(--card)] px-3 py-2"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm text-[var(--text)]">{s.skill}</span>
+            <Badge tone={matchTone(s.match)}>{s.match}</Badge>
+          </div>
+          {s.evidence ? (
+            <p className="mt-1 text-xs text-[var(--muted)]">{s.evidence}</p>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ChipRow({ items, tone = "muted" }: { items?: string[]; tone?: Tone }) {
   if (!items?.length) return null;
   const cls =
     tone === "bad"
       ? "text-[var(--error-text)] border-[var(--error-text)]/30"
       : "text-[var(--chip-text)] border-transparent bg-[var(--chip-bg)]";
   return (
-    <div>
-      <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
-        {label}
-      </p>
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {items.map((it, i) => (
-          <span
-            key={`${it}-${i}`}
-            className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${cls}`}
-          >
-            {it}
-          </span>
-        ))}
-      </div>
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((it, i) => (
+        <span
+          key={`${it}-${i}`}
+          className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${cls}`}
+        >
+          {it}
+        </span>
+      ))}
     </div>
+  );
+}
+
+function BulletList({ items }: { items?: string[] }) {
+  if (!items?.length) return null;
+  return (
+    <ul className="list-disc space-y-1 pl-4 text-sm leading-relaxed text-[var(--text)]">
+      {items.map((it, i) => (
+        <li key={`${it}-${i}`}>{it}</li>
+      ))}
+    </ul>
   );
 }
 
@@ -524,32 +632,12 @@ function Field({
   return (
     <div>
       <dt className="text-[var(--muted)]">{label}</dt>
-      <dd
-        className={`mt-0.5 text-[var(--text)] ${capitalize ? "capitalize" : ""}`}
-      >
+      <dd className={`mt-0.5 text-[var(--text)] ${capitalize ? "capitalize" : ""}`}>
         {value ?? "—"}
       </dd>
       {note ? (
-        <p className="mt-0.5 text-xs leading-relaxed text-[var(--muted)]">
-          {note}
-        </p>
+        <p className="mt-0.5 text-xs leading-relaxed text-[var(--muted)]">{note}</p>
       ) : null}
-    </div>
-  );
-}
-
-function ListField({ label, items }: { label: string; items?: string[] }) {
-  if (!items?.length) return null;
-  return (
-    <div>
-      <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
-        {label}
-      </p>
-      <ul className="mt-1.5 list-disc space-y-1 pl-4 text-sm text-[var(--text)]">
-        {items.map((it, i) => (
-          <li key={`${it}-${i}`}>{it}</li>
-        ))}
-      </ul>
     </div>
   );
 }
