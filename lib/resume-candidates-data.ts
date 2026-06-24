@@ -1,8 +1,17 @@
-import type { Candidate, CandidateDetail, Decision } from "@/lib/resume-candidates";
+import type {
+  Candidate,
+  CandidateDetail,
+  CandidateLink,
+  Decision,
+  GateDetail,
+  RedFlagDetail,
+  SkillMatch,
+} from "@/lib/resume-candidates";
 
 // Maps `resume_review` rows (populated by the n8n screening workflow) onto the
-// Candidate / CandidateDetail shapes the dashboard + detail view already render.
-// Column casing matches Postgres exactly. Only the columns the UI reads are typed.
+// Candidate / CandidateDetail shapes the dashboard + detail view render. The
+// rich nested detail is read from `audit_json` (the clean original model output)
+// with column fallbacks; column casing matches Postgres exactly.
 
 export type ResumeReviewRow = {
   id: string;
@@ -19,10 +28,18 @@ export type ResumeReviewRow = {
   City: string | null;
   State: string | null;
   Country: string | null;
+  github_url: string | null;
+  linkedin_url: string | null;
+  huggingface_url: string | null;
+  portfolio_or_website_url: string | null;
+  other_links: unknown;
   fit_score: number | null;
   decision: string | null;
-  requires_human_review: number | null;
+  recommendation_confidence: string | null;
+  requires_human_review: boolean | null;
   one_line_summary: string | null;
+  required_coverage_pct: number | null;
+  overall_gate_status: string | null;
   score_required_skills: number | null;
   score_experience_depth: number | null;
   score_domain_relevance: number | null;
@@ -32,6 +49,7 @@ export type ResumeReviewRow = {
   red_flags: unknown;
   key_concerns: unknown;
   human_review_reason: string | null;
+  audit_json: unknown;
   filename: string | null;
   submittedAt: string | null;
   createdAt: string | null;
@@ -52,9 +70,23 @@ function capitalizeDecision(d: string | null): Decision {
   }
 }
 
+function asRecord(v: unknown): Record<string, unknown> | null {
+  return v && typeof v === "object" && !Array.isArray(v)
+    ? (v as Record<string, unknown>)
+    : null;
+}
+function asStr(v: unknown): string | undefined {
+  return typeof v === "string" && v.trim() ? v : undefined;
+}
+function asNum(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
 // jsonb arrays may hold plain strings or objects ({skill}, {reason}, …); coerce
-// to a clean string[] so chips / lists render uniformly.
+// to a clean string[] so chips / lists render uniformly. Also accepts a single
+// string (some columns got flattened by the n8n normalize) → [string].
 function toStringList(value: unknown): string[] {
+  if (typeof value === "string") return value.trim() ? [value] : [];
   if (!Array.isArray(value)) return [];
   return value
     .map((item) => {
@@ -67,6 +99,62 @@ function toStringList(value: unknown): string[] {
       return null;
     })
     .filter((s): s is string => Boolean(s && s.trim()));
+}
+
+function toSkillMatches(value: unknown): SkillMatch[] {
+  if (!Array.isArray(value)) return [];
+  const out: SkillMatch[] = [];
+  for (const item of value) {
+    const o = asRecord(item);
+    const skill = o && asStr(o.skill);
+    if (!o || !skill) continue;
+    out.push({
+      skill,
+      match: asStr(o.match) ?? "unknown",
+      evidence: asStr(o.evidence),
+      confidence: asStr(o.confidence),
+    });
+  }
+  return out;
+}
+
+function toGates(value: unknown): GateDetail[] {
+  if (!Array.isArray(value)) return [];
+  const out: GateDetail[] = [];
+  for (const item of value) {
+    const o = asRecord(item);
+    const gate = o && asStr(o.gate);
+    if (!o || !gate) continue;
+    out.push({
+      gate,
+      status: asStr(o.status) ?? "unknown",
+      requirement: asStr(o.requirement),
+      candidateValue: asStr(o.candidate_value),
+      evidence: asStr(o.evidence),
+      reasoning: asStr(o.reasoning),
+      confidence: asStr(o.confidence),
+    });
+  }
+  return out;
+}
+
+function toRedFlags(value: unknown): RedFlagDetail[] {
+  if (!Array.isArray(value)) return [];
+  const out: RedFlagDetail[] = [];
+  for (const item of value) {
+    const o = asRecord(item);
+    if (!o) continue;
+    const type = asStr(o.type);
+    const description = asStr(o.description);
+    if (!type && !description) continue;
+    out.push({
+      type: type ?? "other",
+      severity: asStr(o.severity) ?? "low",
+      description,
+      evidence: asStr(o.evidence),
+    });
+  }
+  return out;
 }
 
 // Accept a date or full timestamp; keep YYYY-MM-DD for the table's date parsing.
@@ -96,36 +184,107 @@ export function mapResumeRow(row: ResumeReviewRow): Candidate {
     fitScore: row.fit_score ?? 0,
     decision: capitalizeDecision(row.decision),
     newThisWeek,
-    flagged: (row.requires_human_review ?? 0) > 0,
+    flagged: Boolean(row.requires_human_review),
     pending,
   };
 }
 
 export function mapResumeDetail(row: ResumeReviewRow): CandidateDetail {
+  const audit = asRecord(row.audit_json);
+  const sk = asRecord(audit?.skills_assessment);
+  const exp = asRecord(audit?.experience_analysis);
+  const gates = asRecord(audit?.hard_gates);
+  const rec = asRecord(audit?.recommendation);
+  const cand = asRecord(audit?.candidate);
+  const comp = asRecord(audit?.compensation_analysis);
+
   const location = [row.City, row.State, row.Country].filter(Boolean).join(", ");
-  const years = row.relevant_years ?? row.total_years_professional;
-  const rawScores: { label: string; score: number | null }[] = [
-    { label: "Skills match", score: row.score_required_skills },
-    { label: "Experience", score: row.score_experience_depth },
-    { label: "Domain", score: row.score_domain_relevance },
-  ];
-  const subScores = rawScores.filter(
-    (s): s is { label: string; score: number } => s.score != null,
-  );
+
+  const subScores = (
+    [
+      { label: "Skills match", score: row.score_required_skills },
+      { label: "Experience", score: row.score_experience_depth },
+      { label: "Domain", score: row.score_domain_relevance },
+    ] as { label: string; score: number | null }[]
+  ).filter((s): s is { label: string; score: number } => s.score != null);
+
+  const links: CandidateLink[] = [
+    row.linkedin_url ? { label: "LinkedIn", url: row.linkedin_url } : null,
+    row.github_url ? { label: "GitHub", url: row.github_url } : null,
+    row.portfolio_or_website_url
+      ? { label: "Website", url: row.portfolio_or_website_url }
+      : null,
+    row.huggingface_url
+      ? { label: "Hugging Face", url: row.huggingface_url }
+      : null,
+    ...toStringList(row.other_links).map((u) => ({ label: u, url: u })),
+  ].filter((l): l is CandidateLink => l != null);
+
+  const requiredSkills = toSkillMatches(sk?.required_skills ?? row.required_skills);
+  const keyConcerns = toStringList(rec?.key_concerns ?? row.key_concerns);
+
+  const relevantYears = asNum(exp?.relevant_years) ?? row.relevant_years ?? undefined;
+  const totalYears =
+    asNum(exp?.total_years_professional) ?? row.total_years_professional ?? undefined;
+  const yearsForHeader = relevantYears ?? totalYears;
+
+  // Compact "flagged for review" reasons shown at the top.
   const flagReasons = [
-    ...toStringList(row.red_flags),
-    ...toStringList(row.key_concerns),
-    ...(row.human_review_reason ? [row.human_review_reason] : []),
+    ...keyConcerns,
+    ...(asStr(rec?.human_review_reason) ?? row.human_review_reason
+      ? [(asStr(rec?.human_review_reason) ?? row.human_review_reason) as string]
+      : []),
   ];
 
   return {
+    // Contact
     phone: row.Phone_Number != null ? String(row.Phone_Number) : undefined,
     location: location || undefined,
-    yearsExperience: years != null ? Math.round(years) : undefined,
-    skills: toStringList(row.required_skills),
-    summary: row.one_line_summary ?? undefined,
+    links: links.length ? links : undefined,
+    // Profile
+    yearsExperience: yearsForHeader != null ? Math.round(yearsForHeader) : undefined,
+    skills: requiredSkills.map((s) => s.skill),
+    // Assessment summary
+    summary: asStr(rec?.one_line_summary) ?? row.one_line_summary ?? undefined,
     subScores: subScores.length ? subScores : undefined,
     flagReasons: flagReasons.length ? flagReasons : undefined,
+    // Recommendation
+    decisionConfidence: asStr(rec?.confidence) ?? row.recommendation_confidence ?? undefined,
+    recommendedNextStep: asStr(rec?.recommended_next_step),
+    requiresHumanReview: Boolean(row.requires_human_review),
+    humanReviewReason: asStr(rec?.human_review_reason) ?? row.human_review_reason ?? undefined,
+    keyStrengths: toStringList(rec?.key_strengths),
+    keyConcerns,
+    interviewFocusAreas: toStringList(rec?.interview_focus_areas),
+    // Skills detail
+    requiredSkills,
+    preferredSkills: toSkillMatches(sk?.preferred_skills),
+    transferableSkills: toStringList(sk?.transferable_skills),
+    missingCriticalSkills: toStringList(sk?.missing_critical_skills),
+    requiredCoveragePct:
+      asNum(sk?.required_coverage_pct) ?? row.required_coverage_pct ?? undefined,
+    preferredCoveragePct: asNum(sk?.preferred_coverage_pct),
+    // Experience detail
+    totalYears,
+    relevantYears,
+    relevantYearsReasoning: asStr(exp?.relevant_years_reasoning),
+    seniorityAssessment: asStr(exp?.seniority_assessment),
+    seniorityReasoning: asStr(exp?.seniority_reasoning),
+    careerTrajectory: asStr(exp?.career_trajectory),
+    tenurePattern: asStr(exp?.tenure_pattern),
+    domainRelevance: asStr(exp?.domain_relevance),
+    domainRelevanceNotes: asStr(exp?.domain_relevance_notes),
+    employmentGaps: toStringList(exp?.employment_gaps),
+    // Hard gates
+    overallGateStatus: asStr(gates?.overall_gate_status) ?? row.overall_gate_status ?? undefined,
+    gates: toGates(gates?.gates),
+    // Red flags
+    redFlags: toRedFlags(audit?.red_flags ?? row.red_flags),
+    // Title alignment / compensation
+    titleAlignment: asStr(cand?.title_alignment),
+    titleAlignmentNotes: asStr(cand?.title_alignment_notes),
+    compensationNotes: asStr(comp?.notes),
+    // Document
     resumeFileName: row.filename ?? undefined,
   };
 }
