@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 // Job-description detail viewer (full page, not a modal). Shows the JD PDF via
@@ -29,22 +30,56 @@ type JobPostingDetail = {
   hard_requirements: string[] | null;
   preferred_requirements: string[] | null;
   key_responsibilities: string[] | null;
+  archived: boolean | null;
   created_at: string | null;
   updated_at: string | null;
 };
 
 const SELECT_COLS =
-  "id, role, department, jd_filename, recruiter_email, parse_status, parsed_at, version, quality, quality_notes, role_title, seniority_level, min_years_experience, location_type, location_or_timezone_constraint, compensation_listed, compensation_range, hard_requirements, preferred_requirements, key_responsibilities, created_at, updated_at";
+  "id, role, department, jd_filename, recruiter_email, parse_status, parsed_at, version, quality, quality_notes, role_title, seniority_level, min_years_experience, location_type, location_or_timezone_constraint, compensation_listed, compensation_range, hard_requirements, preferred_requirements, key_responsibilities, archived, created_at, updated_at";
 
 export function JobDescriptionDetailClient({
   postingId,
+  projectId,
 }: {
   postingId: string;
+  projectId: string;
 }) {
+  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [row, setRow] = useState<JobPostingDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState(false);
+
+  async function archivePosting() {
+    if (
+      !window.confirm(
+        "Archive this position? It will be removed from the active dashboard along with its candidates. You can reopen it from Archived roles.",
+      )
+    ) {
+      return;
+    }
+    setArchiving(true);
+    try {
+      const res = await fetch("/api/job-descriptions/archive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postingId, archived: true }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(data.error ?? "Could not archive this position.");
+        return;
+      }
+      router.push(`/account/projects/${projectId}`);
+      router.refresh();
+    } catch {
+      setError("Network error while archiving.");
+    } finally {
+      setArchiving(false);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -90,14 +125,30 @@ export function JobDescriptionDetailClient({
               ? `${row.role}${row.department ? ` · ${row.department}` : ""}`
               : "Job description"}
           </h3>
-          <a
-            href={fileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-secondary inline-flex !min-h-0 !px-3 !py-1.5 text-xs"
-          >
-            Open in new tab
-          </a>
+          <div className="flex items-center gap-2">
+            {row?.archived ? (
+              <span className="inline-flex items-center rounded-full border border-[var(--ring)] bg-[var(--surface-strong)] px-2.5 py-1 text-xs text-[var(--muted)]">
+                Archived
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={archivePosting}
+                disabled={archiving || loading}
+                className="btn-secondary inline-flex !min-h-0 !px-3 !py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {archiving ? "Archiving…" : "Archive position"}
+              </button>
+            )}
+            <a
+              href={fileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-secondary inline-flex !min-h-0 !px-3 !py-1.5 text-xs"
+            >
+              Open in new tab
+            </a>
+          </div>
         </div>
         <iframe
           src={fileUrl}

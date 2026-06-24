@@ -86,6 +86,35 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  // Resolve the matching posting up front so we can (a) reject uploads into an
+  // archived role before touching storage, and (b) hand n8n the JD reference.
+  // A missing posting is fine: the candidate still uploads; jd_* come back null.
+  type PostingRef = {
+    id: string;
+    jd_object_name: string | null;
+    jd_filename: string | null;
+    archived: boolean | null;
+  };
+  let posting: PostingRef | null = null;
+  try {
+    const { data } = await createAdminClient()
+      .from("job_postings")
+      .select("id, jd_object_name, jd_filename, archived")
+      .eq("project_id", projectId)
+      .eq("role", role)
+      .eq("department", department)
+      .maybeSingle();
+    posting = (data as PostingRef | null) ?? null;
+  } catch (err) {
+    console.warn("CANDIDATE_UPLOAD_POSTING_LOOKUP_FAIL", (err as Error).message);
+  }
+  if (posting?.archived) {
+    return NextResponse.json(
+      { error: "This role is archived. Reopen it before uploading candidates." },
+      { status: 409 },
+    );
+  }
+
   // Fixed resumes bucket (constant, not env) + the webhook URL/secret, which ARE
   // env vars (a URL and a secret — real config/credentials, unlike a bucket name).
   const bucketName = RESUME_BUCKET;
@@ -148,29 +177,6 @@ export async function POST(req: Request) {
     if (meta.size != null) size = Number(meta.size);
   } catch (err) {
     console.warn("CANDIDATE_UPLOAD_META_FAIL", (err as Error).message);
-  }
-
-  // Look up the matching job posting (same project + role + department the user
-  // is uploading into) so the webhook can point n8n at the JD to cross-reference
-  // against this candidate. Service role — the route already gated on membership.
-  // A missing posting is fine: the candidate still uploads; jd_* come back null.
-  type PostingRef = {
-    id: string;
-    jd_object_name: string | null;
-    jd_filename: string | null;
-  };
-  let posting: PostingRef | null = null;
-  try {
-    const { data } = await createAdminClient()
-      .from("job_postings")
-      .select("id, jd_object_name, jd_filename")
-      .eq("project_id", projectId)
-      .eq("role", role)
-      .eq("department", department)
-      .maybeSingle();
-    posting = (data as PostingRef | null) ?? null;
-  } catch (err) {
-    console.warn("CANDIDATE_UPLOAD_POSTING_LOOKUP_FAIL", (err as Error).message);
   }
 
   // Light JSON payload — no file bytes. n8n pulls the resume from GCS using

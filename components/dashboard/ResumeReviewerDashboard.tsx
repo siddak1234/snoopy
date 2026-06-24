@@ -83,7 +83,7 @@ export function ResumeReviewerDashboard({
     (async () => {
       const { data, error } = await supabase
         .from(TABLE)
-        .select("*")
+        .select("*, posting:job_postings(role, role_title)")
         .eq("project_id", projectId);
       if (cancelled) return;
       if (error) {
@@ -92,7 +92,11 @@ export function ResumeReviewerDashboard({
         return;
       }
       setLoadError(null);
-      setCandidates(((data ?? []) as unknown as ResumeReviewRow[]).map(mapResumeRow));
+      setCandidates(
+        ((data ?? []) as unknown as ResumeReviewRow[])
+          .filter((r) => !r.archived)
+          .map(mapResumeRow),
+      );
     })();
     return () => {
       cancelled = true;
@@ -107,7 +111,8 @@ export function ResumeReviewerDashboard({
       const { data, error } = await supabase
         .from("job_postings")
         .select("*")
-        .eq("project_id", projectId);
+        .eq("project_id", projectId)
+        .eq("archived", false);
       if (cancelled || error) return;
       setPostings(((data ?? []) as unknown as JobPostingRow[]).map(mapJobPostingRow));
     })();
@@ -120,10 +125,12 @@ export function ResumeReviewerDashboard({
   const reload = useCallback(async (): Promise<Candidate[]> => {
     const { data, error } = await supabase
       .from(TABLE)
-      .select("*")
+      .select("*, posting:job_postings(role, role_title)")
       .eq("project_id", projectId);
     if (error) return [];
-    const mapped = ((data ?? []) as unknown as ResumeReviewRow[]).map(mapResumeRow);
+    const mapped = ((data ?? []) as unknown as ResumeReviewRow[])
+      .filter((r) => !r.archived)
+      .map(mapResumeRow);
     setCandidates(mapped);
     return mapped;
   }, [supabase, projectId]);
@@ -146,16 +153,8 @@ export function ResumeReviewerDashboard({
     return [...optimistic.filter((o) => !realIds.has(o.id)), ...real];
   }, [candidates, optimistic]);
 
-  // Filter options come from the candidates plus any session-local postings, so
-  // a just-created posting is selectable before its first candidate exists.
-  const roles = useMemo(
-    () =>
-      uniqueSorted([
-        ...postings.map((p) => p.role),
-        ...allCandidates.map((c) => c.role),
-      ]),
-    [postings, allCandidates],
-  );
+  // Department is the primary axis. Options come from postings plus candidates,
+  // so a just-created posting is selectable before its first candidate exists.
   const companies = useMemo(
     () =>
       uniqueSorted([
@@ -164,11 +163,26 @@ export function ResumeReviewerDashboard({
       ]),
     [postings, allCandidates],
   );
-
-  const effectiveRole = roles.includes(pickedRole) ? pickedRole : roles[0] ?? "";
   const effectiveCompany = companies.includes(pickedCompany)
     ? pickedCompany
     : companies[0] ?? "";
+
+  // Roles are SCOPED to the selected department, so the Role pill never lists a
+  // role from another department (which would form a role+department combo that
+  // matches no posting). Changing department resets the role to a valid one.
+  const roles = useMemo(
+    () =>
+      uniqueSorted([
+        ...postings
+          .filter((p) => p.department === effectiveCompany)
+          .map((p) => p.role),
+        ...allCandidates
+          .filter((c) => c.company === effectiveCompany)
+          .map((c) => c.role),
+      ]),
+    [postings, allCandidates, effectiveCompany],
+  );
+  const effectiveRole = roles.includes(pickedRole) ? pickedRole : roles[0] ?? "";
 
   // The posting (if any) for the current role + department selection — drives
   // the "View job description" button and which JD the viewer opens.
@@ -348,6 +362,14 @@ export function ResumeReviewerDashboard({
               View job description
             </button>
           )}
+          <Link
+            href={`/account/projects/${projectId}/positions/archived`}
+            title="View archived roles"
+            className="btn-secondary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm"
+          >
+            <ArchiveIcon />
+            Archived roles
+          </Link>
         </div>
       </div>
 
@@ -520,6 +542,26 @@ export function ResumeReviewerDashboard({
         onCreate={handleCreatePosting}
       />
     </section>
+  );
+}
+
+function ArchiveIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
+      <line x1="10" y1="12" x2="14" y2="12" />
+    </svg>
   );
 }
 

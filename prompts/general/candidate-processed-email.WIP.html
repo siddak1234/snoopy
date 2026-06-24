@@ -1,0 +1,100 @@
+<!--
+  Gmail "Send a message" body — Candidate Screened notification (to recruiter).
+  Same A8X style as jd-processed-email.WIP.html (black header, gray cards).
+  Deliberately a SUMMARY — decision, fit, gates, strengths/concerns, next step,
+  and contact only. The full breakdown lives in the dashboard / audit_json.
+
+  HOW TO USE IN n8n:
+  - Message field = Fixed mode, paste this whole block. Email Type = HTML.
+  - Screening fields read from the normalized resume_review item ($json.*).
+    Role/department/role_title/min_years_experience come from the job-posting
+    lookup node — shown here as $('Get Job Posting'); rename if your node differs.
+  - To: {{ $json.recruiter_email }}
+  - Subject suggestion:
+    Candidate {{ $json.decision }}: {{ $json.First_Name }} {{ $json.Last_Name }} — {{ $('Get Job Posting').item.json.role_title }}
+-->
+<div style="background:#f4f4f5;padding:24px 0;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
+    <!-- Header -->
+    <tr>
+      <td style="background:#0a0a0a;text-align:center;padding:36px 24px;">
+        <div style="color:#ffffff;font-size:34px;font-weight:800;letter-spacing:2px;line-height:1;">A8X</div>
+        <div style="color:#9ca3af;font-size:12px;letter-spacing:4px;margin-top:8px;">AUTOM8X</div>
+      </td>
+    </tr>
+
+    <!-- Body -->
+    <tr>
+      <td style="padding:32px;">
+        <h1 style="margin:0;font-size:22px;font-weight:700;color:#111827;">Candidate Screened</h1>
+        <p style="margin:6px 0 0;color:#6b7280;font-size:14px;">{{ $json.First_Name }} {{ $json.Last_Name }} — {{ $('Get Job Posting').item.json.role_title }}{{ $('Get Job Posting').item.json.department ? ' · ' + $('Get Job Posting').item.json.department : '' }}</p>
+
+        <!-- Decision pill + fit score -->
+        <div style="margin-top:18px;">
+          <span style="display:inline-block;padding:6px 14px;border-radius:999px;font-size:13px;font-weight:700;text-transform:capitalize;background:{{ $json.decision === 'advance' ? '#dcfce7' : ($json.decision === 'reject' ? '#fee2e2' : '#fef9c3') }};color:{{ $json.decision === 'advance' ? '#166534' : ($json.decision === 'reject' ? '#991b1b' : '#854d0e') }};">{{ $json.decision }}</span>
+          <span style="display:inline-block;margin-left:10px;font-size:13px;color:#6b7280;">Fit score <strong style="color:#111827;">{{ $json.fit_score }}/100</strong></span>
+        </div>
+
+        <p style="margin:18px 0 0;color:#374151;font-size:14px;line-height:1.6;">{{ $json.one_line_summary }}</p>
+
+        {{ $json.requires_human_review ? '<div style="margin-top:16px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;color:#854d0e;font-size:13px;line-height:1.5;"><strong>Flagged for human review.</strong> ' + ($json.human_review_reason || '') + '</div>' : '' }}
+
+        <!-- Snapshot -->
+        <p style="margin:28px 0 12px;font-size:12px;font-weight:700;letter-spacing:1px;color:#6b7280;">SNAPSHOT</p>
+
+        <div style="background:#f3f4f6;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+          <div style="font-size:11px;letter-spacing:1px;color:#6b7280;text-transform:uppercase;">Hard gates</div>
+          <div style="font-size:15px;font-weight:600;color:#111827;margin-top:3px;text-transform:capitalize;">{{ $json.overall_gate_status }}</div>
+        </div>
+
+        <div style="background:#f3f4f6;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+          <div style="font-size:11px;letter-spacing:1px;color:#6b7280;text-transform:uppercase;">Relevant experience</div>
+          <div style="font-size:15px;font-weight:600;color:#111827;margin-top:3px;">{{ $json.relevant_years }} yrs relevant{{ $('Get Job Posting').item.json.min_years_experience ? ' · role needs ' + $('Get Job Posting').item.json.min_years_experience + '+' : '' }}</div>
+        </div>
+
+        <div style="background:#f3f4f6;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+          <div style="font-size:11px;letter-spacing:1px;color:#6b7280;text-transform:uppercase;">Seniority vs. role</div>
+          <div style="font-size:15px;font-weight:600;color:#111827;margin-top:3px;text-transform:capitalize;">{{ $json.seniority_assessment }}</div>
+        </div>
+
+        <div style="background:#f3f4f6;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+          <div style="font-size:11px;letter-spacing:1px;color:#6b7280;text-transform:uppercase;">Required-skill coverage</div>
+          <div style="font-size:15px;font-weight:600;color:#111827;margin-top:3px;">{{ $json.required_coverage_pct }}%</div>
+        </div>
+
+        <!-- Strengths -->
+        <p style="margin:28px 0 8px;font-size:12px;font-weight:700;letter-spacing:1px;color:#6b7280;">KEY STRENGTHS</p>
+        <ul style="margin:0;padding-left:20px;color:#374151;font-size:14px;line-height:1.7;">{{ ($json.key_strengths || []).length ? ('<li>' + $json.key_strengths.join('</li><li>') + '</li>') : '<li>None noted</li>' }}</ul>
+
+        <!-- Concerns -->
+        <p style="margin:24px 0 8px;font-size:12px;font-weight:700;letter-spacing:1px;color:#6b7280;">KEY CONCERNS</p>
+        <ul style="margin:0;padding-left:20px;color:#374151;font-size:14px;line-height:1.7;">{{ ($json.key_concerns || []).length ? ('<li>' + $json.key_concerns.join('</li><li>') + '</li>') : '<li>None noted</li>' }}</ul>
+
+        <!-- Next step -->
+        <p style="margin:24px 0 8px;font-size:12px;font-weight:700;letter-spacing:1px;color:#6b7280;">RECOMMENDED NEXT STEP</p>
+        <p style="margin:0;color:#374151;font-size:14px;line-height:1.6;">{{ $json.recommended_next_step }}</p>
+
+        <!-- Contact -->
+        <p style="margin:28px 0 8px;font-size:12px;font-weight:700;letter-spacing:1px;color:#6b7280;">CANDIDATE CONTACT</p>
+        <div style="background:#f3f4f6;border-radius:10px;padding:14px 16px;font-size:14px;color:#374151;line-height:1.7;">
+          <div>{{ $json.Email_Address || '—' }}{{ $json.Phone_Number ? ' · ' + $json.Phone_Number : '' }}</div>
+          <div>{{ [$json.City, $json.State, $json.Country].filter(Boolean).join(', ') || '—' }}</div>
+          <div style="margin-top:4px;">
+            {{ $json.linkedin_url ? '<a href="' + $json.linkedin_url + '" style="color:#2563eb;">LinkedIn</a>' : '' }}{{ $json.github_url ? ' · <a href="' + $json.github_url + '" style="color:#2563eb;">GitHub</a>' : '' }}{{ $json.portfolio_or_website_url ? ' · <a href="' + $json.portfolio_or_website_url + '" style="color:#2563eb;">Website</a>' : '' }}{{ $json.huggingface_url ? ' · <a href="' + $json.huggingface_url + '" style="color:#2563eb;">Hugging Face</a>' : '' }}
+          </div>
+        </div>
+
+        <p style="margin:28px 0 0;color:#9ca3af;font-size:12px;line-height:1.6;">
+          Resume: {{ $json.filename }} · Candidate ID: {{ $json.id }}
+        </p>
+      </td>
+    </tr>
+
+    <!-- Footer -->
+    <tr>
+      <td style="background:#0a0a0a;text-align:center;padding:18px;color:#6b7280;font-size:11px;">
+        © Autom8x · This is an automated notification.
+      </td>
+    </tr>
+  </table>
+</div>
