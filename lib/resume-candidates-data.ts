@@ -8,8 +8,10 @@ export type ResumeReviewRow = {
   id: string;
   project_id: string | null;
   department: string | null;
-  job_title: string | null;
-  jd_role_title: string | null;
+  archived: boolean | null;
+  // Joined from job_postings via job_posting_id (role lives on the posting now
+  // that job_title was dropped from resume_review).
+  posting: { role: string | null; role_title: string | null } | null;
   First_Name: string | null;
   Last_Name: string | null;
   Email_Address: string | null;
@@ -87,8 +89,8 @@ export function mapResumeRow(row: ResumeReviewRow): Candidate {
     id: row.id,
     name,
     email: row.Email_Address ?? "",
-    // Role = the opening's title we stamp on upload; fall back to the JD-parsed title.
-    role: row.job_title ?? row.jd_role_title ?? "",
+    // Role comes from the linked job posting (role, or its parsed role_title).
+    role: row.posting?.role ?? row.posting?.role_title ?? "",
     company: row.department ?? "",
     appliedAt: isoDay(row.submittedAt ?? row.createdAt),
     fitScore: row.fit_score ?? 0,

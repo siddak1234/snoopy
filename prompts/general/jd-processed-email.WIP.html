@@ -1,0 +1,95 @@
+<!--
+  Gmail "Send a message" body — JD Processed notification.
+  Mirrors the A8X "Registration Confirmed" email style (black header, white body,
+  gray detail cards, uppercase section labels).
+
+  HOW TO USE IN n8n:
+  - Set the Message field to **Fixed** mode (not Expression) and paste this whole
+    block. The inline {{ }} expressions resolve in Fixed mode; the surrounding
+    HTML is literal. Email Type = HTML.
+  - All dynamic fields read from the "Update a row" node (the full updated
+    job_postings row, incl. the jsonb arrays). If your Send node sits directly
+    after "Update a row", you can replace every $('Update a row').item.json
+    with just $json.
+  - To: {{ $('Webhook').item.json.body.recruiter_email }}
+  - Subject suggestion: Job Description Processed: {{ $('Update a row').item.json.role }} — {{ $('Update a row').item.json.department }}
+-->
+<div style="background:#f4f4f5;padding:24px 0;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
+    <!-- Header -->
+    <tr>
+      <td style="background:#0a0a0a;text-align:center;padding:36px 24px;">
+        <div style="color:#ffffff;font-size:34px;font-weight:800;letter-spacing:2px;line-height:1;">A8X</div>
+        <div style="color:#9ca3af;font-size:12px;letter-spacing:4px;margin-top:8px;">AUTOM8X</div>
+      </td>
+    </tr>
+
+    <!-- Body -->
+    <tr>
+      <td style="padding:32px;">
+        <h1 style="margin:0;font-size:22px;font-weight:700;color:#111827;">Job Description Processed</h1>
+        <p style="margin:6px 0 0;color:#6b7280;font-size:14px;">{{ $('Update a row').item.json.role_title || $('Update a row').item.json.role }}{{ $('Update a row').item.json.department ? ' — ' + $('Update a row').item.json.department : '' }}</p>
+
+        <p style="margin:24px 0 0;color:#374151;font-size:14px;line-height:1.6;">Hi there,</p>
+        <p style="margin:12px 0 0;color:#374151;font-size:14px;line-height:1.6;">
+          The job description for <strong>{{ $('Update a row').item.json.role }}</strong> has been processed and parsed. A summary is below — the full breakdown is available on the posting's page in your dashboard.
+        </p>
+
+        <!-- Posting details -->
+        <p style="margin:28px 0 12px;font-size:12px;font-weight:700;letter-spacing:1px;color:#6b7280;">POSTING DETAILS</p>
+
+        <div style="background:#f3f4f6;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+          <div style="font-size:11px;letter-spacing:1px;color:#6b7280;text-transform:uppercase;">Parsed title</div>
+          <div style="font-size:15px;font-weight:600;color:#111827;margin-top:3px;">{{ $('Update a row').item.json.role_title || '—' }}</div>
+        </div>
+
+        <div style="background:#f3f4f6;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+          <div style="font-size:11px;letter-spacing:1px;color:#6b7280;text-transform:uppercase;">Seniority</div>
+          <div style="font-size:15px;font-weight:600;color:#111827;margin-top:3px;">{{ $('Update a row').item.json.seniority_level || '—' }}</div>
+        </div>
+
+        <div style="background:#f3f4f6;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+          <div style="font-size:11px;letter-spacing:1px;color:#6b7280;text-transform:uppercase;">Minimum experience</div>
+          <div style="font-size:15px;font-weight:600;color:#111827;margin-top:3px;">{{ $('Update a row').item.json.min_years_experience != null ? $('Update a row').item.json.min_years_experience + '+ years' : 'Not specified' }}</div>
+        </div>
+
+        <div style="background:#f3f4f6;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+          <div style="font-size:11px;letter-spacing:1px;color:#6b7280;text-transform:uppercase;">Location</div>
+          <div style="font-size:15px;font-weight:600;color:#111827;margin-top:3px;">{{ $('Update a row').item.json.location_type || 'Not specified' }}{{ $('Update a row').item.json.location_or_timezone_constraint ? ' · ' + $('Update a row').item.json.location_or_timezone_constraint : '' }}</div>
+        </div>
+
+        <div style="background:#f3f4f6;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+          <div style="font-size:11px;letter-spacing:1px;color:#6b7280;text-transform:uppercase;">Compensation</div>
+          <div style="font-size:15px;font-weight:600;color:#111827;margin-top:3px;">{{ $('Update a row').item.json.compensation_listed ? ($('Update a row').item.json.compensation_range || 'Listed') : 'Not listed' }}</div>
+        </div>
+
+        <div style="background:#f3f4f6;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+          <div style="font-size:11px;letter-spacing:1px;color:#6b7280;text-transform:uppercase;">JD quality</div>
+          <div style="font-size:15px;font-weight:600;color:#111827;margin-top:3px;text-transform:capitalize;">{{ $('Update a row').item.json.quality || '—' }}</div>
+          <div style="font-size:13px;color:#6b7280;margin-top:4px;line-height:1.5;">{{ $('Update a row').item.json.quality_notes || '' }}</div>
+        </div>
+
+        <!-- Requirements -->
+        <p style="margin:28px 0 8px;font-size:12px;font-weight:700;letter-spacing:1px;color:#6b7280;">HARD REQUIREMENTS</p>
+        <ul style="margin:0;padding-left:20px;color:#374151;font-size:14px;line-height:1.7;">{{ ($('Update a row').item.json.hard_requirements || []).length ? ('<li>' + $('Update a row').item.json.hard_requirements.join('</li><li>') + '</li>') : '<li>None specified</li>' }}</ul>
+
+        <p style="margin:24px 0 8px;font-size:12px;font-weight:700;letter-spacing:1px;color:#6b7280;">PREFERRED REQUIREMENTS</p>
+        <ul style="margin:0;padding-left:20px;color:#374151;font-size:14px;line-height:1.7;">{{ ($('Update a row').item.json.preferred_requirements || []).length ? ('<li>' + $('Update a row').item.json.preferred_requirements.join('</li><li>') + '</li>') : '<li>None specified</li>' }}</ul>
+
+        <p style="margin:24px 0 8px;font-size:12px;font-weight:700;letter-spacing:1px;color:#6b7280;">KEY RESPONSIBILITIES</p>
+        <ul style="margin:0;padding-left:20px;color:#374151;font-size:14px;line-height:1.7;">{{ ($('Update a row').item.json.key_responsibilities || []).length ? ('<li>' + $('Update a row').item.json.key_responsibilities.join('</li><li>') + '</li>') : '<li>None specified</li>' }}</ul>
+
+        <p style="margin:28px 0 0;color:#9ca3af;font-size:12px;line-height:1.6;">
+          Posting ID: {{ $('Update a row').item.json.id }} · Version {{ $('Update a row').item.json.version }} · Source file: {{ $('Update a row').item.json.jd_filename }}
+        </p>
+      </td>
+    </tr>
+
+    <!-- Footer -->
+    <tr>
+      <td style="background:#0a0a0a;text-align:center;padding:18px;color:#6b7280;font-size:11px;">
+        © Autom8x · This is an automated notification.
+      </td>
+    </tr>
+  </table>
+</div>

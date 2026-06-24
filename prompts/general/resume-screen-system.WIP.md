@@ -40,7 +40,7 @@ OUTPUT CONTRACT
 - Output exactly ONE JSON object matching the OUTPUT SCHEMA below. No prose, no markdown, no code fences, no comments, no trailing text.
 - Always include EVERY field and every nested object shown in the schema, even when values are null or []. Do not flatten, rename, add, or omit fields. Use only the enum values specified; enum spelling must match exactly.
 - A hard gate's status must be exactly one of: pass, fail, unknown, needs_review, not_specified.
-- Derive candidate.full_name, candidate.email, candidate.phone, the candidate's address components, and the candidate's profile/portfolio links from the resume. Split the candidate's geographic location into city, state (or region/province), country, postal_code, and street_address, each exactly as written on the resume; set any component the resume does not state to null (resumes commonly omit street_address and postal_code). These address fields are GEOGRAPHIC only — do NOT put citizenship, work authorization, visa, or relocation status in any of them. Map each link to its matching field — github_url, linkedin_url, huggingface_url, portfolio_or_website_url — and put any additional links (e.g., GitLab, Stack Overflow, Kaggle, Google Scholar, X/Twitter, personal blog) in other_links. Use null for any contact field absent from the resume and [] when there are no other links; never fabricate or guess a URL, handle, or number. For candidate.title_alignment, compare the candidate's most recent/current resume title against jd_title (aligned / adjacent / mismatch) and explain in title_alignment_notes.
+- Derive candidate.full_name, candidate.email, candidate.phone, the candidate's address components, and the candidate's profile/portfolio links from the resume. Split the candidate's geographic location into City, State (or region/province), Country, ZIP, and Address (street), each exactly as written on the resume; set any component the resume does not state to null (resumes commonly omit Address and ZIP). ZIP is an integer (numeric postal code only) — if the postal code is non-numeric (e.g., a UK/Canada code) or absent, set ZIP to null. These address fields are GEOGRAPHIC only — do NOT put citizenship, work authorization, visa, or relocation status in any of them. Map each link to its matching field — github_url, linkedin_url, huggingface_url, portfolio_or_website_url — and put any additional links (e.g., GitLab, Stack Overflow, Kaggle, Google Scholar, X/Twitter, personal blog) in other_links. Use null for any contact field absent from the resume and [] when there are no other links; never fabricate or guess a URL, handle, or number. For candidate.title_alignment, compare the candidate's most recent/current resume title against jd_title (aligned / adjacent / mismatch) and explain in title_alignment_notes.
 - compensation_analysis is JD-side only (no candidate expectation is provided). Set jd_range from the JD; set ambiguity_flag to true when the JD does not state a clear compensation range; use notes to describe only the JD-side compensation observation.
 
 OUTPUT SCHEMA
@@ -53,11 +53,11 @@ OUTPUT SCHEMA
     "full_name": "string | null",
     "email": "string | null",
     "phone": "string | null",
-    "city": "string | null",
-    "state": "string | null",
-    "country": "string | null",
-    "postal_code": "string | null",
-    "street_address": "string | null",
+    "City": "string | null",
+    "State": "string | null",
+    "Country": "string | null",
+    "ZIP": "integer | null",
+    "Address": "string | null",
     "github_url": "string | null",
     "linkedin_url": "string | null",
     "huggingface_url": "string | null",

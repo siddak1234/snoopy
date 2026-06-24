@@ -36,7 +36,7 @@ export default async function JobDescriptionPage({
       }
     >
       <div className="py-5 first:pt-0">
-        <JobDescriptionDetailClient postingId={postingId} />
+        <JobDescriptionDetailClient postingId={postingId} projectId={id} />
       </div>
     </SectionCard>
   );
