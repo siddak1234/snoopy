@@ -74,7 +74,20 @@ export type CandidateDetail = {
   // Contact
   phone?: string;
   location?: string;
+  address?: string;
   links?: CandidateLink[];
+  // Candidate-attested / EEO (present in resume_review; null until a form fills
+  // them — the current JD+resume automation does not populate these).
+  workAuthorization?: string;
+  sponsorship?: string;
+  willingToRelocate?: string;
+  earliestStart?: string;
+  salaryExpectation?: string;
+  gender?: string;
+  hispanic?: string;
+  ethnicity?: string;
+  veteran?: string;
+  disability?: string;
   // Profile
   yearsExperience?: number;
   skills?: string[];
