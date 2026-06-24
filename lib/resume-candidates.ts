@@ -40,9 +40,35 @@ export type Candidate = {
 // ---------------------------------------------------------------------------
 
 export type CandidateLink = { label: string; url: string };
-export type CandidateEducation = { degree: string; school: string };
 /** A 0–100 screening sub-score (e.g. Skills match) — feeds BreakdownList. */
 export type CandidateSubScore = { label: string; score: number };
+
+/** A single required/preferred skill judged against the JD. */
+export type SkillMatch = {
+  skill: string;
+  /** strong | partial | none | unknown */
+  match: string;
+  evidence?: string;
+  confidence?: string;
+};
+/** A hard-gate evaluation (location_timezone | years_of_experience). */
+export type GateDetail = {
+  gate: string;
+  /** pass | fail | unknown | needs_review | not_specified */
+  status: string;
+  requirement?: string;
+  candidateValue?: string;
+  evidence?: string;
+  reasoning?: string;
+  confidence?: string;
+};
+/** A screening red flag. */
+export type RedFlagDetail = {
+  type: string;
+  severity: string;
+  description?: string;
+  evidence?: string;
+};
 
 export type CandidateDetail = {
   // Contact
@@ -50,15 +76,47 @@ export type CandidateDetail = {
   location?: string;
   links?: CandidateLink[];
   // Profile
-  title?: string;
-  currentEmployer?: string;
   yearsExperience?: number;
-  education?: CandidateEducation[];
   skills?: string[];
-  // Assessment
+  // Assessment (summary)
   summary?: string;
   subScores?: CandidateSubScore[];
   flagReasons?: string[];
+  // Recommendation
+  decisionConfidence?: string;
+  recommendedNextStep?: string;
+  requiresHumanReview?: boolean;
+  humanReviewReason?: string;
+  keyStrengths?: string[];
+  keyConcerns?: string[];
+  interviewFocusAreas?: string[];
+  // Skills detail
+  requiredSkills?: SkillMatch[];
+  preferredSkills?: SkillMatch[];
+  transferableSkills?: string[];
+  missingCriticalSkills?: string[];
+  requiredCoveragePct?: number;
+  preferredCoveragePct?: number;
+  // Experience detail
+  totalYears?: number;
+  relevantYears?: number;
+  relevantYearsReasoning?: string;
+  seniorityAssessment?: string;
+  seniorityReasoning?: string;
+  careerTrajectory?: string;
+  tenurePattern?: string;
+  domainRelevance?: string;
+  domainRelevanceNotes?: string;
+  employmentGaps?: string[];
+  // Hard gates
+  overallGateStatus?: string;
+  gates?: GateDetail[];
+  // Red flags
+  redFlags?: RedFlagDetail[];
+  // Title alignment / compensation
+  titleAlignment?: string;
+  titleAlignmentNotes?: string;
+  compensationNotes?: string;
   // Document
   resumeFileName?: string;
 };

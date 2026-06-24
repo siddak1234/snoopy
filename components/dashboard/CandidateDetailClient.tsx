@@ -37,7 +37,7 @@ export function CandidateDetailClient({
     (async () => {
       const { data, error } = await supabase
         .from("resume_review")
-        .select("*")
+        .select("*, posting:job_postings(role, role_title)")
         .eq("project_id", projectId)
         .eq("id", candidateId)
         .maybeSingle();
