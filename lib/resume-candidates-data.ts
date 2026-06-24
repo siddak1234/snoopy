@@ -82,6 +82,21 @@ function asNum(v: unknown): number | undefined {
   return typeof v === "number" && Number.isFinite(v) ? v : undefined;
 }
 
+// The model sometimes returns a bare host (e.g. "autom8x.ai") with no scheme;
+// without one the browser treats href as a relative path (→ 404). Force https.
+function ensureUrl(u: string): string {
+  const t = u.trim();
+  return /^https?:\/\//i.test(t) ? t : `https://${t}`;
+}
+// A short, readable label for an arbitrary link (its hostname, sans www).
+function hostLabel(u: string): string {
+  try {
+    return new URL(ensureUrl(u)).hostname.replace(/^www\./, "");
+  } catch {
+    return u;
+  }
+}
+
 // jsonb arrays may hold plain strings or objects ({skill}, {reason}, …); coerce
 // to a clean string[] so chips / lists render uniformly. Also accepts a single
 // string (some columns got flattened by the n8n normalize) → [string].
@@ -209,15 +224,18 @@ export function mapResumeDetail(row: ResumeReviewRow): CandidateDetail {
   ).filter((s): s is { label: string; score: number } => s.score != null);
 
   const links: CandidateLink[] = [
-    row.linkedin_url ? { label: "LinkedIn", url: row.linkedin_url } : null,
-    row.github_url ? { label: "GitHub", url: row.github_url } : null,
+    row.linkedin_url ? { label: "LinkedIn", url: ensureUrl(row.linkedin_url) } : null,
+    row.github_url ? { label: "GitHub", url: ensureUrl(row.github_url) } : null,
     row.portfolio_or_website_url
-      ? { label: "Website", url: row.portfolio_or_website_url }
+      ? { label: "Website", url: ensureUrl(row.portfolio_or_website_url) }
       : null,
     row.huggingface_url
-      ? { label: "Hugging Face", url: row.huggingface_url }
+      ? { label: "Hugging Face", url: ensureUrl(row.huggingface_url) }
       : null,
-    ...toStringList(row.other_links).map((u) => ({ label: u, url: u })),
+    ...toStringList(row.other_links).map((u) => ({
+      label: hostLabel(u),
+      url: ensureUrl(u),
+    })),
   ].filter((l): l is CandidateLink => l != null);
 
   const requiredSkills = toSkillMatches(sk?.required_skills ?? row.required_skills);
