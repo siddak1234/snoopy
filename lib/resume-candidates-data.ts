@@ -28,6 +28,17 @@ export type ResumeReviewRow = {
   City: string | null;
   State: string | null;
   Country: string | null;
+  Address: string | null;
+  authorized: string | null;
+  sponsorship: string | null;
+  salary_expectations: number | null;
+  start_date: string | null;
+  relocate: string | null;
+  gender: string | null;
+  hispanic: string | null;
+  ethnicity: string | null;
+  veteran: string | null;
+  disability: string | null;
   github_url: string | null;
   linkedin_url: string | null;
   huggingface_url: string | null;
@@ -258,7 +269,20 @@ export function mapResumeDetail(row: ResumeReviewRow): CandidateDetail {
     // Contact
     phone: row.Phone_Number != null ? String(row.Phone_Number) : undefined,
     location: location || undefined,
+    address: asStr(row.Address),
     links: links.length ? links : undefined,
+    // Candidate-attested / EEO (null until a form populates them)
+    workAuthorization: asStr(row.authorized),
+    sponsorship: asStr(row.sponsorship),
+    willingToRelocate: asStr(row.relocate),
+    earliestStart: row.start_date ? row.start_date.slice(0, 10) : undefined,
+    salaryExpectation:
+      row.salary_expectations != null ? String(row.salary_expectations) : undefined,
+    gender: asStr(row.gender),
+    hispanic: asStr(row.hispanic),
+    ethnicity: asStr(row.ethnicity),
+    veteran: asStr(row.veteran),
+    disability: asStr(row.disability),
     // Profile
     yearsExperience: yearsForHeader != null ? Math.round(yearsForHeader) : undefined,
     skills: requiredSkills.map((s) => s.skill),

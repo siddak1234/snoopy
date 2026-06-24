@@ -133,11 +133,12 @@ export function CandidateDetail({
           )}
         </SectionPanel>
 
-        <SectionPanel title="Contact">
+        <SectionPanel title="Candidate info">
           <dl className="flex flex-col gap-2.5 text-sm">
             <Row label="Email" value={candidate.email || undefined} />
             <Row label="Phone" value={detail?.phone} />
             <Row label="Location" value={detail?.location} />
+            <Row label="Address" value={detail?.address} />
             <div>
               <dt className="text-[var(--muted)]">Links</dt>
               <dd className="mt-1.5">
@@ -152,6 +153,20 @@ export function CandidateDetail({
                 )}
               </dd>
             </div>
+
+            <SubLabel>Eligibility</SubLabel>
+            <Row label="Work authorization" value={detail?.workAuthorization} />
+            <Row label="Needs sponsorship" value={detail?.sponsorship} />
+            <Row label="Willing to relocate" value={detail?.willingToRelocate} />
+            <Row label="Earliest start" value={detail?.earliestStart} />
+            <Row label="Salary expectation" value={detail?.salaryExpectation} />
+
+            <SubLabel>EEO (self-reported)</SubLabel>
+            <Row label="Gender" value={detail?.gender} />
+            <Row label="Hispanic / Latino" value={detail?.hispanic} />
+            <Row label="Ethnicity" value={detail?.ethnicity} />
+            <Row label="Veteran status" value={detail?.veteran} />
+            <Row label="Disability status" value={detail?.disability} />
           </dl>
         </SectionPanel>
       </div>
@@ -639,6 +654,15 @@ function Field({
         <p className="mt-0.5 text-xs leading-relaxed text-[var(--muted)]">{note}</p>
       ) : null}
     </div>
+  );
+}
+
+// Sub-group divider label inside the Candidate info card.
+function SubLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="mt-2 border-t border-[var(--ring)]/60 pt-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+      {children}
+    </p>
   );
 }
 
