@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAppSession } from "@/hooks/use-app-session";
+import { useHydrated } from "@/hooks/use-hydrated";
 
 const pillClass =
   "rounded-full px-4 py-2 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]";
@@ -17,12 +17,8 @@ const loadingPlaceholder = (
 );
 
 export default function AuthNavLinks() {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHydrated();
   const { data: session, status } = useAppSession();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   async function handleSignOut() {
     const supabase = createClient();

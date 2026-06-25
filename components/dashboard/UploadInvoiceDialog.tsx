@@ -172,7 +172,7 @@ export function UploadInvoiceDialog({
         <>
           <p className="mt-1 text-sm text-[var(--muted)]">
             Uploaded — processing has started. The invoice will appear in the
-            list once it's been parsed.
+            list once it&apos;s been parsed.
           </p>
           <dl className="mt-4 space-y-1.5 rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm">
             <Row label="File" value={captured.fileName} />
