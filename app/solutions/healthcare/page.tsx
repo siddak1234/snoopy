@@ -105,8 +105,8 @@ export default function HealthcareSolutionsPage() {
           <Link href="/contact" className="btn-primary px-5">
             Book a demo
           </Link>
-          <Link href="/solutions/use-cases/healthcare-documentation" className="btn-secondary px-5">
-            Read case study
+          <Link href="/use-cases/healthcare-documentation" className="btn-secondary px-5">
+            Read use case
           </Link>
         </div>
       </section>
