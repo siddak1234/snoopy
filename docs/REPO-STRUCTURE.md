@@ -30,7 +30,7 @@ snoopy/
 | Icons / small assets | `components/icons/` or `public/` | Icons as React components in `components/icons/`; static SVGs in `public/`. |
 | Database access | Use `lib/db.ts` | Import `db` from `@/lib/db`; do not create new Prisma client instances. |
 | App/site config (name, tagline) | `lib/site.ts` | Constants used across the app. |
-| Env validation | `lib/env.ts` | `validateEnv()` — in production runtime, throws if required vars missing. Call from `instrumentation.ts` or at app bootstrap if desired. |
+| Env validation | `lib/env.ts` | `validateEnv()` — in production runtime, throws if required vars missing. Wired at startup via `instrumentation.ts` (`register()`, nodejs runtime). |
 | Auth config | `lib/auth.ts`, `lib/auth-supabase.ts` | `ensureDefaultWorkspaceForUser()` in auth.ts; `getAppSession()`, `provisionUserFromSupabaseAuth()` in auth-supabase.ts. |
 | Route protection | `middleware.ts` | Protects `/account` (redirects to `/login` if unauthenticated). |
 | Liveness | `app/api/health/route.ts` | `GET /api/health` — 200 always; no DB (build-safe). |

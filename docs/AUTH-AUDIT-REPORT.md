@@ -142,7 +142,7 @@ After provisioning, `getAppSession()` calls `ensureDefaultWorkspaceForUser(id)` 
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 
-**Note:** `validateEnv()` is **never invoked** in the codebase. To fail fast in production when required env is missing, call it from `instrumentation.ts` (Next.js) or another single bootstrap path.
+**Note:** `validateEnv()` is invoked at startup from `instrumentation.ts` (Next.js `register()` hook, nodejs runtime), so production fails fast when required env is missing.
 
 ---
 
@@ -151,7 +151,7 @@ After provisioning, `getAppSession()` calls `ensureDefaultWorkspaceForUser(id)` 
 | Risk | Mitigation |
 |------|------------|
 | **Same email, multiple OAuth providers** | Single Prisma User per email; `supabaseUserId` stores last-used provider’s Supabase id. If user switches provider, they still get the same app user. |
-| **Env validation not run** | Add `instrumentation.ts` that calls `validateEnv()` so production fails fast on missing vars. |
+| **Env validation not run** | Resolved — `instrumentation.ts` calls `validateEnv()` at startup so production fails fast on missing vars. |
 | **Supabase redirect URLs** | Must include production and local URLs in Supabase Dashboard (e.g. `https://yourdomain.com/auth/callback`, `http://localhost:3000/auth/callback`). |
 | **Middleware deprecation** | Next.js may warn about `middleware` → `proxy`. Auth behavior is correct; follow framework guidance when migrating to `proxy` later. |
 
@@ -184,4 +184,4 @@ After provisioning, `getAppSession()` calls `ensureDefaultWorkspaceForUser(id)` 
 - **Supabase Auth:** Google and Microsoft use `signInWithOAuth` with correct `redirectTo`; callback exchanges code and redirects; client and server Supabase usage is correct.
 - **Guards:** Middleware and layout checks enforce Supabase session for `/account` and `/dashboard`; redirect to login when unauthenticated.
 - **Provisioning:** Single path in `getAppSession()` → `provisionUserFromSupabaseAuth` + `ensureDefaultWorkspaceForUser`; one Prisma User per email; no duplicate users for same email across providers.
-- **Env:** Only Supabase and Postgres vars are used; no code references removed vars. Optional improvement: call `validateEnv()` at bootstrap so production fails fast on missing env.
+- **Env:** Only Supabase and Postgres vars are used; no code references removed vars. `validateEnv()` runs at bootstrap via `instrumentation.ts`, so production fails fast on missing env.
