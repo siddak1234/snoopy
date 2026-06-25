@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useHydrated } from "@/hooks/use-hydrated";
 
 const WORDS = ["Design", "Run", "Autom8"] as const;
 const SUFFIX = " enterprise workflows";
@@ -10,16 +11,12 @@ const PAUSE_AFTER_TYPE = 800;
 const PAUSE_AFTER_DELETE = 220;
 
 export default function TypingHeadline() {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHydrated();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [displayed, setDisplayed] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDone, setIsDone] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

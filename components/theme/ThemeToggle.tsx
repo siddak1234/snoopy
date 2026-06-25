@@ -1,8 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 type Theme = "light" | "dark";
+
+const THEME_EVENT = "themechange";
+
+function subscribe(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener(THEME_EVENT, callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(THEME_EVENT, callback);
+  };
+}
+
+function getThemeSnapshot(): Theme {
+  const stored = localStorage.getItem("theme");
+  return stored === "dark" || stored === "light" ? stored : "light";
+}
+
+// Always "light" on the server so the initial client render matches (avoids hydration error #418).
+function getServerSnapshot(): Theme {
+  return "light";
+}
 
 function MoonIcon() {
   return (
@@ -29,16 +50,7 @@ function SunIcon() {
 }
 
 export default function ThemeToggle() {
-  // Always start with "light" so server and client initial render match (avoids hydration error #418).
-  const [theme, setTheme] = useState<Theme>("light");
-
-  useEffect(() => {
-    const storedTheme = localStorage.getItem("theme");
-    const initial =
-      storedTheme === "dark" || storedTheme === "light" ? storedTheme : "light";
-    setTheme(initial);
-    document.documentElement.dataset.theme = initial;
-  }, []);
+  const theme = useSyncExternalStore(subscribe, getThemeSnapshot, getServerSnapshot);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -47,9 +59,9 @@ export default function ThemeToggle() {
   const nextTheme = theme === "light" ? "dark" : "light";
 
   const toggleTheme = () => {
-    setTheme(nextTheme);
-    document.documentElement.dataset.theme = nextTheme;
     localStorage.setItem("theme", nextTheme);
+    document.documentElement.dataset.theme = nextTheme;
+    window.dispatchEvent(new Event(THEME_EVENT));
   };
 
   return (
