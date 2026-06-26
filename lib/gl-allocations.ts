@@ -93,17 +93,32 @@ export async function recomputeAllocationRow(
     GROUP BY m.allocation_column
   `;
 
-  // Build the per-column sums map (only columns that actually have line items).
-  const perColumn: Record<string, number> = {};
-  let total = 0;
+  // Sum line items into category columns. Anything without a recognized
+  // allocation_column — line items with a NULL GL_Account, or a code mapped to
+  // a column outside ALLOCATION_COLUMNS — is bucketed into `other` so the
+  // category columns always reconcile to `total` (uncategorized money stays
+  // visible instead of silently inflating the total). Accumulate raw amounts
+  // and round once at the end to avoid per-column cent drift.
+  const perColumnRaw: Record<string, number> = {};
   for (const row of summed) {
     const amount = Number(row.column_sum);
-    total += amount;
-    if (row.allocation_column && ALLOCATION_COLUMNS.includes(row.allocation_column as AllocationColumn)) {
-      perColumn[row.allocation_column] = Math.round(amount * 100) / 100;
-    }
+    const col =
+      row.allocation_column &&
+      ALLOCATION_COLUMNS.includes(row.allocation_column as AllocationColumn)
+        ? row.allocation_column
+        : "other";
+    perColumnRaw[col] = (perColumnRaw[col] ?? 0) + amount;
   }
-  total = Math.round(total * 100) / 100;
+
+  const perColumn: Record<string, number> = {};
+  for (const [col, amount] of Object.entries(perColumnRaw)) {
+    perColumn[col] = Math.round(amount * 100) / 100;
+  }
+  // Derive total from the rounded columns so total === sum(columns) exactly.
+  const total =
+    Math.round(
+      Object.values(perColumn).reduce((sum, value) => sum + value, 0) * 100,
+    ) / 100;
 
   // Distinct invoice count for this scope.
   const countRows = await tx.$queryRaw<Array<{ invoice_count: bigint }>>`
