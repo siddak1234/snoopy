@@ -59,6 +59,7 @@ export function ResumeReviewerDashboard({
   projectId: string;
 }) {
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
 
   // `candidates` = real rows from the DB (null = loading). `optimistic` = rows
   // added this session after an upload, before their screened row exists.
@@ -236,8 +237,11 @@ export function ResumeReviewerDashboard({
           subtitle: c.decision,
           value: integerFmt.format(c.fitScore),
           valueClassName: DECISION_TEXT_CLASS[c.decision],
+          href: `/account/projects/${projectId}/candidates/detail?candidate=${encodeURIComponent(
+            c.id,
+          )}`,
         })),
-    [scoped],
+    [scoped, projectId],
   );
 
   // Optimistically show the uploaded candidate as Pending, then poll for its
@@ -410,7 +414,13 @@ export function ResumeReviewerDashboard({
           subtext="flagged by gates"
           highlighted={needsReview > 0}
           disabled={needsReview === 0}
-          onClick={() => {}}
+          onClick={() =>
+            router.push(
+              `/account/projects/${projectId}/candidates/review?role=${encodeURIComponent(
+                effectiveRole,
+              )}&department=${encodeURIComponent(effectiveCompany)}`,
+            )
+          }
         />
       </div>
 

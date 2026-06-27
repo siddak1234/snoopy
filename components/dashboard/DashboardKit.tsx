@@ -1,6 +1,7 @@
 "use client";
 
 import type React from "react";
+import Link from "next/link";
 
 /**
  * Shared presentational primitives for project dashboards.
@@ -318,35 +319,56 @@ export type RankedItem = {
   value: string;
   /** Tailwind classes appended to the value span (e.g. a color token). */
   valueClassName?: string;
+  /** When set, the whole row becomes a link to this href. */
+  href?: string;
 };
 
 /**
  * Generalized from the GL dashboard's VendorsList. Used for "Top vendors"
  * (merchant + invoice count + spend) and "Top candidates" (name + decision +
- * fit score) alike.
+ * fit score) alike. When an item carries an `href`, its row links there;
+ * otherwise it renders as static text (preserving the GL dashboard's behavior).
  */
 export function RankedList({ items }: { items: RankedItem[] }) {
   return (
     <ul className="flex flex-col gap-3">
-      {items.map((item) => (
-        <li key={item.key} className="flex items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-[var(--text)]">
-              {item.title}
+      {items.map((item) => {
+        const content = (
+          <>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-[var(--text)]">
+                {item.title}
+              </p>
+              {item.subtitle ? (
+                <p className="text-[10px] text-[var(--muted)]">{item.subtitle}</p>
+              ) : null}
+            </div>
+            <p
+              className={`shrink-0 text-sm font-semibold tabular-nums ${
+                item.valueClassName ?? "text-[var(--text)]"
+              }`}
+            >
+              {item.value}
             </p>
-            {item.subtitle ? (
-              <p className="text-[10px] text-[var(--muted)]">{item.subtitle}</p>
-            ) : null}
-          </div>
-          <p
-            className={`shrink-0 text-sm font-semibold tabular-nums ${
-              item.valueClassName ?? "text-[var(--text)]"
-            }`}
-          >
-            {item.value}
-          </p>
-        </li>
-      ))}
+          </>
+        );
+        return (
+          <li key={item.key}>
+            {item.href ? (
+              <Link
+                href={item.href}
+                className="flex items-center justify-between gap-3 rounded-lg -mx-2 px-2 py-1 transition hover:bg-[var(--surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+              >
+                {content}
+              </Link>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                {content}
+              </div>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

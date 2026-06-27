@@ -199,6 +199,14 @@ export function mapResumeRow(row: ResumeReviewRow): Candidate {
     ? Date.now() - created.getTime() < WEEK_MS
     : false;
 
+  // Lightweight flag reasons straight from the row columns (the detail view
+  // prefers audit_json; the list only needs this concise version).
+  const humanReviewReason = asStr(row.human_review_reason);
+  const flagReasons = [
+    ...toStringList(row.key_concerns),
+    ...(humanReviewReason ? [humanReviewReason] : []),
+  ];
+
   return {
     id: row.id,
     name,
@@ -211,6 +219,7 @@ export function mapResumeRow(row: ResumeReviewRow): Candidate {
     decision: capitalizeDecision(row.decision),
     newThisWeek,
     flagged: Boolean(row.requires_human_review),
+    flagReasons,
     pending,
   };
 }
