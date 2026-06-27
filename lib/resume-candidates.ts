@@ -27,6 +27,11 @@ export type Candidate = {
   /** Counts toward "Needs review" — flagged by screening gates. */
   flagged: boolean;
   /**
+   * Concise reasons behind the flag (key concerns + human-review reason), shown
+   * on the Needs Review list. Empty/undefined when not flagged.
+   */
+  flagReasons?: string[];
+  /**
    * Uploaded but not yet screened (no decision yet). While true the candidate
    * shows a neutral "Pending" pill and "—" fit score, counts toward Total + New
    * this week, and is EXCLUDED from the decision breakdown / top list / advance
