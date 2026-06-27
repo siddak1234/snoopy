@@ -295,11 +295,13 @@ export function ResumeReviewerDashboard({
     setPickedCompany(input.department);
   }
 
-  // Table rows: most recent first, then client-side search.
+  // Table rows: highest fit score first, then client-side search. Not-yet-scored
+  // (pending) uploads have no real score, so they sink to the bottom.
   const rows = useMemo(() => {
-    const sorted = [...scoped].sort((a, b) =>
-      a.appliedAt < b.appliedAt ? 1 : a.appliedAt > b.appliedAt ? -1 : 0,
-    );
+    const sorted = [...scoped].sort((a, b) => {
+      if (a.pending !== b.pending) return a.pending ? 1 : -1;
+      return b.fitScore - a.fitScore;
+    });
     const q = query.trim().toLowerCase();
     if (!q) return sorted;
     return sorted.filter(
