@@ -1,137 +1,191 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { Button } from "@/components/ui/Button";
+import { Container, Section } from "@/components/ui/Section";
+import { Kicker } from "@/components/ui/Kicker";
+import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
+import { RevealOnScroll } from "@/components/marketing/RevealOnScroll";
 
-function HealthcareIconCluster() {
-  return (
-    <div className="relative h-20 w-20 shrink-0">
-      <svg
-        viewBox="0 0 48 48"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        className="absolute inset-0 h-20 w-20 text-[var(--icon-text)]"
-        aria-hidden
-      >
-        <circle cx="16" cy="14" r="3.5" />
-        <circle cx="32" cy="14" r="3.5" />
-        <circle cx="12" cy="28" r="3.5" />
-        <circle cx="24" cy="34" r="3.5" />
-        <circle cx="36" cy="28" r="3.5" />
-        <path d="M19 14H28" />
-        <path d="M14.6 17L12.9 24.3" />
-        <path d="M33.4 17L35.1 24.3" />
-        <path d="M15.4 29.8L20.8 33" />
-        <path d="M32.6 29.8L27.2 33" />
-      </svg>
-      <span className="absolute top-2 left-0 h-2 w-2 rounded-full bg-[var(--bullet)] opacity-80" />
-      <span className="absolute top-8 right-0 h-1.5 w-1.5 rounded-full bg-[var(--bullet)] opacity-75" />
-      <span className="absolute bottom-1 left-2 h-1.5 w-1.5 rounded-full bg-[var(--bullet)] opacity-70" />
-    </div>
-  );
-}
+export const metadata: Metadata = {
+  title: "Solutions",
+  description:
+    "We automate the document work that slows operations down — scoped to your industry and your workflow.",
+};
 
-function FinanceIconCluster() {
-  return (
-    <div className="relative h-20 w-20 shrink-0">
-      <svg
-        viewBox="0 0 48 48"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        className="absolute inset-0 h-20 w-20 text-[var(--icon-text)]"
-        aria-hidden
-      >
-        <rect x="8" y="27" width="6" height="11" rx="1.2" />
-        <rect x="19" y="21" width="6" height="17" rx="1.2" />
-        <rect x="30" y="15" width="6" height="23" rx="1.2" />
-        <path d="M8 13.5H40" />
-        <path d="M11 13.5L17 8.8L24 13.5L33 7.5L40 11.8" />
-      </svg>
-      <span className="absolute top-4 left-1 h-2 w-2 rounded-full bg-[var(--bullet)] opacity-80" />
-      <span className="absolute top-2 right-1 h-1.5 w-1.5 rounded-full bg-[var(--bullet)] opacity-75" />
-      <span className="absolute right-2 bottom-2 h-1.5 w-1.5 rounded-full bg-[var(--bullet)] opacity-70" />
-    </div>
-  );
-}
+const industries = [
+  {
+    id: "healthcare",
+    number: "01",
+    title: "Healthcare",
+    copy: "Intake, documentation, and follow ups run themselves. Clinical teams stay with patients.",
+    bullets: [
+      "Patient intake and referral processing",
+      "Clinical documentation and coding support",
+      "Scheduling and care coordination",
+    ],
+    cta: "Talk about healthcare",
+    imageAlt: "Clinical operations",
+    imageFirst: false,
+  },
+  {
+    id: "finance",
+    number: "02",
+    title: "Finance & accounting",
+    copy: "Invoices, expenses, approvals, and audit prep. Less manual work, controls intact.",
+    bullets: [
+      "Invoice capture, GL coding, and posting",
+      "Expense classification and approval routing",
+      "Audit trails prepared as the work happens",
+    ],
+    cta: "Talk about finance",
+    imageAlt: "Finance team working with ledgers",
+    imageFirst: true,
+  },
+] as const;
+
+const useCases = [
+  {
+    tag: "Healthcare",
+    title: "From documentation burden to care delivery",
+    copy: "Intake and documentation run themselves. Care teams stay with patients.",
+    imageAlt: "A clinical setting",
+  },
+  {
+    tag: "HR and Governance",
+    title: "From performance reviews to performance intelligence",
+    copy: "Evidence gathered continuously. Reviews write themselves.",
+    imageAlt: "A team review meeting",
+  },
+  {
+    tag: "Finance and Legal",
+    title: "From contracts to financial truth",
+    copy: "Terms extracted, obligations tracked, postings reconciled to source.",
+    imageAlt: "Contracts on a finance desk",
+  },
+] as const;
 
 export default function SolutionsPage() {
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <section className="bubble p-6 sm:p-8">
-        <h1 className="text-3xl font-semibold sm:text-4xl">Solutions</h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">
-          We automate the manual, document-heavy work that slows operations
-          down. Each solution is scoped to a specific industry and workflow so
-          you see results quickly.
-        </p>
-      </section>
+    <>
+      <Container>
+        {/* ── Hero ───────────────────────────────────────────────────── */}
+        <section className="pt-16 pb-14">
+          <Kicker>Solutions</Kicker>
+          <h1 className="m-0 -ml-[0.06em] max-w-[18ch] text-[clamp(38px,4.4vw,60px)] leading-[1.1] font-medium tracking-[-0.016em]">
+            Scoped to an industry. Built around a workflow.
+          </h1>
+          <p className="mt-6 max-w-[56ch] text-base leading-7 text-[color-mix(in_srgb,var(--color-text)_78%,transparent)]">
+            We automate the document work that slows operations down. Scoped to
+            your industry and your workflow.
+          </p>
+        </section>
 
-      <section>
-        <h2 className="mb-4 text-xl font-semibold sm:text-2xl">
-          Solutions by industry
-        </h2>
-        <div className="space-y-4">
-          <article className="bubble group p-5 transition duration-200 hover:-translate-y-1 hover:shadow-xl sm:p-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="max-w-3xl">
-                <h3 className="text-xl font-semibold">Healthcare</h3>
-                <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">
-                  Automate intake, documentation, care coordination, and patient
-                  follow-ups. Reduce administrative burden so clinical teams
-                  focus on patient care.
+        {/* ── Industries ─────────────────────────────────────────────── */}
+        {industries.map((industry) => (
+          <RevealOnScroll key={industry.id}>
+            <section
+              id={industry.id}
+              className="grid scroll-mt-24 items-center gap-[clamp(24px,5vw,96px)] border-t border-[var(--color-neutral-700)] py-10 lg:grid-cols-2"
+            >
+              <div className={industry.imageFirst ? "lg:order-2" : ""}>
+                <p className="m-0 text-[15px] font-[var(--font-heading)] text-[var(--color-accent)] [font-feature-settings:'tnum'_1]">
+                  {industry.number}
                 </p>
-                <Link
-                  href="/solutions/healthcare"
-                  className="mt-4 inline-flex rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
-                >
-                  Healthcare solutions
-                </Link>
-              </div>
-              <div className="self-end md:self-auto">
-                <HealthcareIconCluster />
-              </div>
-            </div>
-          </article>
-
-          <article className="bubble group p-5 transition duration-200 hover:-translate-y-1 hover:shadow-xl sm:p-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="max-w-3xl">
-                <h3 className="text-xl font-semibold">
-                  Finance &amp; Accounting
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">
-                  Automate invoice processing, expense classification, approval
-                  routing, and audit preparation. Cut manual processing time
-                  without compromising controls.
+                <h2 className="mt-3.5 text-[clamp(26px,2.8vw,38px)] leading-tight font-medium">
+                  {industry.title}
+                </h2>
+                <p className="mt-4 max-w-[50ch] text-[15.5px] leading-7 text-[color-mix(in_srgb,var(--color-text)_78%,transparent)]">
+                  {industry.copy}
                 </p>
-                <Link
-                  href="/solutions/finance"
-                  className="mt-4 inline-flex rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
-                >
-                  Finance solutions
-                </Link>
+                <ul className="mt-5 flex list-none flex-col gap-2.5 p-0 text-[14.5px] leading-6 text-[color-mix(in_srgb,var(--color-text)_72%,transparent)]">
+                  {industry.bullets.map((bullet) => (
+                    <li key={bullet} className="flex gap-3">
+                      <span
+                        aria-hidden
+                        className="mt-3 h-px w-4 flex-none bg-[var(--color-accent)]"
+                      />
+                      {bullet}
+                    </li>
+                  ))}
+                </ul>
+                <Button href="/contact" variant="primary" className="mt-7">
+                  {industry.cta}
+                </Button>
               </div>
-              <div className="self-end md:self-auto">
-                <FinanceIconCluster />
-              </div>
-            </div>
-          </article>
-        </div>
-      </section>
+              <figure
+                className={`lighten m-0 ${industry.imageFirst ? "lg:order-1" : ""}`}
+              >
+                <ImagePlaceholder aspect="4/3" alt={industry.imageAlt} />
+              </figure>
+            </section>
+          </RevealOnScroll>
+        ))}
 
-      <section className="bubble-soft p-6 sm:p-7">
-        <h2 className="text-2xl font-semibold">
-          Don&rsquo;t see your industry?
-        </h2>
-        <p className="mt-3 max-w-2xl text-[var(--muted)]">
-          Workflow automation applies wherever teams handle repetitive document
-          processing, multi-step approvals, or manual data entry. Tell us about
-          your operations and we&rsquo;ll scope what an automated version looks
-          like.
-        </p>
-        <Link href="/contact" className="btn-primary mt-5 px-5">
-          Tell Us About Your Workflow
-        </Link>
-      </section>
-    </div>
+        {/* ── Use cases ──────────────────────────────────────────────── */}
+        <RevealOnScroll>
+          <section
+            id="usecases"
+            className="scroll-mt-24 border-t border-[var(--color-neutral-700)] pt-14 pb-18"
+          >
+            <Kicker>Use cases</Kicker>
+            <h2 className="m-0 text-[clamp(26px,2.8vw,38px)] leading-tight font-medium">
+              Real workflows, before and after.
+            </h2>
+            <div className="mt-9 grid gap-6 md:grid-cols-3">
+              {useCases.map((useCase) => (
+                <article
+                  key={useCase.title}
+                  className="interactive-card flex flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-neutral-700)] bg-[color-mix(in_srgb,var(--color-neutral-900)_55%,transparent)]"
+                >
+                  <div className="lighten">
+                    <ImagePlaceholder
+                      aspect="16/9"
+                      alt={useCase.imageAlt}
+                      rounded={false}
+                    />
+                  </div>
+                  <div className="flex flex-1 flex-col gap-2 px-5.5 pt-5 pb-6">
+                    <p className="m-0 text-[11px] tracking-[0.14em] text-[var(--color-neutral-400)] uppercase">
+                      {useCase.tag}
+                    </p>
+                    <h3 className="m-0 text-[19px] font-medium">
+                      {useCase.title}
+                    </h3>
+                    <p className="m-0 flex-1 text-sm leading-6 text-[color-mix(in_srgb,var(--color-text)_70%,transparent)]">
+                      {useCase.copy}
+                    </p>
+                    <Link
+                      href="/contact"
+                      className="text-sm text-[var(--color-accent-300)] transition hover:text-[var(--color-accent)]"
+                    >
+                      Scope this workflow →
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        </RevealOnScroll>
+      </Container>
+
+      {/* ── Band CTA ─────────────────────────────────────────────────── */}
+      <Section band className="mt-10">
+        <Container className="flex flex-wrap items-center justify-between gap-8">
+          <div>
+            <h2 className="m-0 max-w-[26ch] text-[clamp(24px,2.4vw,32px)] leading-tight font-medium">
+              Don&apos;t see your industry? If it&apos;s repetitive, it
+              qualifies.
+            </h2>
+            <p className="mt-3 max-w-[52ch] text-[15px] leading-relaxed text-[color-mix(in_srgb,var(--color-text)_70%,transparent)]">
+              If your team handles documents, approvals, or data entry, we can
+              automate it.
+            </p>
+          </div>
+          <Button href="/contact" variant="primary">
+            Tell us about your workflow
+          </Button>
+        </Container>
+      </Section>
+    </>
   );
 }

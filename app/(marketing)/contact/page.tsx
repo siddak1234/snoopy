@@ -1,193 +1,107 @@
+import type { Metadata } from "next";
+import { Container } from "@/components/ui/Section";
+import { Kicker } from "@/components/ui/Kicker";
+import { Card } from "@/components/ui/Card";
+import { ContactForm } from "@/components/marketing/ContactForm";
 import { site } from "@/lib/site";
+
+export const metadata: Metadata = {
+  title: "Contact",
+  description:
+    "Tell us what's slowing your team down. We find the fastest win and scope a pilot around it.",
+};
+
+const nextSteps = [
+  {
+    lead: "We review your workflow.",
+    copy: "We reply within two business days.",
+  },
+  {
+    lead: "We scope a pilot.",
+    copy: "Focused on one workflow, so you see results quickly.",
+  },
+  {
+    lead: "You see it working.",
+    copy: "We build and deploy. You validate before we expand.",
+  },
+] as const;
+
+const directLines = [
+  { label: "General and partnerships", email: site.email },
+  { label: "Pilots and sales", email: site.salesEmail },
+  { label: "Product and support", email: site.supportEmail },
+] as const;
 
 export default function ContactPage() {
   return (
-    <div className="grid gap-4 lg:grid-cols-3 lg:gap-5">
-      {/* Hero */}
-      <section className="bubble p-6 sm:p-8 lg:col-span-3">
-        <h1 className="text-3xl font-semibold sm:text-4xl">Contact Autom8x</h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">
-          Tell us what repetitive work is slowing your team down, and
-          we&rsquo;ll help identify where AI workflow automation can create the
-          fastest operational impact for your organization.
-        </p>
-        <p className="mt-3 text-sm text-[var(--muted)]">
-          General inquiries:{" "}
-          <a
-            href={`mailto:${site.email}`}
-            className="font-semibold text-[var(--link)] underline underline-offset-4"
-          >
-            {site.email}
-          </a>
+    <Container>
+      <section className="pt-16 pb-14">
+        <Kicker>Contact</Kicker>
+        <h1 className="m-0 -ml-[0.06em] max-w-[20ch] text-[clamp(38px,4.4vw,60px)] leading-[1.1] font-medium tracking-[-0.016em]">
+          Tell us what&apos;s slowing your team down.
+        </h1>
+        <p className="mt-6 max-w-[56ch] text-base leading-7 text-[color-mix(in_srgb,var(--color-text)_78%,transparent)]">
+          We find the fastest win and scope a pilot around it.
         </p>
       </section>
 
-      {/* Card 1 — Start a conversation */}
-      <section className="bubble-soft p-6 sm:p-7">
-        <h2 className="text-xl font-semibold">Start a conversation</h2>
-        <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
-          Reach us at{" "}
-          <a
-            href={`mailto:${site.email}`}
-            className="font-semibold text-[var(--link)] underline underline-offset-4"
-          >
-            {site.email}
-          </a>
-        </p>
-
-        <h3 className="mt-6 text-lg font-semibold">Best for</h3>
-        <ul className="mt-3 space-y-2 text-sm text-[var(--muted)] sm:text-base">
-          <li className="flex items-start gap-2">
-            <span
-              aria-hidden
-              className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bullet)]"
-            />
-            <span>General questions</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span
-              aria-hidden
-              className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bullet)]"
-            />
-            <span>Partnerships</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span
-              aria-hidden
-              className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bullet)]"
-            />
-            <span>Early-stage conversations</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span
-              aria-hidden
-              className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bullet)]"
-            />
-            <span>Not sure where to start</span>
-          </li>
-        </ul>
-      </section>
-
-      {/* Card 2 — Fastest way to start */}
-      <section className="bubble p-6 sm:p-7 lg:col-span-2">
-        <h2 className="text-2xl font-semibold">Fastest way to start</h2>
-        <p className="mt-3 text-[var(--muted)]">
-          Email{" "}
-          <a
-            href={`mailto:${site.salesEmail}`}
-            className="font-semibold text-[var(--link)] underline underline-offset-4"
-          >
-            {site.salesEmail}
-          </a>{" "}
-          with the following details so we can scope an automation pilot:
-        </p>
-
-        <ul className="mt-4 space-y-2 text-sm text-[var(--muted)] sm:text-base">
-          <li className="flex items-start gap-2">
-            <span
-              aria-hidden
-              className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bullet)]"
-            />
-            <span>Your industry and team function</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span
-              aria-hidden
-              className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bullet)]"
-            />
-            <span>The workflow you want to automate</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span
-              aria-hidden
-              className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bullet)]"
-            />
-            <span>
-              Current tools involved (CRM, ticketing, internal tools, etc.)
-            </span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span
-              aria-hidden
-              className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bullet)]"
-            />
-            <span>Approximate volume or frequency of the task</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span
-              aria-hidden
-              className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--bullet)]"
-            />
-            <span>What success looks like in the next 30–60 days</span>
-          </li>
-        </ul>
-      </section>
-
-      {/* What happens next */}
-      <section className="bubble p-6 sm:p-7 lg:col-span-3">
-        <h2 className="text-xl font-semibold">What happens next</h2>
-        <div className="mt-5 grid gap-4 sm:grid-cols-3">
-          <div className="flex flex-col gap-2">
-            <span
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--step-pill-bg)] text-xs font-semibold text-[var(--step-pill-text)]"
-              aria-hidden
+      <section className="grid items-start gap-[clamp(28px,5vw,96px)] pb-20 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+        <Card padding="lg" className="shadow-[var(--shadow-md)]">
+          <h2 className="m-0 text-[22px] font-medium">Scope a pilot</h2>
+          <p className="mt-2.5 text-[14.5px] leading-relaxed text-[color-mix(in_srgb,var(--color-text)_70%,transparent)]">
+            Email{" "}
+            <a
+              href={`mailto:${site.salesEmail}`}
+              className="text-[var(--color-accent-300)] transition hover:text-[var(--color-accent)]"
             >
-              1
-            </span>
-            <h3 className="text-sm font-semibold text-[var(--text)]">
-              We review your workflow
-            </h3>
-            <p className="text-sm leading-6 text-[var(--muted)]">
-              Within 1–2 business days, our team reviews your use case and
-              identifies automation opportunities.
-            </p>
+              {site.salesEmail}
+            </a>
+            , or use the form:
+          </p>
+          <ContactForm />
+        </Card>
+
+        <div className="flex flex-col gap-8">
+          <div>
+            <h2 className="m-0 text-lg font-medium">What happens next</h2>
+            <div className="mt-4 flex flex-col gap-4">
+              {nextSteps.map((step, index) => (
+                <div key={step.lead} className="flex gap-4">
+                  <span className="w-6 flex-none text-sm font-[var(--font-heading)] text-[var(--color-accent)] [font-feature-settings:'tnum'_1]">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <p className="m-0 text-[14.5px] leading-relaxed text-[color-mix(in_srgb,var(--color-text)_72%,transparent)]">
+                    <span className="text-[var(--color-text)]">
+                      {step.lead}
+                    </span>{" "}
+                    {step.copy}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-col gap-2">
-            <span
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--step-pill-bg)] text-xs font-semibold text-[var(--step-pill-text)]"
-              aria-hidden
-            >
-              2
-            </span>
-            <h3 className="text-sm font-semibold text-[var(--text)]">
-              We scope a pilot
-            </h3>
-            <p className="text-sm leading-6 text-[var(--muted)]">
-              We propose a focused automation pilot — scoped to one workflow so
-              you see results quickly.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2">
-            <span
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--step-pill-bg)] text-xs font-semibold text-[var(--step-pill-text)]"
-              aria-hidden
-            >
-              3
-            </span>
-            <h3 className="text-sm font-semibold text-[var(--text)]">
-              You see it working
-            </h3>
-            <p className="text-sm leading-6 text-[var(--muted)]">
-              We build and deploy the workflow. You validate the results with
-              your team before we expand.
-            </p>
+
+          <div className="border-t border-[var(--color-neutral-700)] pt-6">
+            <h2 className="m-0 text-lg font-medium">Direct lines</h2>
+            <div className="mt-4 flex flex-col gap-3 text-[14.5px] leading-6">
+              {directLines.map((line) => (
+                <p
+                  key={line.email}
+                  className="m-0 text-[color-mix(in_srgb,var(--color-text)_72%,transparent)]"
+                >
+                  {line.label}:{" "}
+                  <a
+                    href={`mailto:${line.email}`}
+                    className="text-[var(--color-accent-300)] transition hover:text-[var(--color-accent)]"
+                  >
+                    {line.email}
+                  </a>
+                </p>
+              ))}
+            </div>
           </div>
         </div>
       </section>
-
-      {/* Support */}
-      <section className="bubble-soft p-6 sm:p-7 lg:col-span-3">
-        <h2 className="text-xl font-semibold">Need support?</h2>
-        <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
-          For product, implementation, or account-related help, contact{" "}
-          <a
-            href={`mailto:${site.supportEmail}`}
-            className="font-semibold text-[var(--link)] underline underline-offset-4"
-          >
-            {site.supportEmail}
-          </a>
-        </p>
-      </section>
-    </div>
+    </Container>
   );
 }
