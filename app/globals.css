@@ -625,6 +625,16 @@ textarea.input {
   }
 }
 
+/* Scroll-progress bar (CSS scroll-driven animation path). */
+@keyframes progress-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
 /* Edge fade mask for horizontal tickers (e.g., the industry-signals marquee). */
 .edge-fade-mask {
   -webkit-mask-image: linear-gradient(

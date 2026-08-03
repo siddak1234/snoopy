@@ -1,7 +1,10 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db";
 import { provisionUserFromSupabaseAuth } from "@/lib/auth-supabase";
+import LogoMark from "@/components/branding/LogoMark";
+import ThemeToggle from "@/components/theme/ThemeToggle";
 
 /**
  * Onboarding layout — two guards:
@@ -37,5 +40,19 @@ export default async function OnboardingLayout({
 
   if (existing) redirect("/account");
 
-  return <div className="min-h-screen bg-[var(--bg)]">{children}</div>;
+  return (
+    <div className="min-h-screen bg-[var(--bg)]">
+      <header className="mx-auto flex min-h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <Link
+          href="/"
+          aria-label="Autom8x home"
+          className="flex items-center rounded-full text-[var(--color-text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
+        >
+          <LogoMark width={44} height={22} />
+        </Link>
+        <ThemeToggle />
+      </header>
+      {children}
+    </div>
+  );
 }

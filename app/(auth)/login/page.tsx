@@ -7,30 +7,10 @@ import { createClient } from "@/lib/supabase/client";
 import { useAppSession } from "@/hooks/use-app-session";
 import { isGmailAddress } from "@/lib/email";
 import { FormInput } from "@/components/ui/FormInput";
+import { OAuthButtons, OAuthDivider } from "@/components/auth/OAuthButtons";
 
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
-}
-
-function OAuthButton({
-  provider,
-  label,
-  callbackUrl,
-}: {
-  provider: "google" | "azure";
-  label: string;
-  callbackUrl: string;
-}) {
-  const next = callbackUrl.startsWith("/") ? callbackUrl : `/${callbackUrl}`;
-  const href = `/api/auth/oauth?provider=${provider}&next=${encodeURIComponent(next)}`;
-  return (
-    <a
-      href={href}
-      className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
-    >
-      {label}
-    </a>
-  );
 }
 
 function LoginForm() {
@@ -84,18 +64,10 @@ function LoginForm() {
       : null;
 
   if (searchParams.get("verify") === "1") {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center px-4 py-8">
-        <div className="bubble p-6 sm:p-8">Redirecting…</div>
-      </div>
-    );
+    return <div className="bubble p-6 sm:p-8">Redirecting…</div>;
   }
   if (searchParams.get("deleted") === "1") {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center px-4 py-8">
-        <div className="bubble p-6 sm:p-8">Redirecting…</div>
-      </div>
-    );
+    return <div className="bubble p-6 sm:p-8">Redirecting…</div>;
   }
 
   // Show "Checking authentication..." while session is loading or during the
@@ -103,11 +75,7 @@ function LoginForm() {
   // session has time to settle.
   const isCheckingAuth = authStatus === "loading";
   if (isCheckingAuth) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center px-4 py-8">
-        <div className="bubble p-6 sm:p-8">Checking authentication…</div>
-      </div>
-    );
+    return <div className="bubble p-6 sm:p-8">Checking authentication…</div>;
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -162,104 +130,64 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-[60vh] items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md">
-        <section className="bubble p-6 sm:p-8">
-          <h1 className="text-3xl font-semibold sm:text-4xl">Login</h1>
+    <section className="bubble p-6 sm:p-8">
+      <h1 className="text-3xl font-medium sm:text-4xl">Login</h1>
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-            <FormInput
-              id="email"
-              label="Email"
-              type="email"
-              name="email"
-              autoComplete="email"
-              placeholder="Enter your email"
-              required
-            />
-            <FormInput
-              id="password"
-              label="Password"
-              type="password"
-              name="password"
-              autoComplete="current-password"
-              placeholder="Enter your password"
-              required
-            />
+      <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+        <FormInput
+          id="email"
+          label="Email"
+          type="email"
+          name="email"
+          autoComplete="email"
+          placeholder="Enter your email"
+          required
+        />
+        <FormInput
+          id="password"
+          label="Password"
+          type="password"
+          name="password"
+          autoComplete="current-password"
+          placeholder="Enter your password"
+          required
+        />
 
-            <button
-              type="submit"
-              className="btn-primary w-full px-5"
-              disabled={loading}
-            >
-              {loading ? "Signing in…" : "Log In"}
-            </button>
+        <button
+          type="submit"
+          className="btn-primary w-full px-5"
+          disabled={loading}
+        >
+          {loading ? "Signing in…" : "Log In"}
+        </button>
 
-            {status ? (
-              <p
-                className="text-center text-sm text-[var(--muted)]"
-                role="alert"
-              >
-                {status}
-              </p>
-            ) : derivedAuthError ? (
-              <p
-                className="text-center text-sm text-[var(--muted)]"
-                role="alert"
-              >
-                {derivedAuthError}
-              </p>
-            ) : null}
-          </form>
+        {status ? (
+          <p className="text-center text-sm text-[var(--muted)]" role="alert">
+            {status}
+          </p>
+        ) : derivedAuthError ? (
+          <p className="text-center text-sm text-[var(--muted)]" role="alert">
+            {derivedAuthError}
+          </p>
+        ) : null}
+      </form>
 
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center" aria-hidden>
-              <div className="w-full border-t border-[var(--ring)]" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-[var(--surface)] px-3 text-sm text-[var(--muted)]">
-                or
-              </span>
-            </div>
-          </div>
+      <OAuthDivider />
+      <OAuthButtons callbackUrl={callbackUrl} mode="login" />
 
-          <div className="flex flex-col gap-2">
-            <OAuthButton
-              provider="google"
-              label="Continue with Google"
-              callbackUrl={callbackUrl}
-            />
-            <OAuthButton
-              provider="azure"
-              label="Continue with Microsoft"
-              callbackUrl={callbackUrl}
-            />
-          </div>
-
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 border-t border-[var(--ring)] pt-5">
-            <span className="text-sm text-[var(--muted)]">New here?</span>
-            <Link
-              href="/signup"
-              className="btn-secondary inline-flex px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] focus-visible:outline-none"
-            >
-              Sign Up
-            </Link>
-          </div>
-        </section>
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-2 border-t border-[var(--ring)] pt-5">
+        <span className="text-sm text-[var(--muted)]">New here?</span>
+        <Link href="/signup" className="btn-secondary btn-sm">
+          Sign Up
+        </Link>
       </div>
-    </div>
+    </section>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-[60vh] items-center justify-center px-4 py-8">
-          <div className="bubble p-6 sm:p-8">Loading…</div>
-        </div>
-      }
-    >
+    <Suspense fallback={<div className="bubble p-6 sm:p-8">Loading…</div>}>
       <LoginForm />
     </Suspense>
   );
