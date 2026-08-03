@@ -28,7 +28,7 @@ export default async function AccountWorkflowDesignPage() {
       subheader="Design, save, and manage your automation workflows"
       primaryAction={
         <Link
-          href="/automation-builder"
+          href="/account/builder"
           className="btn-primary inline-flex items-center gap-2 px-5"
         >
           <svg
@@ -74,7 +74,7 @@ export default async function AccountWorkflowDesignPage() {
               workflows will appear here.
             </p>
             <Link
-              href="/automation-builder"
+              href="/account/builder"
               className="btn-primary mt-2 inline-flex items-center gap-2 px-5"
             >
               Open Automation Builder

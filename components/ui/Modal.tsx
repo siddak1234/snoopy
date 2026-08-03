@@ -43,10 +43,15 @@ export default function Modal({
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
     return () => {
       document.body.style.overflow = prev;
+      document.removeEventListener("keydown", onKeyDown);
     };
-  }, []);
+  }, [onClose]);
 
   const modalContent = (
     <div className="fixed inset-0" style={{ zIndex }} role="presentation">

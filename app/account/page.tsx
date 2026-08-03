@@ -32,7 +32,7 @@ export default async function AccountDashboardPage() {
       subheader="Here's what's happening in your workspace."
       primaryAction={
         <Link
-          href="/automation-builder"
+          href="/account/builder"
           className="btn-primary inline-flex px-5"
         >
           Create workflow
@@ -40,7 +40,7 @@ export default async function AccountDashboardPage() {
       }
       secondaryAction={
         <Link
-          href="/automation-builder"
+          href="/account/builder"
           className="btn-secondary inline-flex px-5"
         >
           Browse templates
@@ -53,13 +53,13 @@ export default async function AccountDashboardPage() {
         </h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link
-            href="/automation-builder"
+            href="/account/builder"
             className="btn-primary inline-flex px-4 py-2 text-sm"
           >
             Create workflow
           </Link>
           <Link
-            href="/automation-builder"
+            href="/account/builder"
             className="inline-flex items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
           >
             Browse templates
@@ -172,13 +172,13 @@ export default async function AccountDashboardPage() {
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
-              href="/automation-builder"
+              href="/account/builder"
               className="btn-primary inline-flex px-5"
             >
               Create workflow
             </Link>
             <Link
-              href="/automation-builder"
+              href="/account/builder"
               className="btn-secondary inline-flex px-5"
             >
               Browse templates

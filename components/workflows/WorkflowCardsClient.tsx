@@ -126,7 +126,7 @@ export function WorkflowCardsClient({
               </button>
             </div>
 
-            <Link href={`/automation-builder?id=${wf.id}`} className="block">
+            <Link href={`/account/builder?id=${wf.id}`} className="block">
               <div className="flex items-start justify-between gap-2">
                 <h3 className="text-sm font-semibold text-[var(--text)] group-hover:text-[var(--accent)]">
                   {wf.name}
