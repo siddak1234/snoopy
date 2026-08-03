@@ -37,9 +37,5 @@ export default async function OnboardingLayout({
 
   if (existing) redirect("/account");
 
-  return (
-    <div className="min-h-screen bg-[var(--bg)]">
-      {children}
-    </div>
-  );
+  return <div className="min-h-screen bg-[var(--bg)]">{children}</div>;
 }

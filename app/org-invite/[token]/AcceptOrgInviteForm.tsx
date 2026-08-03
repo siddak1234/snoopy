@@ -53,10 +53,11 @@ export function AcceptOrgInviteForm({ token }: Props) {
           autoComplete="off"
           placeholder="e.g. K7MN2P"
           disabled={pending}
-          className="mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 font-mono uppercase tracking-widest text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60"
+          className="mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 font-mono tracking-widest text-[var(--text)] uppercase placeholder:text-[var(--muted)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none disabled:opacity-60"
         />
         <p className="mt-1 text-xs text-[var(--muted)]">
-          The short code the organization owner shared with you alongside this link.
+          The short code the organization owner shared with you alongside this
+          link.
         </p>
       </div>
       <FormError message={error} />

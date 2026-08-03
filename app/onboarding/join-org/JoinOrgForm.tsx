@@ -64,7 +64,9 @@ export function JoinOrgForm({ workspaceName }: { workspaceName: string }) {
         disabled={busy}
         className="inline-flex w-full justify-center text-sm text-[var(--muted)] underline underline-offset-2 hover:text-[var(--text)] disabled:opacity-60"
       >
-        {pending === "skip" ? "Setting up…" : "No thanks, create a personal account instead"}
+        {pending === "skip"
+          ? "Setting up…"
+          : "No thanks, create a personal account instead"}
       </button>
     </div>
   );

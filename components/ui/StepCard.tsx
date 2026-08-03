@@ -14,7 +14,9 @@ export function StepCard({ step, title, description }: StepCardProps) {
         {step}
       </span>
       <h3 className="mt-4 text-lg font-semibold text-[var(--text)]">{title}</h3>
-      <p className="mt-2 flex-1 text-sm leading-6 text-[var(--muted)]">{description}</p>
+      <p className="mt-2 flex-1 text-sm leading-6 text-[var(--muted)]">
+        {description}
+      </p>
     </article>
   );
 }

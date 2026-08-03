@@ -25,7 +25,7 @@ export function StickyNoteNode({
   };
 
   return (
-    <div className={`sticky-note-node${selected ? " selected" : ""}`}>
+    <div className={`sticky-note-node${selected ? "selected" : ""}`}>
       <div className="flex shrink-0 items-center gap-1">
         <svg
           viewBox="0 0 16 16"
@@ -59,7 +59,7 @@ export function StickyNoteNode({
           onDoubleClick={() => setEditing(true)}
         >
           {data.text ? (
-            <p className="whitespace-pre-wrap text-[0.6rem] leading-relaxed text-[var(--text)]">
+            <p className="text-[0.6rem] leading-relaxed whitespace-pre-wrap text-[var(--text)]">
               {data.text}
             </p>
           ) : (

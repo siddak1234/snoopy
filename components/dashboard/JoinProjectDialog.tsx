@@ -16,12 +16,12 @@ type Props = {
 };
 
 export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
-  const [error, setError]   = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const formRef   = useRef<HTMLFormElement>(null);
-  const urlRef    = useRef<HTMLInputElement>(null);
-  const codeRef   = useRef<HTMLInputElement>(null);
-  const router    = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
+  const urlRef = useRef<HTMLInputElement>(null);
+  const codeRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   const reset = useCallback(() => {
     setError(null);
@@ -41,7 +41,10 @@ export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { e.preventDefault(); onClose(); }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
@@ -51,7 +54,7 @@ export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
     e.preventDefault();
     setError(null);
 
-    const rawUrl  = urlRef.current?.value.trim() ?? "";
+    const rawUrl = urlRef.current?.value.trim() ?? "";
     const rawCode = codeRef.current?.value.trim() ?? "";
 
     if (!rawUrl) {
@@ -64,10 +67,12 @@ export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
     }
 
     const token = parseInviteToken(rawUrl);
-    const code  = normalizeInviteCode(rawCode);
+    const code = normalizeInviteCode(rawCode);
 
     if (!token) {
-      setError("Could not read a token from the link. Paste the full invite URL.");
+      setError(
+        "Could not read a token from the link. Paste the full invite URL.",
+      );
       return;
     }
 
@@ -94,11 +99,15 @@ export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
       bubble
       zIndex={100}
     >
-      <h2 id="join-project-title" className="text-xl font-semibold text-[var(--text)]">
+      <h2
+        id="join-project-title"
+        className="text-xl font-semibold text-[var(--text)]"
+      >
         Join organization
       </h2>
       <p id="join-project-desc" className="mt-1 text-sm text-[var(--muted)]">
-        Paste the invite link and enter the code shared by the organization owner.
+        Paste the invite link and enter the code shared by the organization
+        owner.
       </p>
 
       <form ref={formRef} onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -124,13 +133,17 @@ export function JoinProjectDialog({ open, onClose, onSuccess }: Props) {
           autoComplete="off"
           placeholder="e.g. K7MN2P"
           disabled={pending}
-          className="font-mono uppercase tracking-widest"
+          className="font-mono tracking-widest uppercase"
         />
 
         <FormError message={error} />
 
         <div className="flex flex-wrap gap-2 pt-2">
-          <button type="submit" disabled={pending} className="btn-primary inline-flex px-5">
+          <button
+            type="submit"
+            disabled={pending}
+            className="btn-primary inline-flex px-5"
+          >
             {pending ? "Joining…" : "Join organization"}
           </button>
           <button

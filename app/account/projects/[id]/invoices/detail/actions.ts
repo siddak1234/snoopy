@@ -56,7 +56,10 @@ export type LineUpdate = {
 };
 
 export type HeaderUpdates = Partial<
-  Record<"Merchant" | "Invoice_Number" | "Invoice_Date" | "Status" | "lounge_code", string | null>
+  Record<
+    "Merchant" | "Invoice_Number" | "Invoice_Date" | "Status" | "lounge_code",
+    string | null
+  >
 >;
 
 export type SaveInvoiceEditsInput = {
@@ -84,15 +87,14 @@ export type SaveInvoiceEditsSummary = {
 };
 
 export type SaveInvoiceEditsResult =
-  | { ok: true; summary: SaveInvoiceEditsSummary }
-  | { ok: false; error: string };
+  { ok: true; summary: SaveInvoiceEditsSummary } | { ok: false; error: string };
 
 /**
  * Persist a batch of edits to one invoice's line items + header, then recompute
  * the affected allocation rows — all atomically inside save_invoice_edits().
  */
 export async function saveInvoiceEditsAction(
-  input: SaveInvoiceEditsInput
+  input: SaveInvoiceEditsInput,
 ): Promise<SaveInvoiceEditsResult> {
   const session = await getAppSession();
   if (!session?.user?.id) {
@@ -154,7 +156,9 @@ export async function saveInvoiceEditsAction(
 
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase.rpc("save_invoice_edits", { payload });
+    const { data, error } = await supabase.rpc("save_invoice_edits", {
+      payload,
+    });
     if (error) {
       console.error("saveInvoiceEditsAction rpc", error.message);
       return { ok: false, error: toFriendlyError(error.message) };

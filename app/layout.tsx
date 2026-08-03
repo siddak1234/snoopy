@@ -53,7 +53,7 @@ export default function RootLayout({
                 {/* Left: brand — A8X logo mark only */}
                 <Link
                   href="/"
-                  className="flex min-h-12 flex-shrink-0 items-center justify-center text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] rounded-full"
+                  className="flex min-h-12 flex-shrink-0 items-center justify-center rounded-full text-[var(--text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] focus-visible:outline-none"
                   aria-label="Autom8x"
                 >
                   <LogoMark width={48} height={24} />

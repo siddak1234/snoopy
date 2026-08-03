@@ -5,9 +5,7 @@ export default function ContactPage() {
     <div className="grid gap-4 lg:grid-cols-3 lg:gap-5">
       {/* Hero */}
       <section className="bubble p-6 sm:p-8 lg:col-span-3">
-        <h1 className="text-3xl font-semibold sm:text-4xl">
-          Contact Autom8x
-        </h1>
+        <h1 className="text-3xl font-semibold sm:text-4xl">Contact Autom8x</h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">
           Tell us what repetitive work is slowing your team down, and
           we&rsquo;ll help identify where AI workflow automation can create the

@@ -106,7 +106,7 @@ export async function getTeamProjects(userId: string) {
  */
 export async function getAccessibleProjects(
   userId: string,
-  limit: number = 10
+  limit: number = 10,
 ): Promise<ProjectSummary[]> {
   if (!userId) return [];
   const [owned, team] = await Promise.all([
@@ -146,8 +146,7 @@ export async function getAccessibleProjects(
     }
   }
   combined.sort(
-    (a, b) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
   return combined.slice(0, limit);
 }
@@ -176,7 +175,10 @@ export async function getProjectForUser(projectId: string, userId: string) {
   const projectWorkspaceId = project.workspaceId;
   if (projectWorkspaceId) {
     const workspace = await getTenantForUser(userId);
-    if (workspace?.tenantId === projectWorkspaceId && workspace.role === "org_owner") {
+    if (
+      workspace?.tenantId === projectWorkspaceId &&
+      workspace.role === "org_owner"
+    ) {
       return project;
     }
   }
@@ -209,7 +211,7 @@ export async function getProjectMembers(projectId: string) {
  */
 export async function getWorkspaceMembersNotInProject(
   projectId: string,
-  workspaceId: string
+  workspaceId: string,
 ) {
   const existing = await prisma.projectMembership.findMany({
     where: { projectId },
@@ -252,7 +254,7 @@ export type UsedProjectTypesByScope = Record<ProjectScope, ProjectType[]>;
  * enforce the create-project uniqueness rule in createProjectAction.
  */
 export async function getUsedProjectTypesByScope(
-  userId: string
+  userId: string,
 ): Promise<UsedProjectTypesByScope> {
   const result: UsedProjectTypesByScope = { personal: [], team: [] };
   if (!userId) return result;
@@ -326,7 +328,7 @@ export type ArchivedRestorable = {
  * Team: archived projects in the user's org workspace (any owner).
  */
 export async function getRestorableProjectsByScope(
-  userId: string
+  userId: string,
 ): Promise<ArchivedRestorable[]> {
   if (!userId) return [];
 
@@ -386,8 +388,13 @@ export async function getRestorableProjectsByScope(
  */
 export async function createProject(
   userId: string,
-  data: { name: string; type?: string; description?: string | null; status?: ProjectStatus },
-  targetWorkspaceId?: string
+  data: {
+    name: string;
+    type?: string;
+    description?: string | null;
+    status?: ProjectStatus;
+  },
+  targetWorkspaceId?: string,
 ) {
   let workspaceId: string;
   if (targetWorkspaceId) {
@@ -396,7 +403,8 @@ export async function createProject(
       where: { userId_workspaceId: { userId, workspaceId: targetWorkspaceId } },
       select: { id: true },
     });
-    if (!membership) throw new Error("User is not a member of the specified workspace.");
+    if (!membership)
+      throw new Error("User is not a member of the specified workspace.");
     workspaceId = targetWorkspaceId;
   } else {
     workspaceId = await ensureTenantForUser(userId);
@@ -458,7 +466,7 @@ export async function createProject(
  */
 export async function deleteProject(
   userId: string,
-  projectId: string
+  projectId: string,
 ): Promise<boolean> {
   const project = await prisma.project.findFirst({
     where: { id: projectId, status: { not: "archived" } },
@@ -489,7 +497,7 @@ export async function deleteProject(
  */
 export async function restoreProject(
   userId: string,
-  projectId: string
+  projectId: string,
 ): Promise<boolean> {
   if (!userId || !projectId) return false;
 
@@ -528,7 +536,7 @@ export async function restoreProject(
  */
 export async function leaveProject(
   userId: string,
-  projectId: string
+  projectId: string,
 ): Promise<boolean> {
   if (!userId || !projectId) return false;
 
@@ -549,7 +557,10 @@ export async function getProjectsForUser(userId: string) {
 /** @deprecated Use the invite system instead. Kept temporarily for rollback safety. */
 export async function joinProjectByCode(
   _userId: string,
-  _code: string
+  _code: string,
 ): Promise<{ ok: false; error: string }> {
-  return { ok: false, error: "Access code joining has been replaced by the invite system." };
+  return {
+    ok: false,
+    error: "Access code joining has been replaced by the invite system.",
+  };
 }

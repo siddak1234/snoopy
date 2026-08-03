@@ -53,11 +53,11 @@ export default function InsightsPage() {
                 </p>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                <span className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
                   {section.count}
                 </span>
                 <span
-                  className="inline-flex text-[var(--muted)] transition group-hover:text-[var(--accent-strong)] group-hover:translate-x-1"
+                  className="inline-flex text-[var(--muted)] transition group-hover:translate-x-1 group-hover:text-[var(--accent-strong)]"
                   aria-hidden
                 >
                   <svg

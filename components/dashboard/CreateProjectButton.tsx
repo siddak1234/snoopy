@@ -13,7 +13,11 @@ type Props = {
   hasOrg?: boolean;
 };
 
-export function CreateProjectButton({ usedTypesByScope, restorable, hasOrg }: Props) {
+export function CreateProjectButton({
+  usedTypesByScope,
+  restorable,
+  hasOrg,
+}: Props) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
 

@@ -49,11 +49,7 @@ export default function Modal({
   }, []);
 
   const modalContent = (
-    <div
-      className="fixed inset-0"
-      style={{ zIndex }}
-      role="presentation"
-    >
+    <div className="fixed inset-0" style={{ zIndex }} role="presentation">
       <div
         className="fixed inset-0 bg-black/50 backdrop-blur-[2px]"
         aria-hidden

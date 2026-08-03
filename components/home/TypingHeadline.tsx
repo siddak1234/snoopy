@@ -33,7 +33,10 @@ export default function TypingHeadline() {
     if (!mounted) return;
 
     if (prefersReducedMotion) {
-      const id = window.setTimeout(() => setDisplayed(WORDS[WORDS.length - 1]), 0);
+      const id = window.setTimeout(
+        () => setDisplayed(WORDS[WORDS.length - 1]),
+        0,
+      );
       return () => window.clearTimeout(id);
     }
 
@@ -74,13 +77,20 @@ export default function TypingHeadline() {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [mounted, currentIndex, displayed, isDeleting, isDone, prefersReducedMotion]);
+  }, [
+    mounted,
+    currentIndex,
+    displayed,
+    isDeleting,
+    isDone,
+    prefersReducedMotion,
+  ]);
 
   const showCaret = mounted && !prefersReducedMotion;
   const visibleText = mounted ? displayed : WORDS[WORDS.length - 1];
 
   return (
-    <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">
+    <h1 className="text-3xl leading-tight font-semibold sm:text-4xl">
       <span className="sr-only">Autom8 enterprise workflows</span>
       <span aria-hidden="true">
         <span>{visibleText}</span>

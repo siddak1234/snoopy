@@ -61,9 +61,8 @@ export function CreateProjectDialog({
   // offer Restore instead of/alongside Create. project_id is stable across the
   // delete→restore cycle, so all data tagged with the matched id reappears.
   const restorableMatch = selectedType
-    ? restorables.find(
-        (r) => r.scope === scope && r.type === selectedType
-      ) ?? null
+    ? (restorables.find((r) => r.scope === scope && r.type === selectedType) ??
+      null)
     : null;
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -154,14 +153,21 @@ export function CreateProjectDialog({
       bubble
       zIndex={100}
     >
-      <h2 id="create-project-title" className="text-xl font-semibold text-[var(--text)]">
+      <h2
+        id="create-project-title"
+        className="text-xl font-semibold text-[var(--text)]"
+      >
         Create project
       </h2>
 
       {created ? (
         <>
-          <p id="create-project-success-desc" className="mt-1 text-sm text-[var(--muted)]">
-            Your project was created. Use the project page to invite team members.
+          <p
+            id="create-project-success-desc"
+            className="mt-1 text-sm text-[var(--muted)]"
+          >
+            Your project was created. Use the project page to invite team
+            members.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-2">
             <button
@@ -175,23 +181,42 @@ export function CreateProjectDialog({
           <button
             type="button"
             onClick={handleClose}
-            className="absolute right-4 top-4 rounded-lg p-1.5 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+            className="absolute top-4 right-4 rounded-lg p-1.5 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none"
             aria-label="Close"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           </button>
         </>
       ) : (
         <>
-          <p id="create-project-desc" className="mt-1 text-sm text-[var(--muted)]">
+          <p
+            id="create-project-desc"
+            className="mt-1 text-sm text-[var(--muted)]"
+          >
             Add a new project to your workspace.
           </p>
-          <form ref={formRef} onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <form
+            ref={formRef}
+            onSubmit={handleSubmit}
+            className="mt-6 space-y-4"
+          >
             <fieldset disabled={pending}>
               <legend className="block text-sm font-medium text-[var(--text)]">
-                Project scope <span className="text-[var(--muted)]">(required)</span>
+                Project scope{" "}
+                <span className="text-[var(--muted)]">(required)</span>
               </legend>
               <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {(["personal", "team"] as const).map((value) => {
@@ -252,7 +277,9 @@ export function CreateProjectDialog({
                   id="create-project-all-used-desc"
                   className="text-sm text-[var(--muted)]"
                 >
-                  You&apos;ve already created a {scope} project of every available type. Delete or leave one before creating another{hasOrg ? `, or switch scope above` : ""}.
+                  You&apos;ve already created a {scope} project of every
+                  available type. Delete or leave one before creating another
+                  {hasOrg ? `, or switch scope above` : ""}.
                 </p>
                 <FormError message={error} />
                 <div className="flex flex-wrap gap-2 pt-2">
@@ -270,7 +297,12 @@ export function CreateProjectDialog({
                 <FormInput
                   ref={nameInputRef}
                   id="project-name"
-                  label={<>Project name <span className="text-[var(--muted)]">(required)</span></>}
+                  label={
+                    <>
+                      Project name{" "}
+                      <span className="text-[var(--muted)]">(required)</span>
+                    </>
+                  }
                   name="name"
                   type="text"
                   required
@@ -281,8 +313,12 @@ export function CreateProjectDialog({
                   disabled={pending}
                 />
                 <div>
-                  <label htmlFor="project-type" className="block text-sm font-medium text-[var(--text)]">
-                    Project type <span className="text-[var(--muted)]">(required)</span>
+                  <label
+                    htmlFor="project-type"
+                    className="block text-sm font-medium text-[var(--text)]"
+                  >
+                    Project type{" "}
+                    <span className="text-[var(--muted)]">(required)</span>
                   </label>
                   <div className="relative mt-1.5">
                     <select
@@ -294,7 +330,7 @@ export function CreateProjectDialog({
                       onChange={(e) =>
                         setSelectedType(e.target.value as ProjectType | "")
                       }
-                      className="w-full appearance-none rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60 cursor-pointer"
+                      className="w-full cursor-pointer appearance-none rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none disabled:opacity-60"
                     >
                       <option value="" disabled className="text-[var(--muted)]">
                         Select project type
@@ -302,7 +338,7 @@ export function CreateProjectDialog({
                       {PROJECT_TYPES.map((type) => {
                         const taken = usedSet.has(type);
                         const archived = restorables.some(
-                          (r) => r.scope === scope && r.type === type
+                          (r) => r.scope === scope && r.type === type,
                         );
                         const label = taken
                           ? `${type} — already created`
@@ -327,15 +363,19 @@ export function CreateProjectDialog({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       aria-hidden
-                      className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[var(--muted)]"
+                      className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-[var(--muted)]"
                     >
                       <path d="m6 9 6 6 6-6" />
                     </svg>
                   </div>
                 </div>
                 <div>
-                  <label htmlFor="project-description" className="block text-sm font-medium text-[var(--text)]">
-                    Description <span className="text-[var(--muted)]">(optional)</span>
+                  <label
+                    htmlFor="project-description"
+                    className="block text-sm font-medium text-[var(--text)]"
+                  >
+                    Description{" "}
+                    <span className="text-[var(--muted)]">(optional)</span>
                   </label>
                   <textarea
                     id="project-description"
@@ -344,14 +384,16 @@ export function CreateProjectDialog({
                     maxLength={140}
                     placeholder="Max 140 characters"
                     disabled={pending}
-                    className="mt-1.5 w-full resize-none rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60"
+                    className="mt-1.5 w-full resize-none rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none disabled:opacity-60"
                   />
                 </div>
                 {restorableMatch ? (
                   <div className="rounded-xl border border-[var(--ring)] bg-[var(--surface-hover)] px-4 py-3 text-sm text-[var(--text)]">
                     <span className="font-medium">{restorableMatch.name}</span>{" "}
                     <span className="text-[var(--muted)]">
-                      was deleted earlier. Restore it to bring back the project and its data, or create a new one — the archived project stays preserved either way.
+                      was deleted earlier. Restore it to bring back the project
+                      and its data, or create a new one — the archived project
+                      stays preserved either way.
                     </span>
                   </div>
                 ) : null}

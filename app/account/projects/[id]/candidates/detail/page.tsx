@@ -39,7 +39,10 @@ export default async function CandidateDetailPage({
       }
     >
       <div className="py-5 first:pt-0">
-        <CandidateDetailClient projectId={project.id} candidateId={candidateId} />
+        <CandidateDetailClient
+          projectId={project.id}
+          candidateId={candidateId}
+        />
       </div>
     </SectionCard>
   );

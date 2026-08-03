@@ -15,7 +15,8 @@ type IconCard = {
 const whatAutom8xDoes: IconCard[] = [
   {
     title: "Invoice Processing",
-    description: "Extract line items, match policies, and prepare posting data.",
+    description:
+      "Extract line items, match policies, and prepare posting data.",
     icon: (
       <svg
         viewBox="0 0 24 24"
@@ -131,7 +132,9 @@ function IconCard({ title, description, icon }: IconCard) {
         {icon}
       </div>
       <h3 className="mt-4 text-lg font-semibold text-[var(--text)]">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{description}</p>
+      <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+        {description}
+      </p>
     </article>
   );
 }
@@ -152,7 +155,8 @@ export default function HomeAnimatedSections() {
             variants={fadeInUp({ y: 10 })}
             className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)] sm:text-base"
           >
-            Replace manual processing with structured automation that your team can trust.
+            Replace manual processing with structured automation that your team
+            can trust.
           </motion.p>
           <motion.div
             variants={staggerContainer({ stagger: 0.07, delayChildren: 0.05 })}
@@ -202,7 +206,8 @@ export default function HomeAnimatedSections() {
             variants={fadeInUp({ y: 10 })}
             className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)] sm:text-base"
           >
-            Build a workflow once. Autom8x handles extraction, routing, and updates across systems.
+            Build a workflow once. Autom8x handles extraction, routing, and
+            updates across systems.
           </motion.p>
           <motion.div variants={fadeInUp({ y: 10 })}>
             <AutomationFlowDiagram />

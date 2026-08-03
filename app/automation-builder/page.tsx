@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  Suspense,
+} from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   ReactFlow,
@@ -15,7 +22,13 @@ import {
   BackgroundVariant,
   ConnectionLineType,
 } from "@xyflow/react";
-import type { Connection, Edge, EdgeTypes, Node, NodeTypes } from "@xyflow/react";
+import type {
+  Connection,
+  Edge,
+  EdgeTypes,
+  Node,
+  NodeTypes,
+} from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { WorkflowNode } from "@/components/builder/WorkflowNode";
 import { StickyNoteNode } from "@/components/builder/StickyNoteNode";
@@ -65,8 +78,7 @@ const defaultEdgeOptions = {
 };
 
 type PendingSwitchTarget =
-  | { kind: "new" }
-  | { kind: "existing"; workflow: WorkflowDetail };
+  { kind: "new" } | { kind: "existing"; workflow: WorkflowDetail };
 
 function canvasSignature(nodes: Node[], edges: Edge[]): string {
   return JSON.stringify(reactFlowToCanvasState(nodes, edges));
@@ -99,17 +111,25 @@ function AutomationBuilder() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   const [showSwitchConfirm, setShowSwitchConfirm] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
   const [saveError, setSaveError] = useState("");
   const [switchError, setSwitchError] = useState("");
   const [isSwitching, setIsSwitching] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [workflowMenuOpen, setWorkflowMenuOpen] = useState(false);
-  const [workflowOptions, setWorkflowOptions] = useState<WorkflowListItem[]>([]);
+  const [workflowOptions, setWorkflowOptions] = useState<WorkflowListItem[]>(
+    [],
+  );
   const [menuError, setMenuError] = useState("");
-  const [pendingSwitch, setPendingSwitch] = useState<PendingSwitchTarget | null>(null);
-  const [postSaveSwitch, setPostSaveSwitch] = useState<PendingSwitchTarget | null>(null);
-  const [lastSavedSignature, setLastSavedSignature] = useState<string | null>(null);
+  const [pendingSwitch, setPendingSwitch] =
+    useState<PendingSwitchTarget | null>(null);
+  const [postSaveSwitch, setPostSaveSwitch] =
+    useState<PendingSwitchTarget | null>(null);
+  const [lastSavedSignature, setLastSavedSignature] = useState<string | null>(
+    null,
+  );
 
   const { screenToFlowPosition, getViewport } = useReactFlow();
   const { status: authStatus } = useAppSession();
@@ -195,7 +215,8 @@ function AutomationBuilder() {
     if (!workflowMenuOpen) return;
     const onClickOutside = (event: MouseEvent) => {
       if (!workflowMenuRef.current) return;
-      if (workflowMenuRef.current.contains(event.target as globalThis.Node)) return;
+      if (workflowMenuRef.current.contains(event.target as globalThis.Node))
+        return;
       setWorkflowMenuOpen(false);
     };
     document.addEventListener("mousedown", onClickOutside);
@@ -234,7 +255,9 @@ function AutomationBuilder() {
 
     initializedRef.current = true;
 
-    const { nodes: rfNodes, edges: rfEdges } = canvasStateToReactFlow(draft.state);
+    const { nodes: rfNodes, edges: rfEdges } = canvasStateToReactFlow(
+      draft.state,
+    );
     setNodes(rfNodes);
     setEdges(rfEdges);
     setLastSavedSignature(null);
@@ -465,9 +488,12 @@ function AutomationBuilder() {
       if (postSaveSwitch) {
         if (postSaveSwitch.kind === "existing") {
           applyWorkflowToCanvas(postSaveSwitch.workflow);
-          router.replace(`/automation-builder?id=${postSaveSwitch.workflow.id}`, {
-            scroll: false,
-          });
+          router.replace(
+            `/automation-builder?id=${postSaveSwitch.workflow.id}`,
+            {
+              scroll: false,
+            },
+          );
         } else {
           resetToNewWorkflow();
           router.replace("/automation-builder", { scroll: false });
@@ -515,7 +541,10 @@ function AutomationBuilder() {
     window.location.href = `/signup?callbackUrl=${encodeURIComponent("/automation-builder")}`;
   }, [getCanvasState, nameInput]);
 
-  const currentSignature = useMemo(() => canvasSignature(nodes, edges), [nodes, edges]);
+  const currentSignature = useMemo(
+    () => canvasSignature(nodes, edges),
+    [nodes, edges],
+  );
   const hasUnsavedChanges = useMemo(() => {
     if (workflowId) {
       if (lastSavedSignature === null) return false;
@@ -755,10 +784,10 @@ function AutomationBuilder() {
           {/* Title badge */}
           <div
             ref={workflowMenuRef}
-            className="absolute left-3 top-3 z-10 hidden min-w-[13rem] flex-col items-start gap-1.5 rounded-2xl border border-[var(--ring)] bg-linear-to-br from-[var(--surface)] to-[var(--surface-strong)] px-4 py-2.5 shadow-sm sm:inline-flex"
+            className="absolute top-3 left-3 z-10 hidden min-w-[13rem] flex-col items-start gap-1.5 rounded-2xl border border-[var(--ring)] bg-linear-to-br from-[var(--surface)] to-[var(--surface-strong)] px-4 py-2.5 shadow-sm sm:inline-flex"
           >
             <div className="flex w-full items-center justify-between gap-2">
-              <h1 className="truncate text-sm font-semibold leading-tight tracking-tight text-[var(--text)]">
+              <h1 className="truncate text-sm leading-tight font-semibold tracking-tight text-[var(--text)]">
                 {workflowName || "Automation Builder"}
               </h1>
               <button
@@ -789,19 +818,23 @@ function AutomationBuilder() {
             <span className="text-[0.6rem] font-medium text-[var(--muted)]">
               Automation Builder
             </span>
-            <span className={`rounded-full border px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.12em] ${statusClass}`}>
+            <span
+              className={`rounded-full border px-2 py-0.5 text-[0.6rem] font-semibold tracking-[0.12em] uppercase ${statusClass}`}
+            >
               {statusLabel}
             </span>
 
             {workflowMenuOpen ? (
-              <div className="absolute left-0 top-[calc(100%+0.45rem)] w-[17.5rem] rounded-2xl border border-[var(--ring)] bg-[var(--surface-strong)] p-2 shadow-xl">
+              <div className="absolute top-[calc(100%+0.45rem)] left-0 w-[17.5rem] rounded-2xl border border-[var(--ring)] bg-[var(--surface-strong)] p-2 shadow-xl">
                 <button
                   type="button"
                   onClick={() => void handleWorkflowSelection(null)}
                   className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)]"
                 >
                   <span>New Workflow</span>
-                  <span className="text-[0.6rem] text-[var(--muted)]">Blank</span>
+                  <span className="text-[0.6rem] text-[var(--muted)]">
+                    Blank
+                  </span>
                 </button>
                 <div className="my-1 h-px bg-[var(--ring)]/80" />
                 <div className="max-h-56 overflow-y-auto pr-0.5">
@@ -816,7 +849,9 @@ function AutomationBuilder() {
                           : "text-[var(--text)] hover:bg-[var(--surface-hover)]"
                       }`}
                     >
-                      <span className="truncate text-xs font-medium">{wf.name}</span>
+                      <span className="truncate text-xs font-medium">
+                        {wf.name}
+                      </span>
                       <span className="ml-2 shrink-0 text-[0.6rem] text-[var(--muted)]">
                         {wf.nodeCount}n
                       </span>
@@ -829,20 +864,26 @@ function AutomationBuilder() {
                   ) : null}
                 </div>
                 {menuError ? (
-                  <p className="mt-2 px-2.5 text-[0.64rem] text-[var(--error-text-muted)]">{menuError}</p>
+                  <p className="mt-2 px-2.5 text-[0.64rem] text-[var(--error-text-muted)]">
+                    {menuError}
+                  </p>
                 ) : null}
                 {switchError && !showSwitchConfirm ? (
-                  <p className="mt-1 px-2.5 text-[0.64rem] text-[var(--error-text-muted)]">{switchError}</p>
+                  <p className="mt-1 px-2.5 text-[0.64rem] text-[var(--error-text-muted)]">
+                    {switchError}
+                  </p>
                 ) : null}
                 {isSwitching ? (
-                  <p className="mt-1 px-2.5 text-[0.64rem] text-[var(--muted)]">Loading workflow...</p>
+                  <p className="mt-1 px-2.5 text-[0.64rem] text-[var(--muted)]">
+                    Loading workflow...
+                  </p>
                 ) : null}
               </div>
             ) : null}
           </div>
 
           {/* Toolbar — top-right */}
-          <div className="absolute right-3 top-3 z-10 flex flex-col gap-2">
+          <div className="absolute top-3 right-3 z-10 flex flex-col gap-2">
             {/* Send (placeholder only) */}
             <button
               type="button"
@@ -879,19 +920,53 @@ function AutomationBuilder() {
                       ? "cursor-pointer border-[var(--ring)] bg-[var(--surface)]/80 text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--text)]"
                       : "pointer-events-none border-[var(--ring)] bg-[var(--surface)]/50 text-[var(--muted)]/40"
               }`}
-              aria-label={workflowId ? "Save workflow" : "Save workflow (name required)"}
+              aria-label={
+                workflowId ? "Save workflow" : "Save workflow (name required)"
+              }
             >
               {saveStatus === "saving" ? (
-                <svg className="h-4 w-4 animate-spin" viewBox="0 0 16 16" fill="none">
-                  <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" opacity="0.3" />
-                  <path d="M14 8a6 6 0 0 0-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <svg
+                  className="h-4 w-4 animate-spin"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                >
+                  <circle
+                    cx="8"
+                    cy="8"
+                    r="6"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    opacity="0.3"
+                  />
+                  <path
+                    d="M14 8a6 6 0 0 0-6-6"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
                 </svg>
               ) : saveStatus === "saved" ? (
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <svg
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4"
+                >
                   <path d="M3.5 8.5 6.5 11.5 12.5 4.5" />
                 </svg>
               ) : (
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <svg
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4"
+                >
                   <path d="M12.667 14H3.333A1.333 1.333 0 0 1 2 12.667V3.333A1.333 1.333 0 0 1 3.333 2h7.334L14 5.333v7.334A1.333 1.333 0 0 1 12.667 14z" />
                   <path d="M11.333 14V9.333H4.667V14" />
                   <path d="M4.667 2v3.333h5.333" />
@@ -915,7 +990,15 @@ function AutomationBuilder() {
               }`}
               aria-label="Clear canvas"
             >
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+              >
                 <path d="M2 4h12M5.333 4V2.667a1.333 1.333 0 0 1 1.334-1.334h2.666a1.333 1.333 0 0 1 1.334 1.334V4M6.667 7.333v4M9.333 7.333v4" />
                 <path d="M3.333 4l.667 9.333a1.333 1.333 0 0 0 1.333 1.334h5.334a1.333 1.333 0 0 0 1.333-1.334L12.667 4" />
               </svg>
@@ -928,7 +1011,15 @@ function AutomationBuilder() {
               className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--surface)]/80 text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
               aria-label="Add note"
             >
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+              >
                 <path d="M9.333 1.333H4a1.333 1.333 0 0 0-1.333 1.334v10.666A1.333 1.333 0 0 0 4 14.667h8a1.333 1.333 0 0 0 1.333-1.334V5.333z" />
                 <path d="M9.333 1.333v4h4" />
                 <path d="M5.333 8.667h5.334M5.333 11.333h5.334" />
@@ -969,7 +1060,7 @@ function AutomationBuilder() {
 
       {/* Mobile bottom palette */}
       {isMobile && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-center gap-2 border-t border-[var(--ring)] bg-[var(--surface)]/90 px-3 py-2 backdrop-blur-md">
+        <div className="fixed right-0 bottom-0 left-0 z-40 flex items-center justify-center gap-2 border-t border-[var(--ring)] bg-[var(--surface)]/90 px-3 py-2 backdrop-blur-md">
           {BLOCK_DEFS.map(({ type, label }) => (
             <button
               key={type}
@@ -977,7 +1068,7 @@ function AutomationBuilder() {
               className="flex flex-1 flex-col items-center gap-1 rounded-xl border border-[var(--ring)] bg-[var(--card)] px-1 py-2 transition active:bg-[var(--surface-hover)]"
             >
               <BlockIconTile type={type} size="sm" />
-              <span className="text-[0.5rem] font-medium leading-tight text-[var(--text)]">
+              <span className="text-[0.5rem] leading-tight font-medium text-[var(--text)]">
                 {label}
               </span>
             </button>
@@ -995,12 +1086,16 @@ function AutomationBuilder() {
             <p className="mt-1.5 text-center text-xs leading-relaxed text-[var(--muted)]">
               You selected{" "}
               <span className="font-semibold text-[var(--text)]">
-                {pendingSwitch.kind === "existing" ? pendingSwitch.workflow.name : "New Workflow"}
+                {pendingSwitch.kind === "existing"
+                  ? pendingSwitch.workflow.name
+                  : "New Workflow"}
               </span>
               . Save your current canvas before switching?
             </p>
             {switchError ? (
-              <p className="mt-3 text-center text-xs text-[var(--error-text)]">{switchError}</p>
+              <p className="mt-3 text-center text-xs text-[var(--error-text)]">
+                {switchError}
+              </p>
             ) : null}
             <div className="mt-5 flex gap-2.5">
               <button
@@ -1050,11 +1145,13 @@ function AutomationBuilder() {
                   handleSaveConfirm();
               }}
               placeholder="e.g. Lead Nurture Flow"
-              className="mt-4 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-sm text-[var(--text)] placeholder:text-[var(--muted)]/50 outline-none transition focus:ring-2 focus:ring-[var(--accent-strong)]"
+              className="mt-4 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-sm text-[var(--text)] transition outline-none placeholder:text-[var(--muted)]/50 focus:ring-2 focus:ring-[var(--accent-strong)]"
               maxLength={100}
             />
             {saveError && (
-              <p className="mt-2 text-center text-xs text-[var(--error-text)]">{saveError}</p>
+              <p className="mt-2 text-center text-xs text-[var(--error-text)]">
+                {saveError}
+              </p>
             )}
             <div className="mt-5 flex gap-2.5">
               <button
@@ -1070,7 +1167,9 @@ function AutomationBuilder() {
               </button>
               <button
                 onClick={handleSaveConfirm}
-                disabled={nameInput.trim().length < 2 || saveStatus === "saving"}
+                disabled={
+                  nameInput.trim().length < 2 || saveStatus === "saving"
+                }
                 className="flex-1 cursor-pointer rounded-full border border-[var(--accent)] bg-[var(--accent)]/10 px-4 py-2 text-xs font-semibold text-[var(--accent)] transition hover:bg-[var(--accent)]/20 disabled:pointer-events-none disabled:opacity-40"
               >
                 {saveStatus === "saving" ? "Saving..." : "Save"}
@@ -1088,7 +1187,8 @@ function AutomationBuilder() {
               Sign in to save
             </p>
             <p className="mt-1.5 text-center text-xs leading-relaxed text-[var(--muted)]">
-              Your workflow will be preserved. After signing in you&apos;ll return here to name and save it.
+              Your workflow will be preserved. After signing in you&apos;ll
+              return here to name and save it.
             </p>
             <div className="mt-5 flex flex-col gap-2">
               <button

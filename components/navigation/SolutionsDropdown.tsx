@@ -40,7 +40,11 @@ export default function SolutionsDropdown() {
   };
 
   const onButtonKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
+    if (
+      event.key === "ArrowDown" ||
+      event.key === "Enter" ||
+      event.key === " "
+    ) {
       event.preventDefault();
       setOpen(true);
       focusItem(0);
@@ -55,7 +59,9 @@ export default function SolutionsDropdown() {
   };
 
   const onMenuKeyDown = (event: React.KeyboardEvent<HTMLUListElement>) => {
-    const currentIndex = itemRefs.current.findIndex((item) => item === document.activeElement);
+    const currentIndex = itemRefs.current.findIndex(
+      (item) => item === document.activeElement,
+    );
     if (currentIndex < 0) {
       return;
     }
@@ -78,7 +84,9 @@ export default function SolutionsDropdown() {
     }
   };
 
-  const onSolutionsLinkKeyDown = (event: React.KeyboardEvent<HTMLAnchorElement>) => {
+  const onSolutionsLinkKeyDown = (
+    event: React.KeyboardEvent<HTMLAnchorElement>,
+  ) => {
     if (event.key === "ArrowDown") {
       event.preventDefault();
       setOpen(true);
@@ -106,8 +114,12 @@ export default function SolutionsDropdown() {
       onPointerLeave={onPointerLeave}
       onBlur={onBlur}
     >
-      <div className="inline-flex items-center rounded-full px-4 py-2.5 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-within:bg-[var(--surface-hover)]">
-        <Link href="/solutions" className="focus-visible:outline-none" onKeyDown={onSolutionsLinkKeyDown}>
+      <div className="inline-flex items-center rounded-full px-4 py-2.5 text-sm font-medium text-[var(--text)] transition focus-within:bg-[var(--surface-hover)] hover:bg-[var(--surface-hover)]">
+        <Link
+          href="/solutions"
+          className="focus-visible:outline-none"
+          onKeyDown={onSolutionsLinkKeyDown}
+        >
           Solutions
         </Link>
         <button
@@ -116,7 +128,7 @@ export default function SolutionsDropdown() {
           aria-expanded={open}
           aria-controls="solutions-dropdown-menu"
           aria-label="Toggle Solutions submenu"
-          className="ml-1 inline-flex items-center justify-center rounded p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+          className="ml-1 inline-flex items-center justify-center rounded p-0.5 focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
           onClick={() => setOpen((prev) => !prev)}
           onKeyDown={onButtonKeyDown}
         >
@@ -138,7 +150,7 @@ export default function SolutionsDropdown() {
           id="solutions-dropdown-menu"
           role="menu"
           aria-label="Solutions submenu"
-          className="absolute left-0 top-full z-50 min-w-48 rounded-2xl border border-[var(--ring)] bg-[var(--surface)] p-2 shadow-[0_12px_24px_rgba(12,24,40,0.14)]"
+          className="absolute top-full left-0 z-50 min-w-48 rounded-2xl border border-[var(--ring)] bg-[var(--surface)] p-2 shadow-[0_12px_24px_rgba(12,24,40,0.14)]"
           onKeyDown={onMenuKeyDown}
         >
           {items.map((item, index) => (
@@ -149,7 +161,7 @@ export default function SolutionsDropdown() {
                 ref={(el) => {
                   itemRefs.current[index] = el;
                 }}
-                className="block rounded-xl px-3 py-2 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                className="block rounded-xl px-3 py-2 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
                 onClick={() => setOpen(false)}
               >
                 {item.label}

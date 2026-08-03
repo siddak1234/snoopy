@@ -29,7 +29,10 @@ export default function MobileNavMenu() {
     if (!menuOpen) return;
 
     const onPointerDown = (e: PointerEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
         setMenuOpen(false);
       }
     };
@@ -58,15 +61,29 @@ export default function MobileNavMenu() {
         aria-expanded={menuOpen}
         aria-controls="mobile-nav-panel"
         aria-label={menuOpen ? "Close menu" : "Open menu"}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--card)] text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--card)] text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
       >
         <span className="sr-only">{menuOpen ? "Close menu" : "Open menu"}</span>
         {menuOpen ? (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" aria-hidden>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="h-5 w-5"
+            aria-hidden
+          >
             <path d="M18 6L6 18M6 6l12 12" />
           </svg>
         ) : (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" aria-hidden>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="h-5 w-5"
+            aria-hidden
+          >
             <path d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         )}
@@ -77,7 +94,7 @@ export default function MobileNavMenu() {
           id="mobile-nav-panel"
           role="dialog"
           aria-label="Main navigation"
-          className="absolute right-0 top-full z-50 mt-2 min-w-[16rem] max-h-[min(28rem,calc(100vh-6rem))] overflow-y-auto rounded-2xl border border-[var(--ring)] bg-[var(--surface)] p-2 shadow-[0_12px_24px_rgba(12,24,40,0.14)] [background:linear-gradient(165deg,var(--surface)_0%,var(--surface-strong)_100%)]"
+          className="absolute top-full right-0 z-50 mt-2 max-h-[min(28rem,calc(100vh-6rem))] min-w-[16rem] overflow-y-auto rounded-2xl border border-[var(--ring)] bg-[var(--surface)] p-2 shadow-[0_12px_24px_rgba(12,24,40,0.14)] [background:linear-gradient(165deg,var(--surface)_0%,var(--surface-strong)_100%)]"
         >
           <nav className="flex flex-col gap-0.5 py-1">
             <Link href="/" className={linkClass} onClick={closeMenu}>
@@ -88,7 +105,7 @@ export default function MobileNavMenu() {
               <div className="flex items-center">
                 <Link
                   href="/solutions"
-                  className="block flex-1 rounded-xl px-4 py-3 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                  className="block flex-1 rounded-xl px-4 py-3 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-inset"
                   onClick={closeMenu}
                 >
                   Solutions
@@ -98,7 +115,7 @@ export default function MobileNavMenu() {
                   onClick={() => setSolutionsExpanded((prev) => !prev)}
                   aria-expanded={solutionsExpanded}
                   aria-label="Toggle Solutions submenu"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-inset"
                 >
                   <svg
                     aria-hidden
@@ -113,12 +130,12 @@ export default function MobileNavMenu() {
                 </button>
               </div>
               {solutionsExpanded ? (
-                <div className="ml-3 mt-0.5 flex flex-col gap-0.5 border-l-2 border-[var(--ring)] pl-3">
+                <div className="mt-0.5 ml-3 flex flex-col gap-0.5 border-l-2 border-[var(--ring)] pl-3">
                   {solutionsItems.map((item) => (
                     <Link
                       key={item.href}
                       href={item.href}
-                      className="block rounded-lg py-2.5 pl-1 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                      className="block rounded-lg py-2.5 pl-1 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-inset"
                       onClick={closeMenu}
                     >
                       {item.label}
@@ -132,7 +149,7 @@ export default function MobileNavMenu() {
               <div className="flex items-center">
                 <Link
                   href="/insights"
-                  className="block flex-1 rounded-xl px-4 py-3 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                  className="block flex-1 rounded-xl px-4 py-3 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-inset"
                   onClick={closeMenu}
                 >
                   Insights
@@ -142,7 +159,7 @@ export default function MobileNavMenu() {
                   onClick={() => setInsightsExpanded((prev) => !prev)}
                   aria-expanded={insightsExpanded}
                   aria-label="Toggle Insights submenu"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-inset"
                 >
                   <svg
                     aria-hidden
@@ -157,12 +174,12 @@ export default function MobileNavMenu() {
                 </button>
               </div>
               {insightsExpanded ? (
-                <div className="ml-3 mt-0.5 flex flex-col gap-0.5 border-l-2 border-[var(--ring)] pl-3">
+                <div className="mt-0.5 ml-3 flex flex-col gap-0.5 border-l-2 border-[var(--ring)] pl-3">
                   {insightsItems.map((item) => (
                     <Link
                       key={item.href}
                       href={item.href}
-                      className="block rounded-lg py-2.5 pl-1 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                      className="block rounded-lg py-2.5 pl-1 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-inset"
                       onClick={closeMenu}
                     >
                       {item.label}
@@ -172,7 +189,11 @@ export default function MobileNavMenu() {
               ) : null}
             </div>
 
-            <Link href="/automation-builder" className={linkClass} onClick={closeMenu}>
+            <Link
+              href="/automation-builder"
+              className={linkClass}
+              onClick={closeMenu}
+            >
               Automation Builder
             </Link>
             <Link href="/contact" className={linkClass} onClick={closeMenu}>
@@ -186,7 +207,7 @@ export default function MobileNavMenu() {
               <>
                 <Link
                   href="/account"
-                  className="rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                  className="rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-inset"
                   onClick={closeMenu}
                 >
                   Account
@@ -207,7 +228,7 @@ export default function MobileNavMenu() {
             ) : (
               <Link
                 href="/login"
-                className="rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                className="rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-inset"
                 onClick={closeMenu}
               >
                 Login / Signup

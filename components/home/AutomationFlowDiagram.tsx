@@ -70,7 +70,8 @@ function almostEqual(a: number, b: number): boolean {
 
 function sameLayout(a: LayoutMetrics | null, b: LayoutMetrics): boolean {
   if (!a) return false;
-  if (!almostEqual(a.width, b.width) || !almostEqual(a.height, b.height)) return false;
+  if (!almostEqual(a.width, b.width) || !almostEqual(a.height, b.height))
+    return false;
   if (a.isDesktop !== b.isDesktop) return false;
   if (a.cards.length !== b.cards.length) return false;
   for (let i = 0; i < a.cards.length; i += 1) {
@@ -164,12 +165,15 @@ export default function AutomationFlowDiagram() {
       if (!section) return;
 
       const rect = section.getBoundingClientRect();
-      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+      const viewportHeight =
+        window.innerHeight || document.documentElement.clientHeight;
       const travel = viewportHeight + rect.height;
       if (travel <= 0) return;
 
       const next = clamp((viewportHeight - rect.top) / travel, 0, 1);
-      setSectionProgress((prev) => (Math.abs(prev - next) < 0.002 ? prev : next));
+      setSectionProgress((prev) =>
+        Math.abs(prev - next) < 0.002 ? prev : next,
+      );
     };
 
     const queue = () => {
@@ -272,8 +276,10 @@ export default function AutomationFlowDiagram() {
               );
 
         const deckPeek = card.height * 0.26;
-        const deckLift = index === 0 ? 0 : -(index * Math.max(card.height - deckPeek, 0));
-        const entryScaleMobile = index === 0 ? 1 : clamp(0.98 - index * 0.02, 0.9, 1);
+        const deckLift =
+          index === 0 ? 0 : -(index * Math.max(card.height - deckPeek, 0));
+        const entryScaleMobile =
+          index === 0 ? 1 : clamp(0.98 - index * 0.02, 0.9, 1);
         const entryOpacityMobile =
           index === 0 ? 1 : clamp(0.72 - (index - 1) * 0.1, 0.38, 0.9);
 
@@ -282,7 +288,11 @@ export default function AutomationFlowDiagram() {
             tx: 0,
             ty: lerp(deckLift, 0, revealProgress),
             scale: lerp(entryScaleMobile, 1, revealProgress),
-            opacity: clamp(lerp(entryOpacityMobile, 1, revealProgress), 0.34, 1),
+            opacity: clamp(
+              lerp(entryOpacityMobile, 1, revealProgress),
+              0.34,
+              1,
+            ),
             zIndex: Math.round(lerp(entryZ, spreadZ, revealProgress)),
             cx,
             cy,
@@ -292,7 +302,11 @@ export default function AutomationFlowDiagram() {
         }
 
         if (p > exitStart) {
-          const exitPhase = clamp((p - exitStart) / Math.max(1 - exitStart, 0.001), 0, 1);
+          const exitPhase = clamp(
+            (p - exitStart) / Math.max(1 - exitStart, 0.001),
+            0,
+            1,
+          );
           const exitTyMobile = -(index * card.height * 0.14);
           const exitScaleMobile = 0.96 + (index / Math.max(last, 1)) * 0.06;
           const exitOpacityMobile = 0.62 + (index / Math.max(last, 1)) * 0.38;
@@ -338,7 +352,11 @@ export default function AutomationFlowDiagram() {
       }
 
       if (p > exitStart) {
-        const exitPhase = clamp((p - exitStart) / Math.max(1 - exitStart, 0.001), 0, 1);
+        const exitPhase = clamp(
+          (p - exitStart) / Math.max(1 - exitStart, 0.001),
+          0,
+          1,
+        );
         return {
           tx: lerp(0, exitTx, exitPhase),
           ty: lerp(0, exitTy, exitPhase),
@@ -367,7 +385,12 @@ export default function AutomationFlowDiagram() {
   }, [layout, progress]);
 
   const connectors = useMemo<ConnectorPath[]>(() => {
-    if (!layout || cardStates.length !== FLOW_STEPS.length || FLOW_STEPS.length < 2) return [];
+    if (
+      !layout ||
+      cardStates.length !== FLOW_STEPS.length ||
+      FLOW_STEPS.length < 2
+    )
+      return [];
 
     const count = FLOW_STEPS.length;
     const centerHold = clamp(
@@ -380,7 +403,8 @@ export default function AutomationFlowDiagram() {
       centerDistance <= centerHold
         ? 1
         : clamp(
-            1 - (centerDistance - centerHold) / Math.max(0.5 - centerHold, 0.001),
+            1 -
+              (centerDistance - centerHold) / Math.max(0.5 - centerHold, 0.001),
             0,
             1,
           );
@@ -425,16 +449,33 @@ export default function AutomationFlowDiagram() {
 
   return (
     <div ref={sectionRef} className="mt-6 overflow-hidden">
-      <div ref={containerRef} className="relative grid gap-4 py-1 md:grid-cols-4 md:items-stretch md:gap-5">
+      <div
+        ref={containerRef}
+        className="relative grid gap-4 py-1 md:grid-cols-4 md:items-stretch md:gap-5"
+      >
         <svg
           aria-hidden
           className="pointer-events-none absolute inset-0 z-[5] h-full w-full overflow-visible"
         >
           <defs>
-            <linearGradient id="workflow-connector-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <linearGradient
+              id="workflow-connector-gradient"
+              x1="0%"
+              y1="0%"
+              x2="100%"
+              y2="0%"
+            >
               <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.24" />
-              <stop offset="50%" stopColor="var(--accent-strong)" stopOpacity="0.95" />
-              <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.24" />
+              <stop
+                offset="50%"
+                stopColor="var(--accent-strong)"
+                stopOpacity="0.95"
+              />
+              <stop
+                offset="100%"
+                stopColor="var(--accent)"
+                stopOpacity="0.24"
+              />
             </linearGradient>
           </defs>
           {connectors.map((connector, index) => (
@@ -487,7 +528,7 @@ export default function AutomationFlowDiagram() {
               }}
             >
               <article className="flow-node h-[12rem] rounded-2xl border border-[var(--ring)] bg-[var(--card)] p-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                <p className="text-xs font-semibold tracking-[0.16em] text-[var(--muted)] uppercase">
                   Step {index + 1}
                 </p>
                 <h3 className="mt-1.5 text-lg font-semibold text-[var(--text)] md:text-xl">

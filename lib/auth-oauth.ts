@@ -33,7 +33,11 @@ export function buildAuthCallbackUrl(nextPath: string): string {
   )}`;
 
   if (process.env.NEXT_PUBLIC_AUTH_DEBUG === "1") {
-    console.log("OAUTH_START", { origin, next: normalizedNext, redirectTo: url });
+    console.log("OAUTH_START", {
+      origin,
+      next: normalizedNext,
+      redirectTo: url,
+    });
   }
 
   return url;
@@ -49,7 +53,7 @@ function getSupabaseVerifierCookieNames(): string[] {
       (name) =>
         name.includes("verifier") ||
         name.includes("auth-token") ||
-        name.startsWith("sb-")
+        name.startsWith("sb-"),
     );
 }
 
@@ -77,7 +81,7 @@ function yieldEventLoop(times: number = 3): Promise<void> {
  */
 export function logOAuthCookieState(
   label: "AFTER_SIGNIN" | "BEFORE_NAV",
-  dataUrl: string | undefined
+  dataUrl: string | undefined,
 ): void {
   if (typeof document === "undefined") return;
   const raw = document.cookie;
@@ -107,7 +111,7 @@ export function logOAuthCookieState(
  */
 export function waitForVerifierCookie(
   maxMs: number = 1800,
-  intervalMs: number = 50
+  intervalMs: number = 50,
 ): Promise<boolean> {
   return new Promise((resolve) => {
     const minDelayMs = 300;
@@ -135,7 +139,9 @@ export function waitForVerifierCookie(
  * wait for verifier cookie, log again. Returns true only if cookie is present.
  * Use this so the first OAuth click creates the cookie before redirect.
  */
-export async function ensureVerifierThenRedirect(dataUrl: string | undefined): Promise<boolean> {
+export async function ensureVerifierThenRedirect(
+  dataUrl: string | undefined,
+): Promise<boolean> {
   logOAuthCookieState("AFTER_SIGNIN", dataUrl);
   await yieldEventLoop(3);
   const hasVerifier = await waitForVerifierCookie(1800, 50);
@@ -157,8 +163,7 @@ export function logPkceClientSnapshot(redirectTo: string): void {
   const hasVerifier = names.some((n) => n.includes("verifier"));
   const hasSupabase = names.some((n) => n.toLowerCase().includes("supabase"));
   const hasAuthToken = names.some((n) => n.includes("auth-token"));
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "";
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
   console.log("PKCE_DEBUG_CLIENT", {
     documentCookie: raw,
     cookieNames: names,
@@ -169,4 +174,3 @@ export function logPkceClientSnapshot(redirectTo: string): void {
     windowLocationOrigin: origin,
   });
 }
-

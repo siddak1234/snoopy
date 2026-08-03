@@ -12,7 +12,7 @@ const connectionString =
 // so we can fully control TLS options and avoid sslmode parsing issues.
 if (!connectionString) {
   throw new Error(
-    "Database connection string is missing. Set POSTGRES_URL (pooled) or POSTGRES_PRISMA_URL (direct)."
+    "Database connection string is missing. Set POSTGRES_URL (pooled) or POSTGRES_PRISMA_URL (direct).",
   );
 }
 
@@ -32,9 +32,7 @@ const adapter = new PrismaPg({
   },
 });
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({ adapter });
+export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;

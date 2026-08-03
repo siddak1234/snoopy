@@ -2,7 +2,10 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/auth-supabase";
 import { prisma } from "@/lib/db";
-import { DashboardSidebar, DashboardHeader } from "@/components/dashboard/DashboardNav";
+import {
+  DashboardSidebar,
+  DashboardHeader,
+} from "@/components/dashboard/DashboardNav";
 import { AuthHydrationGate } from "@/components/auth/AuthHydrationGate";
 
 export default async function AccountLayout({

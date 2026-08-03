@@ -55,8 +55,10 @@ export default async function JoinOrgPage({
             {workspace.domain}
           </span>{" "}
           is registered to{" "}
-          <span className="font-medium text-[var(--text)]">{workspace.name}</span>.
-          Would you like to join?
+          <span className="font-medium text-[var(--text)]">
+            {workspace.name}
+          </span>
+          . Would you like to join?
         </p>
 
         <JoinOrgForm workspaceName={workspace.name} />

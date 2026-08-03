@@ -47,8 +47,7 @@ export default function HeroSection() {
   }, [mx, my]);
 
   const contentVariants = useMemo(
-    () =>
-      staggerContainer({ stagger: 0.08, delayChildren: 0.05 }),
+    () => staggerContainer({ stagger: 0.08, delayChildren: 0.05 }),
     [],
   );
 
@@ -75,12 +74,9 @@ export default function HeroSection() {
       variants={contentVariants}
     >
       {/* Soft gradient glow behind content */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        aria-hidden
-      >
-        <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-[var(--accent)]/20 blur-3xl" />
-        <div className="absolute right-[-6rem] top-10 h-80 w-80 rounded-full bg-[var(--accent-strong)]/15 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0" aria-hidden>
+        <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-[var(--accent)]/20 blur-3xl" />
+        <div className="absolute top-10 right-[-6rem] h-80 w-80 rounded-full bg-[var(--accent-strong)]/15 blur-3xl" />
         <div className="absolute bottom-[-7rem] left-1/3 h-72 w-72 rounded-full bg-[#ffffff]/10 blur-3xl" />
       </div>
 
@@ -122,8 +118,8 @@ export default function HeroSection() {
           variants={descriptionVariants}
           className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)] sm:text-lg"
         >
-          Autom8x automates document-heavy operations. Connect inboxes, files, and
-          systems to run workflows with clear review points.
+          Autom8x automates document-heavy operations. Connect inboxes, files,
+          and systems to run workflows with clear review points.
         </motion.p>
 
         <motion.div
@@ -225,7 +221,15 @@ function HeroWorkflowBackdrop({ reducedMotion }: { reducedMotion: boolean }) {
           </circle>
 
           {/* Faint highlight streak */}
-          <rect x="0" y="0" width="40" height="2" rx="999" fill="url(#a8xPulse)" opacity="0.35">
+          <rect
+            x="0"
+            y="0"
+            width="40"
+            height="2"
+            rx="999"
+            fill="url(#a8xPulse)"
+            opacity="0.35"
+          >
             <animateMotion dur="5.4s" repeatCount="indefinite" begin="1.2s">
               <mpath href="#heroPath1" />
             </animateMotion>
@@ -235,4 +239,3 @@ function HeroWorkflowBackdrop({ reducedMotion }: { reducedMotion: boolean }) {
     </svg>
   );
 }
-

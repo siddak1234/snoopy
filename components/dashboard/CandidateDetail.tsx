@@ -68,10 +68,10 @@ export function CandidateDetail({
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <p className="text-[10px] uppercase tracking-wide text-[var(--muted)]">
+            <p className="text-[10px] tracking-wide text-[var(--muted)] uppercase">
               Fit score
             </p>
-            <p className="text-2xl font-semibold tabular-nums text-[var(--text)]">
+            <p className="text-2xl font-semibold text-[var(--text)] tabular-nums">
               {isPending ? "—" : integerFmt.format(candidate.fitScore)}
             </p>
           </div>
@@ -119,7 +119,7 @@ export function CandidateDetail({
               )}
               {candidate.flagged && detail?.flagReasons?.length ? (
                 <div className="rounded-lg border border-[var(--warning-border)] bg-[var(--warning-bg)] px-3 py-2.5">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--warning-text)]">
+                  <p className="text-[11px] font-medium tracking-wide text-[var(--warning-text)] uppercase">
                     Flagged for review
                   </p>
                   <ul className="mt-1.5 list-disc space-y-1 pl-4 text-xs text-[var(--text)]">
@@ -157,7 +157,10 @@ export function CandidateDetail({
             <SubLabel>Eligibility</SubLabel>
             <Row label="Work authorization" value={detail?.workAuthorization} />
             <Row label="Needs sponsorship" value={detail?.sponsorship} />
-            <Row label="Willing to relocate" value={detail?.willingToRelocate} />
+            <Row
+              label="Willing to relocate"
+              value={detail?.willingToRelocate}
+            />
             <Row label="Earliest start" value={detail?.earliestStart} />
             <Row label="Salary expectation" value={detail?.salaryExpectation} />
 
@@ -241,7 +244,8 @@ export function CandidateDetail({
                     <Field
                       label="Years (relevant / total)"
                       value={
-                        detail.relevantYears != null || detail.totalYears != null
+                        detail.relevantYears != null ||
+                        detail.totalYears != null
                           ? `${fmtYears(detail.relevantYears)} relevant · ${fmtYears(detail.totalYears)} total`
                           : undefined
                       }
@@ -267,7 +271,10 @@ export function CandidateDetail({
                         label="Career trajectory"
                         value={detail.careerTrajectory}
                       />
-                      <Field label="Tenure pattern" value={detail.tenurePattern} />
+                      <Field
+                        label="Tenure pattern"
+                        value={detail.tenurePattern}
+                      />
                     </dl>
                   </SubDisclosure>
                 ) : null}
@@ -325,7 +332,9 @@ export function CandidateDetail({
                       </p>
                     ) : null}
                     {g.reasoning ? (
-                      <p className="mt-1 text-xs text-[var(--text)]">{g.reasoning}</p>
+                      <p className="mt-1 text-xs text-[var(--text)]">
+                        {g.reasoning}
+                      </p>
                     ) : null}
                   </div>
                 ))}
@@ -349,7 +358,9 @@ export function CandidateDetail({
                       <span className="text-sm font-medium text-[var(--text)]">
                         {labelize(f.type)}
                       </span>
-                      <Badge tone={severityTone(f.severity)}>{f.severity}</Badge>
+                      <Badge tone={severityTone(f.severity)}>
+                        {f.severity}
+                      </Badge>
                     </div>
                     {f.description ? (
                       <p className="mt-1 text-xs text-[var(--text)]">
@@ -357,7 +368,9 @@ export function CandidateDetail({
                       </p>
                     ) : null}
                     {f.evidence ? (
-                      <p className="mt-1 text-xs text-[var(--muted)]">{f.evidence}</p>
+                      <p className="mt-1 text-xs text-[var(--muted)]">
+                        {f.evidence}
+                      </p>
                     ) : null}
                   </div>
                 ))}
@@ -374,7 +387,9 @@ export function CandidateDetail({
               title="Recommendation"
               badge={
                 detail.decisionConfidence ? (
-                  <Badge tone="muted">{detail.decisionConfidence} confidence</Badge>
+                  <Badge tone="muted">
+                    {detail.decisionConfidence} confidence
+                  </Badge>
                 ) : null
               }
             >
@@ -495,7 +510,9 @@ function Disclosure({
         </span>
         <Chevron group="section" />
       </summary>
-      <div className="border-t border-[var(--ring)]/60 px-4 py-3">{children}</div>
+      <div className="border-t border-[var(--ring)]/60 px-4 py-3">
+        {children}
+      </div>
     </details>
   );
 }
@@ -517,7 +534,7 @@ function SubDisclosure({
       className="group/sub rounded-lg border border-[var(--ring)]/60 bg-[var(--surface-strong)] [&_summary::-webkit-details-marker]:hidden"
     >
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2">
-        <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+        <span className="flex items-center gap-2 text-[11px] font-semibold tracking-wide text-[var(--muted)] uppercase">
           {title}
           {count != null ? (
             <span className="rounded-full border border-[var(--ring)] px-1.5 text-[10px] text-[var(--muted)]">
@@ -527,7 +544,7 @@ function SubDisclosure({
         </span>
         <Chevron group="sub" />
       </summary>
-      <div className="px-3 pb-3 pt-1">{children}</div>
+      <div className="px-3 pt-1 pb-3">{children}</div>
     </details>
   );
 }
@@ -647,11 +664,15 @@ function Field({
   return (
     <div>
       <dt className="text-[var(--muted)]">{label}</dt>
-      <dd className={`mt-0.5 text-[var(--text)] ${capitalize ? "capitalize" : ""}`}>
+      <dd
+        className={`mt-0.5 text-[var(--text)] ${capitalize ? "capitalize" : ""}`}
+      >
         {value ?? "—"}
       </dd>
       {note ? (
-        <p className="mt-0.5 text-xs leading-relaxed text-[var(--muted)]">{note}</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-[var(--muted)]">
+          {note}
+        </p>
       ) : null}
     </div>
   );
@@ -660,7 +681,7 @@ function Field({
 // Sub-group divider label inside the Candidate info card.
 function SubLabel({ children }: { children: ReactNode }) {
   return (
-    <p className="mt-2 border-t border-[var(--ring)]/60 pt-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+    <p className="mt-2 border-t border-[var(--ring)]/60 pt-2.5 text-[11px] font-semibold tracking-wide text-[var(--muted)] uppercase">
       {children}
     </p>
   );

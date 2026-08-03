@@ -37,7 +37,7 @@ export default async function AccountSettingsPage() {
 
       {showOrgCreate ? (
         <div className="border-t border-[var(--ring)] py-5">
-          <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+          <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
             Create organization workspace
           </h2>
           <p className="mt-2 text-sm text-[var(--muted)]">
@@ -53,7 +53,7 @@ export default async function AccountSettingsPage() {
         </div>
       ) : showOrgLink ? (
         <div className="border-t border-[var(--ring)] py-5">
-          <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+          <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
             Organization
           </h2>
           <p className="mt-2 text-sm text-[var(--muted)]">
@@ -71,7 +71,7 @@ export default async function AccountSettingsPage() {
       ) : null}
 
       <div className="border-t border-[var(--ring)] pt-5">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+        <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Danger zone
         </h2>
         <p className="mt-2 text-sm text-[var(--muted)]">

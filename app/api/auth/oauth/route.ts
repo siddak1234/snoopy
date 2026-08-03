@@ -36,7 +36,10 @@ export async function GET(request: Request) {
   if (isRetry) callbackParams.set("retry", "1");
   const redirectTo = `${requestUrl.origin}/auth/callback?${callbackParams.toString()}`;
 
-  if (!provider || !PROVIDERS.includes(provider as (typeof PROVIDERS)[number])) {
+  if (
+    !provider ||
+    !PROVIDERS.includes(provider as (typeof PROVIDERS)[number])
+  ) {
     const login = new URL("/login", requestUrl.origin);
     login.searchParams.set("error", "auth_callback");
     login.searchParams.set("error_description", "Invalid or missing provider");
@@ -62,15 +65,22 @@ export async function GET(request: Request) {
               .split(";")
               .map((c) => {
                 const eq = c.trim().indexOf("=");
-                const name = eq === -1 ? c.trim() : c.trim().slice(0, eq).trim();
-                const value = eq === -1 ? "" : c.trim().slice(eq + 1).trim();
+                const name =
+                  eq === -1 ? c.trim() : c.trim().slice(0, eq).trim();
+                const value =
+                  eq === -1
+                    ? ""
+                    : c
+                        .trim()
+                        .slice(eq + 1)
+                        .trim();
                 return { name, value };
               })
           : [];
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, { ...cookieOptions, ...options })
+          response.cookies.set(name, value, { ...cookieOptions, ...options }),
         );
       },
     },
@@ -90,7 +100,7 @@ export async function GET(request: Request) {
     login.searchParams.set("error", "auth_callback");
     login.searchParams.set(
       "error_description",
-      error?.message ?? "Could not start sign-in"
+      error?.message ?? "Could not start sign-in",
     );
     return NextResponse.redirect(login.toString());
   }

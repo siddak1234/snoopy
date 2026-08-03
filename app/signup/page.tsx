@@ -21,7 +21,9 @@ function SignupForm() {
     e.preventDefault();
     setStatus(null);
     const form = e.currentTarget;
-    const emailInput = form.elements.namedItem("email") as HTMLInputElement | null;
+    const emailInput = form.elements.namedItem(
+      "email",
+    ) as HTMLInputElement | null;
     const email = emailInput?.value;
 
     if (!email?.trim()) {
@@ -31,14 +33,22 @@ function SignupForm() {
 
     const normalizedEmail = normalizeEmail(email);
     if (isGmailAddress(normalizedEmail)) {
-      const next = callbackUrl.startsWith("/") ? callbackUrl : `/${callbackUrl}`;
+      const next = callbackUrl.startsWith("/")
+        ? callbackUrl
+        : `/${callbackUrl}`;
       window.location.href = `/api/auth/oauth?provider=google&next=${encodeURIComponent(next)}`;
       return;
     }
 
-    const fullName = (form.elements.namedItem("fullName") as HTMLInputElement | null)?.value?.trim();
-    const passwordInput = form.elements.namedItem("password") as HTMLInputElement | null;
-    const confirmInput = form.elements.namedItem("confirmPassword") as HTMLInputElement | null;
+    const fullName = (
+      form.elements.namedItem("fullName") as HTMLInputElement | null
+    )?.value?.trim();
+    const passwordInput = form.elements.namedItem(
+      "password",
+    ) as HTMLInputElement | null;
+    const confirmInput = form.elements.namedItem(
+      "confirmPassword",
+    ) as HTMLInputElement | null;
     const password = passwordInput?.value;
     const confirmPassword = confirmInput?.value;
 
@@ -82,7 +92,9 @@ function SignupForm() {
         password,
       });
       if (error) {
-        setStatus("Account created. Please log in with your email and password.");
+        setStatus(
+          "Account created. Please log in with your email and password.",
+        );
         setLoading(false);
         return;
       }
@@ -133,12 +145,19 @@ function SignupForm() {
               placeholder="Confirm your password"
             />
 
-            <button type="submit" className="btn-primary w-full px-5" disabled={loading}>
+            <button
+              type="submit"
+              className="btn-primary w-full px-5"
+              disabled={loading}
+            >
               {loading ? "Creating account…" : "Create Account"}
             </button>
 
             {status ? (
-              <p className="text-center text-sm text-[var(--muted)]" role="alert">
+              <p
+                className="text-center text-sm text-[var(--muted)]"
+                role="alert"
+              >
                 {status}
               </p>
             ) : null}
@@ -149,30 +168,34 @@ function SignupForm() {
               <div className="w-full border-t border-[var(--ring)]" />
             </div>
             <div className="relative flex justify-center">
-              <span className="bg-[var(--surface)] px-3 text-sm text-[var(--muted)]">or</span>
+              <span className="bg-[var(--surface)] px-3 text-sm text-[var(--muted)]">
+                or
+              </span>
             </div>
           </div>
 
           <div className="flex flex-col gap-2">
             <a
               href="/api/auth/oauth?provider=google&next=%2Faccount"
-              className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+              className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
             >
               Sign up with Google
             </a>
             <a
               href="/api/auth/oauth?provider=azure&next=%2Faccount"
-              className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+              className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
             >
               Sign up with Microsoft
             </a>
           </div>
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2 border-t border-[var(--ring)] pt-5">
-            <span className="text-sm text-[var(--muted)]">Already have an account?</span>
+            <span className="text-sm text-[var(--muted)]">
+              Already have an account?
+            </span>
             <Link
               href="/login"
-              className="btn-secondary inline-flex px-4 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]"
+              className="btn-secondary inline-flex px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] focus-visible:outline-none"
             >
               Log in
             </Link>
@@ -185,7 +208,13 @@ function SignupForm() {
 
 export default function SignupPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-[60vh] items-center justify-center px-4 py-8"><div className="bubble p-6 sm:p-8">Loading…</div></div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-[60vh] items-center justify-center px-4 py-8">
+          <div className="bubble p-6 sm:p-8">Loading…</div>
+        </div>
+      }
+    >
       <SignupForm />
     </Suspense>
   );

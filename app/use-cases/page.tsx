@@ -1,12 +1,32 @@
 import Link from "next/link";
 
 const useCases = [
-  { slug: "healthcare-documentation", category: "Healthcare", title: "From Documentation Burden to Intelligent Care Delivery", date: "2026-03-05", dateLabel: "March 5, 2026" },
-  { slug: "performance-intelligence", category: "Human Resources & Governance", title: "From Performance Reviews to Performance Intelligence", date: "2026-02-22", dateLabel: "February 22, 2026" },
-  { slug: "contracts-financial-truth", category: "Finance & Legal", title: "From Contracts to Financial Truth", date: "2026-02-08", dateLabel: "February 8, 2026" },
+  {
+    slug: "healthcare-documentation",
+    category: "Healthcare",
+    title: "From Documentation Burden to Intelligent Care Delivery",
+    date: "2026-03-05",
+    dateLabel: "March 5, 2026",
+  },
+  {
+    slug: "performance-intelligence",
+    category: "Human Resources & Governance",
+    title: "From Performance Reviews to Performance Intelligence",
+    date: "2026-02-22",
+    dateLabel: "February 22, 2026",
+  },
+  {
+    slug: "contracts-financial-truth",
+    category: "Finance & Legal",
+    title: "From Contracts to Financial Truth",
+    date: "2026-02-08",
+    dateLabel: "February 8, 2026",
+  },
 ];
 
-const useCasesByDate = [...useCases].sort((a, b) => b.date.localeCompare(a.date));
+const useCasesByDate = [...useCases].sort((a, b) =>
+  b.date.localeCompare(a.date),
+);
 
 export default function UseCasesPage() {
   return (
@@ -14,7 +34,9 @@ export default function UseCasesPage() {
       <section className="bubble p-6 sm:p-8">
         <h1 className="text-3xl font-semibold sm:text-4xl">Use Cases</h1>
         <p className="mt-4 text-base text-[var(--muted)]">
-          Explore how Autom8x applies AI and automation to specific workflows and business problems—from document processing and intake to billing, compliance, and operations.
+          Explore how Autom8x applies AI and automation to specific workflows
+          and business problems—from document processing and intake to billing,
+          compliance, and operations.
         </p>
       </section>
 
@@ -28,19 +50,22 @@ export default function UseCasesPage() {
               className="bubble group flex flex-col gap-4 p-6 transition duration-200 hover:-translate-y-1 hover:shadow-xl sm:flex-row sm:items-center sm:justify-between sm:p-8"
             >
               <div className="min-w-0 flex-1">
-                <span className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                <span className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
                   {study.category}
                 </span>
                 <h3 className="mt-2 text-xl font-semibold text-[var(--text)] sm:text-2xl">
                   {study.title}
                 </h3>
-                <time dateTime={study.date} className="mt-2 block text-sm text-[var(--muted)]">
+                <time
+                  dateTime={study.date}
+                  className="mt-2 block text-sm text-[var(--muted)]"
+                >
                   {study.dateLabel}
                 </time>
               </div>
               <div className="flex shrink-0 items-center justify-end sm:pl-4">
                 <span
-                  className="inline-flex text-[var(--muted)] transition group-hover:text-[var(--accent-strong)] group-hover:scale-110"
+                  className="inline-flex text-[var(--muted)] transition group-hover:scale-110 group-hover:text-[var(--accent-strong)]"
                   aria-hidden
                 >
                   <svg

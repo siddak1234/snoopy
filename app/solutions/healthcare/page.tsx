@@ -62,22 +62,26 @@ const howItWorksSteps = [
   {
     step: "1",
     title: "Ingest",
-    description: "Connect PDFs, forms, email, and systems. We pull in the documents your teams use daily.",
+    description:
+      "Connect PDFs, forms, email, and systems. We pull in the documents your teams use daily.",
   },
   {
     step: "2",
     title: "Understand",
-    description: "AI extracts and structures dates, codes, and intent for validation without re-entry.",
+    description:
+      "AI extracts and structures dates, codes, and intent for validation without re-entry.",
   },
   {
     step: "3",
     title: "Route",
-    description: "Send the right items to the right people or systems. Human review where you need it.",
+    description:
+      "Send the right items to the right people or systems. Human review where you need it.",
   },
   {
     step: "4",
     title: "Track",
-    description: "Visibility into status and bottlenecks. See what’s in progress and where to focus.",
+    description:
+      "Visibility into status and bottlenecks. See what’s in progress and where to focus.",
   },
 ];
 
@@ -92,20 +96,24 @@ export default function HealthcareSolutionsPage() {
         >
           ← Solutions
         </Link>
-        <p className="mt-3 text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+        <p className="mt-3 text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Healthcare
         </p>
-        <h1 className="mt-2 text-3xl font-semibold leading-tight sm:text-4xl lg:text-[2.75rem]">
+        <h1 className="mt-2 text-3xl leading-tight font-semibold sm:text-4xl lg:text-[2.75rem]">
           AI-powered workflows for healthcare operations
         </h1>
         <p className="mt-4 max-w-2xl text-lg leading-7 text-[var(--muted)] sm:text-xl">
-          Reduce administrative burden and automate document-heavy processes so teams focus on high-value work.
+          Reduce administrative burden and automate document-heavy processes so
+          teams focus on high-value work.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/contact" className="btn-primary px-5">
             Book a demo
           </Link>
-          <Link href="/use-cases/healthcare-documentation" className="btn-secondary px-5">
+          <Link
+            href="/use-cases/healthcare-documentation"
+            className="btn-secondary px-5"
+          >
             Read use case
           </Link>
         </div>
@@ -118,7 +126,11 @@ export default function HealthcareSolutionsPage() {
         </h2>
         <div className="grid gap-4 sm:grid-cols-2">
           {painPoints.map((item) => (
-            <ContentCard key={item.title} title={item.title} description={item.description} />
+            <ContentCard
+              key={item.title}
+              title={item.title}
+              description={item.description}
+            />
           ))}
         </div>
       </section>
@@ -130,7 +142,11 @@ export default function HealthcareSolutionsPage() {
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {useCases.map((useCase) => (
-            <ContentCard key={useCase.title} title={useCase.title} description={useCase.description} />
+            <ContentCard
+              key={useCase.title}
+              title={useCase.title}
+              description={useCase.description}
+            />
           ))}
         </div>
       </section>
@@ -141,15 +157,26 @@ export default function HealthcareSolutionsPage() {
           Why AI + automation matters for healthcare operations
         </h2>
         <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--muted)]">
-          Unstructured docs and data slow processing and create backlogs. Autom8x structures content with AI, then routes and tracks it—fewer touchpoints, faster turnaround, full visibility. Human review stays where your policies require it.
+          Unstructured docs and data slow processing and create backlogs.
+          Autom8x structures content with AI, then routes and tracks it—fewer
+          touchpoints, faster turnaround, full visibility. Human review stays
+          where your policies require it.
         </p>
         <ul className="mt-6 flex flex-wrap gap-3">
-          {["Operational control", "End-to-end visibility", "Faster processing", "Scalable workflows"].map((item) => (
+          {[
+            "Operational control",
+            "End-to-end visibility",
+            "Faster processing",
+            "Scalable workflows",
+          ].map((item) => (
             <li
               key={item}
               className="flex items-center gap-2 rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--text)]"
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--bullet)]" aria-hidden />
+              <span
+                className="h-1.5 w-1.5 rounded-full bg-[var(--bullet)]"
+                aria-hidden
+              />
               {item}
             </li>
           ))}
@@ -158,12 +185,15 @@ export default function HealthcareSolutionsPage() {
 
       {/* How it works */}
       <section>
-        <h2 className="mb-4 text-xl font-semibold sm:text-2xl">
-          How it works
-        </h2>
+        <h2 className="mb-4 text-xl font-semibold sm:text-2xl">How it works</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {howItWorksSteps.map((item) => (
-            <StepCard key={item.step} step={item.step} title={item.title} description={item.description} />
+            <StepCard
+              key={item.step}
+              step={item.step}
+              title={item.title}
+              description={item.description}
+            />
           ))}
         </div>
       </section>
@@ -174,7 +204,8 @@ export default function HealthcareSolutionsPage() {
           Ready to reduce administrative burden?
         </h2>
         <p className="mt-4 max-w-xl text-base leading-7 text-[var(--muted)]">
-          Scale operations without scaling headcount. We’ll walk you through a tailored view of your use case.
+          Scale operations without scaling headcount. We’ll walk you through a
+          tailored view of your use case.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="/contact" className="btn-primary px-5">

@@ -16,7 +16,9 @@ export default function LogoMark({
   accentEight?: boolean;
 }) {
   const strokeW = 2;
-  const eightColor = accentEight ? "var(--brand-accent, currentColor)" : "currentColor";
+  const eightColor = accentEight
+    ? "var(--brand-accent, currentColor)"
+    : "currentColor";
 
   // Content width 0–46. Center in viewBox 48×24; integer offset for crisp pixel alignment.
   const contentWidth = 46;

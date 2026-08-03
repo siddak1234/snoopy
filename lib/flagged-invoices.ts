@@ -70,11 +70,20 @@ export type HighValueDetails = {
 // Discriminated union — each row from the RPC pairs `reason` with a specific
 // `details` shape.
 export type FlaggedItem =
-  | (FlaggedBase & { reason: "duplicate_invoice"; details: DuplicateInvoiceDetails })
-  | (FlaggedBase & { reason: "running_total_drift"; details: RunningTotalDriftDetails })
+  | (FlaggedBase & {
+      reason: "duplicate_invoice";
+      details: DuplicateInvoiceDetails;
+    })
+  | (FlaggedBase & {
+      reason: "running_total_drift";
+      details: RunningTotalDriftDetails;
+    })
   | (FlaggedBase & { reason: "low_confidence"; details: LowConfidenceDetails })
   | (FlaggedBase & { reason: "orphan_refund"; details: OrphanRefundDetails })
-  | (FlaggedBase & { reason: "date_outside_period"; details: DateOutsidePeriodDetails })
+  | (FlaggedBase & {
+      reason: "date_outside_period";
+      details: DateOutsidePeriodDetails;
+    })
   | (FlaggedBase & { reason: "high_value"; details: HighValueDetails });
 
 type FlaggedBase = {

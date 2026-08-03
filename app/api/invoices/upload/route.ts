@@ -76,7 +76,12 @@ function resolveIngestConfig(
     }
     return {
       ok: true,
-      config: { bucketName, webhookUrl, webhookSecret, pathPrefix: "manual_uploads" },
+      config: {
+        bucketName,
+        webhookUrl,
+        webhookSecret,
+        pathPrefix: "manual_uploads",
+      },
     };
   }
   const bucketName = process.env.AUTOM8X_GCS_BUCKET;
@@ -121,7 +126,10 @@ export async function POST(req: Request) {
   try {
     form = await req.formData();
   } catch {
-    return NextResponse.json({ error: "Invalid form payload" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid form payload" },
+      { status: 400 },
+    );
   }
 
   const file = form.get("file");
@@ -139,16 +147,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing projectId" }, { status: 400 });
   }
   if (!invoiceNumber) {
-    return NextResponse.json({ error: "Invoice number is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invoice number is required" },
+      { status: 400 },
+    );
   }
   if (!ISO_DATE.test(invoiceDate)) {
-    return NextResponse.json({ error: "Invoice date is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invoice date is required" },
+      { status: 400 },
+    );
   }
   if (!merchant) {
-    return NextResponse.json({ error: "Merchant is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Merchant is required" },
+      { status: 400 },
+    );
   }
   if (!location) {
-    return NextResponse.json({ error: "Location is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Location is required" },
+      { status: 400 },
+    );
   }
   if (description.length > MAX_DESCRIPTION_LEN) {
     return NextResponse.json(
@@ -157,7 +177,10 @@ export async function POST(req: Request) {
     );
   }
   if (file.size > MAX_FILE_BYTES) {
-    return NextResponse.json({ error: "File must be under 4 MB" }, { status: 400 });
+    return NextResponse.json(
+      { error: "File must be under 4 MB" },
+      { status: 400 },
+    );
   }
   const isPdf =
     file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
@@ -177,7 +200,10 @@ export async function POST(req: Request) {
   const resolved = resolveIngestConfig(projectId, userSlug);
   if (!resolved.ok) {
     // Bail before touching GCS — no orphan files when the workflow isn't wired.
-    return NextResponse.json({ error: resolved.error }, { status: resolved.status });
+    return NextResponse.json(
+      { error: resolved.error },
+      { status: resolved.status },
+    );
   }
   const { bucketName, webhookUrl, webhookSecret, pathPrefix } = resolved.config;
 

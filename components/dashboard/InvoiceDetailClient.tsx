@@ -4,7 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { InvoiceFileViewer } from "@/components/dashboard/InvoiceFileViewer";
-import { GlCodeCombobox, type GlOption } from "@/components/dashboard/GlCodeCombobox";
+import {
+  GlCodeCombobox,
+  type GlOption,
+} from "@/components/dashboard/GlCodeCombobox";
 import {
   saveInvoiceEditsAction,
   type LineUpdate,
@@ -103,7 +106,8 @@ const STATUS_OPTIONS = ["Complete", "In Progress"];
 function deriveAmount(qty: string, price: string): string | null {
   const q = Number(qty);
   const p = Number(price);
-  if (qty.trim() === "" || price.trim() === "" || isNaN(q) || isNaN(p)) return null;
+  if (qty.trim() === "" || price.trim() === "" || isNaN(q) || isNaN(p))
+    return null;
   return (Math.round(q * p * 100) / 100).toFixed(2);
 }
 
@@ -175,14 +179,19 @@ export function InvoiceDetailClient({
       if (cancelled || qError || !data) return;
       const labelByCode = new Map<string, string>();
       for (const r of data as { code: string; full_name: string }[]) {
-        labelByCode.set(r.code, (r.full_name.split(":").pop() ?? r.full_name).trim());
+        labelByCode.set(
+          r.code,
+          (r.full_name.split(":").pop() ?? r.full_name).trim(),
+        );
       }
-      const opts: GlOption[] = (data as {
-        code: string;
-        full_name: string;
-        parent_code: string | null;
-        is_selectable: boolean;
-      }[])
+      const opts: GlOption[] = (
+        data as {
+          code: string;
+          full_name: string;
+          parent_code: string | null;
+          is_selectable: boolean;
+        }[]
+      )
         .filter((r) => r.is_selectable)
         .map((r) => ({
           code: r.code,
@@ -191,7 +200,9 @@ export function InvoiceDetailClient({
           group: (r.parent_code && labelByCode.get(r.parent_code)) || "Other",
         }))
         .sort((a, b) =>
-          a.group === b.group ? a.code.localeCompare(b.code) : a.group.localeCompare(b.group),
+          a.group === b.group
+            ? a.code.localeCompare(b.code)
+            : a.group.localeCompare(b.group),
         );
       setGlOptions(opts);
     })();
@@ -241,7 +252,10 @@ export function InvoiceDetailClient({
     (item: LineItem): number => {
       const d = lineDrafts[String(item.id)];
       if (d && ("QTY" in d || "CU_Price" in d)) {
-        const derived = deriveAmount(fieldValue(item, "QTY"), fieldValue(item, "CU_Price"));
+        const derived = deriveAmount(
+          fieldValue(item, "QTY"),
+          fieldValue(item, "CU_Price"),
+        );
         if (derived != null) return Number(derived);
       }
       return Number(item.Amount);
@@ -249,13 +263,24 @@ export function InvoiceDetailClient({
     [lineDrafts, fieldValue],
   );
 
-  const setLineField = (id: string | number, field: EditableField, value: string) => {
-    setLineDrafts((prev) => ({ ...prev, [String(id)]: { ...prev[String(id)], [field]: value } }));
+  const setLineField = (
+    id: string | number,
+    field: EditableField,
+    value: string,
+  ) => {
+    setLineDrafts((prev) => ({
+      ...prev,
+      [String(id)]: { ...prev[String(id)], [field]: value },
+    }));
   };
   const setGl = (id: string | number, code: string, fullName: string) => {
     setLineDrafts((prev) => ({
       ...prev,
-      [String(id)]: { ...prev[String(id)], GL_Account: code, GL_Category: fullName },
+      [String(id)]: {
+        ...prev[String(id)],
+        GL_Account: code,
+        GL_Category: fullName,
+      },
     }));
   };
   const toggleDelete = (id: string | number) => {
@@ -297,18 +322,33 @@ export function InvoiceDetailClient({
       const d = lineDrafts[id];
       if (!d) continue;
       const fields: LineItemEditableFields = {};
-      (["Item", "line_notes", "QTY", "CU_Price", "Confidence", "GL_Account"] as const).forEach((k) => {
+      (
+        [
+          "Item",
+          "line_notes",
+          "QTY",
+          "CU_Price",
+          "Confidence",
+          "GL_Account",
+        ] as const
+      ).forEach((k) => {
         if (k in d) fields[k] = d[k];
       });
       // Derive Amount only when Qty or Price changed on this row.
       if ("QTY" in d || "CU_Price" in d) {
-        const derived = deriveAmount(fieldValue(it, "QTY"), fieldValue(it, "CU_Price"));
+        const derived = deriveAmount(
+          fieldValue(it, "QTY"),
+          fieldValue(it, "CU_Price"),
+        );
         if (derived != null) fields.Amount = derived;
       }
-      if (Object.keys(fields).length > 0) lineUpdates.push({ id: it.id, fields });
+      if (Object.keys(fields).length > 0)
+        lineUpdates.push({ id: it.id, fields });
     }
 
-    const lineDeletes = items.filter((it) => deletedIds.has(String(it.id))).map((it) => it.id);
+    const lineDeletes = items
+      .filter((it) => deletedIds.has(String(it.id)))
+      .map((it) => it.id);
 
     const res = await saveInvoiceEditsAction({
       projectId,
@@ -371,7 +411,8 @@ export function InvoiceDetailClient({
     ? items.filter((it) => !deletedIds.has(String(it.id)))
     : items;
   const total = liveItems.reduce(
-    (s, it) => s + (editing ? effectiveAmount(it) || 0 : Number(it.Amount) || 0),
+    (s, it) =>
+      s + (editing ? effectiveAmount(it) || 0 : Number(it.Amount) || 0),
     0,
   );
   const invoiceDateText = isValidIsoDate(first.Invoice_Date)
@@ -427,7 +468,9 @@ export function InvoiceDetailClient({
               className={inputCls}
             />
           ) : (
-            <span className="text-sm font-medium text-[var(--text)]">{first.Merchant ?? "—"}</span>
+            <span className="text-sm font-medium text-[var(--text)]">
+              {first.Merchant ?? "—"}
+            </span>
           )}
         </SummaryField>
         <SummaryField label="Invoice number">
@@ -438,19 +481,27 @@ export function InvoiceDetailClient({
               className={inputCls}
             />
           ) : (
-            <span className="text-sm font-medium text-[var(--text)]">{first.Invoice_Number ?? "—"}</span>
+            <span className="text-sm font-medium text-[var(--text)]">
+              {first.Invoice_Number ?? "—"}
+            </span>
           )}
         </SummaryField>
         <SummaryField label="Invoice date">
           {editing ? (
             <input
               type="date"
-              value={isValidIsoDate(headerValue("Invoice_Date")) ? headerValue("Invoice_Date") : ""}
+              value={
+                isValidIsoDate(headerValue("Invoice_Date"))
+                  ? headerValue("Invoice_Date")
+                  : ""
+              }
               onChange={(e) => setHeaderField("Invoice_Date", e.target.value)}
               className={inputCls}
             />
           ) : (
-            <span className="text-sm font-medium text-[var(--text)]">{invoiceDateText}</span>
+            <span className="text-sm font-medium text-[var(--text)]">
+              {invoiceDateText}
+            </span>
           )}
         </SummaryField>
         <SummaryField label="Status">
@@ -461,8 +512,11 @@ export function InvoiceDetailClient({
               className={inputCls}
             >
               {/* Preserve an unexpected legacy value as a selectable option */}
-              {!STATUS_OPTIONS.includes(headerValue("Status")) && headerValue("Status") !== "" ? (
-                <option value={headerValue("Status")}>{headerValue("Status")}</option>
+              {!STATUS_OPTIONS.includes(headerValue("Status")) &&
+              headerValue("Status") !== "" ? (
+                <option value={headerValue("Status")}>
+                  {headerValue("Status")}
+                </option>
               ) : null}
               {STATUS_OPTIONS.map((s) => (
                 <option key={s} value={s}>
@@ -475,12 +529,12 @@ export function InvoiceDetailClient({
           )}
         </SummaryField>
         <SummaryField label="Total">
-          <span className="text-sm font-medium tabular-nums text-[var(--text)]">
+          <span className="text-sm font-medium text-[var(--text)] tabular-nums">
             {currencyFmt.format(total)}
           </span>
         </SummaryField>
         <SummaryField label="Line items">
-          <span className="text-sm font-medium tabular-nums text-[var(--text)]">
+          <span className="text-sm font-medium text-[var(--text)] tabular-nums">
             {integerFmt.format(liveItems.length)}
           </span>
         </SummaryField>
@@ -489,22 +543,67 @@ export function InvoiceDetailClient({
       {/* Stacked view: PDF on top, line items below. */}
       <div className="flex flex-col gap-6">
         {loungeCode ? (
-          <InvoiceFileViewer projectId={projectId} filename={filename} loungeCode={loungeCode} />
+          <InvoiceFileViewer
+            projectId={projectId}
+            filename={filename}
+            loungeCode={loungeCode}
+          />
         ) : null}
 
         <div className="border-t border-[var(--ring)] pt-5">
-          <h3 className="mb-3 text-sm font-semibold text-[var(--text)]">Line items</h3>
+          <h3 className="mb-3 text-sm font-semibold text-[var(--text)]">
+            Line items
+          </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-[10px] uppercase tracking-wide text-[var(--muted)]">
-                  <SortableHeader label="#" sortKey="index" align="right" sort={sort} onSort={handleSort} editing={editing} />
-                  <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">Item / Notes</th>
-                  <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">GL Account / Category</th>
-                  <SortableHeader label="Qty" sortKey="qty" align="right" sort={sort} onSort={handleSort} editing={editing} />
-                  <SortableHeader label="Unit Price" sortKey="unitPrice" align="right" sort={sort} onSort={handleSort} editing={editing} />
-                  <SortableHeader label="Amount" sortKey="amount" align="right" sort={sort} onSort={handleSort} editing={editing} />
-                  <SortableHeader label="Conf." sortKey="confidence" align="right" sort={sort} onSort={handleSort} editing={editing} />
+                <tr className="text-[10px] tracking-wide text-[var(--muted)] uppercase">
+                  <SortableHeader
+                    label="#"
+                    sortKey="index"
+                    align="right"
+                    sort={sort}
+                    onSort={handleSort}
+                    editing={editing}
+                  />
+                  <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">
+                    Item / Notes
+                  </th>
+                  <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">
+                    GL Account / Category
+                  </th>
+                  <SortableHeader
+                    label="Qty"
+                    sortKey="qty"
+                    align="right"
+                    sort={sort}
+                    onSort={handleSort}
+                    editing={editing}
+                  />
+                  <SortableHeader
+                    label="Unit Price"
+                    sortKey="unitPrice"
+                    align="right"
+                    sort={sort}
+                    onSort={handleSort}
+                    editing={editing}
+                  />
+                  <SortableHeader
+                    label="Amount"
+                    sortKey="amount"
+                    align="right"
+                    sort={sort}
+                    onSort={handleSort}
+                    editing={editing}
+                  />
+                  <SortableHeader
+                    label="Conf."
+                    sortKey="confidence"
+                    align="right"
+                    sort={sort}
+                    onSort={handleSort}
+                    editing={editing}
+                  />
                   {editing ? (
                     <th className="border-b border-[var(--ring)] px-3 py-2 text-right font-medium">
                       <span className="sr-only">Delete</span>
@@ -543,10 +642,16 @@ const inputCls =
   "w-full rounded border border-[var(--ring)] bg-[var(--bg)] px-2 py-1 text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]";
 const numInputCls = `${inputCls} text-right tabular-nums`;
 
-function SummaryField({ label, children }: { label: string; children: React.ReactNode }) {
+function SummaryField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
-      <dt className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
+      <dt className="text-[11px] font-medium tracking-wide text-[var(--muted)] uppercase">
         {label}
       </dt>
       <dd className="mt-0.5">{children}</dd>
@@ -572,11 +677,15 @@ function SortableHeader({
   editing?: boolean;
 }) {
   const isActive = sort.key === sortKey;
-  const ariaSort = isActive ? (sort.dir === "asc" ? "ascending" : "descending") : "none";
+  const ariaSort = isActive
+    ? sort.dir === "asc"
+      ? "ascending"
+      : "descending"
+    : "none";
   if (editing) {
     return (
       <th
-        className={`border-b border-[var(--ring)] px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)] ${
+        className={`border-b border-[var(--ring)] px-3 py-2 text-[10px] font-medium tracking-wide text-[var(--muted)] uppercase ${
           align === "right" ? "text-right" : "text-left"
         }`}
       >
@@ -594,7 +703,7 @@ function SortableHeader({
       <button
         type="button"
         onClick={() => onSort(sortKey)}
-        className={`group inline-flex items-center gap-1 text-[10px] uppercase tracking-wide transition hover:text-[var(--text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] rounded ${
+        className={`group inline-flex items-center gap-1 rounded text-[10px] tracking-wide uppercase transition hover:text-[var(--text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] ${
           isActive ? "text-[var(--text)]" : "text-[var(--muted)]"
         } ${align === "right" ? "flex-row-reverse" : ""}`}
         aria-label={`Sort by ${label} ${isActive && sort.dir === "asc" ? "descending" : "ascending"}`}
@@ -608,9 +717,23 @@ function SortableHeader({
 
 function SortIcon({ direction }: { direction: SortDir | null }) {
   return (
-    <svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" className="shrink-0">
-      <path d="M5 1 L8.5 4.5 L1.5 4.5 Z" fill="currentColor" opacity={direction === "asc" ? 1 : 0.3} />
-      <path d="M5 11 L1.5 7.5 L8.5 7.5 Z" fill="currentColor" opacity={direction === "desc" ? 1 : 0.3} />
+    <svg
+      width="10"
+      height="12"
+      viewBox="0 0 10 12"
+      aria-hidden="true"
+      className="shrink-0"
+    >
+      <path
+        d="M5 1 L8.5 4.5 L1.5 4.5 Z"
+        fill="currentColor"
+        opacity={direction === "asc" ? 1 : 0.3}
+      />
+      <path
+        d="M5 11 L1.5 7.5 L8.5 7.5 Z"
+        fill="currentColor"
+        opacity={direction === "desc" ? 1 : 0.3}
+      />
     </svg>
   );
 }
@@ -624,45 +747,45 @@ function LineItemRow({ item }: { item: LineItem }) {
 
   return (
     <tr className="border-b border-[var(--ring)]/50 align-top last:border-b-0">
-      <td className="px-3 py-2.5 text-right text-xs tabular-nums text-[var(--muted)]">
+      <td className="px-3 py-2.5 text-right text-xs text-[var(--muted)] tabular-nums">
         {item.line_item_index ?? "—"}
       </td>
       <td className="px-3 py-2.5">
-        <p className="text-sm font-medium leading-snug text-[var(--text)] break-words">
+        <p className="text-sm leading-snug font-medium break-words text-[var(--text)]">
           {item.Item ?? "—"}
         </p>
         {item.line_notes ? (
-          <p className="mt-1 text-xs leading-snug text-[var(--muted)] break-words">
+          <p className="mt-1 text-xs leading-snug break-words text-[var(--muted)]">
             {item.line_notes}
           </p>
         ) : null}
       </td>
       <td className="px-3 py-2.5">
-        <p className="text-sm font-medium tabular-nums text-[var(--text)] break-words">
+        <p className="text-sm font-medium break-words text-[var(--text)] tabular-nums">
           {item.GL_Account ?? "—"}
         </p>
         {item.GL_Category ? (
-          <p className="mt-1 text-xs leading-snug text-[var(--muted)] break-words">
+          <p className="mt-1 text-xs leading-snug break-words text-[var(--muted)]">
             {item.GL_Category}
           </p>
         ) : null}
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm tabular-nums text-[var(--text)]">
+      <td className="px-3 py-2.5 text-right text-sm whitespace-nowrap text-[var(--text)] tabular-nums">
         {isNaN(qty) ? "—" : integerFmt.format(qty)}
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm tabular-nums text-[var(--text)]">
+      <td className="px-3 py-2.5 text-right text-sm whitespace-nowrap text-[var(--text)] tabular-nums">
         {isNaN(unitPrice) ? "—" : currencyFmt.format(unitPrice)}
       </td>
       <td
         className={
           isNegative
-            ? "whitespace-nowrap px-3 py-2.5 text-right text-sm font-medium tabular-nums text-[var(--error-text-muted)]"
-            : "whitespace-nowrap px-3 py-2.5 text-right text-sm font-medium tabular-nums text-[var(--text)]"
+            ? "px-3 py-2.5 text-right text-sm font-medium whitespace-nowrap text-[var(--error-text-muted)] tabular-nums"
+            : "px-3 py-2.5 text-right text-sm font-medium whitespace-nowrap text-[var(--text)] tabular-nums"
         }
       >
         {isNaN(amount) ? "—" : currencyFmt.format(amount)}
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs tabular-nums text-[var(--muted)]">
+      <td className="px-3 py-2.5 text-right text-xs whitespace-nowrap text-[var(--muted)] tabular-nums">
         {isNaN(confidence) ? "—" : `${Math.round(confidence)}%`}
       </td>
     </tr>
@@ -700,7 +823,7 @@ function EditableLineItemRow({
         deleted ? "opacity-40" : ""
       }`}
     >
-      <td className="px-3 py-2.5 text-right text-xs tabular-nums text-[var(--muted)]">
+      <td className="px-3 py-2.5 text-right text-xs text-[var(--muted)] tabular-nums">
         {item.line_item_index ?? "—"}
       </td>
       <td className="px-3 py-2.5">
@@ -727,7 +850,9 @@ function EditableLineItemRow({
           disabled={deleted}
         />
         {glCategory ? (
-          <p className="mt-1 text-xs leading-snug text-[var(--muted)] break-words">{glCategory}</p>
+          <p className="mt-1 text-xs leading-snug break-words text-[var(--muted)]">
+            {glCategory}
+          </p>
         ) : null}
       </td>
       <td className="px-3 py-2.5">
@@ -754,8 +879,8 @@ function EditableLineItemRow({
       <td
         className={
           isNegative
-            ? "whitespace-nowrap px-3 py-2.5 text-right text-sm font-medium tabular-nums text-[var(--error-text-muted)]"
-            : "whitespace-nowrap px-3 py-2.5 text-right text-sm font-medium tabular-nums text-[var(--text)]"
+            ? "px-3 py-2.5 text-right text-sm font-medium whitespace-nowrap text-[var(--error-text-muted)] tabular-nums"
+            : "px-3 py-2.5 text-right text-sm font-medium whitespace-nowrap text-[var(--text)] tabular-nums"
         }
         title="Derived from Qty × Unit Price"
       >
@@ -771,7 +896,7 @@ function EditableLineItemRow({
           className={numInputCls}
         />
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-right">
+      <td className="px-3 py-2.5 text-right whitespace-nowrap">
         <button
           type="button"
           onClick={() => onToggleDelete(item.id)}

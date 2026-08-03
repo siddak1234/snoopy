@@ -2,7 +2,8 @@ import type { SVGProps } from "react";
 
 type IconProps = SVGProps<SVGSVGElement>;
 
-const baseClasses = "h-10 w-10 rounded-2xl border border-[var(--icon-border)] bg-[var(--icon-bg)] p-2 text-[var(--icon-text)]";
+const baseClasses =
+  "h-10 w-10 rounded-2xl border border-[var(--icon-border)] bg-[var(--icon-bg)] p-2 text-[var(--icon-text)]";
 
 export function SecureIcon(props: IconProps) {
   return (

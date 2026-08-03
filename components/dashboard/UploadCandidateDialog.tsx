@@ -43,9 +43,10 @@ export function UploadCandidateDialog({
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [captured, setCaptured] = useState<{ name: string; fileName: string } | null>(
-    null,
-  );
+  const [captured, setCaptured] = useState<{
+    name: string;
+    fileName: string;
+  } | null>(null);
   const firstFieldRef = useRef<HTMLInputElement>(null);
 
   const reset = useCallback(() => {
@@ -88,7 +89,8 @@ export function UploadCandidateDialog({
     if (!trimmedName) return setError("Candidate name is required.");
     if (!file) return setError("Please choose a resume PDF.");
     const isPdf =
-      file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      file.type === "application/pdf" ||
+      file.name.toLowerCase().endsWith(".pdf");
     if (!isPdf) return setError("Resume must be a PDF.");
     if (file.size > MAX_FILE_MB * 1024 * 1024)
       return setError(`File must be under ${MAX_FILE_MB} MB.`);
@@ -146,9 +148,8 @@ export function UploadCandidateDialog({
       {/* Role + Company/Department are inherited from the dashboard filters and
           shown read-only — never asked. */}
       <p className="mt-1 text-sm text-[var(--muted)]">
-        Adding to{" "}
-        <span className="font-medium text-[var(--text)]">{role}</span> ·{" "}
-        <span className="font-medium text-[var(--text)]">{company}</span>
+        Adding to <span className="font-medium text-[var(--text)]">{role}</span>{" "}
+        · <span className="font-medium text-[var(--text)]">{company}</span>
       </p>
 
       {captured ? (
@@ -231,7 +232,9 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
       <dt className="text-[var(--muted)]">{label}</dt>
-      <dd className="min-w-0 truncate font-medium text-[var(--text)]">{value}</dd>
+      <dd className="min-w-0 truncate font-medium text-[var(--text)]">
+        {value}
+      </dd>
     </div>
   );
 }

@@ -26,7 +26,7 @@ function OAuthButton({
   return (
     <a
       href={href}
-      className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+      className="w-full rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
     >
       {label}
     </a>
@@ -78,7 +78,8 @@ function LoginForm() {
             ? "Sign-in did not complete. Add your production URL to Supabase Dashboard → Authentication → URL Configuration → Redirect URLs (e.g. https://your-domain.com/auth/callback)."
             : isPkceOrVerifier
               ? "Sign-in could not be completed. This usually means the callback URL in Supabase doesn’t match this site. In Supabase Dashboard → Authentication → URL Configuration, set Redirect URLs to this site’s exact address (e.g. http://localhost:3000/auth/callback for local dev)."
-              : authErrorDescription ?? "Sign-in failed or was cancelled. Please try again.";
+              : (authErrorDescription ??
+                "Sign-in failed or was cancelled. Please try again.");
         })()
       : null;
 
@@ -113,7 +114,9 @@ function LoginForm() {
     e.preventDefault();
     setStatus(null);
     const form = e.currentTarget;
-    const emailInput = form.elements.namedItem("email") as HTMLInputElement | null;
+    const emailInput = form.elements.namedItem(
+      "email",
+    ) as HTMLInputElement | null;
     const email = emailInput?.value;
 
     if (!email?.trim()) {
@@ -123,12 +126,16 @@ function LoginForm() {
 
     const normalizedEmail = normalizeEmail(email);
     if (isGmailAddress(normalizedEmail)) {
-      const next = callbackUrl.startsWith("/") ? callbackUrl : `/${callbackUrl}`;
+      const next = callbackUrl.startsWith("/")
+        ? callbackUrl
+        : `/${callbackUrl}`;
       window.location.href = `/api/auth/oauth?provider=google&next=${encodeURIComponent(next)}`;
       return;
     }
 
-    const passwordInput = form.elements.namedItem("password") as HTMLInputElement | null;
+    const passwordInput = form.elements.namedItem(
+      "password",
+    ) as HTMLInputElement | null;
     const password = passwordInput?.value;
     if (!password) {
       setStatus("Please enter your password.");
@@ -180,16 +187,26 @@ function LoginForm() {
               required
             />
 
-            <button type="submit" className="btn-primary w-full px-5" disabled={loading}>
+            <button
+              type="submit"
+              className="btn-primary w-full px-5"
+              disabled={loading}
+            >
               {loading ? "Signing in…" : "Log In"}
             </button>
 
             {status ? (
-              <p className="text-center text-sm text-[var(--muted)]" role="alert">
+              <p
+                className="text-center text-sm text-[var(--muted)]"
+                role="alert"
+              >
                 {status}
               </p>
             ) : derivedAuthError ? (
-              <p className="text-center text-sm text-[var(--muted)]" role="alert">
+              <p
+                className="text-center text-sm text-[var(--muted)]"
+                role="alert"
+              >
                 {derivedAuthError}
               </p>
             ) : null}
@@ -200,7 +217,9 @@ function LoginForm() {
               <div className="w-full border-t border-[var(--ring)]" />
             </div>
             <div className="relative flex justify-center">
-              <span className="bg-[var(--surface)] px-3 text-sm text-[var(--muted)]">or</span>
+              <span className="bg-[var(--surface)] px-3 text-sm text-[var(--muted)]">
+                or
+              </span>
             </div>
           </div>
 
@@ -221,7 +240,7 @@ function LoginForm() {
             <span className="text-sm text-[var(--muted)]">New here?</span>
             <Link
               href="/signup"
-              className="btn-secondary inline-flex px-4 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]"
+              className="btn-secondary inline-flex px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] focus-visible:outline-none"
             >
               Sign Up
             </Link>
@@ -234,7 +253,13 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-[60vh] items-center justify-center px-4 py-8"><div className="bubble p-6 sm:p-8">Loading…</div></div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-[60vh] items-center justify-center px-4 py-8">
+          <div className="bubble p-6 sm:p-8">Loading…</div>
+        </div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

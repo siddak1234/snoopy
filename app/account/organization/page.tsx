@@ -100,7 +100,7 @@ export default async function OrganizationPage() {
     >
       {/* ── Organization details ─────────────────────────────────────────── */}
       <div className="py-5 first:pt-0">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+        <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Organization details
         </h2>
         <dl className="mt-3 space-y-3 text-sm">
@@ -124,7 +124,7 @@ export default async function OrganizationPage() {
 
       {/* ── Members ──────────────────────────────────────────────────────── */}
       <div className="border-t border-[var(--ring)] py-5">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+        <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Members
         </h2>
         <OrgMemberList
@@ -137,7 +137,7 @@ export default async function OrganizationPage() {
 
       {/* ── Invites ──────────────────────────────────────────────────────── */}
       <div className="border-t border-[var(--ring)] py-5">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+        <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Invites
         </h2>
         <div className="mt-3">

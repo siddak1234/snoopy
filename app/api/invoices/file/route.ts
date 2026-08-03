@@ -34,7 +34,9 @@ function getStorage(): Storage {
 }
 
 function bucketForObjectKey(objectKey: string): string {
-  const isClarosPath = CLAROS_PATH_PREFIXES.some((p) => objectKey.startsWith(p));
+  const isClarosPath = CLAROS_PATH_PREFIXES.some((p) =>
+    objectKey.startsWith(p),
+  );
   const bucketName = isClarosPath
     ? process.env.GCS_INVOICE_BUCKET
     : process.env.AUTOM8X_GCS_BUCKET;
@@ -97,9 +99,6 @@ export async function GET(req: Request) {
     return NextResponse.redirect(signedUrl, 307);
   } catch (err) {
     console.error("INVOICE_FILE_SIGN_FAIL", (err as Error).message);
-    return NextResponse.json(
-      { error: "Could not sign URL" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Could not sign URL" }, { status: 500 });
   }
 }

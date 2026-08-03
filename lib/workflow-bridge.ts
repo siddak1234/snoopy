@@ -115,7 +115,10 @@ export function canvasStateToReactFlow(state: CanvasState): {
       id: n.id,
       type: n.type === "workflow" ? "workflow" : "workflow",
       position: { x: n.x, y: n.y },
-      data: ((n as Record<string, unknown>).data as Record<string, unknown> | undefined) ?? { label: n.type, blockType: n.type } as Record<string, unknown>,
+      data:
+        ((n as Record<string, unknown>).data as
+          Record<string, unknown> | undefined) ??
+        ({ label: n.type, blockType: n.type } as Record<string, unknown>),
     });
   }
 

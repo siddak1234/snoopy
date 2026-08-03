@@ -54,9 +54,7 @@ export function DeletableEdge({
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
               pointerEvents: "all",
             }}
-            onClick={() =>
-              setEdges((eds) => eds.filter((e) => e.id !== id))
-            }
+            onClick={() => setEdges((eds) => eds.filter((e) => e.id !== id))}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             aria-label="Delete connection"

@@ -33,11 +33,10 @@ export async function revalidateAccountProjectsAction(): Promise<void> {
 }
 
 export type CreateProjectResult =
-  | { ok: true; projectId: string }
-  | { ok: false; error: string };
+  { ok: true; projectId: string } | { ok: false; error: string };
 
 export async function createProjectAction(
-  formData: FormData
+  formData: FormData,
 ): Promise<CreateProjectResult> {
   const session = await getAppSession();
   if (!session?.user?.id) {
@@ -50,7 +49,10 @@ export async function createProjectAction(
   }
   const trimmed = name.trim();
   if (trimmed.length < NAME_MIN) {
-    return { ok: false, error: `Name must be at least ${NAME_MIN} characters.` };
+    return {
+      ok: false,
+      error: `Name must be at least ${NAME_MIN} characters.`,
+    };
   }
   if (trimmed.length > NAME_MAX) {
     return { ok: false, error: `Name must be at most ${NAME_MAX} characters.` };
@@ -74,9 +76,13 @@ export async function createProjectAction(
   // Resolve the target workspace from scope. Any workspaceId field is ignored
   // intentionally — scope is the source of truth so the client cannot redirect
   // a personal create into an org workspace or vice versa.
-  const targetWorkspaceType = scope === "personal" ? "personal" : "organization";
+  const targetWorkspaceType =
+    scope === "personal" ? "personal" : "organization";
   const targetMembership = await prisma.membership.findFirst({
-    where: { userId: session.user.id, workspace: { type: targetWorkspaceType } },
+    where: {
+      userId: session.user.id,
+      workspace: { type: targetWorkspaceType },
+    },
     orderBy: { createdAt: "asc" },
     select: { workspaceId: true },
   });
@@ -110,7 +116,7 @@ export async function createProjectAction(
     const { project } = await createProjectDb(
       session.user.id,
       { name: trimmed, type: trimmedType, description: descriptionStr },
-      targetWorkspaceId
+      targetWorkspaceId,
     );
     // Do NOT revalidate here — it can unmount the success state in the dialog.
     return { ok: true, projectId: project.id };
@@ -128,7 +134,9 @@ export type DeleteProjectResult = { ok: true } | { ok: false; error: string };
  * (offered automatically by the Create dialog when the same scope+type is
  * picked again).
  */
-export async function deleteProjectAction(projectId: string): Promise<DeleteProjectResult> {
+export async function deleteProjectAction(
+  projectId: string,
+): Promise<DeleteProjectResult> {
   const session = await getAppSession();
   if (!session?.user?.id) {
     return { ok: false, error: "You must be signed in to delete a project." };
@@ -139,7 +147,10 @@ export async function deleteProjectAction(projectId: string): Promise<DeleteProj
   try {
     const deleted = await deleteProjectDb(session.user.id, projectId.trim());
     if (!deleted) {
-      return { ok: false, error: "Project not found or you don't have permission to delete it." };
+      return {
+        ok: false,
+        error: "Project not found or you don't have permission to delete it.",
+      };
     }
     revalidatePath("/account");
     revalidatePath("/account/projects");
@@ -151,8 +162,7 @@ export async function deleteProjectAction(projectId: string): Promise<DeleteProj
 }
 
 export type RestoreProjectResult =
-  | { ok: true; projectId: string }
-  | { ok: false; error: string };
+  { ok: true; projectId: string } | { ok: false; error: string };
 
 /**
  * Restore an archived project. Permission check (owner or org_owner) lives in
@@ -160,7 +170,7 @@ export type RestoreProjectResult =
  * data tables reattaches automatically the moment status flips to active.
  */
 export async function restoreProjectAction(
-  projectId: string
+  projectId: string,
 ): Promise<RestoreProjectResult> {
   const session = await getAppSession();
   if (!session?.user?.id) {
@@ -186,7 +196,7 @@ export async function restoreProjectAction(
 export type LeaveProjectResult = { ok: true } | { ok: false; error: string };
 
 export async function leaveProjectAction(
-  projectId: string
+  projectId: string,
 ): Promise<LeaveProjectResult> {
   const session = await getAppSession();
   if (!session?.user?.id) {
@@ -226,7 +236,7 @@ export type AddMemberResult = { ok: true } | { ok: false; error: string };
 export async function addMemberToProjectAction(
   projectId: string,
   targetUserId: string,
-  role: ProjectMemberRole
+  role: ProjectMemberRole,
 ): Promise<AddMemberResult> {
   const session = await getAppSession();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
@@ -265,7 +275,10 @@ export async function addMemberToProjectAction(
   const [wsMembership, existing] = await Promise.all([
     prisma.membership.findUnique({
       where: {
-        userId_workspaceId: { userId: targetUserId, workspaceId: project.workspaceId },
+        userId_workspaceId: {
+          userId: targetUserId,
+          workspaceId: project.workspaceId,
+        },
       },
     }),
     prisma.projectMembership.findUnique({
@@ -297,7 +310,8 @@ export async function addMemberToProjectAction(
   }
 }
 
-export type ChangeMemberRoleResult = { ok: true } | { ok: false; error: string };
+export type ChangeMemberRoleResult =
+  { ok: true } | { ok: false; error: string };
 
 /**
  * Change a project member's role.
@@ -306,7 +320,7 @@ export type ChangeMemberRoleResult = { ok: true } | { ok: false; error: string }
 export async function changeMemberRoleAction(
   projectId: string,
   targetUserId: string,
-  newRole: ProjectMemberRole
+  newRole: ProjectMemberRole,
 ): Promise<ChangeMemberRoleResult> {
   const session = await getAppSession();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
@@ -327,8 +341,13 @@ export async function changeMemberRoleAction(
     return { ok: false, error: "Target user is not in this project." };
   }
 
-  if (!canModifyMember(actorRole, targetMembership.role, "change_role", newRole)) {
-    return { ok: false, error: "You are not allowed to change this member's role." };
+  if (
+    !canModifyMember(actorRole, targetMembership.role, "change_role", newRole)
+  ) {
+    return {
+      ok: false,
+      error: "You are not allowed to change this member's role.",
+    };
   }
 
   try {
@@ -353,7 +372,7 @@ export type RemoveMemberResult = { ok: true } | { ok: false; error: string };
  */
 export async function removeMemberFromProjectAction(
   projectId: string,
-  targetUserId: string
+  targetUserId: string,
 ): Promise<RemoveMemberResult> {
   const session = await getAppSession();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };

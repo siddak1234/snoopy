@@ -106,7 +106,8 @@ export async function DELETE() {
     } else if (supabaseUserId && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
       console.warn("ACCOUNT_DELETED_AUTH_SKIP", {
         supabaseUserId,
-        reason: "SUPABASE_SERVICE_ROLE_KEY not set; auth user and linked identities were not removed.",
+        reason:
+          "SUPABASE_SERVICE_ROLE_KEY not set; auth user and linked identities were not removed.",
       });
     }
 
@@ -119,7 +120,7 @@ export async function DELETE() {
     });
     return NextResponse.json(
       { error: "Could not delete account. Please try again." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

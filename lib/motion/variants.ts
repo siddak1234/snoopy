@@ -60,7 +60,10 @@ export function staggerContainer(opts?: {
 }
 
 /** Premium hover scale — subtle, not “cardy”. */
-export function scaleHover(opts?: { scale?: number; duration?: number }): TargetAndTransition {
+export function scaleHover(opts?: {
+  scale?: number;
+  duration?: number;
+}): TargetAndTransition {
   return {
     scale: opts?.scale ?? 1.015,
     transition: {
@@ -90,4 +93,3 @@ export function subtleGlow(opts?: {
     transition: { duration: durations.base, ease: easings.premium },
   };
 }
-

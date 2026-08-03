@@ -24,8 +24,11 @@ export default async function SetupOrgPage() {
         </h1>
         <p className="mt-1 text-sm text-[var(--muted)]">
           Your email uses the domain{" "}
-          <span className="font-mono font-medium text-[var(--text)]">{domain}</span>.
-          Create an organization workspace for your team, or continue with a personal account.
+          <span className="font-mono font-medium text-[var(--text)]">
+            {domain}
+          </span>
+          . Create an organization workspace for your team, or continue with a
+          personal account.
         </p>
 
         <SetupOrgForm domain={domain} />

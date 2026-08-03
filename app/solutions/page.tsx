@@ -22,8 +22,8 @@ function HealthcareIconCluster() {
         <path d="M15.4 29.8L20.8 33" />
         <path d="M32.6 29.8L27.2 33" />
       </svg>
-      <span className="absolute left-0 top-2 h-2 w-2 rounded-full bg-[var(--bullet)] opacity-80" />
-      <span className="absolute right-0 top-8 h-1.5 w-1.5 rounded-full bg-[var(--bullet)] opacity-75" />
+      <span className="absolute top-2 left-0 h-2 w-2 rounded-full bg-[var(--bullet)] opacity-80" />
+      <span className="absolute top-8 right-0 h-1.5 w-1.5 rounded-full bg-[var(--bullet)] opacity-75" />
       <span className="absolute bottom-1 left-2 h-1.5 w-1.5 rounded-full bg-[var(--bullet)] opacity-70" />
     </div>
   );
@@ -46,9 +46,9 @@ function FinanceIconCluster() {
         <path d="M8 13.5H40" />
         <path d="M11 13.5L17 8.8L24 13.5L33 7.5L40 11.8" />
       </svg>
-      <span className="absolute left-1 top-4 h-2 w-2 rounded-full bg-[var(--bullet)] opacity-80" />
-      <span className="absolute right-1 top-2 h-1.5 w-1.5 rounded-full bg-[var(--bullet)] opacity-75" />
-      <span className="absolute bottom-2 right-2 h-1.5 w-1.5 rounded-full bg-[var(--bullet)] opacity-70" />
+      <span className="absolute top-4 left-1 h-2 w-2 rounded-full bg-[var(--bullet)] opacity-80" />
+      <span className="absolute top-2 right-1 h-1.5 w-1.5 rounded-full bg-[var(--bullet)] opacity-75" />
+      <span className="absolute right-2 bottom-2 h-1.5 w-1.5 rounded-full bg-[var(--bullet)] opacity-70" />
     </div>
   );
 }
@@ -60,8 +60,8 @@ export default function SolutionsPage() {
         <h1 className="text-3xl font-semibold sm:text-4xl">Solutions</h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">
           We automate the manual, document-heavy work that slows operations
-          down. Each solution is scoped to a specific industry and workflow
-          so you see results quickly.
+          down. Each solution is scoped to a specific industry and workflow so
+          you see results quickly.
         </p>
       </section>
 
@@ -75,13 +75,13 @@ export default function SolutionsPage() {
               <div className="max-w-3xl">
                 <h3 className="text-xl font-semibold">Healthcare</h3>
                 <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">
-                  Automate intake, documentation, care coordination, and
-                  patient follow-ups. Reduce administrative burden so
-                  clinical teams focus on patient care.
+                  Automate intake, documentation, care coordination, and patient
+                  follow-ups. Reduce administrative burden so clinical teams
+                  focus on patient care.
                 </p>
                 <Link
                   href="/solutions/healthcare"
-                  className="mt-4 inline-flex rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                  className="mt-4 inline-flex rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
                 >
                   Healthcare solutions
                 </Link>
@@ -99,13 +99,13 @@ export default function SolutionsPage() {
                   Finance &amp; Accounting
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">
-                  Automate invoice processing, expense classification,
-                  approval routing, and audit preparation. Cut manual
-                  processing time without compromising controls.
+                  Automate invoice processing, expense classification, approval
+                  routing, and audit preparation. Cut manual processing time
+                  without compromising controls.
                 </p>
                 <Link
                   href="/solutions/finance"
-                  className="mt-4 inline-flex rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                  className="mt-4 inline-flex rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
                 >
                   Finance solutions
                 </Link>
@@ -123,10 +123,10 @@ export default function SolutionsPage() {
           Don&rsquo;t see your industry?
         </h2>
         <p className="mt-3 max-w-2xl text-[var(--muted)]">
-          Workflow automation applies wherever teams handle repetitive
-          document processing, multi-step approvals, or manual data entry.
-          Tell us about your operations and we&rsquo;ll scope what an
-          automated version looks like.
+          Workflow automation applies wherever teams handle repetitive document
+          processing, multi-step approvals, or manual data entry. Tell us about
+          your operations and we&rsquo;ll scope what an automated version looks
+          like.
         </p>
         <Link href="/contact" className="btn-primary mt-5 px-5">
           Tell Us About Your Workflow

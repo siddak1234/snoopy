@@ -31,11 +31,11 @@
   /* Semantic state colors */
   --error-text: #dc2626;
   --error-text-hover: #b91c1c;
-  --error-bg: rgba(239, 68, 68, 0.10);
-  --error-bg-strong: rgba(239, 68, 68, 0.20);
-  --error-border: rgba(239, 68, 68, 0.30);
-  --error-border-medium: rgba(248, 113, 113, 0.50);
-  --error-border-strong: rgba(239, 68, 68, 0.70);
+  --error-bg: rgba(239, 68, 68, 0.1);
+  --error-bg-strong: rgba(239, 68, 68, 0.2);
+  --error-border: rgba(239, 68, 68, 0.3);
+  --error-border-medium: rgba(248, 113, 113, 0.5);
+  --error-border-strong: rgba(239, 68, 68, 0.7);
 
   --warning-text: #d97706;
   --warning-bg: rgba(245, 158, 11, 0.12);
@@ -87,19 +87,19 @@
   /* Semantic state colors */
   --error-text: #f87171;
   --error-text-hover: #fca5a5;
-  --error-bg: rgba(239, 68, 68, 0.10);
-  --error-bg-strong: rgba(239, 68, 68, 0.20);
-  --error-border: rgba(239, 68, 68, 0.30);
-  --error-border-medium: rgba(248, 113, 113, 0.50);
-  --error-border-strong: rgba(239, 68, 68, 0.70);
+  --error-bg: rgba(239, 68, 68, 0.1);
+  --error-bg-strong: rgba(239, 68, 68, 0.2);
+  --error-border: rgba(239, 68, 68, 0.3);
+  --error-border-medium: rgba(248, 113, 113, 0.5);
+  --error-border-strong: rgba(239, 68, 68, 0.7);
 
   --warning-text: #fbbf24;
-  --warning-bg: rgba(245, 158, 11, 0.10);
+  --warning-bg: rgba(245, 158, 11, 0.1);
   --warning-border: rgba(245, 158, 11, 0.35);
 
   --success-text: #34d399;
-  --success-bg: rgba(16, 185, 129, 0.10);
-  --success-border: rgba(52, 211, 153, 0.40);
+  --success-bg: rgba(16, 185, 129, 0.1);
+  --success-border: rgba(52, 211, 153, 0.4);
 
   /* Muted text for dark/tinted surfaces (fixed, not theme-inverted) */
   --error-text-muted: #fca5a5;
@@ -144,23 +144,40 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    var(--font-geist-sans),
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
 }
 
 .bubble {
   border-radius: 2rem;
   border: 1px solid var(--ring);
-  background: linear-gradient(165deg, var(--surface) 0%, var(--surface-strong) 100%);
+  background: linear-gradient(
+    165deg,
+    var(--surface) 0%,
+    var(--surface-strong) 100%
+  );
   box-shadow: 0 10px 30px rgba(12, 24, 40, 0.14);
-  transition: transform 180ms ease, box-shadow 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .bubble-soft {
   border-radius: 2rem;
   border: 1px solid color-mix(in srgb, var(--ring) 90%, transparent);
-  background: linear-gradient(165deg, color-mix(in srgb, var(--surface) 95%, transparent) 0%, color-mix(in srgb, var(--surface-strong) 88%, transparent) 100%);
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--surface) 95%, transparent) 0%,
+    color-mix(in srgb, var(--surface-strong) 88%, transparent) 100%
+  );
   backdrop-filter: blur(8px);
-  transition: transform 180ms ease, box-shadow 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
 }
 
 /**
@@ -171,7 +188,11 @@ body {
 .modal-card {
   border-radius: 2rem;
   border: 1px solid var(--ring);
-  background: linear-gradient(165deg, var(--surface) 0%, var(--surface-strong) 100%);
+  background: linear-gradient(
+    165deg,
+    var(--surface) 0%,
+    var(--surface-strong) 100%
+  );
   box-shadow: 0 10px 30px rgba(12, 24, 40, 0.14);
   transition: none;
   transform: translate(-50%, -50%);
@@ -206,8 +227,12 @@ body {
   padding: 0.7rem 1.15rem;
   font-weight: 600;
   text-decoration: none;
-  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease,
-    border-color 150ms ease, color 150ms ease;
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease,
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
   will-change: transform;
 }
 
@@ -230,7 +255,7 @@ body {
 
 .btn-secondary:hover {
   background: var(--card);
-  box-shadow: 0 12px 26px rgba(47, 98, 170, 0.10);
+  box-shadow: 0 12px 26px rgba(47, 98, 170, 0.1);
 }
 
 .btn-primary:active,
@@ -247,7 +272,10 @@ body {
 }
 
 .interactive-card {
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
   will-change: transform;
 }
 
@@ -260,7 +288,9 @@ body {
 }
 
 .interactive-card svg {
-  transition: transform 180ms ease, filter 180ms ease;
+  transition:
+    transform 180ms ease,
+    filter 180ms ease;
   transform-origin: 50% 50%;
 }
 
@@ -272,7 +302,10 @@ body {
 }
 
 .flow-node {
-  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
   will-change: transform;
 }
 
@@ -313,7 +346,9 @@ body {
 .reveal {
   opacity: 0;
   transform: translateY(12px);
-  transition: opacity 360ms ease, transform 360ms ease;
+  transition:
+    opacity 360ms ease,
+    transform 360ms ease;
 }
 
 .reveal-visible {
@@ -431,7 +466,9 @@ body {
   background: var(--card);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   cursor: grab;
-  transition: border-color 150ms, box-shadow 150ms;
+  transition:
+    border-color 150ms,
+    box-shadow 150ms;
 }
 
 .workflow-node:active {
@@ -451,7 +488,9 @@ body {
   background: var(--accent);
   border: 2px solid var(--card);
   border-radius: 50%;
-  transition: transform 120ms, background 120ms;
+  transition:
+    transform 120ms,
+    background 120ms;
 }
 
 .react-flow .react-flow__handle:hover {
@@ -525,7 +564,10 @@ body {
   background: var(--card);
   color: var(--muted);
   cursor: pointer;
-  transition: border-color 120ms, background 120ms, color 120ms,
+  transition:
+    border-color 120ms,
+    background 120ms,
+    color 120ms,
     box-shadow 120ms;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
@@ -547,7 +589,9 @@ body {
   background: var(--card);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   cursor: grab;
-  transition: border-color 150ms, box-shadow 150ms;
+  transition:
+    border-color 150ms,
+    box-shadow 150ms;
 }
 
 .sticky-note-node:active {

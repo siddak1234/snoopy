@@ -59,7 +59,9 @@ export default async function OrgInvitePage({
   return (
     <InviteShell>
       <div className="w-full max-w-md">
-        <p className="text-sm text-[var(--muted)]">You have been invited to join</p>
+        <p className="text-sm text-[var(--muted)]">
+          You have been invited to join
+        </p>
         <h1 className="mt-1 text-2xl font-semibold text-[var(--text)]">
           {invite.workspace.name}
         </h1>
@@ -129,9 +131,11 @@ function InvalidInvite({ reason }: { reason: string }) {
   return (
     <div className="w-full max-w-md rounded-2xl border border-[var(--ring)] bg-[var(--card)] p-8 text-center">
       <p className="text-4xl">🔒</p>
-      <h1 className="mt-4 text-xl font-semibold text-[var(--text)]">{copy.title}</h1>
+      <h1 className="mt-4 text-xl font-semibold text-[var(--text)]">
+        {copy.title}
+      </h1>
       <p className="mt-2 text-sm text-[var(--muted)]">{copy.body}</p>
-      <a href="/account" className="mt-6 inline-flex btn-secondary px-5">
+      <a href="/account" className="btn-secondary mt-6 inline-flex px-5">
         Back to dashboard
       </a>
     </div>

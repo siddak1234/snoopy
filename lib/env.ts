@@ -25,7 +25,7 @@ export function validateEnv(): void {
 
   if (missing.length > 0) {
     throw new Error(
-      `Missing required env in production: ${missing.join(", ")}. See .env.example.`
+      `Missing required env in production: ${missing.join(", ")}. See .env.example.`,
     );
   }
 }

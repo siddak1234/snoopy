@@ -47,7 +47,7 @@ export default async function AccountWorkflowDesignPage() {
       }
     >
       <div className="py-5 first:pt-0">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+        <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Saved workflows
         </h2>
 
@@ -81,11 +81,13 @@ export default async function AccountWorkflowDesignPage() {
             </Link>
           </div>
         ) : (
-          <WorkflowCardsClient workflows={workflows.map((w) => ({
-            ...w,
-            createdAt: w.createdAt.toISOString(),
-            updatedAt: w.updatedAt.toISOString(),
-          }))} />
+          <WorkflowCardsClient
+            workflows={workflows.map((w) => ({
+              ...w,
+              createdAt: w.createdAt.toISOString(),
+              updatedAt: w.updatedAt.toISOString(),
+            }))}
+          />
         )}
       </div>
     </SectionCard>
