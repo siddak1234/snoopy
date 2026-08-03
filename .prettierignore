@@ -1,0 +1,19 @@
+# Build output / deps
+.next/
+node_modules/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# Generated
+package-lock.json
+lib/generated/
+
+# Not app code: n8n source copies, LLM prompts, SQL, docs, infra
+prompts/
+running-total/
+supabase/
+prisma/migrations/
+docs/
+*.md
