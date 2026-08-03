@@ -13,11 +13,17 @@ export function ScrollProgressBar() {
   const [mode, setMode] = useState<"css" | "js" | null>(null);
 
   useEffect(() => {
-    setMode(
-      typeof CSS !== "undefined" && CSS.supports("animation-timeline: scroll()")
-        ? "css"
-        : "js",
-    );
+    // Deferred a frame: feature detection is client-only, and the bar starts
+    // at scaleX(0) either way, so the one-frame delay is invisible.
+    const id = requestAnimationFrame(() => {
+      setMode(
+        typeof CSS !== "undefined" &&
+          CSS.supports("animation-timeline: scroll()")
+          ? "css"
+          : "js",
+      );
+    });
+    return () => cancelAnimationFrame(id);
   }, []);
 
   useEffect(() => {

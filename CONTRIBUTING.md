@@ -21,11 +21,36 @@
 - Commit, push the branch, and open a PR into `main`.
 - The PR merges only after CI (Lint + Typecheck) passes **and** Siddak approves. PRs are squash-merged; the branch is auto-deleted after merge.
 
+## Design system (Nocturne)
+
+The site runs on the Nocturne design system — tokens live in
+`app/globals.css` and are the single source of truth for color, type,
+spacing, radius and shadows.
+
+- **Never hard-code a hex, rgba, or font name in TSX.** Use the tokens:
+  `var(--color-*)`, `var(--font-heading|body)`, `var(--radius-*)`,
+  `var(--shadow-*)`, `var(--space-*)`. ESLint enforces this (error in
+  marketing/ui trees, warn elsewhere while legacy code migrates).
+- **Reuse before you re-implement.** Shared primitives live in
+  `components/ui/`: `Button` (primary = accent outline, never a fill; sizes
+  sm/md/lg), `Card`, `Tag`, `Kicker`, `Section`/`Container`, `NumberedStep`,
+  `ImagePlaceholder`, `NavDropdown`, `FormInput`, `Modal`. Marketing-specific
+  pieces are in `components/marketing/`.
+- **Dark is the default theme**; light is `html[data-theme="light"]`. Verify
+  changes in both (toggle in the header).
+- Headings are never bolder than 500 (`font-medium`) — hierarchy comes from
+  size and space. Icons are Phosphor (`@phosphor-icons/react`).
+- Nav data lives in `lib/nav.ts` (marketing) and
+  `components/dashboard/DashboardNav.tsx` (dashboard) — one source each.
+- Breakpoint canon: `sm:`/`lg:` for content grids, `md:` for navigation.
+- New shared components use **named exports**; component files are
+  `PascalCase.tsx`, lib files `kebab-case.ts`.
+
 ## Adding a new service
 
 Read [`docs/REPO-STRUCTURE.md`](docs/REPO-STRUCTURE.md) first, and use the existing services (invoices, candidates) as reference implementations.
 
-- **Solution page**: `app/solutions/<service>/page.tsx`
+- **Solution content**: add a section to `app/(marketing)/solutions/page.tsx` (the industry pages were consolidated there)
 - **API endpoints**: `app/api/<service>/route.ts` — keep handlers thin; put logic in `lib/`
 - **UI components**: `components/<domain>/`; dashboard widgets go in `components/dashboard/`; dialogs use `components/ui/Modal.tsx` (no custom fixed overlays)
 - **Database**: import `db` from `@/lib/db` — never instantiate your own Prisma client. Schema changes go in `prisma/schema.prisma`, then `npm run db:migrate -- --name <name>`; commit the generated migration folder.
@@ -34,6 +59,6 @@ Read [`docs/REPO-STRUCTURE.md`](docs/REPO-STRUCTURE.md) first, and use the exist
 
 ## Before opening a PR
 
-- `npm run lint` and `npm run typecheck` pass
-- The service runs locally end to end
+- `npm run lint`, `npm run typecheck`, `npm run format:check`, and `npm run build` pass (CI runs all four)
+- The service runs locally end to end, checked in **both themes**
 - No secrets, API keys, or `.env` values anywhere in the diff

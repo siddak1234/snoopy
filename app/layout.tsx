@@ -18,6 +18,7 @@ const inter = Inter({
 const themeInitScript = `(function(){try{var t=localStorage.getItem("theme");document.documentElement.dataset.theme=t==="light"?"light":"dark"}catch(e){document.documentElement.dataset.theme="dark"}})();`;
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://autom8x.ai"),
   title: {
     default: site.name,
     template: `%s | ${site.name}`,

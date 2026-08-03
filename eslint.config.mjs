@@ -49,6 +49,44 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // The rebuilt marketing + shared-UI trees are token-clean: hold the line.
+  // (The raw-px rule stays warn everywhere — SVG geometry and clamp() type
+  // scales legitimately carry px.)
+  {
+    files: [
+      "app/(marketing)/**/*.tsx",
+      "components/ui/**/*.tsx",
+      "components/marketing/**/*.tsx",
+    ],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "JSXAttribute[name.name='className'] Literal[value=/#[0-9a-fA-F]{3,8}\\b|rgba?\\(/]",
+          message:
+            "Raw color in className — use a Nocturne token (e.g. text-[var(--color-accent)] or a generated utility).",
+        },
+        {
+          selector:
+            "Property[key.name=/^(color|background|backgroundColor|fill|stroke|borderColor|boxShadow|outlineColor)$/] > Literal[value=/#[0-9a-fA-F]{3,8}\\b|rgba?\\(/]",
+          message: "Raw color in a style object — use var(--color-*).",
+        },
+        {
+          selector:
+            "JSXAttribute[name.name=/^(fill|stroke|stopColor)$/] > Literal[value=/#[0-9a-fA-F]{3,8}\\b|rgba?\\(/]",
+          message:
+            "Raw color on an SVG attribute — use currentColor or var(--color-*).",
+        },
+        {
+          selector:
+            "Property[key.name='fontFamily'] > Literal[value!=/Inter|var\\(--font/]",
+          message:
+            "Font not provided by the design system. Available: Inter (var(--font-heading) / var(--font-body)).",
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

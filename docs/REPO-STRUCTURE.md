@@ -23,16 +23,19 @@ snoopy/
 
 | Add this | Put it here | Notes |
 |----------|-------------|--------|
-| New page or route | `app/<path>/page.tsx` | One `page.tsx` (or `layout.tsx`) per route segment. |
+| New marketing page | `app/(marketing)/<path>/page.tsx` | Route groups: `(marketing)` = Nocturne nav/footer shell; `(auth)` = centered auth shell; `app/account/` = dashboard shell (protected, incl. the builder canvas at `/account/builder`). Groups do not affect URLs. |
 | New API endpoint | `app/api/<name>/route.ts` | Export `GET`, `POST`, etc. |
-| Shared UI (buttons, cards, nav) | `components/` | Use subfolders by domain: `components/navigation/`, `components/home/`, `components/theme/`. |
+| Shared UI primitives | `components/ui/` | `Button`, `Card`, `Tag`, `Kicker`, `Section`/`Container`, `NumberedStep`, `ImagePlaceholder`, `NavDropdown`, `FormInput`, `Modal` — named exports; reuse before re-implementing. |
+| Marketing-specific components | `components/marketing/` | Nav, footer, pipeline art, marquee, scroll story, typing headline, contact form. |
+| Design tokens / theme | `app/globals.css` | The Nocturne token sheet (dark default + `html[data-theme="light"]`). Never hard-code hex/px/fonts in TSX — lint enforces it. |
+| Nav data | `lib/nav.ts` | Single source for marketing nav + footer columns. Dashboard nav: `components/dashboard/DashboardNav.tsx`. |
 | Modal / popup dialog (button-triggered) | `components/ui/Modal.tsx` | Use `<Modal onClose={...} ariaLabelledBy="...">` so the card is viewport-anchored and does not shift when the cursor moves. Do not build custom fixed overlays for new dialogs. |
-| Icons / small assets | `components/icons/` or `public/` | Icons as React components in `components/icons/`; static SVGs in `public/`. |
+| Icons | `@phosphor-icons/react` | The design system mandates Phosphor; static SVGs in `public/`. |
 | Database access | Use `lib/db.ts` | Import `db` from `@/lib/db`; do not create new Prisma client instances. |
 | App/site config (name, tagline) | `lib/site.ts` | Constants used across the app. |
 | Env validation | `lib/env.ts` | `validateEnv()` — in production runtime, throws if required vars missing. Wired at startup via `instrumentation.ts` (`register()`, nodejs runtime). |
 | Auth config | `lib/auth.ts`, `lib/auth-supabase.ts` | `ensureDefaultWorkspaceForUser()` in auth.ts; `getAppSession()`, `provisionUserFromSupabaseAuth()` in auth-supabase.ts. |
-| Route protection | `middleware.ts` | Protects `/account` (redirects to `/login` if unauthenticated). |
+| Route protection | `middleware.ts` | Protects `/account` (incl. `/account/builder`) and `/onboarding` (redirects to `/login` if unauthenticated). |
 | Liveness | `app/api/health/route.ts` | `GET /api/health` — 200 always; no DB (build-safe). |
 | Readiness | `app/api/ready/route.ts` | `GET /api/ready` — 200 with DB check when env set, or 503 if DB down. |
 | Schema changes | `prisma/schema.prisma` | Then run `npm run db:migrate -- --name <name>`. |
