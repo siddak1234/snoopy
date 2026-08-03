@@ -3,14 +3,20 @@
 import { useEffect, useState } from "react";
 import { useHydrated } from "@/hooks/use-hydrated";
 
-const WORDS = ["Design", "Run", "Autom8"] as const;
-const SUFFIX = " enterprise workflows";
-const TYPE_SPEED = 100;
-const DELETE_SPEED = 60;
-const PAUSE_AFTER_TYPE = 800;
-const PAUSE_AFTER_DELETE = 220;
+/**
+ * The design's hero typewriter: cycles Design → Run → Autom8 in gradient ink
+ * with a blinking caret, settling on "Autom8". The full headline is exposed
+ * to screen readers as static text; under reduced motion the final word
+ * renders immediately.
+ */
 
-export default function TypingHeadline() {
+const WORDS = ["Design", "Run", "Autom8"] as const;
+const TYPE_SPEED = 110;
+const DELETE_SPEED = 55;
+const PAUSE_AFTER_TYPE = 1000;
+const PAUSE_AFTER_DELETE = 240;
+
+export function TypingHeadline() {
   const mounted = useHydrated();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [displayed, setDisplayed] = useState("");
@@ -19,11 +25,8 @@ export default function TypingHeadline() {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     const update = () => setPrefersReducedMotion(mediaQuery.matches);
-
     update();
     mediaQuery.addEventListener("change", update);
     return () => mediaQuery.removeEventListener("change", update);
@@ -40,9 +43,7 @@ export default function TypingHeadline() {
       return () => window.clearTimeout(id);
     }
 
-    if (isDone) {
-      return;
-    }
+    if (isDone) return;
 
     const currentWord = WORDS[currentIndex];
     let timeoutId: number | undefined;
@@ -53,7 +54,6 @@ export default function TypingHeadline() {
       }, TYPE_SPEED);
     } else if (!isDeleting && displayed.length === currentWord.length) {
       const isLastWord = currentIndex === WORDS.length - 1;
-
       timeoutId = window.setTimeout(() => {
         if (isLastWord) {
           setIsDone(true);
@@ -73,9 +73,7 @@ export default function TypingHeadline() {
     }
 
     return () => {
-      if (timeoutId !== undefined) {
-        window.clearTimeout(timeoutId);
-      }
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
     };
   }, [
     mounted,
@@ -86,16 +84,23 @@ export default function TypingHeadline() {
     prefersReducedMotion,
   ]);
 
-  const showCaret = mounted && !prefersReducedMotion;
+  const showCaret = mounted && !prefersReducedMotion && !isDone;
   const visibleText = mounted ? displayed : WORDS[WORDS.length - 1];
 
   return (
-    <h1 className="text-3xl leading-tight font-semibold sm:text-4xl">
-      <span className="sr-only">Autom8 enterprise workflows</span>
+    <h1 className="m-0 -ml-[0.06em] text-[clamp(40px,4.6vw,64px)] leading-[1.1] font-[var(--font-heading)] font-medium tracking-[-0.016em]">
+      <span className="sr-only">Autom8 any workflow.</span>
       <span aria-hidden="true">
-        <span>{visibleText}</span>
-        {showCaret ? <span className="typing-caret ml-0.5">|</span> : null}
-        <span>{SUFFIX}</span>
+        <span className="block min-h-[1.1em]">
+          <span
+            className="bg-[linear-gradient(100deg,var(--color-accent-200)_0%,var(--color-accent)_50%,var(--color-accent-200)_100%)] bg-[length:200%_100%] bg-clip-text text-transparent"
+            style={{ animation: "ink-slide 7s linear infinite" }}
+          >
+            {visibleText}
+          </span>
+          {showCaret ? <span className="typing-caret">|</span> : null}
+        </span>
+        <span className="block">any workflow.</span>
       </span>
     </h1>
   );
