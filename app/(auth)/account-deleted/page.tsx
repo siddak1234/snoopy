@@ -5,7 +5,7 @@ export default function AccountDeletedPage() {
     <div className="flex min-h-[60vh] items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
         <section className="bubble p-6 text-center sm:p-8">
-          <h1 className="text-2xl font-semibold sm:text-3xl">
+          <h1 className="text-2xl font-medium sm:text-3xl">
             Account deleted
           </h1>
           <p className="mt-4 text-[var(--muted)]">

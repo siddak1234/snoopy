@@ -54,7 +54,7 @@ export function CandidateDetail({
             {initials(candidate.name)}
           </span>
           <div className="min-w-0">
-            <h3 className="text-lg font-semibold text-[var(--text)]">
+            <h3 className="text-lg font-medium text-[var(--text)]">
               {candidate.name}
             </h3>
             <p className="truncate text-xs text-[var(--muted)]">

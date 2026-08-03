@@ -177,7 +177,7 @@ export function DashboardHeader({
           id="dashboard-mobile-nav"
           role="dialog"
           aria-label="Dashboard navigation"
-          className="absolute top-full left-0 z-50 mt-2 min-w-[14rem] rounded-2xl border border-[var(--ring)] bg-[var(--surface)] p-2 shadow-[0_12px_24px_rgba(12,24,40,0.14)] [background:linear-gradient(165deg,var(--surface)_0%,var(--surface-strong)_100%)]"
+          className="absolute top-full left-0 z-50 mt-2 min-w-[14rem] rounded-[var(--radius-lg)] border border-[var(--ring)] bg-[var(--surface)] p-2 shadow-[var(--shadow-md)]"
         >
           <nav className="flex flex-col gap-0.5 py-1">
             <NavLinks

@@ -138,7 +138,7 @@ export function FlaggedItemsModal({
             if (bucket.length === 0) return null;
             return (
               <section key={reason}>
-                <h3 className="mb-2 text-[11px] font-semibold tracking-wide text-[var(--muted)] uppercase">
+                <h3 className="mb-2 text-[11px] font-medium tracking-wide text-[var(--muted)] uppercase">
                   {FLAG_REASON_LABELS[reason]} · {bucket.length}
                 </h3>
                 <div className="space-y-2.5">

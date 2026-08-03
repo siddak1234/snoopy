@@ -120,7 +120,7 @@ export function JobDescriptionDetailClient({
       {/* JD PDF */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-[var(--text)]">
+          <h3 className="text-sm font-medium text-[var(--text)]">
             {row?.role
               ? `${row.role}${row.department ? ` · ${row.department}` : ""}`
               : "Job description"}
@@ -159,7 +159,7 @@ export function JobDescriptionDetailClient({
 
       {/* Parsed schema */}
       <div>
-        <h3 className="text-sm font-semibold text-[var(--text)]">
+        <h3 className="text-sm font-medium text-[var(--text)]">
           Parsed details
         </h3>
         {loading ? (

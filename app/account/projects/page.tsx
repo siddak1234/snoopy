@@ -160,7 +160,7 @@ export default async function AccountProjectsPage() {
                   : "border-t border-[var(--ring)] py-5"
               }
             >
-              <h2 className="text-sm font-semibold text-[var(--text)]">
+              <h2 className="text-sm font-medium text-[var(--text)]">
                 {isOrg
                   ? `${group.workspaceName} Team Projects`
                   : group.workspaceName}

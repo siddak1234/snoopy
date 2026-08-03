@@ -458,7 +458,7 @@ export function GlCodeAllocationDashboard({
       {/* Dashboard header: title + download */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-[var(--text)]">
+          <h3 className="text-lg font-medium text-[var(--text)]">
             Invoice Dashboard
           </h3>
           <p className="mt-0.5 text-xs text-[var(--muted)]">

@@ -163,8 +163,8 @@ export default async function AccountDashboardPage() {
       </div>
 
       <div className="py-5">
-        <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 sm:px-5 sm:py-5">
-          <h3 className="text-sm font-semibold text-[var(--text)]">
+        <div className="rounded-xl border border-[var(--color-divider)] bg-[color-mix(in_srgb,var(--color-text)_5%,transparent)] px-4 py-4 sm:px-5 sm:py-5">
+          <h3 className="text-sm font-medium text-[var(--text)]">
             Get started
           </h3>
           <p className="mt-1 text-sm text-[var(--muted)]">

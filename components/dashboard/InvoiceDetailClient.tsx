@@ -551,7 +551,7 @@ export function InvoiceDetailClient({
         ) : null}
 
         <div className="border-t border-[var(--ring)] pt-5">
-          <h3 className="mb-3 text-sm font-semibold text-[var(--text)]">
+          <h3 className="mb-3 text-sm font-medium text-[var(--text)]">
             Line items
           </h3>
           <div className="overflow-x-auto">
