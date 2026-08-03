@@ -14,7 +14,15 @@ import "./globals.css";
 
 const inter = Inter({
   subsets: ["latin"],
+  variable: "--font-inter",
 });
+
+/**
+ * Runs before first paint: applies the stored theme (or the dark default) so
+ * there is never a flash of the wrong theme. Keeps the pre-revamp "theme"
+ * localStorage key so returning users keep their choice.
+ */
+const themeInitScript = `(function(){try{var t=localStorage.getItem("theme");document.documentElement.dataset.theme=t==="light"?"light":"dark"}catch(e){document.documentElement.dataset.theme="dark"}})();`;
 
 export const metadata: Metadata = {
   title: {
@@ -41,9 +49,12 @@ export default function RootLayout({
   const year = new Date().getFullYear();
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body
-        className={`${inter.className} min-h-screen overflow-x-clip antialiased`}
+        className={`${inter.variable} min-h-screen overflow-x-clip antialiased`}
       >
         <MotionProvider>
           <OAuthFragmentRedirect />
