@@ -19,13 +19,16 @@ export default async function SetupOrgPage() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4 py-16">
       <div className="bubble w-full max-w-md px-8 py-8">
-        <h1 className="text-2xl font-semibold text-[var(--text)]">
+        <h1 className="text-2xl font-medium text-[var(--text)]">
           Set up your organization
         </h1>
         <p className="mt-1 text-sm text-[var(--muted)]">
           Your email uses the domain{" "}
-          <span className="font-mono font-medium text-[var(--text)]">{domain}</span>.
-          Create an organization workspace for your team, or continue with a personal account.
+          <span className="font-mono font-medium text-[var(--text)]">
+            {domain}
+          </span>
+          . Create an organization workspace for your team, or continue with a
+          personal account.
         </p>
 
         <SetupOrgForm domain={domain} />

@@ -31,7 +31,13 @@ export default async function AccountProjectsPage() {
   }
 
   await ensureTenantForUser(session.user.id);
-  const [rawMyProjects, rawTeamProjects, usedTypesByScope, restorable, orgMembership] = await Promise.all([
+  const [
+    rawMyProjects,
+    rawTeamProjects,
+    usedTypesByScope,
+    restorable,
+    orgMembership,
+  ] = await Promise.all([
     getMyProjects(session.user.id),
     getTeamProjects(session.user.id),
     getUsedProjectTypesByScope(session.user.id),
@@ -118,7 +124,9 @@ export default async function AccountProjectsPage() {
       {/* Top-level controls: Create (scope-aware) + Join. */}
       <div className="flex flex-wrap items-center justify-end gap-2 py-3 first:pt-0">
         {allScopesFull ? (
-          <p className="text-sm text-[var(--muted)]">All project types created.</p>
+          <p className="text-sm text-[var(--muted)]">
+            All project types created.
+          </p>
         ) : (
           <CreateProjectButton
             usedTypesByScope={usedTypesByScope}
@@ -136,7 +144,8 @@ export default async function AccountProjectsPage() {
         <div className="py-5">
           <p className="text-sm text-[var(--muted)]">No projects yet.</p>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            Create a project to get started, or join an organization to access team projects.
+            Create a project to get started, or join an organization to access
+            team projects.
           </p>
         </div>
       ) : (
@@ -145,10 +154,16 @@ export default async function AccountProjectsPage() {
           return (
             <div
               key={group.workspaceId ?? NO_WS}
-              className={idx === 0 ? "py-5 first:pt-0" : "border-t border-[var(--ring)] py-5"}
+              className={
+                idx === 0
+                  ? "py-5 first:pt-0"
+                  : "border-t border-[var(--ring)] py-5"
+              }
             >
-              <h2 className="text-sm font-semibold text-[var(--text)]">
-                {isOrg ? `${group.workspaceName} Team Projects` : group.workspaceName}
+              <h2 className="text-sm font-medium text-[var(--text)]">
+                {isOrg
+                  ? `${group.workspaceName} Team Projects`
+                  : group.workspaceName}
               </h2>
               <div className="mt-3">
                 <ProjectList projects={group.items} />

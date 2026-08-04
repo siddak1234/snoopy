@@ -12,9 +12,7 @@ function getFirstName(name?: string | null): string | null {
 export default async function AccountDashboardPage() {
   const session = await getAppSession();
   const firstName = getFirstName(session?.user?.name);
-  const greeting = firstName
-    ? `Welcome, ${firstName}!`
-    : "Welcome back!";
+  const greeting = firstName ? `Welcome, ${firstName}!` : "Welcome back!";
 
   const userId = session?.user?.id;
 
@@ -23,10 +21,9 @@ export default async function AccountDashboardPage() {
 
   // Show workspace name tags when the user's top projects span multiple workspaces
   const uniqueWorkspaceIds = new Set(
-    topProjects.map((p) => p.workspaceId).filter(Boolean)
+    topProjects.map((p) => p.workspaceId).filter(Boolean),
   );
   const isMultiWorkspace = uniqueWorkspaceIds.size > 1;
-
 
   return (
     <SectionCard
@@ -34,40 +31,39 @@ export default async function AccountDashboardPage() {
       greeting={greeting}
       subheader="Here's what's happening in your workspace."
       primaryAction={
-        <Link href="/automation-builder" className="btn-primary inline-flex px-5">
+        <Link href="/account/builder" className="btn-primary inline-flex px-5">
           Create workflow
         </Link>
       }
       secondaryAction={
         <Link
-          href="/automation-builder"
+          href="/account/builder"
           className="btn-secondary inline-flex px-5"
         >
           Browse templates
         </Link>
       }
     >
-
       <div className="py-5 first:pt-0">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+        <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Quick actions
         </h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link
-            href="/automation-builder"
+            href="/account/builder"
             className="btn-primary inline-flex px-4 py-2 text-sm"
           >
             Create workflow
           </Link>
           <Link
-            href="/automation-builder"
-            className="inline-flex items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            href="/account/builder"
+            className="inline-flex items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
           >
             Browse templates
           </Link>
           <Link
             href="/account/settings"
-            className="inline-flex items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className="inline-flex items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
           >
             Connect integration
           </Link>
@@ -75,7 +71,7 @@ export default async function AccountDashboardPage() {
       </div>
 
       <div className="py-5">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+        <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Workspace overview
         </h2>
         <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:max-w-md">
@@ -91,9 +87,8 @@ export default async function AccountDashboardPage() {
         </p>
       </div>
 
-
       <div className="py-5">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+        <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Recent activity
         </h2>
         <p className="mt-3 text-sm text-[var(--muted)]">No activity yet.</p>
@@ -103,7 +98,7 @@ export default async function AccountDashboardPage() {
       </div>
 
       <div className="py-5">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+        <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Projects
         </h2>
         {topProjects.length === 0 ? (
@@ -125,9 +120,11 @@ export default async function AccountDashboardPage() {
                 <li key={p.id}>
                   <Link
                     href={`/account/projects/${p.id}`}
-                    className="flex flex-wrap items-center gap-2 rounded-xl px-2 py-2 transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                    className="flex flex-wrap items-center gap-2 rounded-xl px-2 py-2 transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-inset"
                   >
-                    <span className="font-medium text-[var(--text)]">{p.name}</span>
+                    <span className="font-medium text-[var(--text)]">
+                      {p.name}
+                    </span>
                     <span className="inline-flex rounded-full bg-[var(--chip-bg)] px-2.5 py-0.5 text-xs font-medium text-[var(--chip-text)]">
                       {p.status === "active"
                         ? "Active"
@@ -138,9 +135,13 @@ export default async function AccountDashboardPage() {
                             : "Archived"}
                     </span>
                     {isMultiWorkspace && p.workspaceName ? (
-                      <span className="text-xs text-[var(--muted)]">· {p.workspaceName}</span>
+                      <span className="text-xs text-[var(--muted)]">
+                        · {p.workspaceName}
+                      </span>
                     ) : p.ownerName ? (
-                      <span className="text-xs text-[var(--muted)]">· {p.ownerName}</span>
+                      <span className="text-xs text-[var(--muted)]">
+                        · {p.ownerName}
+                      </span>
                     ) : null}
                   </Link>
                 </li>
@@ -149,7 +150,7 @@ export default async function AccountDashboardPage() {
             <div className="mt-3">
               <Link
                 href="/account/projects"
-                className="text-sm font-medium text-[var(--link)] transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                className="text-sm font-medium text-[var(--link)] transition hover:underline focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
               >
                 View all projects
               </Link>
@@ -159,17 +160,22 @@ export default async function AccountDashboardPage() {
       </div>
 
       <div className="py-5">
-        <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 sm:px-5 sm:py-5">
-          <h3 className="text-sm font-semibold text-[var(--text)]">Get started</h3>
+        <div className="rounded-xl border border-[var(--color-divider)] bg-[color-mix(in_srgb,var(--color-text)_5%,transparent)] px-4 py-4 sm:px-5 sm:py-5">
+          <h3 className="text-sm font-medium text-[var(--text)]">
+            Get started
+          </h3>
           <p className="mt-1 text-sm text-[var(--muted)]">
             Create your first workflow or choose a template.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/automation-builder" className="btn-primary inline-flex px-5">
+            <Link
+              href="/account/builder"
+              className="btn-primary inline-flex px-5"
+            >
               Create workflow
             </Link>
             <Link
-              href="/automation-builder"
+              href="/account/builder"
               className="btn-secondary inline-flex px-5"
             >
               Browse templates

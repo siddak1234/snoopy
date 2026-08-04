@@ -46,7 +46,7 @@ export default async function JoinOrgPage({
   return (
     <div className="flex min-h-screen items-center justify-center px-4 py-16">
       <div className="bubble w-full max-w-md px-8 py-8">
-        <h1 className="text-2xl font-semibold text-[var(--text)]">
+        <h1 className="text-2xl font-medium text-[var(--text)]">
           Join your team
         </h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
@@ -55,8 +55,10 @@ export default async function JoinOrgPage({
             {workspace.domain}
           </span>{" "}
           is registered to{" "}
-          <span className="font-medium text-[var(--text)]">{workspace.name}</span>.
-          Would you like to join?
+          <span className="font-medium text-[var(--text)]">
+            {workspace.name}
+          </span>
+          . Would you like to join?
         </p>
 
         <JoinOrgForm workspaceName={workspace.name} />

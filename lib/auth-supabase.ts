@@ -21,7 +21,9 @@ export type AppSession = {
  * Exported so the auth callback and onboarding flows can reuse it without
  * calling the full getAppSession() (which would create a workspace prematurely).
  */
-export async function provisionUserFromSupabaseAuth(supabaseUser: SupabaseUser): Promise<{ id: string }> {
+export async function provisionUserFromSupabaseAuth(
+  supabaseUser: SupabaseUser,
+): Promise<{ id: string }> {
   const { prisma } = await import("@/lib/db");
   const email = normalizeEmail(supabaseUser.email ?? "");
   const supabaseUserId = supabaseUser.id;
@@ -87,8 +89,8 @@ export async function getAppSession(): Promise<AppSession | null> {
       where: { userId: id, workspace: { type: "organization" } },
       select: { workspaceId: true },
     });
-    const workspaceId = orgMembership?.workspaceId
-      ?? await ensureDefaultWorkspaceForUser(id);
+    const workspaceId =
+      orgMembership?.workspaceId ?? (await ensureDefaultWorkspaceForUser(id));
 
     const name =
       (supabaseUser.user_metadata?.full_name as string | null) ??

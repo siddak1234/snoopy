@@ -138,7 +138,7 @@ export function FlaggedItemsModal({
             if (bucket.length === 0) return null;
             return (
               <section key={reason}>
-                <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                <h3 className="mb-2 text-[11px] font-medium tracking-wide text-[var(--muted)] uppercase">
                   {FLAG_REASON_LABELS[reason]} · {bucket.length}
                 </h3>
                 <div className="space-y-2.5">
@@ -215,7 +215,9 @@ function DuplicateInvoiceCard({
 }) {
   const { details } = item;
   // Default: keep the oldest (first_seen) copy, queue the rest for deletion.
-  const [keepFilename, setKeepFilename] = useState<string>(details.files[0]?.filename ?? "");
+  const [keepFilename, setKeepFilename] = useState<string>(
+    details.files[0]?.filename ?? "",
+  );
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -277,7 +279,7 @@ function DuplicateInvoiceCard({
               <span className="truncate font-mono text-[var(--muted)]">
                 {shortFilename(f.filename)}
               </span>
-              <span className="shrink-0 tabular-nums text-[var(--text)]">
+              <span className="shrink-0 text-[var(--text)] tabular-nums">
                 {currencyFmt.format(f.total)} · {f.line_count} lines
               </span>
             </label>
@@ -285,7 +287,7 @@ function DuplicateInvoiceCard({
               href={fileViewUrl(projectId, f.filename, loungeCode)}
               target="_blank"
               rel="noreferrer"
-              className="text-[10px] uppercase tracking-wide text-[var(--link)] hover:underline"
+              className="text-[10px] tracking-wide text-[var(--link)] uppercase hover:underline"
             >
               View
             </a>
@@ -398,7 +400,10 @@ function SimpleFlaggedCard({
   item,
   projectId,
 }: {
-  item: Exclude<FlaggedItem, { reason: "duplicate_invoice" | "running_total_drift" }>;
+  item: Exclude<
+    FlaggedItem,
+    { reason: "duplicate_invoice" | "running_total_drift" }
+  >;
   projectId: string;
 }) {
   return (
@@ -418,7 +423,7 @@ function SimpleFlaggedCard({
           href={fileViewUrl(projectId, item.filename, "")}
           target="_blank"
           rel="noreferrer"
-          className="shrink-0 text-[11px] uppercase tracking-wide text-[var(--link)] hover:underline"
+          className="shrink-0 text-[11px] tracking-wide text-[var(--link)] uppercase hover:underline"
         >
           View
         </a>
@@ -430,7 +435,10 @@ function SimpleFlaggedCard({
 function DetailLine({
   item,
 }: {
-  item: Exclude<FlaggedItem, { reason: "duplicate_invoice" | "running_total_drift" }>;
+  item: Exclude<
+    FlaggedItem,
+    { reason: "duplicate_invoice" | "running_total_drift" }
+  >;
 }) {
   if (item.reason === "low_confidence") {
     return (
@@ -468,7 +476,11 @@ function shortFilename(filename: string): string {
   return segments.length > 38 ? "…" + segments.slice(-38) : segments;
 }
 
-function fileViewUrl(projectId: string, filename: string, loungeCode: string): string {
+function fileViewUrl(
+  projectId: string,
+  filename: string,
+  loungeCode: string,
+): string {
   const lounge = loungeCode ? `&lounge=${encodeURIComponent(loungeCode)}` : "";
   return `/api/invoices/file?file=${encodeURIComponent(filename)}${lounge}&project=${encodeURIComponent(projectId)}`;
 }

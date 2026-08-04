@@ -35,7 +35,7 @@ export default function Modal({
 }) {
   const contentZ = zIndex + 1;
   const baseContent =
-    "fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-[var(--ring)] bg-[var(--surface)] p-6 shadow-xl [background:linear-gradient(165deg,var(--surface)_0%,var(--surface-strong)_100%)]";
+    "fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius-lg)] border border-[var(--ring)] bg-[var(--surface)] p-6 shadow-[var(--shadow-lg)]";
   const contentClass = bubble
     ? `modal-card fixed left-1/2 top-1/2 w-full max-w-md p-6 sm:p-8 ${contentClassName}`.trim()
     : `${baseContent} ${contentClassName}`.trim();
@@ -43,17 +43,18 @@ export default function Modal({
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
     return () => {
       document.body.style.overflow = prev;
+      document.removeEventListener("keydown", onKeyDown);
     };
-  }, []);
+  }, [onClose]);
 
   const modalContent = (
-    <div
-      className="fixed inset-0"
-      style={{ zIndex }}
-      role="presentation"
-    >
+    <div className="fixed inset-0" style={{ zIndex }} role="presentation">
       <div
         className="fixed inset-0 bg-black/50 backdrop-blur-[2px]"
         aria-hidden

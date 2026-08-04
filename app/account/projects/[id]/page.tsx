@@ -132,13 +132,14 @@ export default async function ProjectDetailPage({
       ) : null}
 
       {canViewMembers ? (
-        <div className="py-5 first:pt-0 border-t border-[var(--ring)]">
+        <div className="border-t border-[var(--ring)] py-5 first:pt-0">
           <div className="flex items-center justify-between">
-            <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+            <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
               Team
             </h2>
             <span className="text-xs text-[var(--muted)]">
-              {memberRows.length} {memberRows.length === 1 ? "member" : "members"}
+              {memberRows.length}{" "}
+              {memberRows.length === 1 ? "member" : "members"}
             </span>
           </div>
           <ProjectMemberList

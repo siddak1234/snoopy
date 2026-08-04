@@ -17,24 +17,37 @@ function formatRelative(iso: string): string {
   if (hrs < 24) return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
   if (days < 30) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 const statusColors: Record<string, string> = {
   draft:
     "border-[var(--ring)] bg-[var(--step-pill-bg)] text-[var(--step-pill-text)]",
-  active: "border-[var(--success-border)] bg-[var(--success-bg)] text-[var(--success-text)]",
+  active:
+    "border-[var(--success-border)] bg-[var(--success-bg)] text-[var(--success-text)]",
   archived: "border-[var(--ring)] bg-[var(--surface)] text-[var(--muted)]",
 };
 
-export function WorkflowCardsClient({ workflows }: { workflows: WorkflowListItem[] }) {
+export function WorkflowCardsClient({
+  workflows,
+}: {
+  workflows: WorkflowListItem[];
+}) {
   const router = useRouter();
-  const [deleteTarget, setDeleteTarget] = useState<WorkflowListItem | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<WorkflowListItem | null>(
+    null,
+  );
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
-  const canDelete = useMemo(() => confirmText.trim().toUpperCase() === "DELETE", [confirmText]);
+  const canDelete = useMemo(
+    () => confirmText.trim().toUpperCase() === "DELETE",
+    [confirmText],
+  );
 
   async function confirmDelete() {
     if (!deleteTarget || !canDelete || deleting) return;
@@ -65,7 +78,7 @@ export function WorkflowCardsClient({ workflows }: { workflows: WorkflowListItem
             key={wf.id}
             className="group relative flex flex-col gap-3 rounded-xl border border-[var(--ring)] bg-[var(--card)] p-4 transition hover:border-[var(--accent)] hover:shadow-md"
           >
-            <div className="absolute right-3 top-3 flex items-center gap-1.5 opacity-0 transition group-hover:opacity-100">
+            <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-0 transition group-hover:opacity-100">
               <button
                 type="button"
                 onClick={() => {}}
@@ -113,7 +126,7 @@ export function WorkflowCardsClient({ workflows }: { workflows: WorkflowListItem
               </button>
             </div>
 
-            <Link href={`/automation-builder?id=${wf.id}`} className="block">
+            <Link href={`/account/builder?id=${wf.id}`} className="block">
               <div className="flex items-start justify-between gap-2">
                 <h3 className="text-sm font-semibold text-[var(--text)] group-hover:text-[var(--accent)]">
                   {wf.name}
@@ -153,7 +166,7 @@ export function WorkflowCardsClient({ workflows }: { workflows: WorkflowListItem
             </Link>
 
             <span
-              className={`absolute bottom-3 right-3 shrink-0 rounded-full border px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide ${statusColors[wf.status] ?? statusColors.draft}`}
+              className={`absolute right-3 bottom-3 shrink-0 rounded-full border px-2 py-0.5 text-[0.6rem] font-semibold tracking-wide uppercase ${statusColors[wf.status] ?? statusColors.draft}`}
             >
               {wf.status}
             </span>
@@ -173,12 +186,19 @@ export function WorkflowCardsClient({ workflows }: { workflows: WorkflowListItem
           contentClassName="w-96 max-w-[calc(100vw-2rem)] p-6 sm:p-6"
         >
           <div>
-            <p id="workflow-delete-title" className="text-center text-sm font-semibold text-[var(--text)]">
+            <p
+              id="workflow-delete-title"
+              className="text-center text-sm font-semibold text-[var(--text)]"
+            >
               Delete workflow?
             </p>
             <p className="mt-1.5 text-center text-xs leading-relaxed text-[var(--muted)]">
-              This will permanently delete <span className="font-semibold text-[var(--text)]">{deleteTarget.name}</span>.
-              To confirm, type <span className="font-semibold text-[var(--text)]">DELETE</span>.
+              This will permanently delete{" "}
+              <span className="font-semibold text-[var(--text)]">
+                {deleteTarget.name}
+              </span>
+              . To confirm, type{" "}
+              <span className="font-semibold text-[var(--text)]">DELETE</span>.
             </p>
 
             <input
@@ -190,11 +210,14 @@ export function WorkflowCardsClient({ workflows }: { workflows: WorkflowListItem
                 if (e.key === "Enter") confirmDelete();
               }}
               placeholder="Type DELETE"
-              className="mt-4 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-sm text-[var(--text)] placeholder:text-[var(--muted)]/50 outline-none transition focus:ring-2 focus:ring-[var(--error-border-medium)]"
+              className="mt-4 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-sm text-[var(--text)] transition outline-none placeholder:text-[var(--muted)]/50 focus:ring-2 focus:ring-[var(--error-border-medium)]"
             />
 
             {deleteError ? (
-              <FormError message={deleteError} className="mt-2 text-center text-xs" />
+              <FormError
+                message={deleteError}
+                className="mt-2 text-center text-xs"
+              />
             ) : null}
 
             <div className="mt-5 flex gap-2.5">

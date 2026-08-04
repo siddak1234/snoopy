@@ -44,7 +44,8 @@ export function InvoiceFileViewer({
 
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
-  const showSkeleton = (kind === "pdf" || kind === "image") && !loaded && !errored;
+  const showSkeleton =
+    (kind === "pdf" || kind === "image") && !loaded && !errored;
 
   return (
     <div className="flex flex-col gap-3">
@@ -85,7 +86,7 @@ export function InvoiceFileViewer({
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="underline text-[var(--text)]"
+            className="text-[var(--text)] underline"
           >
             Open file
           </a>
@@ -109,7 +110,7 @@ export function InvoiceFileViewer({
             <iframe
               src={url}
               title="Invoice PDF"
-              className="w-full min-h-[700px] h-[85vh] rounded-lg border border-[var(--ring)]/50"
+              className="h-[85vh] min-h-[700px] w-full rounded-lg border border-[var(--ring)]/50"
               onLoad={() => setLoaded(true)}
               onError={() => setErrored(true)}
             />

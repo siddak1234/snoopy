@@ -3,7 +3,10 @@ import { prisma } from "@/lib/db";
 
 // Re-export pure helpers so server callers can import from one place.
 // Client components must import directly from @/lib/project-rbac-pure.
-export { canModifyMember, type MemberModifyAction } from "@/lib/project-rbac-pure";
+export {
+  canModifyMember,
+  type MemberModifyAction,
+} from "@/lib/project-rbac-pure";
 
 // ---------------------------------------------------------------------------
 // Actions
@@ -13,15 +16,15 @@ export { canModifyMember, type MemberModifyAction } from "@/lib/project-rbac-pur
 // by adding it to the relevant role(s) in ROLE_PERMISSIONS below.
 // ---------------------------------------------------------------------------
 export type ProjectAction =
-  | "project:view"             // view project details
-  | "project:delete"           // delete the project entirely
-  | "project:manage_settings"  // edit name, type, description, status
-  | "project:add_member"       // directly add a user as a project member
-  | "project:view_members"     // see the member list
-  | "project:remove_member"    // kick another member (see canModifyMember for role-level constraints)
-  | "project:change_role"      // change another member's role (see canModifyMember for role-level constraints)
+  | "project:view" // view project details
+  | "project:delete" // delete the project entirely
+  | "project:manage_settings" // edit name, type, description, status
+  | "project:add_member" // directly add a user as a project member
+  | "project:view_members" // see the member list
+  | "project:remove_member" // kick another member (see canModifyMember for role-level constraints)
+  | "project:change_role" // change another member's role (see canModifyMember for role-level constraints)
   | "project:access_workflows" // use workflows linked to this project
-  | "project:leave";           // remove own membership
+  | "project:leave"; // remove own membership
 
 // ---------------------------------------------------------------------------
 // Permissions map
@@ -31,47 +34,49 @@ export type ProjectAction =
 //   2. Run `prisma migrate dev`
 //   3. Add an entry here — done.
 // ---------------------------------------------------------------------------
-const ROLE_PERMISSIONS: Record<ProjectMemberRole, ReadonlySet<ProjectAction>> =
-  {
-    owner: new Set<ProjectAction>([
-      "project:view",
-      "project:delete",
-      "project:manage_settings",
-      "project:add_member",
-      "project:view_members",
-      "project:remove_member",
-      "project:change_role",
-      "project:access_workflows",
-      // owners do NOT get "project:leave" — they must delete the project
-    ]),
-    member: new Set<ProjectAction>([
-      "project:view",
-      "project:view_members",
-      "project:access_workflows",
-      "project:leave",
-    ]),
-    // legacy role — identical permissions to member, kept for backwards compat
-    project_user: new Set<ProjectAction>([
-      "project:view",
-      "project:view_members",
-      "project:access_workflows",
-      "project:leave",
-    ]),
-    // admin: elevated member — can manage project settings and members, cannot delete
-    // Note: admin manages members directly via add_member/remove_member/change_role.
-    // Use canModifyMember() for the second-layer role-level constraints on
-    // remove_member and change_role.
-    admin: new Set<ProjectAction>([
-      "project:view",
-      "project:manage_settings",
-      "project:add_member",
-      "project:view_members",
-      "project:remove_member",
-      "project:change_role",
-      "project:access_workflows",
-      "project:leave",
-    ]),
-  };
+const ROLE_PERMISSIONS: Record<
+  ProjectMemberRole,
+  ReadonlySet<ProjectAction>
+> = {
+  owner: new Set<ProjectAction>([
+    "project:view",
+    "project:delete",
+    "project:manage_settings",
+    "project:add_member",
+    "project:view_members",
+    "project:remove_member",
+    "project:change_role",
+    "project:access_workflows",
+    // owners do NOT get "project:leave" — they must delete the project
+  ]),
+  member: new Set<ProjectAction>([
+    "project:view",
+    "project:view_members",
+    "project:access_workflows",
+    "project:leave",
+  ]),
+  // legacy role — identical permissions to member, kept for backwards compat
+  project_user: new Set<ProjectAction>([
+    "project:view",
+    "project:view_members",
+    "project:access_workflows",
+    "project:leave",
+  ]),
+  // admin: elevated member — can manage project settings and members, cannot delete
+  // Note: admin manages members directly via add_member/remove_member/change_role.
+  // Use canModifyMember() for the second-layer role-level constraints on
+  // remove_member and change_role.
+  admin: new Set<ProjectAction>([
+    "project:view",
+    "project:manage_settings",
+    "project:add_member",
+    "project:view_members",
+    "project:remove_member",
+    "project:change_role",
+    "project:access_workflows",
+    "project:leave",
+  ]),
+};
 
 // ---------------------------------------------------------------------------
 // Core check — single DB lookup, indexed on (projectId, userId)
@@ -85,7 +90,7 @@ const ROLE_PERMISSIONS: Record<ProjectMemberRole, ReadonlySet<ProjectAction>> =
 export async function canUserPerform(
   userId: string,
   projectId: string,
-  action: ProjectAction
+  action: ProjectAction,
 ): Promise<boolean> {
   if (!userId || !projectId) return false;
   const membership = await prisma.projectMembership.findUnique({
@@ -102,7 +107,7 @@ export async function canUserPerform(
  */
 export async function getProjectRole(
   userId: string,
-  projectId: string
+  projectId: string,
 ): Promise<ProjectMemberRole | null> {
   if (!userId || !projectId) return null;
   const membership = await prisma.projectMembership.findUnique({
@@ -112,14 +117,13 @@ export async function getProjectRole(
   return membership?.role ?? null;
 }
 
-
 /**
  * Returns true if the user has any membership in the project (any role).
  * Faster than canUserPerform when you only need an existence check.
  */
 export async function isProjectMember(
   userId: string,
-  projectId: string
+  projectId: string,
 ): Promise<boolean> {
   if (!userId || !projectId) return false;
   const membership = await prisma.projectMembership.findUnique({

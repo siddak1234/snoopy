@@ -11,7 +11,8 @@ const NAME_MAX = 80;
 // Update organization name
 // ---------------------------------------------------------------------------
 
-export type UpdateWorkspaceNameResult = { ok: true } | { ok: false; error: string };
+export type UpdateWorkspaceNameResult =
+  { ok: true } | { ok: false; error: string };
 
 /**
  * Update the display name of an organization workspace.
@@ -19,14 +20,17 @@ export type UpdateWorkspaceNameResult = { ok: true } | { ok: false; error: strin
  */
 export async function updateWorkspaceNameAction(
   workspaceId: string,
-  newName: string
+  newName: string,
 ): Promise<UpdateWorkspaceNameResult> {
   const session = await getAppSession();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
 
   const trimmed = newName.trim();
   if (trimmed.length < NAME_MIN) {
-    return { ok: false, error: `Name must be at least ${NAME_MIN} characters.` };
+    return {
+      ok: false,
+      error: `Name must be at least ${NAME_MIN} characters.`,
+    };
   }
   if (trimmed.length > NAME_MAX) {
     return { ok: false, error: `Name must be at most ${NAME_MAX} characters.` };
@@ -37,7 +41,10 @@ export async function updateWorkspaceNameAction(
     select: { role: true },
   });
   if (!membership || membership.role !== "OWNER") {
-    return { ok: false, error: "Only the organization owner can update the name." };
+    return {
+      ok: false,
+      error: "Only the organization owner can update the name.",
+    };
   }
 
   try {
@@ -58,8 +65,7 @@ export async function updateWorkspaceNameAction(
 // ---------------------------------------------------------------------------
 
 export type RemoveWorkspaceMemberResult =
-  | { ok: true }
-  | { ok: false; error: string; ownsProjects?: true };
+  { ok: true } | { ok: false; error: string; ownsProjects?: true };
 
 /**
  * Remove a MEMBER from an organization workspace.
@@ -71,14 +77,17 @@ export type RemoveWorkspaceMemberResult =
  */
 export async function removeWorkspaceMemberAction(
   workspaceId: string,
-  targetUserId: string
+  targetUserId: string,
 ): Promise<RemoveWorkspaceMemberResult> {
   const session = await getAppSession();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
 
   const actorId = session.user.id;
   if (actorId === targetUserId) {
-    return { ok: false, error: "You cannot remove yourself from the organization." };
+    return {
+      ok: false,
+      error: "You cannot remove yourself from the organization.",
+    };
   }
 
   // Verify actor is OWNER
@@ -87,7 +96,10 @@ export async function removeWorkspaceMemberAction(
     select: { role: true },
   });
   if (!actorMembership || actorMembership.role !== "OWNER") {
-    return { ok: false, error: "Only the organization owner can remove members." };
+    return {
+      ok: false,
+      error: "Only the organization owner can remove members.",
+    };
   }
 
   // Verify target is an existing MEMBER (not OWNER)
@@ -96,7 +108,10 @@ export async function removeWorkspaceMemberAction(
     select: { role: true },
   });
   if (!targetMembership) {
-    return { ok: false, error: "That user is not a member of this organization." };
+    return {
+      ok: false,
+      error: "That user is not a member of this organization.",
+    };
   }
   if (targetMembership.role === "OWNER") {
     return { ok: false, error: "The organization owner cannot be removed." };

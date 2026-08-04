@@ -56,15 +56,13 @@ export function ProjectMemberList({
 
   function handleRoleChanged(userId: string, newRole: ProjectMemberRole) {
     setMembers((prev) =>
-      prev.map((m) => (m.userId === userId ? { ...m, role: newRole } : m))
+      prev.map((m) => (m.userId === userId ? { ...m, role: newRole } : m)),
     );
     router.refresh();
   }
 
   if (members.length === 0) {
-    return (
-      <p className="mt-3 text-sm text-[var(--muted)]">No members yet.</p>
-    );
+    return <p className="mt-3 text-sm text-[var(--muted)]">No members yet.</p>;
   }
 
   return (
@@ -116,9 +114,7 @@ function MemberRowItem({
   // Can the viewer manage this member's role or remove them?
   // (evaluated client-side using pure RBAC function)
   const canManage =
-    !isOwnerRow &&
-    !isOwnRow &&
-    canModifyMember(viewerRole, m.role, "remove"); // remove and change_role share the same condition
+    !isOwnerRow && !isOwnRow && canModifyMember(viewerRole, m.role, "remove"); // remove and change_role share the same condition
 
   // Role dropdown options available to the viewer for this row
   const showRoleDropdown =
@@ -130,11 +126,7 @@ function MemberRowItem({
 
   // Display label for the role badge
   const roleLabel =
-    m.role === "owner"
-      ? "Owner"
-      : m.role === "admin"
-        ? "Admin"
-        : "Member";
+    m.role === "owner" ? "Owner" : m.role === "admin" ? "Admin" : "Member";
 
   async function handleRoleChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const newRole = e.target.value as ProjectMemberRole;
@@ -164,7 +156,8 @@ function MemberRowItem({
   }
 
   async function handleLeave() {
-    if (!confirm("Leave this project? You will lose access immediately.")) return;
+    if (!confirm("Leave this project? You will lose access immediately."))
+      return;
     setBusy(true);
     setError(null);
     const result = await leaveProjectAction(projectId);
@@ -193,9 +186,7 @@ function MemberRowItem({
         <p className="text-xs text-[var(--muted)]">
           Joined {formatDateMediumUTC(m.createdAt)}
         </p>
-        {error ? (
-          <FormError message={error} className="text-xs" />
-        ) : null}
+        {error ? <FormError message={error} className="text-xs" /> : null}
       </div>
 
       {/* Role: badge for owner, dropdown for manageable rows, text for others */}
@@ -208,14 +199,14 @@ function MemberRowItem({
           value={m.role === "project_user" ? "member" : m.role}
           onChange={handleRoleChange}
           disabled={busy}
-          className="shrink-0 rounded-lg border border-[var(--ring)] bg-[var(--card)] px-2 py-1 text-xs text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60"
+          className="shrink-0 rounded-lg border border-[var(--ring)] bg-[var(--card)] px-2 py-1 text-xs text-[var(--text)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none disabled:opacity-60"
           aria-label={`Role for ${m.name || m.email}`}
         >
           <option value="member">Member</option>
           <option value="admin">Admin</option>
         </select>
       ) : (
-        <span className="shrink-0 rounded-full bg-[var(--chip-bg)] px-2.5 py-0.5 text-xs font-medium capitalize text-[var(--chip-text)]">
+        <span className="shrink-0 rounded-full bg-[var(--chip-bg)] px-2.5 py-0.5 text-xs font-medium text-[var(--chip-text)] capitalize">
           {roleLabel}
         </span>
       )}
@@ -226,7 +217,7 @@ function MemberRowItem({
           type="button"
           onClick={handleLeave}
           disabled={busy}
-          className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-[var(--muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+          className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-[var(--muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none disabled:opacity-60"
         >
           {busy ? "Leaving…" : "Leave"}
         </button>

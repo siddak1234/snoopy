@@ -101,39 +101,3 @@ export function definitionToReactFlow(def: WorkflowDefinition): {
 
   return { nodes, edges };
 }
-
-// ─── CanvasState → React Flow (for restoring drafts from localStorage)
-
-export function canvasStateToReactFlow(state: CanvasState): {
-  nodes: Node[];
-  edges: Edge[];
-} {
-  const nodes: Node[] = [];
-
-  for (const n of state.nodes) {
-    nodes.push({
-      id: n.id,
-      type: n.type === "workflow" ? "workflow" : "workflow",
-      position: { x: n.x, y: n.y },
-      data: ((n as Record<string, unknown>).data as Record<string, unknown> | undefined) ?? { label: n.type, blockType: n.type } as Record<string, unknown>,
-    });
-  }
-
-  for (const note of state.notes ?? []) {
-    nodes.push({
-      id: note.id,
-      type: "note",
-      position: { x: note.x, y: note.y },
-      data: { text: note.text },
-    });
-  }
-
-  const edges: Edge[] = (state.edges ?? []).map((e) => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    type: e.type ?? "deletable",
-  }));
-
-  return { nodes, edges };
-}

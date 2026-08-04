@@ -5,7 +5,10 @@
 
 /** Normalise a user-typed invite code: uppercase, strip spaces/hyphens. */
 export function normalizeInviteCode(input: string): string {
-  return input.trim().toUpperCase().replace(/[\s\-]/g, "");
+  return input
+    .trim()
+    .toUpperCase()
+    .replace(/[\s\-]/g, "");
 }
 
 /**

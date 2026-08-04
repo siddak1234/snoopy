@@ -58,9 +58,7 @@ export function ResumeViewerPlaceholder({
           <line x1="16" y1="17" x2="8" y2="17" />
           <line x1="10" y1="9" x2="8" y2="9" />
         </svg>
-        <p className="text-sm font-medium text-[var(--text)]">
-          Resume preview
-        </p>
+        <p className="text-sm font-medium text-[var(--text)]">Resume preview</p>
         <p className="max-w-sm text-xs text-[var(--muted)]">
           {fileName
             ? `“${fileName}” will render here once a document store is connected.`

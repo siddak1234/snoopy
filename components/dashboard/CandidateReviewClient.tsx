@@ -3,9 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { DecisionPill, EmptyMessage } from "@/components/dashboard/DashboardKit";
+import {
+  DecisionPill,
+  EmptyMessage,
+} from "@/components/dashboard/DashboardKit";
 import { initials, type Candidate } from "@/lib/resume-candidates";
-import { mapResumeRow, type ResumeReviewRow } from "@/lib/resume-candidates-data";
+import {
+  mapResumeRow,
+  type ResumeReviewRow,
+} from "@/lib/resume-candidates-data";
 
 const integerFmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
@@ -56,7 +62,9 @@ export function CandidateReviewClient({
   }, [supabase, projectId, role, department]);
 
   if (state.status === "loading") {
-    return <p className="text-sm text-[var(--muted)]">Loading flagged candidates…</p>;
+    return (
+      <p className="text-sm text-[var(--muted)]">Loading flagged candidates…</p>
+    );
   }
   if (state.status === "error") {
     return (
@@ -66,7 +74,9 @@ export function CandidateReviewClient({
     );
   }
   if (state.candidates.length === 0) {
-    return <EmptyMessage text="No candidates need review for this selection." />;
+    return (
+      <EmptyMessage text="No candidates need review for this selection." />
+    );
   }
 
   return (
@@ -106,7 +116,7 @@ export function CandidateReviewClient({
                 </div>
                 <div className="flex shrink-0 items-center gap-2.5">
                   <DecisionPill decision={c.decision} />
-                  <span className="text-sm font-semibold tabular-nums text-[var(--text)]">
+                  <span className="text-sm font-semibold text-[var(--text)] tabular-nums">
                     {c.pending ? "—" : integerFmt.format(c.fitScore)}
                   </span>
                 </div>

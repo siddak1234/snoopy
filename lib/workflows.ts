@@ -76,10 +76,7 @@ export async function getWorkflowsForUser(
 
 // ─── Get single (full definition) ────────────────────────────────────
 
-export async function getWorkflowForUser(
-  workflowId: string,
-  userId: string,
-) {
+export async function getWorkflowForUser(workflowId: string, userId: string) {
   return prisma.workflow.findFirst({
     where: { id: workflowId, userId },
   });

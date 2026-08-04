@@ -1,0 +1,41 @@
+"use client";
+
+import type { ReactNode } from "react";
+import { m, useInView, useReducedMotion } from "framer-motion";
+import { useMemo, useRef } from "react";
+import type { Variants } from "framer-motion";
+import { fadeInUp } from "@/lib/motion";
+
+type RevealOnScrollProps = {
+  children: ReactNode;
+  className?: string;
+  delayMs?: number;
+  variants?: Variants;
+};
+
+/** Fade-up section reveal on first scroll into view (no-op under reduced motion). */
+export function RevealOnScroll({
+  children,
+  className,
+  delayMs = 0,
+  variants,
+}: RevealOnScrollProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { amount: 0.12, once: true });
+  const reduceMotion = useReducedMotion();
+  const resolvedVariants = useMemo(() => {
+    return variants ?? fadeInUp({ y: 12, delay: delayMs / 1000 });
+  }, [variants, delayMs]);
+
+  return (
+    <m.div
+      ref={ref}
+      className={className}
+      variants={reduceMotion ? undefined : resolvedVariants}
+      initial={reduceMotion ? false : "hidden"}
+      animate={reduceMotion ? undefined : isInView ? "show" : "hidden"}
+    >
+      {children}
+    </m.div>
+  );
+}

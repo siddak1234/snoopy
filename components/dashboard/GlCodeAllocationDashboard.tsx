@@ -79,7 +79,10 @@ const GL_CATEGORIES: { key: keyof GLCodeAllocationRow; label: string }[] = [
   { key: "serviceware", label: "Serviceware" },
   { key: "paper_bar_supplies", label: "Paper bar supplies" },
   { key: "cleaning_janitorial_supplies", label: "Cleaning & janitorial" },
-  { key: "non_contracted_repairs_and_maintenance", label: "Non-contracted R&M" },
+  {
+    key: "non_contracted_repairs_and_maintenance",
+    label: "Non-contracted R&M",
+  },
   { key: "maintenance_agreement", label: "Maintenance agreement" },
   { key: "taxes", label: "Taxes" },
   { key: "travel_others", label: "Travel & other" },
@@ -173,12 +176,11 @@ type CategoryBreakdown = {
 };
 
 function getCategoryBreakdown(row: GLCodeAllocationRow): CategoryBreakdown {
-  const allNonZero: CategoryItem[] = GL_CATEGORIES
-    .map((cat) => ({
-      key: String(cat.key),
-      label: cat.label,
-      amount: Number(row[cat.key]) || 0,
-    }))
+  const allNonZero: CategoryItem[] = GL_CATEGORIES.map((cat) => ({
+    key: String(cat.key),
+    label: cat.label,
+    amount: Number(row[cat.key]) || 0,
+  }))
     .filter((b) => b.amount > 0)
     .sort((a, b) => b.amount - a.amount);
 
@@ -446,10 +448,7 @@ export function GlCodeAllocationDashboard({
       : null;
 
   return (
-    <section
-      aria-label="Invoice dashboard"
-      className="flex flex-col gap-5"
-    >
+    <section aria-label="Invoice dashboard" className="flex flex-col gap-5">
       {error ? (
         <p className="rounded-lg border border-[var(--error-border)] bg-[var(--error-bg)] px-3 py-2 text-sm text-[var(--error-text)]">
           {error}
@@ -459,7 +458,7 @@ export function GlCodeAllocationDashboard({
       {/* Dashboard header: title + download */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-[var(--text)]">
+          <h3 className="text-lg font-medium text-[var(--text)]">
             Invoice Dashboard
           </h3>
           <p className="mt-0.5 text-xs text-[var(--muted)]">
@@ -478,7 +477,7 @@ export function GlCodeAllocationDashboard({
               ? "No invoices to download yet"
               : "Download invoice package"
           }
-          className="btn-primary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+          className="btn-primary inline-flex !min-h-0 items-center gap-1.5 !px-4 !py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
         >
           <svg
             width="14"
@@ -566,7 +565,11 @@ export function GlCodeAllocationDashboard({
         />
         <KpiTile
           label="Invoices"
-          value={invoiceCount == null ? null : integerFmt.format(Number(invoiceCount))}
+          value={
+            invoiceCount == null
+              ? null
+              : integerFmt.format(Number(invoiceCount))
+          }
           subtext={
             invoiceCount == null
               ? hasNoData
@@ -654,8 +657,7 @@ export function GlCodeAllocationDashboard({
                 const selected = periods.find(
                   (p) => p.key === effectivePeriodKey,
                 );
-                const viewingPast =
-                  !!selected && selected.period_end < today;
+                const viewingPast = !!selected && selected.period_end < today;
                 if (viewingPast) {
                   const selectedLabel = formatDateRange(
                     selected.period_start,
@@ -668,7 +670,7 @@ export function GlCodeAllocationDashboard({
                 }
                 setUploadOpen(true);
               }}
-              className="btn-primary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm"
+              className="btn-primary inline-flex !min-h-0 items-center gap-1.5 !px-4 !py-1.5 text-sm"
             >
               <svg
                 width="14"
@@ -696,7 +698,7 @@ export function GlCodeAllocationDashboard({
               value={invoiceQuery}
               onChange={(e) => setInvoiceQuery(e.target.value)}
               placeholder="Search vendor or invoice #"
-              className="w-44 rounded-lg border border-[var(--ring)] bg-[var(--bg)] px-3 py-1.5 text-xs text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] sm:w-52"
+              className="w-44 rounded-lg border border-[var(--ring)] bg-[var(--bg)] px-3 py-1.5 text-xs text-[var(--text)] placeholder:text-[var(--muted)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none sm:w-52"
             />
           </div>
         }
@@ -704,7 +706,7 @@ export function GlCodeAllocationDashboard({
         <div className="max-h-[520px] overflow-auto">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-[var(--card)]">
-              <tr className="text-[10px] uppercase tracking-wide text-[var(--muted)]">
+              <tr className="text-[10px] tracking-wide text-[var(--muted)] uppercase">
                 <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">
                   Vendor / Invoice
                 </th>
@@ -730,19 +732,28 @@ export function GlCodeAllocationDashboard({
                 </tr>
               ) : invoices === null ? (
                 <tr>
-                  <td colSpan={4} className="px-3 py-10 text-center text-xs text-[var(--muted)]">
+                  <td
+                    colSpan={4}
+                    className="px-3 py-10 text-center text-xs text-[var(--muted)]"
+                  >
                     Loading invoices…
                   </td>
                 </tr>
               ) : invoices.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-3 py-10 text-center text-xs text-[var(--muted)]">
+                  <td
+                    colSpan={4}
+                    className="px-3 py-10 text-center text-xs text-[var(--muted)]"
+                  >
                     No invoices for this period.
                   </td>
                 </tr>
               ) : filteredInvoices?.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-3 py-10 text-center text-xs text-[var(--muted)]">
+                  <td
+                    colSpan={4}
+                    className="px-3 py-10 text-center text-xs text-[var(--muted)]"
+                  >
                     No invoices match your search.
                   </td>
                 </tr>
@@ -799,9 +810,7 @@ function FlaggedKpiTile({
   onClick: () => void;
 }) {
   if (error) {
-    return (
-      <KpiTile label="Flagged for review" value={null} subtext={error} />
-    );
+    return <KpiTile label="Flagged for review" value={null} subtext={error} />;
   }
   if (disabled || flagged === null) {
     return (
@@ -815,7 +824,8 @@ function FlaggedKpiTile({
   const count = flagged.length;
   const subtext = count === 0 ? "All clear" : summarizeFlagCounts(flagged);
   const over = totalOvercount(flagged);
-  const subtextFull = over > 0 ? `${subtext} · ${currencyFmt.format(over)} over-count` : subtext;
+  const subtextFull =
+    over > 0 ? `${subtext} · ${currencyFmt.format(over)} over-count` : subtext;
 
   return (
     <ClickableKpiTile
@@ -858,7 +868,7 @@ function InvoiceRow({
   return (
     <tr
       onClick={() => router.push(href)}
-      className="cursor-pointer border-b border-[var(--ring)]/50 transition hover:bg-[var(--surface-hover)] last:border-b-0"
+      className="cursor-pointer border-b border-[var(--ring)]/50 transition last:border-b-0 hover:bg-[var(--surface-hover)]"
     >
       <td className="px-3 py-2.5">
         {/* Merchant wraps in a Link so keyboard nav and "open in new tab" work.
@@ -867,7 +877,7 @@ function InvoiceRow({
         <Link
           href={href}
           onClick={(e) => e.stopPropagation()}
-          className="text-sm font-medium text-[var(--text)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] rounded"
+          className="rounded text-sm font-medium text-[var(--text)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
         >
           {merchantLabel}
         </Link>
@@ -881,8 +891,8 @@ function InvoiceRow({
       <td
         className={
           isNegative
-            ? "px-3 py-2.5 text-right text-sm font-medium tabular-nums text-[var(--error-text-muted)]"
-            : "px-3 py-2.5 text-right text-sm font-medium tabular-nums text-[var(--text)]"
+            ? "px-3 py-2.5 text-right text-sm font-medium text-[var(--error-text-muted)] tabular-nums"
+            : "px-3 py-2.5 text-right text-sm font-medium text-[var(--text)] tabular-nums"
         }
       >
         {currencyFmt.format(amount)}
@@ -893,4 +903,3 @@ function InvoiceRow({
     </tr>
   );
 }
-

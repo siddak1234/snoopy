@@ -57,7 +57,7 @@ export function LeaveProjectButton({
         type="button"
         onClick={onOpen}
         disabled={pending}
-        className="shrink-0 rounded-lg px-2 py-1.5 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)] dark:hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+        className="shrink-0 rounded-lg px-2 py-1.5 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none dark:hover:bg-[var(--surface-hover)]"
       >
         {pending ? "Leaving…" : "Leave project"}
       </button>
@@ -76,7 +76,10 @@ export function LeaveProjectButton({
           >
             Leave “{projectName}”?
           </h2>
-          <p id="leave-project-desc" className="mt-1 text-sm text-[var(--muted)]">
+          <p
+            id="leave-project-desc"
+            className="mt-1 text-sm text-[var(--muted)]"
+          >
             You will be removed from this project. To confirm, type{" "}
             <span className="font-semibold text-[var(--text)]">DELETE</span>.
           </p>
@@ -112,7 +115,7 @@ export function LeaveProjectButton({
                 type="button"
                 onClick={onConfirm}
                 disabled={!canConfirm || pending}
-                className="btn-primary inline-flex px-5 disabled:opacity-50 disabled:pointer-events-none"
+                className="btn-primary inline-flex px-5 disabled:pointer-events-none disabled:opacity-50"
               >
                 {pending ? "Leaving…" : "Leave project"}
               </button>
@@ -123,4 +126,3 @@ export function LeaveProjectButton({
     </>
   );
 }
-

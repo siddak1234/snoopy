@@ -73,7 +73,9 @@ export async function recomputeAllocationRow(
   `;
 
   if (rows.length === 0) {
-    throw new Error(`recomputeAllocationRow: allocation row ${allocationRowId} not found`);
+    throw new Error(
+      `recomputeAllocationRow: allocation row ${allocationRowId} not found`,
+    );
   }
   const { project_id, location, period_start, period_end } = rows[0];
 

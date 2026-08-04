@@ -32,7 +32,12 @@ type Props = {
 // Root component
 // ---------------------------------------------------------------------------
 
-export function OrgMemberList({ workspaceId, orgName, viewerUserId, members: initial }: Props) {
+export function OrgMemberList({
+  workspaceId,
+  orgName,
+  viewerUserId,
+  members: initial,
+}: Props) {
   const [members, setMembers] = useState(initial);
   const [confirmTarget, setConfirmTarget] = useState<OrgMember | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -55,11 +60,16 @@ export function OrgMemberList({ workspaceId, orgName, viewerUserId, members: ini
     setRemoving(true);
     setRemoveError(null);
 
-    const result = await removeWorkspaceMemberAction(workspaceId, confirmTarget.userId);
+    const result = await removeWorkspaceMemberAction(
+      workspaceId,
+      confirmTarget.userId,
+    );
     setRemoving(false);
 
     if (result.ok) {
-      setMembers((prev) => prev.filter((m) => m.userId !== confirmTarget.userId));
+      setMembers((prev) =>
+        prev.filter((m) => m.userId !== confirmTarget.userId),
+      );
       setConfirmTarget(null);
       router.refresh();
     } else {
@@ -78,20 +88,21 @@ export function OrgMemberList({ workspaceId, orgName, viewerUserId, members: ini
           const canRemove = !isOwner && !isSelf;
 
           return (
-            <li
-              key={m.id}
-              className="flex flex-wrap items-center gap-3 py-3"
-            >
+            <li key={m.id} className="flex flex-wrap items-center gap-3 py-3">
               {/* Identity */}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-[var(--text)]">
                   {displayName(m)}
                   {isSelf ? (
-                    <span className="ml-1.5 text-xs text-[var(--muted)]">(you)</span>
+                    <span className="ml-1.5 text-xs text-[var(--muted)]">
+                      (you)
+                    </span>
                   ) : null}
                 </p>
                 {m.name ? (
-                  <p className="truncate text-xs text-[var(--muted)]">{m.email}</p>
+                  <p className="truncate text-xs text-[var(--muted)]">
+                    {m.email}
+                  </p>
                 ) : null}
                 <p className="text-xs text-[var(--muted)]">
                   Joined {formatDateMediumUTC(m.joinedAt)}
@@ -99,7 +110,7 @@ export function OrgMemberList({ workspaceId, orgName, viewerUserId, members: ini
               </div>
 
               {/* Role badge */}
-              <span className="shrink-0 rounded-full bg-[var(--chip-bg)] px-2.5 py-0.5 text-xs font-medium capitalize text-[var(--chip-text)]">
+              <span className="shrink-0 rounded-full bg-[var(--chip-bg)] px-2.5 py-0.5 text-xs font-medium text-[var(--chip-text)] capitalize">
                 {isOwner ? "Owner" : "Member"}
               </span>
 
@@ -108,7 +119,7 @@ export function OrgMemberList({ workspaceId, orgName, viewerUserId, members: ini
                 <button
                   type="button"
                   onClick={() => openConfirm(m)}
-                  className="shrink-0 text-xs text-[var(--error-text)] underline hover:text-[var(--error-text-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--error-text)]"
+                  className="shrink-0 text-xs text-[var(--error-text)] underline hover:text-[var(--error-text-hover)] focus-visible:ring-2 focus-visible:ring-[var(--error-text)] focus-visible:outline-none"
                 >
                   Remove
                 </button>
@@ -134,9 +145,12 @@ export function OrgMemberList({ workspaceId, orgName, viewerUserId, members: ini
             Remove {displayName(confirmTarget)}?
           </h2>
           <p id="org-remove-desc" className="mt-2 text-sm text-[var(--muted)]">
-            <strong className="text-[var(--text)]">{displayName(confirmTarget)}</strong> will
-            be removed from <strong className="text-[var(--text)]">{orgName}</strong> and
-            from all projects in this organization. This cannot be undone.
+            <strong className="text-[var(--text)]">
+              {displayName(confirmTarget)}
+            </strong>{" "}
+            will be removed from{" "}
+            <strong className="text-[var(--text)]">{orgName}</strong> and from
+            all projects in this organization. This cannot be undone.
           </p>
 
           <FormError message={removeError} className="mt-3" />

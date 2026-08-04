@@ -20,8 +20,7 @@ import { revalidatePath } from "next/cache";
 // roll back. Both call revalidatePath on completion so the dashboard refreshes.
 
 type ActionResult<T = unknown> =
-  | { ok: true; data: T }
-  | { ok: false; error: string };
+  { ok: true; data: T } | { ok: false; error: string };
 
 // ---------------------------------------------------------------------------
 // Delete one copy of a duplicate invoice — line items for `filename` are

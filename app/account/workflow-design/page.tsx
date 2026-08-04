@@ -28,7 +28,7 @@ export default async function AccountWorkflowDesignPage() {
       subheader="Design, save, and manage your automation workflows"
       primaryAction={
         <Link
-          href="/automation-builder"
+          href="/account/builder"
           className="btn-primary inline-flex items-center gap-2 px-5"
         >
           <svg
@@ -47,7 +47,7 @@ export default async function AccountWorkflowDesignPage() {
       }
     >
       <div className="py-5 first:pt-0">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+        <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Saved workflows
         </h2>
 
@@ -74,18 +74,20 @@ export default async function AccountWorkflowDesignPage() {
               workflows will appear here.
             </p>
             <Link
-              href="/automation-builder"
+              href="/account/builder"
               className="btn-primary mt-2 inline-flex items-center gap-2 px-5"
             >
               Open Automation Builder
             </Link>
           </div>
         ) : (
-          <WorkflowCardsClient workflows={workflows.map((w) => ({
-            ...w,
-            createdAt: w.createdAt.toISOString(),
-            updatedAt: w.updatedAt.toISOString(),
-          }))} />
+          <WorkflowCardsClient
+            workflows={workflows.map((w) => ({
+              ...w,
+              createdAt: w.createdAt.toISOString(),
+              updatedAt: w.updatedAt.toISOString(),
+            }))}
+          />
         )}
       </div>
     </SectionCard>

@@ -20,7 +20,7 @@ export type CreateWorkspaceInviteActionResult =
 
 /** Generate a new invite link + code for a workspace (OWNER only). */
 export async function createWorkspaceInviteAction(
-  workspaceId: string
+  workspaceId: string,
 ): Promise<CreateWorkspaceInviteActionResult> {
   const session = await getAppSession();
   if (!session?.user?.id) {
@@ -41,11 +41,12 @@ export async function createWorkspaceInviteAction(
 // Revoke
 // ---------------------------------------------------------------------------
 
-export type RevokeWorkspaceInviteActionResult = { ok: true } | { ok: false; error: string };
+export type RevokeWorkspaceInviteActionResult =
+  { ok: true } | { ok: false; error: string };
 
 /** Revoke a pending workspace invite (OWNER only). */
 export async function revokeWorkspaceInviteAction(
-  inviteId: string
+  inviteId: string,
 ): Promise<RevokeWorkspaceInviteActionResult> {
   const session = await getAppSession();
   if (!session?.user?.id) {
@@ -55,7 +56,10 @@ export async function revokeWorkspaceInviteAction(
     return { ok: false, error: "Invite ID is required." };
   }
   try {
-    const result = await revokeWorkspaceInvite(inviteId.trim(), session.user.id);
+    const result = await revokeWorkspaceInvite(
+      inviteId.trim(),
+      session.user.id,
+    );
     if (result.ok) {
       revalidatePath("/account");
       revalidatePath("/account/organization");
@@ -72,8 +76,7 @@ export async function revokeWorkspaceInviteAction(
 // ---------------------------------------------------------------------------
 
 export type AcceptWorkspaceInviteActionResult =
-  | { ok: true; workspaceId: string }
-  | { ok: false; error: string };
+  { ok: true; workspaceId: string } | { ok: false; error: string };
 
 /**
  * Accept a workspace invite by token + code. Adds the current user as a MEMBER.
@@ -83,7 +86,7 @@ export type AcceptWorkspaceInviteActionResult =
  */
 export async function acceptWorkspaceInviteAction(
   token: string,
-  code: string
+  code: string,
 ): Promise<AcceptWorkspaceInviteActionResult> {
   let userId: string;
   try {
@@ -108,7 +111,7 @@ export async function acceptWorkspaceInviteAction(
     const result = await validateAndAcceptWorkspaceInvite(
       token.trim(),
       code.trim(),
-      userId
+      userId,
     );
     if (result.ok) {
       revalidatePath("/account");
