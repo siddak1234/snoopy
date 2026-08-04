@@ -31,7 +31,9 @@ export function ArchivedRolesClient({ projectId }: { projectId: string }) {
     (async () => {
       const { data, error } = await supabase
         .from("job_postings")
-        .select("id, role, role_title, department, jd_filename, archived_at, version")
+        .select(
+          "id, role, role_title, department, jd_filename, archived_at, version",
+        )
         .eq("project_id", projectId)
         .eq("archived", true)
         .order("archived_at", { ascending: false });
@@ -71,7 +73,8 @@ export function ArchivedRolesClient({ projectId }: { projectId: string }) {
     }
   }
 
-  const title = (p: ArchivedPosting) => p.role_title || p.role || "Untitled role";
+  const title = (p: ArchivedPosting) =>
+    p.role_title || p.role || "Untitled role";
 
   return (
     <div className="flex flex-col gap-3">
@@ -98,7 +101,9 @@ export function ArchivedRolesClient({ projectId }: { projectId: string }) {
                   </span>
                   <span className="block text-xs text-[var(--muted)]">
                     {p.department ?? "—"}
-                    {p.archived_at ? ` · archived ${p.archived_at.slice(0, 10)}` : ""}
+                    {p.archived_at
+                      ? ` · archived ${p.archived_at.slice(0, 10)}`
+                      : ""}
                   </span>
                 </span>
                 <span className="text-xs text-[var(--muted)]">Reopen ›</span>
@@ -132,7 +137,9 @@ export function ArchivedRolesClient({ projectId }: { projectId: string }) {
           <dl className="mt-4 space-y-1.5 rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-3 text-sm">
             <div className="flex justify-between gap-2">
               <dt className="text-[var(--muted)]">JD file</dt>
-              <dd className="text-[var(--text)]">{selected.jd_filename ?? "—"}</dd>
+              <dd className="text-[var(--text)]">
+                {selected.jd_filename ?? "—"}
+              </dd>
             </div>
             <div className="flex justify-between gap-2">
               <dt className="text-[var(--muted)]">Version</dt>

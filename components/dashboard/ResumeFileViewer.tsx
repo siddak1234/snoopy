@@ -56,13 +56,15 @@ export function ResumeFileViewer({
         <div className="relative">
           {!loaded ? (
             <div className="absolute inset-0 z-10 flex animate-pulse items-center justify-center rounded-lg border border-[var(--ring)]/50 bg-[var(--surface-strong)]">
-              <span className="text-xs text-[var(--muted)]">Loading resume…</span>
+              <span className="text-xs text-[var(--muted)]">
+                Loading resume…
+              </span>
             </div>
           ) : null}
           <iframe
             src={url}
             title="Resume PDF"
-            className="w-full min-h-[700px] h-[80vh] rounded-lg border border-[var(--ring)]/50"
+            className="h-[80vh] min-h-[700px] w-full rounded-lg border border-[var(--ring)]/50"
             onLoad={() => setLoaded(true)}
             onError={() => setErrored(true)}
           />

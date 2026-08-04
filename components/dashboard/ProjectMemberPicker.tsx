@@ -26,7 +26,10 @@ type Props = {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ProjectMemberPicker({ projectId, availableMembers: initial }: Props) {
+export function ProjectMemberPicker({
+  projectId,
+  availableMembers: initial,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [available, setAvailable] = useState<AvailableMember[]>(initial);
   // role selection per userId, default "member"
@@ -107,7 +110,10 @@ export function ProjectMemberPicker({ projectId, availableMembers: initial }: Pr
                       </p>
                     ) : null}
                     {errors[m.userId] ? (
-                      <FormError message={errors[m.userId]} className="text-xs" />
+                      <FormError
+                        message={errors[m.userId]}
+                        className="text-xs"
+                      />
                     ) : null}
                   </div>
 
@@ -121,7 +127,7 @@ export function ProjectMemberPicker({ projectId, availableMembers: initial }: Pr
                       }))
                     }
                     disabled={!!addingUserId}
-                    className="shrink-0 rounded-lg border border-[var(--ring)] bg-[var(--card)] px-2 py-1 text-xs text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60"
+                    className="shrink-0 rounded-lg border border-[var(--ring)] bg-[var(--card)] px-2 py-1 text-xs text-[var(--text)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none disabled:opacity-60"
                     aria-label="Role"
                   >
                     <option value="member">Member</option>

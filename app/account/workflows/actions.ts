@@ -23,8 +23,7 @@ const NAME_MAX = 100;
 // ─── Create ───────────────────────────────────────────────────────────
 
 export type CreateWorkflowResult =
-  | { ok: true; workflowId: string }
-  | { ok: false; error: string };
+  { ok: true; workflowId: string } | { ok: false; error: string };
 
 export async function createWorkflowAction(
   name: string,
@@ -39,7 +38,10 @@ export async function createWorkflowAction(
 
   const trimmed = name.trim();
   if (trimmed.length < NAME_MIN)
-    return { ok: false, error: `Name must be at least ${NAME_MIN} characters.` };
+    return {
+      ok: false,
+      error: `Name must be at least ${NAME_MIN} characters.`,
+    };
   if (trimmed.length > NAME_MAX)
     return { ok: false, error: `Name must be at most ${NAME_MAX} characters.` };
   if (await workflowNameExistsForUserDb(session.user.id, trimmed)) {
@@ -80,8 +82,7 @@ export type WorkflowListItem = {
 };
 
 export type ListWorkflowsResult =
-  | { ok: true; workflows: WorkflowListItem[] }
-  | { ok: false; error: string };
+  { ok: true; workflows: WorkflowListItem[] } | { ok: false; error: string };
 
 export async function listWorkflowsAction(): Promise<ListWorkflowsResult> {
   const session = await getAppSession();
@@ -116,8 +117,7 @@ export type WorkflowDetail = {
 };
 
 export type GetWorkflowResult =
-  | { ok: true; workflow: WorkflowDetail }
-  | { ok: false; error: string };
+  { ok: true; workflow: WorkflowDetail } | { ok: false; error: string };
 
 export async function getWorkflowAction(
   workflowId: string,
@@ -188,9 +188,7 @@ export async function saveWorkflowAction(
 
 // ─── Update metadata ──────────────────────────────────────────────────
 
-export type UpdateWorkflowResult =
-  | { ok: true }
-  | { ok: false; error: string };
+export type UpdateWorkflowResult = { ok: true } | { ok: false; error: string };
 
 export async function updateWorkflowMetadataAction(
   workflowId: string,
@@ -207,9 +205,15 @@ export async function updateWorkflowMetadataAction(
   if (data.name !== undefined) {
     const trimmed = data.name.trim();
     if (trimmed.length < NAME_MIN)
-      return { ok: false, error: `Name must be at least ${NAME_MIN} characters.` };
+      return {
+        ok: false,
+        error: `Name must be at least ${NAME_MIN} characters.`,
+      };
     if (trimmed.length > NAME_MAX)
-      return { ok: false, error: `Name must be at most ${NAME_MAX} characters.` };
+      return {
+        ok: false,
+        error: `Name must be at most ${NAME_MAX} characters.`,
+      };
     if (
       await workflowNameExistsForUserDb(session.user.id, trimmed, {
         excludeWorkflowId: workflowId,
@@ -217,7 +221,8 @@ export async function updateWorkflowMetadataAction(
     ) {
       return {
         ok: false,
-        error: "Workflow name is already taken. Please choose a different name.",
+        error:
+          "Workflow name is already taken. Please choose a different name.",
       };
     }
   }

@@ -28,7 +28,9 @@ export function AuthHydrationGate({
   useEffect(() => {
     if (!didTimeout) return;
     if (status === "unauthenticated") {
-      window.location.replace(`/login?callbackUrl=${encodeURIComponent(destination)}`);
+      window.location.replace(
+        `/login?callbackUrl=${encodeURIComponent(destination)}`,
+      );
     }
   }, [didTimeout, status, destination]);
 
@@ -38,4 +40,3 @@ export function AuthHydrationGate({
     </div>
   );
 }
-

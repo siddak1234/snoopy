@@ -18,7 +18,9 @@ export function SetupOrgForm({ domain }: { domain: string }) {
     e.preventDefault();
     setError(null);
     setPending("create");
-    const result = await createOrgWorkspaceAction(new FormData(e.currentTarget));
+    const result = await createOrgWorkspaceAction(
+      new FormData(e.currentTarget),
+    );
     setPending(null);
     if (result.ok) {
       router.push("/account");
@@ -49,7 +51,9 @@ export function SetupOrgForm({ domain }: { domain: string }) {
           Domain
         </label>
         <div className="mt-1.5 flex items-center gap-2 rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5">
-          <span className="font-mono text-sm text-[var(--muted)]">{domain}</span>
+          <span className="font-mono text-sm text-[var(--muted)]">
+            {domain}
+          </span>
           <span className="ml-auto shrink-0 rounded-full bg-[var(--chip-bg)] px-2 py-0.5 text-xs font-medium text-[var(--chip-text)]">
             from your email
           </span>
@@ -89,7 +93,9 @@ export function SetupOrgForm({ domain }: { domain: string }) {
         disabled={busy}
         className="inline-flex w-full justify-center text-sm text-[var(--muted)] underline underline-offset-2 hover:text-[var(--text)] disabled:opacity-60"
       >
-        {pending === "skip" ? "Setting up…" : "Skip — create a personal account instead"}
+        {pending === "skip"
+          ? "Setting up…"
+          : "Skip — create a personal account instead"}
       </button>
     </form>
   );

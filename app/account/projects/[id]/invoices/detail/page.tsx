@@ -43,7 +43,11 @@ export default async function InvoiceDetailPage({
       }
     >
       <div className="py-5 first:pt-0">
-        <InvoiceDetailClient projectId={project.id} filename={filename} loungeCode={loungeCode ?? null} />
+        <InvoiceDetailClient
+          projectId={project.id}
+          filename={filename}
+          loungeCode={loungeCode ?? null}
+        />
       </div>
     </SectionCard>
   );

@@ -20,7 +20,7 @@ export function DeleteProjectButton({
   function handleClick() {
     if (
       !confirm(
-        `Delete "${projectName}"? You can restore it later by creating a project of the same type — your data will reattach.`
+        `Delete "${projectName}"? You can restore it later by creating a project of the same type — your data will reattach.`,
       )
     )
       return;
@@ -44,7 +44,7 @@ export function DeleteProjectButton({
       onClick={handleClick}
       disabled={pending}
       aria-label={`Delete project ${projectName}`}
-      className="shrink-0 rounded-lg px-2 py-1.5 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--error-bg)] hover:text-[var(--error-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-50"
+      className="shrink-0 rounded-lg px-2 py-1.5 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--error-bg)] hover:text-[var(--error-text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none disabled:opacity-50"
     >
       {pending ? "Deleting…" : "Delete"}
     </button>

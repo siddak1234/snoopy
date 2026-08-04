@@ -4,14 +4,6 @@
 // The detection RPC returns one row per flagged item with `reason` discriminating
 // the case and `details` carrying case-specific data as JSON.
 
-// Default thresholds — exposed here so they can be tuned without touching SQL.
-// If we move to per-project config later, replace these constants with lookups.
-export const DEFAULT_LOW_CONFIDENCE_THRESHOLD = 70;
-export const DEFAULT_HIGH_VALUE_THRESHOLD = 5000;
-
-// Tolerance (dollars) for running-total drift detection. Below this, treat as noise.
-export const DRIFT_TOLERANCE = 0.01;
-
 // ---------------------------------------------------------------------------
 // Reason discriminator + per-reason details payload
 // ---------------------------------------------------------------------------
@@ -70,11 +62,20 @@ export type HighValueDetails = {
 // Discriminated union — each row from the RPC pairs `reason` with a specific
 // `details` shape.
 export type FlaggedItem =
-  | (FlaggedBase & { reason: "duplicate_invoice"; details: DuplicateInvoiceDetails })
-  | (FlaggedBase & { reason: "running_total_drift"; details: RunningTotalDriftDetails })
+  | (FlaggedBase & {
+      reason: "duplicate_invoice";
+      details: DuplicateInvoiceDetails;
+    })
+  | (FlaggedBase & {
+      reason: "running_total_drift";
+      details: RunningTotalDriftDetails;
+    })
   | (FlaggedBase & { reason: "low_confidence"; details: LowConfidenceDetails })
   | (FlaggedBase & { reason: "orphan_refund"; details: OrphanRefundDetails })
-  | (FlaggedBase & { reason: "date_outside_period"; details: DateOutsidePeriodDetails })
+  | (FlaggedBase & {
+      reason: "date_outside_period";
+      details: DateOutsidePeriodDetails;
+    })
   | (FlaggedBase & { reason: "high_value"; details: HighValueDetails });
 
 type FlaggedBase = {

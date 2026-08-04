@@ -22,7 +22,7 @@ export function canModifyMember(
   actorRole: ProjectMemberRole,
   targetRole: ProjectMemberRole | null,
   action: MemberModifyAction,
-  newRole?: ProjectMemberRole
+  newRole?: ProjectMemberRole,
 ): boolean {
   // Owner can do anything to anyone
   if (actorRole === "owner") return true;
@@ -42,7 +42,8 @@ export function canModifyMember(
       case "change_role":
         // Admin can only promote member/project_user → admin
         // Cannot demote admins, cannot touch owner (already handled above)
-        if (targetRole !== "member" && targetRole !== "project_user") return false;
+        if (targetRole !== "member" && targetRole !== "project_user")
+          return false;
         return newRole === "admin";
     }
   }

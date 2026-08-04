@@ -26,7 +26,10 @@ export async function POST(req: Request) {
   try {
     form = await req.formData();
   } catch {
-    return NextResponse.json({ error: "Invalid form payload" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid form payload" },
+      { status: 400 },
+    );
   }
 
   const file = form.get("file");
@@ -44,10 +47,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Role is required" }, { status: 400 });
   }
   if (!department) {
-    return NextResponse.json({ error: "Department is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Department is required" },
+      { status: 400 },
+    );
   }
   if (file.size > MAX_FILE_BYTES) {
-    return NextResponse.json({ error: "File must be under 4 MB" }, { status: 400 });
+    return NextResponse.json(
+      { error: "File must be under 4 MB" },
+      { status: 400 },
+    );
   }
   const isPdf =
     file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");

@@ -19,7 +19,7 @@ export async function GET() {
   } catch {
     return NextResponse.json(
       { status: "error", database: "disconnected" },
-      { status: 503 }
+      { status: 503 },
     );
   }
 }

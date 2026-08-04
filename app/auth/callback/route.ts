@@ -25,12 +25,12 @@ function isLinkAlreadyExistsError(message: string | null | undefined): boolean {
   const msg = (message ?? "").toLowerCase();
   return (
     msg.length > 0 &&
-    (msg.includes("already") &&
+    ((msg.includes("already") &&
       (msg.includes("linked") ||
         msg.includes("exists") ||
         msg.includes("registered") ||
         msg.includes("user") ||
-        msg.includes("account")) ||
+        msg.includes("account"))) ||
       msg.includes("linked to another") ||
       msg.includes("registered to another"))
   );
@@ -40,7 +40,9 @@ function isLinkAlreadyExistsError(message: string | null | undefined): boolean {
  * True if the error indicates the auth code was already exchanged (e.g. two tabs
  * hit the callback; the second gets "code already used" / "invalid grant").
  */
-function isCodeAlreadyUsedOrInvalidGrant(message: string | null | undefined): boolean {
+function isCodeAlreadyUsedOrInvalidGrant(
+  message: string | null | undefined,
+): boolean {
   const msg = (message ?? "").toLowerCase();
   return (
     msg.length > 0 &&
@@ -119,9 +121,11 @@ export async function GET(request: Request) {
   const callbackCookieNames = cookieStore.getAll().map((c) => c.name);
   const hasVerifier = callbackCookieNames.some((n) => n.includes("verifier"));
   const hasSupabase = callbackCookieNames.some((n) =>
-    n.toLowerCase().includes("supabase")
+    n.toLowerCase().includes("supabase"),
   );
-  const hasAuthToken = callbackCookieNames.some((n) => n.includes("auth-token"));
+  const hasAuthToken = callbackCookieNames.some((n) =>
+    n.includes("auth-token"),
+  );
 
   const debug = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
   if (debug) {
@@ -140,8 +144,7 @@ export async function GET(request: Request) {
 
   if (errorParam) {
     const isLinkFlow =
-      next === "/account/settings" ||
-      searchParams.get("flow") === "link";
+      next === "/account/settings" || searchParams.get("flow") === "link";
     if (
       isLinkFlow &&
       (isLinkAlreadyExistsError(errorDescription) ||
@@ -153,7 +156,8 @@ export async function GET(request: Request) {
     }
     const login = new URL("/login", requestUrl.origin);
     login.searchParams.set("error", "auth_callback");
-    if (errorDescription) login.searchParams.set("error_description", errorDescription);
+    if (errorDescription)
+      login.searchParams.set("error_description", errorDescription);
     return NextResponse.redirect(login.toString());
   }
 
@@ -162,7 +166,7 @@ export async function GET(request: Request) {
 
     const cookieNames = cookieStore.getAll().map((c) => c.name);
     const hasVerifierCookie = cookieNames.some(
-      (n) => n.includes("verifier") || n.includes("auth-token")
+      (n) => n.includes("verifier") || n.includes("auth-token"),
     );
     if (debug) {
       console.log("AUTH_CALLBACK_COOKIES", {
@@ -175,7 +179,9 @@ export async function GET(request: Request) {
     // Collect cookies during exchange so we can apply them to whichever final
     // response we build (destination may change after onboarding classification).
     // Cookie options (httpOnly, secure, sameSite, etc.) are preserved this way.
-    type PendingCookie = Parameters<(typeof NextResponse.prototype.cookies)["set"]>;
+    type PendingCookie = Parameters<
+      (typeof NextResponse.prototype.cookies)["set"]
+    >;
     const pendingCookies: PendingCookie[] = [];
 
     // Server client must read request cookies so the PKCE code verifier (set by
@@ -187,7 +193,7 @@ export async function GET(request: Request) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) =>
-            pendingCookies.push([name, value, options ?? {}])
+            pendingCookies.push([name, value, options ?? {}]),
           );
         },
       },
@@ -215,13 +221,24 @@ export async function GET(request: Request) {
       // Returning users (existing Membership row) always go to defaultDestinationUrl.
       let finalDestinationUrl = defaultDestinationUrl;
       try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
         if (authUser) {
-          const resolvedPath = await resolvePostSigninDestination(authUser, next);
-          finalDestinationUrl = new URL(resolvedPath, requestUrl.origin).toString();
+          const resolvedPath = await resolvePostSigninDestination(
+            authUser,
+            next,
+          );
+          finalDestinationUrl = new URL(
+            resolvedPath,
+            requestUrl.origin,
+          ).toString();
         }
       } catch (onboardingErr) {
-        console.error("AUTH_CALLBACK_ONBOARDING_RESOLVE", (onboardingErr as Error).message);
+        console.error(
+          "AUTH_CALLBACK_ONBOARDING_RESOLVE",
+          (onboardingErr as Error).message,
+        );
         // Fall through — use defaultDestinationUrl so auth is never blocked
       }
       return buildSuccessResponse(finalDestinationUrl);
@@ -229,7 +246,7 @@ export async function GET(request: Request) {
 
     const isPkceVerifierMissing =
       /PKCE code verifier not found|code verifier|verifier.*storage/i.test(
-        error.message ?? ""
+        error.message ?? "",
       );
     if (isPkceVerifierMissing) {
       console.error("AUTH_CALLBACK_EXCHANGE_FAIL", {
@@ -264,7 +281,7 @@ export async function GET(request: Request) {
       loginLink.searchParams.set("error", "auth_callback");
       loginLink.searchParams.set(
         "error_description",
-        "This sign-in method is linked to another account. Sign in with your primary method or use account settings to manage linked accounts."
+        "This sign-in method is linked to another account. Sign in with your primary method or use account settings to manage linked accounts.",
       );
       return NextResponse.redirect(loginLink.toString());
     }
@@ -275,7 +292,7 @@ export async function GET(request: Request) {
       loginReused.searchParams.set("error", "auth_callback");
       loginReused.searchParams.set(
         "error_description",
-        "Sign-in was completed in another tab or window. If you need to sign in here, click Continue with Google again."
+        "Sign-in was completed in another tab or window. If you need to sign in here, click Continue with Google again.",
       );
       return NextResponse.redirect(loginReused.toString());
     }
@@ -284,7 +301,9 @@ export async function GET(request: Request) {
     if (isPkceVerifierMissing && !searchParams.get("retry")) {
       const provider = searchParams.get("provider") || "google";
       const retryUrl = `/api/auth/oauth?provider=${encodeURIComponent(provider)}&next=${encodeURIComponent(next)}&retry=1`;
-      return NextResponse.redirect(new URL(retryUrl, requestUrl.origin).toString());
+      return NextResponse.redirect(
+        new URL(retryUrl, requestUrl.origin).toString(),
+      );
     }
 
     const login = new URL("/login", requestUrl.origin);

@@ -54,14 +54,14 @@ export function OrgNameEditor({ workspaceId, initialName }: Props) {
           }}
           disabled={saving}
           maxLength={80}
-          className="w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-60 sm:max-w-xs"
+          className="w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm text-[var(--text)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none disabled:opacity-60 sm:max-w-xs"
         />
         <div className="flex gap-2">
           <button
             type="button"
             onClick={handleSave}
             disabled={saving || !value.trim()}
-            className="btn-primary inline-flex px-4 py-2 text-sm disabled:opacity-50 disabled:pointer-events-none"
+            className="btn-primary inline-flex px-4 py-2 text-sm disabled:pointer-events-none disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save"}
           </button>
@@ -88,7 +88,7 @@ export function OrgNameEditor({ workspaceId, initialName }: Props) {
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="rounded-lg px-2 py-1 text-xs font-medium text-[var(--muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+          className="rounded-lg px-2 py-1 text-xs font-medium text-[var(--muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
         >
           Edit
         </button>

@@ -3,7 +3,9 @@
  * Idempotent: re-fetches first membership after create to handle concurrent logins.
  * Exported for use by lib/tenant (workspace-as-org) and lib/auth-supabase.
  */
-export async function ensureDefaultWorkspaceForUser(userId: string): Promise<string> {
+export async function ensureDefaultWorkspaceForUser(
+  userId: string,
+): Promise<string> {
   const { prisma } = await import("@/lib/db");
 
   const first = await prisma.membership.findFirst({
@@ -19,12 +21,11 @@ export async function ensureDefaultWorkspaceForUser(userId: string): Promise<str
   });
   if (!user) throw new Error("User not found");
 
-  const workspaceName =
-    user.name?.trim()
-      ? `${user.name.trim()}'s Workspace`
-      : user.email?.trim()
-        ? `${user.email.trim()}'s Workspace`
-        : "My Workspace";
+  const workspaceName = user.name?.trim()
+    ? `${user.name.trim()}'s Workspace`
+    : user.email?.trim()
+      ? `${user.email.trim()}'s Workspace`
+      : "My Workspace";
 
   try {
     const workspaceId = await prisma.$transaction(async (tx) => {

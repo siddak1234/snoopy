@@ -44,7 +44,10 @@ export async function POST(req: Request) {
   try {
     form = await req.formData();
   } catch {
-    return NextResponse.json({ error: "Invalid form payload" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid form payload" },
+      { status: 400 },
+    );
   }
 
   const file = form.get("file");
@@ -61,17 +64,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing projectId" }, { status: 400 });
   }
   if (!name) {
-    return NextResponse.json({ error: "Candidate name is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Candidate name is required" },
+      { status: 400 },
+    );
   }
   if (!role) {
     return NextResponse.json({ error: "Role is required" }, { status: 400 });
   }
   if (!department) {
-    return NextResponse.json({ error: "Department is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Department is required" },
+      { status: 400 },
+    );
   }
   // Reject oversized / accidental large PDFs before touching GCS.
   if (file.size > MAX_FILE_BYTES) {
-    return NextResponse.json({ error: "File must be under 4 MB" }, { status: 400 });
+    return NextResponse.json(
+      { error: "File must be under 4 MB" },
+      { status: 400 },
+    );
   }
   const isPdf =
     file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
@@ -106,11 +118,16 @@ export async function POST(req: Request) {
       .maybeSingle();
     posting = (data as PostingRef | null) ?? null;
   } catch (err) {
-    console.warn("CANDIDATE_UPLOAD_POSTING_LOOKUP_FAIL", (err as Error).message);
+    console.warn(
+      "CANDIDATE_UPLOAD_POSTING_LOOKUP_FAIL",
+      (err as Error).message,
+    );
   }
   if (posting?.archived) {
     return NextResponse.json(
-      { error: "This role is archived. Reopen it before uploading candidates." },
+      {
+        error: "This role is archived. Reopen it before uploading candidates.",
+      },
       { status: 409 },
     );
   }

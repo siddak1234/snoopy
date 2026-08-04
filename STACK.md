@@ -34,7 +34,7 @@
 
 - **`/api/health`** — Liveness; no DB.
 - **`/api/ready`** — Readiness; dynamic import of db, `SELECT 1` when `POSTGRES_URL` is set; otherwise 200 + `database: "skipped"`.
-- **`/account`** and **`/dashboard`** — Protected in `middleware.ts` (redirect to `/login` if no Supabase session). Dashboard layout also checks `session?.user?.id` server-side and redirects if missing.
+- **`/account`** (incl. `/account/builder`) and **`/onboarding`** — Protected in `middleware.ts` (redirect to `/login` if no Supabase session). The account layout also checks `session?.user?.id` server-side and redirects if missing. `/dashboard` is a redirect to `/account`.
 
 ---
 

@@ -41,7 +41,7 @@ export type CreateWorkspaceInviteResult =
  */
 export async function createWorkspaceInvite(
   workspaceId: string,
-  ownerId: string
+  ownerId: string,
 ): Promise<CreateWorkspaceInviteResult> {
   const membership = await prisma.membership.findUnique({
     where: { userId_workspaceId: { userId: ownerId, workspaceId } },
@@ -49,10 +49,16 @@ export async function createWorkspaceInvite(
   });
 
   if (!membership || membership.role !== "OWNER") {
-    return { ok: false, error: "Not authorised to create invites for this workspace." };
+    return {
+      ok: false,
+      error: "Not authorised to create invites for this workspace.",
+    };
   }
   if (membership.workspace.type !== "organization") {
-    return { ok: false, error: "Invites are only available for organization workspaces." };
+    return {
+      ok: false,
+      error: "Invites are only available for organization workspaces.",
+    };
   }
 
   const code = generateInviteCode();
@@ -88,39 +94,8 @@ export async function getWorkspaceInviteByToken(token: string) {
   });
 }
 
-/** List pending (not accepted, not revoked, not expired) invites for a workspace. */
-export async function listPendingWorkspaceInvites(workspaceId: string, ownerId: string) {
-  const membership = await prisma.membership.findUnique({
-    where: { userId_workspaceId: { userId: ownerId, workspaceId } },
-    select: { role: true },
-  });
-  if (!membership || membership.role !== "OWNER") return [];
-
-  const now = new Date();
-  return prisma.workspaceInvite.findMany({
-    where: {
-      workspaceId,
-      acceptedAt: null,
-      revokedAt: null,
-      expiresAt: { gt: now },
-    },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      token: true,
-      expiresAt: true,
-      createdAt: true,
-    },
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Accept
-// ---------------------------------------------------------------------------
-
 export type AcceptWorkspaceInviteResult =
-  | { ok: true; workspaceId: string }
-  | { ok: false; error: string };
+  { ok: true; workspaceId: string } | { ok: false; error: string };
 
 /**
  * Validate token + code and add the user to the workspace as a member.
@@ -130,7 +105,7 @@ export type AcceptWorkspaceInviteResult =
 export async function validateAndAcceptWorkspaceInvite(
   token: string,
   rawCode: string,
-  userId: string
+  userId: string,
 ): Promise<AcceptWorkspaceInviteResult> {
   if (!token || !rawCode || !userId) {
     return { ok: false, error: "Invalid request." };
@@ -149,9 +124,12 @@ export async function validateAndAcceptWorkspaceInvite(
   });
 
   if (!invite) return { ok: false, error: "Invite not found." };
-  if (invite.revokedAt) return { ok: false, error: "This invite has been revoked." };
-  if (invite.acceptedAt) return { ok: false, error: "This invite has already been used." };
-  if (invite.expiresAt < new Date()) return { ok: false, error: "This invite has expired." };
+  if (invite.revokedAt)
+    return { ok: false, error: "This invite has been revoked." };
+  if (invite.acceptedAt)
+    return { ok: false, error: "This invite has already been used." };
+  if (invite.expiresAt < new Date())
+    return { ok: false, error: "This invite has expired." };
 
   const normalizedCode = normalizeInviteCode(rawCode);
   const codeMatch = await bcrypt.compare(normalizedCode, invite.codeHash);
@@ -165,7 +143,9 @@ export async function validateAndAcceptWorkspaceInvite(
     });
 
     await tx.membership.upsert({
-      where: { userId_workspaceId: { userId, workspaceId: invite.workspaceId } },
+      where: {
+        userId_workspaceId: { userId, workspaceId: invite.workspaceId },
+      },
       create: { userId, workspaceId: invite.workspaceId, role: "MEMBER" },
       update: {}, // already a member — no-op
     });
@@ -178,14 +158,15 @@ export async function validateAndAcceptWorkspaceInvite(
 // Revoke
 // ---------------------------------------------------------------------------
 
-export type RevokeWorkspaceInviteResult = { ok: true } | { ok: false; error: string };
+export type RevokeWorkspaceInviteResult =
+  { ok: true } | { ok: false; error: string };
 
 /**
  * Soft-revoke a pending invite. Only the workspace OWNER may do this.
  */
 export async function revokeWorkspaceInvite(
   inviteId: string,
-  ownerId: string
+  ownerId: string,
 ): Promise<RevokeWorkspaceInviteResult> {
   const invite = await prisma.workspaceInvite.findUnique({
     where: { id: inviteId },
@@ -193,10 +174,13 @@ export async function revokeWorkspaceInvite(
   });
   if (!invite) return { ok: false, error: "Invite not found." };
   if (invite.revokedAt) return { ok: false, error: "Invite already revoked." };
-  if (invite.acceptedAt) return { ok: false, error: "Invite already accepted." };
+  if (invite.acceptedAt)
+    return { ok: false, error: "Invite already accepted." };
 
   const membership = await prisma.membership.findUnique({
-    where: { userId_workspaceId: { userId: ownerId, workspaceId: invite.workspaceId } },
+    where: {
+      userId_workspaceId: { userId: ownerId, workspaceId: invite.workspaceId },
+    },
     select: { role: true },
   });
   if (!membership || membership.role !== "OWNER") {

@@ -1,9 +1,5 @@
 export type BlockType =
-  | "Trigger"
-  | "AI Agent"
-  | "Data Source"
-  | "Condition"
-  | "Action";
+  "Trigger" | "AI Agent" | "Data Source" | "Condition" | "Action";
 
 export interface WorkflowNodeData {
   label: string;

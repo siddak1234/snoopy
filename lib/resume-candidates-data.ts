@@ -233,7 +233,9 @@ export function mapResumeDetail(row: ResumeReviewRow): CandidateDetail {
   const cand = asRecord(audit?.candidate);
   const comp = asRecord(audit?.compensation_analysis);
 
-  const location = [row.City, row.State, row.Country].filter(Boolean).join(", ");
+  const location = [row.City, row.State, row.Country]
+    .filter(Boolean)
+    .join(", ");
 
   const subScores = (
     [
@@ -244,7 +246,9 @@ export function mapResumeDetail(row: ResumeReviewRow): CandidateDetail {
   ).filter((s): s is { label: string; score: number } => s.score != null);
 
   const links: CandidateLink[] = [
-    row.linkedin_url ? { label: "LinkedIn", url: ensureUrl(row.linkedin_url) } : null,
+    row.linkedin_url
+      ? { label: "LinkedIn", url: ensureUrl(row.linkedin_url) }
+      : null,
     row.github_url ? { label: "GitHub", url: ensureUrl(row.github_url) } : null,
     row.portfolio_or_website_url
       ? { label: "Website", url: ensureUrl(row.portfolio_or_website_url) }
@@ -258,18 +262,23 @@ export function mapResumeDetail(row: ResumeReviewRow): CandidateDetail {
     })),
   ].filter((l): l is CandidateLink => l != null);
 
-  const requiredSkills = toSkillMatches(sk?.required_skills ?? row.required_skills);
+  const requiredSkills = toSkillMatches(
+    sk?.required_skills ?? row.required_skills,
+  );
   const keyConcerns = toStringList(rec?.key_concerns ?? row.key_concerns);
 
-  const relevantYears = asNum(exp?.relevant_years) ?? row.relevant_years ?? undefined;
+  const relevantYears =
+    asNum(exp?.relevant_years) ?? row.relevant_years ?? undefined;
   const totalYears =
-    asNum(exp?.total_years_professional) ?? row.total_years_professional ?? undefined;
+    asNum(exp?.total_years_professional) ??
+    row.total_years_professional ??
+    undefined;
   const yearsForHeader = relevantYears ?? totalYears;
 
   // Compact "flagged for review" reasons shown at the top.
   const flagReasons = [
     ...keyConcerns,
-    ...(asStr(rec?.human_review_reason) ?? row.human_review_reason
+    ...((asStr(rec?.human_review_reason) ?? row.human_review_reason)
       ? [(asStr(rec?.human_review_reason) ?? row.human_review_reason) as string]
       : []),
   ];
@@ -286,24 +295,29 @@ export function mapResumeDetail(row: ResumeReviewRow): CandidateDetail {
     willingToRelocate: asStr(row.relocate),
     earliestStart: row.start_date ? row.start_date.slice(0, 10) : undefined,
     salaryExpectation:
-      row.salary_expectations != null ? String(row.salary_expectations) : undefined,
+      row.salary_expectations != null
+        ? String(row.salary_expectations)
+        : undefined,
     gender: asStr(row.gender),
     hispanic: asStr(row.hispanic),
     ethnicity: asStr(row.ethnicity),
     veteran: asStr(row.veteran),
     disability: asStr(row.disability),
     // Profile
-    yearsExperience: yearsForHeader != null ? Math.round(yearsForHeader) : undefined,
+    yearsExperience:
+      yearsForHeader != null ? Math.round(yearsForHeader) : undefined,
     skills: requiredSkills.map((s) => s.skill),
     // Assessment summary
     summary: asStr(rec?.one_line_summary) ?? row.one_line_summary ?? undefined,
     subScores: subScores.length ? subScores : undefined,
     flagReasons: flagReasons.length ? flagReasons : undefined,
     // Recommendation
-    decisionConfidence: asStr(rec?.confidence) ?? row.recommendation_confidence ?? undefined,
+    decisionConfidence:
+      asStr(rec?.confidence) ?? row.recommendation_confidence ?? undefined,
     recommendedNextStep: asStr(rec?.recommended_next_step),
     requiresHumanReview: Boolean(row.requires_human_review),
-    humanReviewReason: asStr(rec?.human_review_reason) ?? row.human_review_reason ?? undefined,
+    humanReviewReason:
+      asStr(rec?.human_review_reason) ?? row.human_review_reason ?? undefined,
     keyStrengths: toStringList(rec?.key_strengths),
     keyConcerns,
     interviewFocusAreas: toStringList(rec?.interview_focus_areas),
@@ -313,7 +327,9 @@ export function mapResumeDetail(row: ResumeReviewRow): CandidateDetail {
     transferableSkills: toStringList(sk?.transferable_skills),
     missingCriticalSkills: toStringList(sk?.missing_critical_skills),
     requiredCoveragePct:
-      asNum(sk?.required_coverage_pct) ?? row.required_coverage_pct ?? undefined,
+      asNum(sk?.required_coverage_pct) ??
+      row.required_coverage_pct ??
+      undefined,
     preferredCoveragePct: asNum(sk?.preferred_coverage_pct),
     // Experience detail
     totalYears,
@@ -327,7 +343,8 @@ export function mapResumeDetail(row: ResumeReviewRow): CandidateDetail {
     domainRelevanceNotes: asStr(exp?.domain_relevance_notes),
     employmentGaps: toStringList(exp?.employment_gaps),
     // Hard gates
-    overallGateStatus: asStr(gates?.overall_gate_status) ?? row.overall_gate_status ?? undefined,
+    overallGateStatus:
+      asStr(gates?.overall_gate_status) ?? row.overall_gate_status ?? undefined,
     gates: toGates(gates?.gates),
     // Red flags
     redFlags: toRedFlags(audit?.red_flags ?? row.red_flags),

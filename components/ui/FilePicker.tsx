@@ -42,7 +42,9 @@ export function FilePicker({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-[var(--text)]">{label}</label>
+      <label className="block text-sm font-medium text-[var(--text)]">
+        {label}
+      </label>
       <div className="mt-1.5 flex items-center gap-3">
         <button
           type="button"

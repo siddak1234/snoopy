@@ -23,7 +23,7 @@ import { ensureDefaultWorkspaceForUser } from "@/lib/auth";
 
 export async function resolvePostSigninDestination(
   supabaseUser: SupabaseUser,
-  defaultNext: string
+  defaultNext: string,
 ): Promise<string> {
   // 1. Provision the app user row (idempotent upsert)
   const { id: userId } = await provisionUserFromSupabaseAuth(supabaseUser);

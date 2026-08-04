@@ -69,7 +69,10 @@ export function buildResumeObjectName(input: {
 // [A-Za-z0-9_-]. Fallback so a segment is never empty.
 export function slugify(value: string): string {
   return (
-    value.trim().replace(/\s+/g, "_").replace(/[^A-Za-z0-9_-]/g, "") || "untitled"
+    value
+      .trim()
+      .replace(/\s+/g, "_")
+      .replace(/[^A-Za-z0-9_-]/g, "") || "untitled"
   );
 }
 

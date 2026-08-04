@@ -24,7 +24,10 @@ import {
   makePendingCandidate,
   type Candidate,
 } from "@/lib/resume-candidates";
-import { mapResumeRow, type ResumeReviewRow } from "@/lib/resume-candidates-data";
+import {
+  mapResumeRow,
+  type ResumeReviewRow,
+} from "@/lib/resume-candidates-data";
 import {
   makePosting,
   mapJobPostingRow,
@@ -53,11 +56,7 @@ function uniqueSorted(values: string[]): string[] {
   );
 }
 
-export function ResumeReviewerDashboard({
-  projectId,
-}: {
-  projectId: string;
-}) {
+export function ResumeReviewerDashboard({ projectId }: { projectId: string }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
@@ -115,7 +114,9 @@ export function ResumeReviewerDashboard({
         .eq("project_id", projectId)
         .eq("archived", false);
       if (cancelled || error) return;
-      setPostings(((data ?? []) as unknown as JobPostingRow[]).map(mapJobPostingRow));
+      setPostings(
+        ((data ?? []) as unknown as JobPostingRow[]).map(mapJobPostingRow),
+      );
     })();
     return () => {
       cancelled = true;
@@ -166,7 +167,7 @@ export function ResumeReviewerDashboard({
   );
   const effectiveCompany = companies.includes(pickedCompany)
     ? pickedCompany
-    : companies[0] ?? "";
+    : (companies[0] ?? "");
 
   // Roles are SCOPED to the selected department, so the Role pill never lists a
   // role from another department (which would form a role+department combo that
@@ -183,7 +184,9 @@ export function ResumeReviewerDashboard({
       ]),
     [postings, allCandidates, effectiveCompany],
   );
-  const effectiveRole = roles.includes(pickedRole) ? pickedRole : roles[0] ?? "";
+  const effectiveRole = roles.includes(pickedRole)
+    ? pickedRole
+    : (roles[0] ?? "");
 
   // The posting (if any) for the current role + department selection — drives
   // the "View job description" button and which JD the viewer opens.
@@ -317,7 +320,7 @@ export function ResumeReviewerDashboard({
       {/* Header: title + actions */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-[var(--text)]">
+          <h3 className="text-lg font-medium text-[var(--text)]">
             Candidate Dashboard
           </h3>
           <p className="mt-0.5 text-xs text-[var(--muted)]">
@@ -330,7 +333,7 @@ export function ResumeReviewerDashboard({
           <button
             type="button"
             onClick={() => setPostingOpen(true)}
-            className="btn-primary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm"
+            className="btn-primary inline-flex !min-h-0 items-center gap-1.5 !px-4 !py-1.5 text-sm"
           >
             <svg
               width="14"
@@ -352,7 +355,7 @@ export function ResumeReviewerDashboard({
             <Link
               href={`/account/projects/${projectId}/job-description?posting=${activePosting.id}`}
               title="View the job description for this role"
-              className="btn-secondary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm"
+              className="btn-secondary inline-flex !min-h-0 items-center gap-1.5 !px-4 !py-1.5 text-sm"
             >
               <EyeIcon />
               View job description
@@ -362,7 +365,7 @@ export function ResumeReviewerDashboard({
               type="button"
               disabled
               title="No job posting for this role and department yet"
-              className="btn-secondary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              className="btn-secondary inline-flex !min-h-0 items-center gap-1.5 !px-4 !py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
               <EyeIcon />
               View job description
@@ -371,7 +374,7 @@ export function ResumeReviewerDashboard({
           <Link
             href={`/account/projects/${projectId}/positions/archived`}
             title="View archived roles"
-            className="btn-secondary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm"
+            className="btn-secondary inline-flex !min-h-0 items-center gap-1.5 !px-4 !py-1.5 text-sm"
           >
             <ArchiveIcon />
             Archived roles
@@ -460,7 +463,7 @@ export function ResumeReviewerDashboard({
             <button
               type="button"
               onClick={() => setUploadOpen(true)}
-              className="btn-primary inline-flex !min-h-0 !px-4 !py-1.5 items-center gap-1.5 text-sm"
+              className="btn-primary inline-flex !min-h-0 items-center gap-1.5 !px-4 !py-1.5 text-sm"
             >
               <svg
                 width="14"
@@ -488,7 +491,7 @@ export function ResumeReviewerDashboard({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search name or role"
-              className="w-44 rounded-lg border border-[var(--ring)] bg-[var(--bg)] px-3 py-1.5 text-xs text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] sm:w-52"
+              className="w-44 rounded-lg border border-[var(--ring)] bg-[var(--bg)] px-3 py-1.5 text-xs text-[var(--text)] placeholder:text-[var(--muted)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none sm:w-52"
             />
           </div>
         }
@@ -496,7 +499,7 @@ export function ResumeReviewerDashboard({
         <div className="max-h-[520px] overflow-auto">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-[var(--card)]">
-              <tr className="text-[10px] uppercase tracking-wide text-[var(--muted)]">
+              <tr className="text-[10px] tracking-wide text-[var(--muted)] uppercase">
                 <th className="border-b border-[var(--ring)] px-3 py-2 text-left font-medium">
                   Candidate / Email
                 </th>
@@ -526,7 +529,11 @@ export function ResumeReviewerDashboard({
                 />
               ) : (
                 rows.map((c) => (
-                  <CandidateRow key={c.id} candidate={c} projectId={projectId} />
+                  <CandidateRow
+                    key={c.id}
+                    candidate={c}
+                    projectId={projectId}
+                  />
                 ))
               )}
             </tbody>
@@ -627,7 +634,7 @@ function CandidateRow({
   return (
     <tr
       onClick={() => router.push(href)}
-      className="cursor-pointer border-b border-[var(--ring)]/50 transition hover:bg-[var(--surface-hover)] last:border-b-0"
+      className="cursor-pointer border-b border-[var(--ring)]/50 transition last:border-b-0 hover:bg-[var(--surface-hover)]"
     >
       <td className="px-3 py-2.5">
         <div className="flex items-center gap-2.5">
@@ -641,7 +648,7 @@ function CandidateRow({
             <Link
               href={href}
               onClick={(e) => e.stopPropagation()}
-              className="truncate text-sm font-medium text-[var(--text)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] rounded"
+              className="truncate rounded text-sm font-medium text-[var(--text)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
             >
               {candidate.name}
             </Link>
@@ -652,7 +659,7 @@ function CandidateRow({
         </div>
       </td>
       <td className="px-3 py-2.5 text-xs text-[var(--muted)]">{dateLabel}</td>
-      <td className="px-3 py-2.5 text-right text-sm font-medium tabular-nums text-[var(--text)]">
+      <td className="px-3 py-2.5 text-right text-sm font-medium text-[var(--text)] tabular-nums">
         {candidate.pending ? "—" : integerFmt.format(candidate.fitScore)}
       </td>
       <td className="px-3 py-2.5 text-center">

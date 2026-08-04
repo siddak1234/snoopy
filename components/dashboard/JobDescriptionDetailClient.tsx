@@ -120,7 +120,7 @@ export function JobDescriptionDetailClient({
       {/* JD PDF */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-[var(--text)]">
+          <h3 className="text-sm font-medium text-[var(--text)]">
             {row?.role
               ? `${row.role}${row.department ? ` · ${row.department}` : ""}`
               : "Job description"}
@@ -153,13 +153,15 @@ export function JobDescriptionDetailClient({
         <iframe
           src={fileUrl}
           title="Job description PDF"
-          className="w-full min-h-[600px] h-[80vh] rounded-lg border border-[var(--ring)]/50"
+          className="h-[80vh] min-h-[600px] w-full rounded-lg border border-[var(--ring)]/50"
         />
       </div>
 
       {/* Parsed schema */}
       <div>
-        <h3 className="text-sm font-semibold text-[var(--text)]">Parsed details</h3>
+        <h3 className="text-sm font-medium text-[var(--text)]">
+          Parsed details
+        </h3>
         {loading ? (
           <p className="mt-2 text-sm text-[var(--muted)]">Loading…</p>
         ) : error ? (
@@ -178,7 +180,10 @@ function ParsedTable({ row }: { row: JobPostingDetail }) {
   return (
     <div className="mt-2 overflow-hidden rounded-xl border border-[var(--ring)]">
       <dl className="divide-y divide-[var(--ring)]/60 text-sm">
-        <FieldRow label="Parse status" value={<StatusBadge status={status} />} />
+        <FieldRow
+          label="Parse status"
+          value={<StatusBadge status={status} />}
+        />
         <FieldRow label="JD file" value={row.jd_filename ?? "—"} />
         <FieldRow
           label="Version"
@@ -259,7 +264,9 @@ function ListRow({ label, items }: { label: string; items: string[] | null }) {
         {items && items.length ? (
           <ul className="list-disc space-y-1 pl-4">
             {items.map((it, i) => (
-              <li key={i}>{typeof it === "string" ? it : JSON.stringify(it)}</li>
+              <li key={i}>
+                {typeof it === "string" ? it : JSON.stringify(it)}
+              </li>
             ))}
           </ul>
         ) : (

@@ -21,7 +21,10 @@ type Props = {
   initialPendingInvites: PendingInvite[];
 };
 
-export function WorkspaceInviteButton({ workspaceId, initialPendingInvites }: Props) {
+export function WorkspaceInviteButton({
+  workspaceId,
+  initialPendingInvites,
+}: Props) {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -30,7 +33,9 @@ export function WorkspaceInviteButton({ workspaceId, initialPendingInvites }: Pr
     code: string;
     expiresAt: string;
   } | null>(null);
-  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>(initialPendingInvites);
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>(
+    initialPendingInvites,
+  );
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);
@@ -47,9 +52,10 @@ export function WorkspaceInviteButton({ workspaceId, initialPendingInvites }: Pr
     const newInvite = {
       id: result.id,
       token: result.token,
-      expiresAt: result.expiresAt instanceof Date
-        ? result.expiresAt.toISOString()
-        : String(result.expiresAt),
+      expiresAt:
+        result.expiresAt instanceof Date
+          ? result.expiresAt.toISOString()
+          : String(result.expiresAt),
       createdAt: new Date().toISOString(),
     };
     setCurrentInvite({
@@ -99,9 +105,7 @@ export function WorkspaceInviteButton({ workspaceId, initialPendingInvites }: Pr
         >
           {creating ? "Generating…" : "Invite team member"}
         </button>
-        {createError ? (
-          <FormError message={createError} />
-        ) : null}
+        {createError ? <FormError message={createError} /> : null}
       </div>
 
       {/* Pending invites list */}
@@ -154,14 +158,14 @@ export function WorkspaceInviteButton({ workspaceId, initialPendingInvites }: Pr
             Invite link generated
           </h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            Share both the link and code with your team member. The code is shown
-            once — save it now.
+            Share both the link and code with your team member. The code is
+            shown once — save it now.
           </p>
 
           <div className="mt-6 space-y-4">
             {/* Invite URL */}
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+              <p className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
                 Invite link
               </p>
               <div className="mt-1.5 flex items-center gap-2">
@@ -183,7 +187,7 @@ export function WorkspaceInviteButton({ workspaceId, initialPendingInvites }: Pr
 
             {/* Invite code */}
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+              <p className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
                 Invite code
               </p>
               <div className="mt-1.5 flex items-center gap-2">
@@ -202,7 +206,8 @@ export function WorkspaceInviteButton({ workspaceId, initialPendingInvites }: Pr
                 </button>
               </div>
               <p className="mt-1 text-xs text-[var(--muted)]">
-                Valid for 7 days. Shown once — the code is not stored in plain text.
+                Valid for 7 days. Shown once — the code is not stored in plain
+                text.
               </p>
             </div>
           </div>

@@ -2,7 +2,11 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/auth-supabase";
 import { prisma } from "@/lib/db";
-import { DashboardSidebar, DashboardHeader } from "@/components/dashboard/DashboardNav";
+import {
+  DashboardSidebar,
+  DashboardHeader,
+} from "@/components/dashboard/DashboardNav";
+import { AccountTopBar } from "@/components/dashboard/AccountTopBar";
 import { AuthHydrationGate } from "@/components/auth/AuthHydrationGate";
 
 export default async function AccountLayout({
@@ -36,11 +40,11 @@ export default async function AccountLayout({
   const showOrgSettings = !!orgOwnerMembership;
 
   return (
-    // Break out of the root layout's `max-w-6xl` cap (app/layout.tsx).
-    // Marketing pages still need that cap for readable line lengths, so we
-    // expand only the dashboard via symmetric negative margins. The element
-    // ends up viewport-wide; we re-add our own horizontal padding inside.
-    <div className="-mx-[calc((100vw-100%)/2)] px-4 md:px-6">
+    // Self-contained dashboard shell: the route-group split means no marketing
+    // header/container wraps this tree anymore, so it owns its own top bar and
+    // horizontal padding.
+    <div className="min-h-screen px-4 pb-6 md:px-6">
+      <AccountTopBar />
       <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
         <DashboardSidebar showOrgSettings={showOrgSettings} />
         <div className="min-w-0 flex-1">

@@ -14,7 +14,9 @@ export function useAppSession(options?: {
   status: "loading" | "authenticated" | "unauthenticated";
 } {
   const [data, setData] = useState<AppSession | null>(null);
-  const [status, setStatus] = useState<"loading" | "authenticated" | "unauthenticated">("loading");
+  const [status, setStatus] = useState<
+    "loading" | "authenticated" | "unauthenticated"
+  >("loading");
   const retryIfEmpty = options?.retryIfEmpty ?? false;
 
   useEffect(() => {

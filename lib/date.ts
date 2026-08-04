@@ -5,4 +5,3 @@ export function formatDateMediumUTC(date: Date | string | number): string {
     timeZone: "UTC",
   }).format(d);
 }
-

@@ -32,7 +32,7 @@ export default function SectionCard({
     <div className="bubble px-6 py-6 sm:px-8 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-[var(--text)]">
+          <h1 className="text-2xl font-medium text-[var(--text)]">
             {greeting ?? title}
           </h1>
           {subheaderText ? (

@@ -32,7 +32,7 @@ export default function DeleteAccountButton() {
       <button
         type="button"
         onClick={() => setConfirmOpen(true)}
-        className="rounded-full border border-[var(--error-border-strong)] bg-[var(--error-bg)] px-4 py-2 text-sm font-medium text-[var(--error-text)] transition hover:bg-[var(--error-bg-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--error-text)]"
+        className="rounded-full border border-[var(--error-border-strong)] bg-[var(--error-bg)] px-4 py-2 text-sm font-medium text-[var(--error-text)] transition hover:bg-[var(--error-bg-strong)] focus-visible:ring-2 focus-visible:ring-[var(--error-text)] focus-visible:outline-none"
       >
         Delete Account
       </button>
@@ -43,11 +43,15 @@ export default function DeleteAccountButton() {
           ariaLabelledBy="delete-account-title"
           bubble
         >
-          <h2 id="delete-account-title" className="text-xl font-semibold text-[var(--text)]">
+          <h2
+            id="delete-account-title"
+            className="text-xl font-semibold text-[var(--text)]"
+          >
             Delete account?
           </h2>
           <p className="mt-2 text-sm text-[var(--muted)]">
-            This will permanently delete your account and data. You will need to sign up again to use the service. This cannot be undone.
+            This will permanently delete your account and data. You will need to
+            sign up again to use the service. This cannot be undone.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button

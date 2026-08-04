@@ -47,14 +47,14 @@ export function KpiTile({
 }) {
   return (
     <div className="rounded-xl border border-[var(--ring)] bg-[var(--card)] p-4">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
+      <p className="text-[11px] font-medium tracking-wide text-[var(--muted)] uppercase">
         {label}
       </p>
       <p
         className={`mt-1.5 text-2xl font-semibold ${
           value == null
             ? "text-[var(--muted)]"
-            : valueClassName ?? "text-[var(--text)]"
+            : (valueClassName ?? "text-[var(--text)]")
         }`}
       >
         {value ?? "—"}
@@ -104,11 +104,11 @@ export function ClickableKpiTile({
       disabled={disabled}
       className={
         highlighted
-          ? "rounded-xl border border-[var(--warning-border)] bg-[var(--warning-bg)] p-4 text-left transition hover:bg-[var(--warning-bg)]/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] cursor-pointer"
+          ? "cursor-pointer rounded-xl border border-[var(--warning-border)] bg-[var(--warning-bg)] p-4 text-left transition hover:bg-[var(--warning-bg)]/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
           : "rounded-xl border border-[var(--ring)] bg-[var(--card)] p-4 text-left disabled:cursor-default"
       }
     >
-      <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
+      <p className="text-[11px] font-medium tracking-wide text-[var(--muted)] uppercase">
         {label}
       </p>
       <p
@@ -156,7 +156,7 @@ export function FilterPill({
       }`}
     >
       <div className="min-w-0 flex-1">
-        <div className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
+        <div className="text-[11px] font-medium tracking-wide text-[var(--muted)] uppercase">
           {label}
         </div>
         <div className="mt-0.5 truncate text-sm font-medium text-[var(--text)]">
@@ -188,7 +188,7 @@ export function FilterPill({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
-        className="absolute inset-0 cursor-pointer appearance-none bg-transparent text-transparent opacity-0 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] rounded-xl"
+        className="absolute inset-0 cursor-pointer appearance-none rounded-xl bg-transparent text-transparent opacity-0 focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none disabled:cursor-not-allowed"
         aria-label={label}
       >
         <option value="" disabled>
@@ -224,11 +224,11 @@ export function SectionPanel({
     <div className="rounded-xl border border-[var(--ring)] bg-[var(--card)] p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h4 className="text-sm font-semibold text-[var(--text)]">{title}</h4>
-        {rightContent
-          ? rightContent
-          : rightLabel
-            ? <span className="text-[11px] text-[var(--muted)]">{rightLabel}</span>
-            : null}
+        {rightContent ? (
+          rightContent
+        ) : rightLabel ? (
+          <span className="text-[11px] text-[var(--muted)]">{rightLabel}</span>
+        ) : null}
       </div>
       {children}
     </div>
@@ -287,7 +287,7 @@ export function BreakdownList({
               >
                 {item.label}
               </span>
-              <span className="shrink-0 tabular-nums text-[var(--muted)]">
+              <span className="shrink-0 text-[var(--muted)] tabular-nums">
                 {formatValue(item.amount)}{" "}
                 <span style={{ color }}>{pct.toFixed(pctDigits)}%</span>
               </span>
@@ -340,7 +340,9 @@ export function RankedList({ items }: { items: RankedItem[] }) {
                 {item.title}
               </p>
               {item.subtitle ? (
-                <p className="text-[10px] text-[var(--muted)]">{item.subtitle}</p>
+                <p className="text-[10px] text-[var(--muted)]">
+                  {item.subtitle}
+                </p>
               ) : null}
             </div>
             <p
@@ -357,7 +359,7 @@ export function RankedList({ items }: { items: RankedItem[] }) {
             {item.href ? (
               <Link
                 href={item.href}
-                className="flex items-center justify-between gap-3 rounded-lg -mx-2 px-2 py-1 transition hover:bg-[var(--surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-1 transition hover:bg-[var(--surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
               >
                 {content}
               </Link>

@@ -1,5 +1,9 @@
 import Link from "next/link";
-import type { ProjectMemberRole, ProjectStatus, WorkspaceType } from "@prisma/client";
+import type {
+  ProjectMemberRole,
+  ProjectStatus,
+  WorkspaceType,
+} from "@prisma/client";
 import { DeleteProjectButton } from "./DeleteProjectButton";
 
 export type ProjectListItem = {
@@ -81,25 +85,30 @@ export function ProjectList({ projects }: { projects: ProjectListItem[] }) {
             <div className="flex items-start gap-3 rounded-xl px-2 py-3 transition hover:bg-[var(--surface-hover)]">
               <Link
                 href={`/account/projects/${project.id}`}
-                className="min-w-0 flex-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset rounded-lg"
+                className="min-w-0 flex-1 rounded-lg focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-inset"
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-[var(--text)]">{project.name}</span>
+                  <span className="font-medium text-[var(--text)]">
+                    {project.name}
+                  </span>
                   <StatusPill status={project.status} />
                 </div>
                 {project.type.trim() ? (
-                  <span className="block text-sm text-[var(--muted)] mt-0.5">
+                  <span className="mt-0.5 block text-sm text-[var(--muted)]">
                     {project.type}
                   </span>
                 ) : null}
-                <span className="block text-sm text-[var(--muted)] mt-0.5">
+                <span className="mt-0.5 block text-sm text-[var(--muted)]">
                   Owner: {ownerLabel(project.ownerName, project.ownerEmail)}
                 </span>
               </Link>
               <div className="flex shrink-0 items-center gap-2 pt-1">
                 <RolePill role={project.viewerRole} />
                 {isOwner ? (
-                  <DeleteProjectButton projectId={project.id} projectName={project.name} />
+                  <DeleteProjectButton
+                    projectId={project.id}
+                    projectName={project.name}
+                  />
                 ) : null}
               </div>
             </div>

@@ -105,16 +105,20 @@ export function UploadInvoiceDialog({
 
     if (!file) return setError("Please choose an invoice file.");
     const isPdf =
-      file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      file.type === "application/pdf" ||
+      file.name.toLowerCase().endsWith(".pdf");
     if (!isPdf) return setError("File must be a PDF.");
     if (file.size > MAX_FILE_MB * 1024 * 1024)
       return setError(`File must be under ${MAX_FILE_MB} MB.`);
     if (!invoiceNumber.trim()) return setError("Invoice number is required.");
-    if (!ISO_DATE.test(invoiceDate)) return setError("Invoice date is required.");
+    if (!ISO_DATE.test(invoiceDate))
+      return setError("Invoice date is required.");
     if (!merchant.trim()) return setError("Merchant name is required.");
     if (!location.trim()) return setError("Location is required.");
     if (description.trim().length > MAX_DESCRIPTION_LEN)
-      return setError(`Description must be under ${MAX_DESCRIPTION_LEN} characters.`);
+      return setError(
+        `Description must be under ${MAX_DESCRIPTION_LEN} characters.`,
+      );
 
     const trimmed: CapturedData = {
       projectId,
@@ -164,7 +168,10 @@ export function UploadInvoiceDialog({
       zIndex={100}
       contentClassName="max-w-lg"
     >
-      <h2 id="upload-invoice-title" className="text-xl font-semibold text-[var(--text)]">
+      <h2
+        id="upload-invoice-title"
+        className="text-xl font-semibold text-[var(--text)]"
+      >
         Upload invoice
       </h2>
 
@@ -185,7 +192,11 @@ export function UploadInvoiceDialog({
             ) : null}
           </dl>
           <div className="mt-6 flex flex-wrap gap-2">
-            <button type="button" onClick={onClose} className="btn-primary inline-flex px-5">
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn-primary inline-flex px-5"
+            >
               Done
             </button>
           </div>
@@ -226,7 +237,12 @@ export function UploadInvoiceDialog({
             <FormInput
               ref={firstFieldRef}
               id="upload-invoice-number"
-              label={<>Invoice number <span className="text-[var(--muted)]">(required)</span></>}
+              label={
+                <>
+                  Invoice number{" "}
+                  <span className="text-[var(--muted)]">(required)</span>
+                </>
+              }
               type="text"
               value={invoiceNumber}
               onChange={(e) => setInvoiceNumber(e.target.value)}
@@ -235,7 +251,12 @@ export function UploadInvoiceDialog({
 
             <FormInput
               id="upload-invoice-date"
-              label={<>Invoice date <span className="text-[var(--muted)]">(required)</span></>}
+              label={
+                <>
+                  Invoice date{" "}
+                  <span className="text-[var(--muted)]">(required)</span>
+                </>
+              }
               type="date"
               value={invoiceDate}
               onChange={(e) => setInvoiceDate(e.target.value)}
@@ -243,7 +264,12 @@ export function UploadInvoiceDialog({
 
             <FormInput
               id="upload-merchant"
-              label={<>Merchant name <span className="text-[var(--muted)]">(required)</span></>}
+              label={
+                <>
+                  Merchant name{" "}
+                  <span className="text-[var(--muted)]">(required)</span>
+                </>
+              }
               type="text"
               value={merchant}
               onChange={(e) => setMerchant(e.target.value)}
@@ -254,7 +280,10 @@ export function UploadInvoiceDialog({
                 known locations. Browser handles substring filtering as the
                 user types. */}
             <div>
-              <label htmlFor="upload-location" className="block text-sm font-medium text-[var(--text)]">
+              <label
+                htmlFor="upload-location"
+                className="block text-sm font-medium text-[var(--text)]"
+              >
                 Location <span className="text-[var(--muted)]">(required)</span>
               </label>
               <input
@@ -264,7 +293,7 @@ export function UploadInvoiceDialog({
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 autoComplete="off"
-                className="mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                className="mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none"
                 placeholder="e.g. Air France, Portland, Home Office"
               />
               {locationSuggestions.length > 0 ? (
@@ -279,16 +308,22 @@ export function UploadInvoiceDialog({
             {/* Description — optional context for the workflow. Capped at
                 MAX_DESCRIPTION_LEN so the n8n payload stays light. */}
             <div>
-              <label htmlFor="upload-description" className="block text-sm font-medium text-[var(--text)]">
-                Description <span className="text-[var(--muted)]">(optional)</span>
+              <label
+                htmlFor="upload-description"
+                className="block text-sm font-medium text-[var(--text)]"
+              >
+                Description{" "}
+                <span className="text-[var(--muted)]">(optional)</span>
               </label>
               <textarea
                 id="upload-description"
                 value={description}
-                onChange={(e) => setDescription(e.target.value.slice(0, MAX_DESCRIPTION_LEN))}
+                onChange={(e) =>
+                  setDescription(e.target.value.slice(0, MAX_DESCRIPTION_LEN))
+                }
                 maxLength={MAX_DESCRIPTION_LEN}
                 rows={3}
-                className="mt-1.5 w-full resize-y rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                className="mt-1.5 w-full resize-y rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none"
                 placeholder="What is this invoice for? (e.g. client dinner with Acme in Portland)"
               />
               <p className="mt-1 text-right text-[11px] text-[var(--muted)] tabular-nums">
@@ -326,7 +361,9 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
       <dt className="text-[var(--muted)]">{label}</dt>
-      <dd className="min-w-0 truncate font-medium text-[var(--text)]">{value}</dd>
+      <dd className="min-w-0 truncate font-medium text-[var(--text)]">
+        {value}
+      </dd>
     </div>
   );
 }

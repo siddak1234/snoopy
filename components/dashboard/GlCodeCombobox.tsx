@@ -58,7 +58,8 @@ export function GlCodeCombobox({
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -77,7 +78,7 @@ export function GlCodeCombobox({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between gap-1 rounded border border-[var(--ring)] bg-[var(--bg)] px-2 py-1 text-left text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:opacity-50"
+        className="flex w-full items-center justify-between gap-1 rounded border border-[var(--ring)] bg-[var(--bg)] px-2 py-1 text-left text-sm text-[var(--text)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none disabled:opacity-50"
       >
         <span className="truncate">
           {current ? (
@@ -86,10 +87,23 @@ export function GlCodeCombobox({
               <span className="text-[var(--muted)]"> — {current.label}</span>
             </>
           ) : (
-            <span className="text-[var(--muted)]">{value ?? "Select GL code"}</span>
+            <span className="text-[var(--muted)]">
+              {value ?? "Select GL code"}
+            </span>
           )}
         </span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0 text-[var(--muted)]">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+          className="shrink-0 text-[var(--muted)]"
+        >
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
@@ -103,7 +117,7 @@ export function GlCodeCombobox({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search code or name"
-              className="w-full rounded border border-[var(--ring)] bg-[var(--bg)] px-2 py-1 text-sm text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+              className="w-full rounded border border-[var(--ring)] bg-[var(--bg)] px-2 py-1 text-sm text-[var(--text)] placeholder:text-[var(--muted)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none"
             />
           </div>
           {grouped.length === 0 ? (
@@ -111,7 +125,7 @@ export function GlCodeCombobox({
           ) : (
             grouped.map(([group, opts]) => (
               <div key={group}>
-                <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
+                <div className="px-2 py-1 text-[10px] font-medium tracking-wide text-[var(--muted)] uppercase">
                   {group}
                 </div>
                 {opts.map((o) => (
@@ -124,7 +138,9 @@ export function GlCodeCombobox({
                       setQuery("");
                     }}
                     className={`block w-full truncate px-3 py-1.5 text-left text-sm hover:bg-[var(--surface-hover)] ${
-                      o.code === value ? "font-semibold text-[var(--text)]" : "text-[var(--text)]"
+                      o.code === value
+                        ? "font-semibold text-[var(--text)]"
+                        : "text-[var(--text)]"
                     }`}
                   >
                     <span className="tabular-nums">{o.code}</span>

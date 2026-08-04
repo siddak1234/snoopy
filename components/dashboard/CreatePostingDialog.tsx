@@ -101,7 +101,8 @@ export function CreatePostingDialog({
 
     if (!file) return setError("Please choose a job-description PDF.");
     const isPdf =
-      file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      file.type === "application/pdf" ||
+      file.name.toLowerCase().endsWith(".pdf");
     if (!isPdf) return setError("Job description must be a PDF.");
     if (file.size > MAX_FILE_MB * 1024 * 1024)
       return setError(`File must be under ${MAX_FILE_MB} MB.`);
@@ -123,7 +124,11 @@ export function CreatePostingDialog({
         setError(data.error ?? "Upload failed. Please try again.");
         return;
       }
-      onCreate({ role: trimmedRole, department, jobDescriptionFileName: file.name });
+      onCreate({
+        role: trimmedRole,
+        department,
+        jobDescriptionFileName: file.name,
+      });
       setCaptured({ role: trimmedRole, department, fileName: file.name });
     } catch {
       setError("Network error. Please try again.");
@@ -196,13 +201,14 @@ export function CreatePostingDialog({
                 htmlFor="posting-department"
                 className="block text-sm font-medium text-[var(--text)]"
               >
-                Department <span className="text-[var(--muted)]">(required)</span>
+                Department{" "}
+                <span className="text-[var(--muted)]">(required)</span>
               </label>
               <select
                 id="posting-department"
                 value={departmentChoice}
                 onChange={(e) => setDepartmentChoice(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                className="mt-1.5 w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none"
               >
                 <option value="" disabled>
                   Select a department
@@ -276,7 +282,9 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
       <dt className="text-[var(--muted)]">{label}</dt>
-      <dd className="min-w-0 truncate font-medium text-[var(--text)]">{value}</dd>
+      <dd className="min-w-0 truncate font-medium text-[var(--text)]">
+        {value}
+      </dd>
     </div>
   );
 }

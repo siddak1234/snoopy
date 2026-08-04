@@ -44,7 +44,12 @@ export function extractDomain(email: string): string {
   if (atIndex < 1) return ""; // no "@", or "@" at position 0
   const domain = trimmed.slice(atIndex + 1);
   // Minimal sanity check: must have at least one dot with chars on both sides
-  if (!domain || !domain.includes(".") || domain.startsWith(".") || domain.endsWith(".")) {
+  if (
+    !domain ||
+    !domain.includes(".") ||
+    domain.startsWith(".") ||
+    domain.endsWith(".")
+  ) {
     return "";
   }
   return domain;
@@ -59,7 +64,9 @@ export function extractDomain(email: string): string {
 
 export function isPublicDomain(domain: string): boolean {
   if (!domain) return false;
-  return (PUBLIC_DOMAIN_BLOCKLIST as string[]).includes(domain.trim().toLowerCase());
+  return (PUBLIC_DOMAIN_BLOCKLIST as string[]).includes(
+    domain.trim().toLowerCase(),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -67,9 +74,9 @@ export function isPublicDomain(domain: string): boolean {
 // ---------------------------------------------------------------------------
 
 export type DomainClassification =
-  | "public"            // consumer provider — cannot claim
-  | "custom_unclaimed"  // custom domain, no organization workspace registered for it
-  | "custom_claimed";   // an organization workspace already exists for this domain
+  | "public" // consumer provider — cannot claim
+  | "custom_unclaimed" // custom domain, no organization workspace registered for it
+  | "custom_claimed"; // an organization workspace already exists for this domain
 
 export type DomainClassificationResult = {
   domain: string;
@@ -90,7 +97,7 @@ export type DomainClassificationResult = {
  * separate "domain verified" state on the workspace.
  */
 export async function classifyEmailDomain(
-  email: string
+  email: string,
 ): Promise<DomainClassificationResult> {
   const domain = extractDomain(email);
 

@@ -17,9 +17,27 @@ export { CURRENT_SCHEMA_VERSION } from "@/lib/workflow-types";
 // Only these keys survive serialization. Everything else (selection state,
 // drag handles, measured dimensions, animation flags…) is stripped.
 
-const NODE_KEYS: ReadonlySet<string> = new Set(["id", "type", "x", "y", "data"]);
-const EDGE_KEYS: ReadonlySet<string> = new Set(["id", "source", "target", "type"]);
-const NOTE_KEYS: ReadonlySet<string> = new Set(["id", "x", "y", "w", "h", "text"]);
+const NODE_KEYS: ReadonlySet<string> = new Set([
+  "id",
+  "type",
+  "x",
+  "y",
+  "data",
+]);
+const EDGE_KEYS: ReadonlySet<string> = new Set([
+  "id",
+  "source",
+  "target",
+  "type",
+]);
+const NOTE_KEYS: ReadonlySet<string> = new Set([
+  "id",
+  "x",
+  "y",
+  "w",
+  "h",
+  "text",
+]);
 
 function pick<T extends Record<string, unknown>>(
   obj: T,
@@ -76,7 +94,11 @@ export function serializeWorkflowForStorage(
   return def;
 }
 
-function isDefaultViewport(vp: { x: number; y: number; zoom: number }): boolean {
+function isDefaultViewport(vp: {
+  x: number;
+  y: number;
+  zoom: number;
+}): boolean {
   return vp.x === 0 && vp.y === 0 && vp.zoom === 1;
 }
 

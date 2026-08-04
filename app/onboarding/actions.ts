@@ -13,7 +13,10 @@ import { extractDomain } from "@/lib/domain-utils";
 // should only happen if someone hits the action without a session).
 // ---------------------------------------------------------------------------
 
-async function getSessionIdentity(): Promise<{ userId: string; email: string }> {
+async function getSessionIdentity(): Promise<{
+  userId: string;
+  email: string;
+}> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -49,7 +52,7 @@ async function assertNoOrgWorkspace(userId: string): Promise<void> {
 export type CreateOrgResult = { ok: true } | { ok: false; error: string };
 
 export async function createOrgWorkspaceAction(
-  formData: FormData
+  formData: FormData,
 ): Promise<CreateOrgResult> {
   let userId: string;
   let email: string;
@@ -65,10 +68,16 @@ export async function createOrgWorkspaceAction(
   }
   const trimmed = name.trim();
   if (trimmed.length < 2) {
-    return { ok: false, error: "Organization name must be at least 2 characters." };
+    return {
+      ok: false,
+      error: "Organization name must be at least 2 characters.",
+    };
   }
   if (trimmed.length > 80) {
-    return { ok: false, error: "Organization name must be at most 80 characters." };
+    return {
+      ok: false,
+      error: "Organization name must be at most 80 characters.",
+    };
   }
 
   const domain = extractDomain(email);
@@ -111,7 +120,10 @@ export async function createOrgWorkspaceAction(
     // Re-throw Next.js redirects (from assertNoOrgWorkspace)
     if ((e as { digest?: string }).digest?.startsWith("NEXT_REDIRECT")) throw e;
     console.error("createOrgWorkspaceAction", e);
-    return { ok: false, error: "Failed to create organization. Please try again." };
+    return {
+      ok: false,
+      error: "Failed to create organization. Please try again.",
+    };
   }
 }
 
@@ -137,7 +149,10 @@ export async function createPersonalWorkspaceAction(): Promise<CreatePersonalRes
     return { ok: true };
   } catch (e) {
     console.error("createPersonalWorkspaceAction", e);
-    return { ok: false, error: "Failed to create personal account. Please try again." };
+    return {
+      ok: false,
+      error: "Failed to create personal account. Please try again.",
+    };
   }
 }
 
@@ -197,6 +212,9 @@ export async function joinOrgWorkspaceAction(): Promise<JoinOrgResult> {
   } catch (e) {
     if ((e as { digest?: string }).digest?.startsWith("NEXT_REDIRECT")) throw e;
     console.error("joinOrgWorkspaceAction", e);
-    return { ok: false, error: "Failed to join organization. Please try again." };
+    return {
+      ok: false,
+      error: "Failed to join organization. Please try again.",
+    };
   }
 }

@@ -14,7 +14,9 @@ const PROVIDERS: { id: ProviderId; label: string }[] = [
 ];
 
 /** Supabase may return "azure", "azure_ad", or "microsoft" for Microsoft. Normalize to our ProviderId. */
-function normalizeProviderId(provider: string | null | undefined): ProviderId | null {
+function normalizeProviderId(
+  provider: string | null | undefined,
+): ProviderId | null {
   if (provider == null || provider === "") return null;
   const p = provider.toLowerCase();
   if (p === "google") return "google";
@@ -47,7 +49,9 @@ export default function LinkedAccountsSection() {
     const supabase = createClient();
     setState((s) => ({ ...s, loading: true, error: null }));
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     const user = session?.user;
     if (!user) {
       setState((s) => ({
@@ -59,7 +63,8 @@ export default function LinkedAccountsSection() {
       return;
     }
 
-    const { data: identitiesData, error: identitiesError } = await supabase.auth.getUserIdentities();
+    const { data: identitiesData, error: identitiesError } =
+      await supabase.auth.getUserIdentities();
 
     if (identitiesError) {
       setState((s) => ({
@@ -102,7 +107,8 @@ export default function LinkedAccountsSection() {
     if (params.get("linkError") === "already_exists") {
       params.delete("linkError");
       const newUrl =
-        window.location.pathname + (params.toString() ? `?${params.toString()}` : "");
+        window.location.pathname +
+        (params.toString() ? `?${params.toString()}` : "");
       window.history.replaceState(null, "", newUrl);
       // Defer to avoid synchronous state updates inside the effect body.
       queueMicrotask(() => {
@@ -115,9 +121,7 @@ export default function LinkedAccountsSection() {
     const supabase = createClient();
     setState((s) => ({ ...s, linking: provider, error: null }));
 
-    const redirectTo = `${buildAuthCallbackUrl(
-      "/account/settings",
-    )}&flow=link`;
+    const redirectTo = `${buildAuthCallbackUrl("/account/settings")}&flow=link`;
     const options: { redirectTo: string; scopes?: string } = { redirectTo };
     if (provider === "azure") options.scopes = "email openid";
     const { error } = await supabase.auth.linkIdentity({
@@ -139,7 +143,7 @@ export default function LinkedAccountsSection() {
   if (state.loading) {
     return (
       <div className="border-t border-[var(--ring)] pt-5">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+        <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Linked accounts
         </h2>
         <p className="mt-2 text-sm text-[var(--muted)]">Loading…</p>
@@ -149,31 +153,40 @@ export default function LinkedAccountsSection() {
 
   return (
     <div className="border-t border-[var(--ring)] pt-5">
-      <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+      <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
         Linked accounts
       </h2>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        Link additional sign-in options to this account. You can sign in with any linked provider.
+        Link additional sign-in options to this account. You can sign in with
+        any linked provider.
       </p>
       {state.error ? (
         <FormError message={state.error} className="mt-2" />
       ) : null}
       {state.showAlreadyExistsModal ? (
         <Modal
-          onClose={() => setState((s) => ({ ...s, showAlreadyExistsModal: false }))}
+          onClose={() =>
+            setState((s) => ({ ...s, showAlreadyExistsModal: false }))
+          }
           ariaLabelledBy="link-error-title"
           bubble
         >
-          <h2 id="link-error-title" className="text-xl font-semibold text-[var(--text)]">
+          <h2
+            id="link-error-title"
+            className="text-xl font-semibold text-[var(--text)]"
+          >
             User account already existing
           </h2>
           <p className="mt-2 text-sm text-[var(--muted)]">
-            That sign-in option is already used by another account. Use a different Google or Microsoft account that isn’t already in use.
+            That sign-in option is already used by another account. Use a
+            different Google or Microsoft account that isn’t already in use.
           </p>
           <div className="mt-6">
             <button
               type="button"
-              onClick={() => setState((s) => ({ ...s, showAlreadyExistsModal: false }))}
+              onClick={() =>
+                setState((s) => ({ ...s, showAlreadyExistsModal: false }))
+              }
               className="btn-primary px-4 py-2 text-sm"
             >
               OK
@@ -188,7 +201,11 @@ export default function LinkedAccountsSection() {
           const isLinking = state.linking === id;
           const disabled = isLinked;
 
-          const statusText = isPrimary ? "Primary" : isLinked ? "Secondary" : null;
+          const statusText = isPrimary
+            ? "Primary"
+            : isLinked
+              ? "Secondary"
+              : null;
 
           return (
             <li key={id}>
@@ -196,10 +213,12 @@ export default function LinkedAccountsSection() {
                 className={`flex items-center justify-between rounded-xl border px-4 py-3 ${
                   disabled
                     ? "cursor-default border-[var(--ring)] bg-[var(--surface)] opacity-75"
-                    : "cursor-pointer border-[var(--ring)] bg-[var(--card)] transition hover:bg-[var(--surface-hover)] focus-within:ring-2 focus-within:ring-[var(--accent-strong)]"
+                    : "cursor-pointer border-[var(--ring)] bg-[var(--card)] transition focus-within:ring-2 focus-within:ring-[var(--accent-strong)] hover:bg-[var(--surface-hover)]"
                 }`}
               >
-                <span className="text-sm font-medium text-[var(--text)]">{label}</span>
+                <span className="text-sm font-medium text-[var(--text)]">
+                  {label}
+                </span>
                 {disabled ? (
                   <span className="text-xs text-[var(--muted)]">
                     {statusText ?? "Linked"}
@@ -209,7 +228,7 @@ export default function LinkedAccountsSection() {
                     type="button"
                     onClick={() => handleLink(id)}
                     disabled={isLinking}
-                    className="rounded-full border border-[var(--ring)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                    className="rounded-full border border-[var(--ring)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none disabled:opacity-50"
                   >
                     {isLinking ? "Linking…" : "Link"}
                   </button>
