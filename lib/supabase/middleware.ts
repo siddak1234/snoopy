@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
 
@@ -28,11 +28,29 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(callbackUrl);
   }
 
+  const isProtected = protectedPaths.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`)
+  );
+
+  // Without auth env (e.g. a preview deploy without Preview-scoped vars),
+  // treat every visitor as signed out: public pages render normally, gated
+  // paths still bounce to /login.
+  const url = supabaseUrl;
+  const anonKey = supabaseAnonKey;
+  if (!url || !anonKey) {
+    if (isProtected) {
+      const login = new URL("/login", request.url);
+      login.searchParams.set("callbackUrl", pathname + request.nextUrl.search);
+      return NextResponse.redirect(login);
+    }
+    return NextResponse.next({ request: { headers: request.headers } });
+  }
+
   const response = NextResponse.next({
     request: { headers: request.headers },
   });
 
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+  const supabase = createServerClient(url, anonKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -48,10 +66,6 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  const isProtected = protectedPaths.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`)
-  );
 
   if (isProtected && !user) {
     const login = new URL("/login", request.url);
