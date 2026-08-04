@@ -55,7 +55,9 @@ export async function updateSession(request: NextRequest) {
 
   if (isProtected && !user) {
     const login = new URL("/login", request.url);
-    login.searchParams.set("callbackUrl", pathname);
+    // Preserve the query string so deep links survive the login round-trip
+    // (e.g. /account/builder?id=<workflow> must reload that workflow).
+    login.searchParams.set("callbackUrl", pathname + request.nextUrl.search);
     return NextResponse.redirect(login);
   }
 

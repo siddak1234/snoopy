@@ -21,21 +21,34 @@ type ContactPayload = {
 
 const MAX_FIELD_LENGTH = 2000;
 
+/** Coerce an unknown JSON field to a trimmed, clipped string. */
+function asString(value: unknown): string {
+  return typeof value === "string"
+    ? value.trim().slice(0, MAX_FIELD_LENGTH)
+    : "";
+}
+
 export async function POST(request: Request) {
-  let body: ContactPayload;
+  let parsed: unknown;
   try {
-    body = (await request.json()) as ContactPayload;
+    parsed = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
+  // JSON "null", arrays, numbers etc. all parse successfully — reject
+  // anything that isn't a plain object before touching fields.
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+  const body = parsed as ContactPayload;
 
   // Honeypot: pretend success so bots learn nothing.
-  if (body.company) {
+  if (asString(body.company)) {
     return NextResponse.json({ ok: true });
   }
 
-  const email = body.email?.trim() ?? "";
-  const workflow = body.workflow?.trim() ?? "";
+  const email = asString(body.email);
+  const workflow = asString(body.workflow);
   if (!email || !email.includes("@") || !workflow) {
     return NextResponse.json(
       { error: "Please include your email and the workflow to automate." },
@@ -43,8 +56,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const clip = (value?: string) =>
-    (value ?? "").trim().slice(0, MAX_FIELD_LENGTH);
+  const clip = (value?: string) => asString(value);
 
   const webhookUrl = process.env.AUTOM8X_N8N_WEBHOOK_URL;
   const webhookSecret = process.env.AUTOM8X_N8N_WEBHOOK_SECRET;
@@ -75,6 +87,7 @@ export async function POST(request: Request) {
         ...(webhookSecret ? { "X-Webhook-Secret": webhookSecret } : {}),
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10_000),
     });
   } catch (err) {
     console.error("CONTACT_N8N_FAIL", (err as Error).message);

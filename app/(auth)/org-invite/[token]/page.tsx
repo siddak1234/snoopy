@@ -99,12 +99,10 @@ export default async function OrgInvitePage({
 // Shell + error states
 // ---------------------------------------------------------------------------
 
+// The (auth) layout supplies the centered shell, page background and glow;
+// this wrapper stays only as a shared seam for the three return paths.
 function InviteShell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] px-4">
-      {children}
-    </div>
-  );
+  return <>{children}</>;
 }
 
 const REASON_COPY: Record<string, { title: string; body: string }> = {

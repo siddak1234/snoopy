@@ -386,15 +386,21 @@ function PipelineSvg({ variant }: { variant: Variant }) {
   );
 }
 
-/** App-window chrome (traffic lights + title) framing the pipeline art. */
+/**
+ * App-window chrome (traffic lights + title) framing the pipeline art.
+ * Chrome uses the fixed --art-frame-* palette, not theme tokens, so the whole
+ * window stays a dark screenshot in both themes (the art inside is fixed
+ * dark; a theme-flipped frame would make the travelling invoice invisible on
+ * the light ground).
+ */
 export function PipelineWindow({ variant = "home" }: { variant?: Variant }) {
   return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--color-neutral-700)] bg-[linear-gradient(165deg,color-mix(in_srgb,var(--color-neutral-900)_80%,transparent),color-mix(in_srgb,var(--color-neutral-800)_55%,transparent))] p-2.5 shadow-[var(--shadow-lg)]">
-      <div className="flex items-center gap-1.5 border-b border-[var(--color-neutral-800)] px-2.5 pt-2 pb-3">
-        <span className="h-[9px] w-[9px] rounded-full bg-[var(--color-neutral-700)]" />
-        <span className="h-[9px] w-[9px] rounded-full bg-[var(--color-neutral-700)]" />
-        <span className="h-[9px] w-[9px] rounded-full bg-[var(--color-neutral-700)]" />
-        <span className="ml-2.5 text-[11px] tracking-[0.12em] text-[var(--color-neutral-400)] uppercase">
+    <div className="rounded-[var(--radius-lg)] border border-[var(--art-frame-border)] bg-[image:var(--art-frame-bg)] p-2.5 shadow-[var(--shadow-lg)]">
+      <div className="flex items-center gap-1.5 border-b border-[var(--art-frame-divider)] px-2.5 pt-2 pb-3">
+        <span className="h-[9px] w-[9px] rounded-full bg-[var(--art-frame-dot)]" />
+        <span className="h-[9px] w-[9px] rounded-full bg-[var(--art-frame-dot)]" />
+        <span className="h-[9px] w-[9px] rounded-full bg-[var(--art-frame-dot)]" />
+        <span className="ml-2.5 text-[11px] tracking-[0.12em] text-[var(--art-frame-title)] uppercase">
           Invoice pipeline
         </span>
       </div>

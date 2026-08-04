@@ -40,13 +40,7 @@ function layerSamples(index: number) {
   const center = (index + 0.5) / 3;
   const start = Math.max(0, center - 0.292);
   const end = Math.min(1, center + 0.292);
-  const points = [
-    start,
-    (start + center) / 2,
-    center,
-    (center + end) / 2,
-    end,
-  ];
+  const points = [start, (start + center) / 2, center, (center + end) / 2, end];
   const distance = (p: number) => Math.abs(3 * p - index - 0.5);
   return {
     points,
@@ -179,7 +173,7 @@ export function ScrollStory({ phases }: { phases: readonly StoryPhase[] }) {
 
         {/* Scrims for copy legibility. */}
         <div className="absolute inset-0 bg-[color-mix(in_srgb,var(--color-bg)_42%,transparent)] backdrop-blur-[1.5px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(1000px_600px_at_50%_110%,color-mix(in_srgb,black_55%,transparent),transparent_70%),linear-gradient(to_bottom,color-mix(in_srgb,var(--color-bg)_65%,transparent),transparent_35%,transparent_60%,color-mix(in_srgb,var(--color-bg)_88%,transparent))]" />
+        <div className="absolute inset-0 bg-[radial-gradient(1000px_600px_at_50%_110%,color-mix(in_srgb,var(--color-bg)_60%,transparent),transparent_70%),linear-gradient(to_bottom,color-mix(in_srgb,var(--color-bg)_65%,transparent),transparent_35%,transparent_60%,color-mix(in_srgb,var(--color-bg)_88%,transparent))]" />
 
         {/* Copy. */}
         <div className="absolute inset-0 flex items-end px-[clamp(20px,5vw,72px)] pb-[14vh]">

@@ -50,8 +50,10 @@ const eslintConfig = defineConfig([
     },
   },
   // The rebuilt marketing + shared-UI trees are token-clean: hold the line.
-  // (The raw-px rule stays warn everywhere — SVG geometry and clamp() type
-  // scales legitimately carry px.)
+  // Note: flat config replaces rule options wholesale, so the raw-px warn
+  // selector deliberately does NOT apply in these trees — their type scale
+  // (clamp(), 13px kickers) and SVG geometry carry px by design. It keeps
+  // warning everywhere else.
   {
     files: [
       "app/(marketing)/**/*.tsx",

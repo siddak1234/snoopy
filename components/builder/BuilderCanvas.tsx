@@ -75,8 +75,7 @@ const defaultEdgeOptions = {
 };
 
 type PendingSwitchTarget =
-  | { kind: "new" }
-  | { kind: "existing"; workflow: WorkflowDetail };
+  { kind: "new" } | { kind: "existing"; workflow: WorkflowDetail };
 
 function canvasSignature(nodes: Node[], edges: Edge[]): string {
   return JSON.stringify(reactFlowToCanvasState(nodes, edges));
@@ -135,7 +134,11 @@ function BuilderCanvasInner() {
   );
 
   const { screenToFlowPosition, getViewport } = useReactFlow();
-  const { status: authStatus } = useAppSession();
+  // retryIfEmpty: the account layout already verified the session server-side,
+  // so an empty /api/session response here is a transient failure worth
+  // retrying — otherwise one flaky fetch would pin Save/autosave off for the
+  // life of the tab.
+  const { status: authStatus } = useAppSession({ retryIfEmpty: true });
   const nextId = useRef(0);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const trashRef = useRef<HTMLButtonElement>(null);
@@ -391,9 +394,17 @@ function BuilderCanvasInner() {
     if (nodes.length === 0 && !workflowId) return;
     setSaveError("");
 
-    // Middleware gates this route; a missing session here just means the
-    // session is still resolving — the button is a no-op until then.
-    if (authStatus !== "authenticated") return;
+    // Middleware gates this route, so the session exists server-side; wait
+    // quietly while it resolves, but surface a failed session check instead
+    // of silently swallowing the click.
+    if (authStatus === "loading") return;
+    if (authStatus !== "authenticated") {
+      setSaveError(
+        "Couldn't verify your session — reload the page and try again.",
+      );
+      setSaveStatus("error");
+      return;
+    }
 
     if (workflowId) {
       // Existing workflow — update directly
@@ -1087,6 +1098,9 @@ function BuilderCanvasInner() {
           bubble
           zIndex={100}
           onClose={() => {
+            // Escape/backdrop must not dismiss mid-save: the in-flight create
+            // can't be aborted, and a hidden modal would swallow its error.
+            if (saveStatus === "saving") return;
             setShowSaveModal(false);
             setPostSaveSwitch(null);
             setSaveError("");

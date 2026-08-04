@@ -71,6 +71,9 @@ export function DashboardSidebar({
   showOrgSettings?: boolean;
 }) {
   const pathname = usePathname();
+  // The builder canvas is fixed full-viewport over the account shell; without
+  // this the invisible sidebar links would stay in the tab order behind it.
+  if (pathname?.startsWith("/account/builder")) return null;
   return (
     <aside
       className="hidden w-64 shrink-0 lg:block"
@@ -108,6 +111,7 @@ export function DashboardHeader({
   showOrgSettings?: boolean;
 }) {
   const pathname = usePathname();
+  const hidden = pathname?.startsWith("/account/builder") ?? false;
   const [menuOpen, setMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const title = getPageTitle(pathname ?? "/account");
@@ -132,6 +136,9 @@ export function DashboardHeader({
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [menuOpen]);
+
+  // See DashboardSidebar: the builder canvas overlays the shell full-viewport.
+  if (hidden) return null;
 
   return (
     <div ref={containerRef} className="relative lg:hidden">

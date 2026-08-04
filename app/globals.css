@@ -175,6 +175,17 @@
   --art-ink-dark: #1d2030;
   --art-node-fill: #161826;
   --art-accent: #9184d9;
+  /* Window chrome around the art — also fixed, so the whole "screenshot"
+     stays a dark app window on the light theme too. */
+  --art-frame-bg: linear-gradient(
+    165deg,
+    rgba(41, 43, 49, 0.92),
+    rgba(63, 66, 77, 0.75)
+  );
+  --art-frame-border: #3f424d;
+  --art-frame-divider: #343a54;
+  --art-frame-dot: #595d6c;
+  --art-frame-title: #9397ab;
 }
 
 /* ── Light theme ──────────────────────────────────────────────────────────
