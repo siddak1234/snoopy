@@ -350,6 +350,12 @@ html[data-theme="light"] .lighten {
   mix-blend-mode: normal;
 }
 
+/* The official mark (public/a8x-mark.png) is white artwork on transparency —
+   invert it on the light ground, per the design pages. */
+html[data-theme="light"] .brand-mark {
+  filter: invert(1);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Components — Nocturne voice on the pre-revamp class names, so the whole
    app (marketing + dashboard) restyles from this one file.

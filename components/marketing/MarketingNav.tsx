@@ -83,7 +83,7 @@ export function MarketingNav() {
           aria-label="Autom8x home"
           className="mr-auto flex items-center rounded-full text-[var(--color-text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
         >
-          <LogoMark width={44} height={22} />
+          <LogoMark height={22} />
         </Link>
 
         <div className="hidden items-center gap-6 md:flex">

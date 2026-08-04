@@ -290,7 +290,7 @@ export default function Home() {
                 </div>
               </div>
               <figure className="m-0 hidden justify-center opacity-90 lg:flex">
-                <LogoMark width={280} height={140} />
+                <LogoMark height={140} />
               </figure>
             </div>
           </section>
