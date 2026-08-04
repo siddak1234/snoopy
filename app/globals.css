@@ -131,7 +131,6 @@
   --signal-divider: var(--color-neutral-500);
   --btn-primary-border: var(--color-accent);
   --btn-primary-text: var(--color-accent);
-  --brand-accent: var(--color-accent);
   /* Step pills (StepCard + contact steps) — retire with those consumers. */
   --step-pill-bg: color-mix(in srgb, var(--color-accent) 15%, transparent);
   --step-pill-text: var(--color-accent-200);
