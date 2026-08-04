@@ -8,10 +8,16 @@ This repo contains **only the marketing/website application**. n8n and the datab
 snoopy/
 ├── app/              # Next.js App Router — routes, pages, API
 ├── components/       # React UI components (no route logic)
+├── hooks/            # Shared React hooks
 ├── lib/              # Shared runtime logic (DB, config, utils)
 ├── prisma/           # Database schema and migrations (website’s DB access)
+├── supabase/         # Reference SQL (deploy never runs these)
+├── prompts/          # n8n LLM-prompt source copies (not imported by the app)
+├── running-total/    # n8n Code-node source copies (not imported by the app)
 ├── public/           # Static assets (images, favicon, etc.)
 ├── docs/             # Architecture and runbooks (this folder)
+├── proxy.ts          # Route protection (Next proxy convention)
+├── instrumentation.ts # Env validation at server startup
 ├── .env.example            # Required env vars for deployment (copy to .env.local; never commit real secrets)
 ├── next.config.ts
 ├── prisma.config.ts
@@ -35,7 +41,7 @@ snoopy/
 | App/site config (name, tagline) | `lib/site.ts` | Constants used across the app. |
 | Env validation | `lib/env.ts` | `validateEnv()` — in production runtime, throws if required vars missing. Wired at startup via `instrumentation.ts` (`register()`, nodejs runtime). |
 | Auth config | `lib/auth.ts`, `lib/auth-supabase.ts` | `ensureDefaultWorkspaceForUser()` in auth.ts; `getAppSession()`, `provisionUserFromSupabaseAuth()` in auth-supabase.ts. |
-| Route protection | `middleware.ts` | Protects `/account` (incl. `/account/builder`) and `/onboarding` (redirects to `/login` if unauthenticated). |
+| Route protection | `proxy.ts` | Protects `/account` (incl. `/account/builder`) and `/onboarding` (redirects to `/login` if unauthenticated). |
 | Liveness | `app/api/health/route.ts` | `GET /api/health` — 200 always; no DB (build-safe). |
 | Readiness | `app/api/ready/route.ts` | `GET /api/ready` — 200 with DB check when env set, or 503 if DB down. |
 | Schema changes | `prisma/schema.prisma` | Then run `npm run db:migrate -- --name <name>`. |

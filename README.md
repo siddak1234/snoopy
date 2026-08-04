@@ -1,7 +1,7 @@
 # Snoopy — Autom8x website
 
 This repository is the **website only**: Next.js app (marketing site, auth, UI).  
-n8n and the database server are separate; see [System architecture](docs/SYSTEM-ARCHITECTURE.md).
+n8n and the database server are separate; see [Architecture](docs/ARCHITECTURE.md).
 
 ## Stack
 
@@ -36,7 +36,7 @@ Do **not** commit `.env.local` or any file with real secrets.
 | `npm run build` | Production build |
 | `npm run start` | Run production server |
 | `npm run lint` | Run ESLint |
-| `npm run typecheck` | TypeScript check (`tsc --noEmit`) |
+| `npm run typecheck` | Generate Next types + TypeScript check (`next typegen && tsc --noEmit`) |
 | `npm run format` / `format:check` | Prettier write / verify (CI runs the check) |
 | `npm run db:migrate -- --name <name>` | Create and run migrations (interactive; can hang with pooler) |
 | `npm run db:deploy` | Apply pending migrations only (non-interactive; use if migrate hangs) |
@@ -49,10 +49,10 @@ Do **not** commit `.env.local` or any file with real secrets.
 - **`components/`** — React UI components (`ui/`, `marketing/`, `dashboard/`, `builder/`, …)
 - **`hooks/`** — Shared React hooks
 - **`lib/`** — Shared logic: `db.ts`, `site.ts`, `nav.ts`, `env.ts` (validation), `auth.ts` (workspace provisioning), `auth-supabase.ts` (session + user provisioning)
-- **`middleware.ts`** — Protects `/account` and `/onboarding` (redirect to login when unauthenticated)
+- **`proxy.ts`** — Protects `/account` and `/onboarding` (redirect to login when unauthenticated)
 - **`prisma/`** / **`supabase/`** — Schema, migrations, local SQL recipes
 - **`prompts/`** / **`running-total/`** — n8n prompt + Code-node source copies (not imported by the app)
 - **`docs/`** — Architecture and structure
 
 See **[docs/REPO-STRUCTURE.md](docs/REPO-STRUCTURE.md)** for where to put new code.  
-See **[docs/SYSTEM-ARCHITECTURE.md](docs/SYSTEM-ARCHITECTURE.md)** for how this app fits with n8n and the database.
+See **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for the deployment model and how this app fits with n8n and the database.
