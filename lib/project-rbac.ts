@@ -1,13 +1,6 @@
 import type { ProjectMemberRole } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
-// Re-export pure helpers so server callers can import from one place.
-// Client components must import directly from @/lib/project-rbac-pure.
-export {
-  canModifyMember,
-  type MemberModifyAction,
-} from "@/lib/project-rbac-pure";
-
 // ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------

@@ -3,9 +3,6 @@ import bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 import { normalizeInviteCode } from "@/lib/invite-utils";
 
-// Re-export so callers can keep a single import
-export { normalizeInviteCode } from "@/lib/invite-utils";
-
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
