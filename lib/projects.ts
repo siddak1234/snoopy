@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import type { ProjectStatus } from "@prisma/client";
 import { ensureTenantForUser, getTenantForUser } from "@/lib/tenant";
-import { canUserPerform, isProjectMember } from "@/lib/project-rbac";
+import { canUserPerform } from "@/lib/project-rbac";
 import {
   isProjectType,
   type ProjectScope,
@@ -547,20 +547,4 @@ export async function leaveProject(
     where: { projectId, userId },
   });
   return result.count > 0;
-}
-
-/** Backward compat: list all projects for user (owned only). */
-export async function getProjectsForUser(userId: string) {
-  return getMyProjects(userId);
-}
-
-/** @deprecated Use the invite system instead. Kept temporarily for rollback safety. */
-export async function joinProjectByCode(
-  _userId: string,
-  _code: string,
-): Promise<{ ok: false; error: string }> {
-  return {
-    ok: false,
-    error: "Access code joining has been replaced by the invite system.",
-  };
 }

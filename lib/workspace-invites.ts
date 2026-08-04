@@ -94,39 +94,6 @@ export async function getWorkspaceInviteByToken(token: string) {
   });
 }
 
-/** List pending (not accepted, not revoked, not expired) invites for a workspace. */
-export async function listPendingWorkspaceInvites(
-  workspaceId: string,
-  ownerId: string,
-) {
-  const membership = await prisma.membership.findUnique({
-    where: { userId_workspaceId: { userId: ownerId, workspaceId } },
-    select: { role: true },
-  });
-  if (!membership || membership.role !== "OWNER") return [];
-
-  const now = new Date();
-  return prisma.workspaceInvite.findMany({
-    where: {
-      workspaceId,
-      acceptedAt: null,
-      revokedAt: null,
-      expiresAt: { gt: now },
-    },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      token: true,
-      expiresAt: true,
-      createdAt: true,
-    },
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Accept
-// ---------------------------------------------------------------------------
-
 export type AcceptWorkspaceInviteResult =
   { ok: true; workspaceId: string } | { ok: false; error: string };
 

@@ -4,14 +4,6 @@
 // The detection RPC returns one row per flagged item with `reason` discriminating
 // the case and `details` carrying case-specific data as JSON.
 
-// Default thresholds — exposed here so they can be tuned without touching SQL.
-// If we move to per-project config later, replace these constants with lookups.
-export const DEFAULT_LOW_CONFIDENCE_THRESHOLD = 70;
-export const DEFAULT_HIGH_VALUE_THRESHOLD = 5000;
-
-// Tolerance (dollars) for running-total drift detection. Below this, treat as noise.
-export const DRIFT_TOLERANCE = 0.01;
-
 // ---------------------------------------------------------------------------
 // Reason discriminator + per-reason details payload
 // ---------------------------------------------------------------------------
