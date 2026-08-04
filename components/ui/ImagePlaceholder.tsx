@@ -32,7 +32,7 @@ export function ImagePlaceholder({
 }: ImagePlaceholderProps) {
   const shapeClasses = fill
     ? "absolute inset-0"
-    : `relative w-full ${rounded ? "rounded-[var(--radius-lg)] border border-[var(--color-neutral-800)]" : ""}`;
+    : `relative w-full ${rounded ? "rounded-[var(--radius-lg)] border border-[var(--ring)]" : ""}`;
 
   if (src) {
     return (
@@ -59,8 +59,8 @@ export function ImagePlaceholder({
       style={fill ? undefined : { aspectRatio: aspect }}
     >
       <div className="absolute inset-0 bg-[linear-gradient(165deg,var(--color-neutral-900),var(--color-bg))]" />
-      <div className="absolute inset-0 bg-[radial-gradient(70%_60%_at_30%_20%,color-mix(in_srgb,var(--color-accent-900)_75%,transparent),transparent_65%)]" />
-      <div className="absolute inset-0 [background-image:radial-gradient(circle,var(--color-neutral-800)_1px,transparent_1.4px)] [background-size:28px_28px] opacity-40" />
+      <div className="absolute inset-0 bg-[radial-gradient(70%_60%_at_30%_20%,color-mix(in_srgb,var(--color-accent)_14%,transparent),transparent_65%)]" />
+      <div className="absolute inset-0 [background-image:radial-gradient(circle,var(--color-neutral-700)_1px,transparent_1.4px)] [background-size:28px_28px] opacity-40" />
       <span
         aria-hidden
         className="absolute bottom-3 left-4 inline-block h-px w-11 bg-[var(--color-accent)]"
