@@ -15,8 +15,7 @@ This app uses Supabase Auth with the **Azure** provider (`provider: "azure"`) fo
 
 - **Supabase Auth requires a valid email from Azure to create the user.** If the `email` scope is not requested, Azure may not return the email claim and Supabase will not create a user.
 - All Microsoft OAuth entry points in this codebase request `email openid`:
-  - **Login**: `app/login/page.tsx` – `OAuthButton` with `provider="azure"` uses `scopes: "email openid"`.
-  - **Signup**: `app/signup/page.tsx` – "Sign up with Microsoft" uses `scopes: "email openid"`.
+  - **Login/Signup**: `app/(auth)/login/page.tsx` and `app/(auth)/signup/page.tsx` start OAuth via `components/auth/OAuthButtons.tsx`; the scope is set server-side in `app/api/auth/oauth/route.ts`.
   - **Link account**: `components/account/LinkedAccountsSection.tsx` – `linkIdentity({ provider: "azure", options: { ..., scopes: "email openid" } })`.
 
 ## Azure app registration (Redirect URI)

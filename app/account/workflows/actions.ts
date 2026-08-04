@@ -8,7 +8,6 @@ import {
   getWorkflowForUser as getWorkflowDb,
   workflowNameExistsForUser as workflowNameExistsForUserDb,
   saveWorkflowDefinition as saveDefinitionDb,
-  updateWorkflowMetadata as updateMetadataDb,
   deleteWorkflow as deleteWorkflowDb,
 } from "@/lib/workflows";
 import {
@@ -186,62 +185,6 @@ export async function saveWorkflowAction(
   }
 }
 
-// ─── Update metadata ──────────────────────────────────────────────────
-
-export type UpdateWorkflowResult = { ok: true } | { ok: false; error: string };
-
-export async function updateWorkflowMetadataAction(
-  workflowId: string,
-  data: {
-    name?: string;
-    description?: string | null;
-    status?: string;
-    projectId?: string | null;
-  },
-): Promise<UpdateWorkflowResult> {
-  const session = await getAppSession();
-  if (!session?.user?.id) return { ok: false, error: "Not authenticated." };
-
-  if (data.name !== undefined) {
-    const trimmed = data.name.trim();
-    if (trimmed.length < NAME_MIN)
-      return {
-        ok: false,
-        error: `Name must be at least ${NAME_MIN} characters.`,
-      };
-    if (trimmed.length > NAME_MAX)
-      return {
-        ok: false,
-        error: `Name must be at most ${NAME_MAX} characters.`,
-      };
-    if (
-      await workflowNameExistsForUserDb(session.user.id, trimmed, {
-        excludeWorkflowId: workflowId,
-      })
-    ) {
-      return {
-        ok: false,
-        error:
-          "Workflow name is already taken. Please choose a different name.",
-      };
-    }
-  }
-
-  try {
-    const result = await updateMetadataDb(
-      workflowId,
-      session.user.id,
-      data as Parameters<typeof updateMetadataDb>[2],
-    );
-    if (!result) return { ok: false, error: "Workflow not found." };
-    revalidatePath("/account/workflows");
-    return { ok: true };
-  } catch (e) {
-    console.error("updateWorkflowMetadataAction", e);
-    return { ok: false, error: "Failed to update workflow." };
-  }
-}
-
 // ─── Delete ───────────────────────────────────────────────────────────
 
 export type DeleteWorkflowResult = { ok: true } | { ok: false; error: string };
@@ -256,7 +199,6 @@ export async function deleteWorkflowAction(
     const deleted = await deleteWorkflowDb(workflowId, session.user.id);
     if (!deleted)
       return { ok: false, error: "Workflow not found or access denied." };
-    revalidatePath("/account/workflows");
     revalidatePath("/account/workflow-design");
     return { ok: true };
   } catch (e) {
