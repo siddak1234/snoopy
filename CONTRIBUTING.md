@@ -19,7 +19,7 @@
 - **Never commit to `main`** — it is protected; direct pushes are rejected.
 - Create a feature branch: `git checkout -b feat/<service-name>`
 - Commit, push the branch, and open a PR into `main`.
-- The PR merges only after CI (Lint + Typecheck) passes **and** Siddak approves. PRs are squash-merged; the branch is auto-deleted after merge.
+- The PR merges only after CI (Lint + Format + Build + Typecheck) passes **and** Siddak approves. PRs are squash-merged; the branch is auto-deleted after merge.
 
 ## Design system (Nocturne)
 
@@ -33,8 +33,8 @@ spacing, radius and shadows.
   marketing/ui trees, warn elsewhere while legacy code migrates).
 - **Reuse before you re-implement.** Shared primitives live in
   `components/ui/`: `Button` (primary = accent outline, never a fill; sizes
-  sm/md/lg), `Card`, `Tag`, `Kicker`, `Section`/`Container`, `NumberedStep`,
-  `ImagePlaceholder`, `NavDropdown`, `FormInput`, `Modal`. Marketing-specific
+  sm/md/lg), `Card`, `Kicker`, `Section`/`Container`, `NumberedStep`,
+  `ImagePlaceholder`, `FormInput`, `Modal`. Marketing-specific
   pieces are in `components/marketing/`.
 - **Dark is the default theme**; light is `html[data-theme="light"]`. Verify
   changes in both (toggle in the header).

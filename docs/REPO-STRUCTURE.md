@@ -25,7 +25,7 @@ snoopy/
 |----------|-------------|--------|
 | New marketing page | `app/(marketing)/<path>/page.tsx` | Route groups: `(marketing)` = Nocturne nav/footer shell; `(auth)` = centered auth shell; `app/account/` = dashboard shell (protected, incl. the builder canvas at `/account/builder`). Groups do not affect URLs. |
 | New API endpoint | `app/api/<name>/route.ts` | Export `GET`, `POST`, etc. |
-| Shared UI primitives | `components/ui/` | `Button`, `Card`, `Tag`, `Kicker`, `Section`/`Container`, `NumberedStep`, `ImagePlaceholder`, `NavDropdown`, `FormInput`, `Modal` — named exports; reuse before re-implementing. |
+| Shared UI primitives | `components/ui/` | `Button`, `Card`, `Kicker`, `Section`/`Container`, `NumberedStep`, `ImagePlaceholder`, `FormInput`, `Modal` — named exports; reuse before re-implementing. |
 | Marketing-specific components | `components/marketing/` | Nav, footer, pipeline art, marquee, scroll story, typing headline, contact form. |
 | Design tokens / theme | `app/globals.css` | The Nocturne token sheet (dark default + `html[data-theme="light"]`). Never hard-code hex/px/fonts in TSX — lint enforces it. |
 | Nav data | `lib/nav.ts` | Single source for marketing nav + footer columns. Dashboard nav: `components/dashboard/DashboardNav.tsx`. |

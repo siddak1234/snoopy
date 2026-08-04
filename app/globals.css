@@ -312,10 +312,6 @@ img {
   max-width: 100%;
 }
 
-.text-muted {
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
-}
-
 :focus {
   outline: none;
 }
@@ -352,21 +348,6 @@ img {
 
 html[data-theme="light"] .lighten {
   mix-blend-mode: normal;
-}
-
-/* End-fading rule — a Nocturne signature. Freestanding rules fade over 48px
-   an end; box outlines and short accent marks stay solid. */
-.hr-fade {
-  height: 1px;
-  border: 0;
-  margin: var(--space-4) 0;
-  background: linear-gradient(
-    to right,
-    transparent,
-    var(--color-divider) 48px,
-    var(--color-divider) calc(100% - 48px),
-    transparent
-  );
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -526,72 +507,6 @@ html[data-theme="light"] .lighten {
   font-size: 0.9375rem;
 }
 
-/* — tags — */
-
-.tag {
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  letter-spacing: 0.02em;
-  padding: 3px 10px;
-  border-radius: calc(var(--radius-md) * 0.75);
-}
-
-.tag-accent {
-  background: var(--color-accent-800);
-  color: var(--color-accent-100);
-}
-
-.tag-neutral {
-  background: var(--color-neutral-800);
-  color: var(--color-neutral-100);
-}
-
-.tag-outline {
-  border: 1px solid var(--color-accent);
-  color: var(--color-accent);
-}
-
-html[data-theme="light"] .tag-neutral {
-  color: var(--color-neutral-300);
-}
-
-/* — forms — */
-
-.field > label {
-  display: block;
-  font-size: 12px;
-  margin-bottom: 5px;
-  color: color-mix(in srgb, var(--color-text) 70%, transparent);
-}
-
-.input {
-  width: 100%;
-  min-height: 36px;
-  padding: 6px 10px;
-  font: inherit;
-  font-size: 14px;
-  color: var(--color-text);
-  caret-color: var(--color-accent);
-  background: var(--color-surface);
-  border: 1px solid var(--color-divider);
-  border-radius: var(--radius-md);
-}
-
-.input:hover {
-  border-color: color-mix(in srgb, var(--color-text) 45%, transparent);
-}
-
-.input:focus-visible {
-  border-color: var(--color-accent);
-  outline-offset: 0;
-}
-
-textarea.input {
-  min-height: 90px;
-  resize: vertical;
-}
-
 /* — motion-flavored cards — */
 
 .typing-caret {
@@ -628,22 +543,6 @@ textarea.input {
 @media (hover: hover) {
   .interactive-card:hover svg {
     transform: translateY(-1px) scale(1.04);
-  }
-}
-
-.flow-node {
-  transition:
-    transform 180ms ease,
-    border-color 180ms ease,
-    box-shadow 180ms ease;
-  will-change: transform;
-}
-
-@media (hover: hover) {
-  .flow-node:hover {
-    transform: translateY(-2px);
-    border-color: color-mix(in srgb, var(--color-accent) 60%, var(--ring));
-    box-shadow: var(--shadow-sm);
   }
 }
 
@@ -767,7 +666,6 @@ textarea.input {
   .bubble,
   .bubble-soft,
   .interactive-card,
-  .flow-node,
   .btn-primary,
   .btn-secondary {
     transition: none;
@@ -775,8 +673,7 @@ textarea.input {
 
   .bubble:hover,
   .bubble-soft:hover,
-  .interactive-card:hover,
-  .flow-node:hover {
+  .interactive-card:hover {
     transform: none;
   }
 }

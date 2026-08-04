@@ -27,8 +27,11 @@ snoopy/
 ├── app/                    # Next.js App Router
 │   ├── api/auth/signup/route.ts          # Email/password signup
 │   ├── auth/callback/route.ts            # OAuth callback (Supabase)
-│   ├── page.tsx, layout.tsx, globals.css
-│   ├── login, signup, account, contact, automation-builder, solutions/
+│   ├── layout.tsx, globals.css
+│   ├── (marketing)/        # /, solutions, automation-builder, contact
+│   ├── (auth)/             # login, signup, verify-email, org-invite, ...
+│   ├── account/            # protected dashboard (incl. builder canvas)
+│   ├── onboarding/
 │   └── ...
 ├── components/
 ├── lib/
@@ -73,37 +76,6 @@ Recommended:
 
 - **Existing**: `app/auth/callback` — Supabase OAuth callback; `app/api/auth/signup` — email/password signup. Session via Supabase cookies.
 - **Future**: Add routes under `app/api/` for any logic you want to call from other services (e.g. `app/api/jobs/route.ts`). Use `Authorization` headers or internal API keys for server-to-server calls; keep this app as the only thing that talks to Prisma/DB if you stay minimal.
-
----
-
-## Architecture assessment: clean, professional, scalable?
-
-**Verdict: solid foundation, a few gaps before "production-grade" at scale.**
-
-### What's in good shape
-
-| Area | Status | Notes |
-|------|--------|--------|
-| **Stack choice** | OK | Next.js App Router, TypeScript strict, Prisma, Postgres, Supabase Auth — standard, well-supported, cloud-friendly. |
-| **Structure** | OK | Clear separation: `app/` (routes + API), `components/`, `lib/` (db, config). Path alias `@/*` used consistently. |
-| **Config** | OK | No hardcoded secrets or DB URLs. `prisma.config.ts` and Supabase client read from env. Ready for 12-factor deployment. |
-| **Database** | OK | Single Prisma client via `lib/db.ts` (singleton), migrations in repo, `postinstall` runs `prisma generate`. |
-| **Scalability** | OK | Stateless app; horizontal scaling is "run more containers." DB is the only stateful piece; use managed Postgres or connection pooling when needed. |
-| **Containerization** | OK | One service, env-driven, no embedded DB. Straightforward to put in a single Docker image and scale behind a load balancer. |
-
-So: **yes, the architecture is clean and professional enough to deploy in the cloud and scale.** The choices (single app, env-based config, Prisma singleton, JWT auth) are appropriate for containerized, multi-instance deployment.
-
-### Gaps to address (optional but recommended)
-
-| Gap | Risk | Fix (minimal) |
-|-----|------|----------------|
-| **No tests** | Regressions, harder refactors | Add a few integration tests (e.g. Playwright for critical flows) and/or API route tests; even a small suite helps. |
-| **Auth only in UI** | `/account` (and similar) are protected only client-side; direct URL access still renders then redirects. | Middleware protects `/account` and `/dashboard`; redirects unauthenticated users to `/login`. |
-| **Env not validated** | Missing Supabase env can fail in subtle ways. | `lib/env.ts` validates required env in production (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, POSTGRES_URL). |
-| **No health/ready endpoints** | Orchestrators need liveness and readiness. | `GET /api/health` = liveness (200, no DB). `GET /api/ready` = readiness (DB check, 200/503). |
-| **Prisma/User unused** | N/A. | Supabase Auth provisions users into Prisma `User` via `provisionUserFromSupabaseAuth()` in `lib/auth-supabase.ts`. |
-
-None of these block deployment; they improve operability and security as you containerize and scale.
 
 ---
 

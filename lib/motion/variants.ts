@@ -40,21 +40,3 @@ export function fadeInUp(opts?: {
     },
   };
 }
-
-/** Stagger children entrance for grids/lists. */
-export function staggerContainer(opts?: {
-  stagger?: number;
-  delayChildren?: number;
-}): Variants {
-  const stagger = opts?.stagger ?? 0.06;
-  const delayChildren = opts?.delayChildren ?? 0;
-  return {
-    hidden: {},
-    show: {
-      transition: {
-        staggerChildren: stagger,
-        delayChildren,
-      },
-    },
-  };
-}
