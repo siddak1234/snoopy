@@ -8,7 +8,7 @@ export function WorkflowNode({
   selected,
 }: NodeProps & { data: WorkflowNodeData }) {
   return (
-    <div className={`workflow-node${selected ? "selected" : ""}`}>
+    <div className={selected ? "workflow-node selected" : "workflow-node"}>
       <Handle type="target" position={Position.Top} />
       <div className="flex flex-col items-center gap-1.5">
         <span className="text-[0.65rem] leading-tight font-semibold text-[var(--text)]">

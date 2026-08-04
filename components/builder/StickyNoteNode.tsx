@@ -25,7 +25,9 @@ export function StickyNoteNode({
   };
 
   return (
-    <div className={`sticky-note-node${selected ? "selected" : ""}`}>
+    <div
+      className={selected ? "sticky-note-node selected" : "sticky-note-node"}
+    >
       <div className="flex shrink-0 items-center gap-1">
         <svg
           viewBox="0 0 16 16"
