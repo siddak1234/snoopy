@@ -1,22 +1,13 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/auth-supabase";
 import { getWorkflowsForUser } from "@/lib/workflows";
 import SectionCard from "@/components/dashboard/SectionCard";
-import { AuthHydrationGate } from "@/components/auth/AuthHydrationGate";
 import { WorkflowCardsClient } from "@/components/workflows/WorkflowCardsClient";
 
 export default async function AccountWorkflowDesignPage() {
   const session = await getAppSession();
   if (!session?.user?.id) {
-    const cookieStore = await cookies();
-    const hasSupabaseAuthCookies = cookieStore
-      .getAll()
-      .some((c) => c.name.includes("auth-token"));
-    if (hasSupabaseAuthCookies) {
-      return <AuthHydrationGate destination="/account/workflow-design" />;
-    }
     redirect("/login?callbackUrl=/account/workflow-design");
   }
 

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { WorkflowStatus } from "@prisma/client";
-import { ensureTenantForUser } from "@/lib/tenant";
+import { ensureDefaultWorkspaceForUser } from "@/lib/auth";
 import {
   emptyDefinition,
   hashDefinition,
@@ -18,7 +18,7 @@ export async function createWorkflow(
     definition?: WorkflowDefinition;
   },
 ) {
-  const workspaceId = await ensureTenantForUser(userId);
+  const workspaceId = await ensureDefaultWorkspaceForUser(userId);
   const definition = data.definition ?? emptyDefinition();
   const definitionHash = hashDefinition(definition);
 
@@ -141,44 +141,6 @@ export async function saveWorkflowDefinition(
   });
 
   return { saved: true, updatedAt: updated.updatedAt };
-}
-
-// ─── Update metadata ──────────────────────────────────────────────────
-
-export async function updateWorkflowMetadata(
-  workflowId: string,
-  userId: string,
-  data: {
-    name?: string;
-    description?: string | null;
-    status?: WorkflowStatus;
-    projectId?: string | null;
-  },
-) {
-  const existing = await prisma.workflow.findFirst({
-    where: { id: workflowId, userId },
-    select: { id: true },
-  });
-  if (!existing) return null;
-
-  return prisma.workflow.update({
-    where: { id: workflowId },
-    data: {
-      ...(data.name !== undefined && { name: data.name.trim() }),
-      ...(data.description !== undefined && {
-        description: data.description?.trim() || null,
-      }),
-      ...(data.status !== undefined && { status: data.status }),
-      ...(data.projectId !== undefined && { projectId: data.projectId }),
-    },
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      status: true,
-      updatedAt: true,
-    },
-  });
 }
 
 // ─── Delete ───────────────────────────────────────────────────────────

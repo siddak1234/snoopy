@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import type { ProjectStatus } from "@prisma/client";
-import { ensureTenantForUser, getTenantForUser } from "@/lib/tenant";
+import { getTenantForUser } from "@/lib/tenant";
+import { ensureDefaultWorkspaceForUser } from "@/lib/auth";
 import { canUserPerform } from "@/lib/project-rbac";
 import {
   isProjectType,
@@ -407,7 +408,7 @@ export async function createProject(
       throw new Error("User is not a member of the specified workspace.");
     workspaceId = targetWorkspaceId;
   } else {
-    workspaceId = await ensureTenantForUser(userId);
+    workspaceId = await ensureDefaultWorkspaceForUser(userId);
   }
   const user = await prisma.user.findUnique({
     where: { id: userId },

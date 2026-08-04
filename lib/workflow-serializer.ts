@@ -11,7 +11,6 @@ import {
 
 // Re-export types so consumers can import everything from one place on the server
 export type { CanvasState, WorkflowDefinition } from "@/lib/workflow-types";
-export { CURRENT_SCHEMA_VERSION } from "@/lib/workflow-types";
 
 // ─── Property allow-lists ─────────────────────────────────────────────
 // Only these keys survive serialization. Everything else (selection state,

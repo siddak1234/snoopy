@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { m, useInView, useReducedMotion } from "framer-motion";
 import { useMemo, useRef } from "react";
 import type { Variants } from "framer-motion";
-import { fadeInUp } from "@/lib/motion";
+import { fadeInUp } from "@/lib/motion/variants";
 
 type RevealOnScrollProps = {
   children: ReactNode;
