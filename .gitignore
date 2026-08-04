@@ -24,6 +24,11 @@
 .DS_Store
 *.pem
 .claude/
+!.claude/launch.json
+
+# macOS/iCloud Finder conflict copies ("file 2.tsx") — never commit these
+* 2.*
+* 2/
 
 # debug
 npm-debug.log*
@@ -41,8 +46,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-/lib/generated/prisma
 
 # Local-only DB recipes that contain client-specific seed data / identifiers.
 # Reference-only: the deploy never runs migrations and the live Supabase DB is
