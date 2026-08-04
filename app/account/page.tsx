@@ -31,10 +31,7 @@ export default async function AccountDashboardPage() {
       greeting={greeting}
       subheader="Here's what's happening in your workspace."
       primaryAction={
-        <Link
-          href="/account/builder"
-          className="btn-primary inline-flex px-5"
-        >
+        <Link href="/account/builder" className="btn-primary inline-flex px-5">
           Create workflow
         </Link>
       }
