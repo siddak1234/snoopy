@@ -53,3 +53,9 @@ next-env.d.ts
 # disk locally for re-provisioning; never published.
 supabase/migrations/20260521000000_invoice_edit_phase1_gl_account_map_and_audit.sql
 supabase/migrations/20260521000001_invoice_edit_phase2_recompute_and_save_fns.sql
+
+# Recovered client data. `_salvage/` holds the n8n workflow export and the legacy
+# database archive: real customer email addresses, vendor names, and dollar
+# amounts. It belongs in encrypted storage, not in git — history is permanent, so
+# deleting the file later does not undo the commit. CI fails if one is tracked.
+_salvage/
