@@ -19,16 +19,33 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
 
+  gates:
+    name: Architecture gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Fails if a browser Supabase/storage/manual-login path returns, or if a
+      # direct-database import appears outside the pinned cutover allowlist.
+      - run: npm run audit:boundaries
+      # Fails if the backend session wire contract drifts.
+      - run: npm run test:contracts
+
   build:
     name: Build
     runs-on: ubuntu-latest
     env:
-      # Placeholders only — the build imports middleware/env modules that
-      # non-null-assert these; marketing pages have no real DB dependency.
-      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
       POSTGRES_URL: postgres://placeholder:placeholder@localhost:5432/placeholder
       POSTGRES_PRISMA_URL: postgres://placeholder:placeholder@localhost:5432/placeholder
+      # Required at BUILD time, not runtime: Next bakes rewrites into
+      # routes-manifest.json. Without this, next.config.ts emits no
+      # /api/platform rewrite and every browser API call 404s in production
+      # while the build still exits 0. Asserted below.
+      BACKEND_API_ORIGIN: https://backend.invalid
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,6 +54,24 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Assert the backend gateway rewrite is present in the build output
+        run: |
+          node -e "
+            const m = require('./.next/routes-manifest.json');
+            const r = m.rewrites;
+            const all = Array.isArray(r)
+              ? r
+              : [...(r?.beforeFiles ?? []), ...(r?.afterFiles ?? []), ...(r?.fallback ?? [])];
+            const hit = all.find((x) => typeof x.source === 'string' && x.source.startsWith('/api/platform'));
+            if (!hit) {
+              console.error('FAIL: production build contains no /api/platform rewrite.');
+              console.error('BACKEND_API_ORIGIN was missing or invalid at build time, so');
+              console.error('next.config.ts emitted an empty rewrite list. Every browser');
+              console.error('call to the backend gateway would 404 against this build.');
+              process.exit(1);
+            }
+            console.log('OK: ' + hit.source + ' -> ' + hit.destination);
+          "
 
   typecheck:
     name: Typecheck
