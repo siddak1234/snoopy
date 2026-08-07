@@ -19,7 +19,7 @@ cutover evidence and remaining allowlist are in the
 | UI | Next.js 16, React 19, Tailwind 4, Nocturne components | `snoopy` |
 | Login | Same-origin `/api/platform` calls to backend OAuth/session routes | Edge API + Supabase Auth adapter |
 | Product APIs | Browser dashboard calls to `/api/platform/v1/*` | Edge API and owning backend services |
-| Legacy server data | Prisma/PostgreSQL in 17 pinned server files | Access and Automation Catalog services |
+| Legacy server data | Prisma/PostgreSQL in 14 pinned server files | Access and Automation Catalog services |
 | Artifacts | Browser multipart requests to backend artifact routes | Artifact service + object store |
 | Execution | No website webhook or runtime dependency | Execution service/workers |
 
@@ -35,7 +35,7 @@ browser ──same origin──> /api/platform/*
                             v
                        Edge API
                             ├──> Supabase Auth (login identity only)
-                            ├──> Access service (planned)
+                            ├──> Access service (identity + tenancy foundation)
                             ├──> Automation Catalog (planned)
                             ├──> Output service (planned)
                             └──> Artifact service (planned)
@@ -75,9 +75,12 @@ without pretending the new empty Supabase project has an application schema.
 
 ## Transitional database boundary
 
-Seventeen server-side files still import `lib/db.ts` for projects, workspaces,
-memberships, invites, onboarding, workflow drafts, and legacy invoice mutations.
-They remain because replacement Access/Catalog/Output APIs are not implemented.
+Fourteen server-side files still import `lib/db.ts` for project lifecycle/member
+behavior, organization administration, domain joining, invites, workflow drafts,
+and legacy invoice mutations. Account navigation, settings organization presence,
+and the onboarding organization guard now use the validated Access session
+workspace projection. Remaining callers stay pinned until their exact
+Access/Catalog/Output behavior is implemented and tested.
 
 `npm run audit:boundaries` pins the exact list, rejects new direct database
 callers, rejects Supabase/GCS/webhook dependencies, and verifies removed direct
@@ -101,9 +104,10 @@ and Vercel no longer holds database credentials.
 
 ```bash
 npm run audit:boundaries
+npm run test:contracts
 npm run typecheck
 npm run lint
-npm run build
+npx next build --webpack
 ```
 
 UI changes require comparison against the recorded source checksum and route

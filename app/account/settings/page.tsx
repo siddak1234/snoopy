@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { getAppSession } from "@/lib/app-session";
-import { prisma } from "@/lib/db";
 import { extractDomain, isPublicDomain } from "@/lib/domain-utils";
 import SectionCard from "@/components/dashboard/SectionCard";
 import DeleteAccountButton from "@/components/account/DeleteAccountButton";
@@ -9,19 +8,15 @@ import { SetupOrgForm } from "@/app/onboarding/setup-org/SetupOrgForm";
 
 export default async function AccountSettingsPage() {
   const session = await getAppSession();
-  const userId = session?.user?.id;
   const email = session?.user?.email ?? "";
 
   const domain = extractDomain(email);
   const isCustomDomain = !!domain && !isPublicDomain(domain);
 
   // Check if the user already owns an org workspace
-  const orgMembership = userId
-    ? await prisma.membership.findFirst({
-        where: { userId, workspace: { type: "organization" } },
-        select: { workspaceId: true },
-      })
-    : null;
+  const orgMembership = session?.workspaces.find(
+    (workspace) => workspace.type === "organization",
+  );
 
   const showOrgCreate = isCustomDomain && !orgMembership;
   const showOrgLink = isCustomDomain && !!orgMembership;

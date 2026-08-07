@@ -27,16 +27,13 @@ const forbiddenRuntimePatterns = [
 ];
 
 const legacyDatabaseAllowlist = new Set([
-  "app/account/layout.tsx",
   "app/account/organization/actions.ts",
   "app/account/organization/page.tsx",
   "app/account/projects/[id]/invoices/flagged/actions.ts",
   "app/account/projects/actions.ts",
   "app/account/projects/page.tsx",
-  "app/account/settings/page.tsx",
   "app/onboarding/actions.ts",
   "app/onboarding/join-org/page.tsx",
-  "app/onboarding/layout.tsx",
   "lib/auth.ts",
   "lib/domain-utils.ts",
   "lib/project-rbac.ts",

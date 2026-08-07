@@ -137,3 +137,25 @@ configure it.
   that runtime deprecated and otherwise disables static generation for the route;
   image markup and styling are unchanged.
 - `git diff --check`: passed in both changed repositories.
+
+## Subsequent Access tenancy checkpoint
+
+Later on 2026-08-06, the Access tenancy foundation added validated workspace
+projection to the session contract. Three read-only website callers were removed
+from the transitional database boundary without changing their rendered JSX or
+class/style tokens:
+
+- `app/account/layout.tsx`
+- `app/account/settings/page.tsx`
+- `app/onboarding/layout.tsx`
+
+The boundary audit now pins exactly 14 direct-database files. Website contract
+tests prove that active workspace IDs must reference a returned membership and
+that malformed, uncontracted, or duplicate workspace projections fail closed.
+The complete tenancy checkpoint passes 67 backend tests, 2 website contract tests,
+the 14-file boundary audit, TypeScript, formatting, a 22-page supported Webpack
+production build, and dependency audits with 0 known vulnerabilities. The exact
+backend evidence and open policy/deployment gates are recorded in
+`snoopy-backend/docs/audits/2026-08-06-access-tenancy-checkpoint.md`. This does not
+authorize deployment of the mixed legacy/new identity state; the remaining 14
+callers still use legacy IDs and database credentials.

@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
     "audit:boundaries": "node scripts/audit-boundaries.mjs",
+    "test:contracts": "node --experimental-strip-types --test test/*.test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "postinstall": "prisma generate",
