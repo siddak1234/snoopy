@@ -7,9 +7,10 @@ This repository owns the Autom8x website and its existing Nocturne UI/UX. It is 
 client/BFF of `snoopy-backend`; it is not the target owner of identity, product
 data, artifacts, connector credentials, or automation execution.
 
-The cross-repository source of truth is
-[`SNOOPY-LIVING-ARCHITECTURE.md`](../../SNOOPY-LIVING-ARCHITECTURE.md). The exact
-cutover evidence and remaining allowlist are in the
+The cross-repository source of truth is `docs/platform/LIVING-ARCHITECTURE.md` in
+the private `snoopy-backend` repository. It is deliberately not linked from here:
+this repository is public and must not depend on a path it cannot resolve. The
+exact cutover evidence and remaining allowlist are in the
 [`backend boundary audit`](audits/2026-08-06-backend-boundary-cutover.md).
 
 ## Current stack
