@@ -1,20 +1,17 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAppSession } from "@/lib/app-session";
 import { extractDomain } from "@/lib/domain-utils";
 import { SetupOrgForm } from "./SetupOrgForm";
 
 export const metadata = { title: "Set up your organization" };
 
 export default async function SetupOrgPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getAppSession();
 
   // Layout handles the unauthenticated case, but we need the email here.
-  if (!user?.email) redirect("/login");
+  if (!session?.user.email) redirect("/login");
 
-  const domain = extractDomain(user.email);
+  const domain = extractDomain(session.user.email);
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4 py-16">

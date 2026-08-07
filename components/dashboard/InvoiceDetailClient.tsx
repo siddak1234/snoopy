@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { platformApiJson } from "@/lib/platform-api";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { InvoiceFileViewer } from "@/components/dashboard/InvoiceFileViewer";
 import {
@@ -9,11 +9,12 @@ import {
   type GlOption,
 } from "@/components/dashboard/GlCodeCombobox";
 import {
-  saveInvoiceEditsAction,
   type LineUpdate,
   type HeaderUpdates,
   type LineItemEditableFields,
-} from "@/app/account/projects/[id]/invoices/detail/actions";
+  type SaveInvoiceEditsInput,
+  type SaveInvoiceEditsSummary,
+} from "@/lib/invoice-edits";
 
 // One line item from gl_code_line_items. All numeric-looking fields are stored
 // as text and cast to numeric for display. Capitalization matches the actual
@@ -35,9 +36,6 @@ type LineItem = {
   Invoice_Date: string | null;
   Status: string | null;
 };
-
-const TABLE = "gl_code_line_items";
-const GL_MAP_TABLE = "gl_account_map";
 
 // Cent-level precision on the line-item page (unit prices commonly carry
 // cents — e.g., $29.19 — and rounding loses meaningful information). The
@@ -120,7 +118,6 @@ export function InvoiceDetailClient({
   filename: string;
   loungeCode: string | null;
 }) {
-  const supabase = useMemo(() => createClient(), []);
   const [items, setItems] = useState<LineItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Default: line item index ascending — matches the order shown on the PDF.
@@ -142,18 +139,17 @@ export function InvoiceDetailClient({
   // post-save reload without tripping the set-state-in-effect lint rule.
   // Returns null on query error.
   const fetchItems = useCallback(async (): Promise<LineItem[] | null> => {
-    // project_id is the access key (RLS gates on project_memberships). The
-    // additional filename + lounge filters scope to the specific invoice.
-    let query = supabase
-      .from(TABLE)
-      .select("*")
-      .eq("project_id", projectId)
-      .eq("filename", filename);
-    if (loungeCode) query = query.eq("lounge_code", loungeCode);
-    const { data, error: qError } = await query;
-    if (qError) return null;
-    return (data ?? []) as LineItem[];
-  }, [supabase, projectId, filename, loungeCode]);
+    const query = new URLSearchParams({ filename });
+    if (loungeCode) query.set("lounge_code", loungeCode);
+    try {
+      const response = await platformApiJson<{ items: LineItem[] }>(
+        `/v1/projects/${encodeURIComponent(projectId)}/invoice-line-items?${query.toString()}`,
+      );
+      return response.items;
+    } catch {
+      return null;
+    }
+  }, [projectId, filename, loungeCode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -172,11 +168,21 @@ export function InvoiceDetailClient({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data, error: qError } = await supabase
-        .from(GL_MAP_TABLE)
-        .select("code, full_name, parent_code, is_selectable")
-        .eq("project_id", projectId);
-      if (cancelled || qError || !data) return;
+      let data: {
+        code: string;
+        full_name: string;
+        parent_code: string | null;
+        is_selectable: boolean;
+      }[];
+      try {
+        const response = await platformApiJson<{ items: typeof data }>(
+          `/v1/projects/${encodeURIComponent(projectId)}/gl-accounts`,
+        );
+        data = response.items;
+      } catch {
+        return;
+      }
+      if (cancelled) return;
       const labelByCode = new Map<string, string>();
       for (const r of data as { code: string; full_name: string }[]) {
         labelByCode.set(
@@ -209,7 +215,7 @@ export function InvoiceDetailClient({
     return () => {
       cancelled = true;
     };
-  }, [supabase, projectId]);
+  }, [projectId]);
 
   // Sort runs in render rather than once at fetch — clicking a header should
   // reorder the visible rows without re-querying.
@@ -350,17 +356,29 @@ export function InvoiceDetailClient({
       .filter((it) => deletedIds.has(String(it.id)))
       .map((it) => it.id);
 
-    const res = await saveInvoiceEditsAction({
+    const payload: SaveInvoiceEditsInput = {
       projectId,
       filename,
       loungeCode,
       lineUpdates,
       lineDeletes,
       headerUpdates: headerDraft,
-    });
-
-    if (!res.ok) {
-      setSaveError(res.error);
+    };
+    try {
+      await platformApiJson<{ summary: SaveInvoiceEditsSummary }>(
+        `/v1/projects/${encodeURIComponent(projectId)}/invoice-edits`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+    } catch (saveFailure) {
+      setSaveError(
+        saveFailure instanceof Error
+          ? saveFailure.message
+          : "Could not save changes. Please try again.",
+      );
       setSaving(false);
       return;
     }

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getAppSession } from "@/lib/auth-supabase";
+import { getAppSession } from "@/lib/app-session";
 import { prisma } from "@/lib/db";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { OrgNameEditor } from "@/components/dashboard/OrgNameEditor";

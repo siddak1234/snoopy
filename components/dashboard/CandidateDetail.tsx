@@ -31,9 +31,11 @@ const dateFmt = new Intl.DateTimeFormat("en-US", {
 });
 
 export function CandidateDetail({
+  projectId,
   candidate,
   detail,
 }: {
+  projectId: string;
   candidate: Candidate;
   detail: CandidateDetailData | null;
 }) {
@@ -83,6 +85,7 @@ export function CandidateDetail({
       <SectionPanel title="Resume">
         {detail?.resumeFileName ? (
           <ResumeFileViewer
+            projectId={projectId}
             candidateId={candidate.id}
             fileName={detail.resumeFileName}
           />

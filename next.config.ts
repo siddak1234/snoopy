@@ -1,8 +1,19 @@
 import type { NextConfig } from "next";
+import { backendApiOrigin } from "./lib/backend-origin";
 
 const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
+  },
+  async rewrites() {
+    const origin = backendApiOrigin();
+    if (!origin) return [];
+    return [
+      {
+        source: "/api/platform/:path*",
+        destination: `${origin}/:path*`,
+      },
+    ];
   },
   async redirects() {
     return [

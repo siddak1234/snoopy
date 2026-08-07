@@ -1,45 +1,45 @@
-# Microsoft (Azure) OAuth – Protocol and Setup
+# Microsoft login through Supabase Auth
 
-This app uses Supabase Auth with the **Azure** provider (`provider: "azure"`) for "Continue with Microsoft" and "Sign up with Microsoft". The following protocol and configuration are required for user creation and correct behavior.
+Status: **Backend-mediated OAuth-only design**
+Last verified against code: **2026-08-06**
 
-## Tenant: use `common`
+The website displays Microsoft as provider ID `microsoft`. Only
+`snoopy-backend` maps it to Supabase's internal provider ID `azure`, requests
+`openid email`, owns PKCE/code exchange, and stores the resulting login session.
+Snoopy contains no Supabase SDK or provider secret.
 
-- **Supabase** uses the **Microsoft common tenant** by default: `https://login.microsoftonline.com/common`.
-- **Common** allows both personal Microsoft accounts (e.g. Outlook, Live) and work/school (Azure AD) accounts to sign in. It is the correct choice for a public "Continue with Microsoft" flow.
-- In **Supabase Dashboard → Authentication → Providers → Azure**:
-  - Leave **Azure Tenant URL** empty to use the default (`common`), or set explicitly to:
-    - `https://login.microsoftonline.com/common`
-  - Do **not** set a single-tenant URL (e.g. `https://login.microsoftonline.com/<your-tenant-id>`) unless you intend to restrict sign-in to that organization only.
+## Redirect chain
 
-## Required: `email` scope
+1. Browser opens
+   `/api/platform/v1/auth/oauth/microsoft/start?return_to=/account`.
+2. Backend starts Supabase Azure OAuth with PKCE.
+3. Microsoft Entra redirects to the Supabase Auth callback:
+   `https://<project-ref>.supabase.co/auth/v1/callback`.
+4. Supabase redirects to the exact first-party backend gateway callback:
+   `https://www.autom8x.ai/api/platform/v1/auth/oauth/callback`.
+5. Backend exchanges the code and sets host-only HttpOnly cookies.
 
-- **Supabase Auth requires a valid email from Azure to create the user.** If the `email` scope is not requested, Azure may not return the email claim and Supabase will not create a user.
-- All Microsoft OAuth entry points in this codebase request `email openid`:
-  - **Login/Signup**: `app/(auth)/login/page.tsx` and `app/(auth)/signup/page.tsx` start OAuth via `components/auth/OAuthButtons.tsx`; the scope is set server-side in `app/api/auth/oauth/route.ts`.
-  - **Link account**: `components/account/LinkedAccountsSection.tsx` – `linkIdentity({ provider: "azure", options: { ..., scopes: "email openid" } })`.
+## Configuration checklist
 
-## Azure app registration (Redirect URI)
+- [ ] Create the Microsoft Entra application for the intended account audience.
+- [ ] Set its web redirect URI to
+      `https://<project-ref>.supabase.co/auth/v1/callback`.
+- [ ] Enable Supabase Authentication → Providers → Azure and store the Entra
+      client ID/secret there.
+- [ ] Select and document the Entra tenant/audience policy. Do not infer `common`
+      versus tenant-restricted behavior from old code.
+- [ ] Add the exact Autom8x gateway callback to Supabase's redirect allowlist.
+- [ ] Configure the backend identity variable group; do not put these values in
+      Snoopy/Vercel except `BACKEND_API_ORIGIN`.
+- [ ] Verify email/issuer claims and account-linking behavior in a non-production
+      project before enabling production traffic.
 
-- In **Azure Portal → Microsoft Entra ID → App registrations → your app**:
-  - **Redirect URI** must be the **Supabase** callback URL, not this app’s URL:
-    - `https://<project-ref>.supabase.co/auth/v1/callback`
-  - Replace `<project-ref>` with your Supabase project reference (Dashboard → Project Settings → General).
-- For local development, Azure does not allow `127.0.0.1`; use `localhost`. Configure Supabase local API URL in `config.toml` if needed (see Supabase Azure docs).
+## Boundaries
 
-## This app’s redirect URL
+- Microsoft login identity does not grant Microsoft 365 automation access.
+- Outlook/Graph connector consent belongs to the future Connection service and
+  uses capability-derived scopes and separately vaulted delegated credentials.
+- Native app redirect/session behavior is not configured by this website guide.
 
-- After Azure and Supabase complete the OAuth flow, Supabase redirects the user to **this app’s** callback URL, which must be in Supabase’s allow list:
-  - **Supabase Dashboard → Authentication → URL Configuration → Redirect URLs**
-  - Add e.g. `https://yourdomain.com/auth/callback` and `http://localhost:3000/auth/callback` (or a wildcard like `http://localhost:3000/**`).
-
-## Provider identifier in code
-
-- Supabase’s provider id for Microsoft is **`azure`** (not `microsoft`). All code uses `provider: "azure"`.
-- Identity and JWT claims may expose `azure`, `azure_ad`, or `microsoft`; `LinkedAccountsSection` normalizes these to a single "Microsoft" display and linking state.
-
-## Summary checklist
-
-- [ ] Supabase Azure provider: Tenant URL empty or `https://login.microsoftonline.com/common`.
-- [ ] All `signInWithOAuth` and `linkIdentity` calls for Azure pass `scopes: "email openid"`.
-- [ ] Azure app Redirect URI = `https://<project-ref>.supabase.co/auth/v1/callback`.
-- [ ] Supabase Redirect URLs include this app’s `/auth/callback` URL.
+The governing decision is
+[`ADR-0008`](../../snoopy-backend/docs/adr/0008-backend-mediated-oauth-login.md).

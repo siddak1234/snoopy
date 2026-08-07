@@ -1,38 +1,27 @@
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
-import { buildAuthCallbackUrl } from "@/lib/auth-oauth";
 import { useCallback, useEffect, useState } from "react";
-import Modal from "@/components/ui/Modal";
 import { FormError } from "@/components/ui/FormError";
+import { platformApiPath } from "@/lib/platform-api";
 
-type ProviderId = "google" | "azure";
+type ProviderId = "google" | "microsoft" | "apple";
 
 const PROVIDERS: { id: ProviderId; label: string }[] = [
   { id: "google", label: "Google" },
-  { id: "azure", label: "Microsoft" },
+  { id: "microsoft", label: "Microsoft" },
+  { id: "apple", label: "Apple" },
 ];
 
-/** Supabase may return "azure", "azure_ad", or "microsoft" for Microsoft. Normalize to our ProviderId. */
-function normalizeProviderId(
-  provider: string | null | undefined,
-): ProviderId | null {
-  if (provider == null || provider === "") return null;
-  const p = provider.toLowerCase();
-  if (p === "google") return "google";
-  if (p === "azure" || p === "azure_ad" || p === "microsoft") return "azure";
-  return null;
-}
+type IdentityResponse = {
+  identities?: { provider: ProviderId; primary: boolean }[];
+};
 
 type State = {
   linked: Set<ProviderId>;
-  /** Provider used to create the account (first sign-up). */
   primaryProvider: ProviderId | null;
   loading: boolean;
   linking: ProviderId | null;
   error: string | null;
-  /** Show "user account already existing" bubble (from linkError=already_exists in URL). */
-  showAlreadyExistsModal: boolean;
 };
 
 export default function LinkedAccountsSection() {
@@ -42,102 +31,49 @@ export default function LinkedAccountsSection() {
     loading: true,
     linking: null,
     error: null,
-    showAlreadyExistsModal: false,
   });
 
   const loadIdentities = useCallback(async () => {
-    const supabase = createClient();
-    setState((s) => ({ ...s, loading: true, error: null }));
-
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const user = session?.user;
-    if (!user) {
-      setState((s) => ({
-        ...s,
+    setState((current) => ({ ...current, loading: true, error: null }));
+    try {
+      const response = await fetch(platformApiPath("/v1/auth/identities"), {
+        credentials: "same-origin",
+      });
+      if (!response.ok) throw new Error("identity_list_failed");
+      const body = (await response.json()) as IdentityResponse;
+      const identities = body.identities ?? [];
+      setState((current) => ({
+        ...current,
         loading: false,
-        linked: new Set(),
-        primaryProvider: null,
+        linked: new Set(identities.map((identity) => identity.provider)),
+        primaryProvider:
+          identities.find((identity) => identity.primary)?.provider ?? null,
       }));
-      return;
-    }
-
-    const { data: identitiesData, error: identitiesError } =
-      await supabase.auth.getUserIdentities();
-
-    if (identitiesError) {
-      setState((s) => ({
-        ...s,
+    } catch {
+      setState((current) => ({
+        ...current,
         loading: false,
         error: "Could not load linked accounts.",
       }));
-      return;
     }
-
-    const linked = new Set<ProviderId>();
-    const list = identitiesData?.identities ?? [];
-    for (const identity of list) {
-      const ourId = normalizeProviderId(identity.provider);
-      if (ourId) linked.add(ourId);
-    }
-
-    // Primary = account was created with this provider (first sign-up). From app_metadata.
-    const appProvider = (user.app_metadata as { provider?: string })?.provider;
-    const primaryProvider = normalizeProviderId(appProvider ?? undefined);
-
-    setState((s) => ({
-      ...s,
-      loading: false,
-      linked,
-      primaryProvider,
-    }));
   }, []);
 
   useEffect(() => {
-    // Defer to avoid synchronous state updates inside the effect body.
-    queueMicrotask(() => {
-      void loadIdentities();
-    });
+    void loadIdentities();
   }, [loadIdentities]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("linkError") === "already_exists") {
-      params.delete("linkError");
-      const newUrl =
-        window.location.pathname +
-        (params.toString() ? `?${params.toString()}` : "");
-      window.history.replaceState(null, "", newUrl);
-      // Defer to avoid synchronous state updates inside the effect body.
-      queueMicrotask(() => {
-        setState((s) => ({ ...s, showAlreadyExistsModal: true }));
-      });
-    }
-  }, []);
+  function handleLink(provider: ProviderId) {
+    setState((current) => ({
+      ...current,
+      linking: provider,
+      error: null,
+    }));
+  }
 
-  async function handleLink(provider: ProviderId) {
-    const supabase = createClient();
-    setState((s) => ({ ...s, linking: provider, error: null }));
-
-    const redirectTo = `${buildAuthCallbackUrl("/account/settings")}&flow=link`;
-    const options: { redirectTo: string; scopes?: string } = { redirectTo };
-    if (provider === "azure") options.scopes = "email openid";
-    const { error } = await supabase.auth.linkIdentity({
-      provider,
-      options,
-    });
-
-    if (error) {
-      setState((s) => ({
-        ...s,
-        linking: null,
-        error: error.message ?? "Could not start linking. Try again.",
-      }));
-      return;
-    }
-    // Success: browser redirects to OAuth then back to /auth/callback → /account/settings
+  function linkHref(provider: ProviderId): string {
+    return `${platformApiPath(
+      `/v1/auth/identities/${provider}/start`,
+    )}?return_to=${encodeURIComponent("/account/settings")}`;
   }
 
   if (state.loading) {
@@ -157,61 +93,23 @@ export default function LinkedAccountsSection() {
         Linked accounts
       </h2>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        Link additional sign-in options to this account. You can sign in with
-        any linked provider.
+        Link additional sign-in options to this account. Provider credentials
+        are handled by the Autom8x backend and never exposed to this page.
       </p>
       {state.error ? (
         <FormError message={state.error} className="mt-2" />
-      ) : null}
-      {state.showAlreadyExistsModal ? (
-        <Modal
-          onClose={() =>
-            setState((s) => ({ ...s, showAlreadyExistsModal: false }))
-          }
-          ariaLabelledBy="link-error-title"
-          bubble
-        >
-          <h2
-            id="link-error-title"
-            className="text-xl font-semibold text-[var(--text)]"
-          >
-            User account already existing
-          </h2>
-          <p className="mt-2 text-sm text-[var(--muted)]">
-            That sign-in option is already used by another account. Use a
-            different Google or Microsoft account that isn’t already in use.
-          </p>
-          <div className="mt-6">
-            <button
-              type="button"
-              onClick={() =>
-                setState((s) => ({ ...s, showAlreadyExistsModal: false }))
-              }
-              className="btn-primary px-4 py-2 text-sm"
-            >
-              OK
-            </button>
-          </div>
-        </Modal>
       ) : null}
       <ul className="mt-4 space-y-2">
         {PROVIDERS.map(({ id, label }) => {
           const isLinked = state.linked.has(id);
           const isPrimary = state.primaryProvider === id;
           const isLinking = state.linking === id;
-          const disabled = isLinked;
-
-          const statusText = isPrimary
-            ? "Primary"
-            : isLinked
-              ? "Secondary"
-              : null;
 
           return (
             <li key={id}>
               <div
                 className={`flex items-center justify-between rounded-xl border px-4 py-3 ${
-                  disabled
+                  isLinked
                     ? "cursor-default border-[var(--ring)] bg-[var(--surface)] opacity-75"
                     : "cursor-pointer border-[var(--ring)] bg-[var(--card)] transition focus-within:ring-2 focus-within:ring-[var(--accent-strong)] hover:bg-[var(--surface-hover)]"
                 }`}
@@ -219,19 +117,19 @@ export default function LinkedAccountsSection() {
                 <span className="text-sm font-medium text-[var(--text)]">
                   {label}
                 </span>
-                {disabled ? (
+                {isLinked ? (
                   <span className="text-xs text-[var(--muted)]">
-                    {statusText ?? "Linked"}
+                    {isPrimary ? "Primary" : "Linked"}
                   </span>
                 ) : (
-                  <button
-                    type="button"
+                  <a
+                    href={linkHref(id)}
                     onClick={() => handleLink(id)}
-                    disabled={isLinking}
+                    aria-disabled={isLinking}
                     className="rounded-full border border-[var(--ring)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none disabled:opacity-50"
                   >
                     {isLinking ? "Linking…" : "Link"}
-                  </button>
+                  </a>
                 )}
               </div>
             </li>

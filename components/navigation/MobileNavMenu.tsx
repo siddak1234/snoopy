@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+import { signOutFromPlatform } from "@/lib/platform-api";
 import { useAppSession } from "@/hooks/use-app-session";
 import { useEffect, useRef, useState } from "react";
 import { ListIcon, XIcon } from "@phosphor-icons/react";
@@ -15,6 +16,7 @@ const pillClass =
 
 /** Mobile marketing menu — flat links from lib/nav.ts plus the auth pair. */
 export default function MobileNavMenu() {
+  const router = useRouter();
   const { data: session, status } = useAppSession();
   const [menuOpen, setMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -94,9 +96,9 @@ export default function MobileNavMenu() {
                   type="button"
                   onClick={async () => {
                     closeMenu();
-                    const supabase = createClient();
-                    await supabase.auth.signOut();
-                    window.location.href = "/";
+                    await signOutFromPlatform();
+                    router.replace("/");
+                    router.refresh();
                   }}
                   className={`${linkClass} w-full text-center`}
                 >

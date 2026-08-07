@@ -1,17 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { platformApiPath } from "@/lib/platform-api";
 
 // Resume PDF viewer — embeds the signed-URL redirect route in an iframe (bytes
 // stay off Vercel; re-signs on each navigation). Mirrors InvoiceFileViewer.
 export function ResumeFileViewer({
+  projectId,
   candidateId,
   fileName,
 }: {
+  projectId: string;
   candidateId: string;
   fileName?: string | null;
 }) {
-  const url = `/api/candidates/file?candidateId=${encodeURIComponent(candidateId)}`;
+  const url = platformApiPath(
+    `/v1/projects/${encodeURIComponent(projectId)}/recruiting/candidates/${encodeURIComponent(candidateId)}/file`,
+  );
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
 

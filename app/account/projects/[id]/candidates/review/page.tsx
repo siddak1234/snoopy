@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAppSession } from "@/lib/auth-supabase";
+import { getAppSession } from "@/lib/app-session";
 import { getProjectForUser } from "@/lib/projects";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { CandidateReviewClient } from "@/components/dashboard/CandidateReviewClient";

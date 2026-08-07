@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getAppSession } from "@/lib/auth-supabase";
+import { getAppSession } from "@/lib/app-session";
 import { ensureDefaultWorkspaceForUser } from "@/lib/auth";
 import {
   getMyProjects,

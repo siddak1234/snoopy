@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { platformApiJson, platformApiPath } from "@/lib/platform-api";
 
 // Job-description detail viewer (full page, not a modal). Shows the JD PDF via
 // the signed-URL redirect route, then the full parsed job_postings schema below.
-// The parsed columns are filled asynchronously by the JD n8n workflow, so the
+// The parsed columns are filled asynchronously by the recruiting pipeline, so the
 // row is fetched fresh on mount and re-polled while parse_status='pending'.
 
 type JobPostingDetail = {
@@ -35,9 +35,6 @@ type JobPostingDetail = {
   updated_at: string | null;
 };
 
-const SELECT_COLS =
-  "id, role, department, jd_filename, recruiter_email, parse_status, parsed_at, version, quality, quality_notes, role_title, seniority_level, min_years_experience, location_type, location_or_timezone_constraint, compensation_listed, compensation_range, hard_requirements, preferred_requirements, key_responsibilities, archived, created_at, updated_at";
-
 export function JobDescriptionDetailClient({
   postingId,
   projectId,
@@ -46,7 +43,6 @@ export function JobDescriptionDetailClient({
   projectId: string;
 }) {
   const router = useRouter();
-  const supabase = useMemo(() => createClient(), []);
   const [row, setRow] = useState<JobPostingDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,16 +58,14 @@ export function JobDescriptionDetailClient({
     }
     setArchiving(true);
     try {
-      const res = await fetch("/api/job-descriptions/archive", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postingId, archived: true }),
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(data.error ?? "Could not archive this position.");
-        return;
-      }
+      await platformApiJson(
+        `/v1/projects/${encodeURIComponent(projectId)}/job-postings/${encodeURIComponent(postingId)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ archived: true }),
+        },
+      );
       router.push(`/account/projects/${projectId}`);
       router.refresh();
     } catch {
@@ -87,18 +81,26 @@ export function JobDescriptionDetailClient({
 
     async function load(initial: boolean) {
       if (initial) setLoading(true);
-      const { data, error } = await supabase
-        .from("job_postings")
-        .select(SELECT_COLS)
-        .eq("id", postingId)
-        .maybeSingle();
-      if (!active) return;
-      if (error || !data) {
+      let detail: JobPostingDetail | null;
+      try {
+        const response = await platformApiJson<{
+          item: JobPostingDetail | null;
+        }>(
+          `/v1/projects/${encodeURIComponent(projectId)}/job-postings/${encodeURIComponent(postingId)}`,
+        );
+        detail = response.item;
+      } catch {
+        if (!active) return;
         setError("Could not load this job posting.");
         setLoading(false);
         return;
       }
-      const detail = data as JobPostingDetail;
+      if (!active) return;
+      if (!detail) {
+        setError("Could not load this job posting.");
+        setLoading(false);
+        return;
+      }
       setRow(detail);
       setLoading(false);
       if (detail.parse_status === "pending") {
@@ -111,9 +113,11 @@ export function JobDescriptionDetailClient({
       active = false;
       if (timer) clearTimeout(timer);
     };
-  }, [postingId, supabase]);
+  }, [postingId, projectId]);
 
-  const fileUrl = `/api/job-descriptions/file?postingId=${encodeURIComponent(postingId)}`;
+  const fileUrl = platformApiPath(
+    `/v1/projects/${encodeURIComponent(projectId)}/job-postings/${encodeURIComponent(postingId)}/file`,
+  );
 
   return (
     <div className="flex flex-col gap-6">

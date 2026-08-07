@@ -7,6 +7,7 @@ import {
   type FlagReason,
   type FlaggedItem,
 } from "@/lib/flagged-invoices";
+import { platformApiPath } from "@/lib/platform-api";
 import {
   deleteDuplicateInvoiceCopyAction,
   recomputeAllocationAction,
@@ -481,6 +482,9 @@ function fileViewUrl(
   filename: string,
   loungeCode: string,
 ): string {
-  const lounge = loungeCode ? `&lounge=${encodeURIComponent(loungeCode)}` : "";
-  return `/api/invoices/file?file=${encodeURIComponent(filename)}${lounge}&project=${encodeURIComponent(projectId)}`;
+  const query = new URLSearchParams({ file: filename });
+  if (loungeCode) query.set("lounge_code", loungeCode);
+  return `${platformApiPath(
+    `/v1/projects/${encodeURIComponent(projectId)}/invoice-file`,
+  )}?${query.toString()}`;
 }

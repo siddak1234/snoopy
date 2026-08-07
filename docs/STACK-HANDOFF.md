@@ -1,5 +1,12 @@
 # Stack Handoff — replicate this app's frontend, DB & everything
 
+> **Historical handoff warning (2026-08-06):** the UI/version information remains
+> useful, but direct Supabase, database, storage, upload, webhook, and password-auth
+> instructions below are superseded by
+> [`ARCHITECTURE.md`](ARCHITECTURE.md) and the
+> [`backend boundary audit`](audits/2026-08-06-backend-boundary-cutover.md). Do not
+> use this file to configure the new Supabase project or Vercel secrets.
+
 Everything needed to stand up a project matching this one, down to exact versions.
 Since a future merge is possible, the biggest wins for compatibility are: **same
 framework version, same Tailwind v4 CSS-first setup, same design-token system,

@@ -1,8 +1,8 @@
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 import Modal from "@/components/ui/Modal";
+import { platformApiPath, signOutFromPlatform } from "@/lib/platform-api";
 
 export default function DeleteAccountButton() {
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -11,15 +11,21 @@ export default function DeleteAccountButton() {
   async function handleConfirmDelete() {
     setLoading(true);
     try {
-      const res = await fetch("/api/account/delete", { method: "DELETE" });
+      const res = await fetch(platformApiPath("/v1/account"), {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert(data?.error ?? "Could not delete account. Please try again.");
+        alert(
+          data?.detail ??
+            data?.error ??
+            "Could not delete account. Please try again.",
+        );
         setLoading(false);
         return;
       }
-      const supabase = createClient();
-      await supabase.auth.signOut();
+      await signOutFromPlatform();
       window.location.replace("/login?deleted=1");
     } catch {
       alert("Something went wrong. Please try again.");

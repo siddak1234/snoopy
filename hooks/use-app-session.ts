@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { AppSession } from "@/lib/auth-supabase";
+import { toAppSession, type AppSession } from "@/lib/session-contract";
+import { platformApiPath } from "@/lib/platform-api";
 
 const RETRY_DELAY_MS = 800;
 const MAX_RETRIES = 3;
@@ -24,11 +25,13 @@ export function useAppSession(options?: {
 
     async function fetchSession(attempt: number): Promise<void> {
       try {
-        const res = await fetch("/api/session");
-        const session = await res.json();
+        const res = await fetch(platformApiPath("/v1/session"), {
+          credentials: "same-origin",
+        });
+        const session = toAppSession(await res.json().catch(() => null));
         if (cancelled) return;
 
-        if (session?.user) {
+        if (res.ok && session) {
           setData(session);
           setStatus("authenticated");
           return;

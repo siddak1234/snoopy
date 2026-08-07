@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+import { signOutFromPlatform } from "@/lib/platform-api";
 import LogoMark from "@/components/branding/LogoMark";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 
@@ -10,10 +11,12 @@ import ThemeToggle from "@/components/theme/ThemeToggle";
  * the dashboard since the route-group split).
  */
 export function AccountTopBar() {
+  const router = useRouter();
+
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    window.location.href = "/";
+    await signOutFromPlatform();
+    router.replace("/");
+    router.refresh();
   }
 
   return (

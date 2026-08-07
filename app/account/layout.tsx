@@ -1,13 +1,11 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getAppSession } from "@/lib/auth-supabase";
+import { getAppSession } from "@/lib/app-session";
 import { prisma } from "@/lib/db";
 import {
   DashboardSidebar,
   DashboardHeader,
 } from "@/components/dashboard/DashboardNav";
 import { AccountTopBar } from "@/components/dashboard/AccountTopBar";
-import { AuthHydrationGate } from "@/components/auth/AuthHydrationGate";
 
 export default async function AccountLayout({
   children,
@@ -17,15 +15,6 @@ export default async function AccountLayout({
   const session = await getAppSession();
 
   if (!session?.user?.email || !session?.user?.id) {
-    const cookieStore = await cookies();
-    const hasSupabaseAuthCookies = cookieStore
-      .getAll()
-      .some((c) => c.name.includes("auth-token"));
-
-    if (hasSupabaseAuthCookies) {
-      return <AuthHydrationGate destination="/account" />;
-    }
-
     redirect("/login?callbackUrl=/account");
   }
 

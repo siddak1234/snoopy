@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { FormInput } from "@/components/ui/FormInput";
 import { Button } from "@/components/ui/Button";
 import { site } from "@/lib/site";
+import { platformApiPath } from "@/lib/platform-api";
 
 type Status = "idle" | "sending" | "sent" | "error" | "unconfigured";
 
@@ -15,7 +16,7 @@ function FieldLabel({ children }: { children: string }) {
   );
 }
 
-/** The design's pilot-scoping form. Posts to /api/contact (n8n webhook). */
+/** The design's pilot-scoping form. Submission is owned by the backend API. */
 export function ContactForm() {
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -28,7 +29,7 @@ export function ContactForm() {
     setStatus("sending");
     setErrorMessage(null);
     try {
-      const res = await fetch("/api/contact", {
+      const res = await fetch(platformApiPath("/v1/contact-requests"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -39,10 +40,13 @@ export function ContactForm() {
       }
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as {
+          detail?: string;
           error?: string;
         };
         setErrorMessage(
-          body.error ?? "Something went wrong. Please try again.",
+          body.detail ??
+            body.error ??
+            "Something went wrong. Please try again.",
         );
         setStatus("error");
         return;

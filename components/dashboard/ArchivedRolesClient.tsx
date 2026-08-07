@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Modal from "@/components/ui/Modal";
-import { createClient } from "@/lib/supabase/client";
+import { platformApiJson } from "@/lib/platform-api";
 
 // Lists archived job postings for a project (RLS-gated) like the candidate
 // list. Clicking a role opens a modal to reopen it; reopening calls the archive
@@ -20,7 +20,6 @@ type ArchivedPosting = {
 };
 
 export function ArchivedRolesClient({ projectId }: { projectId: string }) {
-  const supabase = useMemo(() => createClient(), []);
   const [list, setList] = useState<ArchivedPosting[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ArchivedPosting | null>(null);
@@ -29,41 +28,35 @@ export function ArchivedRolesClient({ projectId }: { projectId: string }) {
   useEffect(() => {
     let active = true;
     (async () => {
-      const { data, error } = await supabase
-        .from("job_postings")
-        .select(
-          "id, role, role_title, department, jd_filename, archived_at, version",
-        )
-        .eq("project_id", projectId)
-        .eq("archived", true)
-        .order("archived_at", { ascending: false });
-      if (!active) return;
-      if (error) {
+      try {
+        const response = await platformApiJson<{ items: ArchivedPosting[] }>(
+          `/v1/projects/${encodeURIComponent(projectId)}/job-postings?archived=true`,
+        );
+        if (!active) return;
+        setList(response.items);
+      } catch {
+        if (!active) return;
         setError("Could not load archived roles.");
         setList([]);
-        return;
       }
-      setList((data ?? []) as ArchivedPosting[]);
     })();
     return () => {
       active = false;
     };
-  }, [supabase, projectId]);
+  }, [projectId]);
 
   async function reopen(postingId: string) {
     setReopening(true);
     setError(null);
     try {
-      const res = await fetch("/api/job-descriptions/archive", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postingId, archived: false }),
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(data.error ?? "Could not reopen this role.");
-        return;
-      }
+      await platformApiJson(
+        `/v1/projects/${encodeURIComponent(projectId)}/job-postings/${encodeURIComponent(postingId)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ archived: false }),
+        },
+      );
       setList((prev) => (prev ?? []).filter((p) => p.id !== postingId));
       setSelected(null);
     } catch {
