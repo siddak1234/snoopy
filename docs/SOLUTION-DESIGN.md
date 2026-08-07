@@ -1,6 +1,11 @@
 # Snoopy / Autom8x solution design
 
-Status: **Proposed — not ratified**
+Status: **Historical proposal — backend/data/auth sections superseded**
+
+The living cross-repository architecture and current decisions are in
+[`SNOOPY-LIVING-ARCHITECTURE.md`](../../SNOOPY-LIVING-ARCHITECTURE.md). The current
+website boundary is in [`ARCHITECTURE.md`](ARCHITECTURE.md). Do not use this
+historical proposal to configure Supabase, Vercel, uploads, or login.
 Date: 2026-08-06
 Scope: `snoopy`, `snoopy-mobile`, and the repository currently named `snoopy-n8n`
 

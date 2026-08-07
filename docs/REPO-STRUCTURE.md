@@ -1,61 +1,45 @@
 # Repository structure (website)
 
-This repo contains **only the marketing/website application**. n8n and the database server live in separate repos or infrastructure.
+This repository owns the Autom8x website and Nocturne presentation layer. Target
+product capabilities live behind `snoopy-backend` APIs.
 
-## Top-level layout
-
-```
+```text
 snoopy/
-├── app/              # Next.js App Router — routes, pages, API
-├── components/       # React UI components (no route logic)
-├── hooks/            # Shared React hooks
-├── lib/              # Shared runtime logic (DB, config, utils)
-├── prisma/           # Database schema and migrations (website’s DB access)
-├── supabase/         # Reference SQL (deploy never runs these)
-├── prompts/          # n8n LLM-prompt source copies (not imported by the app)
-├── running-total/    # n8n Code-node source copies (not imported by the app)
-├── public/           # Static assets (images, favicon, etc.)
-├── docs/             # Architecture and runbooks (this folder)
-├── proxy.ts          # Route protection (Next proxy convention)
-├── instrumentation.ts # Env validation at server startup
-├── .env.example            # Required env vars for deployment (copy to .env.local; never commit real secrets)
-├── next.config.ts
-├── prisma.config.ts
-├── package.json
-└── README.md
+├── app/                  Next.js routes, pages, server actions
+├── components/           Nocturne UI and product presentation
+├── hooks/                client hooks
+├── lib/                  API/session contracts and transitional server logic
+├── prisma/               legacy-cutover schema/migrations; not the new owner
+├── public/               static assets
+├── scripts/              architecture/boundary audits
+├── docs/                 website design and migration evidence
+├── proxy.ts              backend-session route protection
+├── instrumentation.ts    production backend-origin validation
+└── next.config.ts        redirects and same-origin backend rewrite
 ```
 
-## Where to put what
+## Placement rules
 
-| Add this | Put it here | Notes |
-|----------|-------------|--------|
-| New marketing page | `app/(marketing)/<path>/page.tsx` | Route groups: `(marketing)` = Nocturne nav/footer shell; `(auth)` = centered auth shell; `app/account/` = dashboard shell (protected, incl. the builder canvas at `/account/builder`). Groups do not affect URLs. |
-| New API endpoint | `app/api/<name>/route.ts` | Export `GET`, `POST`, etc. |
-| Shared UI primitives | `components/ui/` | `Button`, `Card`, `Kicker`, `Section`/`Container`, `NumberedStep`, `ImagePlaceholder`, `FormInput`, `Modal` — named exports; reuse before re-implementing. |
-| Marketing-specific components | `components/marketing/` | Nav, footer, pipeline art, marquee, scroll story, typing headline, contact form. |
-| Design tokens / theme | `app/globals.css` | The Nocturne token sheet (dark default + `html[data-theme="light"]`). Never hard-code hex/px/fonts in TSX — lint enforces it. |
-| Nav data | `lib/nav.ts` | Single source for marketing nav + footer columns. Dashboard nav: `components/dashboard/DashboardNav.tsx`. |
-| Modal / popup dialog (button-triggered) | `components/ui/Modal.tsx` | Use `<Modal onClose={...} ariaLabelledBy="...">` so the card is viewport-anchored and does not shift when the cursor moves. Do not build custom fixed overlays for new dialogs. |
-| Icons | `@phosphor-icons/react` | The design system mandates Phosphor; static SVGs in `public/`. |
-| Database access | Use `lib/db.ts` | Import `db` from `@/lib/db`; do not create new Prisma client instances. |
-| App/site config (name, tagline) | `lib/site.ts` | Constants used across the app. |
-| Env validation | `lib/env.ts` | `validateEnv()` — in production runtime, throws if required vars missing. Wired at startup via `instrumentation.ts` (`register()`, nodejs runtime). |
-| Auth config | `lib/auth.ts`, `lib/auth-supabase.ts` | `ensureDefaultWorkspaceForUser()` in auth.ts; `getAppSession()`, `provisionUserFromSupabaseAuth()` in auth-supabase.ts. |
-| Route protection | `proxy.ts` | Protects `/account` (incl. `/account/builder`) and `/onboarding` (redirects to `/login` if unauthenticated). |
-| Liveness | `app/api/health/route.ts` | `GET /api/health` — 200 always; no DB (build-safe). |
-| Readiness | `app/api/ready/route.ts` | `GET /api/ready` — 200 with DB check when env set, or 503 if DB down. |
-| Schema changes | `prisma/schema.prisma` | Then run `npm run db:migrate -- --name <name>`. |
-| Docs / architecture | `docs/` | Keep ARCHITECTURE.md and REPO-STRUCTURE.md up to date. |
+| Change | Location / rule |
+| --- | --- |
+| UI or marketing screen | `app/` plus reusable components in `components/`; preserve Nocturne tokens in `app/globals.css` |
+| Browser API call | Use `lib/platform-api.ts`; call a versioned `/v1/*` path through `/api/platform` |
+| Session UI | Use `hooks/use-app-session.ts` or server-only `lib/app-session.ts`; both validate `lib/session-contract.ts` |
+| Backend origin | `lib/backend-origin.ts`; do not duplicate parsing or expose it as `NEXT_PUBLIC_*` |
+| Product logic/persistence | Add to its owning `snoopy-backend` service, not a new website database route |
+| OAuth login | Backend identity contract only; no Supabase SDK or manual-password route here |
+| Artifact upload/file | Project-scoped backend route; no object-store SDK or credential here |
+| New database access | Prohibited. Existing callers are frozen by `scripts/audit-boundaries.mjs` until migrated |
+| Readiness | `app/api/ready/route.ts` reflects backend readiness |
 
-## Conventions
+## Required checks
 
-- **Imports**: Use the `@/` path alias for app code (e.g. `import { db } from "@/lib/db"`).
-- **No business logic in `app/`**: Keep route handlers thin; call into `lib/` or services.
-- **API routes**: Only under `app/api/`; return JSON and appropriate status codes.
-- **Secrets**: Never in code. Use env vars; copy `.env.example` to `.env.local` and fill in locally.
+```bash
+npm run audit:boundaries
+npm run typecheck
+npm run lint
+npm run build
+```
 
-## What this repo is not
-
-- **Not the n8n app**: Workflow/automation logic and n8n config live in a separate n8n repository.
-- **Not the database server**: Postgres is external (managed or separate container); this app connects via `POSTGRES_URL` at runtime (with `POSTGRES_PRISMA_URL` as optional direct fallback).
-- **Not a monorepo**: One app only. Other services (n8n, future backends) are separate repos or images.
+The exact transition state is documented in
+[`audits/2026-08-06-backend-boundary-cutover.md`](audits/2026-08-06-backend-boundary-cutover.md).

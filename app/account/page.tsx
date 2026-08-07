@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getAppSession } from "@/lib/auth-supabase";
+import { getAppSession } from "@/lib/app-session";
 import { getAccessibleProjects } from "@/lib/projects";
 import SectionCard from "@/components/dashboard/SectionCard";
 

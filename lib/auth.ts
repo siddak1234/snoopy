@@ -1,7 +1,7 @@
 /**
  * Ensure user has a default workspace (create if none). Returns workspaceId.
  * Idempotent: re-fetches first membership after create to handle concurrent logins.
- * Exported for use by lib/tenant (workspace-as-org) and lib/auth-supabase.
+ * Exported for legacy server-side workspace access during the Access API cutover.
  */
 export async function ensureDefaultWorkspaceForUser(
   userId: string,

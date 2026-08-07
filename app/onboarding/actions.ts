@@ -1,9 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db";
-import { provisionUserFromSupabaseAuth } from "@/lib/auth-supabase";
+import { getAppSession } from "@/lib/app-session";
 import { ensureDefaultWorkspaceForUser } from "@/lib/auth";
 import { extractDomain } from "@/lib/domain-utils";
 
@@ -17,13 +16,11 @@ async function getSessionIdentity(): Promise<{
   userId: string;
   email: string;
 }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.email) throw new Error("Not authenticated");
-  const { id: userId } = await provisionUserFromSupabaseAuth(user);
-  return { userId, email: user.email };
+  const session = await getAppSession();
+  if (!session?.user.email || !session.user.id) {
+    throw new Error("Not authenticated");
+  }
+  return { userId: session.user.id, email: session.user.email };
 }
 
 // ---------------------------------------------------------------------------

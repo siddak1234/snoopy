@@ -170,7 +170,7 @@ export function initials(name: string): string {
 /**
  * Build an optimistic, not-yet-screened candidate for the dashboard list after
  * an upload — `id` is the candidate_id the upload route returned, so the real
- * `resume_review` row (inserted by n8n with the same id) reconciles with it on
+ * `resume_review` projection row (published with the same id) reconciles with it on
  * the next fetch. `decision`/`fitScore` are placeholders, never read while
  * `pending` is true.
  */

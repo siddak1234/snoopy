@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import OAuthFragmentRedirect from "@/components/auth/OAuthFragmentRedirect";
 import MotionProvider from "@/components/motion/MotionProvider";
 import { site } from "@/lib/site";
 import "./globals.css";
@@ -42,10 +41,7 @@ export default function RootLayout({
       <body
         className={`${inter.variable} min-h-screen overflow-x-clip antialiased`}
       >
-        <MotionProvider>
-          <OAuthFragmentRedirect />
-          {children}
-        </MotionProvider>
+        <MotionProvider>{children}</MotionProvider>
       </body>
     </html>
   );

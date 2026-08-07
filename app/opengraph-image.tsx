@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 
-export const runtime = "edge";
+// Next 16 deprecates Edge here and disables static generation for this image route.
+export const runtime = "nodejs";
 export const alt = "Autom8x — Automation multiplied by AI";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";

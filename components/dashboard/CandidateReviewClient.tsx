@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { platformApiJson } from "@/lib/platform-api";
 import {
   DecisionPill,
   EmptyMessage,
@@ -29,7 +29,6 @@ export function CandidateReviewClient({
   role: string;
   department: string;
 }) {
-  const supabase = useMemo(() => createClient(), []);
   const [state, setState] = useState<
     | { status: "loading" }
     | { status: "error" }
@@ -39,16 +38,19 @@ export function CandidateReviewClient({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase
-        .from("resume_review")
-        .select("*, posting:job_postings(role, role_title)")
-        .eq("project_id", projectId);
-      if (cancelled) return;
-      if (error) {
+      let data: ResumeReviewRow[];
+      try {
+        const response = await platformApiJson<{ items: ResumeReviewRow[] }>(
+          `/v1/projects/${encodeURIComponent(projectId)}/recruiting/candidates`,
+        );
+        data = response.items;
+      } catch {
+        if (cancelled) return;
         setState({ status: "error" });
         return;
       }
-      const candidates = ((data ?? []) as unknown as ResumeReviewRow[])
+      if (cancelled) return;
+      const candidates = data
         .map(mapResumeRow)
         .filter((c) => c.flagged)
         .filter((c) => (role ? c.role === role : true))
@@ -59,7 +61,7 @@ export function CandidateReviewClient({
     return () => {
       cancelled = true;
     };
-  }, [supabase, projectId, role, department]);
+  }, [projectId, role, department]);
 
   if (state.status === "loading") {
     return (

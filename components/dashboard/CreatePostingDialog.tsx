@@ -5,6 +5,7 @@ import Modal from "@/components/ui/Modal";
 import { FormInput } from "@/components/ui/FormInput";
 import { FormError } from "@/components/ui/FormError";
 import { FilePicker } from "@/components/ui/FilePicker";
+import { platformApiPath } from "@/lib/platform-api";
 
 // Create-job-posting popup. A posting is a (role, department) opening with a
 // job-description PDF. Built on the same shared Modal / FormInput / FormError /
@@ -115,13 +116,20 @@ export function CreatePostingDialog({
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/job-descriptions/upload", {
-        method: "POST",
-        body: fd,
-      });
+      const res = await fetch(
+        platformApiPath(
+          `/v1/projects/${encodeURIComponent(projectId)}/job-postings`,
+        ),
+        { method: "POST", body: fd },
+      );
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(data.error ?? "Upload failed. Please try again.");
+        const data = (await res.json().catch(() => ({}))) as {
+          detail?: string;
+          error?: string;
+        };
+        setError(
+          data.detail ?? data.error ?? "Upload failed. Please try again.",
+        );
         return;
       }
       onCreate({

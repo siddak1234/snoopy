@@ -4,7 +4,7 @@
 //
 // Edit this file → re-run the seed script (or write a sync task) to propagate
 // changes to existing projects. The same 28 codes are also the default list
-// baked into prompts/general/gl-code-allocation-v2.md and the v2 n8n code
+// baked into the historical allocation contract and retained for compatibility
 // node — if you add/remove a code here, mirror it there.
 //
 // Schema matches gl_account_map columns (project_id is added per-project at

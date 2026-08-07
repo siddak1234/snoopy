@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { platformApiPath } from "@/lib/platform-api";
 
 // Extension detection runs on the URL-encoded filename — encoded chars don't
 // affect the trailing extension. Lowercased to accept ".PDF" etc.
@@ -33,11 +34,9 @@ export function InvoiceFileViewer({
   // navigation — sidestepping the 5-min signed-URL expiry for long views.
   const url = useMemo(
     () =>
-      `/api/invoices/file?project=${encodeURIComponent(
-        projectId,
-      )}&file=${encodeURIComponent(filename)}&lounge=${encodeURIComponent(
-        loungeCode,
-      )}`,
+      `${platformApiPath(
+        `/v1/projects/${encodeURIComponent(projectId)}/invoice-file`,
+      )}?file=${encodeURIComponent(filename)}&lounge_code=${encodeURIComponent(loungeCode)}`,
     [projectId, filename, loungeCode],
   );
   const kind = useMemo(() => detectKind(filename), [filename]);

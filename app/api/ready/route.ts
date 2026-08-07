@@ -1,24 +1,31 @@
 import { NextResponse } from "next/server";
+import { backendApiOrigin } from "@/lib/backend-origin";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/**
- * Readiness probe: DB check only at request time. No top-level db import.
- * When POSTGRES_URL is set (Vercel env), runs SELECT 1; otherwise 200 + database:"skipped".
- */
 export async function GET() {
-  if (!process.env.POSTGRES_URL) {
-    return NextResponse.json({ status: "ok", database: "skipped" });
+  const origin = backendApiOrigin();
+  if (!origin) {
+    return NextResponse.json(
+      { status: "not-ready", backend: "not-configured" },
+      { status: 503 },
+    );
   }
 
   try {
-    const { prisma } = await import("@/lib/db");
-    await prisma.$queryRaw`SELECT 1`;
-    return NextResponse.json({ status: "ok", database: "connected" });
+    const response = await fetch(`${origin}/health/ready`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(3_000),
+    });
+    const body = await response.json().catch(() => null);
+    return NextResponse.json(
+      { status: response.ok ? "ready" : "not-ready", backend: body },
+      { status: response.ok ? 200 : 503 },
+    );
   } catch {
     return NextResponse.json(
-      { status: "error", database: "disconnected" },
+      { status: "not-ready", backend: "unreachable" },
       { status: 503 },
     );
   }

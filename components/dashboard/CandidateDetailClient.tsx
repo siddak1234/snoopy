@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState } from "react";
+import { platformApiJson } from "@/lib/platform-api";
 import { CandidateDetail } from "@/components/dashboard/CandidateDetail";
 import type {
   Candidate,
@@ -24,7 +24,6 @@ export function CandidateDetailClient({
   projectId: string;
   candidateId: string;
 }) {
-  const supabase = useMemo(() => createClient(), []);
   const [state, setState] = useState<
     | { status: "loading" }
     | { status: "error" }
@@ -35,22 +34,25 @@ export function CandidateDetailClient({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase
-        .from("resume_review")
-        .select("*, posting:job_postings(role, role_title)")
-        .eq("project_id", projectId)
-        .eq("id", candidateId)
-        .maybeSingle();
-      if (cancelled) return;
-      if (error) {
+      let data: ResumeReviewRow | null;
+      try {
+        const response = await platformApiJson<{
+          item: ResumeReviewRow | null;
+        }>(
+          `/v1/projects/${encodeURIComponent(projectId)}/recruiting/candidates/${encodeURIComponent(candidateId)}`,
+        );
+        data = response.item;
+      } catch {
+        if (cancelled) return;
         setState({ status: "error" });
         return;
       }
+      if (cancelled) return;
       if (!data) {
         setState({ status: "missing" });
         return;
       }
-      const row = data as unknown as ResumeReviewRow;
+      const row = data;
       setState({
         status: "ready",
         candidate: mapResumeRow(row),
@@ -60,7 +62,7 @@ export function CandidateDetailClient({
     return () => {
       cancelled = true;
     };
-  }, [supabase, projectId, candidateId]);
+  }, [projectId, candidateId]);
 
   if (state.status === "loading") {
     return <p className="text-sm text-[var(--muted)]">Loading candidate…</p>;
@@ -80,5 +82,11 @@ export function CandidateDetailClient({
       </div>
     );
   }
-  return <CandidateDetail candidate={state.candidate} detail={state.detail} />;
+  return (
+    <CandidateDetail
+      projectId={projectId}
+      candidate={state.candidate}
+      detail={state.detail}
+    />
+  );
 }

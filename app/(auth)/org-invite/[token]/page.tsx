@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { provisionUserFromSupabaseAuth } from "@/lib/auth-supabase";
+import { getAppSession } from "@/lib/app-session";
 import { getWorkspaceInviteByToken } from "@/lib/workspace-invites";
 import { AcceptOrgInviteForm } from "./AcceptOrgInviteForm";
 
@@ -38,21 +37,8 @@ export default async function OrgInvitePage({
     );
   }
 
-  // ── Auth check — use direct Supabase auth to avoid workspace creation ───
-  let isSignedIn = false;
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user?.id) {
-      // Provision app user row (idempotent) without creating a workspace
-      await provisionUserFromSupabaseAuth(user);
-      isSignedIn = true;
-    }
-  } catch {
-    // Treat as unauthenticated — the form will handle the error
-  }
+  const session = await getAppSession();
+  const isSignedIn = Boolean(session?.user.id);
 
   const callbackUrl = encodeURIComponent(`/org-invite/${token}`);
 

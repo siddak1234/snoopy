@@ -5,11 +5,12 @@ import Modal from "@/components/ui/Modal";
 import { FormInput } from "@/components/ui/FormInput";
 import { FormError } from "@/components/ui/FormError";
 import { FilePicker } from "@/components/ui/FilePicker";
+import { platformApiPath } from "@/lib/platform-api";
 
 // Upload-candidate popup. Collects a name + resume PDF, POSTs them (with the
-// inherited project + role + department) to /api/candidates/upload, which
-// forwards to the candidate n8n webhook for screening + insert into
-// resume_review. Built on the same shared Modal / FormInput / FormError / FilePicker
+// inherited project + role + department) to the backend artifact boundary.
+// The website does not own storage credentials or execution webhooks. Built on
+// the same shared Modal / FormInput / FormError / FilePicker
 // primitives as UploadInvoiceDialog so styling/behavior stay identical.
 //
 // Role + Company/Department are inherited from the dashboard's current filter
@@ -104,16 +105,21 @@ export function UploadCandidateDialog({
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/candidates/upload", {
-        method: "POST",
-        body: fd,
-      });
+      const res = await fetch(
+        platformApiPath(
+          `/v1/projects/${encodeURIComponent(projectId)}/candidate-artifacts`,
+        ),
+        { method: "POST", body: fd },
+      );
       const data = (await res.json().catch(() => ({}))) as {
+        detail?: string;
         error?: string;
         candidateId?: string;
       };
       if (!res.ok) {
-        setError(data.error ?? "Upload failed. Please try again.");
+        setError(
+          data.detail ?? data.error ?? "Upload failed. Please try again.",
+        );
         return;
       }
       onAdd({

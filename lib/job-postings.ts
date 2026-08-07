@@ -3,7 +3,7 @@
  *
  * A posting is one (role, department) opening per project, with an uploaded
  * job-description PDF. Persisted in the `job_postings` table (via
- * /api/job-descriptions/upload). The dashboard reads rows and maps them to the
+ * backend artifact API). The dashboard reads rows and maps them to the
  * `Posting` UI shape; `makePosting()` builds an optimistic row on create.
  */
 

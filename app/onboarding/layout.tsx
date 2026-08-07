@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db";
-import { provisionUserFromSupabaseAuth } from "@/lib/auth-supabase";
+import { getAppSession } from "@/lib/app-session";
 import LogoMark from "@/components/branding/LogoMark";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 
@@ -22,14 +21,9 @@ export default async function OnboardingLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const { id: userId } = await provisionUserFromSupabaseAuth(user);
+  const session = await getAppSession();
+  if (!session?.user.id) redirect("/login");
+  const userId = session.user.id;
 
   // Only redirect if the user already has an org workspace — a pre-existing
   // personal workspace must not block org creation/joining.

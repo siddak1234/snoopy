@@ -4,10 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Modal from "@/components/ui/Modal";
 import { FormInput } from "@/components/ui/FormInput";
 import { FormError } from "@/components/ui/FormError";
+import { platformApiPath } from "@/lib/platform-api";
 
 // Upload-invoice popup. Collects a file + invoice fields, POSTs them as
-// multipart/form-data to /api/invoices/upload, which uploads the PDF to GCS
-// and triggers the n8n ingest workflow. Built on the shared Modal / FormInput
+// multipart/form-data to the backend artifact boundary. The website never owns
+// object-store credentials or an execution-engine webhook. Built on the shared Modal / FormInput
 // / FormError components (same pattern as CreateProjectDialog) so
 // styling/behavior stay consistent.
 
@@ -141,13 +142,23 @@ export function UploadInvoiceDialog({
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/invoices/upload", {
-        method: "POST",
-        body: fd,
-      });
+      const res = await fetch(
+        platformApiPath(
+          `/v1/projects/${encodeURIComponent(projectId)}/invoice-artifacts`,
+        ),
+        {
+          method: "POST",
+          body: fd,
+        },
+      );
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(data.error ?? "Upload failed. Please try again.");
+        const data = (await res.json().catch(() => ({}))) as {
+          detail?: string;
+          error?: string;
+        };
+        setError(
+          data.detail ?? data.error ?? "Upload failed. Please try again.",
+        );
         return;
       }
       setCaptured(trimmed);
@@ -306,7 +317,7 @@ export function UploadInvoiceDialog({
             </div>
 
             {/* Description — optional context for the workflow. Capped at
-                MAX_DESCRIPTION_LEN so the n8n payload stays light. */}
+                MAX_DESCRIPTION_LEN so the ingest request stays bounded. */}
             <div>
               <label
                 htmlFor="upload-description"

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getAppSession } from "@/lib/auth-supabase";
+import { getAppSession } from "@/lib/app-session";
 import { getWorkflowsForUser } from "@/lib/workflows";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { WorkflowCardsClient } from "@/components/workflows/WorkflowCardsClient";

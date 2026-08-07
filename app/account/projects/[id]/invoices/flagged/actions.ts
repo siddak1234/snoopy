@@ -1,6 +1,6 @@
 "use server";
 
-import { getAppSession } from "@/lib/auth-supabase";
+import { getAppSession } from "@/lib/app-session";
 import { prisma } from "@/lib/db";
 import { canUserPerform } from "@/lib/project-rbac";
 import { recomputeAllocationRow } from "@/lib/gl-allocations";

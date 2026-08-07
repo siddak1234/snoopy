@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 // gl_code_allocations isn't in prisma/schema.prisma (Supabase-managed table),
 // so we use $executeRaw / $queryRaw rather than typed model methods. The
 // category columns and `allocation_column` values are mirrored in
-// running-total/{claros,general}/*.code-node.js for the n8n side; if you add
+// the historical running-total implementations; if you add
 // a new column there, add it to ALLOCATION_COLUMNS below too.
 
 export const ALLOCATION_COLUMNS = [
@@ -40,7 +40,7 @@ export type AllocationColumn = (typeof ALLOCATION_COLUMNS)[number];
 // Recompute one allocation row from its responsible line items.
 //
 // Responsible = lines for the same (project_id, location) whose `createdAt`
-// falls within the row's period date range. Matches the bucketing the n8n
+// falls within the row's period date range. Matches the established bucketing
 // running-total workflow uses (execution date, not Invoice_Date).
 //
 // Touched columns get summed from line items grouped by `gl_account_map.allocation_column`.
@@ -135,7 +135,7 @@ export async function recomputeAllocationRow(
 
   // Build a single UPDATE that sets every category column. Columns not in
   // `perColumn` get NULL — matches the "no clutter for untouched categories"
-  // convention from the n8n new-running-total node.
+  // convention from the historical running-total processor.
   const columnAssignments = ALLOCATION_COLUMNS.map((col) => {
     const value = perColumn[col];
     return value !== undefined ? `${col} = ${value}` : `${col} = NULL`;

@@ -1,6 +1,6 @@
 // Claros team project UUIDs. Add to this set if Claros ever stands up another
 // team project that should use the Claros pipeline (Claros GCS bucket,
-// Claros n8n webhook, 80-row Claros chart of accounts). Anything not in this
+// Claros historical integration, 80-row Claros chart of accounts). Anything not in this
 // set falls through to the Autom8x / general flow — including personal
 // projects owned by Claros employees. The boundary is the project, not the
 // person.

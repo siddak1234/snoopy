@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getAppSession } from "@/lib/auth-supabase";
+import { getAppSession } from "@/lib/app-session";
 import { prisma } from "@/lib/db";
 import { extractDomain, isPublicDomain } from "@/lib/domain-utils";
 import SectionCard from "@/components/dashboard/SectionCard";

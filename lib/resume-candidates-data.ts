@@ -8,7 +8,7 @@ import type {
   SkillMatch,
 } from "@/lib/resume-candidates";
 
-// Maps `resume_review` rows (populated by the n8n screening workflow) onto the
+// Maps `resume_review` projection rows onto the
 // Candidate / CandidateDetail shapes the dashboard + detail view render. The
 // rich nested detail is read from `audit_json` (the clean original model output)
 // with column fallbacks; column casing matches Postgres exactly.
@@ -110,7 +110,7 @@ function hostLabel(u: string): string {
 
 // jsonb arrays may hold plain strings or objects ({skill}, {reason}, …); coerce
 // to a clean string[] so chips / lists render uniformly. Also accepts a single
-// string (some columns got flattened by the n8n normalize) → [string].
+// string (some historical rows were flattened during normalization) → [string].
 function toStringList(value: unknown): string[] {
   if (typeof value === "string") return value.trim() ? [value] : [];
   if (!Array.isArray(value)) return [];

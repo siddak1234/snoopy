@@ -1,9 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getAppSession } from "@/lib/auth-supabase";
-import { createClient } from "@/lib/supabase/server";
-import { provisionUserFromSupabaseAuth } from "@/lib/auth-supabase";
+import { getAppSession } from "@/lib/app-session";
 import {
   createWorkspaceInvite,
   validateAndAcceptWorkspaceInvite,
@@ -81,27 +79,18 @@ export type AcceptWorkspaceInviteActionResult =
 /**
  * Accept a workspace invite by token + code. Adds the current user as a MEMBER.
  *
- * Uses direct Supabase auth (not getAppSession) to avoid triggering personal
- * workspace creation for brand-new users who come through an invite link.
+ * Uses the backend session. Identity provisioning and workspace selection are
+ * owned by the Access service, not this web action.
  */
 export async function acceptWorkspaceInviteAction(
   token: string,
   code: string,
 ): Promise<AcceptWorkspaceInviteActionResult> {
-  let userId: string;
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return { ok: false, error: "You must be signed in to accept an invite." };
-    }
-    const provisioned = await provisionUserFromSupabaseAuth(user);
-    userId = provisioned.id;
-  } catch {
+  const session = await getAppSession();
+  if (!session?.user.id) {
     return { ok: false, error: "You must be signed in to accept an invite." };
   }
+  const userId = session.user.id;
 
   if (!token?.trim() || !code?.trim()) {
     return { ok: false, error: "Token and code are required." };

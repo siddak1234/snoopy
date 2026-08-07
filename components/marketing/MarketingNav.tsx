@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { usePathname, useRouter } from "next/navigation";
+import { signOutFromPlatform } from "@/lib/platform-api";
 import { useAppSession } from "@/hooks/use-app-session";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { marketingNav } from "@/lib/nav";
@@ -18,13 +18,14 @@ import MobileNavMenu from "@/components/navigation/MobileNavMenu";
  */
 export function MarketingNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const mounted = useHydrated();
   const { data: session, status } = useAppSession();
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    window.location.href = "/";
+    await signOutFromPlatform();
+    router.replace("/");
+    router.refresh();
   }
 
   const sessionArea =

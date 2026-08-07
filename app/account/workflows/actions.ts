@@ -1,6 +1,6 @@
 "use server";
 
-import { getAppSession } from "@/lib/auth-supabase";
+import { getAppSession } from "@/lib/app-session";
 import { revalidatePath } from "next/cache";
 import {
   createWorkflow as createWorkflowDb,

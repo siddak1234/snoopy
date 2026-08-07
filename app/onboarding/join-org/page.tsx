@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAppSession } from "@/lib/app-session";
 import { prisma } from "@/lib/db";
 import { extractDomain } from "@/lib/domain-utils";
 import { JoinOrgForm } from "./JoinOrgForm";
@@ -15,12 +15,8 @@ export default async function JoinOrgPage({
 
   if (!workspaceId) redirect("/onboarding/setup-org");
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user?.email) redirect("/login");
+  const session = await getAppSession();
+  if (!session?.user.email) redirect("/login");
 
   // Fetch workspace for display only — workspaceId from the URL is used here
   // solely to show the org name. The actual join action re-verifies domain
@@ -38,7 +34,7 @@ export default async function JoinOrgPage({
   if (!workspace) redirect("/onboarding/setup-org");
 
   // Belt-and-suspenders: confirm the user's domain still matches before rendering
-  const userDomain = extractDomain(user.email);
+  const userDomain = extractDomain(session.user.email);
   if (!userDomain || userDomain !== workspace.domain) {
     redirect("/onboarding/setup-org");
   }

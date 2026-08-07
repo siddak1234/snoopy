@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { platformApiJson } from "@/lib/platform-api";
 import {
   KpiTile,
   ClickableKpiTile,
@@ -36,12 +36,10 @@ import {
 } from "@/lib/job-postings";
 
 // Resume Reviewer dashboard. Mirrors the GL Code Allocation dashboard: reads its
-// rows client-side from `resume_review` (RLS-gated by project membership) and
+// rows through the backend recruiting projection and
 // reuses the same presentational primitives (DashboardKit). A freshly uploaded
 // candidate is shown optimistically as "Pending" and reconciled with its real
-// (screened) row — same id — once n8n inserts it.
-
-const TABLE = "resume_review";
+// (screened) row — same id — once durable processing publishes it.
 
 const integerFmt = new Intl.NumberFormat("en-US");
 const dateFmt = new Intl.DateTimeFormat("en-US", {
@@ -57,7 +55,6 @@ function uniqueSorted(values: string[]): string[] {
 }
 
 export function ResumeReviewerDashboard({ projectId }: { projectId: string }) {
-  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
   // `candidates` = real rows from the DB (null = loading). `optimistic` = rows
@@ -81,61 +78,63 @@ export function ResumeReviewerDashboard({ projectId }: { projectId: string }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase
-        .from(TABLE)
-        .select("*, posting:job_postings(role, role_title)")
-        .eq("project_id", projectId);
-      if (cancelled) return;
-      if (error) {
+      let data: ResumeReviewRow[];
+      try {
+        const response = await platformApiJson<{ items: ResumeReviewRow[] }>(
+          `/v1/projects/${encodeURIComponent(projectId)}/recruiting/candidates`,
+        );
+        data = response.items;
+      } catch {
+        if (cancelled) return;
         setLoadError("Could not load candidates.");
         setCandidates([]);
         return;
       }
+      if (cancelled) return;
       setLoadError(null);
-      setCandidates(
-        ((data ?? []) as unknown as ResumeReviewRow[])
-          .filter((r) => !r.archived)
-          .map(mapResumeRow),
-      );
+      setCandidates(data.filter((r) => !r.archived).map(mapResumeRow));
     })();
     return () => {
       cancelled = true;
     };
-  }, [supabase, projectId]);
+  }, [projectId]);
 
   // Load persisted postings for this project (drive the filter options even
   // before any candidate exists). RLS-gated like the candidates read.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase
-        .from("job_postings")
-        .select("*")
-        .eq("project_id", projectId)
-        .eq("archived", false);
-      if (cancelled || error) return;
-      setPostings(
-        ((data ?? []) as unknown as JobPostingRow[]).map(mapJobPostingRow),
-      );
+      try {
+        const response = await platformApiJson<{ items: JobPostingRow[] }>(
+          `/v1/projects/${encodeURIComponent(projectId)}/job-postings?archived=false`,
+        );
+        if (cancelled) return;
+        setPostings(response.items.map(mapJobPostingRow));
+      } catch {
+        // Candidate loading owns the page-level error state; posting filters
+        // remain empty when their independent projection is unavailable.
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [supabase, projectId]);
+  }, [projectId]);
 
   // Silent refetch used by the post-upload poll; returns the fresh rows.
   const reload = useCallback(async (): Promise<Candidate[]> => {
-    const { data, error } = await supabase
-      .from(TABLE)
-      .select("*, posting:job_postings(role, role_title)")
-      .eq("project_id", projectId);
-    if (error) return [];
-    const mapped = ((data ?? []) as unknown as ResumeReviewRow[])
-      .filter((r) => !r.archived)
-      .map(mapResumeRow);
-    setCandidates(mapped);
-    return mapped;
-  }, [supabase, projectId]);
+    try {
+      const response = await platformApiJson<{ items: ResumeReviewRow[] }>(
+        `/v1/projects/${encodeURIComponent(projectId)}/recruiting/candidates`,
+      );
+      const mapped = response.items
+        .filter((row) => !row.archived)
+        .map(mapResumeRow);
+      setCandidates(mapped);
+      return mapped;
+    } catch {
+      return [];
+    }
+  }, [projectId]);
 
   // Clear any pending poll on unmount.
   useEffect(
