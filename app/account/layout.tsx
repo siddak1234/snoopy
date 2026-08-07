@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
-import { prisma } from "@/lib/db";
 import {
   DashboardSidebar,
   DashboardHeader,
@@ -21,12 +20,10 @@ export default async function AccountLayout({
   // Determine whether to show the Organization link in the sidebar.
   // Check all memberships — the session workspaceId may be a personal workspace
   // even when the user is also OWNER of an org workspace.
-  const { id: userId } = session.user;
-  const orgOwnerMembership = await prisma.membership.findFirst({
-    where: { userId, role: "OWNER", workspace: { type: "organization" } },
-    select: { workspaceId: true },
-  });
-  const showOrgSettings = !!orgOwnerMembership;
+  const showOrgSettings = session.workspaces.some(
+    (workspace) =>
+      workspace.type === "organization" && workspace.role === "owner",
+  );
 
   return (
     // Self-contained dashboard shell: the route-group split means no marketing

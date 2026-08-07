@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { getAppSession } from "@/lib/app-session";
 import LogoMark from "@/components/branding/LogoMark";
 import ThemeToggle from "@/components/theme/ThemeToggle";
@@ -23,14 +22,11 @@ export default async function OnboardingLayout({
 }) {
   const session = await getAppSession();
   if (!session?.user.id) redirect("/login");
-  const userId = session.user.id;
-
   // Only redirect if the user already has an org workspace — a pre-existing
   // personal workspace must not block org creation/joining.
-  const existing = await prisma.membership.findFirst({
-    where: { userId, workspace: { type: "organization" } },
-    select: { workspaceId: true },
-  });
+  const existing = session.workspaces.some(
+    (workspace) => workspace.type === "organization",
+  );
 
   if (existing) redirect("/account");
 
