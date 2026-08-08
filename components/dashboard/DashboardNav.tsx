@@ -6,6 +6,9 @@ import { useEffect, useRef, useState } from "react";
 
 export const dashboardNavItems = [
   { href: "/account", label: "Home" },
+  { href: "/account/automations", label: "Automations" },
+  { href: "/account/runs", label: "Activity" },
+  { href: "/account/approvals", label: "Approvals" },
   { href: "/account/projects", label: "Projects" },
   { href: "/account/billing", label: "Billing" },
   { href: "/account/settings", label: "Settings" },
