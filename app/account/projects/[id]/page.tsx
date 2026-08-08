@@ -13,12 +13,7 @@ import { LeaveProjectButton } from "@/components/dashboard/LeaveProjectButton";
 import { ProjectMemberPicker } from "@/components/dashboard/ProjectMemberPicker";
 import { ProjectMemberList } from "@/components/dashboard/ProjectMemberList";
 import type { MemberRow } from "@/components/dashboard/ProjectMemberList";
-import { GlCodeAllocationDashboard } from "@/components/dashboard/GlCodeAllocationDashboard";
-import { ResumeReviewerDashboard } from "@/components/dashboard/ResumeReviewerDashboard";
 import type { AvailableMember } from "@/components/dashboard/ProjectMemberPicker";
-
-const GL_CODE_PROJECT_TYPE = "GL Code Classification";
-const RESUME_REVIEWER_PROJECT_TYPE = "Resume Reviewer";
 
 export default async function ProjectDetailPage({
   params,
@@ -81,11 +76,7 @@ export default async function ProjectDetailPage({
   return (
     <SectionCard
       title={project.name}
-      subheader={
-        project.type === RESUME_REVIEWER_PROJECT_TYPE
-          ? "Candidate screening"
-          : project.type || undefined
-      }
+      subheader={project.type || undefined}
       primaryAction={
         canAddMembers ? (
           <ProjectMemberPicker
@@ -119,18 +110,6 @@ export default async function ProjectDetailPage({
         </div>
       }
     >
-      {project.type === GL_CODE_PROJECT_TYPE ? (
-        <div className="py-5 first:pt-0">
-          <GlCodeAllocationDashboard projectId={project.id} />
-        </div>
-      ) : null}
-
-      {project.type === RESUME_REVIEWER_PROJECT_TYPE ? (
-        <div className="py-5 first:pt-0">
-          <ResumeReviewerDashboard projectId={project.id} />
-        </div>
-      ) : null}
-
       {canViewMembers ? (
         <div className="border-t border-[var(--ring)] py-5 first:pt-0">
           <div className="flex items-center justify-between">

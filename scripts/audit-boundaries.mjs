@@ -26,10 +26,17 @@ const forbiddenRuntimePatterns = [
   },
 ];
 
+// Files still reaching the legacy database directly. The set may only SHRINK:
+// a new direct-database import outside it fails, and a file that no longer
+// needs the entry fails until the entry is removed. It reaches zero when the
+// Access and Catalog APIs replace these callers, at which point `lib/db.ts`,
+// `prisma/`, and the database dependencies are deleted together.
+//
+// 2026-08-08: 14 → 12. The invoice-flagged action and the workflow store went
+// with the verticals and the builder they served.
 const legacyDatabaseAllowlist = new Set([
   "app/account/organization/actions.ts",
   "app/account/organization/page.tsx",
-  "app/account/projects/[id]/invoices/flagged/actions.ts",
   "app/account/projects/actions.ts",
   "app/account/projects/page.tsx",
   "app/onboarding/actions.ts",
@@ -39,7 +46,6 @@ const legacyDatabaseAllowlist = new Set([
   "lib/project-rbac.ts",
   "lib/projects.ts",
   "lib/tenant.ts",
-  "lib/workflows.ts",
   "lib/workspace-invites.ts",
 ]);
 

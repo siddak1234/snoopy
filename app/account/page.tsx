@@ -31,16 +31,16 @@ export default async function AccountDashboardPage() {
       greeting={greeting}
       subheader="Here's what's happening in your workspace."
       primaryAction={
-        <Link href="/account/builder" className="btn-primary inline-flex px-5">
-          Create workflow
+        <Link href="/solutions" className="btn-primary inline-flex px-5">
+          Browse automations
         </Link>
       }
       secondaryAction={
         <Link
-          href="/account/builder"
+          href="/account/settings"
           className="btn-secondary inline-flex px-5"
         >
-          Browse templates
+          Connect integration
         </Link>
       }
     >
@@ -50,16 +50,16 @@ export default async function AccountDashboardPage() {
         </h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link
-            href="/account/builder"
+            href="/solutions"
             className="btn-primary inline-flex px-4 py-2 text-sm"
           >
-            Create workflow
+            Browse automations
           </Link>
           <Link
-            href="/account/builder"
+            href="/account/projects"
             className="inline-flex items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
           >
-            Browse templates
+            View projects
           </Link>
           <Link
             href="/account/settings"
@@ -75,7 +75,7 @@ export default async function AccountDashboardPage() {
           Workspace overview
         </h2>
         <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:max-w-md">
-          <dt className="text-[var(--muted)]">Workflows</dt>
+          <dt className="text-[var(--muted)]">Automations</dt>
           <dd className="text-[var(--text)]">0</dd>
           <dt className="text-[var(--muted)]">Runs this month</dt>
           <dd className="text-[var(--text)]">0</dd>
@@ -93,7 +93,7 @@ export default async function AccountDashboardPage() {
         </h2>
         <p className="mt-3 text-sm text-[var(--muted)]">No activity yet.</p>
         <p className="mt-1 text-xs text-[var(--muted)]">
-          Create your first workflow to see runs and events here.
+          Subscribe to an automation to see runs and events here.
         </p>
       </div>
 
@@ -165,20 +165,17 @@ export default async function AccountDashboardPage() {
             Get started
           </h3>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            Create your first workflow or choose a template.
+            Browse the automations available and connect the accounts one needs.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link
-              href="/account/builder"
-              className="btn-primary inline-flex px-5"
-            >
-              Create workflow
+            <Link href="/solutions" className="btn-primary inline-flex px-5">
+              Browse automations
             </Link>
             <Link
-              href="/account/builder"
+              href="/account/settings"
               className="btn-secondary inline-flex px-5"
             >
-              Browse templates
+              Connect integration
             </Link>
           </div>
         </div>
