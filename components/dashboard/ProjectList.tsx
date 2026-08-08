@@ -5,6 +5,7 @@ import type {
   WorkspaceType,
 } from "@prisma/client";
 import { DeleteProjectButton } from "./DeleteProjectButton";
+import { StatusPill } from "./StatusPill";
 
 export type ProjectListItem = {
   id: string;
@@ -18,31 +19,6 @@ export type ProjectListItem = {
   workspaceName: string | null;
   workspaceType: WorkspaceType | null;
 };
-
-const statusLabel: Record<ProjectStatus, string> = {
-  active: "Active",
-  paused: "Paused",
-  draft: "Draft",
-  archived: "Archived",
-};
-
-function StatusPill({ status }: { status: ProjectStatus }) {
-  const variant =
-    status === "active"
-      ? "bg-[var(--chip-bg)] text-[var(--chip-text)]"
-      : status === "paused"
-        ? "bg-[var(--warning-bg)] text-[var(--warning-text)]"
-        : status === "draft"
-          ? "bg-[var(--muted)]/20 text-[var(--muted)]"
-          : "bg-[var(--ring)]/50 text-[var(--muted)]";
-  return (
-    <span
-      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${variant}`}
-    >
-      {statusLabel[status]}
-    </span>
-  );
-}
 
 const roleLabel: Record<ProjectMemberRole, string> = {
   owner: "Owner",

@@ -376,31 +376,6 @@ export function RankedList({ items }: { items: RankedItem[] }) {
 }
 
 // ---------------------------------------------------------------------------
-// Decision pill (outcome chip with success/warning/error tones)
-// ---------------------------------------------------------------------------
-
-/**
- * Colored outcome chip. Unlike StatusPill (which only knows invoice statuses),
- * this maps decision-style outcomes to success/warning/error tokens. Unknown
- * values render neutral.
- */
-export function DecisionPill({ decision }: { decision: string | null }) {
-  const normalized = (decision ?? "").toLowerCase().trim();
-  let cls =
-    "inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium capitalize";
-  if (normalized === "advance") {
-    cls += " bg-[var(--success-bg)] text-[var(--success-text)]";
-  } else if (normalized === "hold") {
-    cls += " bg-[var(--warning-bg)] text-[var(--warning-text)]";
-  } else if (normalized === "reject") {
-    cls += " bg-[var(--error-bg)] text-[var(--error-text)]";
-  } else {
-    cls += " bg-[var(--surface-strong)] text-[var(--muted)]";
-  }
-  return <span className={cls}>{decision ?? "—"}</span>;
-}
-
-// ---------------------------------------------------------------------------
 // Empty-state message
 // ---------------------------------------------------------------------------
 
