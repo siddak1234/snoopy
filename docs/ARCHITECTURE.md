@@ -1,6 +1,6 @@
 # Snoopy website architecture
 
-Status: **Round 5 web boundary complete**
+Status: **Round 5 web boundary implemented; release audit pending**
 
 Snoopy is the Autom8x web client and same-origin BFF surface. The backend Edge
 API owns identity, tenancy, product data, provider credentials, artifacts,
