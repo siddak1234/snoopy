@@ -89,6 +89,15 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // OpenGraph images are rendered outside the browser and cannot consume the
+  // CSS custom properties in globals.css. Their fixed palette is the documented
+  // exception to the token rule; it is kept isolated to this one generator.
+  {
+    files: ["app/opengraph-image.tsx"],
+    rules: {
+      "no-restricted-syntax": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

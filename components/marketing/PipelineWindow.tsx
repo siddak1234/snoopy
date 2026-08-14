@@ -233,7 +233,7 @@ function PipelineSvg({ variant }: { variant: Variant }) {
             dx="0"
             dy="6"
             stdDeviation="10"
-            floodColor="#000000"
+            floodColor={art("shadow")}
             floodOpacity="0.35"
           />
         </filter>

@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
-import { prisma } from "@/lib/db";
-import { extractDomain } from "@/lib/domain-utils";
+import { discoverOrganizations } from "@/lib/tenancy";
 import { JoinOrgForm } from "./JoinOrgForm";
 
 export const metadata = { title: "Join your organization" };
@@ -12,30 +11,16 @@ export default async function JoinOrgPage({
   searchParams: Promise<{ w?: string }>;
 }) {
   const { w: workspaceId } = await searchParams;
-
   if (!workspaceId) redirect("/onboarding/setup-org");
 
   const session = await getAppSession();
   if (!session?.user.email) redirect("/login");
 
-  // Fetch workspace for display only — workspaceId from the URL is used here
-  // solely to show the org name. The actual join action re-verifies domain
-  // server-side and never trusts this ID.
-  const workspace = await prisma.workspace.findUnique({
-    where: { id: workspaceId },
-    select: { id: true, name: true, domain: true, type: true },
-  });
-
-  // Must be an organization workspace; personal workspaces aren't joinable.
-  if (workspace && workspace.type !== "organization") {
-    redirect("/onboarding/setup-org");
-  }
-
-  if (!workspace) redirect("/onboarding/setup-org");
-
-  // Belt-and-suspenders: confirm the user's domain still matches before rendering
-  const userDomain = extractDomain(session.user.email);
-  if (!userDomain || userDomain !== workspace.domain) {
+  const organizations = await discoverOrganizations();
+  const organization = organizations.find(
+    (candidate) => candidate.workspaceId === workspaceId,
+  );
+  if (!organization || organization.membershipState === "member") {
     redirect("/onboarding/setup-org");
   }
 
@@ -46,18 +31,17 @@ export default async function JoinOrgPage({
           Join your team
         </h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          Your email domain{" "}
-          <span className="font-mono font-medium text-[var(--text)]">
-            {workspace.domain}
-          </span>{" "}
-          is registered to{" "}
+          Your verified email domain is registered to{" "}
           <span className="font-medium text-[var(--text)]">
-            {workspace.name}
+            {organization.name}
           </span>
           . Would you like to join?
         </p>
-
-        <JoinOrgForm workspaceName={workspace.name} />
+        <JoinOrgForm
+          workspaceId={organization.workspaceId}
+          workspaceName={organization.name}
+          requested={organization.membershipState === "requested"}
+        />
       </div>
     </div>
   );

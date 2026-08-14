@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useReducedMotion } from "framer-motion";
 
 /**
  * The design's 2px scroll-progress line pinned to the top of the viewport.
@@ -11,8 +12,12 @@ import { useEffect, useRef, useState } from "react";
 export function ScrollProgressBar() {
   const ref = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<"css" | "js" | null>(null);
+  const reduceMotion = useReducedMotion();
+  const visibleMode = reduceMotion ? null : mode;
 
   useEffect(() => {
+    if (reduceMotion) return;
+
     // Deferred a frame: feature detection is client-only, and the bar starts
     // at scaleX(0) either way, so the one-frame delay is invisible.
     const id = requestAnimationFrame(() => {
@@ -24,10 +29,10 @@ export function ScrollProgressBar() {
       );
     });
     return () => cancelAnimationFrame(id);
-  }, []);
+  }, [reduceMotion]);
 
   useEffect(() => {
-    if (mode !== "js") return;
+    if (reduceMotion || mode !== "js") return;
     const el = ref.current;
     if (!el) return;
     let raf = 0;
@@ -48,14 +53,14 @@ export function ScrollProgressBar() {
       window.removeEventListener("resize", onScroll);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [mode]);
+  }, [mode, reduceMotion]);
 
   return (
     <div
       ref={ref}
       aria-hidden
       className={`fixed top-0 right-0 left-0 z-[70] h-0.5 origin-left scale-x-0 bg-[linear-gradient(to_right,var(--color-accent),var(--color-accent-300))] ${
-        mode === "css"
+        visibleMode === "css"
           ? "[animation:progress-grow_linear_both] [animation-timeline:scroll()]"
           : ""
       }`}

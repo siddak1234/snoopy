@@ -56,6 +56,7 @@ const STATUS_TONE: Record<string, Tone> = {
 
   // Connection, from Phase 5. Listed now because the screens that will use it
   // are being written against a server that already names these states.
+  authorizing: "info",
   connected: "success",
   disconnected: "neutral",
   "reauthorization-required": "warning",

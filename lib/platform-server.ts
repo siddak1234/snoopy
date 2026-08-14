@@ -22,6 +22,8 @@ export class PlatformServerError extends Error {
     public readonly status: number,
     /** The RFC 9457 `code`, when the backend supplied one. */
     public readonly code?: string,
+    /** Public, structured details. Callers must whitelist what they render. */
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "PlatformServerError";
@@ -36,7 +38,37 @@ export class PlatformNotConfiguredError extends Error {
   }
 }
 
-type Problem = { detail?: string; code?: string };
+type Problem = {
+  title?: string;
+  code?: string;
+  details?: Record<string, unknown>;
+};
+
+function fallbackProblemTitle(status: number): string {
+  if (status === 400) return "The request could not be accepted.";
+  if (status === 401) return "Sign in is required.";
+  if (status === 403) return "You are not allowed to complete this action.";
+  if (status === 404) return "The requested resource is unavailable.";
+  if (status === 409)
+    return "This request conflicts with an earlier operation.";
+  if (status === 502 || status === 503)
+    return "The platform could not complete this request.";
+  return "The platform could not complete this request.";
+}
+
+function publicProblem(value: unknown): Problem {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const problem = value as Record<string, unknown>;
+  return {
+    ...(typeof problem.title === "string" ? { title: problem.title } : {}),
+    ...(typeof problem.code === "string" ? { code: problem.code } : {}),
+    ...(problem.details &&
+    typeof problem.details === "object" &&
+    !Array.isArray(problem.details)
+      ? { details: problem.details as Record<string, unknown> }
+      : {}),
+  };
+}
 
 export async function platformServerJson<T>(
   path: string,
@@ -69,11 +101,12 @@ export async function platformServerJson<T>(
 
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    const problem = (body ?? {}) as Problem;
+    const problem = publicProblem(body);
     throw new PlatformServerError(
-      problem.detail ?? `Request failed with status ${response.status}`,
+      problem.title ?? fallbackProblemTitle(response.status),
       response.status,
       problem.code,
+      problem.details,
     );
   }
   return body as T;

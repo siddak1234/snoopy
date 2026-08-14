@@ -22,7 +22,7 @@ function getThemeSnapshot(): Theme {
 }
 
 // Always "dark" on the server so the initial client render matches the
-// pre-paint theme script's default (avoids hydration error #418).
+// pre-paint theme script's default (avoids the documented hydration warning).
 function getServerSnapshot(): Theme {
   return "dark";
 }

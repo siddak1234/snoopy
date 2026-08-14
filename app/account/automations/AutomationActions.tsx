@@ -2,8 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
-import type { SubscriptionStatus } from "@/lib/automations";
+import { FormError } from "@/components/ui/FormError";
+import { FormInput } from "@/components/ui/FormInput";
+import Modal from "@/components/ui/Modal";
+import type {
+  AutomationSetupField,
+  SubscriptionStatus,
+} from "@/lib/automations";
 import {
+  saveSubscriptionConfiguration,
   setSubscriptionStatus,
   subscribeToAutomation,
   triggerRun,
@@ -24,18 +31,22 @@ import {
 export function AutomationActions({
   templateId,
   available,
+  setup,
   subscription,
 }: {
   templateId: string;
   available: boolean;
+  setup: AutomationSetupField[];
   subscription: {
     id: string;
     status: SubscriptionStatus;
     canGoLive: boolean;
+    config: Record<string, unknown>;
   } | null;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [setupOpen, setSetupOpen] = useState(false);
 
   const submit = (
     action: (data: FormData) => Promise<ActionResult>,
@@ -54,6 +65,23 @@ export function AutomationActions({
     return data;
   };
 
+  const closeSetup = () => {
+    setSetupOpen(false);
+    setError(null);
+  };
+
+  const submitSetup = (data: FormData) => {
+    setError(null);
+    startTransition(async () => {
+      const result = await saveSubscriptionConfiguration(data);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      closeSetup();
+    });
+  };
+
   return (
     <div className="mt-auto flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -68,6 +96,19 @@ export function AutomationActions({
           </Button>
         ) : (
           <>
+            {setup.length > 0 ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={pending}
+                onClick={() => {
+                  setError(null);
+                  setSetupOpen(true);
+                }}
+              >
+                Set up
+              </Button>
+            ) : null}
             {subscription.status !== "live" ? (
               <Button
                 variant="primary"
@@ -123,6 +164,175 @@ export function AutomationActions({
           {error}
         </p>
       ) : null}
+
+      {subscription && setupOpen ? (
+        <Modal
+          onClose={closeSetup}
+          bubble
+          ariaLabelledBy={`automation-setup-${subscription.id}-title`}
+          ariaDescribedBy={`automation-setup-${subscription.id}-description`}
+          zIndex={100}
+        >
+          <h2
+            id={`automation-setup-${subscription.id}-title`}
+            className="text-xl font-semibold text-[var(--text)]"
+          >
+            Automation setup
+          </h2>
+          <p
+            id={`automation-setup-${subscription.id}-description`}
+            className="mt-1 text-sm text-[var(--muted)]"
+          >
+            Complete the settings supplied by this automation.
+          </p>
+          <form action={submitSetup} className="mt-6 space-y-6">
+            <input
+              type="hidden"
+              name="subscriptionId"
+              value={subscription.id}
+            />
+            <SetupFields setup={setup} config={subscription.config} />
+            <FormError message={error} />
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={closeSetup}
+                disabled={pending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={pending}>
+                {pending ? "Saving…" : "Save setup"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
     </div>
   );
+}
+
+function SetupFields({
+  setup,
+  config,
+}: {
+  setup: AutomationSetupField[];
+  config: Record<string, unknown>;
+}) {
+  const groups: Array<{
+    section: AutomationSetupField["section"];
+    fields: AutomationSetupField[];
+  }> = [];
+
+  // `setup` is published in manifest order. The contract declares a field's
+  // section, but it does not declare an independent section order, so grouping
+  // may never move a field ahead of an earlier one.
+  for (const field of setup) {
+    const currentGroup = groups.at(-1);
+    if (currentGroup?.section === field.section) {
+      currentGroup.fields.push(field);
+      continue;
+    }
+    groups.push({ section: field.section, fields: [field] });
+  }
+
+  return groups.map(({ section, fields }, groupIndex) => {
+    return (
+      <fieldset key={`${section}-${groupIndex}`} className="space-y-4">
+        <legend className="text-sm font-medium text-[var(--text)] capitalize">
+          {section}
+        </legend>
+        {fields.map((field) => (
+          <SetupField key={field.key} field={field} value={config[field.key]} />
+        ))}
+      </fieldset>
+    );
+  });
+}
+
+function SetupField({
+  field,
+  value,
+}: {
+  field: AutomationSetupField;
+  value: unknown;
+}) {
+  const hasDefault = Object.hasOwn(field, "defaultValue");
+  const initialValue = value ?? field.defaultValue;
+  const required = field.required && !hasDefault;
+  const fieldId = `setup-${field.key}`;
+
+  if (field.control === "toggle") {
+    return (
+      <div>
+        <input
+          type="hidden"
+          name={`config-control:${field.key}`}
+          value={field.control}
+        />
+        <label
+          htmlFor={fieldId}
+          className="flex items-start gap-3 text-sm text-[var(--text)]"
+        >
+          <input
+            id={fieldId}
+            name={`config:${field.key}`}
+            type="checkbox"
+            value="true"
+            defaultChecked={initialValue === true}
+            className="mt-1 size-4 rounded border-[var(--color-divider)] accent-[var(--color-accent)]"
+          />
+          <span>
+            <span className="font-medium">{field.title}</span>
+            <span className="mt-1 block text-xs text-[var(--muted)]">
+              {field.description}
+            </span>
+          </span>
+        </label>
+        <SetupFieldMetadata field={field} />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <input
+        type="hidden"
+        name={`config-control:${field.key}`}
+        value={field.control}
+      />
+      <FormInput
+        id={fieldId}
+        name={`config:${field.key}`}
+        type={inputType(field.control)}
+        step={field.control === "money" ? "any" : undefined}
+        label={field.title}
+        hint={field.description}
+        required={required}
+        defaultValue={
+          initialValue === undefined || initialValue === null
+            ? undefined
+            : String(initialValue)
+        }
+        autoComplete="off"
+      />
+      <SetupFieldMetadata field={field} />
+    </div>
+  );
+}
+
+function inputType(
+  control: AutomationSetupField["control"],
+): "number" | "text" {
+  if (control === "money") return "number";
+  // The contract provides no resource-list endpoint. A resource-picker therefore
+  // accepts the supplied opaque value without inventing a provider-specific list.
+  if (control === "resource-picker") return "text";
+  return "text";
+}
+
+function SetupFieldMetadata({ field }: { field: AutomationSetupField }) {
+  if (!field.notifies) return null;
+  return <p className="mt-1 text-xs text-[var(--muted)]">{field.notifies}</p>;
 }

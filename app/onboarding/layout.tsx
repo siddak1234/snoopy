@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
+import { listWorkspaces } from "@/lib/tenancy";
 import LogoMark from "@/components/branding/LogoMark";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 
@@ -24,7 +25,7 @@ export default async function OnboardingLayout({
   if (!session?.user.id) redirect("/login");
   // Only redirect if the user already has an org workspace — a pre-existing
   // personal workspace must not block org creation/joining.
-  const existing = session.workspaces.some(
+  const existing = (await listWorkspaces()).some(
     (workspace) => workspace.type === "organization",
   );
 

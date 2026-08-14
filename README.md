@@ -1,58 +1,71 @@
 # Snoopy — Autom8x website
 
-This repository is the **website only**: Next.js app (marketing site, auth, UI).  
-n8n and the database server are separate; see [Architecture](docs/ARCHITECTURE.md).
+This repository owns the Autom8x website: public marketing, the authenticated
+web app, and its same-origin gateway to the platform. It is not a database,
+identity-provider, object-store, or connector-secret owner.
 
-## Stack
+## Architecture boundary
 
-- **Next.js 16** (App Router), **TypeScript**, **Tailwind 4**
-- **Supabase Auth** (Google, Microsoft OAuth; email/password)
-- **Prisma** + **PostgreSQL** (connection via env; DB is external to this repo)
+- Next.js 16, React 19, TypeScript, Tailwind 4, and the Nocturne design system.
+- The website consumes only published Edge API contracts generated from public
+  OpenAPI documents. It does not author backend contracts.
+- OAuth login is backend-mediated. The browser holds no provider token,
+  Supabase key, database URL, or service credential.
+- `BACKEND_API_ORIGIN` is the only website runtime/build configuration value.
 
-## Quick start
+See [Architecture](docs/ARCHITECTURE.md) and
+[Repository structure](docs/REPO-STRUCTURE.md) for the current ownership model.
+
+## Local development
 
 ```bash
-cp .env.example .env.local   # then fill in values (see below)
+cp .env.example .env.local
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Set `BACKEND_API_ORIGIN` to a non-production Edge origin when exercising
+authenticated features. Do not add cloud, OAuth, database, or provider secrets
+to this repository or to `.env.local`.
 
-## Environment
+## Verification
 
-Copy `.env.example` to `.env.local` and set:
+```bash
+npm run format:check
+npm run lint
+npm run typecheck
+npm run test:contracts
+npm run audit:boundaries
+npm run verify:platform-contracts
+BACKEND_API_ORIGIN=https://backend.invalid npm run build -- --webpack
+npm run test:browser
+```
 
-- `POSTGRES_URL` — Postgres connection string (required for Prisma)
-- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase Auth (OAuth + email/password). Configure Google and Azure in Dashboard → Authentication → Providers. For Microsoft use tenant "common" and add redirect URLs; see **docs/AUTH-MICROSOFT-AZURE.md**.
+`npm run test:browser:fixtures` starts a loopback-only HTTPS Edge fixture with
+a temporary certificate. It exercises authenticated accessibility, keyboard,
+join-request, idempotency, entitlement, and export paths without real accounts
+or credentials.
 
-Do **not** commit `.env.local` or any file with real secrets.
+## Container
 
-## Scripts
+The website image is standalone and runs as the non-root `nextjs` user. Start
+the platform stack first from `../snoopy-backend`, then run:
 
-| Command | Description |
-|--------|-------------|
-| `npm run dev` | Start dev server |
+```bash
+docker compose up -d --build web
+```
+
+`compose.yml` joins the platform's external `autom8x_default` network and
+passes `http://api:8080` as the internal Edge origin. Production resource and
+secret provisioning belongs to the deployment configuration round, not here.
+
+## Useful scripts
+
+| Command | Purpose |
+| --- | --- |
 | `npm run build` | Production build |
-| `npm run start` | Run production server |
-| `npm run lint` | Run ESLint |
-| `npm run typecheck` | Generate Next types + TypeScript check (`next typegen && tsc --noEmit`) |
-| `npm run format` / `format:check` | Prettier write / verify (CI runs the check) |
-| `npm run db:migrate -- --name <name>` | Create and run migrations (interactive; can hang with pooler) |
-| `npm run db:deploy` | Apply pending migrations only (non-interactive; use if migrate hangs) |
-| `npm run db:studio` | Open Prisma Studio |
-| `npm run db:generate` | Regenerate Prisma client |
-
-## Repository layout
-
-- **`app/`** — Next.js routes: `(marketing)` pages, `(auth)` pages, `account/` dashboard, `onboarding/`, API routes
-- **`components/`** — React UI components (`ui/`, `marketing/`, `dashboard/`, `builder/`, …)
-- **`hooks/`** — Shared React hooks
-- **`lib/`** — Shared logic: `db.ts`, `site.ts`, `nav.ts`, `env.ts` (validation), `auth.ts` (workspace provisioning), `auth-supabase.ts` (session + user provisioning)
-- **`proxy.ts`** — Protects `/account` and `/onboarding` (redirect to login when unauthenticated)
-- **`prisma/`** / **`supabase/`** — Schema, migrations, local SQL recipes
-- **`prompts/`** / **`running-total/`** — n8n prompt + Code-node source copies (not imported by the app)
-- **`docs/`** — Architecture and structure
-
-See **[docs/REPO-STRUCTURE.md](docs/REPO-STRUCTURE.md)** for where to put new code.  
-See **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for the deployment model and how this app fits with n8n and the database.
+| `npm run test:contracts` | Public-contract and boundary behavior tests |
+| `npm run verify:platform-contracts` | Regenerate and verify public OpenAPI declarations |
+| `npm run audit:boundaries` | Reject browser secrets, direct DB access, and manual fetches |
+| `npm run test:browser` | Public accessibility and visual baselines |
+| `npm run test:browser:fixtures` | Credential-free authenticated fixture audit |
