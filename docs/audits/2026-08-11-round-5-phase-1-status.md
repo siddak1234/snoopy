@@ -25,9 +25,11 @@ untracked files. Their code-based scope is:
 - Round 5 design-system cleanup and reduced-motion handling; and
 - this audit documentation.
 
-`AGENTS.md` is a separate governance-document modification. It does not map to
-a Round 5 implementation item and must remain outside a Round 5 commit until
-its ownership is confirmed.
+`AGENTS.md` was initially separated from the implementation while its ownership
+was checked. It is retained as the repository's agent-governance file: the
+Next.js-generated block explicitly states that Next recreates it and that
+committing it keeps the tree clean, while the Autom8x block enforces this
+repository's read-only governance boundary.
 
 The branch baseline was rechecked on 2026-08-12:
 
@@ -430,8 +432,37 @@ The fixture run passed **17/17** tests:
 
 The normal `npm run test:browser` run passed **10** public visual/accessibility
 and callback checks, with **12 expected skips** for fixture-only and missing
-non-production-authentication cases. Marketing screenshot baselines remained
-unchanged.
+non-production-authentication cases. A same-renderer comparison with
+`origin/main` found `/`, `/solutions`, and `/automation-builder`
+byte-identical. `/contact` differed only at the four persistent email-link
+underlines approved in the accessibility audit above; this is an intentional
+NFR-35 correction, not a claim of literal byte identity with `origin/main`.
+
+### Independent release-audit corrections — 2026-08-14
+
+A clean Node 22 Linux install reproduced GitHub's formatting failure in exactly
+five files while the existing macOS install passed. The difference was not the
+operating system: the working install was stale at Tailwind `4.1.18`, while the
+Round 5 lockfile resolved the broad `^4` ranges to `4.3.3`. The same clean
+`4.3.3` build reproduced all four Linux screenshot failures in the pinned
+Playwright `1.62.1` image, including the exact CI dimensions and pixel counts.
+
+A disposable control then pinned `tailwindcss` and `@tailwindcss/postcss` to the
+`origin/main` version, `4.1.18`. In that same renderer, `/`, `/solutions`, and
+`/automation-builder` matched their committed Linux baselines exactly;
+`/contact` differed by **472 pixels**, and inspection showed only the four
+approved underlines. The repository now pins those two design-compiler packages
+to `4.1.18`, and only `contact-linux.png` was regenerated. All four pinned Linux
+visual checks pass.
+
+The failed Vercel deployment `dpl_A3KtBjVFWgf2pQBcK1HJAM2ewSBH` was inspected
+with authenticated build logs. Next compiled successfully under Turbopack, then
+Vercel's `onBuildComplete` failed because
+`.next/next-server.js.nft.json` did not exist. Next.js 16.3 documents that file
+as an output-file-tracing artifact used by standalone deployments. Production
+builds are therefore standardized on Webpack, matching the existing CI/browser
+audit command and producing the required trace. A post-change Vercel redeploy is
+still required and is not claimed here.
 
 ### Final exit evidence
 
