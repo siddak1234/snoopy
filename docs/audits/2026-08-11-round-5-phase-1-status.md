@@ -455,14 +455,27 @@ approved underlines. The repository now pins those two design-compiler packages
 to `4.1.18`, and only `contact-linux.png` was regenerated. All four pinned Linux
 visual checks pass.
 
+The first post-fix GitHub rerun proved that `ubuntu-latest` itself was not the
+renderer used by those baselines: lint, typecheck, build, architecture, Axe, and
+callback checks passed, but all four screenshots had different font/layout
+metrics. The browser job now runs in the same Playwright `1.62.1` Noble image
+used by the independent audit, pinned by immutable digest, with `--ipc=host`.
+The image already contains its matching Chromium and OS dependencies, so the
+moving-runner `playwright install --with-deps` step is removed.
+
 The failed Vercel deployment `dpl_A3KtBjVFWgf2pQBcK1HJAM2ewSBH` was inspected
 with authenticated build logs. Next compiled successfully under Turbopack, then
 Vercel's `onBuildComplete` failed because
 `.next/next-server.js.nft.json` did not exist. Next.js 16.3 documents that file
 as an output-file-tracing artifact used by standalone deployments. Production
 builds are therefore standardized on Webpack, matching the existing CI/browser
-audit command and producing the required trace. A post-change Vercel redeploy is
-still required and is not claimed here.
+audit command and producing the required trace. Post-change deployment
+`dpl_3b7awnziKDBy1rYX9p3XR7De8cov` completed successfully and reached Vercel's
+Ready state. Automated probes returned 200 from `/api/health`, `/`, and
+`/solutions`; `/api/ready` returned the truthful 503
+`{"status":"not-ready","backend":"not-configured"}` because no Preview backend
+origin has been allocated. Deployment is therefore observed; backend-integrated
+Preview behavior remains not configured rather than silently claimed.
 
 ### Final exit evidence
 
