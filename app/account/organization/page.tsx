@@ -1,104 +1,51 @@
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
-import { prisma } from "@/lib/db";
+import {
+  listOrganizationDomains,
+  listJoinRequests,
+  listWorkspaceMembers,
+  listWorkspaces,
+} from "@/lib/tenancy";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { OrgNameEditor } from "@/components/dashboard/OrgNameEditor";
 import { OrgDomainSection } from "@/components/dashboard/OrgDomainSection";
 import { OrgMemberList } from "@/components/dashboard/OrgMemberList";
-import { WorkspaceInviteButton } from "@/components/dashboard/WorkspaceInviteButton";
+import { OrgJoinRequestList } from "@/components/dashboard/OrgJoinRequestList";
 import type { OrgMember } from "@/components/dashboard/OrgMemberList";
 
 export default async function OrganizationPage() {
   const session = await getAppSession();
-  if (!session?.user?.id) redirect("/account");
+  if (!session?.user.id) redirect("/account");
 
-  const userId = session.user.id;
-  const workspaceId = session.user.workspaceId;
+  // The session list can be bounded, so resolve workspace authority from the
+  // documented workspace collection rather than treating its first page as complete.
+  const workspaces = await listWorkspaces();
+  const workspace = workspaces.find(
+    (candidate) =>
+      candidate.id === session.user.workspaceId &&
+      candidate.type === "organization" &&
+      candidate.role === "owner",
+  );
+  if (!workspace) redirect("/account");
 
-  if (!workspaceId) redirect("/account");
-
-  // Verify actor is OWNER of an organization workspace
-  const membership = await prisma.membership.findUnique({
-    where: { userId_workspaceId: { userId, workspaceId } },
-    select: {
-      role: true,
-      workspace: {
-        select: {
-          id: true,
-          name: true,
-          type: true,
-          domain: true,
-        },
-      },
-    },
-  });
-
-  if (
-    !membership ||
-    membership.role !== "OWNER" ||
-    membership.workspace.type !== "organization"
-  ) {
-    redirect("/account");
-  }
-
-  const workspace = membership.workspace;
-
-  // Fetch all workspace members + pending invites in parallel
-  const [rawMembers, rawPendingInvites] = await Promise.all([
-    prisma.membership.findMany({
-      where: { workspaceId },
-      orderBy: { createdAt: "asc" },
-      select: {
-        id: true,
-        userId: true,
-        role: true,
-        createdAt: true,
-        user: { select: { id: true, name: true, email: true } },
-      },
-    }),
-    prisma.workspaceInvite.findMany({
-      where: {
-        workspaceId,
-        acceptedAt: null,
-        revokedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: "desc" },
-      select: { id: true, token: true, expiresAt: true, createdAt: true },
-    }),
+  const [rawMembers, domains, joinRequests] = await Promise.all([
+    listWorkspaceMembers(workspace.id),
+    listOrganizationDomains(workspace.id),
+    listJoinRequests(workspace.id),
   ]);
-
-  // Serialize for client components
-  const members: OrgMember[] = rawMembers.map((m) => ({
-    id: m.id,
-    userId: m.userId,
-    name: m.user.name,
-    email: m.user.email,
-    role: m.role,
-    joinedAt: m.createdAt.toISOString(),
+  const members: OrgMember[] = rawMembers.map((member) => ({
+    userId: member.userId,
+    name: member.displayName ?? null,
+    email: member.email,
+    role: member.role,
+    joinedAt: member.createdAt,
   }));
-
-  const pendingInvites = rawPendingInvites.map((i) => ({
-    id: i.id,
-    token: i.token,
-    expiresAt: i.expiresAt.toISOString(),
-    createdAt: i.createdAt.toISOString(),
-  }));
-
-  // Build domain section props. Verification was removed (Supabase OAuth
-  // already verifies the user's email at sign-in) so the section only shows
-  // the domain as a static label.
-  type DomainProps = { state: "none" } | { state: "set"; domain: string };
-  const domainProps: DomainProps = workspace.domain
-    ? { state: "set", domain: workspace.domain }
-    : { state: "none" };
 
   return (
     <SectionCard
       title="Organization"
-      subheader="Manage your organization settings, members, and invites."
+      subheader="Manage your organization settings and members."
     >
-      {/* ── Organization details ─────────────────────────────────────────── */}
       <div className="py-5 first:pt-0">
         <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Organization details
@@ -116,13 +63,12 @@ export default async function OrganizationPage() {
           <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-4">
             <dt className="w-20 shrink-0 pt-0.5 text-[var(--muted)]">Domain</dt>
             <dd>
-              <OrgDomainSection {...domainProps} />
+              <OrgDomainSection workspaceId={workspace.id} domains={domains} />
             </dd>
           </div>
         </dl>
       </div>
 
-      {/* ── Members ──────────────────────────────────────────────────────── */}
       <div className="border-t border-[var(--ring)] py-5">
         <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Members
@@ -130,22 +76,19 @@ export default async function OrganizationPage() {
         <OrgMemberList
           workspaceId={workspace.id}
           orgName={workspace.name}
-          viewerUserId={userId}
+          viewerUserId={session.user.id}
           members={members}
         />
       </div>
 
-      {/* ── Invites ──────────────────────────────────────────────────────── */}
-      <div className="border-t border-[var(--ring)] py-5">
+      <div className="border-t border-[var(--ring)] py-5 pb-0">
         <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-          Invites
+          Join requests
         </h2>
-        <div className="mt-3">
-          <WorkspaceInviteButton
-            workspaceId={workspace.id}
-            initialPendingInvites={pendingInvites}
-          />
-        </div>
+        <OrgJoinRequestList
+          workspaceId={workspace.id}
+          requests={joinRequests}
+        />
       </div>
     </SectionCard>
   );

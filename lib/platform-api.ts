@@ -40,14 +40,14 @@ export async function platformApiJson<T>(
     ...init,
   });
   const body = (await response.json().catch(() => null)) as
-    { detail?: string } | T | null;
+    { title?: string } | T | null;
   if (!response.ok) {
-    const detail =
-      body && typeof body === "object" && "detail" in body
-        ? body.detail
+    const title =
+      body && typeof body === "object" && "title" in body
+        ? body.title
         : undefined;
     throw new PlatformApiError(
-      detail || `Platform request failed with status ${response.status}`,
+      title || `Platform request failed with status ${response.status}`,
       response.status,
     );
   }

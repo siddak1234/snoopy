@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 export const dashboardNavItems = [
   { href: "/account", label: "Home" },
   { href: "/account/automations", label: "Automations" },
+  { href: "/account/connections", label: "Connections" },
   { href: "/account/runs", label: "Activity" },
   { href: "/account/approvals", label: "Approvals" },
   { href: "/account/projects", label: "Projects" },
@@ -91,6 +92,7 @@ export function DashboardSidebar({
 const pathToTitle: Record<string, string> = {
   "/account": "Dashboard",
   "/account/projects": "Projects",
+  "/account/connections": "Connections",
   "/account/billing": "Billing",
   "/account/settings": "Settings",
   "/account/support": "Support",

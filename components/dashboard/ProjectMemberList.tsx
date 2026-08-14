@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { ProjectMemberRole } from "@prisma/client";
 import { FormError } from "@/components/ui/FormError";
-import { canModifyMember } from "@/lib/project-rbac-pure";
+import type { ProjectRole } from "@/lib/tenancy";
 import {
   changeMemberRoleAction,
   removeMemberFromProjectAction,
@@ -17,11 +16,10 @@ import { formatDateMediumUTC } from "@/lib/date";
 // ---------------------------------------------------------------------------
 
 export type MemberRow = {
-  id: string;
   userId: string;
   name: string | null;
   email: string;
-  role: ProjectMemberRole;
+  role: ProjectRole;
   /** ISO string — serialized from Date in the server component */
   createdAt: string;
 };
@@ -29,7 +27,7 @@ export type MemberRow = {
 type Props = {
   projectId: string;
   viewerUserId: string;
-  viewerRole: ProjectMemberRole;
+  viewerRole: ProjectRole;
   members: MemberRow[];
   /** Pass "/account/projects" so the viewer is redirected after leaving. */
   leaveRedirect?: string;
@@ -54,7 +52,7 @@ export function ProjectMemberList({
     router.refresh();
   }
 
-  function handleRoleChanged(userId: string, newRole: ProjectMemberRole) {
+  function handleRoleChanged(userId: string, newRole: ProjectRole) {
     setMembers((prev) =>
       prev.map((m) => (m.userId === userId ? { ...m, role: newRole } : m)),
     );
@@ -69,7 +67,7 @@ export function ProjectMemberList({
     <ul className="mt-3 divide-y divide-[var(--ring)]">
       {members.map((m) => (
         <MemberRowItem
-          key={m.id}
+          key={m.userId}
           member={m}
           projectId={projectId}
           viewerUserId={viewerUserId}
@@ -99,10 +97,10 @@ function MemberRowItem({
   member: MemberRow;
   projectId: string;
   viewerUserId: string;
-  viewerRole: ProjectMemberRole;
+  viewerRole: ProjectRole;
   leaveRedirect?: string;
   onRemoved: (userId: string) => void;
-  onRoleChanged: (userId: string, newRole: ProjectMemberRole) => void;
+  onRoleChanged: (userId: string, newRole: ProjectRole) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,25 +109,24 @@ function MemberRowItem({
   const isOwnerRow = m.role === "owner";
   const isOwnRow = m.userId === viewerUserId;
 
-  // Can the viewer manage this member's role or remove them?
-  // (evaluated client-side using pure RBAC function)
+  // This is only a display hint. The public mutation remains authoritative.
   const canManage =
-    !isOwnerRow && !isOwnRow && canModifyMember(viewerRole, m.role, "remove"); // remove and change_role share the same condition
+    !isOwnerRow &&
+    !isOwnRow &&
+    (viewerRole === "owner" || viewerRole === "admin");
 
   // Role dropdown options available to the viewer for this row
   const showRoleDropdown =
     !isOwnerRow &&
     !isOwnRow &&
-    (viewerRole === "owner" ||
-      (viewerRole === "admin" &&
-        (m.role === "member" || m.role === "project_user")));
+    (viewerRole === "owner" || (viewerRole === "admin" && m.role === "member"));
 
   // Display label for the role badge
   const roleLabel =
     m.role === "owner" ? "Owner" : m.role === "admin" ? "Admin" : "Member";
 
   async function handleRoleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const newRole = e.target.value as ProjectMemberRole;
+    const newRole = e.target.value as ProjectRole;
     if (newRole === m.role) return; // no-op
     setBusy(true);
     setError(null);
@@ -196,7 +193,7 @@ function MemberRowItem({
         </span>
       ) : showRoleDropdown ? (
         <select
-          value={m.role === "project_user" ? "member" : m.role}
+          value={m.role}
           onChange={handleRoleChange}
           disabled={busy}
           className="shrink-0 rounded-lg border border-[var(--ring)] bg-[var(--card)] px-2 py-1 text-xs text-[var(--text)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none disabled:opacity-60"

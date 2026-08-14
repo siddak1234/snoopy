@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { backendApiOrigin } from "@/lib/backend-origin";
+import { fetchPlatformSessionForProxy } from "@/lib/platform-proxy";
 
 function loginRedirect(request: NextRequest): NextResponse {
   const destination = request.nextUrl.clone();
@@ -13,17 +13,7 @@ function loginRedirect(request: NextRequest): NextResponse {
 }
 
 export default async function proxy(request: NextRequest) {
-  const origin = backendApiOrigin();
-  if (!origin) return loginRedirect(request);
-
-  const sessionResponse = await fetch(`${origin}/v1/session`, {
-    headers: {
-      cookie: request.headers.get("cookie") ?? "",
-      "x-request-id":
-        request.headers.get("x-request-id") ?? crypto.randomUUID(),
-    },
-    cache: "no-store",
-  }).catch(() => null);
+  const sessionResponse = await fetchPlatformSessionForProxy(request.headers);
 
   if (!sessionResponse?.ok) return loginRedirect(request);
 

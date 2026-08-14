@@ -12,11 +12,10 @@ import { formatDateMediumUTC } from "@/lib/date";
 // ---------------------------------------------------------------------------
 
 export type OrgMember = {
-  id: string;
   userId: string;
   name: string | null;
   email: string;
-  role: "OWNER" | "MEMBER";
+  role: "owner" | "admin" | "member";
   /** ISO string */
   joinedAt: string;
 };
@@ -83,12 +82,15 @@ export function OrgMemberList({
     <>
       <ul className="mt-3 divide-y divide-[var(--ring)]">
         {members.map((m) => {
-          const isOwner = m.role === "OWNER";
+          const isOwner = m.role === "owner";
           const isSelf = m.userId === viewerUserId;
           const canRemove = !isOwner && !isSelf;
 
           return (
-            <li key={m.id} className="flex flex-wrap items-center gap-3 py-3">
+            <li
+              key={m.userId}
+              className="flex flex-wrap items-center gap-3 py-3"
+            >
               {/* Identity */}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-[var(--text)]">
@@ -150,7 +152,7 @@ export function OrgMemberList({
             </strong>{" "}
             will be removed from{" "}
             <strong className="text-[var(--text)]">{orgName}</strong> and from
-            all projects in this organization. This cannot be undone.
+            this organization. This cannot be undone.
           </p>
 
           <FormError message={removeError} className="mt-3" />

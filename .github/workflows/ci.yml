@@ -29,8 +29,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # Fails if a browser Supabase/storage/manual-login path returns, or if a
-      # direct-database import appears outside the pinned cutover allowlist.
+      # Fails if a browser secret, storage, manual-login, or direct-database
+      # path returns.
       - run: npm run audit:boundaries
       # Fails if the backend session wire contract drifts.
       - run: npm run test:contracts
@@ -58,8 +58,6 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     env:
-      POSTGRES_URL: postgres://placeholder:placeholder@localhost:5432/placeholder
-      POSTGRES_PRISMA_URL: postgres://placeholder:placeholder@localhost:5432/placeholder
       # Required at BUILD time, not runtime: Next bakes rewrites into
       # routes-manifest.json. Without this, next.config.ts emits no
       # /api/platform rewrite and every browser API call 404s in production
@@ -103,3 +101,19 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+
+  browser:
+    name: Browser regression and accessibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build -- --webpack
+        env:
+          BACKEND_API_ORIGIN: https://backend.invalid
+      - run: npm run test:browser

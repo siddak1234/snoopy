@@ -6,10 +6,9 @@ import { test } from "node:test";
 /**
  * The website's automation types match the backend's specification.
  *
- * `lib/automations.ts` declares the shapes every automation screen renders. They
- * are not generated, so nothing otherwise stops them drifting from the server —
- * and a drifted field does not throw, it renders blank, which is the failure
- * mode worth catching mechanically.
+ * `lib/automations.ts` aliases generated models for every automation screen.
+ * A generated file that is stale or a facade that points at the wrong schema
+ * would otherwise render a renamed field as blank, so both are asserted here.
  *
  * The specification is read from the backend repository beside this one. When it
  * is absent, the test skips rather than fails: a checkout of `snoopy` alone is a
@@ -22,10 +21,121 @@ const SPEC_PATH = resolve(
   "../../snoopy-backend/docs/openapi/automations.yaml",
 );
 const CLIENT_PATH = resolve(import.meta.dirname, "../lib/automations.ts");
+const GENERATED_PATH = resolve(
+  import.meta.dirname,
+  "../lib/generated/platform-contracts/automations.d.ts",
+);
+const ACTIONS_PATH = resolve(
+  import.meta.dirname,
+  "../app/account/automations/actions.ts",
+);
+const ACTIONS_UI_PATH = resolve(
+  import.meta.dirname,
+  "../app/account/automations/AutomationActions.tsx",
+);
+const PAGE_PATH = resolve(
+  import.meta.dirname,
+  "../app/account/automations/page.tsx",
+);
+const PLATFORM_SERVER_PATH = resolve(
+  import.meta.dirname,
+  "../lib/platform-server.ts",
+);
+const ENTITLEMENTS_PATH = resolve(
+  import.meta.dirname,
+  "../lib/subscription-entitlements.ts",
+);
 
 const available = existsSync(SPEC_PATH);
 const spec = available ? readFileSync(SPEC_PATH, "utf8") : "";
 const client = readFileSync(CLIENT_PATH, "utf8");
+const generated = existsSync(GENERATED_PATH)
+  ? readFileSync(GENERATED_PATH, "utf8")
+  : "";
+const actions = readFileSync(ACTIONS_PATH, "utf8");
+const actionsUi = readFileSync(ACTIONS_UI_PATH, "utf8");
+const page = readFileSync(PAGE_PATH, "utf8");
+const platformServer = readFileSync(PLATFORM_SERVER_PATH, "utf8");
+const entitlements = readFileSync(ENTITLEMENTS_PATH, "utf8");
+
+test("generated automation contract is present and used by the facade", () => {
+  assert.ok(
+    generated.length > 0,
+    "generated automation types are missing; run npm run generate:platform-contracts",
+  );
+  for (const type of [
+    "AutomationCatalogEntry",
+    "AutomationSetupField",
+    "Subscription",
+    "Run",
+    "Approval",
+    "SubscriptionStatus",
+    "RunStatus",
+    "ApprovalStatus",
+    "RunOrigin",
+  ]) {
+    facadeAliases(type);
+  }
+  for (const [type, operation] of [
+    ["ListSubscriptionsResponse", "listSubscriptions"],
+    ["ListRunsResponse", "listRuns"],
+    ["ListApprovalsResponse", "listApprovals"],
+    ["CreateSubscriptionResponse", "createSubscription"],
+    ["CreateSubscriptionRequest", "createSubscription"],
+    ["UpdateSubscriptionResponse", "updateSubscription"],
+    ["UpdateSubscriptionRequest", "updateSubscription"],
+    ["CreateRunRequest", "createRun"],
+    ["CreateRunResponse", "createRun"],
+    ["DecideApprovalRequest", "decideApproval"],
+    ["DecideApprovalResponse", "decideApproval"],
+  ]) {
+    assert.match(
+      client,
+      new RegExp(
+        `export type ${type} =\\s*(?:\\|\\s*)?operations\\["${operation}"\\]`,
+      ),
+      `${type} must alias the generated ${operation} operation`,
+    );
+  }
+});
+
+test("the setup UI is generated from the catalog metadata", () => {
+  assert.match(page, /setup=\{automation\.setup\}/);
+  assert.doesNotMatch(actionsUi, /SETUP_SECTIONS/);
+  assert.match(actionsUi, /for \(const field of setup\)/);
+  assert.match(actionsUi, /currentGroup\?\.section === field\.section/);
+  assert.match(
+    actionsUi,
+    /groups\.push\(\{ section: field\.section, fields: \[field\] \}\)/,
+  );
+  for (const control of ["toggle", "money", "text", "resource-picker"]) {
+    assert.match(actionsUi, new RegExp(`"${control}"`));
+  }
+  assert.match(actionsUi, /name=\{`config:\$\{field\.key\}`\}/);
+  assert.match(actionsUi, /field\.defaultValue/);
+  assert.match(actionsUi, /field\.notifies/);
+  assert.match(actions, /saveSubscriptionConfiguration/);
+  assert.match(actions, /const body: UpdateSubscriptionRequest = \{ config \}/);
+});
+
+test("subscription entitlement states use only the documented reason tokens", () => {
+  assert.match(entitlements, /details\?\.reason === "over_plan_limit"/);
+  assert.match(
+    entitlements,
+    /details\?\.reason === "entitlements_not_configured"/,
+  );
+  assert.match(entitlements, /if \(status !== 403\) return null/);
+  assert.doesNotMatch(
+    actions,
+    /\/v1\/(?:billing|checkout|subscription-management)/iu,
+    "the automation client must not invent a billing flow",
+  );
+});
+
+test("server action errors do not display raw RFC problem detail text", () => {
+  assert.match(platformServer, /problem\.title \?\? fallbackProblemTitle/);
+  assert.doesNotMatch(platformServer, /problem\.detail\b/);
+});
 
 /** Required property names under one schema in the specification. */
 function requiredFields(schemaName) {
@@ -40,12 +150,15 @@ function requiredFields(schemaName) {
     .filter(Boolean);
 }
 
-/** Property names the website declares for one exported type. */
-function declaredFields(typeName) {
-  const start = client.indexOf(`export type ${typeName} = {`);
-  assert.ok(start > 0, `${typeName} is missing from lib/automations.ts`);
-  const body = client.slice(start, client.indexOf("\n};", start));
-  return [...body.matchAll(/^\s{2}(\w+)\??:/gmu)].map((match) => match[1]);
+/** Property names emitted for one generated response schema. */
+function generatedFields(schemaName) {
+  const start = generated.indexOf(`${schemaName}: {`);
+  assert.ok(
+    start > 0,
+    `${schemaName} is missing from generated automation types`,
+  );
+  const body = generated.slice(start, start + 3_000);
+  return [...body.matchAll(/^\s+(\w+)\??:/gmu)].map((match) => match[1]);
 }
 
 /** Enum members declared in the specification for one schema. */
@@ -62,12 +175,24 @@ function specEnum(schemaName) {
     .sort();
 }
 
-/** Union members the website declares for one exported type alias. */
-function clientUnion(typeName) {
-  const start = client.indexOf(`export type ${typeName} =`);
-  assert.ok(start > 0, `${typeName} is missing from lib/automations.ts`);
-  const body = client.slice(start, client.indexOf(";", start));
+/** Union members emitted for one generated response schema. */
+function generatedUnion(typeName) {
+  const match = new RegExp(`^\\s+${typeName}:\\s+([\\s\\S]+?);$`, "mu").exec(
+    generated,
+  );
+  assert.ok(match, `${typeName} is missing from generated automation types`);
+  const body = match[1];
   return [...body.matchAll(/"([a-z-]+)"/gu)].map((match) => match[1]).sort();
+}
+
+function facadeAliases(typeName) {
+  assert.match(
+    client,
+    new RegExp(
+      `export type ${typeName} =\\s*components\\["schemas"\\]\\["${typeName}"\\]`,
+    ),
+    `${typeName} must alias the generated schema`,
+  );
 }
 
 test(
@@ -85,7 +210,7 @@ test(
       ["Approval", "Approval"],
     ]) {
       const promised = requiredFields(schema);
-      const declared = new Set(declaredFields(type));
+      const declared = new Set(generatedFields(type));
       const missing = promised.filter((field) => !declared.has(field));
       assert.deepEqual(
         missing,
@@ -108,12 +233,15 @@ test(
     // unstyled neutral chip — visible, but wrong. A status the website knows and
     // the server never sends is dead code that outlives its reason.
     assert.deepEqual(
-      clientUnion("SubscriptionStatus"),
+      generatedUnion("SubscriptionStatus"),
       specEnum("SubscriptionStatus"),
     );
-    assert.deepEqual(clientUnion("RunStatus"), specEnum("RunStatus"));
-    assert.deepEqual(clientUnion("ApprovalStatus"), specEnum("ApprovalStatus"));
-    assert.deepEqual(clientUnion("RunOrigin"), specEnum("RunOrigin"));
+    assert.deepEqual(generatedUnion("RunStatus"), specEnum("RunStatus"));
+    assert.deepEqual(
+      generatedUnion("ApprovalStatus"),
+      specEnum("ApprovalStatus"),
+    );
+    assert.deepEqual(generatedUnion("RunOrigin"), specEnum("RunOrigin"));
   },
 );
 
@@ -133,7 +261,7 @@ test("every status the website can receive has a tone", () => {
   );
 
   for (const type of ["SubscriptionStatus", "RunStatus", "ApprovalStatus"]) {
-    for (const status of clientUnion(type)) {
+    for (const status of generatedUnion(type)) {
       assert.ok(
         mapped.has(status),
         `${type} member "${status}" has no tone in StatusPill`,
@@ -143,10 +271,6 @@ test("every status the website can receive has a tone", () => {
 });
 
 test("the website never sends a field the server refuses", () => {
-  const actions = readFileSync(
-    resolve(import.meta.dirname, "../app/account/automations/actions.ts"),
-    "utf8",
-  );
   // The Edge rejects unsupported fields outright rather than ignoring them, so a
   // body carrying one fails the whole request. These two are the tempting ones:
   // both are resolved from the session and neither may be asserted by a caller.
@@ -156,4 +280,55 @@ test("the website never sends a field the server refuses", () => {
       `actions.ts sends "${refused}", which the Edge refuses as an unsupported field`,
     );
   }
+});
+
+test("automation actions consume generated operation response types", () => {
+  for (const type of [
+    "CreateSubscriptionResponse",
+    "UpdateSubscriptionResponse",
+    "CreateRunResponse",
+    "DecideApprovalResponse",
+  ]) {
+    assert.match(
+      actions,
+      new RegExp(`platformServerJson<${type}>`),
+      `automation action must use ${type}`,
+    );
+  }
+  for (const type of [
+    "CreateSubscriptionRequest",
+    "UpdateSubscriptionRequest",
+    "CreateRunRequest",
+    "DecideApprovalRequest",
+  ]) {
+    assert.match(
+      actions,
+      new RegExp(`const body: ${type} =`),
+      `automation action must use ${type}`,
+    );
+  }
+  assert.doesNotMatch(
+    actions,
+    /platformServerJson<\{\s*(?:subscription|run|approval):/,
+    "automation actions must not recreate generated response shapes",
+  );
+});
+
+test("automation list reads consume generated operation response types", () => {
+  for (const [type, operation] of [
+    ["ListSubscriptionsResponse", "listSubscriptions"],
+    ["ListRunsResponse", "listRuns"],
+    ["ListApprovalsResponse", "listApprovals"],
+  ]) {
+    assert.match(
+      client,
+      new RegExp(`platformServerJson<${type}>`),
+      `${operation} must use ${type}`,
+    );
+  }
+  assert.doesNotMatch(
+    client,
+    /Promise<\{\s*(?:subscriptions|runs|approvals):/,
+    "automation list reads must not recreate generated response shapes",
+  );
 });

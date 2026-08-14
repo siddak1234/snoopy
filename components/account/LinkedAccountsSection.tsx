@@ -2,23 +2,20 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { FormError } from "@/components/ui/FormError";
-import { platformApiPath } from "@/lib/platform-api";
+import { platformApiJson, platformApiPath } from "@/lib/platform-api";
+import type { operations } from "@/lib/generated/platform-contracts/platform";
 
-type ProviderId = "google" | "microsoft" | "apple";
-
-const PROVIDERS: { id: ProviderId; label: string }[] = [
-  { id: "google", label: "Google" },
-  { id: "microsoft", label: "Microsoft" },
-  { id: "apple", label: "Apple" },
-];
-
-type IdentityResponse = {
-  identities?: { provider: ProviderId; primary: boolean }[];
-};
+type IdentityResponse =
+  operations["listLoginIdentities"]["responses"][200]["content"]["application/json"];
+type LoginProvidersResponse =
+  operations["listLoginProviders"]["responses"][200]["content"]["application/json"];
+type Provider = LoginProvidersResponse["providers"][number];
+type ProviderId = Provider["id"];
 
 type State = {
   linked: Set<ProviderId>;
   primaryProvider: ProviderId | null;
+  providers: Provider[];
   loading: boolean;
   linking: ProviderId | null;
   error: string | null;
@@ -28,6 +25,7 @@ export default function LinkedAccountsSection() {
   const [state, setState] = useState<State>({
     linked: new Set(),
     primaryProvider: null,
+    providers: [],
     loading: true,
     linking: null,
     error: null,
@@ -36,15 +34,15 @@ export default function LinkedAccountsSection() {
   const loadIdentities = useCallback(async () => {
     setState((current) => ({ ...current, loading: true, error: null }));
     try {
-      const response = await fetch(platformApiPath("/v1/auth/identities"), {
-        credentials: "same-origin",
-      });
-      if (!response.ok) throw new Error("identity_list_failed");
-      const body = (await response.json()) as IdentityResponse;
-      const identities = body.identities ?? [];
+      const [identityBody, providersBody] = await Promise.all([
+        platformApiJson<IdentityResponse>("/v1/auth/identities"),
+        platformApiJson<LoginProvidersResponse>("/v1/auth/providers"),
+      ]);
+      const identities = identityBody.identities;
       setState((current) => ({
         ...current,
         loading: false,
+        providers: providersBody.providers,
         linked: new Set(identities.map((identity) => identity.provider)),
         primaryProvider:
           identities.find((identity) => identity.primary)?.provider ?? null,
@@ -59,7 +57,10 @@ export default function LinkedAccountsSection() {
   }, []);
 
   useEffect(() => {
-    void loadIdentities();
+    const loadTimer = setTimeout(() => {
+      void loadIdentities();
+    }, 0);
+    return () => clearTimeout(loadTimer);
   }, [loadIdentities]);
 
   function handleLink(provider: ProviderId) {
@@ -100,7 +101,7 @@ export default function LinkedAccountsSection() {
         <FormError message={state.error} className="mt-2" />
       ) : null}
       <ul className="mt-4 space-y-2">
-        {PROVIDERS.map(({ id, label }) => {
+        {state.providers.map(({ id, label }) => {
           const isLinked = state.linked.has(id);
           const isPrimary = state.primaryProvider === id;
           const isLinking = state.linking === id;

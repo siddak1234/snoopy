@@ -52,7 +52,7 @@ export default function ContactPage() {
             Email{" "}
             <a
               href={`mailto:${site.salesEmail}`}
-              className="text-[var(--color-accent-300)] transition hover:text-[var(--color-accent)]"
+              className="text-[var(--color-accent-300)] underline underline-offset-2 transition hover:text-[var(--color-accent)]"
             >
               {site.salesEmail}
             </a>
@@ -92,7 +92,7 @@ export default function ContactPage() {
                   {line.label}:{" "}
                   <a
                     href={`mailto:${line.email}`}
-                    className="text-[var(--color-accent-300)] transition hover:text-[var(--color-accent)]"
+                    className="text-[var(--color-accent-300)] underline underline-offset-2 transition hover:text-[var(--color-accent)]"
                   >
                     {line.email}
                   </a>

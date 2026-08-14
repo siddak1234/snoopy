@@ -1,116 +1,56 @@
 # Snoopy website architecture
 
-Status: **Backend-boundary migration in progress**
-Last verified: **2026-08-06**
+Status: **Round 5 web boundary complete**
 
-This repository owns the Autom8x website and its existing Nocturne UI/UX. It is a
-client/BFF of `snoopy-backend`; it is not the target owner of identity, product
-data, artifacts, connector credentials, or automation execution.
-
-The cross-repository source of truth is `docs/platform/LIVING-ARCHITECTURE.md` in
-the private `snoopy-backend` repository. It is deliberately not linked from here:
-this repository is public and must not depend on a path it cannot resolve. The
-exact cutover evidence and remaining allowlist are in the
-[`backend boundary audit`](audits/2026-08-06-backend-boundary-cutover.md).
-
-## Current stack
-
-| Layer | Current code | Target ownership |
-| --- | --- | --- |
-| UI | Next.js 16, React 19, Tailwind 4, Nocturne components | `snoopy` |
-| Login | Same-origin `/api/platform` calls to backend OAuth/session routes | Edge API + Supabase Auth adapter |
-| Product APIs | Browser dashboard calls to `/api/platform/v1/*` | Edge API and owning backend services |
-| Legacy server data | Prisma/PostgreSQL in 14 pinned server files | Access and Automation Catalog services |
-| Artifacts | Browser multipart requests to backend artifact routes | Artifact service + object store |
-| Execution | No website webhook or runtime dependency | Execution service/workers |
-
-The website no longer depends on a Supabase SDK, Google Cloud Storage SDK, or
-execution-webhook configuration. It must not receive credentials for the new
-Supabase project.
+Snoopy is the Autom8x web client and same-origin BFF surface. The backend Edge
+API owns identity, tenancy, product data, provider credentials, artifacts,
+entitlements, execution, and their secrets.
 
 ## Request boundary
 
 ```text
-browser ──same origin──> /api/platform/*
-                            │ Next rewrite
-                            v
-                       Edge API
-                            ├──> Supabase Auth (login identity only)
-                            ├──> Access service (identity + tenancy foundation)
-                            ├──> Automation Catalog (planned)
-                            ├──> Output service (planned)
-                            └──> Artifact service (planned)
+browser ──same origin──> /api/platform/v1/* ──> Edge API ──> owning services
 ```
 
-`BACKEND_API_ORIGIN` is the only target backend location configured in Vercel.
-`next.config.ts` validates it and rewrites the same-origin path. `proxy.ts` and
-server components resolve sessions through `/v1/session`. Browser code never
-receives the backend origin or a Supabase key.
+`BACKEND_API_ORIGIN` is the website's only build/runtime setting. Next bakes the
+same-origin rewrite into the production build; the origin is never exposed as a
+browser configuration value. Server components, actions, and proxy session
+lookups forward only the browser's host-only session cookies to Edge.
 
-## Login identity
+## Rules enforced in this repository
 
-- Product login is OAuth-only: Google, Microsoft, and Apple.
-- Password signup/login, magic link, verification, and reset-password routes are
-  absent.
-- OAuth start and callback terminate at `snoopy-backend` through the same-origin
-  gateway.
-- The backend owns PKCE, signed transaction state, code exchange, HttpOnly
-  cookies, refresh, logout, and identity linking.
-- Snoopy validates the wire session and maps `user.userId` to the established UI
-  shape `user.id`.
-- Login identity OAuth is not Gmail/Slack/QuickBooks connector authorization.
+- Browser calls use `lib/platform-api.ts`; server calls use
+  `lib/platform-server.ts`; proxy session rotation uses `lib/platform-proxy.ts`.
+- Public response types are generated from the three published OpenAPI inputs.
+  A web change cannot invent a request, response, cursor interpretation, billing
+  flow, invite flow, or OAuth-provider policy.
+- No Prisma, direct database, Supabase SDK, object-store SDK, browser secret,
+  manual password login, or provider credential belongs here.
+- Tenancy state comes from typed Edge responses. Mutations have unique
+  idempotency keys, while a user retry reuses its one explicit intent key.
 
-See [`ADR-0008`](../../snoopy-backend/docs/adr/0008-backend-mediated-oauth-login.md)
-and [Microsoft setup](AUTH-MICROSOFT-AZURE.md).
+## Identity and connections
 
-## Product data and artifact routes
+Login is backend-mediated OAuth. The website renders only the provider policy
+published by Edge; OAuth client registration, redirect allowlists, PKCE, token
+exchange, refresh, and provider secrets stay backend-managed. Connector OAuth
+is distinct from login identity and follows the public connection-provider
+contract.
 
-Dashboard clients call explicit backend paths for candidates, job postings,
-invoice projections, GL accounts, invoice edits, and protected files. Upload
-forms call project-scoped invoice, candidate, and job-posting artifact paths.
+## Container and operations
 
-The matching backend routes authenticate requests, enforce first-party origin on
-mutations, and currently return RFC 9457 `503 NOT_CONFIGURED` until their owning
-service adapters exist. They do not return fake empty data. This preserves UI code
-without pretending the new empty Supabase project has an application schema.
+The Docker image uses Next standalone output and the non-root `nextjs` user.
+`compose.yml` joins the backend's external `autom8x_default` network and uses
+the internal Edge address `http://api:8080`. The web process exposes liveness at
+`GET /api/health`; `GET /api/ready` reflects Edge readiness.
 
-## Transitional database boundary
-
-Fourteen server-side files still import `lib/db.ts` for project lifecycle/member
-behavior, organization administration, domain joining, invites, workflow drafts,
-and legacy invoice mutations. Account navigation, settings organization presence,
-and the onboarding organization guard now use the validated Access session
-workspace projection. Remaining callers stay pinned until their exact
-Access/Catalog/Output behavior is implemented and tested.
-
-`npm run audit:boundaries` pins the exact list, rejects new direct database
-callers, rejects Supabase/GCS/webhook dependencies, and verifies removed direct
-auth/upload/file routes do not return. `POSTGRES_URL` and
-`POSTGRES_PRISMA_URL` are legacy-cutover variables only; never point them at the
-new Supabase project.
-
-Cutover is complete only when the allowlist is zero, response compatibility and
-negative tenant tests pass, Prisma/database packages are removed from this repo,
-and Vercel no longer holds database credentials.
-
-## Operations
-
-- `GET /api/health` is website-process liveness.
-- `GET /api/ready` proxies backend readiness and returns 503 when the backend is
-  absent, unreachable, or not ready.
-- Production startup fails closed if `BACKEND_API_ORIGIN` is absent or malformed.
-- The public marketing UI can still be built without production secrets.
+Infrastructure resource allocation and production secret management are
+deployment concerns. This repository deliberately proves the interfaces with
+typed, credential-free fixtures rather than storing local resource settings.
 
 ## Verification
 
-```bash
-npm run audit:boundaries
-npm run test:contracts
-npm run typecheck
-npm run lint
-npx next build --webpack
-```
-
-UI changes require comparison against the recorded source checksum and route
-inventory. Presentation components and `app/globals.css` are not removed as part
-of backend migration.
+Run the commands in the README. The fixture browser audit provides disposable
+HTTPS, an authenticated cookie-only session, and deterministic public Edge
+responses; it is not a substitute for a real non-production OAuth-provider
+observation when that environment is provisioned.

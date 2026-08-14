@@ -1,6 +1,6 @@
-import { cookies } from "next/headers";
-import { backendApiOrigin } from "@/lib/backend-origin";
+import { platformServerJson } from "@/lib/platform-server";
 import { toAppSession, type AppSession } from "@/lib/session-contract";
+import type { components } from "@/lib/generated/platform-contracts/platform";
 
 export type { AppSession } from "@/lib/session-contract";
 
@@ -9,14 +9,13 @@ export type { AppSession } from "@/lib/session-contract";
  * This module never imports a database driver or Supabase SDK.
  */
 export async function getAppSession(): Promise<AppSession | null> {
-  const origin = backendApiOrigin();
-  if (!origin) return null;
-  const cookieStore = await cookies();
-  const response = await fetch(`${origin}/v1/session`, {
-    headers: { cookie: cookieStore.toString() },
-    cache: "no-store",
-  }).catch(() => null);
-  if (!response?.ok) return null;
-
-  return toAppSession(await response.json().catch(() => null));
+  try {
+    return toAppSession(
+      await platformServerJson<components["schemas"]["SessionResponse"]>(
+        "/v1/session",
+      ),
+    );
+  } catch {
+    return null;
+  }
 }

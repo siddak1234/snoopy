@@ -21,7 +21,17 @@ export function backendApiOrigin(): string | null {
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     throw new Error("BACKEND_API_ORIGIN must use HTTP or HTTPS");
   }
-  if (process.env.NODE_ENV === "production" && parsed.protocol !== "https:") {
+  // The only cleartext production exception is the private Compose DNS name.
+  // It is not a browser-visible origin and cannot point at an arbitrary host.
+  const isPrivateComposeEdge =
+    parsed.protocol === "http:" &&
+    parsed.hostname === "api" &&
+    parsed.port === "8080";
+  if (
+    process.env.NODE_ENV === "production" &&
+    parsed.protocol !== "https:" &&
+    !isPrivateComposeEdge
+  ) {
     throw new Error("BACKEND_API_ORIGIN must use HTTPS in production");
   }
   return parsed.origin;

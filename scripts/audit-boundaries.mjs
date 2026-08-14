@@ -10,6 +10,10 @@ const topLevelFiles = ["proxy.ts", "instrumentation.ts", "next.config.ts"].map(
 const files = [...sourceFiles, ...topLevelFiles].filter(existsSync);
 
 const forbiddenRuntimePatterns = [
+  {
+    label: "Prisma/direct database access",
+    pattern: /(?:@prisma\/|@\/lib\/db|\bprisma\b)/i,
+  },
   { label: "Supabase SDK", pattern: /["']@supabase\// },
   {
     label: "browser-visible Supabase configuration",
@@ -26,27 +30,10 @@ const forbiddenRuntimePatterns = [
   },
 ];
 
-// Files still reaching the legacy database directly. The set may only SHRINK:
-// a new direct-database import outside it fails, and a file that no longer
-// needs the entry fails until the entry is removed. It reaches zero when the
-// Access and Catalog APIs replace these callers, at which point `lib/db.ts`,
-// `prisma/`, and the database dependencies are deleted together.
-//
-// 2026-08-08: 14 → 12. The invoice-flagged action and the workflow store went
-// with the verticals and the builder they served.
-const legacyDatabaseAllowlist = new Set([
-  "app/account/organization/actions.ts",
-  "app/account/organization/page.tsx",
-  "app/account/projects/actions.ts",
-  "app/account/projects/page.tsx",
-  "app/onboarding/actions.ts",
-  "app/onboarding/join-org/page.tsx",
-  "lib/auth.ts",
-  "lib/domain-utils.ts",
-  "lib/project-rbac.ts",
-  "lib/projects.ts",
-  "lib/tenant.ts",
-  "lib/workspace-invites.ts",
+const platformFetchFacades = new Set([
+  "lib/platform-api.ts",
+  "lib/platform-proxy.ts",
+  "lib/platform-server.ts",
 ]);
 
 const removedRouteFiles = [
@@ -68,13 +55,8 @@ for (const file of files) {
   for (const rule of forbiddenRuntimePatterns) {
     if (rule.pattern.test(content)) failures.push(`${path}: ${rule.label}`);
   }
-  if (
-    (content.includes('"@/lib/db"') || content.includes("'@/lib/db'")) &&
-    !legacyDatabaseAllowlist.has(path)
-  ) {
-    failures.push(
-      `${path}: new direct database access is outside the cutover allowlist`,
-    );
+  if (content.includes("fetch(") && !platformFetchFacades.has(path)) {
+    failures.push(`${path}: direct fetch must use a platform API facade`);
   }
 }
 
@@ -82,22 +64,6 @@ for (const path of removedRouteFiles) {
   if (existsSync(join(root, path))) {
     failures.push(
       `${path}: removed direct auth/upload/file route was reintroduced`,
-    );
-  }
-}
-
-const actualLegacyDatabaseFiles = new Set(
-  files
-    .filter((file) => {
-      const content = readFileSync(file, "utf8");
-      return content.includes('"@/lib/db"') || content.includes("'@/lib/db'");
-    })
-    .map((file) => relative(root, file)),
-);
-for (const path of legacyDatabaseAllowlist) {
-  if (!actualLegacyDatabaseFiles.has(path)) {
-    failures.push(
-      `${path}: remove this resolved file from the legacy database allowlist`,
     );
   }
 }
@@ -117,7 +83,7 @@ if (failures.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    `Boundary audit passed. Browser Supabase/storage/manual-login paths: 0. Transitional direct-database files: ${actualLegacyDatabaseFiles.size}.`,
+    "Boundary audit passed. Browser secrets, direct database, storage, and manual-login paths: 0.",
   );
 }
 
