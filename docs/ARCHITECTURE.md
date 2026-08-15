@@ -1,6 +1,7 @@
 # Snoopy website architecture
 
-Status: **Round 5 web boundary implemented; release audit pending**
+Status: **Round 5 web boundary implemented for incremental merge; Round 5 exit
+gates remain open**
 
 Snoopy is the Autom8x web client and same-origin BFF surface. The backend Edge
 API owns identity, tenancy, product data, provider credentials, artifacts,
@@ -47,6 +48,12 @@ the internal Edge address `http://api:8080`. The web process exposes liveness at
 Infrastructure resource allocation and production secret management are
 deployment concerns. This repository deliberately proves the interfaces with
 typed, credential-free fixtures rather than storing local resource settings.
+
+Merging the web implementation does not close Round 5. The exact deferred
+contract, live-observation, accessibility, visual, and governance work is
+recorded in the Round 5 audit. Formal Round 6 work requires the backend-owned
+master-plan status to authorize that sequencing; this repository cannot make
+that governance edit.
 
 ## Verification
 

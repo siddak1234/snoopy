@@ -503,7 +503,30 @@ backend/deployment configuration and are intentionally outside the
 credential-free web fixture. They do not justify adding local resource
 configuration to Snoopy.
 
-After the scoped Snoopy PR is merged and the required human keyboard pass is
-recorded, the backend-owned master plan and Round 5 card must be updated by an
-authorized `snoopy-backend` session. This repository does not edit those private
-governance records.
+## Incremental merge disposition — 2026-08-14
+
+The owner directed PR #4 to merge as an audited **incremental Round 5 web
+implementation**, while leaving Round 5 open until infrastructure-dependent and
+contract-dependent work can be completed. The merge must not be represented as
+Round 5 closure. It allocates no cloud resource, adds no local secret, changes no
+backend contract, and does not convert a non-observation into a pass.
+
+The merge proves the automated evidence in the preceding sections against
+backend commit `7b39746017d5bf861e1155f76d8b73fb4f5a73cb`. The following register
+is the authoritative web-repository handoff for work that remains:
+
+| Requirement | Status at incremental merge | Exact evidence and reason it remains open | Exact completion condition | Owner/repository |
+| --- | --- | --- | --- | --- |
+| Gate 4.5: sign in, subscribe, configure, activate, trigger, and watch steps in the browser | **NOT OBSERVED** | The 17-test HTTPS fixture covers authenticated policy and error boundaries, but it does not execute this complete state sequence. No integrated non-production identity/Edge environment was supplied. | In an authorized non-production environment, record the complete browser sequence against the published API, including setup rows generated from every `manifest.setup[]` control used by the selected automation. | Web observation plus deployed backend environment |
+| Gate 4.5: approve in the UI and show continuation steps under the same root | **NOT OBSERVED** | The fixture observes organization join-request approval, not an automation approval continuation and its `root_run_id` chain. | Record one automation approval in the browser and verify the continuation steps retain the original root. | Web observation plus deployed backend environment |
+| NFR-35 authenticated core keyboard journey | **NOT OBSERVED** | Automated Axe passed, and the fixture proves focus containment, Escape close, and focus return for the connection dialog. The playbook separately requires a human keyboard traversal of the core journey. | Record the playbook-required human keyboard traversal, or amend the backend-owned gate explicitly to accept automated evidence. | Human audit or backend governance decision |
+| Third-party OAuth redirect and client allowlist | **NOT OBSERVED** | The disposable fixture uses a test HttpOnly cookie and no identity-provider account or OAuth client. | Observe a real non-production provider redirect with the deployed callback/redirect allowlist. | Deployment/identity configuration |
+| Live domain, join-request, pasted-key 409, entitlement 403, and export variants | **NOT OBSERVED** | Deterministic fixture observations passed for these public-contract shapes; no deployed Edge origin and authenticated non-production workspace were supplied. | Re-run domain verification, join-request decision, connection 409 retry with the same intent key, both allowlisted entitlement 403 reasons plus an unrelated 403, and complete/unavailable/truncated exports against the deployed Edge. | Web observation plus deployed backend environment |
+| BUILD-PLAN 8.3 billing page | **OPEN — PUBLIC CONTRACT BLOCKER** | The pinned public Edge contract exposes no browser checkout, portal, billing-read, price, or subscription-management operation. The page therefore remains a truthful availability placeholder; Snoopy must not invent an operation. | Backend governance defines and publishes the intended public operation and authorization behavior; backend tests it without requiring production resources; Snoopy regenerates types and implements only that contract. | `snoopy-backend`, then `snoopy` |
+| Marketing byte identity | **NOT PASS under the literal gate** | `/`, `/solutions`, and `/automation-builder` are byte-identical in the pinned renderer. `/contact` differs by 472 pixels solely because four owner-approved persistent link underlines satisfy NFR-35. | Backend governance records the approved accessibility exception to byte identity. Do not silently describe the current result as literal equality. | Backend governance/design owner |
+| Backend-integrated Preview readiness | **NOT OBSERVED** | The deployment is Ready and public routes respond, while `/api/ready` truthfully returns `backend:not-configured`; Preview has no allocated `BACKEND_API_ORIGIN`. | Configure an authorized non-production Edge origin during deployment work and repeat readiness and protected-route observations. | Deployment configuration |
+| Round 5 closure and Round 6 sequencing | **OPEN** | The backend master-plan §0 still says Round 5, `snoopy`, and `NOT STARTED`. Snoopy is read-only with respect to that record. | In an authorized `snoopy-backend` governance session, record this incremental merge and the open register, then explicitly authorize concurrent Round 6 work or keep Round 6 blocked until Round 5 closes. | `snoopy-backend` governance |
+
+Until the final row is updated in the master plan, the repository-of-record still
+names `snoopy` as open. A session in `snoopy-mobile` must not infer Round 6
+authorization from this PR merge alone.
