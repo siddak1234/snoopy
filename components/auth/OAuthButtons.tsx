@@ -1,10 +1,19 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { safePlatformReturnTo } from "@/lib/platform-api";
+import { platformApiJson, platformApiPath } from "@/lib/platform-api";
+import type { operations } from "@/lib/generated/platform-contracts/platform";
 
-type Provider = "google" | "microsoft" | "apple";
+type LoginProvidersResponse =
+  operations["listLoginProviders"]["responses"][200]["content"]["application/json"];
+type LoginProvider = LoginProvidersResponse["providers"][number];
 
-function oauthHref(provider: Provider, callbackUrl: string) {
+function oauthHref(provider: LoginProvider["id"], callbackUrl: string) {
   const next = safePlatformReturnTo(callbackUrl);
-  return `/api/platform/v1/auth/oauth/${provider}/start?return_to=${encodeURIComponent(next)}`;
+  return `${platformApiPath(
+    `/v1/auth/oauth/${provider}/start`,
+  )}?return_to=${encodeURIComponent(next)}`;
 }
 
 const buttonClass =
@@ -21,18 +30,59 @@ export function OAuthButtons({
   callbackUrl?: string;
   mode?: "login" | "signup";
 }) {
+  const [providers, setProviders] = useState<LoginProvider[] | null>(null);
+  const [error, setError] = useState(false);
   const verb = mode === "signup" ? "Sign up" : "Continue";
+
+  useEffect(() => {
+    let cancelled = false;
+    void platformApiJson<LoginProvidersResponse>("/v1/auth/providers")
+      .then((response) => {
+        if (!cancelled) setProviders(response.providers);
+      })
+      .catch(() => {
+        if (!cancelled) setError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (error) {
+    return (
+      <p role="alert" className="text-sm text-[var(--muted)]">
+        Sign-in providers are unavailable right now. Please try again later.
+      </p>
+    );
+  }
+
+  if (!providers) {
+    return (
+      <p role="status" className="text-sm text-[var(--muted)]">
+        Loading sign-in providers…
+      </p>
+    );
+  }
+
+  if (providers.length === 0) {
+    return (
+      <p role="alert" className="text-sm text-[var(--muted)]">
+        No sign-in providers are available in this environment.
+      </p>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2">
-      <a href={oauthHref("google", callbackUrl)} className={buttonClass}>
-        {verb} with Google
-      </a>
-      <a href={oauthHref("microsoft", callbackUrl)} className={buttonClass}>
-        {verb} with Microsoft
-      </a>
-      <a href={oauthHref("apple", callbackUrl)} className={buttonClass}>
-        {verb} with Apple
-      </a>
+      {providers.map((provider) => (
+        <a
+          key={provider.id}
+          href={oauthHref(provider.id, callbackUrl)}
+          className={buttonClass}
+        >
+          {verb} with {provider.label}
+        </a>
+      ))}
     </div>
   );
 }

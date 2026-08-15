@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { ProjectMemberRole } from "@prisma/client";
 import { addMemberToProjectAction } from "@/app/account/projects/actions";
 import Modal from "@/components/ui/Modal";
 import { FormError } from "@/components/ui/FormError";
+import type { ProjectRole } from "@/lib/tenancy";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -33,12 +33,12 @@ export function ProjectMemberPicker({
   const [open, setOpen] = useState(false);
   const [available, setAvailable] = useState<AvailableMember[]>(initial);
   // role selection per userId, default "member"
-  const [roleMap, setRoleMap] = useState<Record<string, ProjectMemberRole>>({});
+  const [roleMap, setRoleMap] = useState<Record<string, ProjectRole>>({});
   const [addingUserId, setAddingUserId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const router = useRouter();
 
-  function getRole(userId: string): ProjectMemberRole {
+  function getRole(userId: string): ProjectRole {
     return roleMap[userId] ?? "member";
   }
 
@@ -123,7 +123,7 @@ export function ProjectMemberPicker({
                     onChange={(e) =>
                       setRoleMap((prev) => ({
                         ...prev,
-                        [m.userId]: e.target.value as ProjectMemberRole,
+                        [m.userId]: e.target.value as ProjectRole,
                       }))
                     }
                     disabled={!!addingUserId}

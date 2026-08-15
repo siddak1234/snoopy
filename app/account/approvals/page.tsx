@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getAppSession } from "@/lib/app-session";
+import { listWorkspaces, resolveActiveWorkspaceId } from "@/lib/tenancy";
 import {
   emptyWhenUnavailable,
   listApprovals,
@@ -21,8 +22,9 @@ export const dynamic = "force-dynamic";
 
 export default async function ApprovalsPage() {
   const session = await getAppSession();
-  const workspaceId = session?.user.workspaceId ?? session?.workspaces[0]?.id;
-  const role = session?.workspaces.find((w) => w.id === workspaceId)?.role;
+  const workspaces = session ? await listWorkspaces() : [];
+  const workspaceId = await resolveActiveWorkspaceId(session);
+  const role = workspaces.find((w) => w.id === workspaceId)?.role;
 
   if (!workspaceId) {
     return (

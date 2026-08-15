@@ -6,6 +6,7 @@ import { PlatformServerError } from "@/lib/platform-server";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { Kicker } from "@/components/ui/Kicker";
+import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 
 /**
  * One run, step by step.
@@ -26,7 +27,7 @@ export default async function RunDetailPage(
   // segment breaks the build rather than producing an undefined param.
   const { runId } = await props.params;
   const session = await getAppSession();
-  const workspaceId = session?.user.workspaceId ?? session?.workspaces[0]?.id;
+  const workspaceId = await resolveActiveWorkspaceId(session);
   if (!workspaceId) notFound();
 
   let detail;

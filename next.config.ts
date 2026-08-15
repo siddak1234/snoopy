@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import { backendApiOrigin } from "./lib/backend-origin";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   turbopack: {
     root: __dirname,
   },

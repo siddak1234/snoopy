@@ -14,7 +14,7 @@ function SignupForm() {
     <section className="bubble p-6 sm:p-8">
       <h1 className="text-3xl font-medium sm:text-4xl">Sign Up</h1>
       <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-        Create your Autom8x account through Google, Microsoft, or Apple. No
+        Create your Autom8x account through an approved sign-in provider. No
         separate password is required.
       </p>
 

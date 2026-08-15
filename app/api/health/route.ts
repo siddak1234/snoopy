@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /**
- * Liveness probe: process is running. Does NOT touch Prisma or the database.
+ * Liveness probe: process is running. Does not touch persistence.
  * Production uses Vercel env vars only; .env.local is local-only.
  */
 export async function GET() {

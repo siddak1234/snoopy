@@ -9,6 +9,7 @@ import {
 import SectionCard from "@/components/dashboard/SectionCard";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { AutomationActions } from "./AutomationActions";
+import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 
 /**
  * The catalog, and what this workspace has done with it.
@@ -23,7 +24,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AutomationsPage() {
   const session = await getAppSession();
-  const workspaceId = session?.user.workspaceId ?? session?.workspaces[0]?.id;
+  const workspaceId = await resolveActiveWorkspaceId(session);
 
   if (!workspaceId) {
     return (
@@ -127,12 +128,14 @@ function AutomationCard({
       <AutomationActions
         templateId={automation.templateId}
         available={automation.available}
+        setup={automation.setup}
         subscription={
           subscription
             ? {
                 id: subscription.id,
                 status: subscription.status,
                 canGoLive: subscription.unmetConnections.length === 0,
+                config: subscription.config,
               }
             : null
         }

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { getAppSession } from "@/lib/app-session";
+import { listWorkspaces } from "@/lib/tenancy";
 import { extractDomain, isPublicDomain } from "@/lib/domain-utils";
 import SectionCard from "@/components/dashboard/SectionCard";
 import DeleteAccountButton from "@/components/account/DeleteAccountButton";
 import LinkedAccountsSection from "@/components/account/LinkedAccountsSection";
 import { SetupOrgForm } from "@/app/onboarding/setup-org/SetupOrgForm";
+import { WorkspaceExportSection } from "./WorkspaceExportSection";
 
 export default async function AccountSettingsPage() {
   const session = await getAppSession();
@@ -13,10 +15,13 @@ export default async function AccountSettingsPage() {
   const domain = extractDomain(email);
   const isCustomDomain = !!domain && !isPublicDomain(domain);
 
-  // Check if the user already owns an org workspace
-  const orgMembership = session?.workspaces.find(
-    (workspace) => workspace.type === "organization",
-  );
+  // The session list can be bounded; the public workspace collection decides
+  // whether organization membership exists.
+  const orgMembership = session
+    ? (await listWorkspaces()).find(
+        (workspace) => workspace.type === "organization",
+      )
+    : undefined;
 
   const showOrgCreate = isCustomDomain && !orgMembership;
   const showOrgLink = isCustomDomain && !!orgMembership;
@@ -64,6 +69,8 @@ export default async function AccountSettingsPage() {
           </div>
         </div>
       ) : null}
+
+      <WorkspaceExportSection />
 
       <div className="border-t border-[var(--ring)] pt-5">
         <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">

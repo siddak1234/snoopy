@@ -9,6 +9,7 @@ import {
 } from "@/lib/automations";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { StatusPill } from "@/components/dashboard/StatusPill";
+import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 
 /**
  * Activity — every run this workspace has had.
@@ -23,7 +24,7 @@ export const dynamic = "force-dynamic";
 
 export default async function RunsPage() {
   const session = await getAppSession();
-  const workspaceId = session?.user.workspaceId ?? session?.workspaces[0]?.id;
+  const workspaceId = await resolveActiveWorkspaceId(session);
 
   if (!workspaceId) {
     return (
@@ -55,7 +56,6 @@ export default async function RunsPage() {
             key={run.id}
             run={run}
             name={nameFor.get(run.templateId) ?? run.templateId}
-            workspaceId={workspaceId}
           />
         ))
       )}
@@ -63,15 +63,7 @@ export default async function RunsPage() {
   );
 }
 
-function RunRow({
-  run,
-  name,
-  workspaceId,
-}: {
-  run: Run;
-  name: string;
-  workspaceId: string;
-}) {
+function RunRow({ run, name }: { run: Run; name: string }) {
   return (
     <Link
       href={`/account/runs/${run.id}`}

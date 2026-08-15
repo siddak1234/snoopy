@@ -1,35 +1,30 @@
 "use server";
 
-import { getAppSession } from "@/lib/app-session";
-import {
-  createProject as createProjectDb,
-  deleteProject as deleteProjectDb,
-  leaveProject as leaveProjectDb,
-  restoreProject as restoreProjectDb,
-  getUsedProjectTypesByScope,
-} from "@/lib/projects";
-import { canUserPerform, getProjectRole } from "@/lib/project-rbac";
-import { canModifyMember } from "@/lib/project-rbac-pure";
-import {
-  isProjectScope,
-  isProjectType,
-  type ProjectScope,
-} from "@/lib/project-types";
-import { prisma } from "@/lib/db";
-import type { ProjectMemberRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { getAppSession } from "@/lib/app-session";
+import { PlatformServerError } from "@/lib/platform-server";
+import {
+  createProject,
+  findAccessibleProject,
+  listWorkspaces,
+  removeProjectMembership,
+  updateProject,
+  upsertProjectMembership,
+  type ProjectRole,
+} from "@/lib/tenancy";
 
-const NAME_MIN = 2;
-const NAME_MAX = 60;
+function platformMessage(error: unknown, fallback: string): string {
+  return error instanceof PlatformServerError ? error.message : fallback;
+}
 
-// ---------------------------------------------------------------------------
-// Project lifecycle
-// ---------------------------------------------------------------------------
-
-/** Call after the user closes the access-code dialog so the projects list refreshes. */
-export async function revalidateAccountProjectsAction(): Promise<void> {
+function refreshProjectPaths(projectId?: string): void {
   revalidatePath("/account");
   revalidatePath("/account/projects");
+  if (projectId) revalidatePath(`/account/projects/${projectId}`);
+}
+
+export async function revalidateAccountProjectsAction(): Promise<void> {
+  refreshProjectPaths();
 }
 
 export type CreateProjectResult =
@@ -38,376 +33,172 @@ export type CreateProjectResult =
 export async function createProjectAction(
   formData: FormData,
 ): Promise<CreateProjectResult> {
-  const session = await getAppSession();
-  if (!session?.user?.id) {
+  if (!(await getAppSession())) {
     return { ok: false, error: "You must be signed in to create a project." };
   }
-
   const name = formData.get("name");
+  const type = formData.get("projectType");
+  const scope = formData.get("scope");
   if (typeof name !== "string" || !name.trim()) {
     return { ok: false, error: "Project name is required." };
   }
-  const trimmed = name.trim();
-  if (trimmed.length < NAME_MIN) {
-    return {
-      ok: false,
-      error: `Name must be at least ${NAME_MIN} characters.`,
-    };
-  }
-  if (trimmed.length > NAME_MAX) {
-    return { ok: false, error: `Name must be at most ${NAME_MAX} characters.` };
-  }
-
-  const projectType = formData.get("projectType");
-  if (typeof projectType !== "string" || !projectType.trim()) {
+  if (typeof type !== "string" || !type.trim()) {
     return { ok: false, error: "Project type is required." };
   }
-  const trimmedType = projectType.trim();
-  if (!isProjectType(trimmedType)) {
-    return { ok: false, error: "Invalid project type." };
-  }
-
-  const scopeRaw = formData.get("scope");
-  if (typeof scopeRaw !== "string" || !isProjectScope(scopeRaw)) {
+  if (scope !== "personal" && scope !== "team") {
     return { ok: false, error: "Project scope is required." };
   }
-  const scope: ProjectScope = scopeRaw;
-
-  // Resolve the target workspace from scope. Any workspaceId field is ignored
-  // intentionally — scope is the source of truth so the client cannot redirect
-  // a personal create into an org workspace or vice versa.
-  const targetWorkspaceType =
-    scope === "personal" ? "personal" : "organization";
-  const targetMembership = await prisma.membership.findFirst({
-    where: {
-      userId: session.user.id,
-      workspace: { type: targetWorkspaceType },
-    },
-    orderBy: { createdAt: "asc" },
-    select: { workspaceId: true },
-  });
-  if (!targetMembership) {
-    return {
-      ok: false,
-      error:
-        scope === "team"
-          ? "Join an organization to create a team project."
-          : "No personal workspace found. Please sign out and back in.",
-    };
-  }
-  const targetWorkspaceId = targetMembership.workspaceId;
-
-  const usedTypes = await getUsedProjectTypesByScope(session.user.id);
-  if (usedTypes[scope].includes(trimmedType)) {
-    const scopeLabel = scope === "personal" ? "personal" : "team";
-    return {
-      ok: false,
-      error: `You already have a "${trimmedType}" ${scopeLabel} project. Delete or leave it before creating another.`,
-    };
-  }
-
-  const description = formData.get("description");
-  const descriptionStr =
-    typeof description === "string" && description.trim()
-      ? description.trim()
-      : null;
 
   try {
-    const { project } = await createProjectDb(
-      session.user.id,
-      { name: trimmed, type: trimmedType, description: descriptionStr },
-      targetWorkspaceId,
+    const workspaces = await listWorkspaces();
+    const workspace = workspaces.find(
+      (candidate) =>
+        candidate.type === (scope === "personal" ? "personal" : "organization"),
     );
-    // Do NOT revalidate here — it can unmount the success state in the dialog.
-    return { ok: true, projectId: project.id };
-  } catch (e) {
-    console.error("createProjectAction", e);
-    return { ok: false, error: "Failed to create project. Please try again." };
-  }
-}
-
-export type DeleteProjectResult = { ok: true } | { ok: false; error: string };
-
-/**
- * Archive (soft-delete) the project. Data rows tagged with the project_id
- * stay intact; the project can be restored later via restoreProjectAction
- * (offered automatically by the Create dialog when the same scope+type is
- * picked again).
- */
-export async function deleteProjectAction(
-  projectId: string,
-): Promise<DeleteProjectResult> {
-  const session = await getAppSession();
-  if (!session?.user?.id) {
-    return { ok: false, error: "You must be signed in to delete a project." };
-  }
-  if (!projectId || typeof projectId !== "string" || !projectId.trim()) {
-    return { ok: false, error: "Project ID is required." };
-  }
-  try {
-    const deleted = await deleteProjectDb(session.user.id, projectId.trim());
-    if (!deleted) {
+    if (!workspace) {
       return {
         ok: false,
-        error: "Project not found or you don't have permission to delete it.",
+        error:
+          scope === "team"
+            ? "Join an organization to create a team project."
+            : "No personal workspace is available.",
       };
     }
-    revalidatePath("/account");
-    revalidatePath("/account/projects");
-    return { ok: true };
-  } catch (e) {
-    console.error("deleteProjectAction", e);
-    return { ok: false, error: "Failed to delete project. Please try again." };
+    const description = formData.get("description");
+    const project = await createProject(workspace.id, {
+      name: name.trim(),
+      type: type.trim(),
+      ...(typeof description === "string" && description.trim()
+        ? { description: description.trim() }
+        : {}),
+    });
+    refreshProjectPaths(project.id);
+    return { ok: true, projectId: project.id };
+  } catch (error) {
+    return {
+      ok: false,
+      error: platformMessage(error, "The project could not be created."),
+    };
   }
 }
 
-export type RestoreProjectResult =
-  { ok: true; projectId: string } | { ok: false; error: string };
+async function projectContext(projectId: string) {
+  const context = await findAccessibleProject(projectId);
+  if (!context)
+    throw new PlatformServerError("The requested project is unavailable.", 404);
+  return context;
+}
 
-/**
- * Restore an archived project. Permission check (owner or org_owner) lives in
- * lib/projects.restoreProject. project_id is unchanged, so every row in the
- * data tables reattaches automatically the moment status flips to active.
- */
+export type ProjectActionResult = { ok: true } | { ok: false; error: string };
+
+export async function deleteProjectAction(
+  projectId: string,
+): Promise<ProjectActionResult> {
+  try {
+    const { workspace } = await projectContext(projectId);
+    await updateProject(workspace.id, projectId, { status: "archived" });
+    refreshProjectPaths(projectId);
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: platformMessage(error, "The project could not be archived."),
+    };
+  }
+}
+
 export async function restoreProjectAction(
   projectId: string,
-): Promise<RestoreProjectResult> {
-  const session = await getAppSession();
-  if (!session?.user?.id) {
-    return { ok: false, error: "You must be signed in to restore a project." };
-  }
-  if (!projectId || typeof projectId !== "string" || !projectId.trim()) {
-    return { ok: false, error: "Project ID is required." };
-  }
+): Promise<CreateProjectResult> {
   try {
-    const restored = await restoreProjectDb(session.user.id, projectId.trim());
-    if (!restored) {
-      return { ok: false, error: "Project not found or cannot be restored." };
-    }
-    revalidatePath("/account");
-    revalidatePath("/account/projects");
-    return { ok: true, projectId: projectId.trim() };
-  } catch (e) {
-    console.error("restoreProjectAction", e);
-    return { ok: false, error: "Failed to restore project. Please try again." };
+    const { workspace } = await projectContext(projectId);
+    const project = await updateProject(workspace.id, projectId, {
+      status: "active",
+    });
+    refreshProjectPaths(projectId);
+    return { ok: true, projectId: project.id };
+  } catch (error) {
+    return {
+      ok: false,
+      error: platformMessage(error, "The project could not be restored."),
+    };
   }
 }
-
-export type LeaveProjectResult = { ok: true } | { ok: false; error: string };
 
 export async function leaveProjectAction(
   projectId: string,
-): Promise<LeaveProjectResult> {
+): Promise<ProjectActionResult> {
   const session = await getAppSession();
-  if (!session?.user?.id) {
-    return { ok: false, error: "You must be signed in to leave a project." };
-  }
-  if (!projectId || typeof projectId !== "string" || !projectId.trim()) {
-    return { ok: false, error: "Project ID is required." };
-  }
+  if (!session) return { ok: false, error: "You must be signed in." };
   try {
-    const left = await leaveProjectDb(session.user.id, projectId.trim());
-    if (!left) {
-      return {
-        ok: false,
-        error: "Unable to leave project (not a member or you are the owner).",
-      };
-    }
-    revalidatePath("/account");
-    revalidatePath("/account/projects");
+    const { workspace } = await projectContext(projectId);
+    await removeProjectMembership(workspace.id, projectId, session.user.id);
+    refreshProjectPaths(projectId);
     return { ok: true };
-  } catch (e) {
-    console.error("leaveProjectAction", e);
-    return { ok: false, error: "Failed to leave project. Please try again." };
+  } catch (error) {
+    return {
+      ok: false,
+      error: platformMessage(error, "You could not leave this project."),
+    };
   }
 }
 
-// ---------------------------------------------------------------------------
-// Member management
-// ---------------------------------------------------------------------------
-
-export type AddMemberResult = { ok: true } | { ok: false; error: string };
-
-/**
- * Add a workspace member to a project.
- * Caller must hold project:add_member (owner or admin).
- * Target must be a workspace member and not already in the project.
- */
 export async function addMemberToProjectAction(
   projectId: string,
   targetUserId: string,
-  role: ProjectMemberRole,
-): Promise<AddMemberResult> {
-  const session = await getAppSession();
-  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
-
-  const [allowed, actorRole] = await Promise.all([
-    canUserPerform(session.user.id, projectId, "project:add_member"),
-    getProjectRole(session.user.id, projectId),
-  ]);
-  if (!allowed || !actorRole) {
-    return { ok: false, error: "You don't have permission to add members." };
-  }
-  if (!canModifyMember(actorRole, null, "add")) {
-    return { ok: false, error: "You don't have permission to add members." };
-  }
-
-  // Reject owner role — only one owner is allowed and it's set at creation
-  if (role === "owner" || role === "project_user") {
-    return { ok: false, error: "Invalid role. Choose 'member' or 'admin'." };
-  }
-
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: {
-      workspaceId: true,
-      type: true,
-      workspace: { select: { type: true } },
-    },
-  });
-  if (!project?.workspaceId) {
-    return { ok: false, error: "Project has no associated workspace." };
-  }
-  if (project.workspace?.type !== "organization") {
-    return { ok: false, error: "Cannot add members to a personal project." };
-  }
-
-  const [wsMembership, existing] = await Promise.all([
-    prisma.membership.findUnique({
-      where: {
-        userId_workspaceId: {
-          userId: targetUserId,
-          workspaceId: project.workspaceId,
-        },
-      },
-    }),
-    prisma.projectMembership.findUnique({
-      where: { projectId_userId: { projectId, userId: targetUserId } },
-    }),
-  ]);
-
-  if (!wsMembership) {
-    return { ok: false, error: "That user is not a member of this workspace." };
-  }
-  if (existing) {
-    return { ok: false, error: "That user is already in this project." };
-  }
-
-  // Per-workspace team uniqueness means only one project per type exists in
-  // the org workspace, so adding a teammate never collides with another team
-  // project they hold. Personal scope is unreachable here — personal projects
-  // are rejected earlier by the project.workspace.type guard.
-
+  role: ProjectRole,
+): Promise<ProjectActionResult> {
+  if (role === "owner") return { ok: false, error: "Choose member or admin." };
   try {
-    await prisma.projectMembership.create({
-      data: { projectId, userId: targetUserId, role },
+    const { workspace } = await projectContext(projectId);
+    await upsertProjectMembership(workspace.id, projectId, {
+      userId: targetUserId,
+      role,
     });
-    revalidatePath(`/account/projects/${projectId}`);
+    refreshProjectPaths(projectId);
     return { ok: true };
-  } catch (e) {
-    console.error("addMemberToProjectAction", e);
-    return { ok: false, error: "Failed to add member. Please try again." };
+  } catch (error) {
+    return {
+      ok: false,
+      error: platformMessage(error, "The member could not be added."),
+    };
   }
 }
 
-export type ChangeMemberRoleResult =
-  { ok: true } | { ok: false; error: string };
-
-/**
- * Change a project member's role.
- * Caller must hold project:change_role; canModifyMember enforces admin restrictions.
- */
 export async function changeMemberRoleAction(
   projectId: string,
   targetUserId: string,
-  newRole: ProjectMemberRole,
-): Promise<ChangeMemberRoleResult> {
-  const session = await getAppSession();
-  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
-
-  const [allowed, actorRole] = await Promise.all([
-    canUserPerform(session.user.id, projectId, "project:change_role"),
-    getProjectRole(session.user.id, projectId),
-  ]);
-  if (!allowed || !actorRole) {
-    return { ok: false, error: "You don't have permission to change roles." };
-  }
-
-  const targetMembership = await prisma.projectMembership.findUnique({
-    where: { projectId_userId: { projectId, userId: targetUserId } },
-    select: { role: true },
-  });
-  if (!targetMembership) {
-    return { ok: false, error: "Target user is not in this project." };
-  }
-
-  if (
-    !canModifyMember(actorRole, targetMembership.role, "change_role", newRole)
-  ) {
+  role: ProjectRole,
+): Promise<ProjectActionResult> {
+  try {
+    const { workspace } = await projectContext(projectId);
+    await upsertProjectMembership(workspace.id, projectId, {
+      userId: targetUserId,
+      role,
+    });
+    refreshProjectPaths(projectId);
+    return { ok: true };
+  } catch (error) {
     return {
       ok: false,
-      error: "You are not allowed to change this member's role.",
+      error: platformMessage(error, "The member role could not be updated."),
     };
-  }
-
-  try {
-    await prisma.projectMembership.update({
-      where: { projectId_userId: { projectId, userId: targetUserId } },
-      data: { role: newRole },
-    });
-    revalidatePath(`/account/projects/${projectId}`);
-    return { ok: true };
-  } catch (e) {
-    console.error("changeMemberRoleAction", e);
-    return { ok: false, error: "Failed to change role. Please try again." };
   }
 }
 
-export type RemoveMemberResult = { ok: true } | { ok: false; error: string };
-
-/**
- * Remove a member from a project.
- * Caller must hold project:remove_member; canModifyMember enforces admin restrictions.
- * The project owner cannot be removed.
- */
 export async function removeMemberFromProjectAction(
   projectId: string,
   targetUserId: string,
-): Promise<RemoveMemberResult> {
-  const session = await getAppSession();
-  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
-
-  const [allowed, actorRole] = await Promise.all([
-    canUserPerform(session.user.id, projectId, "project:remove_member"),
-    getProjectRole(session.user.id, projectId),
-  ]);
-  if (!allowed || !actorRole) {
-    return { ok: false, error: "You don't have permission to remove members." };
-  }
-
-  const targetMembership = await prisma.projectMembership.findUnique({
-    where: { projectId_userId: { projectId, userId: targetUserId } },
-    select: { role: true },
-  });
-  if (!targetMembership) {
-    return { ok: false, error: "Target user is not in this project." };
-  }
-  if (targetMembership.role === "owner") {
-    return { ok: false, error: "The project owner cannot be removed." };
-  }
-
-  if (!canModifyMember(actorRole, targetMembership.role, "remove")) {
-    return { ok: false, error: "You are not allowed to remove this member." };
-  }
-
+): Promise<ProjectActionResult> {
   try {
-    await prisma.projectMembership.delete({
-      where: { projectId_userId: { projectId, userId: targetUserId } },
-    });
-    revalidatePath(`/account/projects/${projectId}`);
+    const { workspace } = await projectContext(projectId);
+    await removeProjectMembership(workspace.id, projectId, targetUserId);
+    refreshProjectPaths(projectId);
     return { ok: true };
-  } catch (e) {
-    console.error("removeMemberFromProjectAction", e);
-    return { ok: false, error: "Failed to remove member. Please try again." };
+  } catch (error) {
+    return {
+      ok: false,
+      error: platformMessage(error, "The member could not be removed."),
+    };
   }
 }

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { toAppSession, type AppSession } from "@/lib/session-contract";
-import { platformApiPath } from "@/lib/platform-api";
+import { platformApiJson } from "@/lib/platform-api";
+import type { components } from "@/lib/generated/platform-contracts/platform";
 
 const RETRY_DELAY_MS = 800;
 const MAX_RETRIES = 3;
@@ -25,13 +26,14 @@ export function useAppSession(options?: {
 
     async function fetchSession(attempt: number): Promise<void> {
       try {
-        const res = await fetch(platformApiPath("/v1/session"), {
-          credentials: "same-origin",
-        });
-        const session = toAppSession(await res.json().catch(() => null));
+        const session = toAppSession(
+          await platformApiJson<components["schemas"]["SessionResponse"]>(
+            "/v1/session",
+          ),
+        );
         if (cancelled) return;
 
-        if (res.ok && session) {
+        if (session) {
           setData(session);
           setStatus("authenticated");
           return;
@@ -60,9 +62,12 @@ export function useAppSession(options?: {
       }
     }
 
-    fetchSession(0);
+    const initialFetch = setTimeout(() => {
+      void fetchSession(0);
+    }, 0);
     return () => {
       cancelled = true;
+      clearTimeout(initialFetch);
     };
   }, [retryIfEmpty]);
 

@@ -1,45 +1,31 @@
-# Repository structure (website)
-
-This repository owns the Autom8x website and Nocturne presentation layer. Target
-product capabilities live behind `snoopy-backend` APIs.
+# Repository structure
 
 ```text
 snoopy/
 ├── app/                  Next.js routes, pages, server actions
-├── components/           Nocturne UI and product presentation
-├── hooks/                client hooks
-├── lib/                  API/session contracts and transitional server logic
-├── prisma/               legacy-cutover schema/migrations; not the new owner
-├── public/               static assets
-├── scripts/              architecture/boundary audits
-├── docs/                 website design and migration evidence
-├── proxy.ts              backend-session route protection
-├── instrumentation.ts    production backend-origin validation
-└── next.config.ts        redirects and same-origin backend rewrite
+├── components/           Nocturne UI and dashboard presentation
+├── e2e/                  Browser, accessibility, and local Edge fixture tests
+├── lib/                  Platform façades, generated contracts, session mapping
+├── scripts/              Contract generation and boundary audits
+├── docs/                 Website architecture and audit evidence
+├── Dockerfile            Standalone non-root website image
+├── compose.yml           Web service on the external platform network
+├── proxy.ts              Backend-session route protection
+└── next.config.ts        Backend-origin validation and same-origin rewrite
 ```
-
-## Placement rules
 
 | Change | Location / rule |
 | --- | --- |
-| UI or marketing screen | `app/` plus reusable components in `components/`; preserve Nocturne tokens in `app/globals.css` |
-| Browser API call | Use `lib/platform-api.ts`; call a versioned `/v1/*` path through `/api/platform` |
-| Session UI | Use `hooks/use-app-session.ts` or server-only `lib/app-session.ts`; both validate `lib/session-contract.ts` |
-| Backend origin | `lib/backend-origin.ts`; do not duplicate parsing or expose it as `NEXT_PUBLIC_*` |
-| Product logic/persistence | Add to its owning `snoopy-backend` service, not a new website database route |
-| OAuth login | Backend identity contract only; no Supabase SDK or manual-password route here |
-| Artifact upload/file | Project-scoped backend route; no object-store SDK or credential here |
-| New database access | Prohibited. Existing callers are frozen by `scripts/audit-boundaries.mjs` until migrated |
-| Readiness | `app/api/ready/route.ts` reflects backend readiness |
+| UI or marketing screen | `app/` and reusable `components/`; preserve Nocturne tokens |
+| Browser API call | `lib/platform-api.ts` through `/api/platform/v1/*` |
+| Server API call | `lib/platform-server.ts` with typed public response aliases |
+| Session UI | `hooks/use-app-session.ts` or server-only `lib/app-session.ts` |
+| Backend origin | `lib/backend-origin.ts`; never expose it as `NEXT_PUBLIC_*` |
+| Generated API types | `lib/generated/platform-contracts/`; regenerate, never hand-edit |
+| Product persistence or provider secret | Owning `snoopy-backend` service; prohibited here |
+| OAuth login | Published backend provider policy only; no Supabase SDK or password route |
+| Browser regression | `e2e/`; fixture-only tests must stay disabled outside their local runner |
 
-## Required checks
-
-```bash
-npm run audit:boundaries
-npm run typecheck
-npm run lint
-npm run build
-```
-
-The exact transition state is documented in
-[`audits/2026-08-06-backend-boundary-cutover.md`](audits/2026-08-06-backend-boundary-cutover.md).
+Required checks are listed in the README. The Round 5 implementation evidence
+and the exit gates intentionally left open after the incremental merge are
+recorded in [the audit record](audits/2026-08-11-round-5-phase-1-status.md).

@@ -29,7 +29,7 @@ function LoginForm() {
     <section className="bubble p-6 sm:p-8">
       <h1 className="text-3xl font-medium sm:text-4xl">Login</h1>
       <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-        Continue securely with your Google, Microsoft, or Apple account.
+        Continue securely with an approved sign-in provider.
       </p>
 
       {authCallbackError ? (

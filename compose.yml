@@ -1,0 +1,19 @@
+# Start the platform first from `../snoopy-backend/compose.yml`. This public
+# repository owns only the web service, which joins that platform's network.
+services:
+  web:
+    build:
+      context: .
+      args:
+        BACKEND_API_ORIGIN: http://api:8080
+    environment:
+      BACKEND_API_ORIGIN: http://api:8080
+    networks:
+      - autom8x-platform
+    ports:
+      - "3000:3000"
+
+networks:
+  autom8x-platform:
+    external: true
+    name: autom8x_default
