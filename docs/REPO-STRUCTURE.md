@@ -26,5 +26,6 @@ snoopy/
 | OAuth login | Published backend provider policy only; no Supabase SDK or password route |
 | Browser regression | `e2e/`; fixture-only tests must stay disabled outside their local runner |
 
-Required checks are listed in the README. The Round 5 completion evidence is
+Required checks are listed in the README. The Round 5 implementation evidence
+and the exit gates intentionally left open after the incremental merge are
 recorded in [the audit record](audits/2026-08-11-round-5-phase-1-status.md).
