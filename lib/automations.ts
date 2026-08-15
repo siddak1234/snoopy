@@ -2,118 +2,62 @@ import {
   platformServerJson,
   PlatformNotConfiguredError,
 } from "@/lib/platform-server";
+import type {
+  components,
+  operations,
+} from "./generated/platform-contracts/automations";
 
 /**
  * The automation surface, as the website consumes it.
  *
- * Types mirror `snoopy-backend/docs/openapi/automations.yaml` and are checked
- * against it by `test/automation-contract.test.mjs`, so a backend field that
- * changes name fails here rather than rendering as blank.
+ * Response models are generated from `docs/openapi/automations.yaml`. The
+ * contract test remains a UI-consumption check: it proves that each field the
+ * page reads is part of the published response rather than merely a type alias.
  *
  * Every path is workspace-scoped because the workspace is the thing being
  * authorized: the Edge refuses one the session does not name, answering 404 so a
  * non-member cannot learn it exists.
  */
 
-export type SubscriptionStatus = "draft" | "live" | "paused";
-
-export type RunStatus =
-  "pending" | "running" | "held" | "succeeded" | "failed" | "cancelled";
-
-export type RunOrigin =
-  "trigger" | "manual" | "approval-continuation" | "retry-continuation";
-
-export type ApprovalStatus = "pending" | "approved" | "rejected" | "expired";
-
-export type AutomationCatalogEntry = {
-  templateId: string;
-  version: number;
-  name: string;
-  description: string;
-  category: string;
-  /** An icon name the client resolves. Never an asset URL. */
-  icon: string;
-  monthlyPriceUsd: number;
-  subscribed: boolean;
-  /** Evidence from a reachability probe, never an assumption. */
-  available: boolean;
-};
-
-export type AutomationCatalog = {
-  automations: AutomationCatalogEntry[];
-  /** The filter vocabulary, already including "All". Rendered, never invented. */
-  categories: string[];
-};
-
-export type Subscription = {
-  id: string;
-  workspaceId: string;
-  templateId: string;
-  templateVersion: number;
-  name?: string;
-  status: SubscriptionStatus;
-  config: Record<string, unknown>;
-  /** Provider ids still to connect. Non-empty blocks going live. */
-  unmetConnections: string[];
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type Run = {
-  id: string;
-  workspaceId: string;
-  subscriptionId: string;
-  /** No display name here — join the catalog for one. */
-  templateId: string;
-  templateVersion: number;
-  status: RunStatus;
-  origin: RunOrigin;
-  continuesRunId?: string;
-  /** Groups a continuation chain, so approve-then-finish reads as one thing. */
-  rootRunId: string;
-  requestId: string;
-  startedAt?: string;
-  endedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type RunStep = {
-  id: string;
-  runId: string;
-  stepId: string;
-  outcome: "ok" | "held" | "failed";
-  /** One line for the timeline. Never the payload itself. */
-  summary: string;
-  heldReason?: string;
-  occurredAt: string;
-};
-
-export type RunEvent = {
-  id: string;
-  runId: string;
-  type: string;
-  stepId?: string;
-  occurredAt: string;
-};
-
-export type RunDetail = { run: Run; steps: RunStep[]; events: RunEvent[] };
-
-export type Approval = {
-  id: string;
-  runId: string;
-  workspaceId: string;
-  subscriptionId: string;
-  stepId: string;
-  status: ApprovalStatus;
-  /** The "why" line shown to the approver. */
-  reason: string;
-  eligibleRoles: string[];
-  createdAt: string;
-  expiresAt: string;
-  decidedAt?: string;
-  continuationRunId?: string;
-};
+export type SubscriptionStatus = components["schemas"]["SubscriptionStatus"];
+export type RunStatus = components["schemas"]["RunStatus"];
+export type RunOrigin = components["schemas"]["RunOrigin"];
+export type ApprovalStatus = components["schemas"]["ApprovalStatus"];
+export type AutomationCatalogEntry =
+  components["schemas"]["AutomationCatalogEntry"];
+export type AutomationSetupField =
+  components["schemas"]["AutomationSetupField"];
+export type AutomationCatalog =
+  components["schemas"]["AutomationCatalogResponse"];
+export type Subscription = components["schemas"]["Subscription"];
+export type Run = components["schemas"]["Run"];
+export type RunStep = components["schemas"]["RunStep"];
+export type RunEvent = components["schemas"]["RunEvent"];
+export type RunDetail = components["schemas"]["RunDetail"];
+export type Approval = components["schemas"]["Approval"];
+export type ListSubscriptionsResponse =
+  operations["listSubscriptions"]["responses"][200]["content"]["application/json"];
+export type ListRunsResponse =
+  operations["listRuns"]["responses"][200]["content"]["application/json"];
+export type ListApprovalsResponse =
+  operations["listApprovals"]["responses"][200]["content"]["application/json"];
+export type CreateSubscriptionRequest =
+  operations["createSubscription"]["requestBody"]["content"]["application/json"];
+export type CreateSubscriptionResponse =
+  operations["createSubscription"]["responses"][200]["content"]["application/json"];
+export type UpdateSubscriptionRequest =
+  operations["updateSubscription"]["requestBody"]["content"]["application/json"];
+export type UpdateSubscriptionResponse =
+  operations["updateSubscription"]["responses"][200]["content"]["application/json"];
+export type CreateRunRequest =
+  operations["createRun"]["requestBody"]["content"]["application/json"];
+export type CreateRunResponse =
+  | operations["createRun"]["responses"][200]["content"]["application/json"]
+  | operations["createRun"]["responses"][201]["content"]["application/json"];
+export type DecideApprovalRequest =
+  operations["decideApproval"]["requestBody"]["content"]["application/json"];
+export type DecideApprovalResponse =
+  operations["decideApproval"]["responses"][200]["content"]["application/json"];
 
 function scope(workspaceId: string): string {
   return `/v1/workspaces/${encodeURIComponent(workspaceId)}`;
@@ -129,18 +73,22 @@ export function listAutomations(
 
 export function listSubscriptions(
   workspaceId: string,
-): Promise<{ subscriptions: Subscription[] }> {
-  return platformServerJson(`${scope(workspaceId)}/subscriptions`);
+): Promise<ListSubscriptionsResponse> {
+  return platformServerJson<ListSubscriptionsResponse>(
+    `${scope(workspaceId)}/subscriptions`,
+  );
 }
 
 export function listRuns(
   workspaceId: string,
   subscriptionId?: string,
-): Promise<{ runs: Run[] }> {
+): Promise<ListRunsResponse> {
   const query = subscriptionId
     ? `?subscriptionId=${encodeURIComponent(subscriptionId)}`
     : "";
-  return platformServerJson(`${scope(workspaceId)}/runs${query}`);
+  return platformServerJson<ListRunsResponse>(
+    `${scope(workspaceId)}/runs${query}`,
+  );
 }
 
 export function readRun(
@@ -155,9 +103,11 @@ export function readRun(
 export function listApprovals(
   workspaceId: string,
   status?: ApprovalStatus,
-): Promise<{ approvals: Approval[] }> {
+): Promise<ListApprovalsResponse> {
   const query = status ? `?status=${status}` : "";
-  return platformServerJson(`${scope(workspaceId)}/approvals${query}`);
+  return platformServerJson<ListApprovalsResponse>(
+    `${scope(workspaceId)}/approvals${query}`,
+  );
 }
 
 /**

@@ -7,7 +7,18 @@ import {
   platformServerJson,
   PlatformServerError,
 } from "@/lib/platform-server";
-import type { Subscription } from "@/lib/automations";
+import type {
+  CreateSubscriptionRequest,
+  CreateSubscriptionResponse,
+  CreateRunRequest,
+  CreateRunResponse,
+  DecideApprovalRequest,
+  DecideApprovalResponse,
+  UpdateSubscriptionRequest,
+  UpdateSubscriptionResponse,
+} from "@/lib/automations";
+import { subscriptionEntitlementState } from "@/lib/subscription-entitlements";
+import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 
 /**
  * Mutations on the automation surface.
@@ -18,11 +29,17 @@ import type { Subscription } from "@/lib/automations";
  * as though it could.
  */
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
+export type ActionResult =
+  | { ok: true; subscriptionId?: string }
+  | {
+      ok: false;
+      error: string;
+      state?: "plan-limit" | "entitlements-unavailable";
+    };
 
 async function activeWorkspaceId(): Promise<string> {
   const session = await getAppSession();
-  const workspaceId = session?.user.workspaceId ?? session?.workspaces[0]?.id;
+  const workspaceId = await resolveActiveWorkspaceId(session);
   if (!workspaceId) throw new PlatformServerError("No active workspace", 401);
   return workspaceId;
 }
@@ -40,6 +57,31 @@ async function attempt(run: () => Promise<unknown>): Promise<ActionResult> {
   }
 }
 
+function subscriptionFailure(error: unknown): ActionResult {
+  if (!(error instanceof PlatformServerError)) throw error;
+
+  // The automation contract intentionally exposes only these two reason tokens
+  // for a subscription entitlement refusal. Every other 403 is authorization,
+  // not a pricing or upgrade signal.
+  const state = subscriptionEntitlementState(error.status, error.details);
+  if (state === "plan-limit") {
+    return {
+      ok: false,
+      error: "This workspace has reached its current plan limit.",
+      state: "plan-limit",
+    };
+  }
+  if (state === "entitlements-unavailable") {
+    return {
+      ok: false,
+      error:
+        "Subscriptions are unavailable while billing entitlements are not configured.",
+      state: "entitlements-unavailable",
+    };
+  }
+  return { ok: false, error: error.message };
+}
+
 export async function subscribeToAutomation(
   formData: FormData,
 ): Promise<ActionResult> {
@@ -47,13 +89,60 @@ export async function subscribeToAutomation(
   if (!templateId) return { ok: false, error: "An automation is required" };
 
   const workspaceId = await activeWorkspaceId();
-  const result = await attempt(() =>
-    platformServerJson<{ subscription: Subscription }>(
+  const body: CreateSubscriptionRequest = { templateId };
+  try {
+    const response = await platformServerJson<CreateSubscriptionResponse>(
       `/v1/workspaces/${workspaceId}/subscriptions`,
       {
         method: "POST",
-        body: JSON.stringify({ templateId }),
+        body: JSON.stringify(body),
         idempotencyKey: newIdempotencyKey("subscribe"),
+      },
+    );
+    revalidatePath("/account/automations");
+    return { ok: true, subscriptionId: response.subscription.id };
+  } catch (error) {
+    return subscriptionFailure(error);
+  }
+}
+
+/**
+ * Writes the metadata-driven configuration unchanged except for the primitive
+ * conversion the selected control requires. The server remains the validator
+ * for declared keys, required/default rules, and every automation-specific
+ * constraint.
+ */
+export async function saveSubscriptionConfiguration(
+  formData: FormData,
+): Promise<ActionResult> {
+  const subscriptionId = String(formData.get("subscriptionId") ?? "");
+  if (!subscriptionId)
+    return { ok: false, error: "A subscription is required." };
+
+  const config: Record<string, string | number | boolean> = {};
+  for (const [name, control] of formData.entries()) {
+    if (!name.startsWith("config-control:") || typeof control !== "string")
+      continue;
+
+    const key = name.slice("config-control:".length);
+    const value = formData.get(`config:${key}`);
+    if (control === "toggle") {
+      config[key] = value === "true";
+      continue;
+    }
+    if (typeof value !== "string" || value.trim() === "") continue;
+    config[key] = control === "money" ? Number(value) : value;
+  }
+
+  const workspaceId = await activeWorkspaceId();
+  const body: UpdateSubscriptionRequest = { config };
+  const result = await attempt(() =>
+    platformServerJson<UpdateSubscriptionResponse>(
+      `/v1/workspaces/${workspaceId}/subscriptions/${subscriptionId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(body),
+        idempotencyKey: newIdempotencyKey("subscription-config"),
       },
     ),
   );
@@ -71,12 +160,13 @@ export async function setSubscriptionStatus(
   }
 
   const workspaceId = await activeWorkspaceId();
+  const body: UpdateSubscriptionRequest = { status };
   const result = await attempt(() =>
-    platformServerJson<{ subscription: Subscription }>(
+    platformServerJson<UpdateSubscriptionResponse>(
       `/v1/workspaces/${workspaceId}/subscriptions/${subscriptionId}`,
       {
         method: "PATCH",
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(body),
         idempotencyKey: newIdempotencyKey("status"),
       },
     ),
@@ -91,14 +181,18 @@ export async function triggerRun(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: "A subscription is required" };
 
   const workspaceId = await activeWorkspaceId();
+  const body: CreateRunRequest = { subscriptionId, input: {} };
   const result = await attempt(() =>
-    platformServerJson(`/v1/workspaces/${workspaceId}/runs`, {
-      method: "POST",
-      // No input: this automation's trigger is manual and its payload comes from
-      // the run form on the subscription page, not from the catalog.
-      body: JSON.stringify({ subscriptionId, input: {} }),
-      idempotencyKey: newIdempotencyKey("run"),
-    }),
+    platformServerJson<CreateRunResponse>(
+      `/v1/workspaces/${workspaceId}/runs`,
+      {
+        method: "POST",
+        // No input: this automation's trigger is manual and its payload comes from
+        // the run form on the subscription page, not from the catalog.
+        body: JSON.stringify(body),
+        idempotencyKey: newIdempotencyKey("run"),
+      },
+    ),
   );
   revalidatePath("/account/runs");
   revalidatePath("/account/automations");
@@ -115,14 +209,15 @@ export async function decideApproval(
   }
 
   const workspaceId = await activeWorkspaceId();
+  const body: DecideApprovalRequest = { decision };
   const result = await attempt(() =>
-    platformServerJson(
+    platformServerJson<DecideApprovalResponse>(
       `/v1/workspaces/${workspaceId}/approvals/${approvalId}/decision`,
       {
         method: "POST",
         // Only the decision. The actor and their role come from the session —
         // sending actorRole is refused as an unsupported field.
-        body: JSON.stringify({ decision }),
+        body: JSON.stringify(body),
         idempotencyKey: newIdempotencyKey("decision"),
       },
     ),

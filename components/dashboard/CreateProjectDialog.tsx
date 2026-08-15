@@ -2,11 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
-import {
-  createProjectAction,
-  restoreProjectAction,
-} from "@/app/account/projects/actions";
+import { createProjectAction } from "@/app/account/projects/actions";
 import Modal from "@/components/ui/Modal";
 import { FormInput } from "@/components/ui/FormInput";
 import { FormError } from "@/components/ui/FormError";
@@ -16,54 +12,21 @@ import {
   type ProjectType,
 } from "@/lib/project-types";
 
-type UsedTypesByScope = Record<ProjectScope, ProjectType[]>;
-
-export type RestorableProject = {
-  id: string;
-  name: string;
-  scope: ProjectScope;
-  type: ProjectType;
-};
-
 type Props = {
   open: boolean;
   onClose: () => void;
-  /** Called after the user closes the success view; use to revalidate + router.refresh(). */
   onSuccess?: () => void | Promise<void>;
-  /** Types the user has already created or joined, partitioned by scope. */
-  usedTypesByScope?: UsedTypesByScope;
-  /** Archived projects this user can restore. Shown as "Restore previous project"
-   *  when the selected scope+type matches one of these. */
-  restorable?: RestorableProject[];
-  /** Whether the signed-in user belongs to an organization workspace. */
   hasOrg?: boolean;
 };
-
-const EMPTY_USED: UsedTypesByScope = { personal: [], team: [] };
-const EMPTY_RESTORABLE: RestorableProject[] = [];
 
 export function CreateProjectDialog({
   open,
   onClose,
   onSuccess,
-  usedTypesByScope,
-  restorable,
   hasOrg = false,
 }: Props) {
-  const used = usedTypesByScope ?? EMPTY_USED;
-  const restorables = restorable ?? EMPTY_RESTORABLE;
-  const router = useRouter();
   const [scope, setScope] = useState<ProjectScope>("personal");
   const [selectedType, setSelectedType] = useState<ProjectType | "">("");
-  const usedSet = new Set<ProjectType>(used[scope]);
-  const allUsedForScope = usedSet.size >= PROJECT_TYPES.length;
-  // Match an archived project to the current (scope, type) selection so we can
-  // offer Restore instead of/alongside Create. project_id is stable across the
-  // delete→restore cycle, so all data tagged with the matched id reappears.
-  const restorableMatch = selectedType
-    ? (restorables.find((r) => r.scope === scope && r.type === selectedType) ??
-      null)
-    : null;
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [created, setCreated] = useState(false);
@@ -81,74 +44,48 @@ export function CreateProjectDialog({
 
   useEffect(() => {
     if (!open) {
-      queueMicrotask(() => reset());
+      queueMicrotask(reset);
       return;
     }
-    const t = setTimeout(() => nameInputRef.current?.focus(), 0);
-    return () => clearTimeout(t);
+    const timeout = setTimeout(() => nameInputRef.current?.focus(), 0);
+    return () => clearTimeout(timeout);
   }, [open, reset]);
 
   const handleClose = useCallback(async () => {
-    if (created) {
-      await Promise.resolve(onSuccess?.());
-    }
+    if (created) await Promise.resolve(onSuccess?.());
     onClose();
   }, [created, onClose, onSuccess]);
 
   useEffect(() => {
     if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        handleClose();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        void handleClose();
       }
     };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open, handleClose]);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [handleClose, open]);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setError(null);
     setPending(true);
-    const formData = new FormData(e.currentTarget);
-    const result = await createProjectAction(formData);
+    const result = await createProjectAction(new FormData(event.currentTarget));
     setPending(false);
-    if (result.ok) {
-      setCreated(true);
-    } else {
-      setError(result.error);
-    }
-  }
-
-  async function handleRestore() {
-    if (!restorableMatch) return;
-    setError(null);
-    setPending(true);
-    const result = await restoreProjectAction(restorableMatch.id);
-    setPending(false);
-    if (result.ok) {
-      // Treat restore like a successful create — the dialog shows the success
-      // pane, and the parent page revalidates via onSuccess on close.
-      setCreated(true);
-      router.refresh();
-    } else {
-      setError(result.error);
-    }
+    if (result.ok) setCreated(true);
+    else setError(result.error);
   }
 
   if (!open) return null;
 
-  const dialogContent = (
+  const dialog = (
     <Modal
       onClose={handleClose}
       ariaLabelledBy="create-project-title"
       ariaDescribedBy={
-        created
-          ? "create-project-success-desc"
-          : allUsedForScope
-            ? "create-project-all-used-desc"
-            : "create-project-desc"
+        created ? "create-project-success-desc" : "create-project-desc"
       }
       bubble
       zIndex={100}
@@ -159,15 +96,13 @@ export function CreateProjectDialog({
       >
         Create project
       </h2>
-
       {created ? (
         <>
           <p
             id="create-project-success-desc"
             className="mt-1 text-sm text-[var(--muted)]"
           >
-            Your project was created. Use the project page to invite team
-            members.
+            Your project was created. Use its project page to add team members.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-2">
             <button
@@ -178,27 +113,6 @@ export function CreateProjectDialog({
               Done
             </button>
           </div>
-          <button
-            type="button"
-            onClick={handleClose}
-            className="absolute top-4 right-4 rounded-lg p-1.5 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none"
-            aria-label="Close"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
-          </button>
         </>
       ) : (
         <>
@@ -220,39 +134,25 @@ export function CreateProjectDialog({
               </legend>
               <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {(["personal", "team"] as const).map((value) => {
-                  const isDisabled = value === "team" && !hasOrg;
+                  const disabled = value === "team" && !hasOrg;
                   const selected = scope === value;
                   return (
                     <label
                       key={value}
-                      className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-4 py-2.5 transition ${
-                        selected
-                          ? "border-[var(--accent-strong)] bg-[var(--card)]"
-                          : "border-[var(--ring)] bg-[var(--card)]"
-                      } ${isDisabled ? "cursor-not-allowed opacity-60" : "hover:bg-[var(--surface-hover)]"}`}
+                      className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-4 py-2.5 transition ${selected ? "border-[var(--accent-strong)] bg-[var(--card)]" : "border-[var(--ring)] bg-[var(--card)]"} ${disabled ? "cursor-not-allowed opacity-60" : "hover:bg-[var(--surface-hover)]"}`}
                     >
                       <input
                         type="radio"
                         name="scope"
                         value={value}
                         checked={selected}
-                        disabled={isDisabled}
-                        onChange={() => {
-                          setScope(value);
-                          // Clear type when scope changes — the dropdown's
-                          // disabled options recompute and the previous pick
-                          // might no longer be valid.
-                          setSelectedType("");
-                        }}
+                        disabled={disabled}
+                        onChange={() => setScope(value)}
                         className="sr-only"
                       />
                       <span
                         aria-hidden
-                        className={`inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border ${
-                          selected
-                            ? "border-[var(--accent-strong)]"
-                            : "border-[var(--ring)]"
-                        }`}
+                        className={`inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border ${selected ? "border-[var(--accent-strong)]" : "border-[var(--ring)]"}`}
                       >
                         {selected ? (
                           <span className="h-2 w-2 rounded-full bg-[var(--accent-strong)]" />
@@ -271,179 +171,95 @@ export function CreateProjectDialog({
                 </p>
               ) : null}
             </fieldset>
-            {allUsedForScope ? (
-              <>
-                <p
-                  id="create-project-all-used-desc"
-                  className="text-sm text-[var(--muted)]"
-                >
-                  You&apos;ve already created a {scope} project of every
-                  available type. Delete or leave one before creating another
-                  {hasOrg ? `, or switch scope above` : ""}.
-                </p>
-                <FormError message={error} />
-                <div className="flex flex-wrap gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="btn-secondary inline-flex px-5"
-                  >
-                    Close
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <FormInput
-                  ref={nameInputRef}
-                  id="project-name"
-                  label={
-                    <>
-                      Project name{" "}
-                      <span className="text-[var(--muted)]">(required)</span>
-                    </>
-                  }
-                  name="name"
-                  type="text"
-                  required
-                  minLength={2}
-                  maxLength={60}
-                  placeholder="My project"
-                  autoComplete="off"
-                  disabled={pending}
-                />
-                <div>
-                  <label
-                    htmlFor="project-type"
-                    className="block text-sm font-medium text-[var(--text)]"
-                  >
-                    Project type{" "}
-                    <span className="text-[var(--muted)]">(required)</span>
-                  </label>
-                  <div className="relative mt-1.5">
-                    <select
-                      id="project-type"
-                      name="projectType"
-                      required
-                      disabled={pending}
-                      value={selectedType}
-                      onChange={(e) =>
-                        setSelectedType(e.target.value as ProjectType | "")
-                      }
-                      className="w-full cursor-pointer appearance-none rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none disabled:opacity-60"
-                    >
-                      <option value="" disabled className="text-[var(--muted)]">
-                        Select project type
-                      </option>
-                      {PROJECT_TYPES.map((type) => {
-                        const taken = usedSet.has(type);
-                        const archived = restorables.some(
-                          (r) => r.scope === scope && r.type === type,
-                        );
-                        const label = taken
-                          ? `${type} — already created`
-                          : archived
-                            ? `${type} — restorable`
-                            : type;
-                        return (
-                          <option key={type} value={type} disabled={taken}>
-                            {label}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden
-                      className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-[var(--muted)]"
-                    >
-                      <path d="m6 9 6 6 6-6" />
-                    </svg>
-                  </div>
-                </div>
-                <div>
-                  <label
-                    htmlFor="project-description"
-                    className="block text-sm font-medium text-[var(--text)]"
-                  >
-                    Description{" "}
-                    <span className="text-[var(--muted)]">(optional)</span>
-                  </label>
-                  <textarea
-                    id="project-description"
-                    name="description"
-                    rows={3}
-                    maxLength={140}
-                    placeholder="Max 140 characters"
-                    disabled={pending}
-                    className="mt-1.5 w-full resize-none rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none disabled:opacity-60"
-                  />
-                </div>
-                {restorableMatch ? (
-                  <div className="rounded-xl border border-[var(--ring)] bg-[var(--surface-hover)] px-4 py-3 text-sm text-[var(--text)]">
-                    <span className="font-medium">{restorableMatch.name}</span>{" "}
-                    <span className="text-[var(--muted)]">
-                      was deleted earlier. Restore it to bring back the project
-                      and its data, or create a new one — the archived project
-                      stays preserved either way.
-                    </span>
-                  </div>
-                ) : null}
-                <FormError message={error} />
-                <div className="flex flex-wrap gap-2 pt-2">
-                  {restorableMatch ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={handleRestore}
-                        disabled={pending}
-                        className="btn-primary inline-flex px-5"
-                      >
-                        {pending ? "Restoring…" : "Restore project"}
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={pending}
-                        className="btn-secondary inline-flex px-5"
-                      >
-                        {pending ? "Creating…" : "Create new"}
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      type="submit"
-                      disabled={pending}
-                      className="btn-primary inline-flex px-5"
-                    >
-                      {pending ? "Creating…" : "Create project"}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    disabled={pending}
-                    className="btn-secondary inline-flex px-5"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </>
-            )}
+            <FormInput
+              ref={nameInputRef}
+              id="project-name"
+              label={
+                <>
+                  Project name{" "}
+                  <span className="text-[var(--muted)]">(required)</span>
+                </>
+              }
+              name="name"
+              type="text"
+              required
+              minLength={2}
+              maxLength={60}
+              placeholder="My project"
+              autoComplete="off"
+              disabled={pending}
+            />
+            <div>
+              <label
+                htmlFor="project-type"
+                className="block text-sm font-medium text-[var(--text)]"
+              >
+                Project type{" "}
+                <span className="text-[var(--muted)]">(required)</span>
+              </label>
+              <select
+                id="project-type"
+                name="projectType"
+                required
+                disabled={pending}
+                value={selectedType}
+                onChange={(event) =>
+                  setSelectedType(event.target.value as ProjectType | "")
+                }
+                className="mt-1.5 w-full cursor-pointer rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none disabled:opacity-60"
+              >
+                <option value="" disabled>
+                  Select project type
+                </option>
+                {PROJECT_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label
+                htmlFor="project-description"
+                className="block text-sm font-medium text-[var(--text)]"
+              >
+                Description{" "}
+                <span className="text-[var(--muted)]">(optional)</span>
+              </label>
+              <textarea
+                id="project-description"
+                name="description"
+                rows={3}
+                maxLength={4000}
+                placeholder="Describe this project"
+                disabled={pending}
+                className="mt-1.5 w-full resize-none rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] placeholder:text-[var(--muted)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none disabled:opacity-60"
+              />
+            </div>
+            <FormError message={error} />
+            <div className="flex flex-wrap gap-2 pt-2">
+              <button
+                type="submit"
+                disabled={pending}
+                className="btn-primary inline-flex px-5"
+              >
+                {pending ? "Creating…" : "Create project"}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={pending}
+                className="btn-secondary inline-flex px-5"
+              >
+                Cancel
+              </button>
+            </div>
           </form>
         </>
       )}
     </Modal>
   );
-
   return typeof document !== "undefined"
-    ? createPortal(dialogContent, document.body)
+    ? createPortal(dialog, document.body)
     : null;
 }

@@ -3,10 +3,12 @@
 import { useState, type FormEvent } from "react";
 import { FormInput } from "@/components/ui/FormInput";
 import { Button } from "@/components/ui/Button";
-import { site } from "@/lib/site";
-import { platformApiPath } from "@/lib/platform-api";
+import { PlatformApiError, platformApiJson } from "@/lib/platform-api";
+import type { operations } from "@/lib/generated/platform-contracts/platform";
 
-type Status = "idle" | "sending" | "sent" | "error" | "unconfigured";
+type Status = "idle" | "sending" | "sent" | "error";
+type ContactReceipt =
+  operations["submitContactRequest"]["responses"][201]["content"]["application/json"];
 
 function FieldLabel({ children }: { children: string }) {
   return (
@@ -29,32 +31,19 @@ export function ContactForm() {
     setStatus("sending");
     setErrorMessage(null);
     try {
-      const res = await fetch(platformApiPath("/v1/contact-requests"), {
+      await platformApiJson<ContactReceipt>("/v1/contact-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (res.status === 503) {
-        setStatus("unconfigured");
-        return;
-      }
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as {
-          detail?: string;
-          error?: string;
-        };
-        setErrorMessage(
-          body.detail ??
-            body.error ??
-            "Something went wrong. Please try again.",
-        );
-        setStatus("error");
-        return;
-      }
       form.reset();
       setStatus("sent");
-    } catch {
-      setErrorMessage("Something went wrong. Please try again.");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof PlatformApiError
+          ? error.message
+          : "Something went wrong. Please try again.",
+      );
       setStatus("error");
     }
   }
@@ -138,18 +127,6 @@ export function ContactForm() {
       {status === "error" && errorMessage ? (
         <p className="m-0 text-sm text-[var(--error-text)]" role="alert">
           {errorMessage}
-        </p>
-      ) : null}
-      {status === "unconfigured" ? (
-        <p className="m-0 text-sm text-[var(--muted)]" role="alert">
-          The form isn&apos;t wired up in this environment — email us instead at{" "}
-          <a
-            href={`mailto:${site.salesEmail}`}
-            className="text-[var(--color-accent-300)]"
-          >
-            {site.salesEmail}
-          </a>
-          .
         </p>
       ) : null}
     </form>

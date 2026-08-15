@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
+import { listWorkspaces } from "@/lib/tenancy";
 import {
   DashboardSidebar,
   DashboardHeader,
@@ -17,10 +18,10 @@ export default async function AccountLayout({
     redirect("/login?callbackUrl=/account");
   }
 
-  // Determine whether to show the Organization link in the sidebar.
-  // Check all memberships — the session workspaceId may be a personal workspace
-  // even when the user is also OWNER of an org workspace.
-  const showOrgSettings = session.workspaces.some(
+  // Session workspaces may be bounded, so use the public collection before
+  // deciding that an organization membership is absent.
+  const workspaces = await listWorkspaces();
+  const showOrgSettings = workspaces.some(
     (workspace) =>
       workspace.type === "organization" && workspace.role === "owner",
   );

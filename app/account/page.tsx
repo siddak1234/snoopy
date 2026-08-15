@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getAppSession } from "@/lib/app-session";
-import { getAccessibleProjects } from "@/lib/projects";
+import { listAccessibleProjects } from "@/lib/tenancy";
 import SectionCard from "@/components/dashboard/SectionCard";
 
 function getFirstName(name?: string | null): string | null {
@@ -14,14 +14,13 @@ export default async function AccountDashboardPage() {
   const firstName = getFirstName(session?.user?.name);
   const greeting = firstName ? `Welcome, ${firstName}!` : "Welcome back!";
 
-  const userId = session?.user?.id;
-
-  const topProjects =
-    userId != null ? await getAccessibleProjects(userId, 3) : [];
+  const topProjects = session
+    ? (await listAccessibleProjects()).slice(0, 3)
+    : [];
 
   // Show workspace name tags when the user's top projects span multiple workspaces
   const uniqueWorkspaceIds = new Set(
-    topProjects.map((p) => p.workspaceId).filter(Boolean),
+    topProjects.map(({ project }) => project.workspaceId),
   );
   const isMultiWorkspace = uniqueWorkspaceIds.size > 1;
 
@@ -116,31 +115,27 @@ export default async function AccountDashboardPage() {
         ) : (
           <>
             <ul className="mt-3 space-y-2">
-              {topProjects.map((p) => (
-                <li key={p.id}>
+              {topProjects.map(({ project, workspace }) => (
+                <li key={project.id}>
                   <Link
-                    href={`/account/projects/${p.id}`}
+                    href={`/account/projects/${project.id}`}
                     className="flex flex-wrap items-center gap-2 rounded-xl px-2 py-2 transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-inset"
                   >
                     <span className="font-medium text-[var(--text)]">
-                      {p.name}
+                      {project.name}
                     </span>
                     <span className="inline-flex rounded-full bg-[var(--chip-bg)] px-2.5 py-0.5 text-xs font-medium text-[var(--chip-text)]">
-                      {p.status === "active"
+                      {project.status === "active"
                         ? "Active"
-                        : p.status === "paused"
+                        : project.status === "paused"
                           ? "Paused"
-                          : p.status === "draft"
+                          : project.status === "draft"
                             ? "Draft"
                             : "Archived"}
                     </span>
-                    {isMultiWorkspace && p.workspaceName ? (
+                    {isMultiWorkspace ? (
                       <span className="text-xs text-[var(--muted)]">
-                        · {p.workspaceName}
-                      </span>
-                    ) : p.ownerName ? (
-                      <span className="text-xs text-[var(--muted)]">
-                        · {p.ownerName}
+                        · {workspace.name}
                       </span>
                     ) : null}
                   </Link>
