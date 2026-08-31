@@ -240,6 +240,15 @@ const server = createServer(
 
     const { pathname } = url;
     const method = request.method ?? "GET";
+    if (method === "POST" && pathname === "/v1/auth/logout") {
+      // Clearing the cookie travels back through the /api/platform rewrite,
+      // so the browser's next session read is genuinely signed out.
+      response.writeHead(204, {
+        "set-cookie": `${fixtureCookie}=; Path=/; Max-Age=0`,
+        "cache-control": "no-store",
+      });
+      return response.end();
+    }
     if (method === "GET" && pathname === "/v1/session") {
       const ownerSession = {
         ...session,

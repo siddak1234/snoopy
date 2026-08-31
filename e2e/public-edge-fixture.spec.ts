@@ -113,6 +113,18 @@ test("the workspace switcher drives the public active-workspace operation", asyn
   await expect(trigger).toContainText("Fixture Organization");
 });
 
+test("signing out flips the marketing nav without a manual reload", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: "Account", exact: true }),
+  ).toHaveCount(0);
+});
+
 test("keyboard reaches dashboard navigation and preserves a visible focus target", async ({
   page,
 }) => {

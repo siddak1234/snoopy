@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { signOutFromPlatform } from "@/lib/platform-api";
 import LogoMark from "@/components/branding/LogoMark";
 import ThemeToggle from "@/components/theme/ThemeToggle";
@@ -19,12 +18,9 @@ export function AccountTopBar({
   workspaces?: Workspace[];
   activeWorkspaceId?: string;
 }) {
-  const router = useRouter();
-
   async function handleSignOut() {
     await signOutFromPlatform();
-    router.replace("/");
-    router.refresh();
+    window.location.replace("/");
   }
 
   return (
