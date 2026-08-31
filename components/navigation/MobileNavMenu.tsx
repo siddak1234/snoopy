@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { signOutFromPlatform } from "@/lib/platform-api";
 import { useAppSession } from "@/hooks/use-app-session";
 import { useEffect, useRef, useState } from "react";
@@ -16,7 +15,6 @@ const pillClass =
 
 /** Mobile marketing menu — flat links from lib/nav.ts plus the auth pair. */
 export default function MobileNavMenu() {
-  const router = useRouter();
   const { data: session, status } = useAppSession();
   const [menuOpen, setMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -97,8 +95,7 @@ export default function MobileNavMenu() {
                   onClick={async () => {
                     closeMenu();
                     await signOutFromPlatform();
-                    router.replace("/");
-                    router.refresh();
+                    window.location.replace("/");
                   }}
                   className={`${linkClass} w-full text-center`}
                 >
