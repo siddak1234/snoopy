@@ -55,22 +55,14 @@ export function MarketingNav() {
         </Button>
       </>
     ) : (
-      <>
-        <Link
-          href="/login"
-          className="hidden text-sm text-[var(--color-neutral-300)] transition hover:text-[var(--color-accent)] md:inline"
-        >
-          Log in
-        </Link>
-        <Button
-          href="/signup"
-          variant="primary"
-          size="sm"
-          className="hidden md:inline-flex"
-        >
-          Sign up
-        </Button>
-      </>
+      <Button
+        href="/login"
+        variant="primary"
+        size="sm"
+        className="hidden md:inline-flex"
+      >
+        Sign in
+      </Button>
     );
 
   return (

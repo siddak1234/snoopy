@@ -7,6 +7,8 @@ const publicRoutes = [
   "/contact",
   "/automation-builder",
   "/login",
+  "/privacy",
+  "/terms",
 ] as const;
 
 const authenticatedRoutes = [

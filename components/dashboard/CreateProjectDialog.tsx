@@ -6,11 +6,6 @@ import { createProjectAction } from "@/app/account/projects/actions";
 import Modal from "@/components/ui/Modal";
 import { FormInput } from "@/components/ui/FormInput";
 import { FormError } from "@/components/ui/FormError";
-import {
-  PROJECT_TYPES,
-  type ProjectScope,
-  type ProjectType,
-} from "@/lib/project-types";
 
 type Props = {
   open: boolean;
@@ -25,8 +20,7 @@ export function CreateProjectDialog({
   onSuccess,
   hasOrg = false,
 }: Props) {
-  const [scope, setScope] = useState<ProjectScope>("personal");
-  const [selectedType, setSelectedType] = useState<ProjectType | "">("");
+  const [scope, setScope] = useState<"personal" | "team">("personal");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [created, setCreated] = useState(false);
@@ -38,7 +32,6 @@ export function CreateProjectDialog({
     setPending(false);
     setCreated(false);
     setScope("personal");
-    setSelectedType("");
     formRef.current?.reset();
   }, []);
 
@@ -189,35 +182,22 @@ export function CreateProjectDialog({
               autoComplete="off"
               disabled={pending}
             />
-            <div>
-              <label
-                htmlFor="project-type"
-                className="block text-sm font-medium text-[var(--text)]"
-              >
-                Project type{" "}
-                <span className="text-[var(--muted)]">(required)</span>
-              </label>
-              <select
-                id="project-type"
-                name="projectType"
-                required
-                disabled={pending}
-                value={selectedType}
-                onChange={(event) =>
-                  setSelectedType(event.target.value as ProjectType | "")
-                }
-                className="mt-1.5 w-full cursor-pointer rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 text-[var(--text)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none disabled:opacity-60"
-              >
-                <option value="" disabled>
-                  Select project type
-                </option>
-                {PROJECT_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <FormInput
+              id="project-type"
+              label={
+                <>
+                  Project type{" "}
+                  <span className="text-[var(--muted)]">(required)</span>
+                </>
+              }
+              name="projectType"
+              type="text"
+              required
+              maxLength={120}
+              placeholder="Invoice processing"
+              autoComplete="off"
+              disabled={pending}
+            />
             <div>
               <label
                 htmlFor="project-description"

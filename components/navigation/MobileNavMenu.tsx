@@ -106,18 +106,13 @@ export default function MobileNavMenu() {
                 </button>
               </>
             ) : (
-              <>
-                <Link href="/login" className={pillClass} onClick={closeMenu}>
-                  Log in
-                </Link>
-                <Link
-                  href="/signup"
-                  className="btn-primary mt-0.5 w-full"
-                  onClick={closeMenu}
-                >
-                  Sign up
-                </Link>
-              </>
+              <Link
+                href="/login"
+                className="btn-primary mt-0.5 w-full"
+                onClick={closeMenu}
+              >
+                Sign in
+              </Link>
             )}
           </nav>
         </div>

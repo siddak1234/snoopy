@@ -68,7 +68,7 @@ for (const path of removedRouteFiles) {
   }
 }
 
-const authFiles = ["app/(auth)/login/page.tsx", "app/(auth)/signup/page.tsx"];
+const authFiles = ["app/(auth)/login/page.tsx"];
 for (const path of authFiles) {
   const content = readFileSync(join(root, path), "utf8");
   if (/type=["']password["']|signInWithPassword|signUp\s*\(/.test(content)) {

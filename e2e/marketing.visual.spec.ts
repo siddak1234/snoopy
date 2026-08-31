@@ -8,6 +8,8 @@ for (const [route, snapshot] of [
   ["/solutions", "solutions.png"],
   ["/contact", "contact.png"],
   ["/automation-builder", "automation-builder.png"],
+  ["/privacy", "privacy.png"],
+  ["/terms", "terms.png"],
 ] as const) {
   test(`marketing design remains unchanged at ${route}`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });

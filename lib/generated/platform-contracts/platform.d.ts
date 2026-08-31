@@ -132,6 +132,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/auth/native/{provider}/start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** @description Begins a native login (ADR-0017). The same transaction and the same `AUTH_CALLBACK_URL` as the website; only the ending differs. The caller opens this in a system browser, which carries the OAuth transaction cookie for it — the app never reads that cookie. `redirect_uri` must match an entry in `NATIVE_APP_REDIRECT_URIS` exactly, and must be an app-claimed HTTPS URL: ADR-0008 rejects custom schemes, which any app on a device can register. `code_challenge` is the app's OWN PKCE pair, independent of the provider transaction's, and is what binds the resulting one-time code to this device. */
+    get: operations["startNativeLogin"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/auth/native/token": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** @description Trades the one-time code for a session. The code is single-use because it carries an unredeemed provider authorization code, which the provider itself refuses to redeem twice. A forged, tampered, expired, replayed, or wrong-verifier code are all one 401 — distinguishing them would tell a holder of a captured code which it is. */
+    post: operations["exchangeNativeSession"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/auth/native/refresh": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** @description Renews a native session without a second consent screen. */
+    post: operations["refreshNativeSession"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/auth/logout": {
     parameters: {
       query?: never;
@@ -141,6 +192,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
+    /** @description Ends a session. The website sends no body and its cookies are cleared. A native client sends its `refreshToken` and a bearer access token, which is what actually revokes the session upstream — without them there is nothing to revoke and the token in the device keychain would stay live. */
     post: operations["logout"];
     delete?: never;
     options?: never;
@@ -179,7 +231,10 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** @description A customer leaving. Returns 503 until Phase 7.1 implements deletion across every schema as one auditable operation. */
+    /**
+     * @description A customer leaving (FR-21). Deletion spans five schemas as one auditable operation; the actor comes from the session and there is no id in the path, so a caller cannot name an account that is not theirs.
+     *     **A native client should send its `refreshToken`.** The purge removes the rows but does not touch the identity provider, so without it the device keeps a working session and the next `GET /v1/session` mints a fresh account. The body is optional because a DELETE conventionally carries none: omitting it deletes the account and skips revocation rather than refusing after the rows are already gone. The website needs nothing — its cookies are cleared, which is itself effective.
+     */
     delete: operations["deleteAccount"];
     options?: never;
     head?: never;
@@ -531,6 +586,23 @@ export interface paths {
     get: operations["listRuns"];
     put?: never;
     post: operations["createRun"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/workspaces/{workspaceId}/run-stats": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** @description Run counts for this workspace, per subscription and rolled up. The full shape is in `openapi/automations.yaml`. */
+    get: operations["readRunStats"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -988,6 +1060,16 @@ export interface components {
     LoginIdentitiesResponse: {
       identities: components["schemas"]["LoginIdentitySummary"][];
     };
+    /** @description The only credential this platform issues to a client, and the reason ADR-0017 amends invariant 1. The website never receives this shape — its session lives in HttpOnly cookies it cannot read. A native client stores these in the OS secure enclave and presents `accessToken` as a bearer credential. */
+    NativeSessionResponse: {
+      /** @constant */
+      tokenType: "Bearer";
+      accessToken: string;
+      /** @description Outlives the access token and is what a sign-out revokes. Appears only in this response and in a refresh or logout body — never in a URL or a log. */
+      refreshToken: string;
+      /** @description Seconds until `accessToken` expires. The refresh token's lifetime is not stated. */
+      expiresIn: number;
+    };
     SessionResponse: {
       /** @constant */
       authenticated: true;
@@ -1308,6 +1390,15 @@ export interface components {
         "application/problem+json": components["schemas"]["ApiProblem"];
       };
     };
+    /** @description A dependency this route needs could not be reached. Distinct from a 4xx on purpose: nothing about the caller's credential or request is known to be wrong, so the correct client behaviour is to retry rather than to discard state. On the session routes, treating this as a 401 would sign a person out of a session that never ended. */
+    DependencyFailure: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        "application/problem+json": components["schemas"]["ApiProblem"];
+      };
+    };
     /** @description The owning production adapter is not configured. */
     NotConfigured: {
       headers: {
@@ -1535,6 +1626,126 @@ export interface operations {
       401: components["responses"]["Unauthenticated"];
     };
   };
+  startNativeLogin: {
+    parameters: {
+      query: {
+        redirect_uri: string;
+        /** @description Base64url SHA-256 of the verifier; exactly 43 characters. */
+        code_challenge: string;
+        code_challenge_method: "S256";
+      };
+      header?: never;
+      path: {
+        provider: components["parameters"]["LoginProvider"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Redirect to the provider through Supabase Auth; sets signed PKCE state carrying the native redirect target. The callback later redirects to `redirect_uri` with a one-time `code`, or with `status=error` and a reason. */
+      302: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      400: components["responses"]["BadRequest"];
+      503: components["responses"]["NotConfigured"];
+    };
+  };
+  exchangeNativeSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          code: string;
+          codeVerifier: string;
+        };
+      };
+    };
+    responses: {
+      /** @description A session for a native client. Never set as a cookie. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["NativeSessionResponse"];
+        };
+      };
+      400: components["responses"]["BadRequest"];
+      /** @description The credential is dead — forged, tampered, expired, already spent, or presented with the wrong verifier. One answer for all of them, because telling them apart only helps someone probing a code they should not have. A client receiving this discards its stored session. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["ApiProblem"];
+        };
+      };
+      /** @description The identity provider could not be reached. **Retry; do not discard the session.** Distinct from 401 on purpose: a client that treats an outage as a dead credential signs out every user who happened to open the app during it. */
+      502: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["ApiProblem"];
+        };
+      };
+      503: components["responses"]["NotConfigured"];
+    };
+  };
+  refreshNativeSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          refreshToken: string;
+        };
+      };
+    };
+    responses: {
+      /** @description A replacement session. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["NativeSessionResponse"];
+        };
+      };
+      400: components["responses"]["BadRequest"];
+      /** @description The refresh token is dead. Sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["ApiProblem"];
+        };
+      };
+      /** @description Provider unreachable. Retry; do not discard the session. */
+      502: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["ApiProblem"];
+        };
+      };
+      503: components["responses"]["NotConfigured"];
+    };
+  };
   logout: {
     parameters: {
       query?: never;
@@ -1542,16 +1753,41 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: never;
+    /** @description Omitted entirely by the website, whose session is in cookies. **Required when the request carries a bearer token**: a native caller with no `refreshToken` is refused with 400 rather than answered 204, because a 204 would have the device delete a keychain entry for a session that is still live upstream. */
+    requestBody?: {
+      content: {
+        "application/json": {
+          refreshToken: string;
+        };
+      };
+    };
     responses: {
-      /** @description Local backend session cookies cleared. */
+      /** @description Cookies cleared, and any supplied refresh token revoked — or already invalid, which is the same outcome for the caller. */
       204: {
         headers: {
           [name: string]: unknown;
         };
         content?: never;
       };
+      /** @description A bearer token was presented without a readable `refreshToken`. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["ApiProblem"];
+        };
+      };
       403: components["responses"]["Forbidden"];
+      /** @description The provider could not be reached, so the session was NOT revoked. Retry before discarding stored tokens. */
+      502: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["ApiProblem"];
+        };
+      };
     };
   };
   submitContactRequest: {
@@ -1599,16 +1835,44 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody?: {
+      content: {
+        "application/json": {
+          refreshToken: string;
+        };
+      };
+    };
     responses: {
-      /** @description The account and its data were removed. */
-      204: {
+      /** @description Deleted. The body reports what was removed per service — `deleted: true` is the only outcome that means the whole operation committed. */
+      200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": Record<string, never>;
+        };
       };
+      400: components["responses"]["BadRequest"];
       401: components["responses"]["Unauthenticated"];
+      403: components["responses"]["Forbidden"];
+      /** @description The deletion did not complete across every service. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["ApiProblem"];
+        };
+      };
+      /** @description Deleted, but the identity provider could not be reached to revoke the session. The device still holds a live credential; retry the revocation through `POST /v1/auth/logout`. */
+      502: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["ApiProblem"];
+        };
+      };
       503: components["responses"]["NotConfigured"];
     };
   };
@@ -2438,6 +2702,28 @@ export interface operations {
     requestBody?: never;
     responses: {
       /** @description The created run. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  readRunStats: {
+    parameters: {
+      query?: {
+        since?: string;
+      };
+      header?: never;
+      path: {
+        workspaceId: components["parameters"]["WorkspaceId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Counts for the workspace and each subscription with runs. */
       200: {
         headers: {
           [name: string]: unknown;

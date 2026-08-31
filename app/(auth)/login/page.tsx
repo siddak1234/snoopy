@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
@@ -27,9 +26,10 @@ function LoginForm() {
 
   return (
     <section className="bubble p-6 sm:p-8">
-      <h1 className="text-3xl font-medium sm:text-4xl">Login</h1>
+      <h1 className="text-3xl font-medium sm:text-4xl">Continue to Autom8x</h1>
       <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-        Continue securely with an approved sign-in provider.
+        Sign in with an approved provider. Your first sign-in creates your
+        account — no separate password needed.
       </p>
 
       {authCallbackError ? (
@@ -42,14 +42,7 @@ function LoginForm() {
       ) : null}
 
       <div className="mt-6">
-        <OAuthButtons callbackUrl={callbackUrl} mode="login" />
-      </div>
-
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-2 border-t border-[var(--ring)] pt-5">
-        <span className="text-sm text-[var(--muted)]">New here?</span>
-        <Link href="/signup" className="btn-secondary btn-sm">
-          Sign Up
-        </Link>
+        <OAuthButtons callbackUrl={callbackUrl} />
       </div>
     </section>
   );

@@ -11,14 +11,12 @@ export default function AccountDeletedPage() {
             removed.
           </p>
           <p className="mt-2 text-sm text-[var(--muted)]">
-            You can sign up again anytime if you change your mind.
+            You can come back anytime — your first sign-in creates a new
+            account.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link href="/signup" className="btn-primary inline-flex px-5">
-              Sign up
-            </Link>
-            <Link href="/login" className="btn-secondary inline-flex px-5">
-              Log in
+            <Link href="/login" className="btn-primary inline-flex px-5">
+              Continue to Autom8x
             </Link>
           </div>
         </section>

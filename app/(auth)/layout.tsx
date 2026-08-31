@@ -2,7 +2,7 @@ import Link from "next/link";
 import LogoMark from "@/components/branding/LogoMark";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 
-/** Narrow centered shell for login / signup / verification flows. */
+/** Narrow centered shell for the sign-in and account-lifecycle flows. */
 export default function AuthLayout({
   children,
 }: Readonly<{

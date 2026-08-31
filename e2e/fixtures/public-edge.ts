@@ -102,6 +102,7 @@ const keyProvider = {
   providerId: "fixture-key",
   displayName: "Fixture key provider",
   description: "A loopback API-key provider for contract tests.",
+  icon: "key",
   scopes: [],
   authType: "api-key",
   credentialFields: [
@@ -135,6 +136,14 @@ const automation = (templateId: string, name: string) =>
     subscribed: false,
     available: true,
     setup: [],
+    pipeline: [
+      {
+        id: "trigger",
+        kicker: "TRIGGER",
+        title: "Fixture trigger",
+        description: "Starts the fixture pipeline.",
+      },
+    ],
   }) satisfies Automations["AutomationCatalogEntry"];
 
 const catalog = {
