@@ -5,12 +5,20 @@ import { useRouter } from "next/navigation";
 import { signOutFromPlatform } from "@/lib/platform-api";
 import LogoMark from "@/components/branding/LogoMark";
 import ThemeToggle from "@/components/theme/ThemeToggle";
+import { WorkspaceSwitcher } from "@/components/dashboard/WorkspaceSwitcher";
+import type { Workspace } from "@/lib/tenancy";
 
 /**
  * Slim top bar for the account shell (the marketing header no longer wraps
  * the dashboard since the route-group split).
  */
-export function AccountTopBar() {
+export function AccountTopBar({
+  workspaces = [],
+  activeWorkspaceId,
+}: {
+  workspaces?: Workspace[];
+  activeWorkspaceId?: string;
+}) {
   const router = useRouter();
 
   async function handleSignOut() {
@@ -29,6 +37,10 @@ export function AccountTopBar() {
         <LogoMark height={22} />
       </Link>
       <div className="flex items-center gap-2">
+        <WorkspaceSwitcher
+          workspaces={workspaces}
+          activeWorkspaceId={activeWorkspaceId}
+        />
         <ThemeToggle />
         <button
           type="button"

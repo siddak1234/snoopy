@@ -98,6 +98,21 @@ test("workspace export distinguishes complete and partial public responses", asy
   await expect(page.getByText("This is a partial export.")).toBeVisible();
 });
 
+test("the workspace switcher drives the public active-workspace operation", async ({
+  page,
+}) => {
+  await page.goto("/account");
+  const trigger = page.getByRole("button", { name: "Switch workspace" });
+  await expect(trigger).toContainText("Fixture Organization");
+  await trigger.click();
+  await page.getByRole("button", { name: /Fixture Personal/ }).click();
+  await expect(trigger).toContainText("Fixture Personal");
+  // Restore the organization as active: later fixture tests depend on it.
+  await trigger.click();
+  await page.getByRole("button", { name: /Fixture Organization/ }).click();
+  await expect(trigger).toContainText("Fixture Organization");
+});
+
 test("keyboard reaches dashboard navigation and preserves a visible focus target", async ({
   page,
 }) => {

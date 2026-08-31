@@ -174,6 +174,19 @@ export async function createWorkspace(
   );
 }
 
+export async function selectActiveWorkspace(
+  workspaceId: string,
+): Promise<Schema["ActiveWorkspaceResponse"]> {
+  return platformServerJson<Schema["ActiveWorkspaceResponse"]>(
+    "/v1/session/active-workspace",
+    {
+      method: "PATCH",
+      body: JSON.stringify({ workspaceId }),
+      idempotencyKey: newIdempotencyKey("workspace-activate"),
+    },
+  );
+}
+
 export async function updateWorkspace(
   workspaceId: string,
   input: Schema["UpdateWorkspaceRequest"],
