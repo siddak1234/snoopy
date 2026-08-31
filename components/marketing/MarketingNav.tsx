@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { signOutFromPlatform } from "@/lib/platform-api";
 import { useAppSession } from "@/hooks/use-app-session";
 import { useHydrated } from "@/hooks/use-hydrated";
@@ -13,19 +13,19 @@ import MobileNavMenu from "@/components/navigation/MobileNavMenu";
 
 /**
  * The design's marketing header: sticky blurred bar with the mark, flat
- * Solutions / Builder / Contact links, theme toggle, and the auth pair
- * (Log in + Sign up, swapping to Account + Sign out with a session).
+ * Solutions / Builder / Contact links, theme toggle, and the auth slot
+ * (Sign in, swapping to Account + Sign out with a session).
  */
 export function MarketingNav() {
   const pathname = usePathname();
-  const router = useRouter();
   const mounted = useHydrated();
   const { data: session, status } = useAppSession();
 
   async function handleSignOut() {
     await signOutFromPlatform();
-    router.replace("/");
-    router.refresh();
+    // A full navigation, not a router refresh: the session hook reads once
+    // per mount, so only a document load makes every consumer re-read it.
+    window.location.replace("/");
   }
 
   const sessionArea =
