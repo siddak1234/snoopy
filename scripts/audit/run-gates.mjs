@@ -27,6 +27,20 @@ function fail(message) {
 }
 
 // --- preflight -------------------------------------------------------------
+// macOS/iCloud Finder conflict copies ("file 2.ts") are invisible to git
+// (the repo's own `* 2.*` ignore rule) yet poison typecheck, the test glob,
+// and visual baselines — the first audit run failed on exactly this.
+const conflictCopies = spawnSync(
+  "find",
+  [".", "-path", "./node_modules", "-prune", "-o", "-name", "* 2.*", "-print"],
+  { cwd: root, encoding: "utf8" },
+).stdout.trim();
+if (conflictCopies) {
+  fail(
+    `Finder conflict copies contaminate the clone (invisible to git, poison the gates):\n${conflictCopies}\nDelete them and re-run:\n  find . -path ./node_modules -prune -o -name '* 2.*' -print -delete`,
+  );
+}
+
 for (const port of [3001, 3443]) {
   const listeners = spawnSync(
     "lsof",
