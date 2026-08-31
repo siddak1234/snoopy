@@ -25,14 +25,12 @@ const buttonClass =
  */
 export function OAuthButtons({
   callbackUrl = "/account",
-  mode = "login",
 }: {
   callbackUrl?: string;
-  mode?: "login" | "signup";
 }) {
   const [providers, setProviders] = useState<LoginProvider[] | null>(null);
-  const [error, setError] = useState(false);
-  const verb = mode === "signup" ? "Sign up" : "Continue";
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,18 +39,30 @@ export function OAuthButtons({
         if (!cancelled) setProviders(response.providers);
       })
       .catch(() => {
-        if (!cancelled) setError(true);
+        if (!cancelled) setFailed(true);
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
-  if (error) {
+  if (failed) {
     return (
-      <p role="alert" className="text-sm text-[var(--muted)]">
-        Sign-in providers are unavailable right now. Please try again later.
-      </p>
+      <div className="flex flex-col items-start gap-3">
+        <p role="alert" className="text-sm text-[var(--muted)]">
+          Sign-in providers could not be loaded.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setFailed(false);
+            setAttempt((current) => current + 1);
+          }}
+          className="btn-secondary btn-sm"
+        >
+          Try again
+        </button>
+      </div>
     );
   }
 
@@ -80,7 +90,7 @@ export function OAuthButtons({
           href={oauthHref(provider.id, callbackUrl)}
           className={buttonClass}
         >
-          {verb} with {provider.label}
+          Continue with {provider.label}
         </a>
       ))}
     </div>
