@@ -32,6 +32,7 @@ test("tenancy mutations use unique idempotency keys", () => {
     "workspace-create",
     "workspace-update",
     "workspace-member",
+    "workspace-activate",
     "project-create",
     "project-update",
     "project-member",
