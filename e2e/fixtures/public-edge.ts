@@ -46,6 +46,19 @@ const workspace = {
   role: "owner",
 } satisfies Platform["WorkspaceSummary"];
 
+const personalWorkspaceId = "88888888-8888-4888-8888-888888888888";
+
+const personalWorkspace = {
+  id: personalWorkspaceId,
+  name: "Fixture Personal",
+  type: "personal",
+  role: "owner",
+} satisfies Platform["WorkspaceSummary"];
+
+// The switcher test moves this and moves it back; the organization tests rely
+// on the organization being active, so state must be restored in-test.
+let activeWorkspaceId: string = workspaceId;
+
 const session = {
   authenticated: true,
   user: {
@@ -228,11 +241,33 @@ const server = createServer(
     const { pathname } = url;
     const method = request.method ?? "GET";
     if (method === "GET" && pathname === "/v1/session") {
+      const ownerSession = {
+        ...session,
+        user: { ...session.user, activeWorkspaceId },
+        workspaces: [workspace, personalWorkspace],
+      } satisfies Platform["SessionResponse"];
       return respond(
         response,
         200,
-        fixtureSession === "owner" ? session : requesterSession,
+        fixtureSession === "owner" ? ownerSession : requesterSession,
       );
+    }
+    if (method === "PATCH" && pathname === "/v1/session/active-workspace") {
+      const body = (await requestJson(request)) as { workspaceId?: string };
+      if (
+        body.workspaceId !== workspaceId &&
+        body.workspaceId !== personalWorkspaceId
+      ) {
+        return respond(response, 404, {
+          type: "about:blank",
+          title: "Not Found",
+          status: 404,
+        });
+      }
+      activeWorkspaceId = body.workspaceId;
+      return respond(response, 200, {
+        activeWorkspaceId,
+      } satisfies Platform["ActiveWorkspaceResponse"]);
     }
     if (method === "GET" && pathname === "/v1/auth/providers") {
       const providers = {
@@ -246,15 +281,22 @@ const server = createServer(
       return respond(response, 200, { identities: [] });
     if (method === "GET" && pathname === "/v1/workspaces") {
       return respond(response, 200, {
-        workspaces: fixtureSession === "owner" ? [workspace] : [],
-        ...(fixtureSession === "owner"
-          ? { activeWorkspaceId: workspaceId }
-          : {}),
+        workspaces:
+          fixtureSession === "owner" ? [workspace, personalWorkspace] : [],
+        ...(fixtureSession === "owner" ? { activeWorkspaceId } : {}),
       } satisfies Platform["WorkspaceListResponse"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/projects")) {
       return respond(response, 200, {
         projects: [project],
+      } satisfies Platform["ProjectListResponse"]);
+    }
+    if (
+      method === "GET" &&
+      pathname === `/v1/workspaces/${personalWorkspaceId}/projects`
+    ) {
+      return respond(response, 200, {
+        projects: [],
       } satisfies Platform["ProjectListResponse"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/members")) {

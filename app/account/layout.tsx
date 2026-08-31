@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
-import { listWorkspaces } from "@/lib/tenancy";
+import { listWorkspaces, resolveActiveWorkspaceId } from "@/lib/tenancy";
 import {
   DashboardSidebar,
   DashboardHeader,
@@ -21,6 +21,7 @@ export default async function AccountLayout({
   // Session workspaces may be bounded, so use the public collection before
   // deciding that an organization membership is absent.
   const workspaces = await listWorkspaces();
+  const activeWorkspaceId = await resolveActiveWorkspaceId(session);
   const showOrgSettings = workspaces.some(
     (workspace) =>
       workspace.type === "organization" && workspace.role === "owner",
@@ -31,7 +32,10 @@ export default async function AccountLayout({
     // header/container wraps this tree anymore, so it owns its own top bar and
     // horizontal padding.
     <div className="min-h-screen px-4 pb-6 md:px-6">
-      <AccountTopBar />
+      <AccountTopBar
+        workspaces={workspaces}
+        activeWorkspaceId={activeWorkspaceId}
+      />
       <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
         <DashboardSidebar showOrgSettings={showOrgSettings} />
         <div className="min-w-0 flex-1">
