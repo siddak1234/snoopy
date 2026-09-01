@@ -51,3 +51,8 @@ wrong repo.** Say so and stop. Then read the current round's card in
    files still importing it are tracked work — do not delete them ad hoc, and do
    not add an eighteenth.
 7. `npm run build` and `npm run lint` clean before every commit.
+8. **No push without a passing change audit.** `/audit-change` must PASS for the
+   exact tree being pushed — it maps the blast radius of the change and tests
+   it, not just the changed feature. The Claude hook in `.claude/settings.json`
+   and the native hook (armed once per clone via
+   `bash scripts/install-git-hooks.sh`) both enforce the marker.

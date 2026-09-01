@@ -25,8 +25,13 @@
 # misc
 .DS_Store
 *.pem
-.claude/
+# .claude/* (not .claude/) so the negations below can re-include files:
+# git never descends into a directory excluded as a whole.
+.claude/*
 !.claude/launch.json
+!.claude/settings.json
+!.claude/agents/
+!.claude/skills/
 
 # macOS/iCloud Finder conflict copies ("file 2.tsx") — never commit these
 * 2.*
