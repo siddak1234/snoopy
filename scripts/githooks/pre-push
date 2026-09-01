@@ -37,9 +37,11 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 
   expires="$(sed -n 's/.*"expires_at": *"\([^"]*\)".*/\1/p' "$marker")"
   if [ -n "$expires" ]; then
-    expires_epoch="$(date -j -f "%Y-%m-%dT%H:%M:%S" "$(echo "$expires" | cut -c1-19)" +%s 2>/dev/null || echo 0)"
-    if [ "$expires_epoch" -ne 0 ] && [ "$expires_epoch" -lt "$now_epoch" ]; then
-      echo "pre-push: the change-audit marker for tree $tree expired ($expires). Re-run /audit-change." >&2
+    # GNU date first (Linux/CI), BSD date fallback (macOS) — both in UTC.
+    # A parse failure must NOT skip the check: an unparseable expiry blocks.
+    expires_epoch="$(date -u -d "$expires" +%s 2>/dev/null || date -j -u -f "%Y-%m-%dT%H:%M:%S" "$(echo "$expires" | cut -c1-19)" +%s 2>/dev/null || echo "")"
+    if [ -z "$expires_epoch" ] || [ "$expires_epoch" -lt "$now_epoch" ]; then
+      echo "pre-push: the change-audit marker for tree $tree expired or is unreadable ($expires). Re-run /audit-change." >&2
       exit 1
     fi
   fi
