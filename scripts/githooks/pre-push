@@ -1,0 +1,50 @@
+#!/bin/sh
+# Native pre-push gate: every push of this repository — from any tool or
+# terminal — requires a PASS marker from /audit-change for the exact tree
+# being pushed. Installed via `bash scripts/install-git-hooks.sh`
+# (git config core.hooksPath scripts/githooks). Deliberate bypass: --no-verify.
+#
+# git calls this with: $1=remote name, $2=remote url, and stdin lines of
+# "<local_ref> <local_sha> <remote_ref> <remote_sha>".
+
+remote_url="$2"
+case "$remote_url" in
+  *siddak1234/snoopy.git*|*siddak1234/snoopy*) ;;
+  *) exit 0 ;; # another remote is not this gate's business
+esac
+
+git_dir="$(git rev-parse --absolute-git-dir)" || exit 1
+marker_dir="$git_dir/autom8x-audit"
+zero="0000000000000000000000000000000000000000"
+now_epoch="$(date +%s)"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue # deletion push
+
+  tree="$(git rev-parse "${local_sha}^{tree}")" || exit 1
+
+  # A tree identical to origin/main ships nothing new.
+  if base_tree="$(git rev-parse origin/main^{tree} 2>/dev/null)"; then
+    [ "$tree" = "$base_tree" ] && continue
+  fi
+
+  marker="$marker_dir/$tree.json"
+  if [ ! -f "$marker" ]; then
+    echo "pre-push: no change-audit PASS marker for tree $tree ($local_ref)." >&2
+    echo "pre-push: run /audit-change in a Claude session, or bypass deliberately with --no-verify." >&2
+    exit 1
+  fi
+
+  expires="$(sed -n 's/.*"expires_at": *"\([^"]*\)".*/\1/p' "$marker")"
+  if [ -n "$expires" ]; then
+    # GNU date first (Linux/CI), BSD date fallback (macOS) — both in UTC.
+    # A parse failure must NOT skip the check: an unparseable expiry blocks.
+    expires_epoch="$(date -u -d "$expires" +%s 2>/dev/null || date -j -u -f "%Y-%m-%dT%H:%M:%S" "$(echo "$expires" | cut -c1-19)" +%s 2>/dev/null || echo "")"
+    if [ -z "$expires_epoch" ] || [ "$expires_epoch" -lt "$now_epoch" ]; then
+      echo "pre-push: the change-audit marker for tree $tree expired or is unreadable ($expires). Re-run /audit-change." >&2
+      exit 1
+    fi
+  fi
+done
+
+exit 0
