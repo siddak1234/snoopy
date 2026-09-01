@@ -30,9 +30,25 @@ function fail(message) {
 // macOS/iCloud Finder conflict copies ("file 2.ts") are invisible to git
 // (the repo's own `* 2.*` ignore rule) yet poison typecheck, the test glob,
 // and visual baselines — the first audit run failed on exactly this.
+// Both patterns: "file 2.ts" AND the dotless "pre-push 2" — the latter dodged
+// the gitignore rule and reached a commit before the audit caught it.
 const conflictCopies = spawnSync(
   "find",
-  [".", "-path", "./node_modules", "-prune", "-o", "-name", "* 2.*", "-print"],
+  [
+    ".",
+    "-path",
+    "./node_modules",
+    "-prune",
+    "-o",
+    "(",
+    "-name",
+    "* 2.*",
+    "-o",
+    "-name",
+    "* 2",
+    ")",
+    "-print",
+  ],
   { cwd: root, encoding: "utf8" },
 ).stdout.trim();
 if (conflictCopies) {
