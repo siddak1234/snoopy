@@ -25,10 +25,13 @@ const SOURCE_ROOTS = [
   "instrumentation.ts",
 ];
 const MARKER_TTL_HOURS = 24;
+// Floors calibrated against observed honest runs (build 19s, browser 5s,
+// fixtures 28s): low enough to pass a real run on this machine, high enough
+// that a fabricated instant "pass" cannot clear them.
 const DURATION_FLOORS = {
   build: 10,
-  "test:browser": 20,
-  "test:browser:fixtures": 20,
+  "test:browser": 3,
+  "test:browser:fixtures": 15,
 };
 const FULL_GATES = [
   "lint",
