@@ -83,6 +83,23 @@ export default async function RunDetailPage(
             .
           </p>
         ) : null}
+
+        {/* Why a run ended, in the automation's own words. `failureReason` is
+            present only on a failed run and `resultSummary` only on a succeeded
+            one; without them a failed run showed only its status pill. */}
+        {run.failureReason ? (
+          <p
+            role="alert"
+            className="mt-4 rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--error-text)]"
+          >
+            {run.failureReason}
+          </p>
+        ) : null}
+        {run.resultSummary ? (
+          <p className="mt-4 text-sm text-[var(--success-text)]">
+            {run.resultSummary}
+          </p>
+        ) : null}
       </div>
 
       <div className="py-5">

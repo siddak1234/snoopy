@@ -52,6 +52,41 @@ test("subscription refusals render only the two documented entitlement states", 
   ).toBeVisible();
 });
 
+test("Run now submits the dialog's JSON input, and the input decides the run", async ({
+  page,
+}) => {
+  const card = page
+    .getByRole("heading", { name: "Manual input automation" })
+    .locator("xpath=../../..");
+
+  // Empty input parses to a JSON object, so the dialog submits it; the run the
+  // server creates fails on its own validation and that reason is surfaced —
+  // no silent async failure out of sight in Activity.
+  await page.goto("/account/automations");
+  await card.getByRole("button", { name: "Run now" }).click();
+  await expect(page.getByLabel("Run input (JSON)")).toHaveValue("{}");
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page).toHaveURL(/\/account\/runs\/fixture-run-failed$/);
+  await expect(
+    page
+      .getByRole("alert")
+      .filter({ hasText: "input must carry vendor, amount, and reference" }),
+  ).toBeVisible();
+
+  // Complete input is a different payload and produces a different, succeeding
+  // run — proof the typed input is what gets sent, not a hardcoded blank.
+  await page.goto("/account/automations");
+  await card.getByRole("button", { name: "Run now" }).click();
+  await page
+    .getByLabel("Run input (JSON)")
+    .fill('{"vendor":"Acme","amount":10,"reference":"INV-1"}');
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page).toHaveURL(/\/account\/runs\/fixture-run-ok$/);
+  await expect(
+    page.getByText("Recorded the invoice and emailed the summary."),
+  ).toBeVisible();
+});
+
 test("domain discovery creates an approval request without an invite flow", async ({
   page,
 }) => {
@@ -131,7 +166,9 @@ test("keyboard reaches dashboard navigation and preserves a visible focus target
   await page.goto("/account/connections");
   await page.keyboard.press("Tab");
   await expect(page.locator(":focus")).toBeVisible();
-  await page.getByRole("button", { name: "Connect", exact: true }).focus();
+  // An earlier test connected the key provider, so its card now offers
+  // "Reconnect" rather than "Connect".
+  await page.getByRole("button", { name: "Reconnect", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(
     page.getByRole("heading", { name: "Connect Fixture key provider" }),
@@ -141,6 +178,6 @@ test("keyboard reaches dashboard navigation and preserves a visible focus target
     page.getByRole("heading", { name: "Connect Fixture key provider" }),
   ).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Connect", exact: true }),
+    page.getByRole("button", { name: "Reconnect", exact: true }),
   ).toBeFocused();
 });

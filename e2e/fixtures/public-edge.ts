@@ -159,13 +159,42 @@ const automation = (templateId: string, name: string) =>
     ],
   }) satisfies Automations["AutomationCatalogEntry"];
 
+// A manual-trigger automation that requires input, mirroring the shipped
+// invoice-check: a run whose input lacks the required fields fails by
+// construction. It is subscribed and live so the Run-now button is offered.
+const manualAutomation = {
+  ...automation("fixture-manual-input", "Manual input automation"),
+  subscribed: true,
+} satisfies Automations["AutomationCatalogEntry"];
+
 const catalog = {
   automations: [
     automation("fixture-plan-limit", "Plan-limit automation"),
     automation("fixture-entitlements", "Entitlements automation"),
+    manualAutomation,
   ],
   categories: ["All", "Operations"],
 } satisfies Automations["AutomationCatalogResponse"];
+
+const manualSubscriptionId = "99999999-9999-4999-8999-999999999999";
+const manualSubscription = {
+  id: manualSubscriptionId,
+  workspaceId,
+  templateId: "fixture-manual-input",
+  templateVersion: 1,
+  status: "live",
+  config: {},
+  unmetConnections: [],
+  createdAt: now,
+  updatedAt: now,
+} satisfies Automations["Subscription"];
+
+// Run ids encode the outcome so the detail read is deterministic without any
+// mutable server state: input with the required fields succeeds, empty input
+// fails with the automation's own message.
+const okRunId = "fixture-run-ok";
+const failedRunId = "fixture-run-failed";
+const runInputFailure = "input must carry vendor, amount, and reference";
 
 let connectionAttemptKey: string | null = null;
 let fixtureConnectionCreated = false;
@@ -432,7 +461,7 @@ const server = createServer(
     }
     if (method === "GET" && isWorkspacePath(pathname, "/subscriptions")) {
       return respond(response, 200, {
-        subscriptions: [],
+        subscriptions: [manualSubscription],
       } satisfies AutomationOperations["listSubscriptions"]["responses"][200]["content"]["application/json"]);
     }
     if (method === "POST" && isWorkspacePath(pathname, "/subscriptions")) {
@@ -451,6 +480,81 @@ const server = createServer(
       return respond(response, 200, {
         runs: [],
       } satisfies AutomationOperations["listRuns"]["responses"][200]["content"]["application/json"]);
+    }
+    if (method === "POST" && isWorkspacePath(pathname, "/runs")) {
+      const body = (await requestJson(request)) as {
+        subscriptionId?: string;
+        input?: Record<string, unknown>;
+      };
+      const input = body.input ?? {};
+      // The automation requires these fields; without them the run fails. Only
+      // whether the payload carries them decides the outcome — the input is
+      // otherwise opaque, exactly as the contract has it.
+      const hasRequiredInput =
+        typeof input === "object" &&
+        input !== null &&
+        "vendor" in input &&
+        "amount" in input &&
+        "reference" in input;
+      const run = {
+        id: hasRequiredInput ? okRunId : failedRunId,
+        workspaceId,
+        subscriptionId: body.subscriptionId ?? manualSubscriptionId,
+        templateId: "fixture-manual-input",
+        templateVersion: 1,
+        status: "pending",
+        origin: "manual",
+        rootRunId: hasRequiredInput ? okRunId : failedRunId,
+        requestId: "fixture-request",
+        createdAt: now,
+        updatedAt: now,
+      } satisfies Automations["Run"];
+      return respond(response, 201, {
+        run,
+      } satisfies AutomationOperations["createRun"]["responses"][201]["content"]["application/json"]);
+    }
+    if (
+      method === "GET" &&
+      pathname.startsWith(`/v1/workspaces/${workspaceId}/runs/`)
+    ) {
+      const runId = decodeURIComponent(
+        pathname.slice(`/v1/workspaces/${workspaceId}/runs/`.length),
+      );
+      const failed = runId === failedRunId;
+      const run = {
+        id: runId,
+        workspaceId,
+        subscriptionId: manualSubscriptionId,
+        templateId: "fixture-manual-input",
+        templateVersion: 1,
+        status: failed ? "failed" : "succeeded",
+        origin: "manual",
+        rootRunId: runId,
+        requestId: "fixture-request",
+        ...(failed
+          ? { failureReason: runInputFailure }
+          : { resultSummary: "Recorded the invoice and emailed the summary." }),
+        startedAt: now,
+        endedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      } satisfies Automations["Run"];
+      const steps = [
+        {
+          id: "fixture-step-1",
+          runId,
+          workspaceId,
+          stepId: "validate-input",
+          outcome: failed ? "failed" : "ok",
+          summary: failed ? runInputFailure : "Input validated.",
+          occurredAt: now,
+        },
+      ] satisfies Automations["RunStep"][];
+      return respond(response, 200, {
+        run,
+        steps,
+        events: [],
+      } satisfies AutomationOperations["readRun"]["responses"][200]["content"]["application/json"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/approvals")) {
       return respond(response, 200, {

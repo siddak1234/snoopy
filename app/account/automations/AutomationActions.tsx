@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import { FormInput } from "@/components/ui/FormInput";
@@ -44,9 +45,11 @@ export function AutomationActions({
     config: Record<string, unknown>;
   } | null;
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
+  const [runOpen, setRunOpen] = useState(false);
 
   const submit = (
     action: (data: FormData) => Promise<ActionResult>,
@@ -68,6 +71,47 @@ export function AutomationActions({
   const closeSetup = () => {
     setSetupOpen(false);
     setError(null);
+  };
+
+  const closeRun = () => {
+    setRunOpen(false);
+    setError(null);
+  };
+
+  // The run input is opaque and validated by the automation, so the dialog only
+  // checks that what the person typed is a JSON object before sending it. A
+  // parseable but incomplete payload (e.g. "{}") is submitted and the server's
+  // own refusal is surfaced on the run it creates.
+  const submitRun = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const raw = String(data.get("input") ?? "").trim();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw === "" ? "{}" : raw);
+    } catch {
+      setError("Run input must be valid JSON.");
+      return;
+    }
+    if (
+      parsed === null ||
+      typeof parsed !== "object" ||
+      Array.isArray(parsed)
+    ) {
+      setError("Run input must be a JSON object.");
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const result = await triggerRun(data);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      // Follow the run so its steps — success or failure — are watched as they
+      // appear, rather than failing silently out of sight in Activity.
+      if (result.runId) router.push(`/account/runs/${result.runId}`);
+    });
   };
 
   const submitSetup = (data: FormData) => {
@@ -149,9 +193,10 @@ export function AutomationActions({
               variant="ghost"
               size="sm"
               disabled={pending || subscription.status !== "live"}
-              onClick={() =>
-                submit(triggerRun, field({ subscriptionId: subscription.id }))
-              }
+              onClick={() => {
+                setError(null);
+                setRunOpen(true);
+              }}
             >
               Run now
             </Button>
@@ -204,6 +249,68 @@ export function AutomationActions({
               </Button>
               <Button type="submit" disabled={pending}>
                 {pending ? "Saving…" : "Save setup"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+
+      {subscription && runOpen ? (
+        <Modal
+          onClose={closeRun}
+          bubble
+          ariaLabelledBy={`automation-run-${subscription.id}-title`}
+          ariaDescribedBy={`automation-run-${subscription.id}-description`}
+          zIndex={100}
+        >
+          <h2
+            id={`automation-run-${subscription.id}-title`}
+            className="text-xl font-semibold text-[var(--text)]"
+          >
+            Run now
+          </h2>
+          <p
+            id={`automation-run-${subscription.id}-description`}
+            className="mt-1 text-sm text-[var(--muted)]"
+          >
+            Provide the trigger input for this run as a JSON object. Leave it as{" "}
+            <code>{"{}"}</code> to send no input.
+          </p>
+          <form onSubmit={submitRun} className="mt-6 space-y-4">
+            <input
+              type="hidden"
+              name="subscriptionId"
+              value={subscription.id}
+            />
+            <div>
+              <label
+                htmlFor={`run-input-${subscription.id}`}
+                className="block text-sm font-medium text-[var(--text)]"
+              >
+                Run input (JSON)
+              </label>
+              <textarea
+                id={`run-input-${subscription.id}`}
+                name="input"
+                rows={6}
+                defaultValue="{}"
+                spellCheck={false}
+                autoComplete="off"
+                className="mt-1.5 w-full resize-y rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2.5 font-mono text-sm text-[var(--text)] placeholder:text-[var(--muted)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none disabled:opacity-60"
+              />
+            </div>
+            <FormError message={error} />
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={closeRun}
+                disabled={pending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={pending}>
+                {pending ? "Running…" : "Run"}
               </Button>
             </div>
           </form>
