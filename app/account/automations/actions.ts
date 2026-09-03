@@ -30,7 +30,7 @@ import { resolveActiveWorkspaceId } from "@/lib/tenancy";
  */
 
 export type ActionResult =
-  | { ok: true; subscriptionId?: string }
+  | { ok: true; subscriptionId?: string; runId?: string }
   | {
       ok: false;
       error: string;
@@ -180,23 +180,49 @@ export async function triggerRun(formData: FormData): Promise<ActionResult> {
   if (!subscriptionId)
     return { ok: false, error: "A subscription is required" };
 
+  // The trigger payload is opaque to the platform (CreateRunRequest.input is a
+  // free-form object) and the manifest publishes no input schema, so the UI
+  // must not hardcode any one automation's fields. The person supplies the
+  // input as JSON; an empty object is the default and a valid payload.
+  const rawInput = formData.get("input");
+  let input: Record<string, unknown> = {};
+  if (typeof rawInput === "string" && rawInput.trim() !== "") {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawInput);
+    } catch {
+      return { ok: false, error: "Run input must be valid JSON." };
+    }
+    if (
+      parsed === null ||
+      typeof parsed !== "object" ||
+      Array.isArray(parsed)
+    ) {
+      return { ok: false, error: "Run input must be a JSON object." };
+    }
+    input = parsed as Record<string, unknown>;
+  }
+
   const workspaceId = await activeWorkspaceId();
-  const body: CreateRunRequest = { subscriptionId, input: {} };
-  const result = await attempt(() =>
-    platformServerJson<CreateRunResponse>(
+  const body: CreateRunRequest = { subscriptionId, input };
+  try {
+    const response = await platformServerJson<CreateRunResponse>(
       `/v1/workspaces/${workspaceId}/runs`,
       {
         method: "POST",
-        // No input: this automation's trigger is manual and its payload comes from
-        // the run form on the subscription page, not from the catalog.
         body: JSON.stringify(body),
         idempotencyKey: newIdempotencyKey("run"),
       },
-    ),
-  );
-  revalidatePath("/account/runs");
-  revalidatePath("/account/automations");
-  return result;
+    );
+    revalidatePath("/account/runs");
+    revalidatePath("/account/automations");
+    return { ok: true, runId: response.run.id };
+  } catch (error) {
+    if (error instanceof PlatformServerError) {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
 }
 
 export async function decideApproval(

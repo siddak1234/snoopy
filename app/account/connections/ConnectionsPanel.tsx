@@ -93,6 +93,15 @@ export function ConnectionsPanel({
     }
   };
 
+  // A live connection for a provider is one already `connected`. It changes both
+  // what the callback-error banner should say and what the provider button offers.
+  const connectedProviderIds = new Set(
+    connections
+      .filter((connection) => connection.status === "connected")
+      .map((connection) => connection.providerId),
+  );
+  const hasConnected = connectedProviderIds.size > 0;
+
   return (
     <div className="py-5 first:pt-0">
       {callbackStatus === "connected" ? (
@@ -102,7 +111,9 @@ export function ConnectionsPanel({
       ) : null}
       {callbackStatus === "error" ? (
         <p role="alert" className="mb-4 text-sm text-[var(--error-text)]">
-          The connection could not be completed. Try again or contact an owner.
+          {hasConnected
+            ? "The new authorization didn't complete, so nothing changed — your existing connection is still active. Try again or contact an owner."
+            : "The connection could not be completed. Try again or contact an owner."}
         </p>
       ) : null}
 
@@ -124,8 +135,11 @@ export function ConnectionsPanel({
                   </p>
                   <StatusPill status={connection.status} />
                 </div>
+                {/* `usedByCount` is live subscriptions only — a draft is being
+                    set up, not running — so the label says "live" to match. */}
                 <p className="mt-1 text-sm text-[var(--muted)]">
                   {connection.providerId} · Used by {connection.usedByCount}{" "}
+                  live{" "}
                   {connection.usedByCount === 1 ? "automation" : "automations"}
                 </p>
                 {connection.errorCode ? (
@@ -176,7 +190,11 @@ export function ConnectionsPanel({
                 disabled={pending}
                 onClick={() => connect(provider)}
               >
-                {pending ? "Connecting…" : "Connect"}
+                {pending
+                  ? "Connecting…"
+                  : connectedProviderIds.has(provider.providerId)
+                    ? "Reconnect"
+                    : "Connect"}
               </Button>
             </div>
           ))}

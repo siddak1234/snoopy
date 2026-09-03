@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getAppSession } from "@/lib/app-session";
 import {
   emptyWhenUnavailable,
@@ -121,7 +122,13 @@ function AutomationCard({
 
       {subscription && subscription.unmetConnections.length > 0 ? (
         <p className="text-xs text-[var(--warning-text)]">
-          Connect {subscription.unmetConnections.join(", ")} before going live.
+          <Link
+            href="/account/connections"
+            className="underline underline-offset-2"
+          >
+            Connect {subscription.unmetConnections.join(", ")}
+          </Link>{" "}
+          before going live.
         </p>
       ) : null}
 
