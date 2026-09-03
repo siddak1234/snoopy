@@ -240,6 +240,21 @@ const server = createServer(
 
     const { pathname } = url;
     const method = request.method ?? "GET";
+    // Mirror of the Edge's enforceSameOriginForCookieRequest: a cookie-carrying
+    // mutation must name the public web origin. Every server-action mutation in
+    // the suite regresses to this 403 if the web stops forwarding Origin.
+    if (
+      request.headers.cookie &&
+      method !== "GET" &&
+      method !== "HEAD" &&
+      request.headers.origin !== "http://127.0.0.1:3001"
+    ) {
+      return respond(
+        response,
+        403,
+        problem(403, "Request origin is not allowed"),
+      );
+    }
     if (method === "POST" && pathname === "/v1/auth/logout") {
       // Clearing the cookie travels back through the /api/platform rewrite,
       // so the browser's next session read is genuinely signed out.

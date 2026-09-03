@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { backendApiOrigin } from "@/lib/backend-origin";
 
 /**
@@ -78,6 +78,13 @@ export async function platformServerJson<T>(
   if (!origin) throw new PlatformNotConfiguredError();
 
   const cookieStore = await cookies();
+  // The Edge refuses cookie-carrying mutations whose Origin is not the public
+  // web origin (its CSRF check). Server-side fetch sends no Origin on its own,
+  // so forward the caller's — a value Next has already verified against Host
+  // for server actions, not a guess.
+  const headerStore = await headers();
+  const requestOrigin =
+    headerStore.get("origin") ?? `https://${headerStore.get("host")}`;
   const { idempotencyKey, ...request } = init ?? {};
 
   let response: Response;
@@ -87,6 +94,7 @@ export async function platformServerJson<T>(
       headers: {
         "content-type": "application/json",
         cookie: cookieStore.toString(),
+        origin: requestOrigin,
         ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
         ...request.headers,
       },
