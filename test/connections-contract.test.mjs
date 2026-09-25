@@ -5,7 +5,9 @@ import { test } from "node:test";
 
 const SPEC_PATH = resolve(
   import.meta.dirname,
-  "../../snoopy-backend/docs/openapi/connections.yaml",
+  "..",
+  process.env.SNOOPY_BACKEND_ROOT || "../snoopy-backend",
+  "docs/openapi/connections.yaml",
 );
 const GENERATED_PATH = resolve(
   import.meta.dirname,
