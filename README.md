@@ -31,15 +31,21 @@ to this repository or to `.env.local`.
 ## Verification
 
 ```bash
-npm run format:check
-npm run lint
-npm run typecheck
-npm run test:contracts
-npm run audit:boundaries
-npm run verify:platform-contracts
-BACKEND_API_ORIGIN=https://backend.invalid npm run build -- --webpack
-npm run test:browser
+npm run verify
 ```
+
+One command, the whole offline gate, in this order: `format:check`, `lint`,
+`typecheck`, `audit:boundaries`, `test:contracts`, `verify:platform-contracts`
+(skipped out loud when `../snoopy-backend` is not checked out beside this
+repository), `build` with `BACKEND_API_ORIGIN=https://backend.invalid` plus the
+`/api/platform` rewrite assertion CI makes, `test:browser`, and
+`test:browser:fixtures`. A run in which every gate ran green ends by emitting
+this repository's facts file to `.autom8x/repo-facts/snoopy.json` (gitignored;
+`snoopy-backend` commits it as `docs/repo-facts/snoopy.json`); a run that had to
+skip the sibling gate says so and emits nothing. Run it on Node 22 (`.nvmrc`), the version
+CI and the container use. Running it while `/audit-change` runs, or the reverse,
+is refused — both build into `.next` and serve on ports 3001 and 3443, so they
+share one lock.
 
 `npm run test:browser:fixtures` starts a loopback-only HTTPS Edge fixture with
 a temporary certificate. It exercises authenticated accessibility, keyboard,
@@ -63,6 +69,7 @@ secret provisioning belongs to the deployment configuration round, not here.
 
 | Command | Purpose |
 | --- | --- |
+| `npm run verify` | The whole offline gate in one command; emits the facts file |
 | `npm run build` | Production build |
 | `npm run test:contracts` | Public-contract and boundary behavior tests |
 | `npm run verify:platform-contracts` | Regenerate and verify public OpenAPI declarations |

@@ -18,7 +18,9 @@ import { test } from "node:test";
 
 const SPEC_PATH = resolve(
   import.meta.dirname,
-  "../../snoopy-backend/docs/openapi/automations.yaml",
+  "..",
+  process.env.SNOOPY_BACKEND_ROOT || "../snoopy-backend",
+  "docs/openapi/automations.yaml",
 );
 const CLIENT_PATH = resolve(import.meta.dirname, "../lib/automations.ts");
 const GENERATED_PATH = resolve(
