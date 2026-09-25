@@ -77,7 +77,8 @@ export default async function AccountSettingsPage() {
           Danger zone
         </h2>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          Permanently delete your account and all associated data.
+          Permanently delete your account, your personal workspace, and every
+          organization you alone own.
         </p>
         <div className="mt-3">
           <DeleteAccountButton />

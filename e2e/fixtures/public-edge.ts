@@ -711,6 +711,47 @@ const server = createServer(
       } satisfies Platform["WorkspaceExportResponse"];
       return respond(response, 200, body);
     }
+    if (method === "DELETE" && pathname === "/v1/account") {
+      // ADR-0028: per workspace, not all-or-nothing. The owner's organization
+      // refuses (a service could not remove it) and the answer is the Edge's
+      // RAW 409 body — `application/json`, no `title` — exactly as apps/api
+      // relays it (backend finding F1), so the client's status-only branch
+      // meets the real shape. The org-less requester deletes cleanly.
+      if (fixtureSession === "owner") {
+        response.writeHead(409, {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "no-store",
+        });
+        return response.end(
+          JSON.stringify({
+            deleted: false,
+            workspaces: [
+              {
+                workspaceId: personalWorkspaceId,
+                type: "personal",
+                complete: true,
+                services: [],
+              },
+              {
+                workspaceId,
+                type: "organization",
+                complete: false,
+                services: [
+                  { service: "entitlements", ok: false, reason: "unreachable" },
+                  {
+                    service: "connections",
+                    ok: false,
+                    reason: "not_attempted",
+                  },
+                ],
+              },
+            ],
+            reason: "a service could not remove this workspace",
+          }),
+        );
+      }
+      return respond(response, 200, {});
+    }
     respond(
       response,
       501,
