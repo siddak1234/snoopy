@@ -130,6 +130,12 @@ try {
       "test",
       "e2e/accessibility.spec.ts",
       "e2e/public-edge-fixture.spec.ts",
+      // One worker: every test here talks to ONE fixture process whose state is
+      // global (the active workspace, billing, exports), and some tests move it
+      // and put it back. With two workers the other file's scans could land
+      // inside that window — the billing axe scan did, on the personal
+      // workspace, and read Next's error page.
+      "--workers=1",
       ...playwrightSelectors,
     ],
     { cwd: root, env: environment, stdio: "inherit" },
