@@ -167,9 +167,10 @@ const automation = (templateId: string, name: string) =>
     ],
   }) satisfies Automations["AutomationCatalogEntry"];
 
-// A manual-trigger automation that requires input, mirroring the shipped
-// invoice-check: a run whose input lacks the required fields fails by
-// construction. It is subscribed and live so the Run-now button is offered.
+// An automation with two fixed runs, mirroring the shipped invoice-check: one
+// failed with the automation's own reason, one succeeded with its summary.
+// It is subscribed and live so a live card renders (Pause, no manual run — the
+// Run-now dialog is retired) and Activity lists both runs.
 const manualAutomation = {
   ...automation("fixture-manual-input", "Manual input automation"),
   subscribed: true,
@@ -201,12 +202,38 @@ const manualSubscription = {
   updatedAt: now,
 } satisfies Automations["Subscription"];
 
-// Run ids encode the outcome so the detail read is deterministic without any
-// mutable server state: input with the required fields succeeds, empty input
-// fails with the automation's own message.
+// Run ids encode the outcome so the reads are deterministic without any
+// mutable server state: the failed run carries the automation's own reason,
+// the succeeded one its summary. Both started from their trigger, as every
+// run does now that nothing offers a manual start.
 const okRunId = "fixture-run-ok";
 const failedRunId = "fixture-run-failed";
 const runInputFailure = "input must carry vendor, amount, and reference";
+
+// One deterministic run by id: the failed one carries the automation's own
+// reason, the succeeded one its summary. Listed by Activity and read by its
+// page, so both handlers describe the same run.
+function fixtureRun(runId: string): Automations["Run"] {
+  const failed = runId === failedRunId;
+  return {
+    id: runId,
+    workspaceId,
+    subscriptionId: manualSubscriptionId,
+    templateId: "fixture-manual-input",
+    templateVersion: 1,
+    status: failed ? "failed" : "succeeded",
+    origin: "trigger",
+    rootRunId: runId,
+    requestId: "fixture-request",
+    ...(failed
+      ? { failureReason: runInputFailure }
+      : { resultSummary: "Recorded the invoice and emailed the summary." }),
+    startedAt: now,
+    endedAt: now,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
 
 let connectionAttemptKey: string | null = null;
 let fixtureConnectionCreated = false;
@@ -529,41 +556,12 @@ const server = createServer(
       );
     }
     if (method === "GET" && isWorkspacePath(pathname, "/runs")) {
+      // Both deterministic runs, so Activity renders rows and the run pages are
+      // reached by a person rather than typed. No POST handler: the Run-now
+      // dialog is retired, and a route nothing calls would be dead fixture.
       return respond(response, 200, {
-        runs: [],
+        runs: [fixtureRun(failedRunId), fixtureRun(okRunId)],
       } satisfies AutomationOperations["listRuns"]["responses"][200]["content"]["application/json"]);
-    }
-    if (method === "POST" && isWorkspacePath(pathname, "/runs")) {
-      const body = (await requestJson(request)) as {
-        subscriptionId?: string;
-        input?: Record<string, unknown>;
-      };
-      const input = body.input ?? {};
-      // The automation requires these fields; without them the run fails. Only
-      // whether the payload carries them decides the outcome — the input is
-      // otherwise opaque, exactly as the contract has it.
-      const hasRequiredInput =
-        typeof input === "object" &&
-        input !== null &&
-        "vendor" in input &&
-        "amount" in input &&
-        "reference" in input;
-      const run = {
-        id: hasRequiredInput ? okRunId : failedRunId,
-        workspaceId,
-        subscriptionId: body.subscriptionId ?? manualSubscriptionId,
-        templateId: "fixture-manual-input",
-        templateVersion: 1,
-        status: "pending",
-        origin: "manual",
-        rootRunId: hasRequiredInput ? okRunId : failedRunId,
-        requestId: "fixture-request",
-        createdAt: now,
-        updatedAt: now,
-      } satisfies Automations["Run"];
-      return respond(response, 201, {
-        run,
-      } satisfies AutomationOperations["createRun"]["responses"][201]["content"]["application/json"]);
     }
     if (
       method === "GET" &&
@@ -572,25 +570,8 @@ const server = createServer(
       const runId = decodeURIComponent(
         pathname.slice(`/v1/workspaces/${workspaceId}/runs/`.length),
       );
-      const failed = runId === failedRunId;
-      const run = {
-        id: runId,
-        workspaceId,
-        subscriptionId: manualSubscriptionId,
-        templateId: "fixture-manual-input",
-        templateVersion: 1,
-        status: failed ? "failed" : "succeeded",
-        origin: "manual",
-        rootRunId: runId,
-        requestId: "fixture-request",
-        ...(failed
-          ? { failureReason: runInputFailure }
-          : { resultSummary: "Recorded the invoice and emailed the summary." }),
-        startedAt: now,
-        endedAt: now,
-        createdAt: now,
-        updatedAt: now,
-      } satisfies Automations["Run"];
+      const run = fixtureRun(runId);
+      const failed = run.status === "failed";
       const steps = [
         {
           id: "fixture-step-1",
