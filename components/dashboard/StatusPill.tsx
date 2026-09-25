@@ -54,6 +54,15 @@ const STATUS_TONE: Record<string, Tone> = {
   active: "success",
   archived: "neutral",
 
+  // Billing — the public billing read's `status` (ADR-0025). `active` is
+  // shared with the project vocabulary above. `past_due` still grants access,
+  // so it warns; `canceled` and `unpaid` are what end it.
+  trialing: "info",
+  past_due: "warning",
+  incomplete: "warning",
+  unpaid: "error",
+  canceled: "neutral",
+
   // Connection, from Phase 5. Listed now because the screens that will use it
   // are being written against a server that already names these states.
   authorizing: "info",
@@ -62,9 +71,9 @@ const STATUS_TONE: Record<string, Tone> = {
   "reauthorization-required": "warning",
 };
 
-/** Display casing. `capitalize` handles the rest; only hyphenated words need help. */
+/** Display casing. `capitalize` handles the rest; only hyphenated and snake_case words need help. */
 function label(status: string): string {
-  return status.replace(/-/g, " ");
+  return status.replace(/[-_]/g, " ");
 }
 
 export function StatusPill({ status }: { status: string | null | undefined }) {
