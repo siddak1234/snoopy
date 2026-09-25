@@ -317,3 +317,49 @@ test("a member sees billing gated — not refused and not unavailable", async ({
     ),
   ).toHaveCount(0);
 });
+
+test("the account-deletion confirmation says what ADR-0028 removes, and a refusal keeps the account", async ({
+  page,
+}) => {
+  await page.goto("/account/settings");
+  await page.getByRole("button", { name: "Delete Account" }).click();
+  const dialog = page.getByRole("dialog");
+  // Read from the rendered component (Gate 20 line 3).
+  await expect(dialog).toContainText(
+    "every organization you are the only owner of",
+  );
+  await expect(dialog).toContainText("who lose them and everything in them");
+  await expect(dialog).toContainText(
+    "Organizations that have another owner are kept",
+  );
+  await expect(dialog).toContainText(
+    "your account stays and you can try again",
+  );
+  await dialog.getByRole("button", { name: "Yes, delete my account" }).click();
+  // 409: a partial deletion. The account is still here, the session too.
+  await expect(dialog.getByRole("alert")).toContainText(
+    "your account is still here",
+  );
+  await expect(dialog.getByRole("button", { name: "Try again" })).toBeVisible();
+  await expect(page).toHaveURL(/\/account\/settings$/);
+  await page.goto("/account");
+  await expect(page).toHaveURL(/\/account$/);
+});
+
+test("a clean account deletion signs out and leaves", async ({ page }) => {
+  await page.context().addCookies([
+    {
+      name: "e2e-public-edge-session",
+      value: "requester",
+      domain: "127.0.0.1",
+      path: "/",
+    },
+  ]);
+  await page.goto("/account/settings");
+  await page.getByRole("button", { name: "Delete Account" }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Yes, delete my account" })
+    .click();
+  await expect(page).toHaveURL(/\/login\?deleted=1$/);
+});
