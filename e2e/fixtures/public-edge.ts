@@ -185,6 +185,10 @@ const manualSubscription = {
   status: "live",
   config: {},
   unmetConnections: [],
+  // Required since the contract gained attribution (backend 18.6.1/18.6.2):
+  // workspace-wide, so no project; created by the fixture owner.
+  projectId: null,
+  createdByUserId: userId,
   createdAt: now,
   updatedAt: now,
 } satisfies Automations["Subscription"];

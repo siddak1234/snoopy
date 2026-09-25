@@ -48,8 +48,14 @@ export default async function AutomationsPage() {
     }),
   ]);
 
+  // Archiving is one-way and is how a workspace gives a plan slot back; using
+  // that automation again means subscribing afresh. The list's contract does not
+  // promise to omit archived rows, so one is treated as absent here: the card
+  // then offers Add rather than Pause or Go live.
   const byTemplate = new Map<string, Subscription>(
-    subscriptions.subscriptions.map((entry) => [entry.templateId, entry]),
+    subscriptions.subscriptions
+      .filter((entry) => entry.status !== "archived")
+      .map((entry) => [entry.templateId, entry]),
   );
 
   return (

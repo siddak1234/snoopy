@@ -294,10 +294,14 @@ export interface components {
       defaultValue?: unknown;
       required: boolean;
       /** @enum {string} */
-      notifies?: "approval-requested" | "approval-expiring" | "run-failed";
+      notifies?:
+        | "approval-requested"
+        | "approval-expiring"
+        | "run-failed"
+        | "run-succeeded";
     };
     /** @enum {string} */
-    SubscriptionStatus: "draft" | "live" | "paused";
+    SubscriptionStatus: "draft" | "live" | "paused" | "archived";
     Subscription: {
       /** Format: uuid */
       id: string;
@@ -313,6 +317,16 @@ export interface components {
       };
       /** @description Provider ids still to connect. Non-empty blocks going live. */
       unmetConnections: string[];
+      /**
+       * Format: uuid
+       * @description The project this subscription is scoped to, or null for workspace-wide (18.6.2). A VISIBILITY scope inside one workspace tenant and never a second tenancy axis: a scoped subscription is listed only for someone who can see that project, so owners and admins see every one and a team grant is honoured.
+       */
+      projectId: string | null;
+      /**
+       * Format: uuid
+       * @description Who set this up. Attribution only (ADR-0019, 18.6.1): the workspace owns the subscription and nothing authorizes on this value. `null` means created before Round 11 recorded it, or by an account that no longer exists.
+       */
+      createdByUserId: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -577,6 +591,11 @@ export interface operations {
           /** @description Omit to pin the newest version at subscribe time. */
           templateVersion?: number;
           name?: string;
+          /**
+           * Format: uuid
+           * @description Scope this subscription to a project, so only people who can see that project see it (18.6.2). Omit for workspace-wide. A project the caller cannot see answers 404, deliberately indistinguishable from one that does not exist.
+           */
+          projectId?: string;
         };
       };
     };
@@ -967,7 +986,7 @@ export interface operations {
       header: {
         /** @description The per-subscription secret, shown once when the endpoint was created. */
         "x-autom8x-webhook-secret": string;
-        /** @description The vendor's own id for this delivery. `x-github-delivery` and `x-shopify-webhook-id` are accepted in its place; one of the three is required. */
+        /** @description The vendor's own id for this delivery. `x-github-delivery` and `x-shopify-webhook-id` are accepted in its place; one of the three is required, and the first one present is the one that counts. At most 83 characters: the id becomes part of a 128-character idempotency key, so the bound is derived from that key rather than chosen, and a test holds this number to the route's. */
         "x-autom8x-delivery-id"?: string;
       };
       path: {
@@ -998,7 +1017,7 @@ export interface operations {
           };
         };
       };
-      /** @description No delivery id was supplied, so the delivery cannot be made idempotent. */
+      /** @description The delivery cannot be made idempotent: no delivery id was supplied (`missing_delivery_id`), or the one supplied is longer than 83 characters (`delivery_id_too_long`). The reason is in the problem's details. */
       400: {
         headers: {
           [name: string]: unknown;
