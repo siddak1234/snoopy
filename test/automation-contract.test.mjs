@@ -270,6 +270,19 @@ test("every status the website can receive has a tone", () => {
   }
 });
 
+test("an archived subscription is treated as absent by the automations page", () => {
+  // Archiving is one-way and is how a workspace gives a plan slot back
+  // (`SubscriptionStatus` in automations.yaml, backend 18.5.3); the automation
+  // is used again by subscribing afresh. The list's contract does not promise to
+  // omit archived rows, so the page drops them before pairing cards with
+  // subscriptions — a card for an archived row offers Add, not Pause or Go live.
+  assert.match(
+    page,
+    /status !== "archived"/,
+    "page.tsx must drop archived subscriptions before pairing them with cards",
+  );
+});
+
 test("the website never sends a field the server refuses", () => {
   // The Edge rejects unsupported fields outright rather than ignoring them, so a
   // body carrying one fails the whole request. These two are the tempting ones:

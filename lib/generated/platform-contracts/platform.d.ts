@@ -707,6 +707,87 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/plans": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * @description The plans a workspace can move onto, with the capability values each grants (ADR-0025). Any signed-in person may read it: it is the same list for everyone and it is what a purchase decision is made from.
+     *     **A plan with no provider price is omitted**, which is how the free floor stays off this list — nothing can check out onto a plan the provider has no price for, so offering it would produce a button that 404s.
+     */
+    get: operations["listPlans"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/workspaces/{workspaceId}/billing": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * @description What this workspace is paying for (ADR-0025). **Requires owner or admin**, which is stricter than most workspace reads and deliberate: a plan, a dunning status and a renewal date are facts about the person who owns the account, not about the automations a member runs.
+     *     **No provider identifier is ever returned.** `planId` is this platform's, never the billing provider's. A workspace that has never paid reports the free plan rather than an absence, because the free plan is the floor and not a missing subscription.
+     */
+    get: operations["readWorkspaceBilling"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/workspaces/{workspaceId}/billing/checkout": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * @description Start a purchase (ADR-0025). Requires owner or admin. The platform creates a **provider-hosted** Checkout session and answers its URL; the client navigates there.
+     *     **The platform never renders a card field and never receives a card number** — card data does not touch a platform server, which keeps the estate in PCI SAQ-A. The returned URL is a capability, not a credential: single-purpose, short-lived, and useless for reading or mutating anything the platform owns.
+     *     The subscription becomes real when the provider's `checkout.session.completed` callback arrives at `POST /v1/billing/webhooks`, not when this call returns. A client should re-read `GET /v1/workspaces/{workspaceId}/billing` after the redirect rather than assuming the plan changed.
+     */
+    post: operations["createBillingCheckoutSession"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/workspaces/{workspaceId}/billing/portal": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * @description Open the provider-hosted customer portal (ADR-0025). Requires owner or admin. **This is where a plan is changed or cancelled**: the platform publishes no cancel, upgrade or downgrade operation of its own, because each would be a money-moving mutation duplicating one the provider already implements correctly. The platform learns the outcome from `customer.subscription.updated` on the webhook it already verifies.
+     *     Answers **409** when the workspace has no billing relationship yet — the client should send the customer to checkout instead. That is not a 404: the workspace exists and the caller can plainly see it.
+     */
+    post: operations["createBillingPortalSession"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/billing/webhooks": {
     parameters: {
       query?: never;
@@ -733,7 +814,11 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** @description An automation container reporting in, authenticated by its run token rather than a session. The segment is the MESSAGE — step, result, model, provider, artifact — never a run id. */
+    /**
+     * @description An automation container reporting in, authenticated by its run token rather than a session. The segment is the MESSAGE — step, result, model, provider, artifact, mail — never a run id.
+     *
+     *     `mail` was served but unpublished from Round 8 until Round 11 (§12.1 #119a): the only definition of its shape was a route handler in a private repository, which an automation author copying the published wire format could not read. `AutomationMailRequest` in `@snoopy/contracts` is now that definition.
+     */
     post: operations["receiveAutomationCallback"];
     delete?: never;
     options?: never;
@@ -1213,6 +1298,66 @@ export interface components {
       subscriptions: components["schemas"]["ExportEntitlementSubscriptionRecord"][];
       truncated: boolean;
     };
+    /** @description A workspace's billing state. **No provider identifier appears here or in any other public schema** (ADR-0025 §2): a provider id is a join key into an account the customer does not control, it is what a support screenshot leaks, and it would weld this contract to the vendor ADR-0005 exists to keep replaceable. */
+    WorkspaceBillingResponse: {
+      /** Format: uuid */
+      workspaceId: string;
+      /** @description This platform's plan id, never the provider's price or product id. */
+      planId: string;
+      displayName: string;
+      /**
+       * @description Absent when the workspace sits on the free floor and has never had a subscription. `past_due` still grants capabilities — dunning is a period in which the provider retries, and `canceled` and `unpaid` are what end access.
+       * @enum {string}
+       */
+      status?:
+        | "trialing"
+        | "active"
+        | "past_due"
+        | "canceled"
+        | "unpaid"
+        | "incomplete";
+      /** Format: date-time */
+      currentPeriodEnd?: string;
+      cancelAtPeriodEnd?: boolean;
+    };
+    PlanListResponse: {
+      plans: components["schemas"]["PurchasablePlan"][];
+    };
+    PurchasablePlan: {
+      planId: string;
+      displayName: string;
+      /** @description Capability name to its numeric allowance, e.g. `automation.subscribe`. A capability is data rather than an enum in this contract (ADR-0016), so a new one is a row in a plan and not a contract change. */
+      capabilities: {
+        [key: string]: number;
+      };
+    };
+    BillingCheckoutRequest: {
+      planId: string;
+      /**
+       * Format: uri
+       * @description Absolute `https:` URL the provider returns the browser to after payment. Validated server-side — an unvalidated value here is an open redirect with a just-paid customer on the other end of it. Defaults to the deployment's configured return URL when omitted.
+       */
+      successUrl?: string;
+      /**
+       * Format: uri
+       * @description Absolute `https:` URL for an abandoned checkout.
+       */
+      cancelUrl?: string;
+    };
+    BillingPortalRequest: {
+      /**
+       * Format: uri
+       * @description Absolute `https:` URL the portal returns the browser to.
+       */
+      returnUrl?: string;
+    };
+    /** @description A provider-hosted page. **A URL and an expiry, and nothing else** — no token, no customer id, no price. It is a capability rather than a credential, which is why it may cross to a browser at all. */
+    HostedBillingSession: {
+      /** Format: uri */
+      url: string;
+      /** Format: date-time */
+      expiresAt: string;
+    };
     ExportEntitlementSubscriptionRecord: {
       plan_id: string;
       display_name: string;
@@ -1265,12 +1410,16 @@ export interface components {
       template_version: number;
       name: string | null;
       /** @enum {string} */
-      status: "draft" | "live" | "paused";
+      status: "draft" | "live" | "paused" | "archived";
       /** @description Validated automation setup values. Provider credentials, webhook secrets, and webhook payloads are not subscription config. */
       config: {
         [key: string]: unknown;
       };
       unmet_connections: string[];
+      /** Format: uuid */
+      project_id: string | null;
+      /** Format: uuid */
+      created_by_user_id: string | null;
       /** Format: date-time */
       created_at: string;
       /** Format: date-time */
@@ -2861,6 +3010,117 @@ export interface operations {
       429: components["responses"]["TooManyRequests"];
     };
   };
+  listPlans: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The purchasable plans. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PlanListResponse"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      503: components["responses"]["NotConfigured"];
+    };
+  };
+  readWorkspaceBilling: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workspaceId: components["parameters"]["WorkspaceId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The workspace's current plan and subscription state. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkspaceBillingResponse"];
+        };
+      };
+      401: components["responses"]["Unauthenticated"];
+      403: components["responses"]["Forbidden"];
+      404: components["responses"]["NotFound"];
+      503: components["responses"]["NotConfigured"];
+    };
+  };
+  createBillingCheckoutSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workspaceId: components["parameters"]["WorkspaceId"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BillingCheckoutRequest"];
+      };
+    };
+    responses: {
+      /** @description A provider-hosted Checkout session. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HostedBillingSession"];
+        };
+      };
+      400: components["responses"]["BadRequest"];
+      401: components["responses"]["Unauthenticated"];
+      403: components["responses"]["Forbidden"];
+      404: components["responses"]["NotFound"];
+      503: components["responses"]["NotConfigured"];
+    };
+  };
+  createBillingPortalSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workspaceId: components["parameters"]["WorkspaceId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["BillingPortalRequest"];
+      };
+    };
+    responses: {
+      /** @description A provider-hosted portal session. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HostedBillingSession"];
+        };
+      };
+      400: components["responses"]["BadRequest"];
+      401: components["responses"]["Unauthenticated"];
+      403: components["responses"]["Forbidden"];
+      404: components["responses"]["NotFound"];
+      409: components["responses"]["Conflict"];
+      503: components["responses"]["NotConfigured"];
+    };
+  };
   receiveBillingWebhook: {
     parameters: {
       query?: never;
@@ -2904,7 +3164,7 @@ export interface operations {
       query?: never;
       header?: never;
       path: {
-        message: "step" | "result" | "model" | "provider" | "artifact";
+        message: "step" | "result" | "model" | "provider" | "artifact" | "mail";
       };
       cookie?: never;
     };
