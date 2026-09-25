@@ -30,6 +30,7 @@ const now = "2026-08-12T12:00:00.000Z";
 const workspaceId = "11111111-1111-4111-8111-111111111111";
 const userId = "22222222-2222-4222-8222-222222222222";
 const requesterUserId = "66666666-6666-4666-8666-666666666666";
+const memberUserId = "77777777-7777-4777-8777-777777777777";
 const projectId = "33333333-3333-4333-8333-333333333333";
 const joinRequestId = "44444444-4444-4444-8444-444444444444";
 const domainId = "55555555-5555-4555-8555-555555555555";
@@ -53,6 +54,13 @@ const personalWorkspace = {
   name: "Fixture Personal",
   type: "personal",
   role: "owner",
+} satisfies Platform["WorkspaceSummary"];
+
+// A plain member of the organization: sees the workspace, may not see its
+// billing. The role is what the server's owner-or-admin gate reads.
+const memberWorkspace = {
+  ...workspace,
+  role: "member",
 } satisfies Platform["WorkspaceSummary"];
 
 // The switcher test moves this and moves it back; the organization tests rely
@@ -204,6 +212,26 @@ let connectionAttemptKey: string | null = null;
 let fixtureConnectionCreated = false;
 let exportCount = 0;
 
+// Billing (ADR-0025): the free floor never appears in the plan list, and a
+// workspace that has never paid reports the free plan with no status. A
+// checkout makes the bought plan `active` — the fixture's stand-in for the
+// provider webhook that does it in production. Nothing in the published API
+// restores it (like the connection and export state above, it lives for one
+// fixture process), so the billing tests order their own steps. Two plans, so
+// that a live subscription offering no second checkout is observable.
+const teamPlan = {
+  planId: "fixture-team",
+  displayName: "Team",
+  capabilities: { "automation.subscribe": 10 },
+} satisfies Platform["PurchasablePlan"];
+const proPlan = {
+  planId: "fixture-pro",
+  displayName: "Pro",
+  capabilities: { "automation.subscribe": 50 },
+} satisfies Platform["PurchasablePlan"];
+let subscribedPlan: Platform["PurchasablePlan"] | null = null;
+const hostedExpiry = "2026-08-12T12:30:00.000Z";
+
 function problem(status: number, title: string, details?: Json): Json {
   return {
     type: "about:blank",
@@ -219,13 +247,14 @@ function problem(status: number, title: string, details?: Json): Json {
 
 function fixtureSessionValue(
   cookie: string | undefined,
-): "owner" | "requester" | null {
+): "owner" | "requester" | "member" | null {
   const value = cookie
     ?.split(";")
     .map((entry) => entry.trim())
     .find((entry) => entry.startsWith(`${fixtureCookie}=`));
   if (value === `${fixtureCookie}=owner`) return "owner";
   if (value === `${fixtureCookie}=requester`) return "requester";
+  if (value === `${fixtureCookie}=member`) return "member";
   return null;
 }
 
@@ -303,10 +332,24 @@ const server = createServer(
         user: { ...session.user, activeWorkspaceId },
         workspaces: [workspace, personalWorkspace],
       } satisfies Platform["SessionResponse"];
+      const memberSession = {
+        authenticated: true,
+        user: {
+          userId: memberUserId,
+          email: "member@example.test",
+          displayName: "Fixture Member",
+          activeWorkspaceId: workspaceId,
+        },
+        workspaces: [memberWorkspace],
+      } satisfies Platform["SessionResponse"];
       return respond(
         response,
         200,
-        fixtureSession === "owner" ? ownerSession : requesterSession,
+        fixtureSession === "owner"
+          ? ownerSession
+          : fixtureSession === "member"
+            ? memberSession
+            : requesterSession,
       );
     }
     if (method === "PATCH" && pathname === "/v1/session/active-workspace") {
@@ -337,10 +380,15 @@ const server = createServer(
     if (method === "GET" && pathname === "/v1/auth/identities")
       return respond(response, 200, { identities: [] });
     if (method === "GET" && pathname === "/v1/workspaces") {
+      const workspaces =
+        fixtureSession === "owner"
+          ? [workspace, personalWorkspace]
+          : fixtureSession === "member"
+            ? [memberWorkspace]
+            : [];
       return respond(response, 200, {
-        workspaces:
-          fixtureSession === "owner" ? [workspace, personalWorkspace] : [],
-        ...(fixtureSession === "owner" ? { activeWorkspaceId } : {}),
+        workspaces,
+        ...(fixtureSession === "requester" ? {} : { activeWorkspaceId }),
       } satisfies Platform["WorkspaceListResponse"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/projects")) {
@@ -564,6 +612,80 @@ const server = createServer(
       return respond(response, 200, {
         approvals: [],
       } satisfies AutomationOperations["listApprovals"]["responses"][200]["content"]["application/json"]);
+    }
+    if (method === "GET" && pathname === "/v1/plans") {
+      // Any signed-in person may read the plan list; the free floor is never
+      // on it (a plan with no provider price is omitted).
+      const body = {
+        plans: [teamPlan, proPlan],
+      } satisfies Platform["PlanListResponse"];
+      return respond(response, 200, body);
+    }
+    if (
+      pathname === `/v1/workspaces/${workspaceId}/billing` ||
+      pathname.startsWith(`/v1/workspaces/${workspaceId}/billing/`)
+    ) {
+      // Owner or admin for the workspace's billing, its checkout and its
+      // portal, as the Edge enforces (billing-routes.ts): a member is refused.
+      if (fixtureSession !== "owner") {
+        return respond(
+          response,
+          403,
+          problem(403, "Billing requires an admin", { requiredRole: "admin" }),
+        );
+      }
+    }
+    if (method === "GET" && isWorkspacePath(pathname, "/billing")) {
+      const body = subscribedPlan
+        ? ({
+            workspaceId,
+            planId: subscribedPlan.planId,
+            displayName: subscribedPlan.displayName,
+            status: "active",
+            currentPeriodEnd: "2026-09-12T12:00:00.000Z",
+            cancelAtPeriodEnd: false,
+          } satisfies Platform["WorkspaceBillingResponse"])
+        : ({
+            workspaceId,
+            planId: "fixture-free",
+            displayName: "Free",
+          } satisfies Platform["WorkspaceBillingResponse"]);
+      return respond(response, 200, body);
+    }
+    if (method === "POST" && isWorkspacePath(pathname, "/billing/checkout")) {
+      const body = (await requestJson(request)) as { planId?: string };
+      const plan = [teamPlan, proPlan].find(
+        (candidate) => candidate.planId === body.planId,
+      );
+      // The Edge answers 404 for a plan that is not purchasable.
+      if (!plan) {
+        return respond(
+          response,
+          404,
+          problem(404, "The plan is not purchasable"),
+        );
+      }
+      subscribedPlan = plan;
+      return respond(response, 201, {
+        url: "https://billing.invalid/checkout/fixture-session",
+        expiresAt: hostedExpiry,
+      } satisfies Platform["HostedBillingSession"]);
+    }
+    if (method === "POST" && isWorkspacePath(pathname, "/billing/portal")) {
+      await requestJson(request);
+      // No billing account yet answers 409: the client sends the person to
+      // checkout rather than showing a conflict.
+      if (!subscribedPlan) {
+        return respond(
+          response,
+          409,
+          problem(409, "The workspace has no billing account yet"),
+        );
+      }
+      return respond(response, 201, {
+        url: "https://billing.invalid/portal/fixture-session",
+        expiresAt: hostedExpiry,
+      } satisfies Platform["HostedBillingSession"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/export")) {
       exportCount += 1;

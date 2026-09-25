@@ -14,6 +14,7 @@ const publicRoutes = [
 const authenticatedRoutes = [
   "/account",
   "/account/automations",
+  "/account/billing",
   "/account/connections",
   "/account/organization",
   "/account/projects",
