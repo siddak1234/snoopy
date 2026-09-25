@@ -61,3 +61,7 @@ next-env.d.ts
 # amounts. It belongs in encrypted storage, not in git — history is permanent, so
 # deleting the file later does not undo the commit. CI fails if one is tracked.
 _salvage/
+
+# The facts file `npm run verify` emits (scripts/repo-facts.mjs). Never committed
+# here: it would restate this repository's own HEAD. snoopy-backend commits it.
+/.autom8x/

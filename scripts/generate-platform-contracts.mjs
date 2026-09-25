@@ -4,7 +4,13 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const backendRoot = resolve(root, "../snoopy-backend");
+// SNOOPY_BACKEND_ROOT points at another checkout; scripts/verify.mjs and the
+// contract tests read the same variable and resolve it from the repository
+// root as this does, so every reader agrees. Empty means unset.
+const backendRoot = resolve(
+  root,
+  process.env.SNOOPY_BACKEND_ROOT || "../snoopy-backend",
+);
 const generator = join(root, "node_modules/.bin/openapi-typescript");
 const prettier = join(root, "node_modules/.bin/prettier");
 
