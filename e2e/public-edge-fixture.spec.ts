@@ -53,35 +53,44 @@ test("subscription refusals render only the two documented entitlement states", 
   ).toBeVisible();
 });
 
-test("Run now submits the dialog's JSON input, and the input decides the run", async ({
+test("a live automation offers Pause and no manual run — the Run-now dialog is retired", async ({
   page,
 }) => {
+  // Paired with Pause so the card's presence is proved, not just the button's
+  // absence: a card that failed to render would also have no "Run now".
+  await page.goto("/account/automations");
   const card = page
     .getByRole("heading", { name: "Manual input automation" })
     .locator("xpath=../../..");
+  await expect(card.getByRole("button", { name: "Pause" })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Run now" })).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
 
-  // Empty input parses to a JSON object, so the dialog submits it; the run the
-  // server creates fails on its own validation and that reason is surfaced —
-  // no silent async failure out of sight in Activity.
-  await page.goto("/account/automations");
-  await card.getByRole("button", { name: "Run now" }).click();
-  await expect(page.getByLabel("Run input (JSON)")).toHaveValue("{}");
-  await page.getByRole("button", { name: "Run", exact: true }).click();
+test("a run's outcome is read on its own page — failure reason and result summary", async ({
+  page,
+}) => {
+  // Reached from Activity rather than from a dialog: the run pages keep their
+  // fixture path after the Run-now scaffolding went. RunRow's accessible name
+  // is `Run of ${name}, ${run.status}` (app/account/runs/page.tsx).
+  await page.goto("/account/runs");
+  await page
+    .getByRole("link", { name: "Run of Manual input automation, failed" })
+    .click();
   await expect(page).toHaveURL(/\/account\/runs\/fixture-run-failed$/);
   await expect(
     page
       .getByRole("alert")
       .filter({ hasText: "input must carry vendor, amount, and reference" }),
   ).toBeVisible();
+  // Every run now starts from its trigger; the page says so rather than
+  // defaulting to the manual start the website no longer offers.
+  await expect(page.getByText("Triggered", { exact: true })).toBeVisible();
 
-  // Complete input is a different payload and produces a different, succeeding
-  // run — proof the typed input is what gets sent, not a hardcoded blank.
-  await page.goto("/account/automations");
-  await card.getByRole("button", { name: "Run now" }).click();
+  await page.goto("/account/runs");
   await page
-    .getByLabel("Run input (JSON)")
-    .fill('{"vendor":"Acme","amount":10,"reference":"INV-1"}');
-  await page.getByRole("button", { name: "Run", exact: true }).click();
+    .getByRole("link", { name: "Run of Manual input automation, succeeded" })
+    .click();
   await expect(page).toHaveURL(/\/account\/runs\/fixture-run-ok$/);
   await expect(
     page.getByText("Recorded the invoice and emailed the summary."),

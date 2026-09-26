@@ -49,7 +49,7 @@ export default async function RunsPage() {
   return (
     <SectionCard title="Activity" subheader="Every run in this workspace">
       {runs.runs.length === 0 ? (
-        <Empty text="No runs yet. Add an automation and run it to see activity here." />
+        <Empty text="No runs yet. Once an automation is live, its runs appear here." />
       ) : (
         runs.runs.map((run) => (
           <RunRow

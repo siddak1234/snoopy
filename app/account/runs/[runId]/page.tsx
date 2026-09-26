@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
-import { formatWhen, readRun, type RunStep } from "@/lib/automations";
+import {
+  formatWhen,
+  readRun,
+  type RunOrigin,
+  type RunStep,
+} from "@/lib/automations";
 import { PlatformServerError } from "@/lib/platform-server";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { StatusPill } from "@/components/dashboard/StatusPill";
@@ -18,6 +23,16 @@ import { resolveActiveWorkspaceId } from "@/lib/tenancy";
  */
 
 export const dynamic = "force-dynamic";
+
+// Every origin the contract names, so a run says how it started. A new origin
+// fails the build here rather than reading as a manual start — which the
+// website no longer offers.
+const ORIGIN_LABEL: Record<RunOrigin, string> = {
+  trigger: "Triggered",
+  manual: "Manual",
+  "approval-continuation": "After approval",
+  "retry-continuation": "After retry",
+};
 
 export default async function RunDetailPage(
   props: PageProps<"/account/runs/[runId]">,
@@ -59,14 +74,7 @@ export default async function RunDetailPage(
             label="Ended"
             value={run.endedAt ? formatWhen(run.endedAt) : "—"}
           />
-          <Fact
-            label="Trigger"
-            value={
-              run.origin === "approval-continuation"
-                ? "After approval"
-                : "Manual"
-            }
-          />
+          <Fact label="Trigger" value={ORIGIN_LABEL[run.origin]} />
         </dl>
 
         {/* A continuation belongs to the run it continues. The link is how a
