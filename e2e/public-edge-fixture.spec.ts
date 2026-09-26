@@ -634,3 +634,22 @@ test("a crafted return target cannot leave the site — signed in, the login pag
     /^http:\/\/127\.0\.0\.1:3001\/account\/settings$/,
   );
 });
+
+test("keyboard journey — the owner's NFR-35 traversal, by hand", async ({
+  page,
+}) => {
+  // Not an automated assertion: the playbook's Round 5 gate asks for a human
+  // keyboard traversal of the core journey. This opens the built site against
+  // the loopback fixture, signed in as the owner, and hands the browser over.
+  // Run it alone, headed:
+  //   KEYBOARD_JOURNEY=1 node scripts/run-browser-fixtures.mjs --headed --grep "keyboard journey"
+  // Resume in the Playwright Inspector ends it. The route list is in the Round 5
+  // audit (docs/audits/2026-08-11-round-5-phase-1-status.md).
+  test.skip(
+    process.env.KEYBOARD_JOURNEY !== "1",
+    "the owner's traversal, run on purpose with KEYBOARD_JOURNEY=1",
+  );
+  test.setTimeout(0);
+  await page.goto("/account");
+  await page.pause();
+});
