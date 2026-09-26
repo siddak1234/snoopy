@@ -10,10 +10,25 @@ export function safePlatformReturnTo(value: string | null | undefined): string {
   try {
     const parsed = new URL(normalized, RETURN_TO_VALIDATION_ORIGIN);
     if (parsed.origin !== RETURN_TO_VALIDATION_ORIGIN) return DEFAULT_RETURN_TO;
+    // Dot segments normalise away — "/.//evil.example" and "/%2e//evil.example"
+    // both parse to the path "//evil.example" — and a path that begins with
+    // "//" is read by the browser as another host. Refuse it after
+    // normalisation, where it can no longer hide.
+    if (parsed.pathname.startsWith("//")) return DEFAULT_RETURN_TO;
     return `${parsed.pathname}${parsed.search}${parsed.hash}`;
   } catch {
     return DEFAULT_RETURN_TO;
   }
+}
+
+/**
+ * The sign-in page with a return to `returnTo`, validated the same way the
+ * login page reads it back, so a caller cannot build a return the page would
+ * refuse. New callers use this; the older hand-built redirects are recorded to
+ * migrate (F42).
+ */
+export function loginHref(returnTo: string | null | undefined): string {
+  return `/login?callbackUrl=${encodeURIComponent(safePlatformReturnTo(returnTo))}`;
 }
 
 export function platformApiPath(path: string): string {

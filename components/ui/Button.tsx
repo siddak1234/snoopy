@@ -1,5 +1,9 @@
 import Link from "next/link";
-import type { AnchorHTMLAttributes, ButtonHTMLAttributes } from "react";
+import type {
+  AnchorHTMLAttributes,
+  ButtonHTMLAttributes,
+  RefAttributes,
+} from "react";
 
 type Variant = "primary" | "secondary" | "ghost";
 type Size = "sm" | "md" | "lg";
@@ -22,11 +26,15 @@ type CommonProps = {
   className?: string;
 };
 
+// `ref` reaches the rendered element: React 19 passes it as an ordinary prop,
+// and both branches below spread the rest of their props onto the element.
 type ButtonAsButton = CommonProps &
-  ButtonHTMLAttributes<HTMLButtonElement> & { href?: undefined };
+  ButtonHTMLAttributes<HTMLButtonElement> &
+  RefAttributes<HTMLButtonElement> & { href?: undefined };
 
 type ButtonAsLink = CommonProps &
-  Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & { href: string };
+  Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> &
+  RefAttributes<HTMLAnchorElement> & { href: string };
 
 export type ButtonProps = ButtonAsButton | ButtonAsLink;
 

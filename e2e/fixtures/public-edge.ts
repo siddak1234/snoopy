@@ -272,16 +272,28 @@ function problem(status: number, title: string, details?: Json): Json {
   } satisfies Platform["ApiProblem"];
 }
 
-function fixtureSessionValue(
-  cookie: string | undefined,
-): "owner" | "requester" | "member" | null {
-  const value = cookie
+// A requester whose account deletion runs and whose answer is then lost on the
+// way back — the case only a real hop can show. Until its deletion runs it IS
+// the requester; afterwards its session went with the account, so every request
+// meets the unauthenticated 401, as the Edge's would.
+const departingSession = `${fixtureCookie}=departing`;
+let departed = false;
+
+function fixtureCookieEntry(cookie: string | undefined) {
+  return cookie
     ?.split(";")
     .map((entry) => entry.trim())
     .find((entry) => entry.startsWith(`${fixtureCookie}=`));
+}
+
+function fixtureSessionValue(
+  cookie: string | undefined,
+): "owner" | "requester" | "member" | null {
+  const value = fixtureCookieEntry(cookie);
   if (value === `${fixtureCookie}=owner`) return "owner";
   if (value === `${fixtureCookie}=requester`) return "requester";
   if (value === `${fixtureCookie}=member`) return "member";
+  if (value === departingSession) return departed ? null : "requester";
   return null;
 }
 
@@ -693,6 +705,14 @@ const server = createServer(
       return respond(response, 200, body);
     }
     if (method === "DELETE" && pathname === "/v1/account") {
+      // The departing session: the deletion runs, then the answer is lost —
+      // the connection drops before a status line is written. Nothing in the
+      // browser can fake this; it is the website's own rewrite that meets it.
+      if (fixtureCookieEntry(request.headers.cookie) === departingSession) {
+        departed = true;
+        response.socket?.destroy();
+        return;
+      }
       // ADR-0028: per workspace, not all-or-nothing. The owner's organization
       // refuses (a service could not remove it) and the answer is the Edge's
       // RAW 409 body — `application/json`, no `title` — exactly as apps/api
