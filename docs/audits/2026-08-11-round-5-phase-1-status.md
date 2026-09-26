@@ -530,3 +530,146 @@ is the authoritative web-repository handoff for work that remains:
 Until the final row is updated in the master plan, the repository-of-record still
 names `snoopy` as open. A session in `snoopy-mobile` must not infer Round 6
 authorization from this PR merge alone.
+
+## Round 5 re-entry disposition — 2026-09-24/26
+
+Round 5 was re-entered on the owner's word on 2026-09-24 as BUILD-PLAN **Phase 20**
+(`snoopy-backend` `9fe81b5`, PR #112). The work below happened in this repository;
+its boxes flip in `snoopy-backend` at Round 5's close, which re-runs this evidence.
+Every row of the 2026-08-14 register above is re-read here **by evidence, not by
+date**. A row that needs production stays NOT OBSERVED and is re-dated: production
+answers 503 (backend §12.1 #156) and no authorized non-production environment exists.
+
+| Requirement (2026-08-14 row) | Disposition 2026-09-26 | Evidence |
+| --- | --- | --- |
+| Gate 4.5: sign in, subscribe, configure, activate, trigger, watch steps | **OBSERVED 2026-09-03, production** — by the backend's Gate 4.5 cell, not re-observed here | BUILD-PLAN Gate 4.5 line 1 (the platform's first real user at www.autom8x.ai; three production fixes shipped mid-observation, two of them this repository's — #9 and #10). This repository's own live re-observation is carried: production is down (§12.1 #156). |
+| Gate 4.5: approve in the UI, continuation under the same root | **OBSERVED 2026-09-03, production, twice** — by the backend's cell | BUILD-PLAN Gate 4.5 line 2: approval `5751b10c` → continuation `e0f7267d` (origin `approval-continuation`, `root_run_id` the held run); `c61fa3cd` → `d81cc20d`. |
+| NFR-35 authenticated core keyboard journey | **PENDING THE OWNER'S TRAVERSAL** — decided 2026-09-24 for this round; the recipe below is ready (the fixture limits two of its stops — F45, F49); the observation is recorded in Gate 20 line 7's cell at the close | Automated meanwhile: axe clean on every authenticated route the suite scans, `/account/billing` included (seven authenticated pages are not: `/account/approvals`, `/account/projects/[id]`, `/account/runs`, `/account/runs/[runId]`, `/account/support`, `/onboarding/join-org`, `/onboarding/setup-org` — F37); the fixture's keyboard test (dashboard navigation keeps a visible focus target); the deletion dialog moves focus to the control that replaces its confirm button (#19). |
+| Third-party OAuth redirect and client allowlist | **OBSERVED in production** — by BUILD-PLAN 8.2's own text | 8.2: "incremental consent and reconnect both ran through Google's screen in production, attempts `a03775c1`/`f39915f5`". |
+| Live domain, join-request, pasted-key 409, entitlement 403, export variants | **NOT OBSERVED — re-dated 2026-09-26** | Fixture observations pass (the fixture suite: 39 passing at this PR, with the owner's hand-over test skipped unless asked for); a live run needs production (§12.1 #156). |
+| BUILD-PLAN 8.3 billing page | **UNBLOCKED 2026-09-20 (ADR-0025) · IMPLEMENTED `ba4fd44` (#16) · live observation carried** | Four published operations, generated client only (#14); page, facade, actions, fixture member identity, four e2e + axe, 26 audit probes; Gate 20 line 1. |
+| Marketing byte identity | **DECIDED 2026-09-24 by the owner: the NFR-35 accessibility exception is accepted** | `/`, `/solutions`, `/automation-builder`, `/privacy`, `/terms` byte-identical; `/contact` differs only by the four owner-approved persistent link underlines, already in both baselines. `test:visual` 6/6 green on darwin (every `npm run verify`) and linux (CI's pinned Playwright image, the "Browser regression and accessibility" job: `main` pushes `36140364318` @ `c97d557` (#14), `36147960894` @ `fddcd17` (#15), `36176059273` @ `ba4fd44` (#16), `36187006932` @ `caa12be` (#17), `36237192134` @ `961221b` (#18), `36255537829` @ `061768e` (#19); PR runs `36088330621` (#14), `36147684131` (#15), `36175809012` (#16), `36186563329` (#17), `36220159864` (#18), `36255400710` (#19) — every one green). |
+| Backend-integrated Preview readiness | **NOT OBSERVED — re-dated 2026-09-26** | Needs an authorized non-production Edge origin (deployment work). |
+| Round 5 closure and Round 6 sequencing | **Round 6 half SETTLED** (owner-approved resequencing 2026-08-16; Round 6 closed 2026-08-18) · **Round 5 half RE-ENTERED 2026-09-24**, closes at Gate 20 in `snoopy-backend` | MASTER-PLAN §4 (the owner-approved resequencing, 2026-08-16), its §0.2 archive (Round 6 closed 2026-08-18) and §0.1 (Round 5 re-entered 2026-09-24), all at backend `9fe81b5`; this section. |
+
+**Shipped since this register was written, confirmed against the code rather than the
+commit subjects:** legal pages (#5 — `app/(marketing)/privacy`, `app/(marketing)/terms`,
+footer links `lib/nav.ts:33-34` rendered by `components/marketing/MarketingFooter.tsx`,
+sitemap rows); the workspace switcher (#6 — `components/dashboard/WorkspaceSwitcher.tsx`
+→ `app/account/actions.ts` → `lib/tenancy.ts` `PATCH /v1/session/active-workspace`);
+sign-out ends in a document load (#7); the forwarded Origin (#9 — `lib/platform-server.ts`);
+Run-now fixed (#10), then **retired** by the owner's decision this round (`961221b`, #18).
+
+### Progress this round (Phase 20)
+
+| Item | Commit | Gate 20 line | Evidence |
+| --- | --- | --- | --- |
+| 20.2.1 regenerate the client | `c97d557` (#14) | 2 | Backend `9fe81b5`, clean; byte-identical on re-run; contracts 32/32 |
+| 20.4.1 + 20.4.2 `npm run verify` + facts | `fddcd17` (#15) | 5 | Green with and without the sibling; facts 23/43/21/9; lock both ways |
+| 8.3 billing page | `ba4fd44` (#16) | 1 | Owner/admin as the server enforces; no checkout while a subscription is live; no provider identifier rendered; 11 static + 4 e2e; audit 35 surfaces / 26 probes; live carried (§12.1 #156) |
+| 20.3.1 account-deletion copy | `caa12be` (#17) | 3 | ADR-0028's sentences read from the rendered dialog; 409 keeps the account (raw body — F1); workspace-delete search empty, `delete?: never` asserted; audit 13 surfaces / 9 probes |
+| 20.6.1 Run-now retired | `961221b` (#18) | 4 | Pause offered, no Run now, no dialog — observed in the rendered UI; Activity → both run pages; Trigger fact over every `RunOrigin`; audit 14 surfaces / 7 probes |
+| 20.3.1 follow-up (review and audit of #17) | `061768e` (#19) | 3 | A failed deletion never reads as done: any 5xx or lost answer is "unknown" — the contract's 502 is bearer-only (F39) and the standalone rewrite answers 500 for a lost Edge answer; an expired session is said inline with a sign-in link, hedged after a lost answer, focus kept; the pre-existing `//` return-target redirect closed; nine e2e — one through the real rewrite (a fixture session whose answer is lost), one through the real login page, seven answered at the route; audit 29 surfaces / 24 probes, after a first audit failed on the rewrite's 500 |
+| 20.5.1 this register | this PR | 6, 7 | The 2026-08-14 rows re-read by evidence (above); findings F1–F49 (below); the NFR-35 hand-over test; `test:visual` 6/6 on darwin and linux; axe on every scanned authenticated route |
+
+Every new assertion was proved to bite by hand (Gate 20 line 8): broken, run as a
+whole file, RED naming its test, restored from a SHA-256-checked copy, tree unchanged.
+Each squash commit's message on `main` lists the proofs its PR ran
+(`git log -1 --format=%b <sha>`), including the breaks that did not apply and the one
+RED for the wrong reason (#19: a build refusal), each recorded and re-run rather than
+counted. This PR adds no assertion: its hand-over test is proved skipped in the suite
+and listed by its own command. Line 9 — a fresh session re-running every line — is the
+close's.
+
+#### NFR-35 keyboard traversal — the owner's recipe
+
+Run alone, headed, from a clean checkout of `main` (Node 22):
+
+```bash
+KEYBOARD_JOURNEY=1 node scripts/run-browser-fixtures.mjs --headed --grep "keyboard journey"
+```
+
+It builds the site, starts the loopback Edge fixture, opens `/account` signed in as the
+fixture owner, and pauses in the Playwright Inspector. Tab, Shift+Tab, Enter, Space,
+the arrow keys and Escape only — no pointer:
+
+1. `/account` — the sidebar links in order, each with a visible focus ring; the
+   workspace switcher opens, moves, closes on Escape, and focus returns to it.
+2. `/account/automations` — a card's Add and Pause. (The set-up dialog cannot be
+   reached here: no fixture automation declares setup fields — F49.)
+3. `/account/connections` — Connect opens its dialog; focus stays inside; Escape;
+   focus returns.
+4. `/account/billing` — Choose plan and Manage billing are reachable and named.
+5. `/account/settings` — Delete Account opens the dialog; "Yes, delete my account"
+   meets the fixture owner's refusal (nothing is deleted), which is announced;
+   Try again and Cancel are reachable; Escape closes and focus returns.
+6. Sign out from the top bar.
+7. `/login`, signed out — the fixture refuses the provider list without a session
+   (F45), so the page shows its "could not be loaded" state: its Try again button,
+   with a visible focus ring, is the stop. The provider buttons wait for F45.
+
+Resume in the Inspector ends the run. The close records the date, the route list and
+anything found in Gate 20 line 7's cell; a finding becomes a register row for the next
+web round.
+
+#### Test debt named by the audits
+
+Every `/audit-change` verdict lists the tests it would have wanted, beyond the probes it ran
+itself (the probes all passed). They are the next web round's test backlog:
+
+- #14 (5): a subscription with status 'archived' is treated as absent: its card shows no StatusPill, no 'Connect … before going live' hint, and offers…; Add click on an archived row's card subscribes afresh (server action subscribeToAutomation → POST /v1/workspaces/{ws}/subscriptions {templat…; Pause click on a live card (setSubscriptionStatus → PATCH {status:'paused'}) re-renders the card Paused / Go live / Run now disabled; Go live click on a paused card with no unmet connections (PATCH {status:'live'}) re-renders the card Live / Pause / Run now enabled; Set up modal: SetupFieldMetadata renders AutomationSetupField.notifies verbatim (enum now includes 'run-succeeded'); Escape closes the dialo…
+- #15 (9): verify.mjs lock semantics; verify.mjs skip branch (sibling absent); verify.mjs full run emission; repo-facts counts reproduce from their commands; dirty-tree warning; repo-facts CLI entrypoint; repo-facts pipefail (failing producer must throw, never record 0); generate-platform-contracts.mjs SNOOPY_BACKEND_ROOT resolution; contract tests honour SNOOPY_BACKEND_ROOT; .gitignore ignores the facts path
+- #16 (15): No active workspace empty state; Lost access (403/404 from the billing read); Unavailable (503 NotConfigured from billing or plans); Breakage rethrown (500 from billing; undocumented 404 from plans); Empty plan list and the no-plans needsCheckout copy; portal body {}; Portal refused when the active workspace changed; Action unreachable stays in the panel; Pending state: only the pressed control says Opening…, all disabled; Departure lock after window.location.assign; bfcache restore reloads; https-only hosted URL guard (checkout and portal; http:// and unparsable); Server refusals shown as the problem title (checkout 403/404, portal 403); Every non-active billing status: pill label/tone, period line wording, checkout vs portal door; Capability copy; StatusPill labels on the other dashboard pages
+- #17 (8): R4 'Try again' re-issues the DELETE; R5 Cancel closes, clears the error, restores focus; R6 Escape / backdrop close the dialog; R7 in-flight guard; R8 other HTTP problem / network failure render inline; R9 502 treated as deleted; R11 failed courtesy sign-out still leaves; R12 dialog accessibility
+- #18 (6): R3 Pause click; R4 Go live on a non-live subscription; R5 Set up + setup modal; R7 Activity empty state; R10/R11/R12 Trigger labels for manual / approval-continuation / retry-continuation; R14 /account/approvals (pre-existing gap, not introduced here)
+- #19 (16): focus after a 409 and after a fetch that never answers; 200: courtesy sign-out; every other 5xx through the real rewrite (A1); the Edge silent past the 30 s proxy timeout (A1); the hedge after Escape / backdrop close (A2); other 4xx through the real rewrite; close() forgets a 409/403; keyboard after expiry; axe on the open dialog in each state; Sign in again with a still-valid session; Sign in again after the session ended; signed-out login page return_to for crafted targets; safePlatformReturnTo / loginHref behaviour; confirm button focus ring; Button runtime for every importer; platform-api existing exports for other importers
+
+### Findings — for `snoopy-backend`, and for the next web round
+
+Filed here because a `snoopy` session never edits `snoopy-backend` (AGENTS.md rule 1).
+Each names the evidence a backend session can re-run.
+
+**Contract / Edge (the backend to decide or fix)**
+
+- **F1** `DELETE /v1/account` answers its 409 with the raw Access result `{deleted:false, workspaces, reason}` as `application/json` (`apps/api/src/app.ts:463-466`), while `docs/openapi.yaml:428-435` publishes `application/problem+json` `ApiProblem`; no backend test asserts the 409 at either route. The web branches on status only (#17).
+- **F3** `POST …/billing/portal`: the contract marks the body optional (`required: false`), the Edge answers 400 "Request body is required" on an empty body (`packages/http/src/index.ts:225-227`). The web sends `{}`.
+- **F4 / #158** `siddak1234/snoopy`'s GitHub Actions ran and passed on 2026-09-25 (`main` pushes `36140364318` @ `c97d557`, `36147960894` @ `fddcd17`, `36176059273` @ `ba4fd44`; PR runs `36147684131`, `36175809012`, `36186563329`) — §12.1 #158's billing block did not apply to this repository then; and `main` @ `43c2975` was RED on `test:contracts` whenever the sibling was present (fixed by #14) while CI was green without it.
+- **F10** Undocumented 502s on the billing operations (`apps/api/src/modules/entitlements/billing-routes.ts:323,351,368`).
+- **F12** SYSTEM-MANIFEST §9's fourth count command (`find . -name '*.test.*'`) counts `node_modules` (351 on this machine on 2026-09-26 — the number moves with `node_modules`); the facts file states `git ls-files --cached --others --exclude-standard` forms for all four units — §9 should quote the facts file.
+- **F14** "163 `@theme` tokens" (AGENTS.md:42, §9.2) is the whole-file custom-property count; 46 sit inside `@theme {}`, and 4 more in an `@theme inline {}` block.
+- **F20 (owner call)** The website offers no Archive/Remove action for a subscription; archiving is the backend's only way to free a plan slot (18.5.3), so a workspace at its plan limit cannot free one from the browser — 18.5.3's client half.
+- **F23** GitHub reported six Dependabot vulnerabilities on `main` (4 critical, 2 high) at the round's open and four (2 critical, 2 high) at the 2026-09-25 pushes — PRs #11–#13 (`next`, `sharp`, `js-yaml`/`@redocly/openapi-core`), whose own CI runs pass; owner's call, not this round's.
+- **F39** `DELETE /v1/account`'s documented 502 ("deleted, but the identity provider could not be reached to revoke the session") is raised only for a bearer caller: `apps/api/src/app.ts` (the `/v1/account` handler) throws it only when `revoking` is set, and `nativeLogoutSession` returns `undefined` for a request with no bearer — every request the website makes; a website's failed cookie revocation is folded into 200 (its cookies are cleared regardless). Every 502 a cookie caller can receive on that route is the Access client's `dependencyFailure` (`apps/api/src/modules/access/client.ts`: unreachable, invalid body, unexpected status) — the deletion did not run, or its outcome is unknown. Both outcomes share `DEPENDENCY_FAILURE` / `urn:autom8x:problem:dependency-failure`. The contract should say the 502 is bearer-only, and the two outcomes should carry distinct codes. (#17 had read the contract literally and signed the person out on any 502; #19 reverses it.) **F36** — the earlier note that the Edge should clear its cookies on its 502 path — is superseded by this reading: for a cookie caller it clears them before any 502 could be raised, and raises none.
+
+**Web (this repository's next round; not this one)**
+
+- **F2** `/login?deleted=1` is never read; `app/(auth)/account-deleted/page.tsx` exists and is linked from nowhere.
+- **F5** The checkout lives in iCloud-synced `~/Desktop/Business Infra`: files are evicted (16,766 at this round's open, 1,518 under `.git`) and Finder duplicates (`* 2.*`, `* 2`) re-appear under `.next/` during builds; both gates refuse them by design. Excluding the repository from sync ends the class.
+- **F6** `verify:platform-contracts` rewrites the generated files in place and does not restore on "stale". **F7** the generated files carry no source sha (the cell records it by hand).
+- **F8** Connections and Settings → Export have no UI role gate (the server enforces). **F9** action files interpolate the server-resolved workspace id without `encodeURIComponent` (the facades do).
+- **F13** `.claude/launch.json` references a nonexistent `npm run db:studio`. **F15** `scripts/audit/run-gates.mjs` omits `format:check` and `verify:platform-contracts` (both in `npm run verify`). **F16** the `browser` CI job is not a required check. **F17** local Node 24 vs the pinned 22 (`.nvmrc` added in #15).
+- **F18** the web had no handling for the contract's `archived` subscription status (now treated as absent, #14). **F21** `automations/page.tsx` `byTemplate` is keyed by `templateId`, last-wins over a `created_at DESC` list — with project-scoped subscriptions the oldest hides the newer. **F22** `AutomationSetupField.notifies` renders the raw wire token (`run-succeeded`, `approval-expiring`, …).
+- **F24** `scripts/verify.mjs` duplicates `run-gates.mjs`'s preflight, lock and rewrite assertion (~70 lines); a shared `scripts/audit/preflight.mjs` would end it — touching the audit machinery was outside 20.4.1. **F25** `run-gates.mjs` itself acquires its lock non-atomically and treats an empty lock as pid 0 (`process.kill(0, 0)` signals its own group) — `verify.mjs` does neither.
+- **F26** The app has no `error.tsx` boundary at any level; a rethrown platform failure renders Next's default error page.
+- **F27** Pages call `getAppSession` → `listWorkspaces` → `resolveActiveWorkspaceId` sequentially, and the account layout already made the same calls (`cache: "no-store"`) — up to three extra round trips per render.
+- **F28** `activeWorkspaceId()` and `failure()` are private copies in the automations, connections and billing action modules; one `requireActiveWorkspaceId()` in `lib/tenancy.ts` would serve all three.
+- **F29** Four private empty-row helpers (`Empty`/`EmptyRow` in approvals, automations, runs, billing) render one markup; no shared component exists in `components/dashboard`.
+- **F30** The loopback fixture's billing state (`subscribedPlan`), like its connection and export state, lives for one fixture process and is never reset through the published API; the billing e2e orders its own steps.
+- **F31** The fixture keys its workspace routes to the organization (`isWorkspacePath`); a personal-workspace billing read is an undeclared route (501, "fail closed"). Per-workspace fixture billing would let the suite run in more than one worker.
+- **F32** From `/account/billing` the "no backend configured" path is unreachable (the account layout redirects first); the facade guard still serves its other callers.
+- **F33** (closed by #19) The error-to-copy mapping was written out in `ContactForm.tsx` and `DeleteAccountButton.tsx`; the dialog now has its own status table (`outcomeFor`), and `ContactForm.tsx` keeps the only generic mapping.
+- **F34** The loopback fixture's `DELETE /v1/account` 200 does not clear the session cookie the way the Edge does (`apps/api/src/app.ts:438-448`); harmless today because the component's courtesy sign-out clears it, but a future "signed out without the courtesy logout" test needs the fixture to mirror the Edge (#17's audit).
+- **F37** `e2e/accessibility.spec.ts`'s authenticated route list lacks seven of the fourteen authenticated pages — `/account/approvals`, `/account/projects/[id]`, `/account/runs`, `/account/runs/[runId]`, `/account/support`, `/onboarding/join-org`, `/onboarding/setup-org` — so axe never scans them (#18's audit named three; this PR's audit counted seven; pre-existing).
+- **F38** The loopback fixture declares no `PATCH /v1/workspaces/{id}/subscriptions/{id}`, so Pause / Go live / Set up can only surface a 501 refusal in the suite — the automation card's retained mutations have no positive fixture path (#18's audit; pre-existing).
+- **F40** Session expiry (401) is handled inside `DeleteAccountButton` only; `LinkedAccountsSection.tsx`, `OAuthButtons.tsx` and `hooks/use-app-session.ts` also call `platformApiJson` and none handle a 401 — one rule in `lib/platform-api.ts` (or a shared hook) would serve every caller, with the return target derived from the current path as the deletion dialog now does (#19's review).
+- **F41** `platformApiJson` reads `body.title` untyped: a JSON intermediary answering `{"title": {}}` would render "[object Object]" through `FormError`; gate on `typeof body.title === "string" && body.title.length > 0` (#19's review; pre-existing).
+- **F42** The sign-in return URL is still hand-built at four sites (`proxy.ts`, `app/account/layout.tsx`, `app/account/projects/page.tsx`, `app/(marketing)/automation-builder/page.tsx`) with slightly different rules (the proxy keeps the query string); #19 added `loginHref()` beside `safePlatformReturnTo` in `lib/platform-api.ts` and uses it in the deletion dialog — the other four should call it (#19's review).
+- **F43** The account-deletion trigger and its confirm button carry the same hand-written error-styled class string (`rounded-full border border-[var(--error-border-strong)] bg-[var(--error-bg)] …`) rather than a `Button` variant; a `danger` variant on `components/ui/Button` would end the duplication (#19's review; the confirm button's missing focus-visible ring was fixed there).
+- **F44** `focus-visible:outline-none` does nothing wherever it is used: the unlayered global `:focus-visible` rule in `app/globals.css` wins over Tailwind's layered utilities, so keyboard focus shows the accent outline and the utility's ring together (the account-deletion trigger and confirm button among them; #19's audit). Either drop the dead utility or scope the global rule.
+- **F45** The loopback fixture checks the session before it answers `GET /v1/auth/providers`, so a signed-out request gets 401 and no signed-out login-page test can run against it (#19's audit).
+- **F46** The deletion dialog's "any other 4xx" row shows the Edge's generic problem title verbatim ("Forbidden", "Request origin is not allowed"); the body's `detail`, or a short curated map, would tell a person more (#19's audit).
+- **F47** Once an attempt on the page ended unknown, a later 401 in the deletion dialog hedges ("may already have been removed") even when an intervening 409 showed the account still there; a 409 could clear the memory. It errs cautious and never claims "deleted" (#19's re-audit, A10).
+- **F48** The loopback fixture's `departed` flag is module state that never resets, so the lost-answer test cannot run twice against one fixture process (a retry or `--repeat-each` meets 401 on its first DELETE); `playwright.config.ts` configures no retries and `scripts/run-browser-fixtures.mjs` starts a fresh fixture per run (#19's re-audit, A11; the F30 class).
+- **F49** No loopback-fixture automation declares setup fields (every catalog entry has `setup: []`), and `Set up` renders only when `setup.length > 0` (`AutomationActions.tsx`), so the set-up dialog cannot be reached in the harness: no e2e opens it and the owner's keyboard traversal cannot visit it (this PR's audit; the same debt as #14 R7 and #18 R5).
+
+**Numbering.** F11 — mobile's wrapper claimed to "match snoopy" by skipping the sibling gate — became true with #15, whose `verify` skips out loud; closed. F19 — retiring Run-now would have stranded the run pages' fixture coverage — kept through Activity in #18; closed. F35 was never assigned. F36 — the Edge should clear its cookies on its 502 path — is withdrawn: F39 shows that for a cookie caller the Edge clears them before that 502 could be raised, and raises none.
