@@ -49,11 +49,15 @@ Infrastructure resource allocation and production secret management are
 deployment concerns. This repository deliberately proves the interfaces with
 typed, credential-free fixtures rather than storing local resource settings.
 
-Merging the web implementation does not close Round 5. The exact deferred
-contract, live-observation, accessibility, visual, and governance work is
-recorded in the Round 5 audit. Formal Round 6 work requires the backend-owned
-master-plan status to authorize that sequencing; this repository cannot make
-that governance edit.
+Round 5 was re-entered on 2026-09-24 as BUILD-PLAN Phase 20 and its items
+landed here — the regenerated client (#14), `npm run verify` and the facts file
+(#15), the billing page on ADR-0025's four operations (#16), ADR-0028's
+account-deletion copy (#17, #19), and the retired Run-now dialog (#18). The
+re-read register and the evidence behind Gate 20 are in the Round 5 audit
+(`docs/audits/2026-08-11-round-5-phase-1-status.md`, "Round 5 re-entry
+disposition"); Gate 20's cells and boxes are filled in the backend-owned
+BUILD-PLAN at the close, which this repository cannot edit. Live observation is
+still carried — production answers 503.
 
 ## Verification
 

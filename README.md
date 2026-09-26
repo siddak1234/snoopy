@@ -49,8 +49,12 @@ share one lock.
 
 `npm run test:browser:fixtures` starts a loopback-only HTTPS Edge fixture with
 a temporary certificate. It exercises authenticated accessibility, keyboard,
-join-request, idempotency, entitlement, and export paths without real accounts
-or credentials.
+join-request, idempotency, entitlement, billing, account-deletion, and export
+paths without real accounts or credentials. The playbook's human keyboard
+traversal (NFR-35) has a hand-over test in the same suite:
+`KEYBOARD_JOURNEY=1 node scripts/run-browser-fixtures.mjs --headed --grep "keyboard journey"`
+opens the built site against the fixture, signed in, and pauses for the person
+at the keyboard; it is skipped otherwise.
 
 ## Container
 
