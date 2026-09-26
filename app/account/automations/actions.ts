@@ -10,8 +10,6 @@ import {
 import type {
   CreateSubscriptionRequest,
   CreateSubscriptionResponse,
-  CreateRunRequest,
-  CreateRunResponse,
   DecideApprovalRequest,
   DecideApprovalResponse,
   UpdateSubscriptionRequest,
@@ -30,7 +28,7 @@ import { resolveActiveWorkspaceId } from "@/lib/tenancy";
  */
 
 export type ActionResult =
-  | { ok: true; subscriptionId?: string; runId?: string }
+  | { ok: true; subscriptionId?: string }
   | {
       ok: false;
       error: string;
@@ -173,56 +171,6 @@ export async function setSubscriptionStatus(
   );
   revalidatePath("/account/automations");
   return result;
-}
-
-export async function triggerRun(formData: FormData): Promise<ActionResult> {
-  const subscriptionId = String(formData.get("subscriptionId") ?? "");
-  if (!subscriptionId)
-    return { ok: false, error: "A subscription is required" };
-
-  // The trigger payload is opaque to the platform (CreateRunRequest.input is a
-  // free-form object) and the manifest publishes no input schema, so the UI
-  // must not hardcode any one automation's fields. The person supplies the
-  // input as JSON; an empty object is the default and a valid payload.
-  const rawInput = formData.get("input");
-  let input: Record<string, unknown> = {};
-  if (typeof rawInput === "string" && rawInput.trim() !== "") {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(rawInput);
-    } catch {
-      return { ok: false, error: "Run input must be valid JSON." };
-    }
-    if (
-      parsed === null ||
-      typeof parsed !== "object" ||
-      Array.isArray(parsed)
-    ) {
-      return { ok: false, error: "Run input must be a JSON object." };
-    }
-    input = parsed as Record<string, unknown>;
-  }
-
-  const workspaceId = await activeWorkspaceId();
-  const body: CreateRunRequest = { subscriptionId, input };
-  try {
-    const response = await platformServerJson<CreateRunResponse>(
-      `/v1/workspaces/${workspaceId}/runs`,
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-        idempotencyKey: newIdempotencyKey("run"),
-      },
-    );
-    revalidatePath("/account/runs");
-    revalidatePath("/account/automations");
-    return { ok: true, runId: response.run.id };
-  } catch (error) {
-    if (error instanceof PlatformServerError) {
-      return { ok: false, error: error.message };
-    }
-    throw error;
-  }
 }
 
 export async function decideApproval(

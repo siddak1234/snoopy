@@ -86,8 +86,6 @@ test("generated automation contract is present and used by the facade", () => {
     ["CreateSubscriptionRequest", "createSubscription"],
     ["UpdateSubscriptionResponse", "updateSubscription"],
     ["UpdateSubscriptionRequest", "updateSubscription"],
-    ["CreateRunRequest", "createRun"],
-    ["CreateRunResponse", "createRun"],
     ["DecideApprovalRequest", "decideApproval"],
     ["DecideApprovalResponse", "decideApproval"],
   ]) {
@@ -301,7 +299,6 @@ test("automation actions consume generated operation response types", () => {
   for (const type of [
     "CreateSubscriptionResponse",
     "UpdateSubscriptionResponse",
-    "CreateRunResponse",
     "DecideApprovalResponse",
   ]) {
     assert.match(
@@ -313,7 +310,6 @@ test("automation actions consume generated operation response types", () => {
   for (const type of [
     "CreateSubscriptionRequest",
     "UpdateSubscriptionRequest",
-    "CreateRunRequest",
     "DecideApprovalRequest",
   ]) {
     assert.match(
@@ -345,5 +341,27 @@ test("automation list reads consume generated operation response types", () => {
     client,
     /Promise<\{\s*(?:subscriptions|runs|approvals):/,
     "automation list reads must not recreate generated response shapes",
+  );
+});
+
+test("the Run-now dialog is retired — nothing offers a manual run", () => {
+  // Gate scaffolding by the owner's direction (2026-09-09): to go once a
+  // background-triggered automation exists, which invoice-intake is. Retired
+  // rather than hidden (owner's decision 2026-09-24): no flag mechanism exists
+  // here, and a hidden server action would stay reachable by POST.
+  assert.doesNotMatch(
+    actionsUi,
+    /Run now|runOpen|triggerRun/u,
+    "the automation card must not offer a manual run",
+  );
+  assert.doesNotMatch(
+    actions,
+    /triggerRun|\/runs`/u,
+    "no server action may create a run",
+  );
+  assert.doesNotMatch(
+    client,
+    /CreateRunRequest|CreateRunResponse/u,
+    "the facade must not alias the createRun operation",
   );
 });
