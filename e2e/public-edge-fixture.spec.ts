@@ -1,7 +1,18 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Request } from "@playwright/test";
 
 const requesterUserId = "66666666-6666-4666-8666-666666666666";
 const organizationWorkspaceId = "11111111-1111-4111-8111-111111111111";
+
+// Requests of one shape, observed as they leave the page.
+function observe(page: Page, matches: (request: Request) => boolean): string[] {
+  const seen: string[] = [];
+  page.on("request", (request) => {
+    if (matches(request)) seen.push(request.url());
+  });
+  return seen;
+}
+const isLogout = (request: Request) =>
+  request.method() === "POST" && request.url().includes("/v1/auth/logout");
 
 test.use({ storageState: process.env.PLAYWRIGHT_AUTH_STORAGE_STATE });
 test.skip(
@@ -12,10 +23,10 @@ test.skip(
 test("the pasted-key 409 retry preserves the original connection intent", async ({
   page,
 }) => {
-  const serverActionRequests: string[] = [];
-  page.on("request", (request) => {
-    if (request.method() === "POST") serverActionRequests.push(request.url());
-  });
+  const serverActionRequests = observe(
+    page,
+    (request) => request.method() === "POST",
+  );
   await page.goto("/account/connections");
   await page.getByRole("button", { name: "Connect" }).click();
   await expect(page.locator('input[name="idempotencyKey"]')).not.toHaveValue(
@@ -371,4 +382,255 @@ test("a clean account deletion signs out and leaves", async ({ page }) => {
     .getByRole("button", { name: "Yes, delete my account" })
     .click();
   await expect(page).toHaveURL(/\/login\?deleted=1$/);
+});
+
+// For a cookie caller every 502 on DELETE /v1/account means the Access hop
+// failed — the contract's "deleted, but not revoked" 502 is bearer-only
+// (backend F39) — and a gateway 504 or a connection lost mid-request is the
+// same case: the request may have run and its answer been lost. All of them
+// keep the account and say the outcome is unknown, rather than relaying a
+// title. The fixture answers none of them; the route is answered here.
+const UNKNOWN_OUTCOME = "it is not known whether your account was removed";
+const lostAnswers: ReadonlyArray<
+  readonly [
+    string,
+    { status: number; contentType: string; body: string } | "connectionreset",
+  ]
+> = [
+  [
+    "the Edge's own 502 problem body",
+    {
+      status: 502,
+      contentType: "application/problem+json",
+      body: JSON.stringify({
+        type: "urn:autom8x:problem:dependency-failure",
+        title: "Dependency Failure",
+        status: 502,
+        detail: "Access service is unreachable",
+        code: "DEPENDENCY_FAILURE",
+      }),
+    },
+  ],
+  [
+    "a bodiless gateway 502",
+    {
+      status: 502,
+      contentType: "text/html",
+      body: "<!doctype html><title>502</title><p>Bad Gateway</p>",
+    },
+  ],
+  [
+    "a gateway 504",
+    {
+      status: 504,
+      contentType: "text/html",
+      body: "<!doctype html><title>504</title><p>Gateway Timeout</p>",
+    },
+  ],
+  ["a connection lost mid-request", "connectionreset"],
+];
+for (const [answer, fulfil] of lostAnswers) {
+  test(`${answer} keeps the account — the outcome is said to be unknown`, async ({
+    page,
+  }) => {
+    const logouts = observe(page, isLogout);
+    await page.route(/\/api\/platform\/v1\/account$/, (route) =>
+      fulfil === "connectionreset"
+        ? route.abort(fulfil)
+        : route.fulfill(fulfil),
+    );
+    await page.goto("/account/settings");
+    await page.getByRole("button", { name: "Delete Account" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog
+      .getByRole("button", { name: "Yes, delete my account" })
+      .click();
+    await expect(dialog.getByRole("alert")).toContainText(UNKNOWN_OUTCOME);
+    await expect(dialog.getByRole("alert")).not.toContainText(
+      /Dependency Failure|status 50/,
+    );
+    await expect(
+      dialog.getByRole("button", { name: "Try again" }),
+    ).toBeVisible();
+    await expect(page).toHaveURL(/\/account\/settings$/);
+    expect(logouts).toHaveLength(0);
+    await page.goto("/account");
+    await expect(page).toHaveURL(/\/account$/);
+  });
+}
+
+const unauthenticated = {
+  status: 401,
+  contentType: "application/problem+json",
+  body: JSON.stringify({
+    type: "urn:autom8x:problem:unauthenticated",
+    title: "Sign in is required.",
+    status: 401,
+    code: "UNAUTHENTICATED",
+  }),
+};
+
+test("an expired session is said inline, with the way back in — not a retry, not a redirect", async ({
+  page,
+}) => {
+  const deletes = observe(page, (request) => request.method() === "DELETE");
+  const logouts = observe(page, isLogout);
+  await page.route(/\/api\/platform\/v1\/account$/, (route) =>
+    route.fulfill(unauthenticated),
+  );
+  await page.goto("/account/settings");
+  await page.getByRole("button", { name: "Delete Account" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Yes, delete my account" }).click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "Your session ended, so this attempt did not run",
+  );
+  // The way back in returns to this page; the login page validates the target.
+  const signIn = dialog.getByRole("link", { name: "Sign in again" });
+  await expect(signIn).toHaveAttribute(
+    "href",
+    "/login?callbackUrl=%2Faccount%2Fsettings",
+  );
+  // Focus follows the replaced control (NFR-35): nobody is left on <body>.
+  await expect(signIn).toBeFocused();
+  await expect(dialog.getByRole("button", { name: "Try again" })).toHaveCount(
+    0,
+  );
+  await expect(page).toHaveURL(/\/account\/settings$/);
+  expect(deletes).toHaveLength(1);
+  expect(logouts).toHaveLength(0);
+  // An ended session survives Cancel: reopening offers the way back in, never
+  // the destructive button again.
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "Delete Account" }).click();
+  const reopened = page.getByRole("dialog");
+  await expect(
+    reopened.getByRole("link", { name: "Sign in again" }),
+  ).toBeVisible();
+  await expect(
+    reopened.getByRole("button", { name: "Yes, delete my account" }),
+  ).toHaveCount(0);
+  expect(deletes).toHaveLength(1);
+});
+
+test("a 401 right after a lost answer hedges — the account may already be gone", async ({
+  page,
+}) => {
+  // The earlier attempt may have finished server-side and taken the session
+  // with it, so "this attempt did not run" would overclaim.
+  let answer: "lost" | "expired" = "lost";
+  await page.route(/\/api\/platform\/v1\/account$/, (route) =>
+    answer === "lost"
+      ? route.fulfill({
+          status: 502,
+          contentType: "text/html",
+          body: "<!doctype html><title>502</title><p>Bad Gateway</p>",
+        })
+      : route.fulfill(unauthenticated),
+  );
+  await page.goto("/account/settings");
+  await page.getByRole("button", { name: "Delete Account" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Yes, delete my account" }).click();
+  await expect(dialog.getByRole("alert")).toContainText(UNKNOWN_OUTCOME);
+  answer = "expired";
+  await dialog.getByRole("button", { name: "Try again" }).click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "may already have been removed by the earlier attempt",
+  );
+  await expect(
+    dialog.getByRole("link", { name: "Sign in again" }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/account\/settings$/);
+});
+
+test("an answer lost behind the website's own proxy reads as unknown — and after Cancel, the retry's 401 still hedges", async ({
+  page,
+}) => {
+  // No page.route: the fixture's departing session runs its deletion and then
+  // drops the connection, and the website's own /api/platform rewrite meets
+  // that loss. Its session went with the account, so the next attempt is 401.
+  await page.context().addCookies([
+    {
+      name: "e2e-public-edge-session",
+      value: "departing",
+      domain: "127.0.0.1",
+      path: "/",
+    },
+  ]);
+  const logouts = observe(page, isLogout);
+  await page.goto("/account/settings");
+  await page.getByRole("button", { name: "Delete Account" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Yes, delete my account" }).click();
+  await expect(dialog.getByRole("alert")).toContainText(UNKNOWN_OUTCOME);
+  // Focus is back on the control that answers it (NFR-35), not on <body>.
+  await expect(dialog.getByRole("button", { name: "Try again" })).toBeFocused();
+  // The person closes the dialog and comes back to it later on the same page.
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("button", { name: "Delete Account" }).click();
+  const reopened = page.getByRole("dialog");
+  await reopened
+    .getByRole("button", { name: "Yes, delete my account" })
+    .click();
+  await expect(reopened.getByRole("alert")).toContainText(
+    "may already have been removed by the earlier attempt",
+  );
+  await expect(
+    reopened.getByRole("link", { name: "Sign in again" }),
+  ).toBeFocused();
+  await expect(page).toHaveURL(/\/account\/settings$/);
+  expect(logouts).toHaveLength(0);
+});
+
+test("a refusal shows the server's own title, and focus returns to Try again", async ({
+  page,
+}) => {
+  await page.route(/\/api\/platform\/v1\/account$/, (route) =>
+    route.fulfill({
+      status: 403,
+      contentType: "application/problem+json",
+      body: JSON.stringify({
+        type: "urn:autom8x:problem:forbidden",
+        title: "Request origin is not allowed",
+        status: 403,
+        code: "FORBIDDEN",
+      }),
+    }),
+  );
+  await page.goto("/account/settings");
+  await page.getByRole("button", { name: "Delete Account" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Yes, delete my account" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Request origin is not allowed",
+  );
+  await expect(dialog.getByRole("button", { name: "Try again" })).toBeFocused();
+  await expect(page).toHaveURL(/\/account\/settings$/);
+});
+
+test("a crafted return target cannot leave the site — signed in, the login page lands on the account", async ({
+  page,
+}) => {
+  // Signed in, the login page sends a person straight on to its return
+  // target, so a target that normalises to "//host" would leave the site.
+  for (const target of [
+    "/.//evil.example",
+    "/%2e//evil.example",
+    "/..//evil.example",
+    "//evil.example",
+    "/\\evil.example",
+    "https://evil.example",
+  ]) {
+    await page.goto(`/login?callbackUrl=${encodeURIComponent(target)}`);
+    await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:3001\/account$/);
+  }
+  // The control: an ordinary return target is honoured.
+  await page.goto(
+    `/login?callbackUrl=${encodeURIComponent("/account/settings")}`,
+  );
+  await expect(page).toHaveURL(
+    /^http:\/\/127\.0\.0\.1:3001\/account\/settings$/,
+  );
 });
