@@ -716,7 +716,7 @@ export interface paths {
     };
     /**
      * @description The plans a workspace can move onto, with the capability values each grants (ADR-0025). Any signed-in person may read it: it is the same list for everyone and it is what a purchase decision is made from.
-     *     **A plan with no provider price is omitted**, which is how the free floor stays off this list — nothing can check out onto a plan the provider has no price for, so offering it would produce a button that 404s.
+     *     **A plan with no provider price is omitted**, which is how the free floor stays off this list — nothing can check out onto a plan the provider has no price for, so offering it would produce a button that 404s. **Each plan carries its `price` when the provider can state it** (§12.1 #163); the provider's own identifier for it is never published.
      */
     get: operations["listPlans"];
     put?: never;
@@ -1181,6 +1181,36 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
+    /** @description What `DELETE /v1/account` removed (FR-21), relayed from Access. The same shape on 200 and 409; only `deleted: true` means the operation committed. */
+    AccountDeletionResult: {
+      deleted: boolean;
+      /** @description Every workspace that leaves with the account (ADR-0028). */
+      workspaces: components["schemas"]["AccountDeletionWorkspace"][];
+      /** @description Present when `deleted` is false. */
+      reason?: string;
+      /** @description Present when `deleted` is true — what Access removed. */
+      account?: {
+        [key: string]: unknown;
+      };
+    };
+    AccountDeletionWorkspace: {
+      /** Format: uuid */
+      workspaceId: string;
+      /** @enum {string} */
+      type: "personal" | "organization";
+      /** @description True only when every service removed this workspace. */
+      complete: boolean;
+      services: {
+        /** @enum {string} */
+        service:
+          "entitlements" | "connections" | "runs" | "catalog" | "artifacts";
+        ok: boolean;
+        /** @description What the service reported removing, in its own shape. */
+        detail?: unknown;
+        /** @description Why it did not, when it did not — `not_attempted` for a service after the one that refused. Never an upstream body verbatim. */
+        reason?: string;
+      }[];
+    };
     ApiProblem: {
       /** Format: uri-reference */
       type: string;
@@ -1330,6 +1360,20 @@ export interface components {
       capabilities: {
         [key: string]: number;
       };
+      /** @description Absent when the provider cannot state one flat amount for the plan's price, or cannot be reached — never invented. A client says the price is shown at checkout. */
+      price?: components["schemas"]["PlanPrice"];
+    };
+    /** @description What a plan costs, read from the billing provider by the plan's price (§12.1 #163). Display only: the provider's checkout states the figure a customer actually agrees to. */
+    PlanPrice: {
+      /** @description Minor units — cents for `usd` — so no float carries money. */
+      amount: number;
+      /** @description ISO 4217, lower case, as the provider states it. */
+      currency: string;
+      /**
+       * @description How often it recurs. Absent for a one-time price.
+       * @enum {string}
+       */
+      interval?: "day" | "week" | "month" | "year";
     };
     BillingCheckoutRequest: {
       planId: string;
@@ -1998,22 +2042,22 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": Record<string, never>;
+          "application/json": components["schemas"]["AccountDeletionResult"];
         };
       };
       400: components["responses"]["BadRequest"];
       401: components["responses"]["Unauthenticated"];
       403: components["responses"]["Forbidden"];
-      /** @description The deletion did not complete across every service. */
+      /** @description The deletion did not complete across every service. `deleted` is false, `reason` says why, and each workspace reports its services. Nothing after the refusing service was attempted, so a retry resumes. */
       409: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          "application/problem+json": components["schemas"]["ApiProblem"];
+          "application/json": components["schemas"]["AccountDeletionResult"];
         };
       };
-      /** @description Deleted, but the identity provider could not be reached to revoke the session. The device still holds a live credential; retry the revocation through `POST /v1/auth/logout`. */
+      /** @description **`SESSION_REVOCATION_FAILED` — bearer callers only.** The account was deleted, but the identity provider could not be reached to revoke the refresh token the caller sent. The device still holds a live credential; retry the revocation through `POST /v1/auth/logout`. A cookie caller never receives it: its cookies are cleared, which is itself effective. **`DEPENDENCY_FAILURE` — any caller.** The Edge could not complete its call to the service that deletes, so whether anything was removed is unknown; read `GET /v1/session` before telling a person either way. */
       502: {
         headers: {
           [name: string]: unknown;
@@ -3029,6 +3073,7 @@ export interface operations {
         };
       };
       401: components["responses"]["Unauthenticated"];
+      502: components["responses"]["DependencyFailure"];
       503: components["responses"]["NotConfigured"];
     };
   };
@@ -3055,6 +3100,7 @@ export interface operations {
       401: components["responses"]["Unauthenticated"];
       403: components["responses"]["Forbidden"];
       404: components["responses"]["NotFound"];
+      502: components["responses"]["DependencyFailure"];
       503: components["responses"]["NotConfigured"];
     };
   };
@@ -3086,6 +3132,7 @@ export interface operations {
       401: components["responses"]["Unauthenticated"];
       403: components["responses"]["Forbidden"];
       404: components["responses"]["NotFound"];
+      502: components["responses"]["DependencyFailure"];
       503: components["responses"]["NotConfigured"];
     };
   };
@@ -3118,6 +3165,7 @@ export interface operations {
       403: components["responses"]["Forbidden"];
       404: components["responses"]["NotFound"];
       409: components["responses"]["Conflict"];
+      502: components["responses"]["DependencyFailure"];
       503: components["responses"]["NotConfigured"];
     };
   };

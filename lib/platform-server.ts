@@ -121,6 +121,44 @@ export async function platformServerJson<T>(
 }
 
 /**
+ * A PUBLIC read — the same answer for every visitor — cached for
+ * `revalidateSeconds`. Backend §12.1 #160 and ADR-0029: every request the website
+ * makes reaches the Edge from the website's own servers, and a signed-out visitor
+ * is keyed by that shared address, so a read every visitor makes is the one worth
+ * making once a minute rather than once a view.
+ *
+ * **No cookie and no forwarded header is sent**, which is what makes caching it
+ * safe: nothing session-scoped can reach this cache, and the platform answers it
+ * identically for everyone. Session-scoped reads stay on `platformServerJson`,
+ * which never caches.
+ */
+export async function platformPublicJson<T>(
+  path: string,
+  revalidateSeconds: number,
+): Promise<T> {
+  const origin = backendApiOrigin();
+  if (!origin) throw new PlatformNotConfiguredError();
+
+  let response: Response;
+  try {
+    response = await fetch(`${origin}${path}`, {
+      next: { revalidate: revalidateSeconds },
+      signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+    });
+  } catch {
+    throw new PlatformServerError("The platform is unreachable", 502);
+  }
+  const body: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new PlatformServerError(
+      fallbackProblemTitle(response.status),
+      response.status,
+    );
+  }
+  return body as T;
+}
+
+/**
  * An idempotency key for one mutation.
  *
  * The backend requires 16-128 characters and treats the same key with different

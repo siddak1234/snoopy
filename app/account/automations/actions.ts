@@ -8,6 +8,8 @@ import {
   PlatformServerError,
 } from "@/lib/platform-server";
 import type {
+  CreateRunRequest,
+  CreateRunResponse,
   CreateSubscriptionRequest,
   CreateSubscriptionResponse,
   DecideApprovalRequest,
@@ -21,14 +23,24 @@ import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 /**
  * Mutations on the automation surface.
  *
+ * **A path is revalidated only when the mutation succeeded.** Revalidating after a
+ * refusal re-renders the page, and under a platform that is refusing requests
+ * (backend §12.1 #160) that re-render is the "busy" panel — replacing the dialog,
+ * its refusal and what the person typed. A refusal changed nothing to re-read.
+ *
  * The workspace is resolved from the session here rather than accepted from the
  * form. The Edge would refuse a workspace the session does not name anyway, but
  * a form field that cannot influence the outcome is worth not having: it reads
  * as though it could.
+ *
+ * **Resolved inside each action's `try`** (backend §12.1 #160): the session read
+ * throws when the platform refuses it, and an action that rejected would take the
+ * page to its error boundary and lose what the person typed; a refusal is shown
+ * in place instead.
  */
 
 export type ActionResult =
-  | { ok: true; subscriptionId?: string }
+  | { ok: true; subscriptionId?: string; runId?: string }
   | {
       ok: false;
       error: string;
@@ -43,9 +55,11 @@ async function activeWorkspaceId(): Promise<string> {
 }
 
 /** Turns a refusal into something renderable, and lets the unexpected surface. */
-async function attempt(run: () => Promise<unknown>): Promise<ActionResult> {
+async function attempt(
+  run: (workspaceId: string) => Promise<unknown>,
+): Promise<ActionResult> {
   try {
-    await run();
+    await run(await activeWorkspaceId());
     return { ok: true };
   } catch (error) {
     if (error instanceof PlatformServerError) {
@@ -86,9 +100,9 @@ export async function subscribeToAutomation(
   const templateId = String(formData.get("templateId") ?? "");
   if (!templateId) return { ok: false, error: "An automation is required" };
 
-  const workspaceId = await activeWorkspaceId();
   const body: CreateSubscriptionRequest = { templateId };
   try {
+    const workspaceId = await activeWorkspaceId();
     const response = await platformServerJson<CreateSubscriptionResponse>(
       `/v1/workspaces/${workspaceId}/subscriptions`,
       {
@@ -110,6 +124,34 @@ export async function subscribeToAutomation(
  * for declared keys, required/default rules, and every automation-specific
  * constraint.
  */
+/**
+ * The values a manifest-driven form posted, converted to the type each control
+ * promises — the one conversion both the setup form and the run form need
+ * (`ManifestFields.tsx` names every value `<prefix>:<key>` and its control
+ * `<prefix>-control:<key>`). An empty text or money field is left out, so the
+ * platform applies the manifest's own default or refuses a required one.
+ */
+function declaredValues(
+  formData: FormData,
+  prefix: "config" | "input",
+): Record<string, string | number | boolean> {
+  const values: Record<string, string | number | boolean> = {};
+  for (const [name, control] of formData.entries()) {
+    if (!name.startsWith(`${prefix}-control:`) || typeof control !== "string")
+      continue;
+
+    const key = name.slice(`${prefix}-control:`.length);
+    const value = formData.get(`${prefix}:${key}`);
+    if (control === "toggle") {
+      values[key] = value === "true";
+      continue;
+    }
+    if (typeof value !== "string" || value.trim() === "") continue;
+    values[key] = control === "money" ? Number(value) : value;
+  }
+  return values;
+}
+
 export async function saveSubscriptionConfiguration(
   formData: FormData,
 ): Promise<ActionResult> {
@@ -117,24 +159,10 @@ export async function saveSubscriptionConfiguration(
   if (!subscriptionId)
     return { ok: false, error: "A subscription is required." };
 
-  const config: Record<string, string | number | boolean> = {};
-  for (const [name, control] of formData.entries()) {
-    if (!name.startsWith("config-control:") || typeof control !== "string")
-      continue;
+  const config = declaredValues(formData, "config");
 
-    const key = name.slice("config-control:".length);
-    const value = formData.get(`config:${key}`);
-    if (control === "toggle") {
-      config[key] = value === "true";
-      continue;
-    }
-    if (typeof value !== "string" || value.trim() === "") continue;
-    config[key] = control === "money" ? Number(value) : value;
-  }
-
-  const workspaceId = await activeWorkspaceId();
   const body: UpdateSubscriptionRequest = { config };
-  const result = await attempt(() =>
+  const result = await attempt((workspaceId) =>
     platformServerJson<UpdateSubscriptionResponse>(
       `/v1/workspaces/${workspaceId}/subscriptions/${subscriptionId}`,
       {
@@ -144,7 +172,93 @@ export async function saveSubscriptionConfiguration(
       },
     ),
   );
-  revalidatePath("/account/automations");
+  if (result.ok) revalidatePath("/account/automations");
+  return result;
+}
+
+/**
+ * Start a run of a manual automation — backend §12.1 #162, ADR-0030.
+ *
+ * The input is exactly what the subscription's pinned version declares; the
+ * platform refuses anything else with 422 and runs nothing, so a refusal here is
+ * worded as "check the values" rather than as a failure of the platform.
+ *
+ * **The idempotency key comes from the form**, made when the dialog opens and
+ * again whenever a value changes. A resubmission of the same values after an
+ * answer was lost therefore carries the same key, and the platform returns the
+ * run it already started instead of starting a second one.
+ */
+export async function startRun(formData: FormData): Promise<ActionResult> {
+  const subscriptionId = String(formData.get("subscriptionId") ?? "");
+  if (!subscriptionId)
+    return { ok: false, error: "A subscription is required." };
+  const idempotencyKey = String(formData.get("idempotencyKey") ?? "");
+  if (!/^[A-Za-z0-9._~:-]{16,128}$/u.test(idempotencyKey)) {
+    return { ok: false, error: "Reopen the form and try again." };
+  }
+
+  const body: CreateRunRequest = {
+    subscriptionId,
+    input: declaredValues(formData, "input"),
+  };
+  try {
+    const workspaceId = await activeWorkspaceId();
+    const response = await platformServerJson<CreateRunResponse>(
+      `/v1/workspaces/${workspaceId}/runs`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+        idempotencyKey,
+      },
+    );
+    revalidatePath("/account/runs");
+    return { ok: true, runId: response.run.id };
+  } catch (error) {
+    if (!(error instanceof PlatformServerError)) throw error;
+    if (error.status === 422) {
+      return {
+        ok: false,
+        error: "The run was not started. Check each value and try again.",
+      };
+    }
+    if (error.status === 409) {
+      return {
+        ok: false,
+        error: "This automation is not live, so it cannot run.",
+      };
+    }
+    return { ok: false, error: error.message };
+  }
+}
+
+/**
+ * Archive a subscription — backend §12.1 #92 and #169. ONE-WAY by the platform's
+ * rule: it gives the plan slot back, and using the automation again means adding
+ * it afresh. Its own action, rather than a status the generic one accepts, so the
+ * irreversible transition is only ever reached through its confirmation.
+ */
+export async function archiveSubscription(
+  formData: FormData,
+): Promise<ActionResult> {
+  const subscriptionId = String(formData.get("subscriptionId") ?? "");
+  if (!subscriptionId)
+    return { ok: false, error: "A subscription is required." };
+
+  const body: UpdateSubscriptionRequest = { status: "archived" };
+  const result = await attempt((workspaceId) =>
+    platformServerJson<UpdateSubscriptionResponse>(
+      `/v1/workspaces/${workspaceId}/subscriptions/${subscriptionId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(body),
+        idempotencyKey: newIdempotencyKey("archive"),
+      },
+    ),
+  );
+  if (result.ok) {
+    revalidatePath("/account/automations");
+    revalidatePath("/account/billing");
+  }
   return result;
 }
 
@@ -157,9 +271,8 @@ export async function setSubscriptionStatus(
     return { ok: false, error: "Unsupported status" };
   }
 
-  const workspaceId = await activeWorkspaceId();
   const body: UpdateSubscriptionRequest = { status };
-  const result = await attempt(() =>
+  const result = await attempt((workspaceId) =>
     platformServerJson<UpdateSubscriptionResponse>(
       `/v1/workspaces/${workspaceId}/subscriptions/${subscriptionId}`,
       {
@@ -169,7 +282,7 @@ export async function setSubscriptionStatus(
       },
     ),
   );
-  revalidatePath("/account/automations");
+  if (result.ok) revalidatePath("/account/automations");
   return result;
 }
 
@@ -182,9 +295,8 @@ export async function decideApproval(
     return { ok: false, error: "Unsupported decision" };
   }
 
-  const workspaceId = await activeWorkspaceId();
   const body: DecideApprovalRequest = { decision };
-  const result = await attempt(() =>
+  const result = await attempt((workspaceId) =>
     platformServerJson<DecideApprovalResponse>(
       `/v1/workspaces/${workspaceId}/approvals/${approvalId}/decision`,
       {
@@ -196,7 +308,9 @@ export async function decideApproval(
       },
     ),
   );
-  revalidatePath("/account/approvals");
-  revalidatePath("/account/runs");
+  if (result.ok) {
+    revalidatePath("/account/approvals");
+    revalidatePath("/account/runs");
+  }
   return result;
 }

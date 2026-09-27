@@ -5,6 +5,7 @@ import { StatusPill } from "@/components/dashboard/StatusPill";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import type { PurchasablePlan, WorkspaceBillingResponse } from "@/lib/billing";
+import { formatPlanPrice } from "@/lib/plan-price";
 import {
   beginBillingCheckout,
   openBillingPortal,
@@ -26,10 +27,13 @@ import {
  */
 
 // Capabilities are data (ADR-0016): a plan lists what it allows by name and
-// number. The one name that exists today reads as a person would say it; any
-// other is shown as written rather than hidden.
+// number. Each one the platform grants reads as a person would say it. A name
+// with no label here is NOT printed — backend §12.1 #163 found the card reading
+// "workspace.rate 120", a key rather than a sentence; a new capability is shown
+// once it is given words.
 const capabilityCopy: Record<string, string> = {
   "automation.subscribe": "Automations",
+  "workspace.rate": "Requests per minute",
 };
 
 export function BillingPanel({
@@ -189,15 +193,23 @@ export function BillingPanel({
                   <p className="text-base font-medium text-[var(--text)]">
                     {plan.displayName}
                   </p>
+                  {/* The provider's own figure when it can state one flat
+                      amount (ADR-0031); otherwise said, not guessed. */}
+                  <p className="text-sm text-[var(--text)]">
+                    {(plan.price && formatPlanPrice(plan.price)) ??
+                      "Price shown at checkout"}
+                  </p>
                   <dl className="flex flex-col gap-1 text-xs text-[var(--muted)]">
-                    {Object.entries(plan.capabilities).map(
-                      ([capability, allowance]) => (
+                    {Object.entries(plan.capabilities)
+                      .filter(([capability]) =>
+                        Object.hasOwn(capabilityCopy, capability),
+                      )
+                      .map(([capability, allowance]) => (
                         <div key={capability} className="flex gap-1">
-                          <dt>{capabilityCopy[capability] ?? capability}</dt>
+                          <dt>{capabilityCopy[capability]}</dt>
                           <dd className="text-[var(--text)]">{allowance}</dd>
                         </div>
-                      ),
-                    )}
+                      ))}
                   </dl>
                   {current ? (
                     <div className="mt-auto pt-2">

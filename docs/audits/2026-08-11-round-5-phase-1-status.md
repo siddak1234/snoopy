@@ -544,13 +544,13 @@ answers 503 (backend §12.1 #156) and no authorized non-production environment e
 | --- | --- | --- |
 | Gate 4.5: sign in, subscribe, configure, activate, trigger, watch steps | **OBSERVED 2026-09-03, production** — by the backend's Gate 4.5 cell, not re-observed here | BUILD-PLAN Gate 4.5 line 1 (the platform's first real user at www.autom8x.ai; three production fixes shipped mid-observation, two of them this repository's — #9 and #10). This repository's own live re-observation is carried: production is down (§12.1 #156). |
 | Gate 4.5: approve in the UI, continuation under the same root | **OBSERVED 2026-09-03, production, twice** — by the backend's cell | BUILD-PLAN Gate 4.5 line 2: approval `5751b10c` → continuation `e0f7267d` (origin `approval-continuation`, `root_run_id` the held run); `c61fa3cd` → `d81cc20d`. |
-| NFR-35 authenticated core keyboard journey | **PENDING THE OWNER'S TRAVERSAL** — decided 2026-09-24 for this round; the recipe below is ready (the fixture limits two of its stops — F45, F49); the observation is recorded in Gate 20 line 7's cell at the close | Automated meanwhile: axe clean on every authenticated route the suite scans, `/account/billing` included (seven authenticated pages are not: `/account/approvals`, `/account/projects/[id]`, `/account/runs`, `/account/runs/[runId]`, `/account/support`, `/onboarding/join-org`, `/onboarding/setup-org` — F37); the fixture's keyboard test (dashboard navigation keeps a visible focus target); the deletion dialog moves focus to the control that replaces its confirm button (#19). |
+| NFR-35 authenticated core keyboard journey | **DECIDED BY THE OWNER 2026-09-27 — the closing session's keyboard-only traversal accepted as this half** (backend BUILD-PLAN Gate 20 line 7). It reached all seven stops of the recipe below; stop 1 failed two of its expectations — the switcher's arrow keys and Escape's focus (backend §12.1 #170) — **fixed in Round 13** (below) | The traversal's record is Gate 20 line 7's cell in `snoopy-backend` (120 records, 110 focus stops, every control with a visible indicator). Automated since: axe on every authenticated route the suite scans and on the Run, Archive and "platform could not answer" states; the switcher's keyboard behaviour as an e2e (Round 13). |
 | Third-party OAuth redirect and client allowlist | **OBSERVED in production** — by BUILD-PLAN 8.2's own text | 8.2: "incremental consent and reconnect both ran through Google's screen in production, attempts `a03775c1`/`f39915f5`". |
 | Live domain, join-request, pasted-key 409, entitlement 403, export variants | **NOT OBSERVED — re-dated 2026-09-26** | Fixture observations pass (the fixture suite: 39 passing at this PR, with the owner's hand-over test skipped unless asked for); a live run needs production (§12.1 #156). |
 | BUILD-PLAN 8.3 billing page | **UNBLOCKED 2026-09-20 (ADR-0025) · IMPLEMENTED `ba4fd44` (#16) · live observation carried** | Four published operations, generated client only (#14); page, facade, actions, fixture member identity, four e2e + axe, 26 audit probes; Gate 20 line 1. |
 | Marketing byte identity | **DECIDED 2026-09-24 by the owner: the NFR-35 accessibility exception is accepted** | `/`, `/solutions`, `/automation-builder`, `/privacy`, `/terms` byte-identical; `/contact` differs only by the four owner-approved persistent link underlines, already in both baselines. `test:visual` 6/6 green on darwin (every `npm run verify`) and linux (CI's pinned Playwright image, the "Browser regression and accessibility" job: `main` pushes `36140364318` @ `c97d557` (#14), `36147960894` @ `fddcd17` (#15), `36176059273` @ `ba4fd44` (#16), `36187006932` @ `caa12be` (#17), `36237192134` @ `961221b` (#18), `36255537829` @ `061768e` (#19); PR runs `36088330621` (#14), `36147684131` (#15), `36175809012` (#16), `36186563329` (#17), `36220159864` (#18), `36255400710` (#19) — every one green). |
 | Backend-integrated Preview readiness | **NOT OBSERVED — re-dated 2026-09-26** | Needs an authorized non-production Edge origin (deployment work). |
-| Round 5 closure and Round 6 sequencing | **Round 6 half SETTLED** (owner-approved resequencing 2026-08-16; Round 6 closed 2026-08-18) · **Round 5 half RE-ENTERED 2026-09-24**, closes at Gate 20 in `snoopy-backend` | MASTER-PLAN §4 (the owner-approved resequencing, 2026-08-16), its §0.2 archive (Round 6 closed 2026-08-18) and §0.1 (Round 5 re-entered 2026-09-24), all at backend `9fe81b5`; this section. |
+| Round 5 closure and Round 6 sequencing | **SETTLED** — Round 6 closed 2026-08-18; **Round 5 CLOSED 2026-09-27** at Gate 20, nine lines for nine (`snoopy-backend` `ae9a2bf`, PR #113) | MASTER-PLAN §0.2 archive (both closes). The findings Round 5's close filed from the web against the real Edge became Round 13 (below). |
 
 **Shipped since this register was written, confirmed against the code rather than the
 commit subjects:** legal pages (#5 — `app/(marketing)/privacy`, `app/(marketing)/terms`,
@@ -594,9 +594,12 @@ fixture owner, and pauses in the Playwright Inspector. Tab, Shift+Tab, Enter, Sp
 the arrow keys and Escape only — no pointer:
 
 1. `/account` — the sidebar links in order, each with a visible focus ring; the
-   workspace switcher opens, moves, closes on Escape, and focus returns to it.
-2. `/account/automations` — a card's Add and Pause. (The set-up dialog cannot be
-   reached here: no fixture automation declares setup fields — F49.)
+   workspace switcher opens on the workspace in use, the arrow keys, Home and End
+   move among its options, and Escape or a selection returns focus to it (#170,
+   Round 13).
+2. `/account/automations` — a card's Add, Pause, Set up (its dialog: Spending
+   limit, Save setup), Run (its dialog: Vendor, Amount, Invoice reference, Start
+   run) and Archive (its confirmation: Cancel returns focus).
 3. `/account/connections` — Connect opens its dialog; focus stays inside; Escape;
    focus returns.
 4. `/account/billing` — Choose plan and Manage billing are reachable and named.
@@ -604,9 +607,8 @@ the arrow keys and Escape only — no pointer:
    meets the fixture owner's refusal (nothing is deleted), which is announced;
    Try again and Cancel are reachable; Escape closes and focus returns.
 6. Sign out from the top bar.
-7. `/login`, signed out — the fixture refuses the provider list without a session
-   (F45), so the page shows its "could not be loaded" state: its Try again button,
-   with a visible focus ring, is the stop. The provider buttons wait for F45.
+7. `/login`, signed out — the provider buttons (F45 is closed: the fixture answers
+   the provider list without a session, as the Edge does).
 
 Resume in the Inspector ends the run. The close records the date, the route list and
 anything found in Gate 20 line 7's cell; a finding becomes a register row for the next
@@ -673,3 +675,48 @@ Each names the evidence a backend session can re-run.
 - **F49** No loopback-fixture automation declares setup fields (every catalog entry has `setup: []`), and `Set up` renders only when `setup.length > 0` (`AutomationActions.tsx`), so the set-up dialog cannot be reached in the harness: no e2e opens it and the owner's keyboard traversal cannot visit it (this PR's audit; the same debt as #14 R7 and #18 R5).
 
 **Numbering.** F11 — mobile's wrapper claimed to "match snoopy" by skipping the sibling gate — became true with #15, whose `verify` skips out loud; closed. F19 — retiring Run-now would have stranded the run pages' fixture coverage — kept through Activity in #18; closed. F35 was never assigned. F36 — the Edge should clear its cookies on its 502 path — is withdrawn: F39 shows that for a cookie caller the Edge clears them before that 502 could be raised, and raises none.
+
+## Round 13 — the web signs a person in, sells, and runs — 2026-09-27
+
+Opened in `snoopy-backend` on the owner's word (BUILD-PLAN **Phase 21**, Gate 21) from
+the findings Round 5's close filed when the real website first met the real Edge —
+backend §12.1 #160–#170. The backend half landed first, because every item here reads a
+contract it changed; this repository then regenerated its client from that tree
+(`verify:platform-contracts` green against it). Each box flips in `snoopy-backend` at the
+round's close, which re-runs this evidence.
+
+| Item | Backend row | What changed here | Evidence |
+| --- | --- | --- | --- |
+| 21.2.2 a refusal is not a sign-out | #160 | Every `<Link>` in the account area has `prefetch={false}`. `getAppSession()` is memoised per request and returns `null` only for a 401 or a site with no platform; a 429, a 5xx or no answer is thrown. The proxy sends a person to sign in on a 401 only — or, without asking the Edge, when the request carries no cookie at all. The account and onboarding layouts render `PlatformUnavailable` for a refusal (busy for 429); `app/account/error.tsx` does the same for a page. The four action modules that turned a missing session into "sign in again" (workspace switch, project create, export, onboarding) read it inside their `try`, so a refusal shows the platform's own answer. The login page reads the provider list on the server, cookieless, cached for a minute, and renders per request rather than at build time | `test/session-contract.test.mjs` (the four rules, every account-area link); e2e: a page view makes no RSC request after load, hovering included; a 429 and a 503 each keep the URL, say so, pass axe and send no sign-out; a page's own failed read stays inside the shell and Try again asks again; signed out, `/login` arrives with its providers and the browser asks for none |
+| 21.4.2 Run | #162 | A live subscription whose **pinned** version declares `runInput` offers Run: a dialog rendered by the setup renderer (`ManifestFields.tsx`, shared), a server action on the generated `createRun` types whose idempotency key is the form's — made when the dialog opens and whenever a value changes, so a resubmission after a lost answer cannot start a second run — then the run's page. An `artifact` field is not rendered. The Run and Set up forms submit from `onSubmit`, not a form `action` — React resets an action form when it settles, which cleared the values and so the key — and a path is revalidated only after a mutation succeeded. The Run-now JSON dialog stays retired | `test/automation-contract.test.mjs`; e2e: the fixture creates the run only for exactly the declared input, typed (a number for money), and the page lands on it with the Manual trigger; axe on the open dialog; a refused start keeps the values and the key, and the same values then start the run; a refused set-up save stays in its dialog with the platform's answer and the typed value |
+| 21.5.2 price and labels | #163 | A plan shows the provider's price (minor units, divided by an exponent stated per currency in `lib/plan-price.ts`; a currency it does not state is not guessed at) or "Price shown at checkout"; `workspace.rate` reads "Requests per minute"; a capability with no words is not printed | `test/billing-contract.test.mjs` (the formatter run on usd, eur, jpy and on currencies it refuses); e2e: `$5.00 per month`, "Price shown at checkout", no raw key; axe |
+| 21.8.1 Archive | #169 | Archive on every subscription card, behind a confirmation that says it is one-way and gives the plan slot back; its own server action — the generic status action still refuses `archived` | `test/automation-contract.test.mjs`; e2e: Cancel returns focus and changes nothing; confirming leaves Add; axe on the dialog |
+| 21.8.2 the switcher's keyboard | #170 | Opening focuses the workspace in use; ArrowUp/ArrowDown wrap, Home and End jump; Escape and a selection return focus to the trigger; while a switch is pending the options are `aria-disabled`, not `disabled`, so focus is not dropped | e2e, key by key, including a selection made from the keyboard |
+| 21.8.3 this register | — | The NFR-35 and Round 5 rows above, the recipe, this section | — |
+| 21.8.4 Dependabot #11 and #13 | — | `sharp` 0.35.3 → 0.35.4 and `js-yaml` 4.3.1 → 4.3.2 (through `@redocly/openapi-core` 1.34.19 → 1.34.20) — each PR's own lockfile change, applied unchanged, through this round's full gate | `npm ci` then `npm run verify` on the result |
+
+**Findings above that this round closes:** F1 (the 409 is published as sent — backend
+#164; the fixture's body now `satisfies` the generated `AccountDeletionResult`), F3 (the
+portal takes no body — #165), F10 (the billing 502s are documented — #166), F20 (Archive —
+#169), F39 (the bearer-only revocation 502 has its own code — #167; for a cookie caller
+every 502 on that route still means "unknown", as #19 reads it), F45 (the fixture serves the
+provider list without a session), F49 (the fixture's live automation declares a setting, so the Set up dialog is reached and tested). **Narrowed, not closed:** F26 — the account area has an
+error boundary; the rest of the app has none; F27 — the session read is shared by the layout
+and its page, the workspace list is still read by both; F38 — the fixture declares the
+subscription PATCH for a set-up save and the archive, not for Pause or Go live.
+
+**New findings this round — for the next web round:**
+
+- **F50** `e2e/marketing.visual.spec.ts` screenshots a marketing page while the nav's own
+  session check can still be in flight: once, under a concurrent image build, `/automation-builder`
+  differed by 850 px — the nav showed its loading `…` where the baseline has "Sign in" (the
+  suite's origin is unroutable, so that check ends in a DNS failure). Green on the re-run with
+  nothing else running; the test waits for fonts, not for the nav.
+- **F51** The change audit's probes saw a server action send the Edge a cookie header shaped
+  `…=owner; Path=/; probe-ext=1; Path=/` — attributes inside the `Cookie` header. Observed
+  through the audit's own shim, which set a second cookie; pre-existing (`lib/platform-server.ts`
+  sends `cookies().toString()`), and NOT reproduced here: to be verified before it is fixed.
+
+**Mobile's half is not this repository's** — backend BUILD-PLAN 21.9.1 lists what
+`snoopy-mobile` adopts in its own round: the regenerated contracts, a Run control from
+`runInput`, Archive, and a 429 read as "try again", never as signed out.
