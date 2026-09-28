@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
 import {
+  administers,
   findAccessibleProject,
   listProjectMemberships,
   listProjectTeamGrants,
@@ -153,8 +154,24 @@ export default async function ProjectDetailPage({
           ) : null}
           {canManage && teams.length === 0 ? (
             <p className="mt-3 text-sm text-[var(--muted)]">
-              You can give access to a team you can see — the teams you are on.
-              The organization&apos;s owners and admins see every team.
+              {administers(workspace.role) ? (
+                <>
+                  This organization has no teams yet. Teams are made on the{" "}
+                  <Link
+                    href="/account/teams"
+                    prefetch={false}
+                    className="text-[var(--accent)] underline underline-offset-2"
+                  >
+                    Teams page
+                  </Link>
+                  .
+                </>
+              ) : (
+                <>
+                  You can give access to a team you can see — the teams you are
+                  on. The organization&apos;s owners and admins see every team.
+                </>
+              )}
             </p>
           ) : null}
         </div>

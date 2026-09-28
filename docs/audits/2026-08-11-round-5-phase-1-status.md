@@ -840,8 +840,9 @@ the sha256 of the contract it came from.
     reported. The browser gates still refuse a stale server, because they run with
     `CI=1`, which turns off `reuseExistingServer`. Binding each port would ask the
     question directly.
-  - **27 surfaces the change audit probed in a browser and no test asserts.** Each probe
-    passed; each is a test to write:
+  - **26 surfaces the change audit probed in a browser and no test asserts.** Each probe
+    passed; each is a test to write. (It named 27. The 27th, Replace answered `reused`,
+    is now held by a static test: the platform never gives that answer.)
     1. the home's recent-run link opens the run;
     2. recent activity when the runs read fails, and in an empty workspace;
     3. a figure's 401 goes to the boundary, the navigation stays, Try again recovers (F60);
@@ -855,22 +856,22 @@ the sha256 of the contract it came from.
     11. Delete Account's danger colours and focus ring (F43);
     12. a 409 after a lost answer, then a 401 (F47);
     13. Disconnect, then the provider offers Connect;
-    14. Replace answered `reused` says the account is still connected;
-    15. an unmet connection's link, the version notice and a disabled Go live;
-    16. Cancel on a run another tab already stopped;
-    17. Approvals: the empty state, a decision, and a member offered none;
-    18. billing's 503;
-    19. a team project refused after another tab switched workspace;
-    20. the Teams pages' remaining states: personal, an unknown team, no teams, a plain
+    14. an unmet connection's link, the version notice and a disabled Go live;
+    15. Cancel on a run another tab already stopped;
+    16. Approvals: the empty state, a decision, and a member offered none;
+    17. billing's 503;
+    18. a team project refused after another tab switched workspace;
+    19. the Teams pages' remaining states: personal, an unknown team, no teams, a plain
         member, Back;
-    21. a team's member form refused after a switch;
-    22. `app/error.tsx` and its Try again;
-    23. `app/global-error.tsx`, which nothing in this tree can trigger, so it needs a build
+    20. a team's member form refused after a switch;
+    21. `app/error.tsx` and its Try again;
+    22. `app/global-error.tsx`, which nothing in this tree can trigger, so it needs a build
         or a unit render that can;
-    24. `GET /api/session` answers 404;
-    25. `GET /api/ready` keeps its 503;
-    26. the workspace list read once per request, counted at the fixture;
-    27. "A team you are not on", and an owner with no team to offer.
+    23. `GET /api/session` answers 404;
+    24. `GET /api/ready` keeps its 503;
+    25. the workspace list read once per request, counted at the fixture;
+    26. "A team you are not on", and a project's owner who is a plain member with no
+        team to offer.
 
 **The change review's ten findings** (`/code-review`, high, on `c974177`). Eight were fixed,
 each with a test that was run red against the old code. One was accepted with a reason, and
@@ -915,6 +916,48 @@ one is the backend's:
    `test/boundaries-contract.test.mjs` plants each case.
 10. **Fixed.** Replace account read a `reused` answer as a failure. It now says the account is
     already connected. `test/structure-contract.test.mjs`.
+
+**The second change review** (`/code-review`, high, on `9854232`, `ca777bf` and
+`ec52e15`, the commits after `c974177`) found nine things. Five are fixed, each with a
+test that was run red against the old code. Four are accepted, each with its reason:
+
+1. **Fixed.** Both repositories' document checks ran only when their own URL equalled
+   `file://` plus the path they were started from. A URL percent-encodes a space, and the
+   owner's checkouts live under `Business Infra/`, so there the check never ran and exited
+   0: a silent pass. It now compares paths. `test/doc-references.test.mjs` runs it from a
+   folder with a space.
+2. **Fixed.** The check read only tracked documents, but looked files up among untracked
+   ones too, and counted a file deleted on disk as present. The documents and the files
+   are now one view: what git sees, less what is deleted. The same test plants an
+   untracked document and a deleted file.
+3. **Fixed.** Replace, answered `reused`, named the row's account rather than the one the
+   platform answered with. The platform never reuses a grant it was asked to replace
+   (`snoopy-backend/apps/connections/src/postgres-attempts.ts`), so no fixture gives this
+   answer, and a static test holds the name instead (`test/structure-contract.test.mjs`).
+4. **Fixed.** On a team project in an organization with no team yet, its owner was told
+   they could give access to "the teams you are on", and that owners and admins see every
+   team. That was true, and no help. They are now told the organization has no teams yet,
+   with a link to the Teams page. e2e: "an organization with no team yet tells its owner
+   where teams are made …".
+5. **Fixed.** The fixture's created projects had nine characters in their id's first
+   group from the tenth on; now always eight. The finding's other half, that a plain
+   member may create a project, is the platform's own rule (`requireWorkspaceMembership`),
+   so the fixture keeps it.
+6. **Accepted.** Only `snoopy-backend/…` and `../snoopy-backend/…` name the platform, so a
+   deeper relative link or a root-absolute one reads as missing. The check fails closed,
+   so such a form cannot pass unnoticed, and no document uses one.
+7. **Accepted.** `figure()` on the home page is a third degradation helper. On a site with
+   no backend it reads "Unavailable" where the lists' helpers read empty. It is meant to
+   differ, because a figure the platform refuses is not zero. And on a site with no
+   backend the account area is not reachable: the layout finds no session and sends the
+   person to sign in.
+8. **Accepted.** `audit:boundaries` still refuses a fragment that reads as a colour outside
+   an `href` (`router.push("#add")`, `querySelector("#cafe")`). None exists, and the rule
+   fails closed: one would be reported by file and line.
+9. **Accepted.** A team grant resolves its project through `findAccessibleProject`: one
+   read of the workspaces, and one of each workspace's projects. Every project action
+   resolves its project that way. A grant is an owner's or admin's occasional act, far
+   inside a person's 120 requests a minute.
 
 **`/security-review`** on 22.3.1, 22.3.3, 22.5.3 and 22.5.4, and on the rest of the diff:
 no finding at the bar. The website's server holds no platform credential and sends the

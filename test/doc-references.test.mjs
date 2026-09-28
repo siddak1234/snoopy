@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
@@ -82,6 +88,47 @@ test("a missing file is listed with its document and line; a struck one is a rec
       /found 3, struck 1, not checked 3, missing 2$/mu,
       "the present file (twice), the platform's contract, the struck file, the phone app's and the two build outputs",
     );
+  } finally {
+    rmSync(planted, { recursive: true, force: true });
+  }
+});
+
+test("the audit runs from a path with a space, and reads the documents and the files git sees", () => {
+  const planted = mkdtempSync(join(tmpdir(), "doc-references-"));
+  try {
+    // The owner's checkouts live under `Business Infra/`: a URL of the script's
+    // path percent-encodes the space, and the audit once never ran there.
+    const copy = join(planted, "with space", "audit-doc-references.mjs");
+    mkdirSync(dirname(copy), { recursive: true });
+    copyFileSync(script, copy);
+    const repository = join(planted, "web");
+    const plant = (path, content) => {
+      mkdirSync(dirname(join(repository, path)), { recursive: true });
+      writeFileSync(join(repository, path), content);
+    };
+    plant("lib/present.ts", "export {};\n");
+    plant("lib/deleted.ts", "export {};\n");
+    plant("docs/guide.md", "Reads `lib/present.ts` and `lib/deleted.ts`.\n");
+    execFileSync("git", ["init", "-q"], { cwd: repository });
+    execFileSync("git", ["add", "."], { cwd: repository });
+    // Deleted on disk and not yet staged: a commit of this tree has no such file.
+    rmSync(join(repository, "lib/deleted.ts"));
+    // Not yet added: a commit of this tree has it, so it is read.
+    plant("docs/new.md", "Names `lib/nowhere.ts`.\n");
+
+    const run = spawnSync(process.execPath, [copy, repository], {
+      encoding: "utf8",
+    });
+    const output = `${run.stdout}${run.stderr}`;
+    assert.equal(run.status, 1, output);
+    assert.deepEqual(
+      output.split("\n").filter((line) => line.startsWith("missing\t")),
+      [
+        "missing\tdocs/guide.md:1\tlib/deleted.ts",
+        "missing\tdocs/new.md:1\tlib/nowhere.ts",
+      ],
+    );
+    assert.match(output, /found 1, struck 0, not checked 0, missing 2$/mu);
   } finally {
     rmSync(planted, { recursive: true, force: true });
   }

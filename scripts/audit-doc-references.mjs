@@ -10,14 +10,16 @@
 // checked, never as found. A file that was removed stays namable in a record of
 // its removal, struck through: ~~`lib/auth.ts`~~ says it is gone.
 //
-// A path here is found in what git sees — tracked files, and untracked ones it
-// does not ignore, the facts file's basis — never in whatever is on disk. A path
-// git ignores is a build output (`.next/`, `node_modules/`, `.autom8x/`): it is
-// there only once this checkout is built, so it is reported as not checked.
-// Found on disk, CI's clean checkout failed three that a built one passed.
+// The documents read and the files they may name are one view: what git sees —
+// tracked files still on disk, and untracked ones it does not ignore (the facts
+// file's basis) — never whatever is on disk. A path git ignores is a build
+// output (`.next/`, `node_modules/`, `.autom8x/`): it is there only once this
+// checkout is built, so it is reported as not checked. Found on disk, CI's
+// clean checkout failed three that a built one passed.
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, normalize, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // `node scripts/audit-doc-references.mjs [repository] [--all]`, in either order.
 const [target] = process.argv.slice(2).filter((arg) => !arg.startsWith("--"));
@@ -33,14 +35,18 @@ const OTHER_REPOSITORIES = [
   "snoopy-n8n/",
   "snoopy-automations/",
 ];
-const files = new Set(
-  execFileSync(
-    "git",
-    ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-    { cwd: root, encoding: "utf8" },
-  )
+const gitFiles = (...options) =>
+  execFileSync("git", ["ls-files", "-z", ...options], {
+    cwd: root,
+    encoding: "utf8",
+  })
     .split("\0")
-    .filter(Boolean),
+    .filter(Boolean);
+const deleted = new Set(gitFiles("--deleted"));
+const files = new Set(
+  gitFiles("--cached", "--others", "--exclude-standard").filter(
+    (file) => !deleted.has(file),
+  ),
 );
 const ignored = (path) =>
   spawnSync("git", ["check-ignore", "-q", path], { cwd: root }).status === 0;
@@ -75,12 +81,7 @@ function locate(doc, path) {
 }
 
 export function auditDocReferences() {
-  const docs = execFileSync("git", ["ls-files", "*.md"], {
-    cwd: root,
-    encoding: "utf8",
-  })
-    .split("\n")
-    .filter(Boolean);
+  const docs = [...files].filter((file) => file.endsWith(".md")).sort();
   const references = [];
   for (const doc of docs) {
     const lines = readFileSync(join(root, doc), "utf8").split("\n");
@@ -109,7 +110,12 @@ export function auditDocReferences() {
   return references;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Paths, not URLs: a URL percent-encodes a space (`Business Infra/`), and the
+// audit then never ran — a silent pass.
+if (
+  realpathSync(resolve(process.argv[1] ?? "")) ===
+  fileURLToPath(import.meta.url)
+) {
   const references = auditDocReferences();
   const count = (status) =>
     references.filter((entry) => entry.status === status).length;

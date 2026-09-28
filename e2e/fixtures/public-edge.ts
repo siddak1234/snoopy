@@ -671,6 +671,15 @@ const server = createServer(
     }
     if (
       request.method === "POST" &&
+      url.pathname === "/__fixture/org-without-teams"
+    ) {
+      state.teams = [];
+      state.teamMemberships = [];
+      response.writeHead(204, { "cache-control": "no-store" });
+      return response.end();
+    }
+    if (
+      request.method === "POST" &&
       url.pathname === "/__fixture/oauth-connection-broken"
     ) {
       state.oauthStatus = "reauthorization-required";
@@ -850,7 +859,8 @@ const server = createServer(
         return respond(response, 400, problem(400, "Bad Request"));
       }
       const created = {
-        id: `5555555${state.createdProjects.length}-5555-4555-8555-555555555555`,
+        // Eight hex digits in the first group, however many are created.
+        id: `${String(state.createdProjects.length).padStart(8, "5")}-5555-4555-8555-555555555555`,
         workspaceId,
         name: body.name,
         type: body.type,

@@ -106,7 +106,7 @@ export function ConnectionsPanel({
       if (result.ok && result.alreadyConnectedAs) {
         setReplacing(null);
         setNotice(
-          `${connection.externalAccount.displayName} is still connected — there was nothing to replace.`,
+          `${result.alreadyConnectedAs} is still connected — there was nothing to replace.`,
         );
         router.refresh();
         return;

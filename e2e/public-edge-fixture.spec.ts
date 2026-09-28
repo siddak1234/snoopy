@@ -760,6 +760,24 @@ test("anyone on a project reads the teams granted to it, and only its owner or a
   );
 });
 
+test("an organization with no team yet tells its owner where teams are made, not which teams they can see", async ({
+  page,
+}) => {
+  await fixtureControl("org-without-teams");
+  await page.goto("/account/projects/33333333-3333-4333-8333-333333333333");
+  await expect(
+    page.getByText("This organization has no teams yet."),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Teams page" })).toHaveAttribute(
+    "href",
+    "/account/teams",
+  );
+  await expect(page.getByText("the teams you are on")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Give access" })).toHaveCount(
+    0,
+  );
+});
+
 test("an organization with no project yet creates its first team project, in the organization being worked in (register F57)", async ({
   page,
 }) => {

@@ -199,4 +199,12 @@ test("a replace answered as reused says so, rather than failing", () => {
     replace,
     /if \(result\.ok && result\.alreadyConnectedAs\) \{\s*setReplacing\(null\);/u,
   );
+  // The account the platform says is connected, not the row's: the platform
+  // never reuses a grant it was asked to replace (backend
+  // apps/connections/src/postgres-attempts.ts), so no fixture gives this answer
+  // and the page's own name for the row could be stale.
+  assert.match(
+    replace,
+    /setNotice\(\s*`\$\{result\.alreadyConnectedAs\} is still connected/u,
+  );
 });
