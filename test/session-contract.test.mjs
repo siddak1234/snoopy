@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 
 import { toAppSession } from "../lib/session-contract.ts";
@@ -70,6 +71,91 @@ test("a bounded session list does not infer workspace non-membership", () => {
   assert.equal(
     projected.user.workspaceId,
     "305282fc-00e3-42fc-9647-b812cd615dc9",
+  );
+});
+
+test("no session means 401 — a refused or failed read is not a sign-out", () => {
+  // Backend §12.1 #160: every failure used to read as "no session", so a 429
+  // sent a signed-in person to /login. Only a 401 and an unconfigured site are
+  // null now; anything else is thrown for the account area to render.
+  const source = readFileSync("lib/app-session.ts", "utf8");
+  assert.match(source, /export const getAppSession = cache\(/);
+  assert.match(
+    source,
+    /error instanceof PlatformNotConfiguredError\) return null/,
+  );
+  assert.match(source, /error\.status === 401\)\s*\{\s*return null;/u);
+  assert.match(source, /throw error;/);
+  const layout = readFileSync("app/account/layout.tsx", "utf8");
+  assert.match(layout, /<PlatformUnavailable/);
+  assert.match(layout, /error\.status === 429/);
+  const boundary = readFileSync("app/account/error.tsx", "utf8");
+  assert.match(boundary, /<PlatformUnavailable retry=\{retry\} \/>/);
+  // The proxy reads the session too, before any page: it may send a person to
+  // sign in on a 401 (or a site with no platform), and on nothing else.
+  const proxy = readFileSync("proxy.ts", "utf8");
+  assert.match(
+    proxy,
+    /sessionResponse === "not-configured" \|\| sessionResponse\?\.status === 401/u,
+  );
+  // No cookie at all is no session, answered without spending the website's
+  // shared address bucket at the Edge.
+  assert.match(
+    proxy,
+    /if \(!request\.headers\.get\("cookie"\)\) return loginRedirect\(request\);\s*\n\s*const sessionResponse/u,
+  );
+  assert.doesNotMatch(
+    proxy,
+    /if \(!sessionResponse\?\.ok\) return loginRedirect/u,
+    "a refused or failed session read must not redirect to sign-in",
+  );
+});
+
+test("no link in the account area prefetches", () => {
+  // Backend §12.1 #160: each visible <Link> prefetched, and one page view cost
+  // 23 Edge requests against a 120-a-minute bucket.
+  const files = [];
+  const walk = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (entry.name.endsWith(".tsx")) files.push(path);
+    }
+  };
+  walk("app/account");
+  walk("components/dashboard");
+  let links = 0;
+  for (const path of files) {
+    for (const match of readFileSync(path, "utf8").matchAll(
+      /<Link\b[^>]*>/gu,
+    )) {
+      links += 1;
+      assert.match(
+        match[0],
+        /prefetch=\{false\}/u,
+        `${path}: ${match[0].slice(0, 60)} must not prefetch`,
+      );
+    }
+  }
+  assert.ok(links > 0, "no account-area links were found to check");
+});
+
+test("the login page reads the provider list on the server, cached and cookieless", () => {
+  // The one read every signed-out visitor makes, identical for all of them.
+  const loginPage = readFileSync("app/(auth)/login/page.tsx", "utf8");
+  assert.match(
+    loginPage,
+    /platformPublicJson<LoginProvidersResponse>\(\s*"\/v1\/auth\/providers",\s*60,?\s*\)/u,
+  );
+  const server = readFileSync("lib/platform-server.ts", "utf8");
+  const publicRead =
+    /export async function platformPublicJson[\s\S]*?\n\}/u.exec(server);
+  assert.ok(publicRead, "platformPublicJson not found");
+  assert.match(publicRead[0], /next: \{ revalidate: revalidateSeconds \}/);
+  assert.doesNotMatch(
+    publicRead[0],
+    /cookie|forwardedHeaders|headers\(/iu,
+    "a cached public read must carry nothing session-scoped",
   );
 });
 

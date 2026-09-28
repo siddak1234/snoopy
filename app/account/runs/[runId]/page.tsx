@@ -83,6 +83,7 @@ export default async function RunDetailPage(
           <p className="mt-4 text-sm text-[var(--muted)]">
             Continues{" "}
             <Link
+              prefetch={false}
               href={`/account/runs/${run.continuesRunId}`}
               className="text-[var(--accent)] underline underline-offset-2"
             >

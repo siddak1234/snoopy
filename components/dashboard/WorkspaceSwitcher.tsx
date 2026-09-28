@@ -10,6 +10,10 @@ import type { Workspace } from "@/lib/tenancy";
  * PATCH /v1/session/active-workspace operation. The active workspace lives in
  * the backend session, so switching is a mutation plus a refresh — the client
  * keeps no workspace state of its own.
+ *
+ * Keyboard (backend §12.1 #170): opening moves focus to the current workspace,
+ * the arrow keys and Home/End move among the options, and Escape or a selection
+ * returns focus to the trigger — a keyboard user never lands on `<body>`.
  */
 export function WorkspaceSwitcher({
   workspaces,
@@ -23,6 +27,8 @@ export function WorkspaceSwitcher({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -35,7 +41,9 @@ export function WorkspaceSwitcher({
       }
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      triggerRef.current?.focus();
     };
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -45,15 +53,52 @@ export function WorkspaceSwitcher({
     };
   }, [open]);
 
+  // Opening puts focus on the workspace in use, so the arrow keys start there.
+  useEffect(() => {
+    if (!open) return;
+    const menu = menuRef.current;
+    const current =
+      menu?.querySelector<HTMLButtonElement>(
+        'button[data-workspace-option][aria-current="true"]',
+      ) ??
+      menu?.querySelector<HTMLButtonElement>("button[data-workspace-option]");
+    current?.focus();
+  }, [open]);
+
   if (workspaces.length < 2) return null;
 
   const active = workspaces.find(
     (workspace) => workspace.id === activeWorkspaceId,
   );
 
+  function close() {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
+  function onMenuKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    const options = Array.from(
+      menuRef.current?.querySelectorAll<HTMLButtonElement>(
+        "button[data-workspace-option]",
+      ) ?? [],
+    );
+    if (options.length === 0) return;
+    const index = options.indexOf(document.activeElement as HTMLButtonElement);
+    let next: number;
+    if (event.key === "ArrowDown") next = (index + 1) % options.length;
+    else if (event.key === "ArrowUp")
+      next = (index - 1 + options.length) % options.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = options.length - 1;
+    else return;
+    event.preventDefault();
+    options[next]?.focus();
+  }
+
   async function handleSelect(workspaceId: string) {
+    if (pending) return;
     if (workspaceId === activeWorkspaceId) {
-      setOpen(false);
+      close();
       return;
     }
     setPending(true);
@@ -61,7 +106,7 @@ export function WorkspaceSwitcher({
     const result = await selectActiveWorkspaceAction(workspaceId);
     setPending(false);
     if (result.ok) {
-      setOpen(false);
+      close();
       router.refresh();
     } else {
       setError(result.error);
@@ -71,6 +116,7 @@ export function WorkspaceSwitcher({
   return (
     <div ref={containerRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         aria-label="Switch workspace"
@@ -92,7 +138,9 @@ export function WorkspaceSwitcher({
       </button>
       {open ? (
         <div
+          ref={menuRef}
           id="workspace-switcher-menu"
+          onKeyDown={onMenuKeyDown}
           role="dialog"
           aria-label="Switch workspace"
           className="absolute top-full right-0 z-50 mt-2 min-w-[14rem] rounded-[var(--radius-lg)] border border-[var(--ring)] bg-[var(--surface)] p-2 shadow-[var(--shadow-md)]"
@@ -104,10 +152,13 @@ export function WorkspaceSwitcher({
                 <button
                   key={workspace.id}
                   type="button"
-                  disabled={pending}
+                  data-workspace-option
+                  // aria-disabled, not disabled: a disabled button loses focus,
+                  // and a switch that fails would leave the keyboard on <body>.
+                  aria-disabled={pending || undefined}
                   aria-current={isActive ? "true" : undefined}
                   onClick={() => void handleSelect(workspace.id)}
-                  className={`flex items-center justify-between gap-3 rounded-[var(--radius-md)] px-3 py-2 text-left text-sm transition disabled:opacity-60 ${isActive ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"}`}
+                  className={`flex items-center justify-between gap-3 rounded-[var(--radius-md)] px-3 py-2 text-left text-sm transition aria-disabled:opacity-60 ${isActive ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"}`}
                 >
                   <span className="min-w-0">
                     <span className="block truncate font-medium">

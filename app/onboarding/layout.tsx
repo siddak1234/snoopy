@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
+import { PlatformServerError } from "@/lib/platform-server";
 import { listWorkspaces } from "@/lib/tenancy";
+import { PlatformUnavailable } from "@/components/dashboard/PlatformUnavailable";
 import LogoMark from "@/components/branding/LogoMark";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 
@@ -21,13 +23,22 @@ export default async function OnboardingLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getAppSession();
-  if (!session?.user.id) redirect("/login");
-  // Only redirect if the user already has an org workspace — a pre-existing
-  // personal workspace must not block org creation/joining.
-  const existing = (await listWorkspaces()).some(
-    (workspace) => workspace.type === "organization",
-  );
+  // A refused or failed read is not a sign-out (backend §12.1 #160): it renders
+  // here, as the account layout does, and only "no session" goes to /login.
+  let existing: boolean;
+  try {
+    const session = await getAppSession();
+    if (!session?.user.id) redirect("/login");
+    // Only redirect if the user already has an org workspace — a pre-existing
+    // personal workspace must not block org creation/joining.
+    existing = (await listWorkspaces()).some(
+      (workspace) => workspace.type === "organization",
+    );
+  } catch (error) {
+    if (!(error instanceof PlatformServerError)) throw error;
+    if (error.status === 401) redirect("/login");
+    return <PlatformUnavailable busy={error.status === 429} />;
+  }
 
   if (existing) redirect("/account");
 

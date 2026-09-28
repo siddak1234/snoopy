@@ -9,9 +9,9 @@ import { backendApiOrigin } from "@/lib/backend-origin";
  */
 export async function fetchPlatformSessionForProxy(
   requestHeaders: Headers,
-): Promise<Response | null> {
+): Promise<Response | "not-configured" | null> {
   const origin = backendApiOrigin();
-  if (!origin) return null;
+  if (!origin) return "not-configured";
 
   return fetch(`${origin}/v1/session`, {
     headers: {
@@ -19,5 +19,6 @@ export async function fetchPlatformSessionForProxy(
       "x-request-id": requestHeaders.get("x-request-id") ?? crypto.randomUUID(),
     },
     cache: "no-store",
+    // `null` is "no answer" — unreachable — which is not "no session".
   }).catch(() => null);
 }

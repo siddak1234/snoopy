@@ -6,7 +6,11 @@ export default function AccountSupportPage() {
     <SectionCard
       title="Support"
       primaryAction={
-        <Link href="/contact" className="btn-secondary inline-flex px-5">
+        <Link
+          prefetch={false}
+          href="/contact"
+          className="btn-secondary inline-flex px-5"
+        >
           Contact us
         </Link>
       }

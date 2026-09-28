@@ -14,6 +14,11 @@ function platformMessage(error: unknown, fallback: string): string {
   return error instanceof PlatformServerError ? error.message : fallback;
 }
 
+/**
+ * `null` is "no session" only. A refused or failed read throws (backend §12.1
+ * #160), so every action calls this inside its try and shows the platform's
+ * answer rather than "Please sign in again."
+ */
 async function currentSession() {
   const session = await getAppSession();
   if (!session?.user.id) return null;
@@ -25,17 +30,19 @@ export type CreateOrgResult = { ok: true } | { ok: false; error: string };
 export async function createOrgWorkspaceAction(
   formData: FormData,
 ): Promise<CreateOrgResult> {
-  const session = await currentSession();
-  if (!session) return { ok: false, error: "Please sign in again." };
-
-  const name = formData.get("name");
-  if (typeof name !== "string" || !name.trim()) {
-    return { ok: false, error: "Organization name is required." };
-  }
-  const domain = extractDomain(session.user.email);
-  if (!domain) return { ok: false, error: "Your email domain is unavailable." };
-
   try {
+    const session = await currentSession();
+    if (!session) return { ok: false, error: "Please sign in again." };
+
+    const name = formData.get("name");
+    if (typeof name !== "string" || !name.trim()) {
+      return { ok: false, error: "Organization name is required." };
+    }
+    const domain = extractDomain(session.user.email);
+    if (!domain) {
+      return { ok: false, error: "Your email domain is unavailable." };
+    }
+
     const created = await createWorkspace({
       name: name.trim(),
       type: "organization",
@@ -57,10 +64,9 @@ export async function createOrgWorkspaceAction(
 export type CreatePersonalResult = { ok: true } | { ok: false; error: string };
 
 export async function createPersonalWorkspaceAction(): Promise<CreatePersonalResult> {
-  const session = await currentSession();
-  if (!session) return { ok: false, error: "Please sign in again." };
-
   try {
+    const session = await currentSession();
+    if (!session) return { ok: false, error: "Please sign in again." };
     const label = session.user.name?.trim()
       ? `${session.user.name.trim()}'s Workspace`
       : `${session.user.email}'s Workspace`;
@@ -85,10 +91,10 @@ export type JoinOrgResult =
 export async function joinOrgWorkspaceAction(
   workspaceId: string,
 ): Promise<JoinOrgResult> {
-  if (!(await currentSession())) {
-    return { ok: false, error: "Please sign in again." };
-  }
   try {
+    if (!(await currentSession())) {
+      return { ok: false, error: "Please sign in again." };
+    }
     const result = await requestOrganizationJoin(workspaceId);
     return {
       ok: true,
@@ -110,10 +116,10 @@ export async function cancelJoinRequestAction(
   workspaceId: string,
   joinRequestId: string,
 ): Promise<CancelJoinRequestResult> {
-  if (!(await currentSession())) {
-    return { ok: false, error: "Please sign in again." };
-  }
   try {
+    if (!(await currentSession())) {
+      return { ok: false, error: "Please sign in again." };
+    }
     await cancelOrganizationJoinRequest(workspaceId, joinRequestId);
     return { ok: true };
   } catch (error) {

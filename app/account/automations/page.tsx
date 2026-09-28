@@ -129,6 +129,7 @@ function AutomationCard({
       {subscription && subscription.unmetConnections.length > 0 ? (
         <p className="text-xs text-[var(--warning-text)]">
           <Link
+            prefetch={false}
             href="/account/connections"
             className="underline underline-offset-2"
           >
@@ -138,8 +139,20 @@ function AutomationCard({
         </p>
       ) : null}
 
+      {/* A subscription runs the version it PINNED (backend ADR-0030), and adding
+          an automation pins the newest. The catalog does not say what a newer
+          version declares, so the card says only which version runs and how to
+          move — never that moving gives a Run. */}
+      {subscription && subscription.templateVersion < automation.version ? (
+        <p className="text-xs text-[var(--muted)]">
+          This runs v{subscription.templateVersion}. To move to v
+          {automation.version}, archive it and add it again.
+        </p>
+      ) : null}
+
       <AutomationActions
         templateId={automation.templateId}
+        name={automation.name}
         available={automation.available}
         setup={automation.setup}
         subscription={
@@ -149,6 +162,9 @@ function AutomationCard({
                 status: subscription.status,
                 canGoLive: subscription.unmetConnections.length === 0,
                 config: subscription.config,
+                ...(subscription.runInput
+                  ? { runInput: subscription.runInput }
+                  : {}),
               }
             : null
         }

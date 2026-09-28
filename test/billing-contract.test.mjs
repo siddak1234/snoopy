@@ -3,6 +3,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 
+import { formatPlanPrice } from "../lib/plan-price.ts";
+
 /**
  * The billing page consumes ADR-0025's four published operations and nothing
  * else (BUILD-PLAN 8.3, Gate 20 line 1). These assertions pin what the contract
@@ -301,6 +303,42 @@ test("no billing file names the provider or renders a provider identifier", () =
     panel,
     /[^=]\{(?:billing|plan)\.planId\}/u,
     "the plan id is compared and keyed, never rendered as text",
+  );
+});
+
+test("a plan's price is the provider's minor units, divided by that currency's stated exponent, or said to be at checkout", () => {
+  // Backend §12.1 #163, ADR-0031. Behaviour, not source text: the formatter runs.
+  assert.equal(
+    formatPlanPrice({ amount: 500, currency: "usd", interval: "month" }),
+    "$5.00 per month",
+  );
+  assert.equal(formatPlanPrice({ amount: 1999, currency: "eur" }), "€19.99");
+  // Zero-decimal: 500 minor units ARE 500 yen.
+  assert.equal(
+    formatPlanPrice({ amount: 500, currency: "jpy", interval: "year" }),
+    "¥500 per year",
+  );
+  // A currency whose minor unit this website does not state is not guessed at —
+  // Intl's display digits and the provider's minor units disagree for some.
+  for (const currency of ["huf", "isk", "kwd", "xyz"]) {
+    assert.equal(formatPlanPrice({ amount: 500000, currency }), undefined);
+  }
+  assert.equal(formatPlanPrice({ amount: 1.5, currency: "usd" }), undefined);
+  assert.match(
+    panel,
+    /formatPlanPrice\(plan\.price\)\) \?\?\s*"Price shown at checkout"/u,
+  );
+});
+
+test("every capability the panel shows has words, and an unlabelled key is not printed", () => {
+  // The card read "workspace.rate 120" — a key, not a sentence (§12.1 #163).
+  assert.match(panel, /"automation\.subscribe": "Automations"/);
+  assert.match(panel, /"workspace\.rate": "Requests per minute"/);
+  assert.match(panel, /Object\.hasOwn\(capabilityCopy, capability\)/);
+  assert.doesNotMatch(
+    panel,
+    /capabilityCopy\[capability\] \?\? capability/u,
+    "an unknown key must not fall back to printing itself",
   );
 });
 

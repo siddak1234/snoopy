@@ -13,9 +13,21 @@ function loginRedirect(request: NextRequest): NextResponse {
 }
 
 export default async function proxy(request: NextRequest) {
+  // No cookie at all is no session. Asking the Edge would spend the website's
+  // shared address bucket (backend ADR-0029) on a visitor who is plainly signed
+  // out — and, when that bucket is spent, show them "busy" instead of sign-in.
+  if (!request.headers.get("cookie")) return loginRedirect(request);
+
   const sessionResponse = await fetchPlatformSessionForProxy(request.headers);
 
-  if (!sessionResponse?.ok) return loginRedirect(request);
+  // **Only "no session" goes to sign-in — backend §12.1 #160.** A 401 is the Edge
+  // saying there is none, and a site with no platform has none. A refusal (429),
+  // a failure (5xx) or no answer is NOT a sign-out: the request goes on, and the
+  // page's own session read renders "the platform could not answer" instead.
+  if (sessionResponse === "not-configured" || sessionResponse?.status === 401) {
+    return loginRedirect(request);
+  }
+  if (!sessionResponse?.ok) return NextResponse.next();
 
   const headers = sessionResponse.headers as Headers & {
     getSetCookie?: () => string[];

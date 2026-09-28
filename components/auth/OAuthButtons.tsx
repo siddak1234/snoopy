@@ -7,7 +7,7 @@ import type { operations } from "@/lib/generated/platform-contracts/platform";
 
 type LoginProvidersResponse =
   operations["listLoginProviders"]["responses"][200]["content"]["application/json"];
-type LoginProvider = LoginProvidersResponse["providers"][number];
+export type LoginProvider = LoginProvidersResponse["providers"][number];
 
 function oauthHref(provider: LoginProvider["id"], callbackUrl: string) {
   const next = safePlatformReturnTo(callbackUrl);
@@ -25,14 +25,24 @@ const buttonClass =
  */
 export function OAuthButtons({
   callbackUrl = "/account",
+  initialProviders,
 }: {
   callbackUrl?: string;
+  /**
+   * The list the server already read and cached (backend §12.1 #160). When it is
+   * here the browser does not ask again; when it is not — the server's read
+   * failed — the browser asks, as it always did.
+   */
+  initialProviders?: LoginProvider[];
 }) {
-  const [providers, setProviders] = useState<LoginProvider[] | null>(null);
+  const [providers, setProviders] = useState<LoginProvider[] | null>(
+    initialProviders ?? null,
+  );
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    if (attempt === 0 && initialProviders) return;
     let cancelled = false;
     void platformApiJson<LoginProvidersResponse>("/v1/auth/providers")
       .then((response) => {
@@ -44,7 +54,7 @@ export function OAuthButtons({
     return () => {
       cancelled = true;
     };
-  }, [attempt]);
+  }, [attempt, initialProviders]);
 
   if (failed) {
     return (

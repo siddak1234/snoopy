@@ -26,6 +26,7 @@ export function AccountTopBar({
   return (
     <div className="flex min-h-16 items-center justify-between">
       <Link
+        prefetch={false}
         href="/"
         aria-label="Autom8x home"
         className="flex items-center rounded-full text-[var(--color-text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"

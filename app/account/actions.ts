@@ -10,10 +10,15 @@ export type SelectWorkspaceResult = { ok: true } | { ok: false; error: string };
 export async function selectActiveWorkspaceAction(
   workspaceId: string,
 ): Promise<SelectWorkspaceResult> {
-  if (!(await getAppSession())) {
-    return { ok: false, error: "You must be signed in to switch workspaces." };
-  }
   try {
+    // Inside the try: a refused session read is the platform's answer to show,
+    // not "signed out" (backend §12.1 #160).
+    if (!(await getAppSession())) {
+      return {
+        ok: false,
+        error: "You must be signed in to switch workspaces.",
+      };
+    }
     await selectActiveWorkspace(workspaceId);
     revalidatePath("/account", "layout");
     return { ok: true };
