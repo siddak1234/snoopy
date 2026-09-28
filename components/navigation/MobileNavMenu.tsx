@@ -8,10 +8,10 @@ import { ListIcon, XIcon } from "@phosphor-icons/react";
 import { marketingNav } from "@/lib/nav";
 
 const linkClass =
-  "block rounded-[var(--radius-md)] px-4 py-3 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset";
+  "block rounded-[var(--radius-md)] px-4 py-3 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset";
 
 const pillClass =
-  "rounded-[var(--radius-md)] border border-[var(--ring)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-inset";
+  "rounded-[var(--radius-md)] border border-[var(--ring)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset";
 
 /** Mobile marketing menu — flat links from lib/nav.ts plus the auth pair. */
 export default function MobileNavMenu() {
@@ -52,7 +52,7 @@ export default function MobileNavMenu() {
         aria-expanded={menuOpen}
         aria-controls="mobile-nav-panel"
         aria-label={menuOpen ? "Close menu" : "Open menu"}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--ring)] text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--ring)] text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
       >
         <span className="sr-only">{menuOpen ? "Close menu" : "Open menu"}</span>
         {menuOpen ? (

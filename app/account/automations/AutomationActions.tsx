@@ -15,30 +15,27 @@ import {
   saveSubscriptionConfiguration,
   setSubscriptionStatus,
   startRun,
-  subscribeToAutomation,
   type ActionResult,
 } from "./actions";
 import { RunInputFields, SetupFields } from "./ManifestFields";
 
 /**
- * The buttons on an automation card.
+ * The buttons for one subscription on an automation card — adding is
+ * `AddAutomation`'s, since one automation can hold a subscription per project.
  *
  * A client component only because it holds pending state and the last refusal.
  * The work happens in server actions, so nothing here knows the backend origin
  * and no fetch call is written by hand.
  *
- * A refusal is shown rather than swallowed. "Add" can fail because the
- * subscription already exists, and "Go live" can fail because a connection is
- * unmet — both are answers a person needs, not console noise.
+ * A refusal is shown rather than swallowed: "Go live" can fail because a
+ * connection is unmet, which is an answer a person needs, not console noise.
  */
 export function AutomationActions({
-  templateId,
   name,
   available,
   setup,
   subscription,
 }: {
-  templateId: string;
   name: string;
   available: boolean;
   setup: AutomationSetupField[];
@@ -49,7 +46,7 @@ export function AutomationActions({
     config: Record<string, unknown>;
     /** The PINNED version's run input (backend ADR-0030); absent means no Run. */
     runInput?: AutomationRunInputField[];
-  } | null;
+  };
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -127,7 +124,6 @@ export function AutomationActions({
   };
 
   const confirmArchive = () => {
-    if (!subscription) return;
     setError(null);
     startTransition(async () => {
       const result = await archiveSubscription(
@@ -145,86 +141,73 @@ export function AutomationActions({
   // version declares what a run needs. A version that declares nothing gets no
   // form, because the platform could not check one (ADR-0030).
   const canRun =
-    subscription?.status === "live" &&
+    subscription.status === "live" &&
     (subscription.runInput?.length ?? 0) > 0 &&
     available;
 
   return (
     <div className="mt-auto flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        {!subscription ? (
+        {canRun ? (
           <Button
             variant="primary"
             size="sm"
-            disabled={pending || !available}
-            onClick={() => submit(subscribeToAutomation, field({ templateId }))}
+            disabled={pending}
+            onClick={() => open("run")}
           >
-            {pending ? "Adding…" : "Add"}
+            Run
+          </Button>
+        ) : null}
+        {setup.length > 0 ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={pending}
+            onClick={() => open("setup")}
+          >
+            Set up
+          </Button>
+        ) : null}
+        {subscription.status !== "live" ? (
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={pending || !subscription.canGoLive || !available}
+            onClick={() =>
+              submit(
+                setSubscriptionStatus,
+                field({ subscriptionId: subscription.id, status: "live" }),
+              )
+            }
+          >
+            {pending ? "Working…" : "Go live"}
           </Button>
         ) : (
-          <>
-            {canRun ? (
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={pending}
-                onClick={() => open("run")}
-              >
-                Run
-              </Button>
-            ) : null}
-            {setup.length > 0 ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={pending}
-                onClick={() => open("setup")}
-              >
-                Set up
-              </Button>
-            ) : null}
-            {subscription.status !== "live" ? (
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={pending || !subscription.canGoLive || !available}
-                onClick={() =>
-                  submit(
-                    setSubscriptionStatus,
-                    field({ subscriptionId: subscription.id, status: "live" }),
-                  )
-                }
-              >
-                {pending ? "Working…" : "Go live"}
-              </Button>
-            ) : (
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={pending}
-                onClick={() =>
-                  submit(
-                    setSubscriptionStatus,
-                    field({
-                      subscriptionId: subscription.id,
-                      status: "paused",
-                    }),
-                  )
-                }
-              >
-                {pending ? "Working…" : "Pause"}
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={pending}
-              onClick={() => open("archive")}
-            >
-              Archive
-            </Button>
-          </>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={pending}
+            onClick={() =>
+              submit(
+                setSubscriptionStatus,
+                field({
+                  subscriptionId: subscription.id,
+                  status: "paused",
+                }),
+              )
+            }
+          >
+            {pending ? "Working…" : "Pause"}
+          </Button>
         )}
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={pending}
+          onClick={() => open("archive")}
+        >
+          Archive
+        </Button>
       </div>
 
       {error && dialog === null ? (
@@ -233,7 +216,7 @@ export function AutomationActions({
         </p>
       ) : null}
 
-      {subscription && dialog === "setup" ? (
+      {dialog === "setup" ? (
         <Modal
           onClose={close}
           bubble
@@ -278,7 +261,7 @@ export function AutomationActions({
         </Modal>
       ) : null}
 
-      {subscription && dialog === "run" && subscription.runInput ? (
+      {dialog === "run" && subscription.runInput ? (
         <Modal
           onClose={close}
           bubble
@@ -329,7 +312,7 @@ export function AutomationActions({
         </Modal>
       ) : null}
 
-      {subscription && dialog === "archive" ? (
+      {dialog === "archive" ? (
         <Modal
           onClose={close}
           bubble

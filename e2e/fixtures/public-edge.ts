@@ -31,6 +31,7 @@ const workspaceId = "11111111-1111-4111-8111-111111111111";
 const userId = "22222222-2222-4222-8222-222222222222";
 const requesterUserId = "66666666-6666-4666-8666-666666666666";
 const memberUserId = "77777777-7777-4777-8777-777777777777";
+const adminUserId = "12121212-1212-4121-8121-121212121212";
 const projectId = "33333333-3333-4333-8333-333333333333";
 const joinRequestId = "44444444-4444-4444-8444-444444444444";
 const domainId = "55555555-5555-4555-8555-555555555555";
@@ -63,9 +64,101 @@ const memberWorkspace = {
   role: "member",
 } satisfies Platform["WorkspaceSummary"];
 
-// The switcher test moves this and moves it back; the organization tests rely
-// on the organization being active, so state must be restored in-test.
-let activeWorkspaceId: string = workspaceId;
+// An admin of the organization: everything its owner may do there except what
+// ownership alone allows.
+const adminWorkspace = {
+  ...workspace,
+  role: "admin",
+} satisfies Platform["WorkspaceSummary"];
+
+// The organization's people, as its member list reads them.
+const organizationMembers = [
+  {
+    workspaceId,
+    userId,
+    role: "owner",
+    displayName: "Fixture Owner",
+    email: "owner@example.test",
+    createdAt: now,
+  },
+  {
+    workspaceId,
+    userId: adminUserId,
+    role: "admin",
+    displayName: "Fixture Admin",
+    email: "admin@example.test",
+    createdAt: now,
+  },
+  {
+    workspaceId,
+    userId: memberUserId,
+    role: "member",
+    displayName: "Fixture Member",
+    email: "member@example.test",
+    createdAt: now,
+  },
+] satisfies Platform["WorkspaceMember"][];
+
+// One team, managed by the plain member — the case that needs teams to have a
+// page of their own (backend ADR-0010).
+const operationsTeamId = "abababab-abab-4bab-8bab-abababababab";
+
+/**
+ * Everything a test can change, in one place, reset by `POST /__fixture/reset`
+ * before each test (register F30, F48) — so no test depends on the order the
+ * suite runs in, and one can run twice against one fixture process. The route is
+ * the fixture's own: it is not part of the published API and the website never
+ * calls it.
+ */
+function initialState() {
+  return {
+    activeWorkspaceId: workspaceId as string,
+    joinRequestStatus: "pending" as "pending" | "approved",
+    archivableArchived: false,
+    manualStatus: "live" as "live" | "paused",
+    connectionAttemptKey: null as string | null,
+    fixtureConnectionCreated: false,
+    exportCount: 0,
+    // Per workspace, so a personal workspace has billing of its own (F31).
+    subscribedPlan: new Map<string, Platform["PurchasablePlan"]>(),
+    departed: false,
+    runningCancelled: false,
+    // Scopes the project automation was added to: a project id, or null for
+    // the whole workspace.
+    projectAutomationScopes: [] as (string | null)[],
+    // The OAuth connection's id — changed when another admin is said to have
+    // replaced it — and whether its grant still works.
+    oauthConnectionId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+    oauthStatus: "connected" as "connected" | "reauthorization-required",
+    // The run tally the dashboard reads, when the platform cannot answer it.
+    runStatsFailing: false,
+    teams: [
+      {
+        id: operationsTeamId,
+        workspaceId,
+        name: "Operations",
+        description: "Runs the invoice automations.",
+        status: "active",
+        createdAt: now,
+      },
+    ] as Platform["TeamSummary"][],
+    teamMemberships: [
+      {
+        teamId: operationsTeamId,
+        workspaceId,
+        userId: memberUserId,
+        role: "manager",
+        createdAt: now,
+      },
+    ] as Platform["TeamMembershipSummary"][],
+    projectTeamGrants: [] as Platform["ProjectTeamGrantSummary"][],
+    // Whether the organization lists its fixture project, and the projects a
+    // test created — so an organization can be new, with none (register F57).
+    fixtureProjectListed: true,
+    createdProjects: [] as Platform["ProjectSummary"][],
+  };
+}
+let state = initialState();
 
 const session = {
   authenticated: true,
@@ -111,13 +204,25 @@ const domain = {
   createdAt: now,
 } satisfies Platform["OrganizationDomain"];
 
-let joinRequest: Platform["OrganizationJoinRequest"] = {
-  id: joinRequestId,
-  workspaceId,
-  userId: requesterUserId,
-  status: "pending",
-  createdAt: now,
-} satisfies Platform["OrganizationJoinRequest"];
+function joinRequest(): Platform["OrganizationJoinRequest"] {
+  return state.joinRequestStatus === "approved"
+    ? {
+        id: joinRequestId,
+        workspaceId,
+        userId: requesterUserId,
+        status: "approved",
+        createdAt: now,
+        decidedAt: now,
+        decidedByUserId: userId,
+      }
+    : {
+        id: joinRequestId,
+        workspaceId,
+        userId: requesterUserId,
+        status: "pending",
+        createdAt: now,
+      };
+}
 
 const keyProvider = {
   providerId: "fixture-key",
@@ -130,6 +235,36 @@ const keyProvider = {
     { name: "apiKey", label: "API key", secret: true, help: "Fixture value." },
   ],
 } satisfies Connections["ConnectionProvider"];
+
+// An OAuth provider the workspace is already connected to: the account a
+// Reconnect keeps and Replace account swaps (backend ADR-0019 §4, ADR-0026).
+const oauthProvider = {
+  providerId: "fixture-oauth",
+  displayName: "Fixture OAuth provider",
+  description: "A loopback OAuth provider for contract tests.",
+  icon: "link",
+  scopes: ["fixture.read"],
+  authType: "oauth2",
+} satisfies Connections["ConnectionProvider"];
+
+function oauthConnectionState(): Connections["ConnectionState"] {
+  return {
+    id: state.oauthConnectionId,
+    providerId: oauthProvider.providerId,
+    workspaceId,
+    externalAccount: {
+      id: "fixture-oauth-account",
+      displayName: "Fixture OAuth account",
+    },
+    status: state.oauthStatus,
+    requiredScopes: ["fixture.read"],
+    grantedScopes: ["fixture.read"],
+    authorizedByUserId: userId,
+    ...(state.oauthStatus === "reauthorization-required"
+      ? { errorCode: "invalid_grant" }
+      : {}),
+  };
+}
 
 const connection = {
   id: "77777777-7777-4777-8777-777777777777",
@@ -186,6 +321,19 @@ const manualAutomation = {
       defaultValue: 500,
       required: true,
     },
+    // A notifications switch: the manifest allows `notifies` only on a toggle
+    // in the `notifications` section, and the website says what it switches
+    // in words (register F22).
+    {
+      section: "notifications",
+      key: "notifyOnFailure",
+      title: "Failure notices",
+      description: "Tell the workspace when this automation fails.",
+      control: "toggle",
+      defaultValue: true,
+      required: false,
+      notifies: "run-failed",
+    },
   ],
 } satisfies Automations["AutomationCatalogEntry"];
 
@@ -197,7 +345,10 @@ const archivableAutomation = automation(
   "fixture-archivable",
   "Archivable automation",
 );
-let archivableArchived = false;
+
+// Accepts an Add to the whole workspace or to the fixture project — the path a
+// project-scoped subscription is created on (backend 18.6.2).
+const projectAutomation = automation("fixture-projects", "Project automation");
 
 function fixtureCatalog(): Automations["AutomationCatalogResponse"] {
   return {
@@ -205,7 +356,11 @@ function fixtureCatalog(): Automations["AutomationCatalogResponse"] {
       automation("fixture-plan-limit", "Plan-limit automation"),
       automation("fixture-entitlements", "Entitlements automation"),
       manualAutomation,
-      { ...archivableAutomation, subscribed: !archivableArchived },
+      { ...archivableAutomation, subscribed: !state.archivableArchived },
+      {
+        ...projectAutomation,
+        subscribed: state.projectAutomationScopes.length > 0,
+      },
     ],
     categories: ["All", "Operations"],
   };
@@ -269,6 +424,33 @@ const archivableSubscription = {
   runInput: undefined,
 } satisfies Automations["Subscription"];
 
+// The plan-limit automation, already added to the fixture project and still a
+// draft: its card lists this row under the project and offers Add for the
+// whole workspace only (register F21).
+const projectDraftSubscription = {
+  ...manualSubscription,
+  id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  templateId: "fixture-plan-limit",
+  status: "draft",
+  runInput: undefined,
+  projectId,
+} satisfies Automations["Subscription"];
+
+function projectAutomationSubscription(
+  scope: string | null,
+): Automations["Subscription"] {
+  return {
+    ...manualSubscription,
+    id: scope
+      ? "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+      : "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    templateId: projectAutomation.templateId,
+    status: "draft",
+    runInput: undefined,
+    projectId: scope,
+  };
+}
+
 // Run ids encode the outcome so the reads are deterministic without any
 // mutable server state: the failed run carries the automation's own reason,
 // the succeeded one its summary. Both started from their trigger, as every
@@ -278,6 +460,9 @@ const failedRunId = "fixture-run-failed";
 // The run a person starts from the Run form; the fixture creates it only when
 // the input is exactly what the declaration asks for, typed as it says.
 const startedRunId = "fixture-run-started";
+// A run still in progress: the one Cancel is offered for, and cancelled for
+// the rest of the test once it is (backend `cancelRun`).
+const runningRunId = "fixture-run-running";
 const runInputFailure = "input must carry vendor, amount, and reference";
 
 // One deterministic run by id: the failed one carries the automation's own
@@ -285,6 +470,23 @@ const runInputFailure = "input must carry vendor, amount, and reference";
 // page, so both handlers describe the same run.
 function fixtureRun(runId: string): Automations["Run"] {
   const failed = runId === failedRunId;
+  if (runId === runningRunId) {
+    return {
+      id: runId,
+      workspaceId,
+      subscriptionId: manualSubscriptionId,
+      templateId: "fixture-manual-input",
+      templateVersion: 1,
+      status: state.runningCancelled ? "cancelled" : "running",
+      origin: "trigger",
+      rootRunId: runId,
+      requestId: "fixture-request",
+      startedAt: now,
+      ...(state.runningCancelled ? { endedAt: now } : {}),
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
   return {
     id: runId,
     workspaceId,
@@ -305,9 +507,30 @@ function fixtureRun(runId: string): Automations["Run"] {
   };
 }
 
-let connectionAttemptKey: string | null = null;
-let fixtureConnectionCreated = false;
-let exportCount = 0;
+const listedRunIds = [runningRunId, failedRunId, okRunId];
+
+/** The platform's tally of the listed runs, as `readRunStats` answers it. */
+function fixtureRunStats(since: string | null): Automations["RunStats"] {
+  const counts = {
+    total: 0,
+    pending: 0,
+    running: 0,
+    held: 0,
+    succeeded: 0,
+    failed: 0,
+    cancelled: 0,
+  };
+  for (const runId of listedRunIds) {
+    const { status } = fixtureRun(runId);
+    counts.total += 1;
+    if (status in counts) counts[status as keyof typeof counts] += 1;
+  }
+  return {
+    ...(since ? { since } : {}),
+    workspace: counts,
+    subscriptions: [{ subscriptionId: manualSubscriptionId, ...counts }],
+  };
+}
 
 // Billing (ADR-0025): the free floor never appears in the plan list, and a
 // workspace that has never paid reports the free plan with no status. A
@@ -331,7 +554,6 @@ const proPlan = {
   displayName: "Pro",
   capabilities: { "automation.subscribe": 50, "fixture.unlabelled": 7 },
 } satisfies Platform["PurchasablePlan"];
-let subscribedPlan: Platform["PurchasablePlan"] | null = null;
 const hostedExpiry = "2026-08-12T12:30:00.000Z";
 
 function problem(status: number, title: string, details?: Json): Json {
@@ -352,7 +574,6 @@ function problem(status: number, title: string, details?: Json): Json {
 // the requester; afterwards its session went with the account, so every request
 // meets the unauthenticated 401, as the Edge's would.
 const departingSession = `${fixtureCookie}=departing`;
-let departed = false;
 
 function fixtureCookieEntry(cookie: string | undefined) {
   return cookie
@@ -363,7 +584,7 @@ function fixtureCookieEntry(cookie: string | undefined) {
 
 function fixtureSessionValue(
   cookie: string | undefined,
-): "owner" | "requester" | "member" | "throttled" | "failing" | null {
+): "owner" | "admin" | "requester" | "member" | "throttled" | "failing" | null {
   const value = fixtureCookieEntry(cookie);
   if (value === `${fixtureCookie}=owner`) return "owner";
   // The owner, whose billing read alone fails — the page-level boundary's case.
@@ -372,7 +593,17 @@ function fixtureSessionValue(
   if (value === `${fixtureCookie}=failing`) return "failing";
   if (value === `${fixtureCookie}=requester`) return "requester";
   if (value === `${fixtureCookie}=member`) return "member";
-  if (value === departingSession) return departed ? null : "requester";
+  if (value === `${fixtureCookie}=admin`) return "admin";
+  if (value === departingSession) return state.departed ? null : "requester";
+  return null;
+}
+
+function projectRoleOf(
+  fixtureSession: ReturnType<typeof fixtureSessionValue>,
+): Platform["ProjectSummary"]["viewerRole"] | null {
+  if (fixtureSession === "owner") return "owner";
+  if (fixtureSession === "admin") return "admin";
+  if (fixtureSession === "member") return "member";
   return null;
 }
 
@@ -404,6 +635,72 @@ const server = createServer(
   { cert: readFileSync(certificate), key: readFileSync(privateKey) },
   async (request, response) => {
     const url = new URL(request.url ?? "/", `https://127.0.0.1:${port}`);
+    // The fixture's own control, never the published API: each test starts from
+    // the same state (register F30, F48).
+    if (request.method === "POST" && url.pathname === "/__fixture/reset") {
+      state = initialState();
+      response.writeHead(204, { "cache-control": "no-store" });
+      return response.end();
+    }
+    // What another admin, or the provider, does between a page's read and a
+    // person's click: the OAuth connection replaced (so the page names a stale
+    // id), or its grant revoked (so it needs reauthorization).
+    if (
+      request.method === "POST" &&
+      url.pathname === "/__fixture/oauth-connection-replaced"
+    ) {
+      state.oauthConnectionId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+      response.writeHead(204, { "cache-control": "no-store" });
+      return response.end();
+    }
+    if (
+      request.method === "POST" &&
+      url.pathname === "/__fixture/run-stats-failing"
+    ) {
+      state.runStatsFailing = true;
+      response.writeHead(204, { "cache-control": "no-store" });
+      return response.end();
+    }
+    if (
+      request.method === "POST" &&
+      url.pathname === "/__fixture/org-without-projects"
+    ) {
+      state.fixtureProjectListed = false;
+      response.writeHead(204, { "cache-control": "no-store" });
+      return response.end();
+    }
+    if (
+      request.method === "POST" &&
+      url.pathname === "/__fixture/org-without-teams"
+    ) {
+      state.teams = [];
+      state.teamMemberships = [];
+      response.writeHead(204, { "cache-control": "no-store" });
+      return response.end();
+    }
+    if (
+      request.method === "POST" &&
+      url.pathname === "/__fixture/oauth-connection-broken"
+    ) {
+      state.oauthStatus = "reauthorization-required";
+      response.writeHead(204, { "cache-control": "no-store" });
+      return response.end();
+    }
+    // A `Cookie` header carries name=value pairs and nothing else. The website
+    // once sent `Set-Cookie` attributes from its server actions (register F51);
+    // any request that does is refused here, so every action in the suite
+    // fails if it comes back.
+    if (
+      /(?:^|;)\s*(?:path|expires|max-age|domain|secure|httponly|samesite|partitioned|priority)(?:=|;|$)/iu.test(
+        request.headers.cookie ?? "",
+      )
+    ) {
+      return respond(
+        response,
+        400,
+        problem(400, "The Cookie header carries cookie attributes"),
+      );
+    }
     if (url.pathname === "/health/live") {
       respond(response, 200, {
         status: "ok",
@@ -468,7 +765,7 @@ const server = createServer(
     if (method === "GET" && pathname === "/v1/session") {
       const ownerSession = {
         ...session,
-        user: { ...session.user, activeWorkspaceId },
+        user: { ...session.user, activeWorkspaceId: state.activeWorkspaceId },
         workspaces: [workspace, personalWorkspace],
       } satisfies Platform["SessionResponse"];
       const memberSession = {
@@ -481,6 +778,16 @@ const server = createServer(
         },
         workspaces: [memberWorkspace],
       } satisfies Platform["SessionResponse"];
+      const adminSession = {
+        authenticated: true,
+        user: {
+          userId: adminUserId,
+          email: "admin@example.test",
+          displayName: "Fixture Admin",
+          activeWorkspaceId: workspaceId,
+        },
+        workspaces: [adminWorkspace],
+      } satisfies Platform["SessionResponse"];
       return respond(
         response,
         200,
@@ -488,7 +795,9 @@ const server = createServer(
           ? ownerSession
           : fixtureSession === "member"
             ? memberSession
-            : requesterSession,
+            : fixtureSession === "admin"
+              ? adminSession
+              : requesterSession,
       );
     }
     if (method === "PATCH" && pathname === "/v1/session/active-workspace") {
@@ -503,9 +812,9 @@ const server = createServer(
           status: 404,
         });
       }
-      activeWorkspaceId = body.workspaceId;
+      state.activeWorkspaceId = body.workspaceId;
       return respond(response, 200, {
-        activeWorkspaceId,
+        activeWorkspaceId: state.activeWorkspaceId,
       } satisfies Platform["ActiveWorkspaceResponse"]);
     }
     if (method === "GET" && pathname === "/v1/auth/identities")
@@ -516,29 +825,64 @@ const server = createServer(
           ? [workspace, personalWorkspace]
           : fixtureSession === "member"
             ? [memberWorkspace]
-            : [];
+            : fixtureSession === "admin"
+              ? [adminWorkspace]
+              : [];
       return respond(response, 200, {
         workspaces,
-        ...(fixtureSession === "requester" ? {} : { activeWorkspaceId }),
+        ...(fixtureSession === "requester"
+          ? {}
+          : { activeWorkspaceId: state.activeWorkspaceId }),
       } satisfies Platform["WorkspaceListResponse"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/projects")) {
+      // The role each person holds on the fixture project: its owner, an
+      // organization admin (effective admin), or a plain member on it.
+      const viewerRole = projectRoleOf(fixtureSession);
       return respond(response, 200, {
-        projects: [project],
+        projects: [
+          ...(viewerRole && state.fixtureProjectListed
+            ? [{ ...project, viewerRole }]
+            : []),
+          ...state.createdProjects,
+        ],
       } satisfies Platform["ProjectListResponse"]);
+    }
+    // Creating a project in the organization: its creator owns it, as Access
+    // records the owner membership in the same transaction.
+    if (method === "POST" && isWorkspacePath(pathname, "/projects")) {
+      const body = (await requestJson(request)) as {
+        name?: string;
+        type?: string;
+      };
+      if (!body.name || !body.type) {
+        return respond(response, 400, problem(400, "Bad Request"));
+      }
+      const created = {
+        // Eight hex digits in the first group, however many are created.
+        id: `${String(state.createdProjects.length).padStart(8, "5")}-5555-4555-8555-555555555555`,
+        workspaceId,
+        name: body.name,
+        type: body.type,
+        status: "active",
+        viewerRole: "owner",
+        createdAt: now,
+      } satisfies Platform["ProjectSummary"];
+      state.createdProjects.push(created);
+      return respond(response, 200, {
+        project: created,
+      } satisfies Platform["ProjectMutationResponse"]);
     }
     if (
       method === "GET" &&
-      pathname === `/v1/workspaces/${personalWorkspaceId}/projects`
+      isWorkspacePath(pathname, `/projects/${projectId}/memberships`)
     ) {
+      // The project page lists who is on the project (register F37: axe had
+      // never scanned it, because this read was undeclared here).
       return respond(response, 200, {
-        projects: [],
-      } satisfies Platform["ProjectListResponse"]);
-    }
-    if (method === "GET" && isWorkspacePath(pathname, "/members")) {
-      return respond(response, 200, {
-        members: [
+        memberships: [
           {
+            projectId,
             workspaceId,
             userId,
             role: "owner",
@@ -547,7 +891,220 @@ const server = createServer(
             createdAt: now,
           },
         ],
+      } satisfies Platform["ProjectMembershipListResponse"]);
+    }
+    // The owner's personal workspace holds nothing but its own billing (below):
+    // every list the account pages read for it is empty, as the Edge answers a
+    // workspace with nothing in it, and the catalog is the same catalog with
+    // nothing subscribed. A test that switches to it reads real pages, not 501s.
+    if (
+      method === "GET" &&
+      pathname.startsWith(`/v1/workspaces/${personalWorkspaceId}/`)
+    ) {
+      const read = pathname.slice(
+        `/v1/workspaces/${personalWorkspaceId}`.length,
+      );
+      const noRuns = {
+        total: 0,
+        pending: 0,
+        running: 0,
+        held: 0,
+        succeeded: 0,
+        failed: 0,
+        cancelled: 0,
+      };
+      const empty: Record<string, Json> = {
+        "/projects": { projects: [] } satisfies Platform["ProjectListResponse"],
+        "/subscriptions": {
+          subscriptions: [],
+        } satisfies AutomationOperations["listSubscriptions"]["responses"][200]["content"]["application/json"],
+        "/runs": {
+          runs: [],
+        } satisfies AutomationOperations["listRuns"]["responses"][200]["content"]["application/json"],
+        "/run-stats": {
+          workspace: noRuns,
+          subscriptions: [],
+        } satisfies Automations["RunStats"],
+        "/approvals": {
+          approvals: [],
+        } satisfies AutomationOperations["listApprovals"]["responses"][200]["content"]["application/json"],
+        "/connections": {
+          connections: [],
+        } satisfies ConnectionOperations["listConnections"]["responses"][200]["content"]["application/json"],
+        "/automations": {
+          ...fixtureCatalog(),
+          automations: fixtureCatalog().automations.map((entry) => ({
+            ...entry,
+            subscribed: false,
+          })),
+        } satisfies Automations["AutomationCatalogResponse"],
+      };
+      const answer = empty[read];
+      if (answer) return respond(response, 200, answer);
+    }
+    if (method === "GET" && isWorkspacePath(pathname, "/members")) {
+      return respond(response, 200, {
+        members: organizationMembers,
       } satisfies Platform["WorkspaceMemberListResponse"]);
+    }
+    // Teams, as backend ADR-0010 and the published descriptions hold them: an
+    // owner or admin sees and creates every team; anyone else sees the teams
+    // they are on. An owner, an admin or the team's manager reads and changes
+    // its members. A project's owner or admin grants it to a team.
+    const viewer =
+      fixtureSession === "owner"
+        ? userId
+        : fixtureSession === "admin"
+          ? adminUserId
+          : fixtureSession === "member"
+            ? memberUserId
+            : requesterUserId;
+    const administering =
+      fixtureSession === "owner" || fixtureSession === "admin";
+    const onTeam = (teamId: string) =>
+      state.teamMemberships.find(
+        (entry) => entry.teamId === teamId && entry.userId === viewer,
+      );
+    if (isWorkspacePath(pathname, "/teams")) {
+      if (method === "GET") {
+        return respond(response, 200, {
+          teams: state.teams.flatMap((team) => {
+            const mine = onTeam(team.id);
+            if (!administering && !mine) return [];
+            return [{ ...team, ...(mine ? { viewerRole: mine.role } : {}) }];
+          }),
+        } satisfies Platform["TeamListResponse"]);
+      }
+      if (method === "POST") {
+        if (!administering) {
+          return respond(response, 403, problem(403, "Forbidden"));
+        }
+        const body = (await requestJson(request)) as {
+          name?: string;
+          description?: string;
+        };
+        if (
+          !request.headers["idempotency-key"] ||
+          typeof body.name !== "string" ||
+          body.name.length < 2 ||
+          body.name.length > 120
+        ) {
+          return respond(response, 400, problem(400, "Bad Request"));
+        }
+        const team = {
+          id: crypto.randomUUID(),
+          workspaceId,
+          name: body.name,
+          ...(body.description ? { description: body.description } : {}),
+          status: "active",
+          createdAt: now,
+        } satisfies Platform["TeamSummary"];
+        state.teams.unshift(team);
+        return respond(response, 200, {
+          team,
+        } satisfies Platform["TeamMutationResponse"]);
+      }
+    }
+    const teamMembers = new RegExp(
+      `^/v1/workspaces/${workspaceId}/teams/([^/]+)/memberships$`,
+      "u",
+    ).exec(pathname);
+    if (teamMembers) {
+      const team = state.teams.find((entry) => entry.id === teamMembers[1]);
+      if (!team) return respond(response, 404, problem(404, "Not Found"));
+      // An owner, an admin or the team's manager; any other member is 403.
+      if (!administering && onTeam(team.id)?.role !== "manager") {
+        return respond(response, 403, problem(403, "Forbidden"));
+      }
+      if (method === "GET") {
+        return respond(response, 200, {
+          memberships: state.teamMemberships.filter(
+            (entry) => entry.teamId === team.id,
+          ),
+        } satisfies Platform["TeamMembershipListResponse"]);
+      }
+      if (method === "POST") {
+        const body = (await requestJson(request)) as {
+          userId?: string;
+          role?: string;
+        };
+        if (
+          !request.headers["idempotency-key"] ||
+          (body.role !== "manager" && body.role !== "member")
+        ) {
+          return respond(response, 400, problem(400, "Bad Request"));
+        }
+        // Only someone already in the workspace can join one of its teams.
+        if (
+          !organizationMembers.some((entry) => entry.userId === body.userId)
+        ) {
+          return respond(response, 404, problem(404, "Not Found"));
+        }
+        const membership = {
+          teamId: team.id,
+          workspaceId,
+          userId: body.userId as string,
+          role: body.role,
+          createdAt: now,
+        } satisfies Platform["TeamMembershipSummary"];
+        state.teamMemberships = [
+          membership,
+          ...state.teamMemberships.filter(
+            (entry) =>
+              !(entry.teamId === team.id && entry.userId === body.userId),
+          ),
+        ];
+        return respond(response, 200, {
+          membership,
+        } satisfies Platform["TeamMembershipMutationResponse"]);
+      }
+    }
+    if (isWorkspacePath(pathname, `/projects/${projectId}/team-grants`)) {
+      // Anyone with a role on the project reads its grants; anyone else is 404.
+      // Granting is the project's effective owner's or admin's.
+      const projectRole = projectRoleOf(fixtureSession);
+      if (!projectRole) {
+        return respond(response, 404, problem(404, "Not Found"));
+      }
+      if (method === "GET") {
+        return respond(response, 200, {
+          grants: state.projectTeamGrants,
+        } satisfies Platform["ProjectTeamGrantListResponse"]);
+      }
+      if (method === "POST") {
+        if (projectRole !== "owner" && projectRole !== "admin") {
+          return respond(response, 403, problem(403, "Forbidden"));
+        }
+        const body = (await requestJson(request)) as {
+          teamId?: string;
+          role?: string;
+        };
+        if (
+          !request.headers["idempotency-key"] ||
+          (body.role !== "admin" && body.role !== "member")
+        ) {
+          return respond(response, 400, problem(400, "Bad Request"));
+        }
+        if (!state.teams.some((entry) => entry.id === body.teamId)) {
+          return respond(response, 404, problem(404, "Not Found"));
+        }
+        const grant = {
+          projectId,
+          teamId: body.teamId as string,
+          workspaceId,
+          role: body.role,
+          createdAt: now,
+        } satisfies Platform["ProjectTeamGrantSummary"];
+        state.projectTeamGrants = [
+          grant,
+          ...state.projectTeamGrants.filter(
+            (entry) => entry.teamId !== body.teamId,
+          ),
+        ];
+        return respond(response, 200, {
+          grant,
+        } satisfies Platform["ProjectTeamGrantMutationResponse"]);
+      }
     }
     if (method === "GET" && isWorkspacePath(pathname, "/domains")) {
       return respond(response, 200, {
@@ -556,7 +1113,7 @@ const server = createServer(
     }
     if (method === "GET" && isWorkspacePath(pathname, "/join-requests")) {
       return respond(response, 200, {
-        requests: [joinRequest],
+        requests: [joinRequest()],
       } satisfies Platform["OrganizationJoinRequestListResponse"]);
     }
     if (
@@ -564,14 +1121,9 @@ const server = createServer(
       pathname ===
         `/v1/workspaces/${workspaceId}/join-requests/${joinRequestId}`
     ) {
-      joinRequest = {
-        ...joinRequest,
-        status: "approved",
-        decidedAt: now,
-        decidedByUserId: userId,
-      };
+      state.joinRequestStatus = "approved";
       return respond(response, 200, {
-        request: joinRequest,
+        request: joinRequest(),
       } satisfies Platform["OrganizationJoinRequestMutationResponse"]);
     }
     if (method === "GET" && pathname === "/v1/organization-discovery") {
@@ -594,18 +1146,61 @@ const server = createServer(
       return respond(response, 200, {
         outcome: "requested",
         workspaceId,
-        request: joinRequest,
+        request: joinRequest(),
       } satisfies Platform["OrganizationJoinResponse"]);
     }
     if (method === "GET" && pathname === "/v1/connections/providers") {
       return respond(response, 200, {
-        providers: [keyProvider],
+        providers: [keyProvider, oauthProvider],
       } satisfies ConnectionOperations["listConnectionProviders"]["responses"][200]["content"]["application/json"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/connections")) {
       return respond(response, 200, {
-        connections: fixtureConnectionCreated ? [connection] : [],
+        connections: [
+          { ...oauthConnectionState(), usedByCount: 1 },
+          ...(state.fixtureConnectionCreated ? [connection] : []),
+        ],
       } satisfies ConnectionOperations["listConnections"]["responses"][200]["content"]["application/json"]);
+    }
+    if (
+      method === "POST" &&
+      isWorkspacePath(pathname, "/connections/authorize")
+    ) {
+      const body = (await requestJson(request)) as {
+        providerId?: string;
+        replaceConnectionId?: string;
+      };
+      if (body.providerId !== oauthProvider.providerId) {
+        return respond(response, 404, problem(404, "Not Found"));
+      }
+      // The replace intent names the exact live connection; any other id is
+      // stale, and the Edge relays the service's refusal as a plain 409.
+      if (
+        body.replaceConnectionId !== undefined &&
+        body.replaceConnectionId !== state.oauthConnectionId
+      ) {
+        return respond(response, 409, problem(409, "Conflict"));
+      }
+      // Reused only when the grant is connected and nothing is being replaced
+      // (backend ADR-0019 §2, §12.1 #175); otherwise consent is asked for.
+      const answer =
+        body.replaceConnectionId === undefined &&
+        state.oauthStatus === "connected"
+          ? ({
+              outcome: "reused",
+              connection: oauthConnectionState(),
+            } as const)
+          : ({
+              outcome: "authorization-required",
+              authorizationUrl:
+                "https://oauth.invalid/authorize?state=fixture-state",
+              expiresAt: hostedExpiry,
+            } as const);
+      return respond(
+        response,
+        200,
+        answer satisfies ConnectionOperations["beginConnectionAuthorization"]["responses"][200]["content"]["application/json"],
+      );
     }
     if (method === "POST" && isWorkspacePath(pathname, "/connections/key")) {
       const rawIdempotencyKey = request.headers["idempotency-key"];
@@ -619,22 +1214,22 @@ const server = createServer(
           problem(400, "An Idempotency-Key header is required"),
         );
       }
-      if (!connectionAttemptKey) {
-        connectionAttemptKey = idempotencyKey;
+      if (!state.connectionAttemptKey) {
+        state.connectionAttemptKey = idempotencyKey;
         return respond(
           response,
           409,
           problem(409, "Connection verification is still in progress"),
         );
       }
-      if (idempotencyKey !== connectionAttemptKey) {
+      if (idempotencyKey !== state.connectionAttemptKey) {
         return respond(
           response,
           409,
           problem(409, "Retry must use the original idempotency key"),
         );
       }
-      fixtureConnectionCreated = true;
+      state.fixtureConnectionCreated = true;
       return respond(response, 201, {
         connection,
       } satisfies ConnectionOperations["connectProviderWithKey"]["responses"][201]["content"]["application/json"]);
@@ -644,24 +1239,55 @@ const server = createServer(
     }
     if (method === "GET" && isWorkspacePath(pathname, "/subscriptions")) {
       return respond(response, 200, {
-        subscriptions: archivableArchived
-          ? [manualSubscription]
-          : [manualSubscription, archivableSubscription],
+        subscriptions: [
+          ...state.projectAutomationScopes.map(projectAutomationSubscription),
+          { ...manualSubscription, status: state.manualStatus },
+          ...(state.archivableArchived ? [] : [archivableSubscription]),
+          projectDraftSubscription,
+        ],
       } satisfies AutomationOperations["listSubscriptions"]["responses"][200]["content"]["application/json"]);
     }
     if (
       method === "PATCH" &&
       isWorkspacePath(pathname, `/subscriptions/${manualSubscriptionId}`)
     ) {
-      // Only a set-up save, holding the one declared setting to its control's
-      // type, as the catalog does; the saved value is not kept.
-      const body = (await requestJson(request)) as { config?: Json };
+      // A status change — Pause or Go live, kept for this test (register F38) —
+      // or a set-up save, holding each declared setting to its control's type as
+      // the catalog does; the saved values are not kept.
+      const body = (await requestJson(request)) as {
+        config?: Json;
+        status?: string;
+      };
+      if (!request.headers["idempotency-key"]) {
+        return respond(
+          response,
+          422,
+          problem(422, "The request could not be processed"),
+        );
+      }
+      if (body.status !== undefined) {
+        if (
+          Object.keys(body).join() !== "status" ||
+          (body.status !== "paused" && body.status !== "live")
+        ) {
+          return respond(
+            response,
+            422,
+            problem(422, "Undeclared fixture subscription update"),
+          );
+        }
+        state.manualStatus = body.status;
+        return respond(response, 200, {
+          subscription: { ...manualSubscription, status: state.manualStatus },
+        } satisfies AutomationOperations["updateSubscription"]["responses"][200]["content"]["application/json"]);
+      }
       const config = body.config;
       if (
-        !request.headers["idempotency-key"] ||
         !config ||
-        Object.keys(config).join() !== "holdAboveAmount" ||
-        typeof config.holdAboveAmount !== "number"
+        Object.keys(config).sort().join() !==
+          "holdAboveAmount,notifyOnFailure" ||
+        typeof config.holdAboveAmount !== "number" ||
+        typeof config.notifyOnFailure !== "boolean"
       ) {
         return respond(
           response,
@@ -670,7 +1296,11 @@ const server = createServer(
         );
       }
       return respond(response, 200, {
-        subscription: { ...manualSubscription, config },
+        subscription: {
+          ...manualSubscription,
+          status: state.manualStatus,
+          config,
+        },
       } satisfies AutomationOperations["updateSubscription"]["responses"][200]["content"]["application/json"]);
     }
     if (
@@ -687,13 +1317,35 @@ const server = createServer(
           problem(422, "Undeclared fixture subscription update"),
         );
       }
-      archivableArchived = true;
+      state.archivableArchived = true;
       return respond(response, 200, {
         subscription: { ...archivableSubscription, status: "archived" },
       } satisfies AutomationOperations["updateSubscription"]["responses"][200]["content"]["application/json"]);
     }
     if (method === "POST" && isWorkspacePath(pathname, "/subscriptions")) {
-      const body = (await requestJson(request)) as { templateId?: string };
+      const body = (await requestJson(request)) as {
+        templateId?: string;
+        projectId?: string;
+      };
+      if (body.templateId === projectAutomation.templateId) {
+        // One live subscription per template and scope; a project the person
+        // cannot see is 404, as the catalog answers it.
+        const scope = body.projectId ?? null;
+        if (scope !== null && scope !== projectId) {
+          return respond(response, 404, problem(404, "Not Found"));
+        }
+        if (state.projectAutomationScopes.includes(scope)) {
+          return respond(
+            response,
+            409,
+            problem(409, "This automation is already added here"),
+          );
+        }
+        state.projectAutomationScopes.push(scope);
+        return respond(response, 200, {
+          subscription: projectAutomationSubscription(scope),
+        } satisfies AutomationOperations["createSubscription"]["responses"][200]["content"]["application/json"]);
+      }
       const reason =
         body.templateId === "fixture-plan-limit"
           ? "over_plan_limit"
@@ -735,8 +1387,32 @@ const server = createServer(
       // Both deterministic runs, so Activity renders rows and the run pages are
       // reached by a person rather than typed.
       return respond(response, 200, {
-        runs: [fixtureRun(failedRunId), fixtureRun(okRunId)],
+        runs: listedRunIds.map(fixtureRun),
       } satisfies AutomationOperations["listRuns"]["responses"][200]["content"]["application/json"]);
+    }
+    if (method === "GET" && isWorkspacePath(pathname, "/run-stats")) {
+      if (state.runStatsFailing) {
+        return respond(response, 503, problem(503, "Service Unavailable"));
+      }
+      return respond(
+        response,
+        200,
+        fixtureRunStats(url.searchParams.get("since")),
+      );
+    }
+    if (
+      method === "POST" &&
+      isWorkspacePath(pathname, `/runs/${runningRunId}/cancel`)
+    ) {
+      // Only a pending or running run is cancelled; any other answers 404, as
+      // `cancelRun` does.
+      if (state.runningCancelled) {
+        return respond(response, 404, problem(404, "Not Found"));
+      }
+      state.runningCancelled = true;
+      return respond(response, 200, {
+        run: fixtureRun(runningRunId),
+      } satisfies AutomationOperations["cancelRun"]["responses"][200]["content"]["application/json"]);
     }
     if (
       method === "GET" &&
@@ -777,81 +1453,98 @@ const server = createServer(
       } satisfies Platform["PlanListResponse"];
       return respond(response, 200, body);
     }
-    if (
-      pathname === `/v1/workspaces/${workspaceId}/billing` ||
-      pathname.startsWith(`/v1/workspaces/${workspaceId}/billing/`)
-    ) {
+    // Billing, per workspace (register F31): the organization's and the owner's
+    // personal workspace each hold their own plan, as the Edge scopes them.
+    const billing =
+      /^\/v1\/workspaces\/([^/]+)\/billing(\/checkout|\/portal)?$/u.exec(
+        pathname,
+      );
+    if (billing) {
+      const billedWorkspace = billing[1];
+      const operation = billing[2] ?? "";
+      if (
+        billedWorkspace !== workspaceId &&
+        billedWorkspace !== personalWorkspaceId
+      ) {
+        return respond(response, 404, problem(404, "Not Found"));
+      }
       // Owner or admin for the workspace's billing, its checkout and its
       // portal, as the Edge enforces (billing-routes.ts): a member is refused.
-      if (fixtureSession !== "owner") {
+      // The admin administers the organization only; the personal workspace
+      // is the owner's alone.
+      if (
+        fixtureSession !== "owner" &&
+        !(fixtureSession === "admin" && billedWorkspace === workspaceId)
+      ) {
         return respond(
           response,
           403,
           problem(403, "Billing requires an admin", { requiredRole: "admin" }),
         );
       }
-    }
-    if (method === "GET" && isWorkspacePath(pathname, "/billing")) {
-      if (
-        fixtureCookieEntry(request.headers.cookie) ===
-        `${fixtureCookie}=page-failing`
-      ) {
-        return respond(response, 500, problem(500, "Internal Server Error"));
+      const subscribed = state.subscribedPlan.get(billedWorkspace);
+      if (method === "GET" && operation === "") {
+        if (
+          fixtureCookieEntry(request.headers.cookie) ===
+          `${fixtureCookie}=page-failing`
+        ) {
+          return respond(response, 500, problem(500, "Internal Server Error"));
+        }
+        const body = subscribed
+          ? ({
+              workspaceId: billedWorkspace,
+              planId: subscribed.planId,
+              displayName: subscribed.displayName,
+              status: "active",
+              currentPeriodEnd: "2026-09-12T12:00:00.000Z",
+              cancelAtPeriodEnd: false,
+            } satisfies Platform["WorkspaceBillingResponse"])
+          : ({
+              workspaceId: billedWorkspace,
+              planId: "fixture-free",
+              displayName: "Free",
+            } satisfies Platform["WorkspaceBillingResponse"]);
+        return respond(response, 200, body);
       }
-      const body = subscribedPlan
-        ? ({
-            workspaceId,
-            planId: subscribedPlan.planId,
-            displayName: subscribedPlan.displayName,
-            status: "active",
-            currentPeriodEnd: "2026-09-12T12:00:00.000Z",
-            cancelAtPeriodEnd: false,
-          } satisfies Platform["WorkspaceBillingResponse"])
-        : ({
-            workspaceId,
-            planId: "fixture-free",
-            displayName: "Free",
-          } satisfies Platform["WorkspaceBillingResponse"]);
-      return respond(response, 200, body);
-    }
-    if (method === "POST" && isWorkspacePath(pathname, "/billing/checkout")) {
-      const body = (await requestJson(request)) as { planId?: string };
-      const plan = [teamPlan, proPlan].find(
-        (candidate) => candidate.planId === body.planId,
-      );
-      // The Edge answers 404 for a plan that is not purchasable.
-      if (!plan) {
-        return respond(
-          response,
-          404,
-          problem(404, "The plan is not purchasable"),
+      if (method === "POST" && operation === "/checkout") {
+        const body = (await requestJson(request)) as { planId?: string };
+        const plan = [teamPlan, proPlan].find(
+          (candidate) => candidate.planId === body.planId,
         );
+        // The Edge answers 404 for a plan that is not purchasable.
+        if (!plan) {
+          return respond(
+            response,
+            404,
+            problem(404, "The plan is not purchasable"),
+          );
+        }
+        state.subscribedPlan.set(billedWorkspace, plan);
+        return respond(response, 201, {
+          url: "https://billing.invalid/checkout/fixture-session",
+          expiresAt: hostedExpiry,
+        } satisfies Platform["HostedBillingSession"]);
       }
-      subscribedPlan = plan;
-      return respond(response, 201, {
-        url: "https://billing.invalid/checkout/fixture-session",
-        expiresAt: hostedExpiry,
-      } satisfies Platform["HostedBillingSession"]);
-    }
-    if (method === "POST" && isWorkspacePath(pathname, "/billing/portal")) {
-      await requestJson(request);
-      // No billing account yet answers 409: the client sends the person to
-      // checkout rather than showing a conflict.
-      if (!subscribedPlan) {
-        return respond(
-          response,
-          409,
-          problem(409, "The workspace has no billing account yet"),
-        );
+      if (method === "POST" && operation === "/portal") {
+        await requestJson(request);
+        // No billing account yet answers 409: the client sends the person to
+        // checkout rather than showing a conflict.
+        if (!subscribed) {
+          return respond(
+            response,
+            409,
+            problem(409, "The workspace has no billing account yet"),
+          );
+        }
+        return respond(response, 201, {
+          url: "https://billing.invalid/portal/fixture-session",
+          expiresAt: hostedExpiry,
+        } satisfies Platform["HostedBillingSession"]);
       }
-      return respond(response, 201, {
-        url: "https://billing.invalid/portal/fixture-session",
-        expiresAt: hostedExpiry,
-      } satisfies Platform["HostedBillingSession"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/export")) {
-      exportCount += 1;
-      const complete = exportCount % 2 === 1;
+      state.exportCount += 1;
+      const complete = state.exportCount % 2 === 1;
       const body = {
         workspaceId,
         exportedAt: now,
@@ -878,7 +1571,7 @@ const server = createServer(
       // the connection drops before a status line is written. Nothing in the
       // browser can fake this; it is the website's own rewrite that meets it.
       if (fixtureCookieEntry(request.headers.cookie) === departingSession) {
-        departed = true;
+        state.departed = true;
         response.socket?.destroy();
         return;
       }
@@ -921,7 +1614,23 @@ const server = createServer(
           } satisfies Platform["AccountDeletionResult"]),
         );
       }
-      return respond(response, 200, {});
+      // Deleted: the Edge clears the session cookies with its 200
+      // (`apps/api/src/app.ts`, the `/v1/account` handler), so the browser is
+      // signed out by the deletion itself, not only by the courtesy logout
+      // after it (register F34).
+      response.writeHead(200, {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "set-cookie": `${fixtureCookie}=; Path=/; Max-Age=0`,
+      });
+      // The requester owns no workspace, so none leaves with the account.
+      return response.end(
+        JSON.stringify({
+          deleted: true,
+          workspaces: [],
+          account: {},
+        } satisfies Platform["AccountDeletionResult"]),
+      );
     }
     respond(
       response,

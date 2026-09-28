@@ -1,7 +1,7 @@
 import {
   platformServerJson,
-  PlatformNotConfiguredError,
   PlatformServerError,
+  workspacePath as scope,
 } from "@/lib/platform-server";
 import type {
   components,
@@ -35,12 +35,35 @@ export type BillingPortalRequest = NonNullable<
 export type HostedBillingSession =
   operations["createBillingCheckoutSession"]["responses"][201]["content"]["application/json"];
 
-function scope(workspaceId: string): string {
-  return `/v1/workspaces/${encodeURIComponent(workspaceId)}`;
-}
-
 export function listPlans(): Promise<PlanListResponse> {
   return platformServerJson("/v1/plans");
+}
+
+/** A hosted checkout for one plan — no success or cancel URL: the platform uses its own. */
+export function createBillingCheckout(
+  workspaceId: string,
+  body: BillingCheckoutRequest,
+): Promise<HostedBillingSession> {
+  return platformServerJson<HostedBillingSession>(
+    `${scope(workspaceId)}/billing/checkout`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
+/**
+ * A hosted portal session. The contract marks the body optional and the Edge
+ * accepts none since backend §12.1 #165; `{}` is still sent because an Edge
+ * deployed before that fix answers 400 to an empty body, and `{}` is valid for
+ * both.
+ */
+export function createBillingPortal(
+  workspaceId: string,
+): Promise<HostedBillingSession> {
+  const body: BillingPortalRequest = {};
+  return platformServerJson<HostedBillingSession>(
+    `${scope(workspaceId)}/billing/portal`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
 }
 
 export function readWorkspaceBilling(
@@ -50,12 +73,14 @@ export function readWorkspaceBilling(
 }
 
 /**
- * Billing is unavailable in two honest ways: the site has no backend configured,
- * or the platform has no billing provider configured and answers 503 —
- * `NotConfigured` on every billing operation, which is what production does
- * until a provider key exists. Both render as "unavailable", never as a false
- * plan. Anything else is rethrown: a broken platform must not look like one
- * that simply has no billing yet.
+ * Billing is unavailable in one honest way: the platform has no billing provider
+ * configured and answers 503 — `NotConfigured` on every billing operation, which
+ * is what an estate does until a provider key exists. That renders as
+ * "unavailable", never as a false plan. Anything else is rethrown: a broken
+ * platform must not look like one that simply has no billing yet.
+ *
+ * A site with no backend configured never reaches here — the account layout
+ * sends it to sign-in first — so it is not special-cased (register F32).
  */
 export async function billingWhenUnavailable<T>(
   read: () => Promise<T>,
@@ -63,7 +88,6 @@ export async function billingWhenUnavailable<T>(
   try {
     return await read();
   } catch (error) {
-    if (error instanceof PlatformNotConfiguredError) return null;
     if (error instanceof PlatformServerError && error.status === 503) {
       return null;
     }

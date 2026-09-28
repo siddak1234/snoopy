@@ -7,18 +7,23 @@ import Modal from "@/components/ui/Modal";
 import { FormInput } from "@/components/ui/FormInput";
 import { FormError } from "@/components/ui/FormError";
 
+/** The organization a team project is created in: the active workspace. */
+export type TeamWorkspace = { id: string; name: string };
+
 type Props = {
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void | Promise<void>;
-  hasOrg?: boolean;
+  teamWorkspace: TeamWorkspace | null;
+  inOrganization: boolean;
 };
 
 export function CreateProjectDialog({
   open,
   onClose,
   onSuccess,
-  hasOrg = false,
+  teamWorkspace,
+  inOrganization,
 }: Props) {
   const [scope, setScope] = useState<"personal" | "team">("personal");
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +132,7 @@ export function CreateProjectDialog({
               </legend>
               <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {(["personal", "team"] as const).map((value) => {
-                  const disabled = value === "team" && !hasOrg;
+                  const disabled = value === "team" && !teamWorkspace;
                   const selected = scope === value;
                   return (
                     <label
@@ -158,11 +163,26 @@ export function CreateProjectDialog({
                   );
                 })}
               </div>
-              {!hasOrg ? (
+              {teamWorkspace ? (
+                scope === "team" ? (
+                  <>
+                    <input
+                      type="hidden"
+                      name="workspaceId"
+                      value={teamWorkspace.id}
+                    />
+                    <p className="mt-1.5 text-xs text-[var(--muted)]">
+                      Created in {teamWorkspace.name}.
+                    </p>
+                  </>
+                ) : null
+              ) : (
                 <p className="mt-1.5 text-xs text-[var(--muted)]">
-                  Join an organization to enable team projects.
+                  {inOrganization
+                    ? "Switch to your organization to create a team project in it."
+                    : "Join an organization to enable team projects."}
                 </p>
-              ) : null}
+              )}
             </fieldset>
             <FormInput
               ref={nameInputRef}

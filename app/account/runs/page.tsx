@@ -8,6 +8,7 @@ import {
   type Run,
 } from "@/lib/automations";
 import SectionCard from "@/components/dashboard/SectionCard";
+import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 
@@ -29,7 +30,7 @@ export default async function RunsPage() {
   if (!workspaceId) {
     return (
       <SectionCard title="Activity" subheader="Every run in this workspace">
-        <Empty text="No workspace is active yet." />
+        <EmptyRow text="No workspace is active yet." />
       </SectionCard>
     );
   }
@@ -49,7 +50,7 @@ export default async function RunsPage() {
   return (
     <SectionCard title="Activity" subheader="Every run in this workspace">
       {runs.runs.length === 0 ? (
-        <Empty text="No runs yet. Once an automation is live, its runs appear here." />
+        <EmptyRow text="No runs yet. Once an automation is live, its runs appear here." />
       ) : (
         runs.runs.map((run) => (
           <RunRow
@@ -88,13 +89,5 @@ function RunRow({ run, name }: { run: Run; name: string }) {
       </div>
       <StatusPill status={run.status} />
     </Link>
-  );
-}
-
-function Empty({ text }: { text: string }) {
-  return (
-    <div className="py-5 first:pt-0">
-      <p className="text-sm text-[var(--muted)]">{text}</p>
-    </div>
   );
 }

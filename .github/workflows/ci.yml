@@ -90,6 +90,22 @@ jobs:
             console.log('OK: ' + hit.source + ' -> ' + hit.destination);
           "
 
+  # A Vercel preview builds with no BACKEND_API_ORIGIN: the site with no
+  # backend, whose account area sends everyone to sign in. A page that reads the
+  # platform with no session fails that build while it prerenders (register
+  # F62), and the build above, with the origin set, cannot see it.
+  build-no-backend:
+    name: Build with no backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:no-backend
+
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
@@ -108,6 +124,12 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
       options: --ipc=host
+    # Firefox will not start as root under a HOME another user owns, and a
+    # container job's HOME is /github/home, owned by the image's pwuser.
+    # Chromium and WebKit do not mind, so a local `docker run` of this image
+    # (HOME=/root) passed in all three engines while CI's Firefox could not launch.
+    env:
+      HOME: /root
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -119,3 +141,97 @@ jobs:
         env:
           BACKEND_API_ORIGIN: https://backend.invalid
       - run: npm run test:browser
+
+  # The authenticated suite against the loopback fixture Edge (backend BUILD-PLAN
+  # 22.6.6): every account page, every refusal the website must survive, in all
+  # three engines (NFR-36). It had only ever run on a developer's machine.
+  fixtures:
+    name: Authenticated fixture suite
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
+      options: --ipc=host
+    # Firefox needs a HOME that root owns, as in `browser`.
+    env:
+      HOME: /root
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Builds with the fixture's origin, serves the standalone bundle, and
+      # runs the accessibility and fixture specs against it.
+      - run: npm run test:browser:fixtures
+
+  # Backend SYSTEM-MANIFEST §12.2 #8, on NFR-24's model (the backend's own
+  # `ci.yml`): what ships must be clean, so the runtime tree and the image block;
+  # build tooling, and vulnerabilities upstream has not fixed, are reported. A
+  # gate that goes red for what nobody can act on is a gate somebody switches off.
+  scan:
+    name: Dependency and image scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Audit build and test dependencies (report only)
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
+      # Built and never pushed: the scan proves the image is clean without
+      # anywhere to leak a credential to.
+      - name: Build the website image
+        id: image
+        if: ${{ !cancelled() }}
+        run: docker build --build-arg BACKEND_API_ORIGIN=https://backend.invalid -t autom8x-web:ci .
+
+      # Pinned by commit, not tag: a tag is a promise its owner can rewrite, and
+      # this is the security gate. The comment names the version the commit is.
+      - name: Scan the image — fixable CRITICAL and HIGH block
+        if: ${{ !cancelled() && steps.image.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: autom8x-web:ci
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+
+      - name: Report the image, including vulnerabilities with no fix yet
+        if: ${{ !cancelled() && steps.image.outcome == 'success' }}
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: autom8x-web:ci
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: false
+          exit-code: "0"
+          format: table
+
+      # NFR-25: an SBOM of exactly the artifact that was scanned, kept with the
+      # build, so "which images carry this package" has an answer the day a CVE
+      # lands.
+      - name: SBOM — website image
+        if: ${{ !cancelled() && steps.image.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: autom8x-web:ci
+          format: cyclonedx
+          output: sbom-web.cdx.json
+
+      - name: Retain the SBOM
+        if: ${{ !cancelled() && steps.image.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom-web.cdx.json
+          if-no-files-found: error
+          retention-days: 90

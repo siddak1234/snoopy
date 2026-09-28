@@ -1,10 +1,18 @@
-import { newIdempotencyKey, platformServerJson } from "@/lib/platform-server";
+import { cache } from "react";
+import { getAppSession } from "@/lib/app-session";
+import {
+  newIdempotencyKey,
+  platformServerJson,
+  PlatformServerError,
+  workspacePath,
+} from "@/lib/platform-server";
 import type { components } from "@/lib/generated/platform-contracts/platform";
 
 type Schema = components["schemas"];
 
 export type Workspace = Schema["WorkspaceSummary"];
 export type WorkspaceMember = Schema["WorkspaceMember"];
+export type WorkspaceRole = Workspace["role"];
 export type Project = Schema["ProjectSummary"];
 export type ProjectMembership = Schema["ProjectMembership"];
 export type ProjectRole = ProjectMembership["role"];
@@ -15,13 +23,18 @@ export type OrganizationJoinRequest = Schema["OrganizationJoinRequest"];
 export type OrganizationJoinRequestDecision =
   Schema["DecideOrganizationJoinRequest"]["decision"];
 export type DiscoverableOrganization = Schema["DiscoverableOrganization"];
-
-function workspacePath(workspaceId: string): string {
-  return `/v1/workspaces/${encodeURIComponent(workspaceId)}`;
-}
+export type Team = Schema["TeamSummary"];
+export type TeamMembership = Schema["TeamMembershipSummary"];
+export type TeamRole = TeamMembership["role"];
+export type ProjectTeamGrant = Schema["ProjectTeamGrantSummary"];
+export type ProjectTeamGrantRole = ProjectTeamGrant["role"];
 
 function projectPath(workspaceId: string, projectId: string): string {
   return `${workspacePath(workspaceId)}/projects/${encodeURIComponent(projectId)}`;
+}
+
+function teamPath(workspaceId: string, teamId: string): string {
+  return `${workspacePath(workspaceId)}/teams/${encodeURIComponent(teamId)}`;
 }
 
 /** Cursors are opaque values: this only encodes them for HTTP transport. */
@@ -52,11 +65,16 @@ export async function listWorkspaces(): Promise<Workspace[]> {
   return response.workspaces;
 }
 
-async function listWorkspaceCollection(): Promise<
-  Schema["WorkspaceListResponse"]
-> {
-  return platformServerJson<Schema["WorkspaceListResponse"]>("/v1/workspaces");
-}
+/**
+ * **Read once per request** (register F27), as the session is: the account
+ * layout and the page it wraps both need the workspace list, and each ask was a
+ * separate Edge request charged to the person's own rate bucket (backend
+ * ADR-0029).
+ */
+const listWorkspaceCollection = cache(
+  async (): Promise<Schema["WorkspaceListResponse"]> =>
+    platformServerJson<Schema["WorkspaceListResponse"]>("/v1/workspaces"),
+);
 
 /**
  * The active workspace ID is authoritative when the session provides one.
@@ -70,6 +88,62 @@ export async function resolveActiveWorkspaceId(
     session?.user.workspaceId ??
     (await listWorkspaceCollection()).activeWorkspaceId
   );
+}
+
+/**
+ * The person's role in a workspace, from the workspace list — read once per
+ * request, so a page asking spends nothing the layout did not. `undefined` when
+ * the workspace is not on the list.
+ */
+export async function roleInWorkspace(
+  workspaceId: string | undefined,
+): Promise<WorkspaceRole | undefined> {
+  if (!workspaceId) return undefined;
+  return (await listWorkspaces()).find((entry) => entry.id === workspaceId)
+    ?.role;
+}
+
+/**
+ * Owner or admin — who the platform lets connect or disconnect an account,
+ * export a workspace, or see and change its billing. The server enforces it on
+ * every call; a page asks only so it does not offer what would be refused
+ * (register F8).
+ */
+export function administers(role: WorkspaceRole | undefined): boolean {
+  return role === "owner" || role === "admin";
+}
+
+/**
+ * The workspace a server action acts on: the session's active one, never one the
+ * browser names — one helper for every action module (register F28). Called
+ * inside the action's `try`, so a refused session read is shown in place rather
+ * than throwing away what the person typed (backend §12.1 #160).
+ */
+export async function requireActiveWorkspaceId(): Promise<string> {
+  const workspaceId = await resolveActiveWorkspaceId(await getAppSession());
+  if (!workspaceId) throw new PlatformServerError("No active workspace", 401);
+  return workspaceId;
+}
+
+/**
+ * The active workspace changed in another tab after the page rendered, so an
+ * action taken on that page would act on a workspace the person was not looking
+ * at.
+ */
+export const WORKSPACE_CHANGED =
+  "The active workspace changed in another tab. Reload this page before continuing.";
+
+/**
+ * The active workspace, only while it is still the one the page showed — or
+ * `null`. The page sends the id it rendered; it is only compared, and the
+ * action's path always uses the workspace the server resolves, never one the
+ * browser names.
+ */
+export async function activeWorkspaceIfShown(
+  shownWorkspaceId: string,
+): Promise<string | null> {
+  const workspaceId = await requireActiveWorkspaceId();
+  return workspaceId === shownWorkspaceId ? workspaceId : null;
 }
 
 export async function listWorkspaceMembers(
@@ -149,16 +223,6 @@ export async function listJoinRequests(
     >(withCursor(`${workspacePath(workspaceId)}/join-requests`, cursor));
     return { items: response.requests, nextCursor: response.nextCursor };
   });
-}
-
-export async function getProject(
-  workspaceId: string,
-  projectId: string,
-): Promise<Project> {
-  const response = await platformServerJson<Schema["ProjectMutationResponse"]>(
-    projectPath(workspaceId, projectId),
-  );
-  return response.project;
 }
 
 export async function createWorkspace(
@@ -367,4 +431,94 @@ export async function cancelOrganizationJoinRequest(
       idempotencyKey: newIdempotencyKey("join-request-cancel"),
     },
   );
+}
+
+/* --- Teams (backend ADR-0010, §12.1 #173) -----------------------------------
+ * Who may do what is the platform's rule, restated only so a page does not
+ * offer what would be refused: an owner or admin creates teams and sees every
+ * one; anyone else sees the teams they are on. An owner, an admin or the team's
+ * manager lists and adds its members. A project's effective owner or admin
+ * grants it to a team, and anyone with a role on the project reads its grants.
+ * Nothing removes a team member or revokes a grant — no operation publishes one
+ * (backend §12.1 #174). */
+
+export async function listTeams(workspaceId: string): Promise<Team[]> {
+  return collectPages(async (cursor) => {
+    const response = await platformServerJson<Schema["TeamListResponse"]>(
+      withCursor(`${workspacePath(workspaceId)}/teams`, cursor),
+    );
+    return { items: response.teams, nextCursor: response.nextCursor };
+  });
+}
+
+export async function createTeam(
+  workspaceId: string,
+  input: Schema["CreateTeamRequest"],
+): Promise<Team> {
+  const response = await platformServerJson<Schema["TeamMutationResponse"]>(
+    `${workspacePath(workspaceId)}/teams`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+      idempotencyKey: newIdempotencyKey("team-create"),
+    },
+  );
+  return response.team;
+}
+
+/** Names are not carried: a member is resolved against the workspace's list. */
+export async function listTeamMemberships(
+  workspaceId: string,
+  teamId: string,
+): Promise<TeamMembership[]> {
+  return collectPages(async (cursor) => {
+    const response = await platformServerJson<
+      Schema["TeamMembershipListResponse"]
+    >(withCursor(`${teamPath(workspaceId, teamId)}/memberships`, cursor));
+    return { items: response.memberships, nextCursor: response.nextCursor };
+  });
+}
+
+/** Adds a workspace member to the team, or changes their team role. */
+export async function upsertTeamMembership(
+  workspaceId: string,
+  teamId: string,
+  input: Schema["UpsertTeamMembershipRequest"],
+): Promise<TeamMembership> {
+  const response = await platformServerJson<
+    Schema["TeamMembershipMutationResponse"]
+  >(`${teamPath(workspaceId, teamId)}/memberships`, {
+    method: "POST",
+    body: JSON.stringify(input),
+    idempotencyKey: newIdempotencyKey("team-member"),
+  });
+  return response.membership;
+}
+
+export async function listProjectTeamGrants(
+  workspaceId: string,
+  projectId: string,
+): Promise<ProjectTeamGrant[]> {
+  return collectPages(async (cursor) => {
+    const response = await platformServerJson<
+      Schema["ProjectTeamGrantListResponse"]
+    >(withCursor(`${projectPath(workspaceId, projectId)}/team-grants`, cursor));
+    return { items: response.grants, nextCursor: response.nextCursor };
+  });
+}
+
+/** Grants a team a role on the project, or changes it. Never ownership. */
+export async function grantProjectTeam(
+  workspaceId: string,
+  projectId: string,
+  input: Schema["GrantProjectTeamRequest"],
+): Promise<ProjectTeamGrant> {
+  const response = await platformServerJson<
+    Schema["ProjectTeamGrantMutationResponse"]
+  >(`${projectPath(workspaceId, projectId)}/team-grants`, {
+    method: "POST",
+    body: JSON.stringify(input),
+    idempotencyKey: newIdempotencyKey("project-team"),
+  });
+  return response.grant;
 }

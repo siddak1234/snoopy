@@ -27,6 +27,22 @@ const COUNTS = [
   ["components", `${BASIS}':(glob)components/**/*.tsx' | wc -l`],
   ["libModules", `${BASIS}lib | wc -l`],
   ["testFiles", `${BASIS}':(glob)**/*.test.*' | wc -l`],
+  // §9.2's rows (backend §12.2 #83): the three directories it names, and every
+  // other directory together — so the four always sum to `components`, and a
+  // new directory lands in a row rather than outside all of them.
+  ["componentsUi", `${BASIS}':(glob)components/ui/**/*.tsx' | wc -l`],
+  [
+    "componentsDashboard",
+    `${BASIS}':(glob)components/dashboard/**/*.tsx' | wc -l`,
+  ],
+  [
+    "componentsMarketing",
+    `${BASIS}':(glob)components/marketing/**/*.tsx' | wc -l`,
+  ],
+  [
+    "componentsOther",
+    `${BASIS}':(glob)components/**/*.tsx' ':(glob,exclude)components/ui/**' ':(glob,exclude)components/dashboard/**' ':(glob,exclude)components/marketing/**' | wc -l`,
+  ],
 ];
 
 // `pipefail`, so a producer that fails cannot hide behind `wc`'s exit 0 and be

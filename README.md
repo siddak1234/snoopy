@@ -37,20 +37,25 @@ npm run verify
 One command, the whole offline gate, in this order: `format:check`, `lint`,
 `typecheck`, `audit:boundaries`, `test:contracts`, `verify:platform-contracts`
 (skipped out loud when `../snoopy-backend` is not checked out beside this
-repository), `build` with `BACKEND_API_ORIGIN=https://backend.invalid` plus the
+repository), `build:no-backend` (the site with no backend, as a Vercel preview
+builds it), `build` with `BACKEND_API_ORIGIN=https://backend.invalid` plus the
 `/api/platform` rewrite assertion CI makes, `test:browser`, and
-`test:browser:fixtures`. A run in which every gate ran green ends by emitting
+`test:browser:fixtures`. The browser suites run in Chromium, Firefox and WebKit
+(NFR-36); the marketing screenshots are Chromium's baselines alone. A run in
+which every gate ran green ends by emitting
 this repository's facts file to `.autom8x/repo-facts/snoopy.json` (gitignored;
-`snoopy-backend` commits it as `docs/repo-facts/snoopy.json`); a run that had to
+`snoopy-backend` commits it as `snoopy-backend/docs/repo-facts/snoopy.json`); a run that had to
 skip the sibling gate says so and emits nothing. Run it on Node 22 (`.nvmrc`), the version
 CI and the container use. Running it while `/audit-change` runs, or the reverse,
 is refused — both build into `.next` and serve on ports 3001 and 3443, so they
 share one lock.
 
 `npm run test:browser:fixtures` starts a loopback-only HTTPS Edge fixture with
-a temporary certificate. It exercises authenticated accessibility, keyboard,
-join-request, idempotency, entitlement, billing, account-deletion, and export
-paths without real accounts or credentials. The playbook's human keyboard
+a temporary certificate and scans every authenticated page with axe. Its tests
+drive the published operations the website calls — automations and runs,
+connections, teams and project access, billing, export, account deletion, and
+the platform's refusals — without real accounts or credentials, and each test
+starts from the fixture's first state. The playbook's human keyboard
 traversal (NFR-35) has a hand-over test in the same suite:
 `KEYBOARD_JOURNEY=1 node scripts/run-browser-fixtures.mjs --headed --grep "keyboard journey"`
 opens the built site against the fixture, signed in, and pauses for the person
@@ -75,8 +80,14 @@ secret provisioning belongs to the deployment configuration round, not here.
 | --- | --- |
 | `npm run verify` | The whole offline gate in one command; emits the facts file |
 | `npm run build` | Production build |
+| `npm run build:no-backend` | The build a Vercel preview makes: no `BACKEND_API_ORIGIN` |
 | `npm run test:contracts` | Public-contract and boundary behavior tests |
-| `npm run verify:platform-contracts` | Regenerate and verify public OpenAPI declarations |
-| `npm run audit:boundaries` | Reject browser secrets, direct DB access, and manual fetches |
-| `npm run test:browser` | Public accessibility and visual baselines |
-| `npm run test:browser:fixtures` | Credential-free authenticated fixture audit |
+| `npm run generate:platform-contracts` | Regenerate the typed client from `../snoopy-backend`'s published contracts |
+| `npm run verify:platform-contracts` | Report a generated type that differs from its contract; changes nothing |
+| `npm run audit:boundaries` | Reject browser secrets, direct DB access, manual fetches, and raw hex colours |
+| `npm run test:browser` | Public accessibility in three engines, and Chromium's visual baselines |
+| `npm run test:browser:fixtures` | Credential-free authenticated suite, in three engines |
+
+CI (`.github/workflows/ci.yml`) runs these gates as jobs, plus what `npm run
+verify` cannot run offline: the dependency audit, a scan of the built image, and
+its SBOM.

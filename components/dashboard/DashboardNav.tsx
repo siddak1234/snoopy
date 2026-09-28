@@ -17,15 +17,21 @@ export const dashboardNavItems = [
 ] as const;
 
 const navLinkClass =
-  "block rounded-xl px-4 py-3 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset";
+  "block rounded-xl px-4 py-3 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset";
+
+/**
+ * The two organization links show only where their pages render: Teams in an
+ * organization workspace, Organization for its owners and admins (register F55).
+ */
+type OrganizationLinks = { showOrgSettings?: boolean; showTeams?: boolean };
 
 function NavLinks({
   currentPath,
   showOrgSettings,
+  showTeams,
   onNavigate,
-}: {
+}: OrganizationLinks & {
   currentPath: string;
-  showOrgSettings?: boolean;
   onNavigate?: () => void;
 }) {
   return (
@@ -48,6 +54,24 @@ function NavLinks({
           </Link>
         );
       })}
+
+      {showTeams ? (
+        <Link
+          prefetch={false}
+          href="/account/teams"
+          onClick={onNavigate}
+          className={`${navLinkClass} ${
+            currentPath.startsWith("/account/teams")
+              ? "bg-[var(--surface-hover)] font-medium"
+              : ""
+          }`}
+          aria-current={
+            currentPath.startsWith("/account/teams") ? "page" : undefined
+          }
+        >
+          Teams
+        </Link>
+      ) : null}
 
       {showOrgSettings ? (
         <Link
@@ -72,9 +96,8 @@ function NavLinks({
 
 export function DashboardSidebar({
   showOrgSettings,
-}: {
-  showOrgSettings?: boolean;
-}) {
+  showTeams,
+}: OrganizationLinks) {
   const pathname = usePathname();
   return (
     <aside
@@ -85,16 +108,23 @@ export function DashboardSidebar({
         <NavLinks
           currentPath={pathname ?? ""}
           showOrgSettings={showOrgSettings}
+          showTeams={showTeams}
         />
       </nav>
     </aside>
   );
 }
 
+// Every page's title for the small-screen header (register F56: four pages
+// read "Dashboard").
 const pathToTitle: Record<string, string> = {
   "/account": "Dashboard",
-  "/account/projects": "Projects",
+  "/account/automations": "Automations",
   "/account/connections": "Connections",
+  "/account/runs": "Activity",
+  "/account/approvals": "Approvals",
+  "/account/projects": "Projects",
+  "/account/teams": "Teams",
   "/account/billing": "Billing",
   "/account/settings": "Settings",
   "/account/support": "Support",
@@ -102,16 +132,18 @@ const pathToTitle: Record<string, string> = {
 };
 
 function getPageTitle(pathname: string): string {
-  // Project detail pages: /account/projects/[id]
+  // Detail pages: /account/projects/[id], /account/runs/[runId],
+  // /account/teams/[teamId]
   if (pathname.startsWith("/account/projects/")) return "Project";
+  if (pathname.startsWith("/account/runs/")) return "Run";
+  if (pathname.startsWith("/account/teams/")) return "Team";
   return pathToTitle[pathname] ?? "Dashboard";
 }
 
 export function DashboardHeader({
   showOrgSettings,
-}: {
-  showOrgSettings?: boolean;
-}) {
+  showTeams,
+}: OrganizationLinks) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -147,7 +179,7 @@ export function DashboardHeader({
           aria-expanded={menuOpen}
           aria-controls="dashboard-mobile-nav"
           aria-label={menuOpen ? "Close menu" : "Open menu"}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--card)] text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--card)] text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
         >
           {menuOpen ? (
             <svg
@@ -188,6 +220,7 @@ export function DashboardHeader({
             <NavLinks
               currentPath={pathname ?? ""}
               showOrgSettings={showOrgSettings}
+              showTeams={showTeams}
               onNavigate={() => setMenuOpen(false)}
             />
           </nav>

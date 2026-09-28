@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
 import {
+  administers,
   listOrganizationDomains,
   listJoinRequests,
   listWorkspaceMembers,
@@ -20,11 +21,14 @@ export default async function OrganizationPage() {
   // The session list can be bounded, so resolve workspace authority from the
   // documented workspace collection rather than treating its first page as complete.
   const workspaces = await listWorkspaces();
+  // Its owners and admins: every operation on this page admits both (backend
+  // `requireWorkspaceRole(…, ['owner', 'admin'])`), and it admitted only the
+  // owner (register F55).
   const workspace = workspaces.find(
     (candidate) =>
       candidate.id === session.user.workspaceId &&
       candidate.type === "organization" &&
-      candidate.role === "owner",
+      administers(candidate.role),
   );
   if (!workspace) redirect("/account");
 

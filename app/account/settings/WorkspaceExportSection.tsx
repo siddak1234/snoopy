@@ -22,7 +22,13 @@ function downloadExport(response: WorkspaceExportResponse) {
   URL.revokeObjectURL(url);
 }
 
-export function WorkspaceExportSection() {
+/**
+ * `canExport` is the page's reading of the platform's rule — an export is every
+ * member's email, every project and every run, so it is an owner's or an
+ * admin's (Access's `assertWorkspaceAdministrator`). A member is told who can
+ * rather than offered a button the platform would refuse (register F8).
+ */
+export function WorkspaceExportSection({ canExport }: { canExport: boolean }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<WorkspaceExportResponse | null>(
@@ -52,25 +58,32 @@ export function WorkspaceExportSection() {
         Download the records and references currently available for this
         workspace.
       </p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button
-          variant="secondary"
-          size="sm"
-          disabled={pending}
-          onClick={requestExport}
-        >
-          {pending ? "Preparing export…" : "Prepare export"}
-        </Button>
-        {response ? (
+      {canExport ? (
+        <div className="mt-3 flex flex-wrap gap-2">
           <Button
+            variant="secondary"
             size="sm"
             disabled={pending}
-            onClick={() => downloadExport(response)}
+            onClick={requestExport}
           >
-            Download JSON
+            {pending ? "Preparing export…" : "Prepare export"}
           </Button>
-        ) : null}
-      </div>
+          {response ? (
+            <Button
+              size="sm"
+              disabled={pending}
+              onClick={() => downloadExport(response)}
+            >
+              Download JSON
+            </Button>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-[var(--muted)]">
+          Exporting a workspace is for its owners and admins, because the export
+          holds every member&apos;s email and every project.
+        </p>
+      )}
       <FormError message={error} className="mt-3" />
 
       {response ? (

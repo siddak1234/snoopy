@@ -1,15 +1,20 @@
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
+import { loginHref } from "@/lib/platform-api";
 import { PlatformServerError } from "@/lib/platform-server";
 import { PlatformUnavailable } from "@/components/dashboard/PlatformUnavailable";
-import { listWorkspaces, resolveActiveWorkspaceId } from "@/lib/tenancy";
+import {
+  administers,
+  listWorkspaces,
+  resolveActiveWorkspaceId,
+} from "@/lib/tenancy";
 import {
   DashboardSidebar,
   DashboardHeader,
 } from "@/components/dashboard/DashboardNav";
 import { AccountTopBar } from "@/components/dashboard/AccountTopBar";
 
-const SIGN_IN = "/login?callbackUrl=/account";
+const SIGN_IN = loginHref("/account");
 
 /** What the shell needs, or `null` when there is no session. */
 async function readAccountShell() {
@@ -37,15 +42,25 @@ export default async function AccountLayout({
   } catch (error) {
     if (!(error instanceof PlatformServerError)) throw error;
     if (error.status === 401) redirect(SIGN_IN);
-    return <PlatformUnavailable busy={error.status === 429} />;
+    return (
+      <PlatformUnavailable
+        busy={error.status === 429}
+        retryAfterSeconds={error.retryAfterSeconds}
+      />
+    );
   }
   if (!shell) redirect(SIGN_IN);
 
   const { workspaces, activeWorkspaceId } = shell;
-  const showOrgSettings = workspaces.some(
-    (workspace) =>
-      workspace.type === "organization" && workspace.role === "owner",
+  // Each organization link shows where its page renders: the organization page
+  // for the active organization's owners and admins — who may do everything on
+  // it (register F55) — and teams in any organization workspace.
+  const active = workspaces.find(
+    (workspace) => workspace.id === activeWorkspaceId,
   );
+  const inOrganization = active?.type === "organization";
+  const showOrgSettings = inOrganization && administers(active?.role);
+  const showTeams = inOrganization;
 
   return (
     // Self-contained dashboard shell: the route-group split means no marketing
@@ -57,10 +72,16 @@ export default async function AccountLayout({
         activeWorkspaceId={activeWorkspaceId}
       />
       <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
-        <DashboardSidebar showOrgSettings={showOrgSettings} />
+        <DashboardSidebar
+          showOrgSettings={showOrgSettings}
+          showTeams={showTeams}
+        />
         <div className="min-w-0 flex-1">
           <header className="mb-4 lg:mb-0">
-            <DashboardHeader showOrgSettings={showOrgSettings} />
+            <DashboardHeader
+              showOrgSettings={showOrgSettings}
+              showTeams={showTeams}
+            />
           </header>
           <main>{children}</main>
         </div>

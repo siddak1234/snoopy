@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join, relative } from "node:path";
+import ts from "typescript";
 
 const root = process.cwd();
 const sourceRoots = ["app", "components", "hooks", "lib"];
@@ -48,10 +49,65 @@ const removedRouteFiles = [
   "app/api/job-descriptions/file/route.ts",
 ];
 
+// Colour lives in the design tokens (register F14): a hex literal anywhere but
+// app/globals.css, where the tokens are defined, is a colour the theme cannot
+// change. app/opengraph-image.tsx is the one exemption — image generation cannot
+// read CSS custom properties. Code is read by TypeScript's own parser, so only
+// strings, templates and JSX text are looked at: a comment ("§12.1 #160") is not
+// code, and an `href`'s value ("#add") is a fragment, not a colour.
+const hexColour =
+  /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9A-Za-z_-])/u;
+const hexAllowed = new Set(["app/globals.css", "app/opengraph-image.tsx"]);
+
+function rawHexColour(path, content) {
+  if (path.endsWith(".css")) {
+    return content.replace(/\/\*[\s\S]*?\*\//gu, "").match(hexColour)?.[0];
+  }
+  const source = ts.createSourceFile(
+    path,
+    content,
+    ts.ScriptTarget.Latest,
+    false,
+    path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  let found;
+  const visit = (node) => {
+    if (found) return;
+    if (
+      ts.isJsxAttribute(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === "href"
+    ) {
+      return;
+    }
+    if (
+      ts.isStringLiteralLike(node) ||
+      ts.isTemplateHead(node) ||
+      ts.isTemplateMiddle(node) ||
+      ts.isTemplateTail(node) ||
+      ts.isJsxText(node)
+    ) {
+      found = node.text.match(hexColour)?.[0];
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found;
+}
+
 const failures = [];
 for (const file of files) {
   const content = readFileSync(file, "utf8");
   const path = relative(root, file);
+  if (!hexAllowed.has(path)) {
+    const colour = rawHexColour(path, content);
+    if (colour) {
+      failures.push(
+        `${path}: raw hex colour ${colour} — use a design token from app/globals.css`,
+      );
+    }
+  }
   for (const rule of forbiddenRuntimePatterns) {
     if (rule.pattern.test(content)) failures.push(`${path}: ${rule.label}`);
   }
@@ -83,7 +139,7 @@ if (failures.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    "Boundary audit passed. Browser secrets, direct database, storage, and manual-login paths: 0.",
+    "Boundary audit passed. Browser secrets, direct database, storage, manual-login paths and raw hex colours: 0.",
   );
 }
 
@@ -94,7 +150,7 @@ function walk(path) {
     const candidate = join(path, entry);
     const stats = statSync(candidate);
     if (stats.isDirectory()) output.push(...walk(candidate));
-    else if ([".ts", ".tsx"].includes(extname(candidate)))
+    else if ([".ts", ".tsx", ".css"].includes(extname(candidate)))
       output.push(candidate);
   }
   return output;

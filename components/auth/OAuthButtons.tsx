@@ -17,7 +17,7 @@ function oauthHref(provider: LoginProvider["id"], callbackUrl: string) {
 }
 
 const buttonClass =
-  "w-full rounded-[var(--radius-md)] border border-[var(--ring)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none";
+  "w-full rounded-[var(--radius-md)] border border-[var(--ring)] px-4 py-3 text-center text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]";
 
 /**
  * Provider-only login entry points. The browser follows the Autom8x API route;

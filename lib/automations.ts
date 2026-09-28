@@ -1,6 +1,8 @@
 import {
+  newIdempotencyKey,
   platformServerJson,
   PlatformNotConfiguredError,
+  workspacePath as scope,
 } from "@/lib/platform-server";
 import type {
   components,
@@ -59,10 +61,10 @@ export type DecideApprovalRequest =
   operations["decideApproval"]["requestBody"]["content"]["application/json"];
 export type DecideApprovalResponse =
   operations["decideApproval"]["responses"][200]["content"]["application/json"];
-
-function scope(workspaceId: string): string {
-  return `/v1/workspaces/${encodeURIComponent(workspaceId)}`;
-}
+export type CancelRunResponse =
+  operations["cancelRun"]["responses"][200]["content"]["application/json"];
+export type RunStats = components["schemas"]["RunStats"];
+export type RunStatusCounts = components["schemas"]["RunStatusCounts"];
 
 export function listAutomations(
   workspaceId: string,
@@ -108,6 +110,98 @@ export function listApprovals(
   const query = status ? `?status=${status}` : "";
   return platformServerJson<ListApprovalsResponse>(
     `${scope(workspaceId)}/approvals${query}`,
+  );
+}
+
+/**
+ * The platform's own tally of this workspace's runs (`readRunStats`) — every
+ * status counted, so a screen sums what it wants rather than counting a page of
+ * runs. `since` bounds the window; omitted, it is every run the workspace has.
+ */
+export function readRunStats(
+  workspaceId: string,
+  since?: string,
+): Promise<RunStats> {
+  const query = since ? `?since=${encodeURIComponent(since)}` : "";
+  return platformServerJson<RunStats>(
+    `${scope(workspaceId)}/run-stats${query}`,
+  );
+}
+
+/* --- mutations -------------------------------------------------------------
+ *
+ * Every write builds its path here, where each id is encoded (register F9); the
+ * server actions decide what to send and what a refusal means, and nothing else.
+ */
+
+export function createSubscription(
+  workspaceId: string,
+  body: CreateSubscriptionRequest,
+): Promise<CreateSubscriptionResponse> {
+  return platformServerJson<CreateSubscriptionResponse>(
+    `${scope(workspaceId)}/subscriptions`,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+      idempotencyKey: newIdempotencyKey("subscribe"),
+    },
+  );
+}
+
+export function updateSubscription(
+  workspaceId: string,
+  subscriptionId: string,
+  body: UpdateSubscriptionRequest,
+  intent: "subscription-config" | "status" | "archive",
+): Promise<UpdateSubscriptionResponse> {
+  return platformServerJson<UpdateSubscriptionResponse>(
+    `${scope(workspaceId)}/subscriptions/${encodeURIComponent(subscriptionId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(body),
+      idempotencyKey: newIdempotencyKey(intent),
+    },
+  );
+}
+
+/** The key is the caller's: a resubmitted run form must reuse its own. */
+export function createRun(
+  workspaceId: string,
+  body: CreateRunRequest,
+  idempotencyKey: string,
+): Promise<CreateRunResponse> {
+  return platformServerJson<CreateRunResponse>(`${scope(workspaceId)}/runs`, {
+    method: "POST",
+    body: JSON.stringify(body),
+    idempotencyKey,
+  });
+}
+
+/** Only a `pending` or `running` run can be cancelled; any other answers 404. */
+export function cancelRun(
+  workspaceId: string,
+  runId: string,
+): Promise<CancelRunResponse> {
+  return platformServerJson<CancelRunResponse>(
+    `${scope(workspaceId)}/runs/${encodeURIComponent(runId)}/cancel`,
+    { method: "POST", idempotencyKey: newIdempotencyKey("cancel") },
+  );
+}
+
+export function decideApproval(
+  workspaceId: string,
+  approvalId: string,
+  body: DecideApprovalRequest,
+): Promise<DecideApprovalResponse> {
+  return platformServerJson<DecideApprovalResponse>(
+    `${scope(workspaceId)}/approvals/${encodeURIComponent(approvalId)}/decision`,
+    {
+      method: "POST",
+      // Only the decision. The actor and their role come from the session —
+      // sending actorRole is refused as an unsupported field.
+      body: JSON.stringify(body),
+      idempotencyKey: newIdempotencyKey("decision"),
+    },
   );
 }
 

@@ -86,15 +86,19 @@ test("a 409 keeps the account: branched on the status, said inline, nothing sign
   );
   assert.match(
     component,
-    /const failure = caught instanceof PlatformApiError \? caught : null;\s*const next = outcomeFor\(failure, anAttemptWasLost\.current\);\s*if \(next\.kind === "unknown"\) anAttemptWasLost\.current = true;\s*setOutcome\(next\);\s*setLoading\(false\);\s*return;/u,
-    "every failure ends in the table's outcome, loading cleared, no departure",
+    /const failure = caught instanceof PlatformApiError \? caught : null;\s*const next = outcomeFor\(failure, anAttemptWasLost\.current\);\s*if \(next\.kind === "unknown"\) anAttemptWasLost\.current = true;(?:\s*\/\/[^\n]*)*\s*if \(failure\?\.status === 409\) anAttemptWasLost\.current = false;\s*setOutcome\(next\);\s*setLoading\(false\);\s*return;/u,
+    "every failure ends in the table's outcome, loading cleared, no departure — and a 409 clears the lost-answer memory (register F47)",
   );
-  // Any other 4xx is a refusal: the deletion did not run, so the server's own
-  // title is the truest thing to show.
+  // Any other 4xx is a refusal: the deletion did not run. Said in words, not as
+  // the Edge's generic title ("Forbidden") — register F46. A 429 says the wait.
   assert.match(
     component,
-    /return \{ kind: "failed", message: failure\.message \};\s*\}\s*\n\s*export default function/u,
-    "the table's last row is the server's title",
+    /if \(failure\.status === 429\) \{\s*return \{\s*kind: "failed",\s*message: `\$\{failure\.message\} Your account was not deleted\.`,?\s*\};\s*\}\s*return \{ kind: "failed", message: REFUSED_COPY \};\s*\}\s*\n\s*export default function/u,
+    "the table's last rows: a 429 with its wait, then any refusal in words",
+  );
+  assert.match(
+    component,
+    /const REFUSED_COPY =\s*"The platform refused this request, so your account was not deleted\. Reload the page and try again; if it is refused again, contact support\."/u,
   );
   // Focus goes back to the control that answers the outcome — the confirm
   // button lost it when it was disabled mid-request (NFR-35).
@@ -158,9 +162,14 @@ test("an answer that may have been lost keeps the account and says the outcome i
     "nothing in the outcome table leaves or signs out",
   );
   assert.equal(
-    component.split('window.location.replace("/login?deleted=1")').length - 1,
+    component.split('window.location.replace("/account-deleted")').length - 1,
     1,
-    "exactly one departure, after the catch",
+    "exactly one departure, after the catch — to the page built to say so (register F2)",
+  );
+  assert.doesNotMatch(
+    component,
+    /deleted=1/u,
+    "the sign-in page is not the destination",
   );
 });
 
@@ -174,15 +183,22 @@ test("an expired session is said inline, with the way back in — not a retry, n
     component.indexOf("function outcomeFor("),
     component.indexOf("export default function"),
   );
-  const status401 = table.indexOf("failure?.status === 401");
+  const status401 = table.indexOf("sessionEnded(failure)");
   const status409 = table.indexOf("failure?.status === 409");
   assert.ok(
     status401 >= 0 && status401 < status409,
     "the 401 row comes before the 409 row",
   );
+  // One rule for every browser caller (register F40): an ended session is a 401,
+  // and nothing else.
+  assert.match(
+    platformApi,
+    /export function sessionEnded\(error: unknown\): boolean \{\s*return error instanceof PlatformApiError && error\.status === 401;\s*\}/u,
+    "sessionEnded is the 401 rule, defined once in lib/platform-api.ts",
+  );
   assert.match(
     table,
-    /failure\?\.status === 401\)\s*\{\s*return \{\s*kind: "expired",\s*message: anAttemptWasLost \? EXPIRED_AFTER_UNKNOWN_COPY : EXPIRED_COPY,?\s*\};/u,
+    /sessionEnded\(failure\)\)\s*\{\s*return \{\s*kind: "expired",\s*message: anAttemptWasLost \? EXPIRED_AFTER_UNKNOWN_COPY : EXPIRED_COPY,?\s*\};/u,
     "a 401 is said inline, hedged after an unknown outcome",
   );
   // The hedge outlives the dialog: closing and reopening does not make a lost

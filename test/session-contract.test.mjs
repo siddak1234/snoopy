@@ -177,3 +177,87 @@ test("OAuth provider UI consumes the generated public provider policy", () => {
   assert.doesNotMatch(oauthButtons, /oauthHref\("(?:google|microsoft|apple)"/);
   assert.match(linkedAccounts, /state\.providers\.map/);
 });
+
+test("a server-side call sends the Edge cookies, never cookie attributes (register F51)", async () => {
+  const { requestCookieHeader } = await import("../lib/cookie-header.ts");
+  const { ResponseCookies, RequestCookies } =
+    await import("next/dist/compiled/@edge-runtime/cookies/index.js");
+  // The store a server action or a route handler gets is a RESPONSE store, and
+  // its own serialisation carries `Set-Cookie` attributes — the defect.
+  const actionStore = new ResponseCookies(new Headers());
+  actionStore.set("e2e-public-edge-session", "owner a;b");
+  actionStore.set("theme", "dark");
+  assert.match(
+    actionStore.toString(),
+    /; Path=\//u,
+    "Next's response store no longer adds Path= — re-read what F51 guards",
+  );
+  const header = requestCookieHeader(actionStore);
+  assert.equal(header, "e2e-public-edge-session=owner%20a%3Bb; theme=dark");
+  assert.doesNotMatch(header, /Path=|Expires=|Max-Age=|HttpOnly|SameSite/iu);
+  // Encoded as the request store encodes, so the Edge reads the same values
+  // the browser sent.
+  const parsed = new RequestCookies(new Headers({ cookie: header }));
+  assert.equal(parsed.get("e2e-public-edge-session")?.value, "owner a;b");
+  assert.equal(parsed.toString(), header);
+
+  const server = readFileSync("lib/platform-server.ts", "utf8");
+  assert.match(server, /cookie: cookieHeader,/u);
+  assert.match(server, /requestCookieHeader\(await cookies\(\)\)/u);
+  assert.doesNotMatch(
+    server,
+    /cookieStore\.toString\(\)|cookies\(\)\)\.toString\(\)/u,
+  );
+});
+
+test("a refused request says when to try again, from retry-after (backend §12.1 #114)", async () => {
+  const { busyMessage, retryAfterSeconds, tryAgainIn } =
+    await import("../lib/retry-after.ts");
+  // Whole seconds, as the Edge sends them; anything else is not interpreted.
+  assert.equal(retryAfterSeconds("30"), 30);
+  assert.equal(retryAfterSeconds(" 60 "), 60);
+  for (const value of [null, undefined, "", "-1", "1.5", "Wed, 21 Oct 2026"]) {
+    assert.equal(retryAfterSeconds(value), undefined, String(value));
+  }
+  assert.equal(tryAgainIn(undefined), "Try again in a moment.");
+  assert.equal(tryAgainIn(1), "Try again in a second.");
+  assert.equal(tryAgainIn(30), "Try again in 30 seconds.");
+  assert.equal(tryAgainIn(120), "Try again in 2 minutes.");
+  assert.equal(
+    busyMessage(30),
+    "The platform is busy right now. Try again in 30 seconds.",
+  );
+  // Both clients word a 429 this way, never with the Edge's "Too Many Requests".
+  const server = readFileSync("lib/platform-server.ts", "utf8");
+  const browser = readFileSync("lib/platform-api.ts", "utf8");
+  for (const [name, source] of [
+    ["lib/platform-server.ts", server],
+    ["lib/platform-api.ts", browser],
+  ]) {
+    assert.match(
+      source,
+      /response\.status === 429\)\s*\{\s*const wait = retryAfterSeconds\(response\.headers\.get\("retry-after"\)\);/u,
+      name,
+    );
+  }
+  const panel = readFileSync(
+    "components/dashboard/PlatformUnavailable.tsx",
+    "utf8",
+  );
+  assert.match(panel, /tryAgainIn\(busy \? retryAfterSeconds : undefined\)/u);
+});
+
+test("a server read takes the request's cookies before the origin, so no page is prerendered around it (register F62)", () => {
+  const server = readFileSync("lib/platform-server.ts", "utf8");
+  // Comments stripped, so a comment naming the call cannot stand in for it.
+  const read = server
+    .slice(server.indexOf("export async function platformServerJson"))
+    .replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/gu, "");
+  const cookiesAt = read.indexOf("await cookies()");
+  const originAt = read.indexOf("backendApiOrigin()");
+  assert.ok(cookiesAt > 0 && originAt > 0, "platformServerJson changed shape");
+  assert.ok(
+    cookiesAt < originAt,
+    "with no backend, a platform read before the cookies fails the build",
+  );
+});

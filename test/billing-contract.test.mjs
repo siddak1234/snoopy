@@ -97,12 +97,14 @@ test("the facade aliases the four published billing operations and nothing hand-
 
 test("billing that is not configured renders as unavailable, and nothing else is swallowed", () => {
   // Every billing operation answers 503 NotConfigured until a provider key
-  // exists — production today. The guard maps exactly that and the site's own
-  // unconfigured state to null and rethrows everything else; the page, not the
-  // facade, gives the two authoritative refusals (403, 404) their meaning.
-  assert.match(
+  // exists. The guard maps exactly that to null and rethrows everything else;
+  // the page, not the facade, gives the two authoritative refusals (403, 404)
+  // their meaning. A site with no backend never reaches the billing page — the
+  // account layout sends it to sign-in — so it is not special-cased (F32).
+  assert.doesNotMatch(
     facade,
-    /error instanceof PlatformNotConfiguredError\) return null/u,
+    /PlatformNotConfiguredError/u,
+    "no branch for a state the page cannot reach",
   );
   assert.match(facade, /PlatformServerError && error\.status === 503/u);
   assert.match(facade, /throw error;/u);
@@ -110,23 +112,27 @@ test("billing that is not configured renders as unavailable, and nothing else is
 });
 
 test("the two hosted hand-offs use the generated types and send only what the Edge accepts", () => {
+  // The calls live in the facade, where the path is built (register F9); the
+  // actions check the workspace and decide what an answer means.
   assert.equal(
-    (actions.match(/platformServerJson<HostedBillingSession>/gu) ?? []).length,
+    (facade.match(/platformServerJson<HostedBillingSession>/gu) ?? []).length,
     2,
     "checkout and portal must both read HostedBillingSession",
   );
+  assert.doesNotMatch(actions, /platformServerJson|\/v1\//u);
   assert.match(actions, /const body: BillingCheckoutRequest = \{ planId \}/u);
-  assert.match(actions, /const body: BillingPortalRequest = \{\}/u);
-  // The two bodies above are the only request bodies in the file: no return URL
-  // is ever sent (the Edge refuses any origin but the deployment's own), and
-  // prose mentioning one must not satisfy this.
+  assert.match(facade, /const body: BillingPortalRequest = \{\}/u);
+  // Those are the only request bodies: no return URL is ever sent (the Edge
+  // refuses any origin but the deployment's own), and prose mentioning one must
+  // not satisfy this.
   assert.equal(
-    (actions.match(/const body: /gu) ?? []).length,
+    (actions.match(/const body: /gu) ?? []).length +
+      (facade.match(/const body: /gu) ?? []).length,
     2,
-    "actions.ts must declare exactly the two request bodies asserted above",
+    "exactly the two request bodies asserted above",
   );
   assert.doesNotMatch(
-    actions,
+    `${actions}\n${facade}`,
     /idempotencyKey/u,
     "the billing operations declare no Idempotency-Key",
   );
@@ -254,31 +260,41 @@ test("both hand-offs refuse when the page's workspace is no longer the active on
       /shownWorkspaceId: string/u,
       `${name} takes the shown workspace`,
     );
-    const check = body.indexOf("if (workspaceId !== shownWorkspaceId)");
-    const call = body.indexOf("platformServerJson<HostedBillingSession>");
-    assert.ok(
-      check > 0 && call > check,
-      `${name} must compare before it calls`,
-    );
     assert.match(
       body,
-      /`\/v1\/workspaces\/\$\{workspaceId\}\/billing\//u,
-      `${name}'s path uses the server-resolved workspace`,
+      /const workspaceId = await activeWorkspaceIfShown\(shownWorkspaceId\);/u,
+      `${name} resolves the workspace on the server and compares it`,
+    );
+    const check = body.indexOf(
+      "if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };",
+    );
+    const call = body.search(/createBilling(?:Checkout|Portal)\(workspaceId/u);
+    assert.ok(
+      check > 0 && call > check,
+      `${name} must compare before it calls — with the server-resolved workspace`,
     );
   }
+  assert.match(
+    facade,
+    /`\$\{scope\(workspaceId\)\}\/billing\/checkout`/u,
+    "the checkout path is built from the workspace it is given, encoded",
+  );
+  assert.match(facade, /`\$\{scope\(workspaceId\)\}\/billing\/portal`/u);
   assert.match(panel, /beginBillingCheckout\(workspaceId, plan\.planId\)/u);
   assert.match(panel, /openBillingPortal\(workspaceId\)/u);
   assert.match(page, /workspaceId=\{workspaceId\}/u);
 });
 
 test("the page gates on owner or admin from the workspace list before any billing read", () => {
-  assert.match(page, /listWorkspaces\(\)/u);
+  // `roleInWorkspace` reads the public workspace list; `administers` is owner
+  // or admin — one rule for every page that gates (register F8).
+  assert.match(page, /roleInWorkspace\(workspaceId\)/u);
   assert.doesNotMatch(
     page,
     /session\??\.workspaces/u,
     "roles come from the public workspace list, not the bounded session",
   );
-  const gate = page.search(/role !== "owner" && role !== "admin"/u);
+  const gate = page.search(/if \(!administers\(role\)\)/u);
   const read = page.indexOf("readWorkspaceBilling(");
   assert.ok(gate > 0, "the page must gate on owner or admin");
   assert.ok(read > gate, "the billing read must come after the role gate");

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { tryAgainIn } from "@/lib/retry-after";
 
 /**
  * What the account area shows when the platform refused or could not answer —
@@ -15,10 +16,13 @@ import { Button } from "@/components/ui/Button";
  */
 export function PlatformUnavailable({
   busy = false,
+  retryAfterSeconds,
   retry,
 }: {
   /** The platform said "too many requests", as opposed to failing. */
   busy?: boolean;
+  /** The wait the platform stated with its refusal (`retry-after`), if any. */
+  retryAfterSeconds?: number;
   retry?: () => void;
 }) {
   const router = useRouter();
@@ -37,8 +41,8 @@ export function PlatformUnavailable({
           : "The platform could not answer just now"}
       </h1>
       <p className="text-sm text-[var(--muted)]">
-        You have not been signed out, and nothing was lost. Try again in a
-        moment.
+        You have not been signed out, and nothing was lost.{" "}
+        {tryAgainIn(busy ? retryAfterSeconds : undefined)}
       </p>
       <div>
         <Button

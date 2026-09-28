@@ -38,7 +38,7 @@ export function ProjectList({ projects }: { projects: ProjectListItem[] }) {
             <Link
               prefetch={false}
               href={`/account/projects/${project.id}`}
-              className="min-w-0 flex-1 rounded-lg focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-inset"
+              className="min-w-0 flex-1 rounded-lg focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-[var(--text)]">

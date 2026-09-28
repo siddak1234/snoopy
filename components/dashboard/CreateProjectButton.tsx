@@ -2,10 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CreateProjectDialog } from "./CreateProjectDialog";
+import { CreateProjectDialog, type TeamWorkspace } from "./CreateProjectDialog";
 import { revalidateAccountProjectsAction } from "@/app/account/projects/actions";
 
-export function CreateProjectButton({ hasOrg }: { hasOrg?: boolean }) {
+export function CreateProjectButton({
+  teamWorkspace,
+  inOrganization,
+}: {
+  teamWorkspace: TeamWorkspace | null;
+  inOrganization: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   return (
@@ -20,7 +26,8 @@ export function CreateProjectButton({ hasOrg }: { hasOrg?: boolean }) {
       <CreateProjectDialog
         open={open}
         onClose={() => setOpen(false)}
-        hasOrg={hasOrg}
+        teamWorkspace={teamWorkspace}
+        inOrganization={inOrganization}
         onSuccess={async () => {
           await revalidateAccountProjectsAction();
           router.refresh();

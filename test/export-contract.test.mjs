@@ -24,10 +24,8 @@ const contract = readFileSync(CONTRACT_PATH, "utf8");
 const ui = readFileSync(UI_PATH, "utf8");
 
 test("workspace export uses the generated public root operation", () => {
-  assert.match(
-    facade,
-    /\/v1\/workspaces\/\$\{encodeURIComponent\(workspaceId\)\}/,
-  );
+  // The workspace segment is built, encoded, in one place (register F9).
+  assert.match(facade, /workspacePath as scope/u);
   assert.match(facade, /\$\{scope\(workspaceId\)\}\/export/);
   assert.match(
     contract,

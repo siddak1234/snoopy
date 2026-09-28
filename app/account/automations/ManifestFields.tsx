@@ -165,7 +165,26 @@ function ManifestFieldInput({
 // accepts the supplied opaque value as text without inventing a
 // provider-specific list.
 
+/**
+ * What a notifications toggle switches, in words (register F22) — the manifest
+ * allows `notifies` only on a toggle in the `notifications` section. Keyed by the
+ * generated enum, so a value the contract adds cannot render as its wire token.
+ */
+const NOTIFIES: Record<
+  NonNullable<AutomationSetupField["notifies"]>,
+  string
+> = {
+  "approval-requested": "an approval is requested",
+  "approval-expiring": "an approval is about to expire",
+  "run-failed": "a run fails",
+  "run-succeeded": "a run succeeds",
+};
+
 function FieldMetadata({ field }: { field: ManifestField }) {
   if (!("notifies" in field) || !field.notifies) return null;
-  return <p className="mt-1 text-xs text-[var(--muted)]">{field.notifies}</p>;
+  return (
+    <p className="mt-1 text-xs text-[var(--muted)]">
+      Controls the notification sent when {NOTIFIES[field.notifies]}.
+    </p>
+  );
 }

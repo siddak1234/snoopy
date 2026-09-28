@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
+import { loginHref } from "@/lib/platform-api";
 import { discoverOrganizations } from "@/lib/tenancy";
 import { JoinOrgForm } from "./JoinOrgForm";
 
@@ -14,7 +15,13 @@ export default async function JoinOrgPage({
   if (!workspaceId) redirect("/onboarding/setup-org");
 
   const session = await getAppSession();
-  if (!session?.user.email) redirect("/login");
+  // The return keeps `?w=`: without it, signing in lands on "create an
+  // organization" instead of the one this link named.
+  if (!session?.user.email) {
+    redirect(
+      loginHref(`/onboarding/join-org?w=${encodeURIComponent(workspaceId)}`),
+    );
+  }
 
   const organizations = await discoverOrganizations();
   const organization = organizations.find(

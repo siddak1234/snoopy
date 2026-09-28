@@ -1,6 +1,7 @@
 import {
   platformServerJson,
   PlatformNotConfiguredError,
+  workspacePath as scope,
 } from "@/lib/platform-server";
 import type {
   components,
@@ -22,10 +23,8 @@ export type ConnectProviderWithKeyResponse =
   operations["connectProviderWithKey"]["responses"][201]["content"]["application/json"];
 export type DisconnectConnectionResponse =
   operations["disconnectConnection"]["responses"][200]["content"]["application/json"];
-
-function scope(workspaceId: string): string {
-  return `/v1/workspaces/${encodeURIComponent(workspaceId)}`;
-}
+export type ConnectionAuthorizationRequest =
+  operations["beginConnectionAuthorization"]["requestBody"]["content"]["application/json"];
 
 export function listConnectionProviders(): Promise<ConnectionProvidersResponse> {
   return platformServerJson("/v1/connections/providers");
@@ -35,6 +34,41 @@ export function listConnections(
   workspaceId: string,
 ): Promise<ConnectionsResponse> {
   return platformServerJson(`${scope(workspaceId)}/connections`);
+}
+
+export function beginConnectionAuthorization(
+  workspaceId: string,
+  body: ConnectionAuthorizationRequest,
+): Promise<ConnectionAuthorizationResponse> {
+  return platformServerJson<ConnectionAuthorizationResponse>(
+    `${scope(workspaceId)}/connections/authorize`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
+/**
+ * The key is minted once in the browser when Connect is chosen, so a retry of the
+ * same intent reuses it; it is deliberately not part of the JSON body.
+ */
+export function connectProviderWithKey(
+  workspaceId: string,
+  body: ConnectProviderWithKeyRequest,
+  idempotencyKey: string,
+): Promise<ConnectProviderWithKeyResponse> {
+  return platformServerJson<ConnectProviderWithKeyResponse>(
+    `${scope(workspaceId)}/connections/key`,
+    { method: "POST", body: JSON.stringify(body), idempotencyKey },
+  );
+}
+
+export function disconnectConnection(
+  workspaceId: string,
+  connectionId: string,
+): Promise<DisconnectConnectionResponse> {
+  return platformServerJson<DisconnectConnectionResponse>(
+    `${scope(workspaceId)}/connections/${encodeURIComponent(connectionId)}`,
+    { method: "DELETE" },
+  );
 }
 
 /** Renders an unavailable integration surface as empty, never as a false claim. */

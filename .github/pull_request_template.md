@@ -5,7 +5,7 @@
 ## Checklist
 
 - [ ] Follows `docs/REPO-STRUCTURE.md` (routes in `app/`, logic in `lib/`, UI in `components/`)
-- [ ] `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm run test:contracts`, and `npm run audit:boundaries` pass locally
+- [ ] `npm run verify` passes on this tree, and `/audit-change` passed for it
 - [ ] Public contract changes use generated types; no manual browser `fetch` was added
 - [ ] UI changes have browser/a11y evidence; protected-flow changes have fixture or non-production observations
 - [ ] No database, Supabase, object-store, provider, or browser secret appears in the diff

@@ -1,27 +1,22 @@
 // The website's whole offline gate in one command — `npm run verify` — so
 // "green" means the same list every time rather than whichever commands a
 // session remembered (backend §12.2 #68; BUILD-PLAN 20.4.1). It runs the gates
-// scripts/audit/run-gates.mjs runs, in the same order, plus format:check (CI's
-// Lint job runs it; the audit runner does not) and verify:platform-contracts
-// (neither runs it), and ends by emitting this repository's facts file
-// (scripts/repo-facts.mjs).
+// scripts/audit/run-gates.mjs runs, in the same order — format:check and
+// verify:platform-contracts among them (register F15) — and ends by emitting
+// this repository's facts file (scripts/repo-facts.mjs).
 //
 // Deliberately separate from run-gates.mjs: that runner is the change audit's —
 // it needs origin/main, exits 0 without running a gate when HEAD equals the
 // merge-base tree, and writes the evidence the marker writer cross-checks.
-// test/verify-gate.test.mjs keeps the two gate lists in step. The two share one
-// thing on purpose, the audit lock: both build into .next and serve on 3001 and
-// 3443, so running them at once is refused rather than left to memory.
+// test/verify-gate.test.mjs keeps the two gate lists in step. The two share
+// their preflight — conflict copies, listeners, and one lock, since both build
+// into .next and serve on 3001 and 3443 — and the rewrite assertion, from
+// scripts/audit/preflight.mjs (register F24).
 import { spawnSync } from "node:child_process";
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync } from "node:fs";
 import { constants as osConstants } from "node:os";
 import { join, resolve } from "node:path";
+import { assertPlatformRewrite, preflight } from "./audit/preflight.mjs";
 import { FACTS_PATH, writeRepoFacts } from "./repo-facts.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -51,121 +46,8 @@ function fail(message) {
   process.exit(1);
 }
 
-// --- preflight: the two checks the audit runner makes, for the same reasons ---
-const conflictCopies = spawnSync(
-  "find",
-  [
-    ".",
-    "-path",
-    "./node_modules",
-    "-prune",
-    "-o",
-    "(",
-    "-name",
-    "* 2.*",
-    "-o",
-    "-name",
-    "* 2",
-    ")",
-    "-print",
-  ],
-  { cwd: root, encoding: "utf8" },
-).stdout.trim();
-if (conflictCopies) {
-  fail(
-    `Finder conflict copies contaminate the clone (tsconfig's **/*.ts would typecheck them):\n${conflictCopies}`,
-  );
-}
-for (const port of [3001, 3443]) {
-  const listeners = spawnSync(
-    "lsof",
-    ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN"],
-    {
-      encoding: "utf8",
-    },
-  );
-  if (listeners.status === 0 && listeners.stdout.trim()) {
-    fail(`port ${port} has a listener; stop it first:\n${listeners.stdout}`);
-  }
-}
-// The audit runner's lock, shared on purpose: the port check is blind while the
-// other is still in its lint, typecheck or build phase, and two builds into one
-// .next produce a manifest neither of them ran. A live pid refuses; a stale one
-// is cleared; this run's pid is held until exit so an audit refuses in turn.
-const auditDir = join(root, ".git/autom8x-audit");
-const lockPath = join(auditDir, "lock");
-mkdirSync(auditDir, { recursive: true });
-// Acquired atomically — `wx` refuses an existing file — so two runs started in
-// the same instant cannot both pass: the loser reads the winner's pid. A stale
-// lock is cleared once: a dead pid, or an empty or garbled file, which must
-// never count as live (pid 0 would signal this process's own group and
-// "succeed", wedging every later run).
-function acquireLock(retry) {
-  try {
-    writeFileSync(lockPath, String(process.pid), { flag: "wx" });
-    return;
-  } catch (error) {
-    if (error.code !== "EEXIST") throw error;
-  }
-  let content = "";
-  try {
-    content = readFileSync(lockPath, "utf8");
-  } catch {
-    // Released between the two calls: one more attempt.
-    if (retry) return acquireLock(false);
-    fail(`the audit lock ${lockPath} could not be read`);
-  }
-  const pid = Number(content.trim());
-  let alive = false;
-  if (Number.isInteger(pid) && pid > 0) {
-    try {
-      process.kill(pid, 0);
-      alive = true;
-    } catch {
-      alive = false;
-    }
-  }
-  if (alive) {
-    fail(
-      `a change audit or another verify is running (pid ${pid}); wait for it`,
-    );
-  }
-  if (!retry) fail(`the audit lock ${lockPath} could not be acquired`);
-  rmSync(lockPath, { force: true });
-  acquireLock(false);
-}
-acquireLock(true);
-const releaseLock = () => {
-  try {
-    rmSync(lockPath);
-  } catch {
-    /* already gone */
-  }
-};
-process.on("exit", releaseLock);
-process.on("SIGINT", () => process.exit(130));
-process.on("SIGTERM", () => process.exit(143));
-
-// Mirrors the CI build job and run-gates.mjs: a build without the /api/platform
-// rewrite exits 0 while every browser API call would 404 in production.
-function assertPlatformRewrite() {
-  const manifest = JSON.parse(
-    readFileSync(join(root, ".next/routes-manifest.json"), "utf8"),
-  );
-  const rewrites = Array.isArray(manifest.rewrites)
-    ? manifest.rewrites
-    : [
-        ...(manifest.rewrites?.beforeFiles ?? []),
-        ...(manifest.rewrites?.afterFiles ?? []),
-        ...(manifest.rewrites?.fallback ?? []),
-      ];
-  const hit = rewrites.some(
-    (entry) =>
-      typeof entry.source === "string" &&
-      entry.source.startsWith("/api/platform"),
-  );
-  if (!hit) throw new Error("build output contains no /api/platform rewrite");
-}
+// --- preflight: shared with the change audit (scripts/audit/preflight.mjs) ---
+preflight({ root, fail });
 
 const siblingPresent = contractInputs.every((path) => existsSync(path));
 const gates = [
@@ -183,10 +65,13 @@ const gates = [
       ? null
       : `sibling checkout not present at ${backendRoot}; accepted dependency (§12.2 #78)`,
   },
+  // The site with no backend, as a Vercel preview builds it (register F62).
+  // Before `build`, whose output the browser suite serves.
+  { name: "build:no-backend" },
   {
     name: "build",
     env: { BACKEND_API_ORIGIN: buildOrigin },
-    after: assertPlatformRewrite,
+    after: () => assertPlatformRewrite(root),
   },
   {
     name: "test:browser",

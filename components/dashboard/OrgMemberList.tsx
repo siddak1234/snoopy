@@ -111,9 +111,10 @@ export function OrgMemberList({
                 </p>
               </div>
 
-              {/* Role badge */}
+              {/* Role badge: the role the platform holds, admins included —
+                  they reach this page too (register F55). */}
               <span className="shrink-0 rounded-full bg-[var(--chip-bg)] px-2.5 py-0.5 text-xs font-medium text-[var(--chip-text)] capitalize">
-                {isOwner ? "Owner" : "Member"}
+                {m.role}
               </span>
 
               {/* Remove button */}
@@ -121,7 +122,7 @@ export function OrgMemberList({
                 <button
                   type="button"
                   onClick={() => openConfirm(m)}
-                  className="shrink-0 text-xs text-[var(--error-text)] underline hover:text-[var(--error-text-hover)] focus-visible:ring-2 focus-visible:ring-[var(--error-text)] focus-visible:outline-none"
+                  className="shrink-0 text-xs text-[var(--error-text)] underline hover:text-[var(--error-text-hover)] focus-visible:ring-2 focus-visible:ring-[var(--error-text)]"
                 >
                   Remove
                 </button>

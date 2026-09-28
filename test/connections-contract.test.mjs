@@ -58,23 +58,31 @@ test("generated connection models and operations are used by the platform facade
   }
 });
 
-test("connection actions consume generated operation response types", () => {
+test("connection mutations consume generated operation response types", () => {
+  // The calls live in the facade, where the path is built and every id encoded
+  // (register F9); the actions decide what to send and what a refusal means.
   for (const type of [
     "ConnectionAuthorizationResponse",
     "ConnectProviderWithKeyResponse",
     "DisconnectConnectionResponse",
   ]) {
     assert.match(
-      actions,
+      facade,
       new RegExp(`platformServerJson<${type}>`),
-      `connection action must use ${type}`,
+      `the connections facade must use ${type}`,
     );
   }
+  assert.doesNotMatch(actions, /platformServerJson|\/v1\//u);
   assert.match(actions, /const body: ConnectProviderWithKeyRequest =/);
+  assert.match(
+    facade,
+    /\/connections\/\$\{encodeURIComponent\(connectionId\)\}/u,
+    "the connection id is encoded where the path is built",
+  );
   assert.doesNotMatch(
-    actions,
+    facade,
     /platformServerJson<\{\s*(?:authorizationUrl|connection):/,
-    "connection actions must not recreate generated response shapes",
+    "the facade must not recreate generated response shapes",
   );
 });
 
@@ -100,11 +108,19 @@ test("pasted-key retries preserve one client intent and send its key as a header
   );
   assert.match(panel, /name="idempotencyKey"/);
   assert.match(panel, /retryWithSameIntent/);
-  assert.match(actions, /idempotencyKey,\s*\n/);
+  // The form's key goes to the facade, which sends it as the header.
+  assert.match(
+    actions,
+    /connectWithKey\(\s*await requireActiveWorkspaceId\(\),\s*body,\s*idempotencyKey,?\s*\)/u,
+  );
+  assert.match(
+    facade,
+    /method: "POST", body: JSON\.stringify\(body\), idempotencyKey \}/u,
+  );
   assert.match(actions, /error\.status === 409/);
   assert.match(panel, /Retry verification/);
   assert.doesNotMatch(
-    actions,
+    `${actions}\n${facade}`,
     /credentials:\s*\{[^}]*idempotencyKey/su,
     "the idempotency key must never be placed in the credential JSON",
   );
