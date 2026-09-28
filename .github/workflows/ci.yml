@@ -24,6 +24,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        # The document check believes a struck path only when a commit once
+        # added it; a one-commit clone has no history to show.
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -105,6 +109,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build:no-backend
+      # Served as a preview serves it (register F62's run-time path).
+      - run: npm run probe:no-backend
 
   typecheck:
     name: Typecheck

@@ -9,6 +9,10 @@ export type WorkspaceExportServiceResult =
   components["schemas"]["WorkspaceExportServiceResult"];
 export type ExportWorkspaceResponse =
   operations["exportWorkspace"]["responses"][200]["content"]["application/json"];
+/** A complete export, staged as one file (backend §12.1 #39). */
+export type WorkspaceExportJob = components["schemas"]["WorkspaceExportJob"];
+export type WorkspaceExportJobResponse =
+  components["schemas"]["WorkspaceExportJobResponse"];
 
 /**
  * The server calculates `complete`, but the UI also sees each typed section.

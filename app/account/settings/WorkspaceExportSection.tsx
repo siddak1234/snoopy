@@ -8,6 +8,7 @@ import {
   isPartialWorkspaceExport,
   type WorkspaceExportResponse,
 } from "@/lib/export-contract";
+import { CompleteExportSection } from "./CompleteExportSection";
 import { requestWorkspaceExport } from "./export-actions";
 
 function downloadExport(response: WorkspaceExportResponse) {
@@ -28,7 +29,14 @@ function downloadExport(response: WorkspaceExportResponse) {
  * admin's (Access's `assertWorkspaceAdministrator`). A member is told who can
  * rather than offered a button the platform would refuse (register F8).
  */
-export function WorkspaceExportSection({ canExport }: { canExport: boolean }) {
+export function WorkspaceExportSection({
+  canExport,
+  workspaceId,
+}: {
+  canExport: boolean;
+  /** The workspace this page shows; an export of any other is refused. */
+  workspaceId: string;
+}) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<WorkspaceExportResponse | null>(
@@ -38,7 +46,7 @@ export function WorkspaceExportSection({ canExport }: { canExport: boolean }) {
   const requestExport = () => {
     setError(null);
     startTransition(async () => {
-      const result = await requestWorkspaceExport();
+      const result = await requestWorkspaceExport(workspaceId);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -55,8 +63,8 @@ export function WorkspaceExportSection({ canExport }: { canExport: boolean }) {
         Workspace data export
       </h2>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        Download the records and references currently available for this
-        workspace.
+        Download a quick summary of this workspace&apos;s records — each part
+        bounded to its most recent entries.
       </p>
       {canExport ? (
         <div className="mt-3 flex flex-wrap gap-2">
@@ -78,6 +86,9 @@ export function WorkspaceExportSection({ canExport }: { canExport: boolean }) {
             </Button>
           ) : null}
         </div>
+      ) : null}
+      {canExport ? (
+        <CompleteExportSection workspaceId={workspaceId} />
       ) : (
         <p className="mt-3 text-sm text-[var(--muted)]">
           Exporting a workspace is for its owners and admins, because the export

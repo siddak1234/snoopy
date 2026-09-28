@@ -438,9 +438,10 @@ export async function cancelOrganizationJoinRequest(
  * offer what would be refused: an owner or admin creates teams and sees every
  * one; anyone else sees the teams they are on. An owner, an admin or the team's
  * manager lists and adds its members. A project's effective owner or admin
- * grants it to a team, and anyone with a role on the project reads its grants.
- * Nothing removes a team member or revokes a grant — no operation publishes one
- * (backend §12.1 #174). */
+ * grants it — only a team they can see, as their own list shows it (backend
+ * §12.1 #176) — and anyone with a role on the project reads its grants. The
+ * same authority takes a member off a team, or a team's access away (§12.1
+ * #174); absent is `false`, not an error. */
 
 export async function listTeams(workspaceId: string): Promise<Team[]> {
   return collectPages(async (cursor) => {
@@ -521,4 +522,32 @@ export async function grantProjectTeam(
     idempotencyKey: newIdempotencyKey("project-team"),
   });
   return response.grant;
+}
+
+export async function removeTeamMembership(
+  workspaceId: string,
+  teamId: string,
+  userId: string,
+): Promise<Schema["RemovalResponse"]> {
+  return platformServerJson<Schema["RemovalResponse"]>(
+    `${teamPath(workspaceId, teamId)}/memberships/${encodeURIComponent(userId)}`,
+    {
+      method: "DELETE",
+      idempotencyKey: newIdempotencyKey("team-member-remove"),
+    },
+  );
+}
+
+export async function revokeProjectTeam(
+  workspaceId: string,
+  projectId: string,
+  teamId: string,
+): Promise<Schema["RevocationResponse"]> {
+  return platformServerJson<Schema["RevocationResponse"]>(
+    `${projectPath(workspaceId, projectId)}/team-grants/${encodeURIComponent(teamId)}`,
+    {
+      method: "DELETE",
+      idempotencyKey: newIdempotencyKey("project-team-revoke"),
+    },
+  );
 }

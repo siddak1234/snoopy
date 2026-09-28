@@ -7,6 +7,8 @@ import {
   createTeam,
   findAccessibleProject,
   grantProjectTeam,
+  removeTeamMembership,
+  revokeProjectTeam,
   upsertTeamMembership,
   WORKSPACE_CHANGED,
   type ProjectTeamGrantRole,
@@ -14,7 +16,7 @@ import {
 } from "@/lib/tenancy";
 
 /**
- * The three team writes (backend ADR-0010, §12.1 #173), each showing the
+ * The five team writes (backend ADR-0010, §12.1 #173 and #174), each showing the
  * platform's refusal in place: who may do what is the platform's to decide, and
  * a page only avoids offering what it would refuse. A team's two writes act on
  * the session's active workspace while it is still the one the page showed
@@ -116,5 +118,43 @@ export async function grantProjectTeamAction(
     return { ok: true };
   } catch (error) {
     return refused(error, "The team could not be given access.");
+  }
+}
+
+/**
+ * Takes someone off a team (backend §12.1 #174). Bound in the team's page to
+ * the workspace it showed, which must still be the active one (register F28).
+ */
+export async function removeTeamMemberAction(
+  shownWorkspaceId: string,
+  teamId: string,
+  userId: string,
+): Promise<TeamActionResult> {
+  try {
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspaceId);
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+    await removeTeamMembership(workspaceId, teamId, userId);
+    revalidatePath(`/account/teams/${teamId}`);
+    return { ok: true };
+  } catch (error) {
+    return refused(error, "The team member could not be removed.");
+  }
+}
+
+/** Withdraws a team's access to a project, in the project's own workspace. */
+export async function revokeProjectTeamAction(
+  projectId: string,
+  teamId: string,
+): Promise<TeamActionResult> {
+  try {
+    const context = await findAccessibleProject(projectId);
+    if (!context) {
+      return { ok: false, error: "The project is unavailable." };
+    }
+    await revokeProjectTeam(context.workspace.id, projectId, teamId);
+    revalidatePath(`/account/projects/${projectId}`);
+    return { ok: true };
+  } catch (error) {
+    return refused(error, "The team's access could not be removed.");
   }
 }

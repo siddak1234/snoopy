@@ -11,6 +11,8 @@ import {
 } from "@/lib/tenancy";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
+import { ConfirmRemoveButton } from "@/components/dashboard/ConfirmRemoveButton";
+import { removeTeamMemberAction } from "../actions";
 import { TeamMemberForm } from "./TeamMemberForm";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +56,11 @@ export default async function TeamPage({
     const member = person.get(userId);
     return member?.displayName ?? member?.email ?? "A former member";
   };
+  // A manager who is not an owner or admin sees this team only while on it: one
+  // who takes themselves off goes back to the teams they can still see, not to
+  // a page that would now be not found.
+  const leavesSight = (userId: string) =>
+    userId === session?.user.id && !administers(workspace.role);
 
   return (
     <SectionCard
@@ -72,7 +79,11 @@ export default async function TeamPage({
       {canManage ? (
         <>
           <div className="py-5 first:pt-0">
-            <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
+            <h2
+              id="team-members-title"
+              tabIndex={-1}
+              className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
+            >
               Members
             </h2>
             {memberships.length === 0 ? (
@@ -94,9 +105,30 @@ export default async function TeamPage({
                         </p>
                       ) : null}
                     </div>
-                    <span className="text-xs text-[var(--muted)] capitalize">
-                      {membership.role}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[var(--muted)] capitalize">
+                        {membership.role}
+                      </span>
+                      <ConfirmRemoveButton
+                        label="Remove"
+                        busyLabel="Removing…"
+                        title={`Remove ${label(membership.userId)} from ${team.name}?`}
+                        description="They lose any project access the team gave them. You can add them again."
+                        confirmLabel="Remove"
+                        action={removeTeamMemberAction.bind(
+                          null,
+                          workspace.id,
+                          team.id,
+                          membership.userId,
+                        )}
+                        focusAfter="team-members-title"
+                        redirectAfter={
+                          leavesSight(membership.userId)
+                            ? "/account/teams"
+                            : undefined
+                        }
+                      />
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -116,9 +148,6 @@ export default async function TeamPage({
                   : member.email,
               }))}
             />
-            <p className="mt-3 text-xs text-[var(--muted)]">
-              Removing someone from a team is not available yet.
-            </p>
           </div>
         </>
       ) : (

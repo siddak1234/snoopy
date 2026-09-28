@@ -30,10 +30,11 @@ export default async function AccountSettingsPage() {
 
   // Only with a session, as the workspace list above: without one there is no
   // workspace to read, and nothing to export.
+  const workspaceId = session
+    ? await resolveActiveWorkspaceId(session)
+    : undefined;
   const canExport = session
-    ? administers(
-        await roleInWorkspace(await resolveActiveWorkspaceId(session)),
-      )
+    ? administers(await roleInWorkspace(workspaceId))
     : false;
 
   const showOrgCreate = isCustomDomain && !orgMembership;
@@ -85,7 +86,10 @@ export default async function AccountSettingsPage() {
         </div>
       ) : null}
 
-      <WorkspaceExportSection canExport={canExport} />
+      <WorkspaceExportSection
+        canExport={canExport}
+        workspaceId={workspaceId ?? ""}
+      />
 
       <div className="border-t border-[var(--ring)] pt-5">
         <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">

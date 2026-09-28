@@ -185,6 +185,20 @@ test("every CI job in the Playwright image runs with a HOME that root owns (regi
   }
 });
 
+test("CI's contract tests read the whole history, so a struck document path is checked, not skipped", () => {
+  // `scripts/audit-doc-references.mjs` believes a strike only for a file a
+  // commit once added; in a one-commit clone every strike reads "not checked".
+  const job = read(".github/workflows/ci.yml")
+    .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
+    .find((entry) => entry.startsWith("gates:"));
+  assert.ok(job, "CI has no gates job");
+  assert.match(job, /- run: npm run test:contracts$/mu);
+  assert.match(
+    job,
+    /- uses: actions\/checkout@v4\n(?: {8}#.*\n)*? {8}with:\n {10}fetch-depth: 0$/mu,
+  );
+});
+
 test("CI builds the site with no backend, as a Vercel preview does (register F62)", () => {
   // A platform read on the settings page failed every Vercel preview's build
   // while CI, which builds with the origin set, stayed green.
@@ -193,6 +207,11 @@ test("CI builds the site with no backend, as a Vercel preview does (register F62
     .find((entry) => entry.startsWith("build-no-backend:"));
   assert.ok(job, "CI has no build-no-backend job");
   assert.match(job, /^ {6}- run: npm run build:no-backend$/mu);
+  // And serves it, straight after, from that build's output.
+  assert.match(
+    job,
+    /^ {6}- run: npm run build:no-backend\n(?: {6}#.*\n)* {6}- run: npm run probe:no-backend$/mu,
+  );
   assert.doesNotMatch(
     job,
     /continue-on-error|^\s+if:|^\s+needs:/mu,

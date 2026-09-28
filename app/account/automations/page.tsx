@@ -12,9 +12,13 @@ import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { AutomationActions } from "./AutomationActions";
 import { AddAutomation, type AddScope } from "./AddAutomation";
+import { MoveVersionButton } from "./MoveVersionButton";
+import { WebhookAddressButton } from "./WebhookAddressButton";
 import {
+  administers,
   listWorkspaceProjects,
   resolveActiveWorkspaceId,
+  roleInWorkspace,
   type Project,
 } from "@/lib/tenancy";
 
@@ -51,7 +55,7 @@ export default async function AutomationsPage() {
     );
   }
 
-  const [catalog, subscriptions, projects] = await Promise.all([
+  const [catalog, subscriptions, projects, role] = await Promise.all([
     emptyWhenUnavailable(() => listAutomations(workspaceId), {
       automations: [],
       categories: [],
@@ -60,7 +64,9 @@ export default async function AutomationsPage() {
       subscriptions: [],
     }),
     emptyWhenUnavailable(() => listWorkspaceProjects(workspaceId), []),
+    roleInWorkspace(workspaceId),
   ]);
+  const canAdminister = administers(role);
 
   // Archiving is one-way and is how a workspace gives a plan slot back; using
   // that automation again means subscribing afresh. The list's contract does not
@@ -93,6 +99,8 @@ export default async function AutomationsPage() {
               automation={automation}
               subscriptions={byTemplate.get(automation.templateId) ?? []}
               projects={openProjects}
+              canAdminister={canAdminister}
+              workspaceId={workspaceId}
             />
           ))}
         </div>
@@ -105,10 +113,15 @@ function AutomationCard({
   automation,
   subscriptions,
   projects,
+  canAdminister,
+  workspaceId,
 }: {
   automation: AutomationCatalogEntry;
   subscriptions: Subscription[];
   projects: Project[];
+  canAdminister: boolean;
+  /** The workspace this page shows; its actions are refused once it is not active. */
+  workspaceId: string;
 }) {
   const projectName = new Map(
     projects.map((project) => [project.id, project.name]),
@@ -133,7 +146,13 @@ function AutomationCard({
           <p className="text-xs tracking-[0.06em] text-[var(--muted)] uppercase">
             {automation.category}
           </p>
-          <h2 className="mt-1 truncate text-base font-medium text-[var(--text)]">
+          {/* Where focus goes once a control that leaves the card is done —
+              a move to the newest version takes its own button away. */}
+          <h2
+            id={`automation-${automation.templateId}-name`}
+            tabIndex={-1}
+            className="mt-1 truncate text-base font-medium text-[var(--text)]"
+          >
             {automation.name}
           </h2>
         </div>
@@ -192,14 +211,35 @@ function AutomationCard({
           ) : null}
 
           {/* A subscription runs the version it PINNED (backend ADR-0030), and
-              adding an automation pins the newest. The catalog does not say what
-              a newer version declares, so the card says only which version runs
-              and how to move — never that moving gives a Run. */}
+              adding an automation pins the newest. It moves in place (backend
+              §12.1 #126); the catalog does not say what a newer version
+              declares, so the card says only which version runs. */}
           {subscription.templateVersion < automation.version ? (
-            <p className="text-xs text-[var(--muted)]">
-              This runs v{subscription.templateVersion}. To move to v
-              {automation.version}, archive it and add it again.
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs text-[var(--muted)]">
+                This runs v{subscription.templateVersion}; v{automation.version}{" "}
+                is available.
+              </p>
+              <MoveVersionButton
+                subscriptionId={subscription.id}
+                name={automation.name}
+                from={subscription.templateVersion}
+                to={automation.version}
+                focusAfter={`automation-${automation.templateId}-name`}
+              />
+            </div>
+          ) : null}
+
+          {/* Where a vendor sends the events that start it (backend §12.1 #91):
+              only for a webhook-started version, and only for an owner or admin,
+              as the platform allows no one else. */}
+          {subscription.triggerKind === "webhook" && canAdminister ? (
+            <div>
+              <WebhookAddressButton
+                workspaceId={workspaceId}
+                subscriptionId={subscription.id}
+              />
+            </div>
           ) : null}
 
           <AutomationActions

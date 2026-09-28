@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
@@ -57,6 +57,24 @@ export function AutomationActions({
   // One run per key: made when the Run dialog opens and again whenever a value
   // changes, so only a resubmission of the same values reuses it.
   const [runKey, setRunKey] = useState("");
+  // A file field uploads as soon as a file is chosen; the run waits for every
+  // one. Held per field, so one field's upload ending — or one abandoned when
+  // the form closed — never speaks for another's still in flight.
+  const [uploadingFields, setUploadingFields] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const uploading = uploadingFields.size > 0;
+  const onUploadingChange = useCallback((key: string, busy: boolean) => {
+    setUploadingFields((current) => {
+      if (busy === current.has(key)) return current;
+      const next = new Set(current);
+      if (busy) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }, []);
+  // Bumped to empty the file fields when the platform will not take a file.
+  const [fileRound, setFileRound] = useState(0);
   const newRunKey = () => setRunKey(`run-${crypto.randomUUID()}`);
 
   const submit = (
@@ -84,6 +102,7 @@ export function AutomationActions({
   const close = () => {
     setDialog(null);
     setError(null);
+    setUploadingFields(new Set());
   };
 
   // Submitted from `onSubmit`, not a form `action`: React resets an action form's
@@ -116,6 +135,12 @@ export function AutomationActions({
       const result = await startRun(data);
       if (!result.ok) {
         setError(result.error);
+        // A file already used, or gone: its field is emptied to choose again,
+        // and the changed input is a new run.
+        if (result.state === "file-unavailable") {
+          setFileRound((round) => round + 1);
+          newRunKey();
+        }
         return;
       }
       close();
@@ -293,7 +318,12 @@ export function AutomationActions({
               value={subscription.id}
             />
             <input type="hidden" name="idempotencyKey" value={runKey} />
-            <RunInputFields runInput={subscription.runInput} />
+            <RunInputFields
+              runInput={subscription.runInput}
+              subscriptionId={subscription.id}
+              onUploadingChange={onUploadingChange}
+              fileRound={fileRound}
+            />
             <FormError message={error} />
             <div className="flex flex-wrap gap-2 pt-2">
               <Button
@@ -304,8 +334,8 @@ export function AutomationActions({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={pending}>
-                {pending ? "Starting…" : "Start run"}
+              <Button type="submit" disabled={pending || uploading}>
+                {pending ? "Starting…" : uploading ? "Uploading…" : "Start run"}
               </Button>
             </div>
           </form>
