@@ -70,17 +70,20 @@ export function RunInputFields({
   runInput,
   subscriptionId,
   onUploadingChange,
+  fileRound,
 }: {
   runInput: AutomationRunInputField[];
   subscriptionId: string;
-  onUploadingChange: (uploading: boolean) => void;
+  onUploadingChange: (key: string, uploading: boolean) => void;
+  /** Changed to empty every file field — a file the platform will no longer take. */
+  fileRound: number;
 }) {
   return (
     <div className="space-y-4">
       {runInput.map((field) =>
         field.control === "artifact" ? (
           <RunFileField
-            key={field.key}
+            key={`${field.key}:${fileRound}`}
             field={field}
             subscriptionId={subscriptionId}
             onBusyChange={onUploadingChange}

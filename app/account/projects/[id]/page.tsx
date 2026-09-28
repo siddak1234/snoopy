@@ -124,7 +124,11 @@ export default async function ProjectDetailPage({
 
       {isTeamProject ? (
         <div className="border-t border-[var(--ring)] py-5 pb-0">
-          <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
+          <h2
+            id="project-teams-title"
+            tabIndex={-1}
+            className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
+          >
             Teams with access
           </h2>
           {grants.length === 0 ? (
@@ -157,6 +161,7 @@ export default async function ProjectDetailPage({
                           project.id,
                           grant.teamId,
                         )}
+                        focusAfter="project-teams-title"
                       />
                     ) : null}
                   </div>

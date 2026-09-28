@@ -82,6 +82,9 @@ export function WebhookAddressButton({
           ariaLabelledBy={titleId}
           ariaDescribedBy={`${titleId}-desc`}
           zIndex={100}
+          // Held open while a secret is being made: the platform stops the old
+          // one when it answers, and the new one exists only in that answer.
+          dismissible={!pending}
         >
           <h2 id={titleId} className="text-xl font-semibold text-[var(--text)]">
             Webhook address
@@ -116,6 +119,14 @@ export function WebhookAddressButton({
                 : ""}
             </p>
           ) : null}
+          {/* Said once it arrives — the secret itself is only shown, never
+              announced. Empty while a request is pending, so a second secret
+              is a change the region announces again. */}
+          <p role="status" className="sr-only">
+            {issued && !pending
+              ? "A new secret was made. Copy it now: it is shown this once."
+              : ""}
+          </p>
           {issued ? (
             <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--ring)] p-3">
               <p className="text-xs text-[var(--muted)]">

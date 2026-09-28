@@ -45,6 +45,10 @@ const server = spawn(
   { cwd: root, env: environment, stdio: ["ignore", "inherit", "inherit"] },
 );
 
+// A child killed by a signal exits with `exitCode` null and its `signalCode`
+// set: both are asked, or a server that died that way reads as still running.
+const exited = () => server.exitCode !== null || server.signalCode !== null;
+
 const failures = [];
 function expectThat(condition, message) {
   if (!condition) failures.push(message);
@@ -53,7 +57,7 @@ function expectThat(condition, message) {
 try {
   const deadline = Date.now() + 60_000;
   for (;;) {
-    if (server.exitCode !== null) throw new Error("next start exited early");
+    if (exited()) throw new Error("next start exited early");
     const answer = await fetch(`${origin}/`).catch(() => null);
     if (answer?.status === 200) break;
     if (Date.now() > deadline) throw new Error("next start did not answer");
@@ -99,8 +103,11 @@ try {
 } catch (error) {
   failures.push(error.message);
 } finally {
-  server.kill("SIGTERM");
-  if (server.exitCode === null) await once(server, "exit");
+  // An exit that already happened is not waited for: its event has fired.
+  if (!exited()) {
+    server.kill("SIGTERM");
+    await once(server, "exit");
+  }
 }
 
 if (failures.length > 0) {

@@ -12,6 +12,12 @@ import { FormError } from "@/components/ui/FormError";
  * team, a team's access to a project (backend §12.1 #174). Nothing here is
  * one-way: the same person or team can be added again, which is why a plain
  * confirmation suffices where deleting a project asks for a typed word.
+ *
+ * The removed row takes this button with it, so focus is handed to
+ * `focusAfter` — the id of the list's heading, which stays. A removal that
+ * takes the page away from the person (a manager leaving their own team, which
+ * they then cannot see) goes to `redirectAfter` instead, as leaving a project
+ * does.
  */
 export function ConfirmRemoveButton({
   label,
@@ -20,6 +26,8 @@ export function ConfirmRemoveButton({
   description,
   confirmLabel,
   action,
+  focusAfter,
+  redirectAfter,
 }: {
   /** The button, e.g. "Remove". */
   label: string;
@@ -29,6 +37,8 @@ export function ConfirmRemoveButton({
   description: string;
   confirmLabel: string;
   action: () => Promise<{ ok: true } | { ok: false; error: string }>;
+  focusAfter: string;
+  redirectAfter?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -44,6 +54,11 @@ export function ConfirmRemoveButton({
         return;
       }
       setOpen(false);
+      if (redirectAfter) {
+        router.push(redirectAfter);
+        return;
+      }
+      document.getElementById(focusAfter)?.focus();
       router.refresh();
     });
   };
@@ -68,6 +83,7 @@ export function ConfirmRemoveButton({
           ariaDescribedBy={`${titleId}-desc`}
           bubble
           zIndex={105}
+          dismissible={!pending}
         >
           <h2
             id={`${titleId}-title`}

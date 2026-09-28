@@ -1,9 +1,19 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
+import { pathToFileURL } from "node:url";
 import { preflight } from "../scripts/audit/preflight.mjs";
 
 /**
@@ -195,6 +205,83 @@ test("the preflight refuses a port a server holds, whatever its process is calle
   }
 });
 
+test("the preflight takes the lock before it asks about a port, and a refused port gives the lock back", async () => {
+  // Asking about a port binds it. Asked while another run holds the lock, that
+  // bind could take the port its server is about to listen on, so a run that
+  // cannot have the lock must be refused before it binds anything.
+  const root = mkdtempSync(join(tmpdir(), "autom8x-preflight-order-"));
+  const lock = join(root, ".git/autom8x-audit/lock");
+  const refuse = (message) => {
+    throw new Error(message);
+  };
+  const server = await plant("127.0.0.1");
+  const { port } = server.address();
+  try {
+    // Another run holds the lock (a live pid: this one).
+    mkdirSync(join(root, ".git/autom8x-audit"), { recursive: true });
+    writeFileSync(lock, String(process.pid));
+    await assert.rejects(
+      async () => preflight({ root, fail: refuse, ports: [port] }),
+      /another verify is running/u,
+      "the port was asked about while another run held the lock",
+    );
+    // Free, the lock is taken — and given back when the port is refused, so
+    // a refusal leaves nothing behind for the next run to trip on.
+    rmSync(lock);
+    await assert.rejects(
+      async () => preflight({ root, fail: refuse, ports: [port] }),
+      new RegExp(`port ${port}\\b`, "u"),
+    );
+    assert.equal(existsSync(lock), false, "a refused port kept the lock");
+  } finally {
+    await new Promise((closed) => server.close(closed));
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the no-backend probe stops at once when its server is killed by a signal, and never waits for an exit already gone (register F62)", async () => {
+  // A child killed by a signal has `exitCode` null: a probe that asked only
+  // that polled for a minute, then awaited an "exit" event that had fired.
+  // Here `next start` is replaced, through the builtin module's own exports,
+  // by a process that kills itself.
+  const directory = mkdtempSync(join(tmpdir(), "autom8x-probe-"));
+  const preload = join(directory, "killed-server.mjs");
+  writeFileSync(
+    preload,
+    [
+      'import childProcess from "node:child_process";',
+      'import { syncBuiltinESMExports } from "node:module";',
+      "const spawn = childProcess.spawn;",
+      "childProcess.spawn = () =>",
+      '  spawn(process.execPath, ["-e", "process.kill(process.pid, \'SIGKILL\')"], {',
+      '    stdio: "ignore",',
+      "  });",
+      "syncBuiltinESMExports();",
+    ].join("\n"),
+  );
+  try {
+    const probe = spawn(
+      process.execPath,
+      [
+        "--import",
+        pathToFileURL(preload).href,
+        resolve(import.meta.dirname, "../scripts/probe-no-backend.mjs"),
+      ],
+      { stdio: ["ignore", "ignore", "pipe"] },
+    );
+    let stderr = "";
+    probe.stderr.on("data", (chunk) => (stderr += chunk));
+    const timer = setTimeout(() => probe.kill("SIGKILL"), 20_000);
+    const [code, signal] = await once(probe, "exit");
+    clearTimeout(timer);
+    assert.equal(signal, null, "the probe hung and was killed after 20s");
+    assert.equal(code, 1, stderr);
+    assert.match(stderr, /next start exited early/u);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("the change audit runs verify's gates, in verify's order, and the marker requires them all (register F15)", () => {
   const verifyGates = gateNames(
     verify,
@@ -294,6 +381,16 @@ test("the change audit's evidence keeps the runner's summary and counts, not onl
   assert.deepEqual(
     gateOutput(
       "ok 1 - a\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 5.1\n",
+      "",
+    ).counts,
+    { tests: 1, pass: 1, fail: 0, cancelled: 0, skipped: 0, todo: 0 },
+  );
+  // node:test's spec reporter, the default wherever a Node prints it to a
+  // pipe too: the same counts, marked ℹ — never a null the evidence reads as
+  // "no test runner".
+  assert.deepEqual(
+    gateOutput(
+      "✔ a (0.5ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 5.1\n",
       "",
     ).counts,
     { tests: 1, pass: 1, fail: 0, cancelled: 0, skipped: 0, todo: 0 },

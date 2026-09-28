@@ -123,14 +123,17 @@ test("the complete export is started once, followed, and its link asked for agai
   // one kept from when the file became ready.
   assert.match(
     complete,
-    /const download = \(\) => \{[\s\S]*?const result = await readCompleteExport\(job\.id\);[\s\S]*?window\.location\.assign\(result\.job\.file\.downloadUrl\)/u,
+    /const download = \(\) => \{[\s\S]*?const result = await readCompleteExport\(workspaceId, job\.id\);[\s\S]*?window\.location\.assign\(result\.job\.file\.downloadUrl\)/u,
   );
   assert.doesNotMatch(
     complete,
     /(?<!result\.)job\.file\.downloadUrl|localStorage|sessionStorage/u,
   );
   // Offered to an owner or admin only, as the quick export is.
-  assert.match(ui, /\{canExport \? \(\s*<CompleteExportSection \/>/u);
+  assert.match(
+    ui,
+    /\{canExport \? \(\s*<CompleteExportSection workspaceId=\{workspaceId\} \/>/u,
+  );
   if (existsSync(SPEC_PATH)) {
     const spec = readFileSync(SPEC_PATH, "utf8");
     const described =

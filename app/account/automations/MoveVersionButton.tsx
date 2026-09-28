@@ -13,17 +13,22 @@ import { moveSubscriptionVersion } from "./actions";
  * version it moves to, and refuses while an approval still waits on the one it
  * runs now; each refusal is said in words by the action. The history stays:
  * runs already made are the old version's, and nothing is re-added.
+ *
+ * Once moved, this button goes with the version note it sits in, so focus is
+ * handed to `focusAfter` — the id of something the card keeps.
  */
 export function MoveVersionButton({
   subscriptionId,
   name,
   from,
   to,
+  focusAfter,
 }: {
   subscriptionId: string;
   name: string;
   from: number;
   to: number;
+  focusAfter: string;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -42,6 +47,7 @@ export function MoveVersionButton({
         return;
       }
       setOpen(false);
+      document.getElementById(focusAfter)?.focus();
     });
   };
 
@@ -65,6 +71,7 @@ export function MoveVersionButton({
           ariaLabelledBy={titleId}
           ariaDescribedBy={`${titleId}-desc`}
           zIndex={100}
+          dismissible={!pending}
         >
           <h2 id={titleId} className="text-xl font-semibold text-[var(--text)]">
             Move {name} to v{to}?

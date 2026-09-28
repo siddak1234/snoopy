@@ -28,6 +28,10 @@ function focusableChildren(container: HTMLElement): HTMLElement[] {
  * Structure: portal to body, then backdrop (fixed inset-0) + content (fixed, centered).
  * Backdrop click calls onClose. Content click is stopped so it doesn’t close.
  * Modal content has no hover/parallax/tilt—position is fixed and stable.
+ *
+ * `dismissible={false}` holds it open against Escape and the backdrop — for
+ * while a request it sent is in flight, whose answer (a refusal, a secret shown
+ * once) would otherwise arrive after the dialog that says it had gone.
  */
 export default function Modal({
   onClose,
@@ -37,6 +41,7 @@ export default function Modal({
   bubble = false,
   contentClassName = "",
   zIndex = 50,
+  dismissible = true,
 }: {
   onClose: () => void;
   children: React.ReactNode;
@@ -47,13 +52,17 @@ export default function Modal({
   /** Extra classes for the content panel (e.g. max-w-md, p-6) */
   contentClassName?: string;
   zIndex?: number;
+  /** Whether Escape and a backdrop click close it; false while a request is pending. */
+  dismissible?: boolean;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
+  const dismissibleRef = useRef(dismissible);
 
   useEffect(() => {
     onCloseRef.current = onClose;
-  }, [onClose]);
+    dismissibleRef.current = dismissible;
+  }, [onClose, dismissible]);
 
   const contentZ = zIndex + 1;
   const baseContent =
@@ -80,7 +89,7 @@ export default function Modal({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onCloseRef.current();
+        if (dismissibleRef.current) onCloseRef.current();
         return;
       }
       if (event.key !== "Tab") return;
@@ -125,7 +134,7 @@ export default function Modal({
       <div
         className="fixed inset-0 bg-black/50 backdrop-blur-[2px]"
         aria-hidden
-        onClick={onClose}
+        onClick={dismissible ? onClose : undefined}
       />
       <div
         role="dialog"

@@ -23,11 +23,20 @@ const SERVER_ADDRESSES = ["127.0.0.1", "0.0.0.0", "::"];
  * Refuses a clone that cannot give an honest answer, then holds the lock until
  * this process exits. `ports` exists for the contract tests, which plant a
  * listener on a port of their own rather than touch the servers'.
+ *
+ * The lock comes first: asking about a port binds it, and a bind made while
+ * another run holds the lock could take the port its server is about to listen
+ * on. A refused port gives the lock back.
  */
 export async function preflight({ root, fail, ports = SERVER_PORTS }) {
   refuseConflictCopies(root, fail);
-  await refuseBusyPorts(ports, fail);
-  holdLock(root, fail);
+  const release = holdLock(root, fail);
+  try {
+    await refuseBusyPorts(ports, fail);
+  } catch (error) {
+    release();
+    throw error;
+  }
 }
 
 // macOS/iCloud Finder conflict copies ("file 2.ts") are invisible to git (the
@@ -140,15 +149,22 @@ function holdLock(root, fail) {
   };
   acquire(true);
 
-  process.on("exit", () => {
+  const release = () => {
+    process.off("exit", release);
+    process.off("SIGINT", interrupted);
+    process.off("SIGTERM", terminated);
     try {
       rmSync(lockPath);
     } catch {
       /* already gone */
     }
-  });
-  process.on("SIGINT", () => process.exit(130));
-  process.on("SIGTERM", () => process.exit(143));
+  };
+  const interrupted = () => process.exit(130);
+  const terminated = () => process.exit(143);
+  process.on("exit", release);
+  process.on("SIGINT", interrupted);
+  process.on("SIGTERM", terminated);
+  return release;
 }
 
 /**

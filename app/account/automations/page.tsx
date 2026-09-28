@@ -142,7 +142,13 @@ function AutomationCard({
           <p className="text-xs tracking-[0.06em] text-[var(--muted)] uppercase">
             {automation.category}
           </p>
-          <h2 className="mt-1 truncate text-base font-medium text-[var(--text)]">
+          {/* Where focus goes once a control that leaves the card is done —
+              a move to the newest version takes its own button away. */}
+          <h2
+            id={`automation-${automation.templateId}-name`}
+            tabIndex={-1}
+            className="mt-1 truncate text-base font-medium text-[var(--text)]"
+          >
             {automation.name}
           </h2>
         </div>
@@ -215,6 +221,7 @@ function AutomationCard({
                 name={automation.name}
                 from={subscription.templateVersion}
                 to={automation.version}
+                focusAfter={`automation-${automation.templateId}-name`}
               />
             </div>
           ) : null}

@@ -129,9 +129,11 @@ test("a page offers owner-or-admin controls by the platform's own rule (register
     "Disconnect and Connect/Reconnect are each behind canManage",
   );
   const settings = readFileSync("app/account/settings/page.tsx", "utf8");
+  // With the workspace the page showed, which every export is held to
+  // (register F28).
   assert.match(
     settings,
-    /<WorkspaceExportSection canExport=\{canExport\} \/>/u,
+    /<WorkspaceExportSection\s+canExport=\{canExport\}\s+workspaceId=\{workspaceId \?\? ""\}\s+\/>/u,
   );
   // With a session only, and no export without one (register F62).
   assert.match(

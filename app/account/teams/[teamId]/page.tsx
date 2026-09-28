@@ -56,6 +56,11 @@ export default async function TeamPage({
     const member = person.get(userId);
     return member?.displayName ?? member?.email ?? "A former member";
   };
+  // A manager who is not an owner or admin sees this team only while on it: one
+  // who takes themselves off goes back to the teams they can still see, not to
+  // a page that would now be not found.
+  const leavesSight = (userId: string) =>
+    userId === session?.user.id && !administers(workspace.role);
 
   return (
     <SectionCard
@@ -74,7 +79,11 @@ export default async function TeamPage({
       {canManage ? (
         <>
           <div className="py-5 first:pt-0">
-            <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
+            <h2
+              id="team-members-title"
+              tabIndex={-1}
+              className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
+            >
               Members
             </h2>
             {memberships.length === 0 ? (
@@ -112,6 +121,12 @@ export default async function TeamPage({
                           team.id,
                           membership.userId,
                         )}
+                        focusAfter="team-members-title"
+                        redirectAfter={
+                          leavesSight(membership.userId)
+                            ? "/account/teams"
+                            : undefined
+                        }
                       />
                     </div>
                   </li>

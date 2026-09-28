@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { FormError } from "@/components/ui/FormError";
 import type { AutomationRunInputField } from "@/lib/automations";
 import { putFileToSignedUrl } from "@/lib/platform-api";
@@ -14,6 +14,10 @@ import { completeRunUpload, openRunUpload } from "./upload-actions";
  * website or the platform's API — and the platform then says what arrived.
  * What the form carries is only the file's id, in the same `input:<key>` field
  * every other control uses, so the run's input is built the one way.
+ *
+ * An upload belongs to the field that started it: its busy state is reported
+ * under the field's key, it stops when the field goes (the form closed), and an
+ * answer that arrives for one no longer in flight changes nothing.
  */
 export function RunFileField({
   field,
@@ -22,9 +26,25 @@ export function RunFileField({
 }: {
   field: AutomationRunInputField;
   subscriptionId: string;
-  onBusyChange: (busy: boolean) => void;
+  onBusyChange: (key: string, busy: boolean) => void;
 }) {
   const inputId = useId();
+  const input = useRef<HTMLInputElement>(null);
+  const inFlight = useRef<AbortController | null>(null);
+  const report = useRef(onBusyChange);
+  useEffect(() => {
+    report.current = onBusyChange;
+  }, [onBusyChange]);
+  useEffect(() => {
+    const key = field.key;
+    return () => {
+      const upload = inFlight.current;
+      if (!upload) return;
+      inFlight.current = null;
+      upload.abort();
+      report.current(key, false);
+    };
+  }, [field.key]);
   const [state, setState] = useState<
     | { kind: "empty" }
     | { kind: "uploading"; name: string }
@@ -38,8 +58,11 @@ export function RunFileField({
       setState({ kind: "empty" });
       return;
     }
+    inFlight.current?.abort();
+    const upload = new AbortController();
+    inFlight.current = upload;
     setState({ kind: "uploading", name: file.name });
-    onBusyChange(true);
+    onBusyChange(field.key, true);
     try {
       const opened = await openRunUpload({
         subscriptionId,
@@ -47,9 +70,11 @@ export function RunFileField({
         contentType: file.type,
         sizeBytes: file.size,
       });
+      if (upload.signal.aborted) return;
       if (!opened.ok) throw new Error(opened.error);
-      await putFileToSignedUrl(opened.ticket.uploadUrl, file);
+      await putFileToSignedUrl(opened.ticket.uploadUrl, file, upload.signal);
       const completed = await completeRunUpload(opened.ticket.uploadSessionId);
+      if (upload.signal.aborted) return;
       if (!completed.ok) throw new Error(completed.error);
       setState({
         kind: "ready",
@@ -58,14 +83,21 @@ export function RunFileField({
         sizeBytes: completed.file.sizeBytes,
       });
     } catch (failure) {
+      if (upload.signal.aborted) return;
       setState({ kind: "empty" });
+      // Emptied, so choosing the same file again is a change the browser
+      // reports — as "Choose it again" asks.
+      if (input.current) input.current.value = "";
       setError(
         failure instanceof Error
           ? failure.message
           : "The file could not be sent.",
       );
     } finally {
-      onBusyChange(false);
+      if (inFlight.current === upload) {
+        inFlight.current = null;
+        onBusyChange(field.key, false);
+      }
     }
   };
 
@@ -96,6 +128,7 @@ export function RunFileField({
       </label>
       <p className="mt-1 text-xs text-[var(--muted)]">{field.description}</p>
       <input
+        ref={input}
         id={inputId}
         type="file"
         disabled={state.kind === "uploading"}

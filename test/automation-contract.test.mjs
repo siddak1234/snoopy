@@ -536,7 +536,10 @@ function specReasons(operationId) {
   return [
     ...new Set(
       [
-        ...spec.slice(start, start + end).matchAll(/`([a-z]+(?:_[a-z]+)+)`/gu),
+        // A reason is named on its own, or as `details.reason: <reason>`.
+        ...spec
+          .slice(start, start + end)
+          .matchAll(/`(?:details\.reason: )?([a-z]+(?:_[a-z]+)+)`/gu),
       ].map((match) => match[1]),
     ),
   ].sort();
@@ -578,7 +581,7 @@ test("a run's file goes straight to the store, and the run carries only its id (
   // or the platform's API, and with no cookie.
   assert.match(
     fileField,
-    /await putFileToSignedUrl\(opened\.ticket\.uploadUrl, file\)/u,
+    /await putFileToSignedUrl\(opened\.ticket\.uploadUrl, file, upload\.signal\)/u,
   );
   assert.doesNotMatch(fileField, /platformServerJson|\/api\/platform/u);
   assert.match(
@@ -602,6 +605,27 @@ test("a run's file goes straight to the store, and the run carries only its id (
       refusalKeys(uploads, "UPLOAD_REFUSALS"),
       [...specReasons("openUpload"), ...specReasons("completeUpload")].sort(),
       "every refusal the two upload operations name is said in words, and no other",
+    );
+  }
+});
+
+test("a run refused for its file says so and empties the file field to choose again, and no other refusal does (backend FR-14)", () => {
+  // `artifact_unavailable` is a file already given to a run, or gone: checking
+  // the values cannot fix it, so it is said in its own words.
+  assert.match(
+    actions,
+    /if \(error\.status === 422 && known\) \{[\s\S]*?reason === "artifact_unavailable"\s*\?\s*\{ state: "file-unavailable" as const \}/u,
+  );
+  assert.match(
+    actionsUi,
+    /if \(result\.state === "file-unavailable"\) \{\s*setFileRound\(\(round\) => round \+ 1\);\s*newRunKey\(\);/u,
+  );
+  assert.match(fields, /key=\{`\$\{field\.key\}:\$\{fileRound\}`\}/u);
+  if (available) {
+    assert.deepEqual(
+      refusalKeys(actions, "RUN_REFUSALS"),
+      specReasons("createRun"),
+      "every reason createRun names is said in words, and no other",
     );
   }
 });

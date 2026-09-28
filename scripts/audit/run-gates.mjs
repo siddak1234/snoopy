@@ -17,8 +17,11 @@ const TAIL_LINES = 30;
 const PLAYWRIGHT_SUMMARY = /^::notice title=[^:]*Playwright Run Summary::/u;
 const PLAYWRIGHT_COUNT =
   /^\s*(\d+) (passed|failed|flaky|skipped|interrupted|did not run)\b/u;
-// node:test prints TAP to a pipe, ending in `# pass 103`; the last one wins.
-const NODE_TEST_COUNT = /^# (tests|pass|fail|cancelled|skipped|todo) (\d+)$/u;
+// node:test prints TAP to a pipe, ending in `# pass 103`; a Node whose default
+// reporter is `spec` everywhere ends in `ℹ pass 103` instead. Either is read,
+// and the last one wins.
+const NODE_TEST_COUNT =
+  /^(?:#|ℹ) (tests|pass|fail|cancelled|skipped|todo) (\d+)$/u;
 
 function git(...args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();

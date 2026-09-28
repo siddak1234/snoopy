@@ -9,6 +9,14 @@ import { readCompleteExport, startCompleteExport } from "./export-actions";
 /** How often a running export is asked about. */
 const POLL_MS = 2_000;
 
+/**
+ * How many reads in a row may fail before the page stops asking, each after
+ * twice the wait of the one before. Then the failure is said and Export
+ * everything is offered again: asking again answers the export already
+ * running, so nothing is started twice.
+ */
+const FAILED_READS_ALLOWED = 3;
+
 /** A reason code the platform names, in words. */
 const FAILURES: Record<string, string> = {
   interrupted: "The export was interrupted. Start it again.",
@@ -24,31 +32,62 @@ const FAILURES: Record<string, string> = {
  * download rather than kept from when the file became ready: one fetched
  * earlier may have expired by the time it is clicked. The file itself is kept
  * for a day.
+ *
+ * `workspaceId` is the workspace the page shows: every call is refused once
+ * another tab has made a different one active (register F28).
  */
-export function CompleteExportSection() {
+export function CompleteExportSection({
+  workspaceId,
+}: {
+  workspaceId: string;
+}) {
   const [pending, startTransition] = useTransition();
   const [job, setJob] = useState<WorkspaceExportJob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Off the page: a read still in flight when it goes schedules nothing after.
+  const gone = useRef(false);
 
-  useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(() => {
+    gone.current = false;
+    return () => {
+      gone.current = true;
+      clearTimeout(timer.current);
+    };
+  }, []);
 
-  const follow = (exportId: string) => {
-    timer.current = setTimeout(async () => {
-      const result = await readCompleteExport(exportId);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      setJob(result.job);
-      if (result.job.status === "running") follow(exportId);
-    }, POLL_MS);
+  const follow = (exportId: string, failedReads = 0) => {
+    timer.current = setTimeout(
+      async () => {
+        // A read the browser could not even send is a failed read, not an
+        // unhandled rejection that stops the following unseen.
+        const result = await readCompleteExport(workspaceId, exportId).catch(
+          () => ({
+            ok: false as const,
+            error: "The export could not be checked just now.",
+          }),
+        );
+        if (gone.current) return;
+        if (!result.ok) {
+          if (failedReads + 1 < FAILED_READS_ALLOWED) {
+            follow(exportId, failedReads + 1);
+            return;
+          }
+          setJob(null);
+          setError(result.error);
+          return;
+        }
+        setJob(result.job);
+        if (result.job.status === "running") follow(exportId);
+      },
+      POLL_MS * 2 ** failedReads,
+    );
   };
 
   const start = () => {
     setError(null);
     startTransition(async () => {
-      const result = await startCompleteExport();
+      const result = await startCompleteExport(workspaceId);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -62,7 +101,7 @@ export function CompleteExportSection() {
     if (!job) return;
     setError(null);
     startTransition(async () => {
-      const result = await readCompleteExport(job.id);
+      const result = await readCompleteExport(workspaceId, job.id);
       if (!result.ok) {
         setError(result.error);
         return;

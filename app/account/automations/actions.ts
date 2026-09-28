@@ -44,7 +44,7 @@ export type ActionResult =
   | {
       ok: false;
       error: string;
-      state?: "plan-limit" | "entitlements-unavailable";
+      state?: "plan-limit" | "entitlements-unavailable" | "file-unavailable";
     };
 
 /** Turns a refusal into something renderable, and lets the unexpected surface. */
@@ -169,6 +169,15 @@ export async function saveSubscriptionConfiguration(
 }
 
 /**
+ * The refusals a run can meet that name their reason (backend FR-14), in
+ * words. A file already given to a run, or gone, cannot be fixed by checking
+ * the values: its field is emptied to choose the file again.
+ */
+const RUN_REFUSALS: Record<string, string> = {
+  artifact_unavailable: "That file can no longer be used. Choose it again.",
+};
+
+/**
  * Start a run of a manual automation — backend §12.1 #162, ADR-0030.
  *
  * The input is exactly what the subscription's pinned version declares; the
@@ -203,6 +212,17 @@ export async function startRun(formData: FormData): Promise<ActionResult> {
     return { ok: true, runId: response.run.id };
   } catch (error) {
     if (!(error instanceof PlatformServerError)) throw error;
+    const reason = error.details?.reason;
+    const known = typeof reason === "string" ? RUN_REFUSALS[reason] : undefined;
+    if (error.status === 422 && known) {
+      return {
+        ok: false,
+        error: known,
+        ...(reason === "artifact_unavailable"
+          ? { state: "file-unavailable" as const }
+          : {}),
+      };
+    }
     if (error.status === 422) {
       return {
         ok: false,
@@ -250,6 +270,8 @@ export async function archiveSubscription(
 const MOVE_REFUSALS: Record<string, string> = {
   approvals_pending:
     "An approval for this automation is still waiting. Decide it first, then move.",
+  runs_in_flight:
+    "A run of this automation is still going. Wait for it to finish, then move.",
   version_unavailable: "That version is no longer available.",
   subscription_archived: "An archived automation cannot move.",
   invalid_config:

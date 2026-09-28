@@ -100,24 +100,43 @@ export async function signOutFromPlatform(): Promise<void> {
 }
 
 /**
+ * How long a file may take to reach the store: as long as its signed URL is
+ * good for (the store's upload sessions last 15 minutes). A PUT still going
+ * after that could not be completed anyway, so it is given up rather than left
+ * "Uploading…" for ever.
+ */
+const UPLOAD_TIMEOUT_MS = 15 * 60_000;
+
+/**
  * Sends a file straight to the store, at a URL the platform signed for it
  * (backend FR-14) — not a platform call, so no cookie and no `/api/platform`.
  * The size is signed into the URL, and the browser sets `Content-Length` from
- * the file itself, so only this file fits it.
+ * the file itself, so only this file fits it. `signal` is the caller's: a file
+ * chosen again, or a form closed, stops the one in flight.
  */
 export async function putFileToSignedUrl(
   url: string,
   file: Blob,
+  signal?: AbortSignal,
 ): Promise<void> {
+  const upload = new AbortController();
+  const stop = () => upload.abort();
+  const timer = setTimeout(stop, UPLOAD_TIMEOUT_MS);
+  signal?.addEventListener("abort", stop, { once: true });
+  if (signal?.aborted) stop();
   let response: Response;
   try {
     response = await fetch(url, {
       method: "PUT",
       body: file,
       credentials: "omit",
+      signal: upload.signal,
     });
   } catch {
     throw new PlatformApiError("The file could not be sent. Try again.", 0);
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", stop);
   }
   if (!response.ok) {
     throw new PlatformApiError(

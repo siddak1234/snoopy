@@ -72,3 +72,35 @@ export async function presentSession(page: Page, value: string) {
     },
   ]);
 }
+
+// A server action as the page sends it: a POST to its own URL, named by header.
+export const isServerAction = (request: Request) =>
+  request.method() === "POST" && request.headers()["next-action"] !== undefined;
+
+// Holds the first request to `url` that `matches` until `release()` — the
+// moment a person can act while the page waits on it: press Escape, click
+// away, leave. `arrived` settles once it is held. A request the page gave up
+// on meanwhile is let go quietly.
+export async function holdRequest(
+  page: Page,
+  url: string,
+  matches: (request: Request) => boolean = () => true,
+) {
+  let release = () => {};
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let arrive = () => {};
+  const arrived = new Promise<void>((resolve) => {
+    arrive = resolve;
+  });
+  let taken = false;
+  await page.route(url, async (route) => {
+    if (taken || !matches(route.request())) return route.fallback();
+    taken = true;
+    arrive();
+    await released;
+    await route.continue().catch(() => undefined);
+  });
+  return { arrived, release };
+}

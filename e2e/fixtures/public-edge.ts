@@ -172,15 +172,18 @@ function initialState() {
       { filename: string; sizeBytes: number; runId?: string }
     >(),
     // Backend §12.1 #126: the version the webhook automation's subscription
-    // pins, and whether an approval still waits on it.
+    // pins, and whether an approval, or a run, still waits on it.
     webhookVersion: 1,
     approvalPendingOnMove: false,
+    runsInFlightOnMove: false,
     // Backend §12.1 #91: the address once issued, and how many secrets so far.
     webhookSecrets: 0,
     // Backend §12.1 #39: the complete export, read as running once then ready.
     exportJobReads: 0,
     exportJobStarted: false,
     exportExpired: false,
+    // How many of the next reads of it the platform fails (503).
+    exportReadsFailing: 0,
     // Register F60 and F62's run-time path: a session the fixture ends on a
     // schedule — once the layout has read it, or once the proxy has.
     sessionEnded: false,
@@ -790,6 +793,18 @@ const server = createServer(
           entry.userId === memberUserId ? { ...entry, role: "member" } : entry,
         );
       },
+      // FR-14: every completed file collected, so a run named one is refused
+      // with `artifact_unavailable`, as a file that is gone is.
+      "/__fixture/files-collected": () => {
+        state.files.clear();
+      },
+      // Backend §12.1 #39: the complete export's next read fails, or every one.
+      "/__fixture/export-read-failing-once": () => {
+        state.exportReadsFailing = 1;
+      },
+      "/__fixture/export-read-failing": () => {
+        state.exportReadsFailing = Number.POSITIVE_INFINITY;
+      },
     };
     const control =
       request.method === "POST" ? controls[url.pathname] : undefined;
@@ -798,10 +813,14 @@ const server = createServer(
       response.writeHead(204, { "cache-control": "no-store" });
       return response.end();
     }
-    // Register F27: how many times the workspace list was read.
+    // Register F27: how many times the workspace list was read — and the
+    // exports asked for, which no page shows once it has gone.
     if (request.method === "GET" && url.pathname === "/__fixture/counts") {
       return respond(response, 200, {
         workspaceListReads: state.workspaceListReads,
+        exportJobReads: state.exportJobReads,
+        exportCount: state.exportCount,
+        exportJobStarted: state.exportJobStarted,
       });
     }
     if (
@@ -883,6 +902,14 @@ const server = createServer(
       url.pathname === "/__fixture/approval-pending-on-move"
     ) {
       state.approvalPendingOnMove = true;
+      response.writeHead(204, { "cache-control": "no-store" });
+      return response.end();
+    }
+    if (
+      request.method === "POST" &&
+      url.pathname === "/__fixture/runs-in-flight-on-move"
+    ) {
+      state.runsInFlightOnMove = true;
       response.writeHead(204, { "cache-control": "no-store" });
       return response.end();
     }
@@ -1647,6 +1674,14 @@ const server = createServer(
           details: { reason: "approvals_pending" },
         });
       }
+      // The Edge refuses a move while a run of the subscription is pending or
+      // running, whose callbacks the move would break (backend 23.6.3).
+      if (state.runsInFlightOnMove) {
+        return respond(response, 409, {
+          ...problem(409, "Conflict"),
+          details: { reason: "runs_in_flight" },
+        });
+      }
       state.webhookVersion = 2;
       return respond(response, 200, {
         subscription: webhookSubscription(),
@@ -1770,6 +1805,10 @@ const server = createServer(
     ) {
       if (!administering || !state.exportJobStarted) {
         return respond(response, 404, problem(404, "Not Found"));
+      }
+      if (state.exportReadsFailing > 0) {
+        state.exportReadsFailing -= 1;
+        return respond(response, 503, problem(503, "Service Unavailable"));
       }
       state.exportJobReads += 1;
       if (state.exportExpired) {

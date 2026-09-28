@@ -38,5 +38,17 @@ export default function AccountError({ retry }: { retry: () => void }) {
     };
   }, []);
   if (session === "ended") return <SessionEnded />;
+  // Nothing is claimed until the platform answers — not an alert, and not a
+  // cause that may turn out to be the wrong one.
+  if (session === "checking") {
+    return (
+      <section
+        aria-busy="true"
+        className="bubble mx-auto mt-10 flex max-w-lg flex-col gap-3 p-6 sm:p-8"
+      >
+        <p className="text-sm text-[var(--muted)]">Loading…</p>
+      </section>
+    );
+  }
   return <PlatformUnavailable retry={retry} sessionKept={session === "kept"} />;
 }

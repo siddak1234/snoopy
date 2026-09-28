@@ -8,20 +8,25 @@ import {
   type WorkspaceExportResponse,
 } from "@/lib/exports";
 import { PlatformServerError } from "@/lib/platform-server";
-import { requireActiveWorkspaceId } from "@/lib/tenancy";
+import { activeWorkspaceIfShown, WORKSPACE_CHANGED } from "@/lib/tenancy";
+
+// An export is of the workspace the person was looking at, so the page sends
+// that id (`activeWorkspaceIfShown`, register F28): after a switch in another
+// tab it is refused, never another workspace's records handed to this one.
 
 export type WorkspaceExportActionResult =
   | { ok: true; response: WorkspaceExportResponse }
   | { ok: false; error: string };
 
-export async function requestWorkspaceExport(): Promise<WorkspaceExportActionResult> {
+export async function requestWorkspaceExport(
+  shownWorkspaceId: string,
+): Promise<WorkspaceExportActionResult> {
   try {
     // Inside the try: a refused session read is the platform's answer to show
     // (backend §12.1 #160).
-    return {
-      ok: true,
-      response: await exportWorkspace(await requireActiveWorkspaceId()),
-    };
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspaceId);
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+    return { ok: true, response: await exportWorkspace(workspaceId) };
   } catch (error) {
     if (error instanceof PlatformServerError) {
       return { ok: false, error: error.message };
@@ -34,12 +39,13 @@ export type CompleteExportActionResult =
   { ok: true; job: WorkspaceExportJob } | { ok: false; error: string };
 
 /** Everything, staged as one file (backend §12.1 #39). */
-export async function startCompleteExport(): Promise<CompleteExportActionResult> {
+export async function startCompleteExport(
+  shownWorkspaceId: string,
+): Promise<CompleteExportActionResult> {
   try {
-    return {
-      ok: true,
-      job: await startWorkspaceExport(await requireActiveWorkspaceId()),
-    };
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspaceId);
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+    return { ok: true, job: await startWorkspaceExport(workspaceId) };
   } catch (error) {
     if (error instanceof PlatformServerError) {
       return { ok: false, error: error.message };
@@ -49,16 +55,13 @@ export async function startCompleteExport(): Promise<CompleteExportActionResult>
 }
 
 export async function readCompleteExport(
+  shownWorkspaceId: string,
   exportId: string,
 ): Promise<CompleteExportActionResult> {
   try {
-    return {
-      ok: true,
-      job: await readWorkspaceExport(
-        await requireActiveWorkspaceId(),
-        exportId,
-      ),
-    };
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspaceId);
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+    return { ok: true, job: await readWorkspaceExport(workspaceId, exportId) };
   } catch (error) {
     if (error instanceof PlatformServerError) {
       return { ok: false, error: error.message };

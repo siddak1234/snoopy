@@ -1055,3 +1055,71 @@ with its hash checked:
 
 **Numbering.** F64 was filed by Round 14's fresh audit in `snoopy-backend`'s §0.1 and enters
 this register here. F65 to F68 are new, and no number is reused.
+
+**Review of this round's web half, 2026-09-28.** An adversarial review of the diff above
+found fourteen issues, numbered here as it numbered them. Thirteen are fixed, each held by
+a test seen failing with its fix taken out and the file restored with its hash checked; one
+is declined:
+
+1. A secret, a move's refusal or a removal's refusal was lost to Escape or a backdrop click
+   while its request was pending: fixed — `components/ui/Modal.tsx` takes `dismissible`,
+   false while the webhook, move and removal dialogs wait. e2e "a webhook address's dialog
+   cannot be dismissed …", "a move's dialog cannot be dismissed …", "a removal's dialog
+   cannot be dismissed …".
+2. One shared upload flag, never reset, with no abort and no timeout: fixed — uploads are
+   held per field, reset on close, stopped when the field goes, a superseded answer changes
+   nothing, and the PUT is given up after the signed URL's 15 minutes. e2e "a form closed
+   mid-upload stops the upload …", "an abandoned upload that ends never releases Start run
+   …", "an upload the store never answers is given up …".
+3. The complete export stopped following at one failed read, dropped a rejected read
+   unseen, and scheduled a read after the page had gone: fixed — a failed read is asked
+   again after twice the wait, three in a row are said with Export everything offered
+   again, and nothing is scheduled off the page. e2e ×4 in "following a complete export
+   when a read of it fails".
+4. Both exports acted on the session's workspace, not the page's: fixed — they carry the
+   workspace the page showed (register F28). e2e "an export from a page whose workspace was
+   switched away in another tab says so, and exports nothing (register F28)".
+5. A refused file stayed in its chooser, so the same file chosen again was no change:
+   fixed — it is emptied. e2e "a file of a type the automation does not take …".
+6. Declined: every 404 on the webhook read is "no address yet". The contract's
+   `readWebhookEndpoint` says only "404 when no address has been issued" and names no
+   reason, and the platform's read answers a bare 404 whether or not the subscription
+   exists, so nothing tells the two apart. Issuing an address for one that is gone is
+   refused, and said.
+7. `artifact_unavailable` read as "check each value": fixed — said in its own words, and
+   the file field emptied to choose again. e2e "a file the platform will no longer take …";
+   `test/automation-contract.test.mjs` holds the words to `createRun`'s reasons.
+8. The no-backend probe missed a server killed by a signal and then waited for an exit
+   already gone: fixed. `test/verify-gate.test.mjs` "the no-backend probe stops at once
+   …".
+9. The preflight bound the ports before taking the lock: fixed — the lock first, given back
+   when a port is refused. `test/verify-gate.test.mjs` "the preflight takes the lock before
+   it asks about a port …".
+10. The evidence's counts read TAP only: fixed — node:test's spec summary too, in the F63
+    test.
+11. The account boundary said "could not answer" while it asked: fixed — a neutral
+    "Loading…" until the answer. e2e "F60 — while the boundary asks for the session it
+    claims nothing …".
+12. Focus fell to the page after a move or a removal, and a new secret was not announced:
+    fixed — focus goes to the card's or the list's heading, and a polite status says a new
+    secret was made (never the secret). Asserted in the move, removal and webhook tests.
+13. A manager who took themselves off a team refreshed into not-found: fixed — they go to
+    their teams, as leaving a project does. e2e "a team's manager who takes themselves off
+    it goes back to their teams …".
+14. The switcher's focus test never checked the focus was on an option: fixed, in "10 — …".
+
+The backend's own review of its half (`snoopy-backend` BUILD-PLAN 23.6.3, merged as
+`215697c`, #118) changed three contracts this website reads, and the client is regenerated
+from that tree:
+
+- A move is also refused while a run of the automation is pending or running (409
+  `runs_in_flight`). It is said in words ("A run of this automation is still going. Wait
+  for it to finish, then move."). The e2e test "a move refused while a run of the
+  automation is still going …" went red without the words (it read "Conflict"), and
+  `test/automation-contract.test.mjs`'s check of `MOVE_REFUSALS` against the spec went red
+  before they were added.
+- A run's file is checked against the run's own pinned limits, and one outside them is
+  `artifact_unavailable`. That is item 7's words: nothing new to say.
+- The complete export states its one-file ceiling (`too_large`, already in words here), and
+  a deleted workspace withdraws its export (`workspace_deleted`), which no page of a
+  deleted workspace can show.

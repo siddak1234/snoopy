@@ -4,6 +4,7 @@ import {
   expectNoAxeViolations,
   fixtureControl,
   fixtureRead,
+  holdRequest,
   observe,
   presentSession,
   providerCard,
@@ -102,6 +103,27 @@ test("3, F60 — a session that ends while a page loads says so, with the way ba
   await expectNoAxeViolations(page);
   await page.getByRole("link", { name: "Sign in again" }).click();
   await expect(page).toHaveURL(/\/login\?callbackUrl=%2Faccount$/);
+});
+
+test("F60 — while the boundary asks for the session it claims nothing: no alert, and not a cause that may be wrong", async ({
+  page,
+}) => {
+  const check = await holdRequest(page, "**/api/platform/v1/session");
+  await presentSession(page, "ending");
+  await page.goto("/account");
+  await check.arrived;
+  const main = page.locator("main");
+  await expect(main.getByText("Loading…")).toBeVisible();
+  await expect(main.getByRole("alert")).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", {
+      name: "The platform could not answer just now",
+    }),
+  ).toHaveCount(0);
+  check.release();
+  await expect(
+    page.getByRole("heading", { name: "Your session has ended" }),
+  ).toBeVisible();
 });
 
 test("F62 — a session that ends between the proxy's read and the render goes to sign in, and no page throws on the way", async ({
@@ -323,6 +345,12 @@ test("10 — every control on the account pages F44 touched shows its keyboard f
   await page.getByRole("button", { name: "Switch workspace" }).focus();
   await page.keyboard.press("Enter");
   await page.keyboard.press("ArrowDown");
+  // The ring checked below is an option's, not whatever else kept focus.
+  await expect(
+    page
+      .getByRole("dialog", { name: "Switch workspace" })
+      .getByRole("button", { name: /Fixture Personal/ }),
+  ).toBeFocused();
   const option = await page.evaluate(() => {
     const style = getComputedStyle(document.activeElement as HTMLElement);
     return (
