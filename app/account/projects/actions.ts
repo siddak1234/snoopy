@@ -33,9 +33,6 @@ export type CreateProjectResult =
 export async function createProjectAction(
   formData: FormData,
 ): Promise<CreateProjectResult> {
-  if (!(await getAppSession())) {
-    return { ok: false, error: "You must be signed in to create a project." };
-  }
   const name = formData.get("name");
   const type = formData.get("projectType");
   const scope = formData.get("scope");
@@ -50,6 +47,11 @@ export async function createProjectAction(
   }
 
   try {
+    // Inside the try: a refused session read is the platform's answer to show,
+    // not "signed out" (backend §12.1 #160).
+    if (!(await getAppSession())) {
+      return { ok: false, error: "You must be signed in to create a project." };
+    }
     const workspaces = await listWorkspaces();
     const workspace = workspaces.find(
       (candidate) =>
@@ -128,9 +130,10 @@ export async function restoreProjectAction(
 export async function leaveProjectAction(
   projectId: string,
 ): Promise<ProjectActionResult> {
-  const session = await getAppSession();
-  if (!session) return { ok: false, error: "You must be signed in." };
   try {
+    // Inside the try, as createProjectAction's: a refusal is not "signed out".
+    const session = await getAppSession();
+    if (!session) return { ok: false, error: "You must be signed in." };
     const { workspace } = await projectContext(projectId);
     await removeProjectMembership(workspace.id, projectId, session.user.id);
     refreshProjectPaths(projectId);

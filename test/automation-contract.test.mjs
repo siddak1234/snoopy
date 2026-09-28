@@ -35,6 +35,10 @@ const ACTIONS_UI_PATH = resolve(
   import.meta.dirname,
   "../app/account/automations/AutomationActions.tsx",
 );
+const FIELDS_PATH = resolve(
+  import.meta.dirname,
+  "../app/account/automations/ManifestFields.tsx",
+);
 const PAGE_PATH = resolve(
   import.meta.dirname,
   "../app/account/automations/page.tsx",
@@ -56,6 +60,7 @@ const generated = existsSync(GENERATED_PATH)
   : "";
 const actions = readFileSync(ACTIONS_PATH, "utf8");
 const actionsUi = readFileSync(ACTIONS_UI_PATH, "utf8");
+const fields = readFileSync(FIELDS_PATH, "utf8");
 const page = readFileSync(PAGE_PATH, "utf8");
 const platformServer = readFileSync(PLATFORM_SERVER_PATH, "utf8");
 const entitlements = readFileSync(ENTITLEMENTS_PATH, "utf8");
@@ -68,6 +73,7 @@ test("generated automation contract is present and used by the facade", () => {
   for (const type of [
     "AutomationCatalogEntry",
     "AutomationSetupField",
+    "AutomationRunInputField",
     "Subscription",
     "Run",
     "Approval",
@@ -88,6 +94,8 @@ test("generated automation contract is present and used by the facade", () => {
     ["UpdateSubscriptionRequest", "updateSubscription"],
     ["DecideApprovalRequest", "decideApproval"],
     ["DecideApprovalResponse", "decideApproval"],
+    ["CreateRunRequest", "createRun"],
+    ["CreateRunResponse", "createRun"],
   ]) {
     assert.match(
       client,
@@ -100,21 +108,27 @@ test("generated automation contract is present and used by the facade", () => {
 });
 
 test("the setup UI is generated from the catalog metadata", () => {
+  // One renderer for both manifest declarations — setup and run input (backend
+  // ADR-0030) — in ManifestFields.tsx; the card only chooses which to show.
   assert.match(page, /setup=\{automation\.setup\}/);
   assert.doesNotMatch(actionsUi, /SETUP_SECTIONS/);
-  assert.match(actionsUi, /for \(const field of setup\)/);
-  assert.match(actionsUi, /currentGroup\?\.section === field\.section/);
+  assert.match(actionsUi, /<SetupFields setup=\{setup\}/);
+  assert.match(fields, /for \(const field of setup\)/);
+  assert.match(fields, /currentGroup\?\.section === field\.section/);
   assert.match(
-    actionsUi,
+    fields,
     /groups\.push\(\{ section: field\.section, fields: \[field\] \}\)/,
   );
-  for (const control of ["toggle", "money", "text", "resource-picker"]) {
-    assert.match(actionsUi, new RegExp(`"${control}"`));
-  }
-  assert.match(actionsUi, /name=\{`config:\$\{field\.key\}`\}/);
-  assert.match(actionsUi, /field\.defaultValue/);
-  assert.match(actionsUi, /field\.notifies/);
+  // toggle is a checkbox, money a number; text and resource-picker are text,
+  // because no contract lists resources to pick from.
+  assert.match(fields, /field\.control === "toggle"/);
+  assert.match(fields, /field\.control === "money" \? "number" : "text"/);
+  assert.match(fields, /name=\{`\$\{prefix\}:\$\{field\.key\}`\}/);
+  assert.match(fields, /prefix="config"/);
+  assert.match(fields, /field\.defaultValue/);
+  assert.match(fields, /field\.notifies/);
   assert.match(actions, /saveSubscriptionConfiguration/);
+  assert.match(actions, /declaredValues\(formData, "config"\)/);
   assert.match(actions, /const body: UpdateSubscriptionRequest = \{ config \}/);
 });
 
@@ -300,6 +314,7 @@ test("automation actions consume generated operation response types", () => {
     "CreateSubscriptionResponse",
     "UpdateSubscriptionResponse",
     "DecideApprovalResponse",
+    "CreateRunResponse",
   ]) {
     assert.match(
       actions,
@@ -311,6 +326,7 @@ test("automation actions consume generated operation response types", () => {
     "CreateSubscriptionRequest",
     "UpdateSubscriptionRequest",
     "DecideApprovalRequest",
+    "CreateRunRequest",
   ]) {
     assert.match(
       actions,
@@ -344,24 +360,58 @@ test("automation list reads consume generated operation response types", () => {
   );
 });
 
-test("the Run-now dialog is retired — nothing offers a manual run", () => {
-  // Gate scaffolding by the owner's direction (2026-09-09): to go once a
-  // background-triggered automation exists, which invoice-intake is. Retired
-  // rather than hidden (owner's decision 2026-09-24): no flag mechanism exists
-  // here, and a hidden server action would stay reachable by POST.
+test("a manual run is started only from the pinned version's declared input — never raw JSON", () => {
+  // The Run-now dialog took raw JSON and stays retired (owner, 2026-09-24).
+  // Its replacement is the owner's decision in backend ADR-0030 (§12.1 #162): a
+  // form rendered from `Subscription.runInput`, which the platform also checks.
   assert.doesNotMatch(
     actionsUi,
-    /Run now|runOpen|triggerRun/u,
-    "the automation card must not offer a manual run",
+    /Run now|runOpen|triggerRun|<textarea|JSON\.parse/u,
+    "the retired raw-JSON dialog must not come back",
   );
+  assert.doesNotMatch(actions, /JSON\.parse/u, "no action accepts raw JSON");
+  // Offered only when it can be honest: live, available, and declared.
+  assert.match(actionsUi, /subscription\?\.status === "live"/);
+  assert.match(actionsUi, /subscription\.runInput\?\.length \?\? 0\) > 0/);
+  assert.match(
+    actionsUi,
+    /<RunInputFields runInput=\{subscription\.runInput\}/,
+  );
+  // The pinned version's declaration, not the catalog's newest.
+  assert.match(page, /runInput: subscription\.runInput/);
+  // A file field is not rendered: no published operation uploads one here.
+  assert.match(fields, /field\.control !== "artifact"/);
+  assert.match(fields, /prefix="input"/);
+  // The run is created through the generated client, once per key, and the
+  // person is taken to its page.
+  assert.match(actions, /declaredValues\(formData, "input"\)/);
+  // The key is the form's, made when the dialog opens and whenever a value
+  // changes, so a resubmission after a lost answer cannot start a second run.
+  assert.match(actionsUi, /name="idempotencyKey" value=\{runKey\}/);
+  assert.match(actionsUi, /onChange=\{newRunKey\}/);
+  assert.match(actionsUi, /if \(which === "run"\) newRunKey\(\)/);
+  assert.match(actions, /formData\.get\("idempotencyKey"\)/);
+  assert.doesNotMatch(actions, /newIdempotencyKey\("run"\)/);
+  assert.match(
+    actionsUi,
+    /router\.push\(`\/account\/runs\/\$\{result\.runId\}`\)/,
+  );
+});
+
+test("archiving is its own confirmed action, and the generic status action cannot reach it", () => {
+  // Backend §12.1 #169 and #92: one-way, and how a plan slot is given back.
+  assert.match(actions, /export async function archiveSubscription/);
+  assert.match(actions, /status: "archived"/);
+  assert.match(actions, /revalidatePath\("\/account\/billing"\)/);
+  const generic =
+    /export async function setSubscriptionStatus[\s\S]*?\n\}/u.exec(actions);
+  assert.ok(generic, "setSubscriptionStatus not found");
   assert.doesNotMatch(
-    actions,
-    /triggerRun|\/runs`/u,
-    "no server action may create a run",
+    generic[0],
+    /"archived"/u,
+    "the unconfirmed status action must not accept archived",
   );
-  assert.doesNotMatch(
-    client,
-    /CreateRunRequest|CreateRunResponse/u,
-    "the facade must not alias the createRun operation",
-  );
+  assert.match(actionsUi, /archiveSubscription\(/);
+  assert.match(actionsUi, /This cannot be\s+undone/u);
+  assert.match(actionsUi, /gives its plan slot back/);
 });

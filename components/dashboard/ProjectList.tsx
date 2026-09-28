@@ -36,6 +36,7 @@ export function ProjectList({ projects }: { projects: ProjectListItem[] }) {
         <li key={project.id}>
           <div className="flex items-start gap-3 rounded-xl px-2 py-3 transition hover:bg-[var(--surface-hover)]">
             <Link
+              prefetch={false}
               href={`/account/projects/${project.id}`}
               className="min-w-0 flex-1 rounded-lg focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-inset"
             >

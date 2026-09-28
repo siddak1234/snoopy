@@ -80,7 +80,7 @@ export interface paths {
     put?: never;
     /**
      * Trigger a run.
-     * @description Idempotent per `Idempotency-Key`: the run id is derived from it, so a retried request returns the same run and dispatches once. The subscription must belong to this workspace and be `live`.
+     * @description Idempotent per `Idempotency-Key`: the run id is derived from it, so a retried request returns the same run and dispatches once. The subscription must belong to this workspace and be `live`. **When the subscription's pinned version declares `runInput`, `input` must satisfy it** (ADR-0030): an undeclared key, a missing required field or a value of the wrong type is refused with 422 and nothing runs.
      */
     post: operations["createRun"];
     delete?: never;
@@ -300,6 +300,17 @@ export interface components {
         | "run-failed"
         | "run-succeeded";
     };
+    /** @description One value a person supplies when starting a manual run (ADR-0030). The setup vocabulary without `section`, `notifies` or `resource-picker`, which describe a SETTING rather than one run. **`artifact` is a file the run reads**: never required, never defaulted, sent as the id an upload returned — a client with no upload surface does not render it, and the run starts without a file. */
+    AutomationRunInputField: {
+      /** @description The `input` object key the value is sent under. */
+      key: string;
+      title: string;
+      description: string;
+      /** @enum {string} */
+      control: "toggle" | "money" | "text" | "artifact";
+      defaultValue?: unknown;
+      required: boolean;
+    };
     /** @enum {string} */
     SubscriptionStatus: "draft" | "live" | "paused" | "archived";
     Subscription: {
@@ -317,6 +328,8 @@ export interface components {
       };
       /** @description Provider ids still to connect. Non-empty blocks going live. */
       unmetConnections: string[];
+      /** @description What a person supplies to START a run of this subscription (ADR-0030), read from the manifest version it PINS — never the newest — because that is the version that runs and the one `createRun` checks input against. Present only when the pinned version is `manual` and declares input; absent means no form a client could honestly render. A client renders it in order, and `createRun` refuses an undeclared key or a value of the wrong type with 422. */
+      runInput?: components["schemas"]["AutomationRunInputField"][];
       /**
        * Format: uuid
        * @description The project this subscription is scoped to, or null for workspace-wide (18.6.2). A VISIBILITY scope inside one workspace tenant and never a second tenancy axis: a scoped subscription is listed only for someone who can see that project, so owners and admins see every one and a team grant is honoured.
@@ -716,7 +729,7 @@ export interface operations {
         "application/json": {
           /** Format: uuid */
           subscriptionId: string;
-          /** @description The trigger payload, passed to the automation verbatim. */
+          /** @description The trigger payload, passed to the automation verbatim — and, when the pinned version declares `runInput`, held to it first. */
           input?: {
             [key: string]: unknown;
           };

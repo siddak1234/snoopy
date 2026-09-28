@@ -37,6 +37,7 @@ function NavLinks({
             : currentPath.startsWith(href);
         return (
           <Link
+            prefetch={false}
             key={href}
             href={href}
             onClick={onNavigate}
@@ -50,6 +51,7 @@ function NavLinks({
 
       {showOrgSettings ? (
         <Link
+          prefetch={false}
           href="/account/organization"
           onClick={onNavigate}
           className={`${navLinkClass} ${

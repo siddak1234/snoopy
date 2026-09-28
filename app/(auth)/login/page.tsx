@@ -1,57 +1,45 @@
-"use client";
+import { Suspense } from "react";
+import type { LoginProvider } from "@/components/auth/OAuthButtons";
+import { platformPublicJson } from "@/lib/platform-server";
+import type { operations } from "@/lib/generated/platform-contracts/platform";
+import { LoginForm } from "./LoginForm";
 
-import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect } from "react";
-import { OAuthButtons } from "@/components/auth/OAuthButtons";
-import { useAppSession } from "@/hooks/use-app-session";
-import { safePlatformReturnTo } from "@/lib/platform-api";
+type LoginProvidersResponse =
+  operations["listLoginProviders"]["responses"][200]["content"]["application/json"];
 
-function LoginForm() {
-  const searchParams = useSearchParams();
-  const callbackUrl = safePlatformReturnTo(searchParams.get("callbackUrl"));
-  const authCallbackError = searchParams.get("error") === "auth_callback";
-  const { data: session, status } = useAppSession({
-    retryIfEmpty: authCallbackError,
-  });
-
-  useEffect(() => {
-    if (status === "authenticated" && session?.user) {
-      window.location.replace(callbackUrl);
-    }
-  }, [status, session?.user, callbackUrl]);
-
-  if (status === "loading") {
-    return <div className="bubble p-6 sm:p-8">Checking authentication…</div>;
+/**
+ * The provider list, read once a minute on the server rather than once a view in
+ * the browser — backend §12.1 #160, ADR-0029. It is the one read every signed-out
+ * visitor makes, it is identical for everyone, and a signed-out visitor shares the
+ * website's address bucket at the Edge. A failed read is not an error here: the
+ * buttons fall back to asking from the browser, exactly as before.
+ */
+async function cachedLoginProviders(): Promise<LoginProvider[] | undefined> {
+  try {
+    const response = await platformPublicJson<LoginProvidersResponse>(
+      "/v1/auth/providers",
+      60,
+    );
+    return response.providers;
+  } catch {
+    return undefined;
   }
-
-  return (
-    <section className="bubble p-6 sm:p-8">
-      <h1 className="text-3xl font-medium sm:text-4xl">Continue to Autom8x</h1>
-      <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-        Sign in with an approved provider. Your first sign-in creates your
-        account — no separate password needed.
-      </p>
-
-      {authCallbackError ? (
-        <p
-          className="mt-5 rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--muted)]"
-          role="alert"
-        >
-          Sign-in did not complete. Please try your provider again.
-        </p>
-      ) : null}
-
-      <div className="mt-6">
-        <OAuthButtons callbackUrl={callbackUrl} />
-      </div>
-    </section>
-  );
 }
 
-export default function LoginPage() {
+/**
+ * Rendered per request, not prerendered: a prerender would make the read above at
+ * BUILD time, tying the build to the platform and shipping a page without
+ * providers whenever that read failed. The read itself stays cached for a minute,
+ * because a fetch with a positive `revalidate` keeps its cache under
+ * `revalidate = 0` (Next's "caching without cache components" guide).
+ */
+export const revalidate = 0;
+
+export default async function LoginPage() {
+  const providers = await cachedLoginProviders();
   return (
     <Suspense fallback={<div className="bubble p-6 sm:p-8">Loading…</div>}>
-      <LoginForm />
+      <LoginForm providers={providers} />
     </Suspense>
   );
 }

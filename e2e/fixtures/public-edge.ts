@@ -169,21 +169,47 @@ const automation = (templateId: string, name: string) =>
 
 // An automation with two fixed runs, mirroring the shipped invoice-check: one
 // failed with the automation's own reason, one succeeded with its summary.
-// It is subscribed and live so a live card renders (Pause, no manual run — the
-// Run-now dialog is retired) and Activity lists both runs.
+// It is subscribed and live, and its pinned version declares run input, so its
+// card offers Run (backend ADR-0030) and Activity lists both runs.
 const manualAutomation = {
   ...automation("fixture-manual-input", "Manual input automation"),
   subscribed: true,
+  // One setting, so the Set up dialog is reachable in this harness (register
+  // F49) and a refused save can be observed keeping what was typed.
+  setup: [
+    {
+      section: "rules",
+      key: "holdAboveAmount",
+      title: "Spending limit",
+      description: "Runs above this amount wait for approval.",
+      control: "money",
+      defaultValue: 500,
+      required: true,
+    },
+  ],
 } satisfies Automations["AutomationCatalogEntry"];
 
-const catalog = {
-  automations: [
-    automation("fixture-plan-limit", "Plan-limit automation"),
-    automation("fixture-entitlements", "Entitlements automation"),
-    manualAutomation,
-  ],
-  categories: ["All", "Operations"],
-} satisfies Automations["AutomationCatalogResponse"];
+// Live, and its pinned version declares no run input: the card offers Pause and
+// Archive and no Run. Archiving it (backend §12.1 #169) is one-way, so the
+// fixture forgets the subscription and the card offers Add again — state that,
+// like billing's, lives for one fixture process.
+const archivableAutomation = automation(
+  "fixture-archivable",
+  "Archivable automation",
+);
+let archivableArchived = false;
+
+function fixtureCatalog(): Automations["AutomationCatalogResponse"] {
+  return {
+    automations: [
+      automation("fixture-plan-limit", "Plan-limit automation"),
+      automation("fixture-entitlements", "Entitlements automation"),
+      manualAutomation,
+      { ...archivableAutomation, subscribed: !archivableArchived },
+    ],
+    categories: ["All", "Operations"],
+  };
+}
 
 const manualSubscriptionId = "99999999-9999-4999-8999-999999999999";
 const manualSubscription = {
@@ -194,6 +220,39 @@ const manualSubscription = {
   status: "live",
   config: {},
   unmetConnections: [],
+  // The shipped invoice-check v4's declaration (backend ADR-0030): three typed
+  // fields its container requires, and a file it reads when given one — which no
+  // web form supplies, so the website does not render it.
+  runInput: [
+    {
+      key: "vendor",
+      title: "Vendor",
+      description: "Who sent the invoice.",
+      control: "text",
+      required: true,
+    },
+    {
+      key: "amount",
+      title: "Amount",
+      description: "The invoice total.",
+      control: "money",
+      required: true,
+    },
+    {
+      key: "reference",
+      title: "Invoice reference",
+      description: "The invoice number, as printed on it.",
+      control: "text",
+      required: true,
+    },
+    {
+      key: "artifactId",
+      title: "Invoice file",
+      description: "A file already uploaded for this run.",
+      control: "artifact",
+      required: false,
+    },
+  ],
   // Required since the contract gained attribution (backend 18.6.1/18.6.2):
   // workspace-wide, so no project; created by the fixture owner.
   projectId: null,
@@ -202,12 +261,23 @@ const manualSubscription = {
   updatedAt: now,
 } satisfies Automations["Subscription"];
 
+const archivableSubscriptionId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const archivableSubscription = {
+  ...manualSubscription,
+  id: archivableSubscriptionId,
+  templateId: archivableAutomation.templateId,
+  runInput: undefined,
+} satisfies Automations["Subscription"];
+
 // Run ids encode the outcome so the reads are deterministic without any
 // mutable server state: the failed run carries the automation's own reason,
 // the succeeded one its summary. Both started from their trigger, as every
 // run does now that nothing offers a manual start.
 const okRunId = "fixture-run-ok";
 const failedRunId = "fixture-run-failed";
+// The run a person starts from the Run form; the fixture creates it only when
+// the input is exactly what the declaration asks for, typed as it says.
+const startedRunId = "fixture-run-started";
 const runInputFailure = "input must carry vendor, amount, and reference";
 
 // One deterministic run by id: the failed one carries the automation's own
@@ -222,7 +292,7 @@ function fixtureRun(runId: string): Automations["Run"] {
     templateId: "fixture-manual-input",
     templateVersion: 1,
     status: failed ? "failed" : "succeeded",
-    origin: "trigger",
+    origin: runId === startedRunId ? "manual" : "trigger",
     rootRunId: runId,
     requestId: "fixture-request",
     ...(failed
@@ -246,15 +316,20 @@ let exportCount = 0;
 // restores it (like the connection and export state above, it lives for one
 // fixture process), so the billing tests order their own steps. Two plans, so
 // that a live subscription offering no second checkout is observable.
+// Team carries the provider's price (backend ADR-0031) and both capabilities the
+// production plans grant; Pro has no price — the provider could not state one
+// flat figure — and a capability the website has no words for, which it must
+// not print as a raw key.
 const teamPlan = {
   planId: "fixture-team",
   displayName: "Team",
-  capabilities: { "automation.subscribe": 10 },
+  capabilities: { "automation.subscribe": 10, "workspace.rate": 120 },
+  price: { amount: 500, currency: "usd", interval: "month" },
 } satisfies Platform["PurchasablePlan"];
 const proPlan = {
   planId: "fixture-pro",
   displayName: "Pro",
-  capabilities: { "automation.subscribe": 50 },
+  capabilities: { "automation.subscribe": 50, "fixture.unlabelled": 7 },
 } satisfies Platform["PurchasablePlan"];
 let subscribedPlan: Platform["PurchasablePlan"] | null = null;
 const hostedExpiry = "2026-08-12T12:30:00.000Z";
@@ -288,9 +363,13 @@ function fixtureCookieEntry(cookie: string | undefined) {
 
 function fixtureSessionValue(
   cookie: string | undefined,
-): "owner" | "requester" | "member" | null {
+): "owner" | "requester" | "member" | "throttled" | "failing" | null {
   const value = fixtureCookieEntry(cookie);
   if (value === `${fixtureCookie}=owner`) return "owner";
+  // The owner, whose billing read alone fails — the page-level boundary's case.
+  if (value === `${fixtureCookie}=page-failing`) return "owner";
+  if (value === `${fixtureCookie}=throttled`) return "throttled";
+  if (value === `${fixtureCookie}=failing`) return "failing";
   if (value === `${fixtureCookie}=requester`) return "requester";
   if (value === `${fixtureCookie}=member`) return "member";
   if (value === departingSession) return departed ? null : "requester";
@@ -333,10 +412,31 @@ const server = createServer(
       });
       return;
     }
+    // Public, as the Edge serves it: no session is needed to list the ways in,
+    // and the website reads it on the server with no cookie (§12.1 #160).
+    if (request.method === "GET" && url.pathname === "/v1/auth/providers") {
+      const providers = {
+        providers: [{ id: "google", label: "Google" }],
+        passwordLoginEnabled: false,
+        magicLinkLoginEnabled: false,
+      } satisfies Platform["LoginProvidersResponse"];
+      return respond(response, 200, providers);
+    }
     const fixtureSession = fixtureSessionValue(request.headers.cookie);
     if (!fixtureSession) {
       respond(response, 401, problem(401, "Authentication is required"));
       return;
+    }
+    // A signed-in person the platform refuses (429) or cannot answer (503) —
+    // backend §12.1 #160. Neither is "no session", and the website must not
+    // read either as a sign-out. The refusal meets the session read itself;
+    // the failure lets the session through and meets the reads after it.
+    if (fixtureSession === "throttled") {
+      response.setHeader("retry-after", "30");
+      return respond(response, 429, problem(429, "Too Many Requests"));
+    }
+    if (fixtureSession === "failing" && url.pathname !== "/v1/session") {
+      return respond(response, 503, problem(503, "Service Unavailable"));
     }
 
     const { pathname } = url;
@@ -407,14 +507,6 @@ const server = createServer(
       return respond(response, 200, {
         activeWorkspaceId,
       } satisfies Platform["ActiveWorkspaceResponse"]);
-    }
-    if (method === "GET" && pathname === "/v1/auth/providers") {
-      const providers = {
-        providers: [{ id: "google", label: "Google" }],
-        passwordLoginEnabled: false,
-        magicLinkLoginEnabled: false,
-      } satisfies Platform["LoginProvidersResponse"];
-      return respond(response, 200, providers);
     }
     if (method === "GET" && pathname === "/v1/auth/identities")
       return respond(response, 200, { identities: [] });
@@ -548,12 +640,57 @@ const server = createServer(
       } satisfies ConnectionOperations["connectProviderWithKey"]["responses"][201]["content"]["application/json"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/automations")) {
-      return respond(response, 200, catalog);
+      return respond(response, 200, fixtureCatalog());
     }
     if (method === "GET" && isWorkspacePath(pathname, "/subscriptions")) {
       return respond(response, 200, {
-        subscriptions: [manualSubscription],
+        subscriptions: archivableArchived
+          ? [manualSubscription]
+          : [manualSubscription, archivableSubscription],
       } satisfies AutomationOperations["listSubscriptions"]["responses"][200]["content"]["application/json"]);
+    }
+    if (
+      method === "PATCH" &&
+      isWorkspacePath(pathname, `/subscriptions/${manualSubscriptionId}`)
+    ) {
+      // Only a set-up save, holding the one declared setting to its control's
+      // type, as the catalog does; the saved value is not kept.
+      const body = (await requestJson(request)) as { config?: Json };
+      const config = body.config;
+      if (
+        !request.headers["idempotency-key"] ||
+        !config ||
+        Object.keys(config).join() !== "holdAboveAmount" ||
+        typeof config.holdAboveAmount !== "number"
+      ) {
+        return respond(
+          response,
+          422,
+          problem(422, "The request could not be processed"),
+        );
+      }
+      return respond(response, 200, {
+        subscription: { ...manualSubscription, config },
+      } satisfies AutomationOperations["updateSubscription"]["responses"][200]["content"]["application/json"]);
+    }
+    if (
+      method === "PATCH" &&
+      isWorkspacePath(pathname, `/subscriptions/${archivableSubscriptionId}`)
+    ) {
+      // Only the archive this suite drives (§12.1 #169): anything else is an
+      // undeclared use of this route and fails closed.
+      const body = (await requestJson(request)) as { status?: string };
+      if (body.status !== "archived" || !request.headers["idempotency-key"]) {
+        return respond(
+          response,
+          422,
+          problem(422, "Undeclared fixture subscription update"),
+        );
+      }
+      archivableArchived = true;
+      return respond(response, 200, {
+        subscription: { ...archivableSubscription, status: "archived" },
+      } satisfies AutomationOperations["updateSubscription"]["responses"][200]["content"]["application/json"]);
     }
     if (method === "POST" && isWorkspacePath(pathname, "/subscriptions")) {
       const body = (await requestJson(request)) as { templateId?: string };
@@ -567,10 +704,36 @@ const server = createServer(
         problem(403, "Subscription cannot be created", { reason }),
       );
     }
+    if (method === "POST" && isWorkspacePath(pathname, "/runs")) {
+      // createRun as ADR-0030 holds it: the input must be exactly the pinned
+      // declaration, typed as it says — a number for money, not a string — or
+      // the platform answers 422 and nothing runs. The file field is optional
+      // and the website supplies none.
+      const body = (await requestJson(request)) as {
+        subscriptionId?: string;
+        input?: Json;
+      };
+      const input = body.input ?? {};
+      const exact =
+        body.subscriptionId === manualSubscriptionId &&
+        Object.keys(input).sort().join() === "amount,reference,vendor" &&
+        typeof input.vendor === "string" &&
+        typeof input.amount === "number" &&
+        typeof input.reference === "string";
+      if (!request.headers["idempotency-key"] || !exact) {
+        return respond(
+          response,
+          422,
+          problem(422, "The request could not be processed"),
+        );
+      }
+      return respond(response, 201, {
+        run: { ...fixtureRun(startedRunId), status: "pending" },
+      } satisfies AutomationOperations["createRun"]["responses"][201]["content"]["application/json"]);
+    }
     if (method === "GET" && isWorkspacePath(pathname, "/runs")) {
       // Both deterministic runs, so Activity renders rows and the run pages are
-      // reached by a person rather than typed. No POST handler: the Run-now
-      // dialog is retired, and a route nothing calls would be dead fixture.
+      // reached by a person rather than typed.
       return respond(response, 200, {
         runs: [fixtureRun(failedRunId), fixtureRun(okRunId)],
       } satisfies AutomationOperations["listRuns"]["responses"][200]["content"]["application/json"]);
@@ -629,6 +792,12 @@ const server = createServer(
       }
     }
     if (method === "GET" && isWorkspacePath(pathname, "/billing")) {
+      if (
+        fixtureCookieEntry(request.headers.cookie) ===
+        `${fixtureCookie}=page-failing`
+      ) {
+        return respond(response, 500, problem(500, "Internal Server Error"));
+      }
       const body = subscribedPlan
         ? ({
             workspaceId,
@@ -716,8 +885,9 @@ const server = createServer(
       // ADR-0028: per workspace, not all-or-nothing. The owner's organization
       // refuses (a service could not remove it) and the answer is the Edge's
       // RAW 409 body — `application/json`, no `title` — exactly as apps/api
-      // relays it (backend finding F1), so the client's status-only branch
-      // meets the real shape. The org-less requester deletes cleanly.
+      // relays it and, since backend §12.1 #164, as the contract publishes it
+      // (`AccountDeletionResult`), so the client's status-only branch meets the
+      // real shape. The org-less requester deletes cleanly.
       if (fixtureSession === "owner") {
         response.writeHead(409, {
           "content-type": "application/json; charset=utf-8",
@@ -748,7 +918,7 @@ const server = createServer(
               },
             ],
             reason: "a service could not remove this workspace",
-          }),
+          } satisfies Platform["AccountDeletionResult"]),
         );
       }
       return respond(response, 200, {});

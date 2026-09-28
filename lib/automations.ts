@@ -27,6 +27,8 @@ export type AutomationCatalogEntry =
   components["schemas"]["AutomationCatalogEntry"];
 export type AutomationSetupField =
   components["schemas"]["AutomationSetupField"];
+export type AutomationRunInputField =
+  components["schemas"]["AutomationRunInputField"];
 export type AutomationCatalog =
   components["schemas"]["AutomationCatalogResponse"];
 export type Subscription = components["schemas"]["Subscription"];
@@ -49,6 +51,10 @@ export type UpdateSubscriptionRequest =
   operations["updateSubscription"]["requestBody"]["content"]["application/json"];
 export type UpdateSubscriptionResponse =
   operations["updateSubscription"]["responses"][200]["content"]["application/json"];
+export type CreateRunRequest =
+  operations["createRun"]["requestBody"]["content"]["application/json"];
+export type CreateRunResponse =
+  operations["createRun"]["responses"][201]["content"]["application/json"];
 export type DecideApprovalRequest =
   operations["decideApproval"]["requestBody"]["content"]["application/json"];
 export type DecideApprovalResponse =

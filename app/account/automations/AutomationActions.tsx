@@ -1,20 +1,24 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
-import { FormInput } from "@/components/ui/FormInput";
 import Modal from "@/components/ui/Modal";
 import type {
+  AutomationRunInputField,
   AutomationSetupField,
   SubscriptionStatus,
 } from "@/lib/automations";
 import {
+  archiveSubscription,
   saveSubscriptionConfiguration,
   setSubscriptionStatus,
+  startRun,
   subscribeToAutomation,
   type ActionResult,
 } from "./actions";
+import { RunInputFields, SetupFields } from "./ManifestFields";
 
 /**
  * The buttons on an automation card.
@@ -29,11 +33,13 @@ import {
  */
 export function AutomationActions({
   templateId,
+  name,
   available,
   setup,
   subscription,
 }: {
   templateId: string;
+  name: string;
   available: boolean;
   setup: AutomationSetupField[];
   subscription: {
@@ -41,11 +47,20 @@ export function AutomationActions({
     status: SubscriptionStatus;
     canGoLive: boolean;
     config: Record<string, unknown>;
+    /** The PINNED version's run input (backend ADR-0030); absent means no Run. */
+    runInput?: AutomationRunInputField[];
   } | null;
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [setupOpen, setSetupOpen] = useState(false);
+  const [dialog, setDialog] = useState<"setup" | "run" | "archive" | null>(
+    null,
+  );
+  // One run per key: made when the Run dialog opens and again whenever a value
+  // changes, so only a resubmission of the same values reuses it.
+  const [runKey, setRunKey] = useState("");
+  const newRunKey = () => setRunKey(`run-${crypto.randomUUID()}`);
 
   const submit = (
     action: (data: FormData) => Promise<ActionResult>,
@@ -64,10 +79,26 @@ export function AutomationActions({
     return data;
   };
 
-  const closeSetup = () => {
-    setSetupOpen(false);
+  const open = (which: "setup" | "run" | "archive") => {
+    setError(null);
+    if (which === "run") newRunKey();
+    setDialog(which);
+  };
+  const close = () => {
+    setDialog(null);
     setError(null);
   };
+
+  // Submitted from `onSubmit`, not a form `action`: React resets an action form's
+  // fields when the action settles, and a refused save or run must keep what the
+  // person typed — for the run, so that resubmitting the same values reuses the
+  // same idempotency key.
+  const fromForm =
+    (handler: (data: FormData) => void) =>
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      handler(new FormData(event.currentTarget));
+    };
 
   const submitSetup = (data: FormData) => {
     setError(null);
@@ -77,9 +108,46 @@ export function AutomationActions({
         setError(result.error);
         return;
       }
-      closeSetup();
+      close();
     });
   };
+
+  // A started run is somewhere to go: its own page, where its steps arrive.
+  const submitRun = (data: FormData) => {
+    setError(null);
+    startTransition(async () => {
+      const result = await startRun(data);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      close();
+      if (result.runId) router.push(`/account/runs/${result.runId}`);
+    });
+  };
+
+  const confirmArchive = () => {
+    if (!subscription) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await archiveSubscription(
+        field({ subscriptionId: subscription.id }),
+      );
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      close();
+    });
+  };
+
+  // Run is offered only where it can be honest: a live subscription whose pinned
+  // version declares what a run needs. A version that declares nothing gets no
+  // form, because the platform could not check one (ADR-0030).
+  const canRun =
+    subscription?.status === "live" &&
+    (subscription.runInput?.length ?? 0) > 0 &&
+    available;
 
   return (
     <div className="mt-auto flex flex-col gap-2">
@@ -95,15 +163,22 @@ export function AutomationActions({
           </Button>
         ) : (
           <>
+            {canRun ? (
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={pending}
+                onClick={() => open("run")}
+              >
+                Run
+              </Button>
+            ) : null}
             {setup.length > 0 ? (
               <Button
                 variant="secondary"
                 size="sm"
                 disabled={pending}
-                onClick={() => {
-                  setError(null);
-                  setSetupOpen(true);
-                }}
+                onClick={() => open("setup")}
               >
                 Set up
               </Button>
@@ -140,19 +215,27 @@ export function AutomationActions({
                 {pending ? "Working…" : "Pause"}
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={pending}
+              onClick={() => open("archive")}
+            >
+              Archive
+            </Button>
           </>
         )}
       </div>
 
-      {error ? (
+      {error && dialog === null ? (
         <p role="alert" className="text-xs text-[var(--error-text)]">
           {error}
         </p>
       ) : null}
 
-      {subscription && setupOpen ? (
+      {subscription && dialog === "setup" ? (
         <Modal
-          onClose={closeSetup}
+          onClose={close}
           bubble
           ariaLabelledBy={`automation-setup-${subscription.id}-title`}
           ariaDescribedBy={`automation-setup-${subscription.id}-description`}
@@ -170,7 +253,7 @@ export function AutomationActions({
           >
             Complete the settings supplied by this automation.
           </p>
-          <form action={submitSetup} className="mt-6 space-y-6">
+          <form onSubmit={fromForm(submitSetup)} className="mt-6 space-y-6">
             <input
               type="hidden"
               name="subscriptionId"
@@ -182,7 +265,7 @@ export function AutomationActions({
               <Button
                 type="button"
                 variant="ghost"
-                onClick={closeSetup}
+                onClick={close}
                 disabled={pending}
               >
                 Cancel
@@ -194,130 +277,96 @@ export function AutomationActions({
           </form>
         </Modal>
       ) : null}
-    </div>
-  );
-}
 
-function SetupFields({
-  setup,
-  config,
-}: {
-  setup: AutomationSetupField[];
-  config: Record<string, unknown>;
-}) {
-  const groups: Array<{
-    section: AutomationSetupField["section"];
-    fields: AutomationSetupField[];
-  }> = [];
-
-  // `setup` is published in manifest order. The contract declares a field's
-  // section, but it does not declare an independent section order, so grouping
-  // may never move a field ahead of an earlier one.
-  for (const field of setup) {
-    const currentGroup = groups.at(-1);
-    if (currentGroup?.section === field.section) {
-      currentGroup.fields.push(field);
-      continue;
-    }
-    groups.push({ section: field.section, fields: [field] });
-  }
-
-  return groups.map(({ section, fields }, groupIndex) => {
-    return (
-      <fieldset key={`${section}-${groupIndex}`} className="space-y-4">
-        <legend className="text-sm font-medium text-[var(--text)] capitalize">
-          {section}
-        </legend>
-        {fields.map((field) => (
-          <SetupField key={field.key} field={field} value={config[field.key]} />
-        ))}
-      </fieldset>
-    );
-  });
-}
-
-function SetupField({
-  field,
-  value,
-}: {
-  field: AutomationSetupField;
-  value: unknown;
-}) {
-  const hasDefault = Object.hasOwn(field, "defaultValue");
-  const initialValue = value ?? field.defaultValue;
-  const required = field.required && !hasDefault;
-  const fieldId = `setup-${field.key}`;
-
-  if (field.control === "toggle") {
-    return (
-      <div>
-        <input
-          type="hidden"
-          name={`config-control:${field.key}`}
-          value={field.control}
-        />
-        <label
-          htmlFor={fieldId}
-          className="flex items-start gap-3 text-sm text-[var(--text)]"
+      {subscription && dialog === "run" && subscription.runInput ? (
+        <Modal
+          onClose={close}
+          bubble
+          ariaLabelledBy={`automation-run-${subscription.id}-title`}
+          ariaDescribedBy={`automation-run-${subscription.id}-description`}
+          zIndex={100}
         >
-          <input
-            id={fieldId}
-            name={`config:${field.key}`}
-            type="checkbox"
-            value="true"
-            defaultChecked={initialValue === true}
-            className="mt-1 size-4 rounded border-[var(--color-divider)] accent-[var(--color-accent)]"
-          />
-          <span>
-            <span className="font-medium">{field.title}</span>
-            <span className="mt-1 block text-xs text-[var(--muted)]">
-              {field.description}
-            </span>
-          </span>
-        </label>
-        <SetupFieldMetadata field={field} />
-      </div>
-    );
-  }
+          <h2
+            id={`automation-run-${subscription.id}-title`}
+            className="text-xl font-semibold text-[var(--text)]"
+          >
+            Run {name}
+          </h2>
+          <p
+            id={`automation-run-${subscription.id}-description`}
+            className="mt-1 text-sm text-[var(--muted)]"
+          >
+            Enter what this run needs. It starts as soon as you submit, and its
+            page shows each step as it happens.
+          </p>
+          <form
+            onSubmit={fromForm(submitRun)}
+            onChange={newRunKey}
+            className="mt-6 space-y-6"
+          >
+            <input
+              type="hidden"
+              name="subscriptionId"
+              value={subscription.id}
+            />
+            <input type="hidden" name="idempotencyKey" value={runKey} />
+            <RunInputFields runInput={subscription.runInput} />
+            <FormError message={error} />
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={close}
+                disabled={pending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={pending}>
+                {pending ? "Starting…" : "Start run"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
 
-  return (
-    <div>
-      <input
-        type="hidden"
-        name={`config-control:${field.key}`}
-        value={field.control}
-      />
-      <FormInput
-        id={fieldId}
-        name={`config:${field.key}`}
-        type={inputType(field.control)}
-        step={field.control === "money" ? "any" : undefined}
-        label={field.title}
-        hint={field.description}
-        required={required}
-        defaultValue={
-          initialValue === undefined || initialValue === null
-            ? undefined
-            : String(initialValue)
-        }
-        autoComplete="off"
-      />
-      <SetupFieldMetadata field={field} />
+      {subscription && dialog === "archive" ? (
+        <Modal
+          onClose={close}
+          bubble
+          ariaLabelledBy={`automation-archive-${subscription.id}-title`}
+          ariaDescribedBy={`automation-archive-${subscription.id}-description`}
+          zIndex={100}
+        >
+          <h2
+            id={`automation-archive-${subscription.id}-title`}
+            className="text-xl font-semibold text-[var(--text)]"
+          >
+            Archive {name}?
+          </h2>
+          <p
+            id={`automation-archive-${subscription.id}-description`}
+            className="mt-1 text-sm text-[var(--muted)]"
+          >
+            It stops running and gives its plan slot back. This cannot be
+            undone: to use it again, add it afresh. Runs it already made stay in
+            Activity.
+          </p>
+          <FormError message={error} />
+          <div className="mt-6 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={close}
+              disabled={pending}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={confirmArchive} disabled={pending}>
+              {pending ? "Archiving…" : "Archive"}
+            </Button>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   );
-}
-
-function inputType(
-  control: AutomationSetupField["control"],
-): "number" | "text" {
-  if (control === "money") return "number";
-  // The contract provides no resource-list endpoint. A resource-picker therefore
-  // accepts the supplied opaque value without inventing a provider-specific list.
-  if (control === "resource-picker") return "text";
-  return "text";
-}
-
-function SetupFieldMetadata({ field }: { field: AutomationSetupField }) {
-  if (!field.notifies) return null;
-  return <p className="mt-1 text-xs text-[var(--muted)]">{field.notifies}</p>;
 }

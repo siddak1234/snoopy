@@ -10,12 +10,13 @@ export type WorkspaceExportActionResult =
   | { ok: false; error: string };
 
 export async function requestWorkspaceExport(): Promise<WorkspaceExportActionResult> {
-  const session = await getAppSession();
-  const workspaceId = await resolveActiveWorkspaceId(session);
-  if (!workspaceId)
-    return { ok: false, error: "No active workspace is available." };
-
   try {
+    // Inside the try: a refused session read is the platform's answer to show
+    // (backend §12.1 #160).
+    const session = await getAppSession();
+    const workspaceId = await resolveActiveWorkspaceId(session);
+    if (!workspaceId)
+      return { ok: false, error: "No active workspace is available." };
     return { ok: true, response: await exportWorkspace(workspaceId) };
   } catch (error) {
     if (error instanceof PlatformServerError) {

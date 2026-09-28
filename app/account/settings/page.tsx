@@ -61,6 +61,7 @@ export default async function AccountSettingsPage() {
           </p>
           <div className="mt-3">
             <Link
+              prefetch={false}
               href="/account/organization"
               className="text-sm font-medium text-[var(--link)] transition hover:underline"
             >
