@@ -491,7 +491,13 @@ test("a run that can still stop offers Cancel, and nothing else does (cancelRun)
   );
   assert.match(
     runPage,
-    /run\.status === "pending" \|\| run\.status === "running" \? \(\s*<div className="mt-4">\s*<CancelRunButton runId=\{run\.id\} \/>/u,
+    /run\.status === "pending" \|\| run\.status === "running" \? \(\s*<div className="mt-4">\s*<CancelRunButton runId=\{run\.id\} workspaceId=\{run\.workspaceId\} \/>/u,
+  );
+  // The run the page showed, in the workspace it showed: after a switch in
+  // another tab the same id would 404 elsewhere and read as "already stopped".
+  assert.match(
+    actions,
+    /const workspaceId = await activeWorkspaceIfShown\(shownWorkspaceId\);\s*if \(!workspaceId\) return \{ ok: false, error: WORKSPACE_CHANGED \};\s*await cancelWorkspaceRun\(workspaceId, runId\);/u,
   );
   assert.match(
     actions,

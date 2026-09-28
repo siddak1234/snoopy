@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join, relative } from "node:path";
+import ts from "typescript";
 
 const root = process.cwd();
 const sourceRoots = ["app", "components", "hooks", "lib"];
@@ -51,16 +52,48 @@ const removedRouteFiles = [
 // Colour lives in the design tokens (register F14): a hex literal anywhere but
 // app/globals.css, where the tokens are defined, is a colour the theme cannot
 // change. app/opengraph-image.tsx is the one exemption — image generation cannot
-// read CSS custom properties. Comments are not code: "§12.1 #160" names a
-// register row, not a colour.
+// read CSS custom properties. Code is read by TypeScript's own parser, so only
+// strings, templates and JSX text are looked at: a comment ("§12.1 #160") is not
+// code, and an `href`'s value ("#add") is a fragment, not a colour.
 const hexColour =
   /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9A-Za-z_-])/u;
 const hexAllowed = new Set(["app/globals.css", "app/opengraph-image.tsx"]);
 
-function withoutComments(source) {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//gu, "")
-    .replace(/(^|[^:"'`\\])\/\/.*$/gmu, "$1");
+function rawHexColour(path, content) {
+  if (path.endsWith(".css")) {
+    return content.replace(/\/\*[\s\S]*?\*\//gu, "").match(hexColour)?.[0];
+  }
+  const source = ts.createSourceFile(
+    path,
+    content,
+    ts.ScriptTarget.Latest,
+    false,
+    path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  let found;
+  const visit = (node) => {
+    if (found) return;
+    if (
+      ts.isJsxAttribute(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === "href"
+    ) {
+      return;
+    }
+    if (
+      ts.isStringLiteralLike(node) ||
+      ts.isTemplateHead(node) ||
+      ts.isTemplateMiddle(node) ||
+      ts.isTemplateTail(node) ||
+      ts.isJsxText(node)
+    ) {
+      found = node.text.match(hexColour)?.[0];
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found;
 }
 
 const failures = [];
@@ -68,10 +101,10 @@ for (const file of files) {
   const content = readFileSync(file, "utf8");
   const path = relative(root, file);
   if (!hexAllowed.has(path)) {
-    const colour = withoutComments(content).match(hexColour);
+    const colour = rawHexColour(path, content);
     if (colour) {
       failures.push(
-        `${path}: raw hex colour ${colour[0]} — use a design token from app/globals.css`,
+        `${path}: raw hex colour ${colour} — use a design token from app/globals.css`,
       );
     }
   }

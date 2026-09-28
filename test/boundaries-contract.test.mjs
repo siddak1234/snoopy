@@ -40,6 +40,18 @@ test("a raw hex colour outside the token file is refused (register F14)", () => 
     ["components/Card.tsx", 'export const edge = "#1a2b3c";\n'],
     ["app/page.tsx", 'const c = <div className="bg-[#fff]" />;\n'],
     ["components/extra.css", ".x { color: #12345678; }\n"],
+    // A `/*` inside a string is not a comment, so it hides nothing after it.
+    [
+      "lib/glob.ts",
+      'export const glob = "src/**/*.ts";\nexport const c = "#ff0000";\n',
+    ],
+    // Nor is `//` after `url(` in CSS.
+    [
+      "components/cdn.css",
+      ".y { background: url(//cdn.example/x.png); color: #123456; }\n",
+    ],
+    // A template carries it as well as a string does.
+    ["lib/template.ts", "export const t = `border: 1px solid #abcdef`;\n"],
   ]) {
     const { status, output } = auditTree({ [path]: content });
     assert.equal(status, 1, `${path} passed with a raw colour`);
@@ -56,6 +68,9 @@ test("the token file, the OG image and comments may carry what looks like hex", 
     "app/opengraph-image.tsx": 'const background = "#0b0b10";\n',
     "lib/notes.ts":
       '// backend §12.1 #160 names a register row\n/* and so does #175 */\nexport const url = "https://example.test/#top";\n',
+    // A fragment link that spells a colour is a link.
+    "components/Anchor.tsx":
+      'export const Anchor = () => <a href="#add">Add</a>;\n',
   });
   assert.equal(status, 0, output);
 });

@@ -1,17 +1,17 @@
 import Link from "next/link";
 import { getAppSession } from "@/lib/app-session";
 import {
-  emptyWhenUnavailable,
   formatWhen,
   listAutomations,
   listRuns,
   listSubscriptions,
   readRunStats,
 } from "@/lib/automations";
+import { listConnections } from "@/lib/connections";
 import {
-  emptyConnectionsWhenUnavailable,
-  listConnections,
-} from "@/lib/connections";
+  PlatformNotConfiguredError,
+  PlatformServerError,
+} from "@/lib/platform-server";
 import {
   listAccessibleProjects,
   resolveActiveWorkspaceId,
@@ -33,42 +33,51 @@ function startOfMonthUtc(now: Date): string {
  * integrations are the lists those pages read. A recent run is named from the
  * catalog, as Activity names it, and falls back to its template id. `null` when
  * no workspace is active, so nothing is claimed about one.
+ *
+ * Each figure stands alone: one the platform refuses or cannot answer reads
+ * "Unavailable" and the rest still show, rather than one read taking the whole
+ * home with it. A session that ended is not a figure's to absorb, so it goes to
+ * the account area's boundary as every other page's does.
  */
 async function readOverview(workspaceId: string | undefined) {
   if (!workspaceId) return null;
   const [subscriptions, stats, connections, runs, catalog] = await Promise.all([
-    emptyWhenUnavailable(() => listSubscriptions(workspaceId), {
-      subscriptions: [],
-    }),
-    emptyWhenUnavailable(
-      () => readRunStats(workspaceId, startOfMonthUtc(new Date())),
-      null,
-    ),
-    emptyConnectionsWhenUnavailable(() => listConnections(workspaceId), {
-      connections: [],
-    }),
-    emptyWhenUnavailable(() => listRuns(workspaceId), { runs: [] }),
-    emptyWhenUnavailable(() => listAutomations(workspaceId), {
-      automations: [],
-      categories: [],
-    }),
+    figure(() => listSubscriptions(workspaceId)),
+    figure(() => readRunStats(workspaceId, startOfMonthUtc(new Date()))),
+    figure(() => listConnections(workspaceId)),
+    figure(() => listRuns(workspaceId)),
+    figure(() => listAutomations(workspaceId)),
   ]);
   const nameFor = new Map(
-    catalog.automations.map((entry) => [entry.templateId, entry.name]),
+    (catalog?.automations ?? []).map((entry) => [entry.templateId, entry.name]),
   );
   return {
-    automations: subscriptions.subscriptions.filter(
-      (entry) => entry.status !== "archived",
-    ).length,
+    automations:
+      subscriptions?.subscriptions.filter(
+        (entry) => entry.status !== "archived",
+      ).length ?? null,
     runs: stats?.workspace ?? null,
-    integrations: connections.connections.filter(
-      (entry) => entry.status === "connected",
-    ).length,
-    recent: runs.runs.slice(0, 3).map((run) => ({
-      run,
-      name: nameFor.get(run.templateId) ?? run.templateId,
-    })),
+    integrations:
+      connections?.connections.filter((entry) => entry.status === "connected")
+        .length ?? null,
+    recent:
+      runs?.runs.slice(0, 3).map((run) => ({
+        run,
+        name: nameFor.get(run.templateId) ?? run.templateId,
+      })) ?? null,
   };
+}
+
+async function figure<T>(read: () => Promise<T>): Promise<T | null> {
+  try {
+    return await read();
+  } catch (error) {
+    if (error instanceof PlatformNotConfiguredError) return null;
+    if (error instanceof PlatformServerError && error.status !== 401) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 function getFirstName(name?: string | null): string | null {
@@ -156,7 +165,9 @@ export default async function AccountDashboardPage() {
           <>
             <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:max-w-md">
               <dt className="text-[var(--muted)]">Automations</dt>
-              <dd className="text-[var(--text)]">{overview.automations}</dd>
+              <dd className="text-[var(--text)]">
+                {overview.automations ?? "Unavailable"}
+              </dd>
               <dt className="text-[var(--muted)]">Runs this month</dt>
               <dd className="text-[var(--text)]">
                 {overview.runs
@@ -164,7 +175,9 @@ export default async function AccountDashboardPage() {
                   : "Unavailable"}
               </dd>
               <dt className="text-[var(--muted)]">Integrations</dt>
-              <dd className="text-[var(--text)]">{overview.integrations}</dd>
+              <dd className="text-[var(--text)]">
+                {overview.integrations ?? "Unavailable"}
+              </dd>
             </dl>
             <p className="mt-3 text-xs text-[var(--muted)]">
               Runs are counted from the first of the month, UTC.
@@ -181,7 +194,11 @@ export default async function AccountDashboardPage() {
         <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Recent activity
         </h2>
-        {overview && overview.recent.length > 0 ? (
+        {overview && overview.recent === null ? (
+          <p className="mt-3 text-sm text-[var(--muted)]">
+            Recent activity could not be read just now.
+          </p>
+        ) : overview?.recent && overview.recent.length > 0 ? (
           <ul className="mt-3 space-y-2">
             {overview.recent.map(({ run, name }) => (
               <li key={run.id}>

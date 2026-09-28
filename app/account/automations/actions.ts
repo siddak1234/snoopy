@@ -14,7 +14,11 @@ import {
   type UpdateSubscriptionRequest,
 } from "@/lib/automations";
 import { subscriptionEntitlementState } from "@/lib/subscription-entitlements";
-import { requireActiveWorkspaceId } from "@/lib/tenancy";
+import {
+  activeWorkspaceIfShown,
+  requireActiveWorkspaceId,
+  WORKSPACE_CHANGED,
+} from "@/lib/tenancy";
 
 /**
  * Mutations on the automation surface.
@@ -284,9 +288,15 @@ export async function decideApproval(
  */
 export async function cancelRun(formData: FormData): Promise<ActionResult> {
   const runId = String(formData.get("runId") ?? "");
+  const shownWorkspaceId = String(formData.get("workspaceId") ?? "");
   if (!runId) return { ok: false, error: "A run is required." };
   try {
-    await cancelWorkspaceRun(await requireActiveWorkspaceId(), runId);
+    // The run the page showed, in the workspace it showed: after a switch in
+    // another tab the same id would be looked up elsewhere, answer 404, and
+    // read as "already stopped" while it runs on.
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspaceId);
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+    await cancelWorkspaceRun(workspaceId, runId);
     revalidatePath(`/account/runs/${encodeURIComponent(runId)}`);
     revalidatePath("/account/runs");
     return { ok: true, runId };

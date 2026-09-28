@@ -101,6 +101,16 @@ export function ConnectionsPanel({
         connection.providerId,
         connection.id,
       );
+      // The contract's answer is a union; the platform does not reuse a grant
+      // it was asked to replace, but a reused answer is still an answer.
+      if (result.ok && result.alreadyConnectedAs) {
+        setReplacing(null);
+        setNotice(
+          `${connection.externalAccount.displayName} is still connected — there was nothing to replace.`,
+        );
+        router.refresh();
+        return;
+      }
       if (!result.ok || !result.authorizationUrl) {
         setReplaceError(
           result.ok ? "Could not start the replacement" : result.error,

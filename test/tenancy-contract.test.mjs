@@ -84,9 +84,14 @@ test("bounded session previews are never used as workspace authority", () => {
     "app/account/billing/actions.ts",
     "app/account/connections/actions.ts",
     "app/account/settings/export-actions.ts",
+    "app/account/teams/actions.ts",
   ]) {
     const source = readFileSync(file, "utf8");
-    assert.match(source, /requireActiveWorkspaceId\(\)/u, file);
+    assert.match(
+      source,
+      /requireActiveWorkspaceId\(\)|activeWorkspaceIfShown\(shownWorkspaceId\)/u,
+      file,
+    );
     assert.doesNotMatch(
       source,
       /async function activeWorkspaceId|resolveActiveWorkspaceId|session\?\.workspaces|session\.workspaces/u,
@@ -168,4 +173,24 @@ test("organization lifecycle UI uses only documented domain and join operations"
   }
   assert.match(domainUi, /verificationRecordName/);
   assert.match(joinUi, /"approve" \| "reject"/);
+});
+
+test("an action on a page's workspace refuses once another tab changed it — billing and Cancel share one guard", () => {
+  assert.match(
+    tenancy,
+    /export async function activeWorkspaceIfShown\(\s*shownWorkspaceId: string,\s*\): Promise<string \| null> \{\s*const workspaceId = await requireActiveWorkspaceId\(\);\s*return workspaceId === shownWorkspaceId \? workspaceId : null;\s*\}/u,
+    "resolved by the session, compared, never taken from the browser",
+  );
+  for (const file of [
+    "app/account/billing/actions.ts",
+    "app/account/automations/actions.ts",
+  ]) {
+    const source = readFileSync(file, "utf8");
+    assert.doesNotMatch(
+      source,
+      /const WORKSPACE_CHANGED =/u,
+      `${file} keeps no private copy of the guard`,
+    );
+    assert.match(source, /error: WORKSPACE_CHANGED/u, file);
+  }
 });

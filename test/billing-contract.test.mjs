@@ -260,7 +260,14 @@ test("both hand-offs refuse when the page's workspace is no longer the active on
       /shownWorkspaceId: string/u,
       `${name} takes the shown workspace`,
     );
-    const check = body.indexOf("if (workspaceId !== shownWorkspaceId)");
+    assert.match(
+      body,
+      /const workspaceId = await activeWorkspaceIfShown\(shownWorkspaceId\);/u,
+      `${name} resolves the workspace on the server and compares it`,
+    );
+    const check = body.indexOf(
+      "if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };",
+    );
     const call = body.search(/createBilling(?:Checkout|Portal)\(workspaceId/u);
     assert.ok(
       check > 0 && call > check,

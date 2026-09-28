@@ -125,6 +125,27 @@ export async function requireActiveWorkspaceId(): Promise<string> {
   return workspaceId;
 }
 
+/**
+ * The active workspace changed in another tab after the page rendered, so an
+ * action taken on that page would act on a workspace the person was not looking
+ * at.
+ */
+export const WORKSPACE_CHANGED =
+  "The active workspace changed in another tab. Reload this page before continuing.";
+
+/**
+ * The active workspace, only while it is still the one the page showed — or
+ * `null`. The page sends the id it rendered; it is only compared, and the
+ * action's path always uses the workspace the server resolves, never one the
+ * browser names.
+ */
+export async function activeWorkspaceIfShown(
+  shownWorkspaceId: string,
+): Promise<string | null> {
+  const workspaceId = await requireActiveWorkspaceId();
+  return workspaceId === shownWorkspaceId ? workspaceId : null;
+}
+
 export async function listWorkspaceMembers(
   workspaceId: string,
 ): Promise<WorkspaceMember[]> {

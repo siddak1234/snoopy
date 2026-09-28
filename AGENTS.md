@@ -25,9 +25,10 @@ repository; this repo **reads** them and never edits them.
 > That path is outside this working directory. Run `/add-dir ../snoopy-backend`
 > at the start of the session (or launch with `--add-dir`) so the read succeeds
 > without a prompt. **Read access only.** `npm run generate:platform-contracts`
-> also reads `docs/openapi.yaml`, `docs/openapi/automations.yaml` and
-> `docs/openapi/connections.yaml` from there to generate the API client —
-> reading a contract is correct; editing one from a web session is not.
+> also reads the API client's three contracts from there —
+> `snoopy-backend/docs/openapi.yaml`, `snoopy-backend/docs/openapi/automations.yaml`
+> and `snoopy-backend/docs/openapi/connections.yaml`. Reading a contract is correct;
+> editing one from a web session is not.
 
 **If §0 STATUS does not name `snoopy` as the open repository, you are in the
 wrong repo.** Say so and stop. Then read the current round's card in

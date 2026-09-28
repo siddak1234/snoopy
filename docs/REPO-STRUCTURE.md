@@ -9,7 +9,8 @@ snoopy/
 ├── e2e/                  Browser, accessibility, and local Edge fixture tests
 ├── test/                 Contract and structure tests (`npm run test:contracts`)
 ├── scripts/              `npm run verify`, contract generation, boundary audit,
-│                         repository facts; `audit/` is the change audit's gate
+│                         the documents' file references, repository facts;
+│                         `audit/` is the change audit's gate
 │                         runner, marker writer and their shared preflight;
 │                         `githooks/` and `hooks/` enforce its marker on push
 ├── docs/                 Website architecture and the audit register

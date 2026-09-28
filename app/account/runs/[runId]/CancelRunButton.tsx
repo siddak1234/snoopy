@@ -11,7 +11,13 @@ import { cancelRun } from "@/app/account/automations/actions";
  * or `running` run — the two states the platform cancels — and confirmed first,
  * because a cancelled run is not resumed: it ends where it stands.
  */
-export function CancelRunButton({ runId }: { runId: string }) {
+export function CancelRunButton({
+  runId,
+  workspaceId,
+}: {
+  runId: string;
+  workspaceId: string;
+}) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +33,7 @@ export function CancelRunButton({ runId }: { runId: string }) {
     startTransition(async () => {
       const data = new FormData();
       data.append("runId", runId);
+      data.append("workspaceId", workspaceId);
       const result = await cancelRun(data);
       if (!result.ok) {
         setError(result.error);

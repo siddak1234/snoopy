@@ -81,7 +81,7 @@ export default async function RunDetailPage(
         {/* Only the two states the platform cancels; any other answers 404. */}
         {run.status === "pending" || run.status === "running" ? (
           <div className="mt-4">
-            <CancelRunButton runId={run.id} />
+            <CancelRunButton runId={run.id} workspaceId={run.workspaceId} />
           </div>
         ) : null}
 

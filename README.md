@@ -43,7 +43,7 @@ repository), `build` with `BACKEND_API_ORIGIN=https://backend.invalid` plus the
 (NFR-36); the marketing screenshots are Chromium's baselines alone. A run in
 which every gate ran green ends by emitting
 this repository's facts file to `.autom8x/repo-facts/snoopy.json` (gitignored;
-`snoopy-backend` commits it as `docs/repo-facts/snoopy.json`); a run that had to
+`snoopy-backend` commits it as `snoopy-backend/docs/repo-facts/snoopy.json`); a run that had to
 skip the sibling gate says so and emits nothing. Run it on Node 22 (`.nvmrc`), the version
 CI and the container use. Running it while `/audit-change` runs, or the reverse,
 is refused — both build into `.next` and serve on ports 3001 and 3443, so they

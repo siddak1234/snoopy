@@ -130,6 +130,8 @@ function initialState() {
     // replaced it — and whether its grant still works.
     oauthConnectionId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
     oauthStatus: "connected" as "connected" | "reauthorization-required",
+    // The run tally the dashboard reads, when the platform cannot answer it.
+    runStatsFailing: false,
     teams: [
       {
         id: operationsTeamId,
@@ -592,6 +594,15 @@ function fixtureSessionValue(
   return null;
 }
 
+function projectRoleOf(
+  fixtureSession: ReturnType<typeof fixtureSessionValue>,
+): Platform["ProjectSummary"]["viewerRole"] | null {
+  if (fixtureSession === "owner") return "owner";
+  if (fixtureSession === "admin") return "admin";
+  if (fixtureSession === "member") return "member";
+  return null;
+}
+
 function respond(
   response: import("node:http").ServerResponse,
   status: number,
@@ -635,6 +646,14 @@ const server = createServer(
       url.pathname === "/__fixture/oauth-connection-replaced"
     ) {
       state.oauthConnectionId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+      response.writeHead(204, { "cache-control": "no-store" });
+      return response.end();
+    }
+    if (
+      request.method === "POST" &&
+      url.pathname === "/__fixture/run-stats-failing"
+    ) {
+      state.runStatsFailing = true;
       response.writeHead(204, { "cache-control": "no-store" });
       return response.end();
     }
@@ -796,8 +815,11 @@ const server = createServer(
       } satisfies Platform["WorkspaceListResponse"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/projects")) {
+      // The role each person holds on the fixture project: its owner, an
+      // organization admin (effective admin), or a plain member on it.
+      const viewerRole = projectRoleOf(fixtureSession);
       return respond(response, 200, {
-        projects: [project],
+        projects: viewerRole ? [{ ...project, viewerRole }] : [],
       } satisfies Platform["ProjectListResponse"]);
     }
     if (
@@ -938,9 +960,8 @@ const server = createServer(
     ).exec(pathname);
     if (teamMembers) {
       const team = state.teams.find((entry) => entry.id === teamMembers[1]);
-      if (!team || (!administering && !onTeam(team.id))) {
-        return respond(response, 404, problem(404, "Not Found"));
-      }
+      if (!team) return respond(response, 404, problem(404, "Not Found"));
+      // An owner, an admin or the team's manager; any other member is 403.
       if (!administering && onTeam(team.id)?.role !== "manager") {
         return respond(response, 403, problem(403, "Forbidden"));
       }
@@ -988,13 +1009,19 @@ const server = createServer(
       }
     }
     if (isWorkspacePath(pathname, `/projects/${projectId}/team-grants`)) {
+      // Anyone with a role on the project reads its grants; anyone else is 404.
+      // Granting is the project's effective owner's or admin's.
+      const projectRole = projectRoleOf(fixtureSession);
+      if (!projectRole) {
+        return respond(response, 404, problem(404, "Not Found"));
+      }
       if (method === "GET") {
         return respond(response, 200, {
           grants: state.projectTeamGrants,
         } satisfies Platform["ProjectTeamGrantListResponse"]);
       }
       if (method === "POST") {
-        if (!administering) {
+        if (projectRole !== "owner" && projectRole !== "admin") {
           return respond(response, 403, problem(403, "Forbidden"));
         }
         const body = (await requestJson(request)) as {
@@ -1313,6 +1340,9 @@ const server = createServer(
       } satisfies AutomationOperations["listRuns"]["responses"][200]["content"]["application/json"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/run-stats")) {
+      if (state.runStatsFailing) {
+        return respond(response, 503, problem(503, "Service Unavailable"));
+      }
       return respond(
         response,
         200,

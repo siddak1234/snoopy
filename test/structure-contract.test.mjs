@@ -168,3 +168,19 @@ test("one Node major everywhere — .nvmrc, CI and the image (register F17)", ()
     assert.equal(from[1], major, "Dockerfile");
   }
 });
+
+test("signing in from a join link returns to the organization it named", () => {
+  assert.match(
+    read("app/onboarding/join-org/page.tsx"),
+    /loginHref\(`\/onboarding\/join-org\?w=\$\{encodeURIComponent\(workspaceId\)\}`\)/u,
+  );
+});
+
+test("a replace answered as reused says so, rather than failing", () => {
+  const panel = read("app/account/connections/ConnectionsPanel.tsx");
+  const replace = panel.slice(panel.indexOf("const confirmReplace"));
+  assert.match(
+    replace,
+    /if \(result\.ok && result\.alreadyConnectedAs\) \{\s*setReplacing\(null\);/u,
+  );
+});

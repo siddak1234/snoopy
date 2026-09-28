@@ -151,6 +151,12 @@ export default async function ProjectDetailPage({
               teams={teams.map((team) => ({ id: team.id, name: team.name }))}
             />
           ) : null}
+          {canManage && teams.length === 0 ? (
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              You can give access to a team you can see — the teams you are on.
+              The organization&apos;s owners and admins see every team.
+            </p>
+          ) : null}
         </div>
       ) : null}
     </SectionCard>

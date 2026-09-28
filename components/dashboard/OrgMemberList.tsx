@@ -111,9 +111,10 @@ export function OrgMemberList({
                 </p>
               </div>
 
-              {/* Role badge */}
+              {/* Role badge: the role the platform holds, admins included —
+                  they reach this page too (register F55). */}
               <span className="shrink-0 rounded-full bg-[var(--chip-bg)] px-2.5 py-0.5 text-xs font-medium text-[var(--chip-text)] capitalize">
-                {isOwner ? "Owner" : "Member"}
+                {m.role}
               </span>
 
               {/* Remove button */}

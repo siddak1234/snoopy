@@ -502,6 +502,52 @@ test("a running run is cancelled from its page, confirmed first, and then reads 
   await expect(page.getByRole("button", { name: "Cancel run" })).toHaveCount(0);
 });
 
+test("a figure the platform cannot answer reads Unavailable, and the rest of the dashboard still shows", async ({
+  page,
+}) => {
+  await fixtureControl("run-stats-failing");
+  await page.goto("/account");
+  const figure = (term: string) =>
+    page
+      .locator("dt", { hasText: term })
+      .locator("xpath=following-sibling::dd[1]");
+  await expect(figure("Runs this month")).toHaveText("Unavailable");
+  await expect(figure("Automations")).toHaveText("3");
+  await expect(figure("Integrations")).toHaveText("1");
+  await expect(
+    page.getByRole("link", { name: "Run of Manual input automation, running" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: /The platform (is busy|could not answer)/,
+    }),
+  ).toHaveCount(0);
+});
+
+test("Cancel on a run whose workspace was switched away in another tab says so, and cancels nothing", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/account/runs/fixture-run-running");
+  const other = await context.newPage();
+  try {
+    await other.goto("/account");
+    const trigger = other.getByRole("button", { name: "Switch workspace" });
+    await trigger.click();
+    await other.getByRole("button", { name: /Fixture Personal/ }).click();
+    await expect(trigger).toContainText("Fixture Personal");
+  } finally {
+    await other.close();
+  }
+  await page.getByRole("button", { name: "Cancel run" }).click();
+  const dialog = page.getByRole("dialog", { name: "Cancel this run?" });
+  await dialog.getByRole("button", { name: "Cancel run" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "The active workspace changed in another tab. Reload this page before continuing.",
+  );
+  await expect(page.locator("main").getByText(/^running$/i)).toBeVisible();
+});
+
 test("the dashboard shows the workspace's own numbers and names its recent runs (register F54)", async ({
   page,
 }) => {
@@ -667,6 +713,10 @@ test("an admin reaches the organization page, where every operation admits them 
   await expect(
     page.getByRole("heading", { name: "Organization", exact: true }),
   ).toBeVisible();
+  // Each member's badge is the role the platform holds — an admin reads as one.
+  const self = page.locator("main li").filter({ hasText: "(you)" });
+  await expect(self).toContainText("Fixture Admin");
+  await expect(self.getByText(/^admin$/i)).toBeVisible();
   await expect(
     page
       .getByRole("complementary", { name: "Dashboard navigation" })
@@ -692,6 +742,22 @@ test("a project's owner gives a team access, and the project lists the teams gra
     page.getByText("No team has access to this project."),
   ).toHaveCount(0);
   await expectNoAxeViolations(page);
+});
+
+test("anyone on a project reads the teams granted to it, and only its owner or admin is offered the grant (backend ADR-0010)", async ({
+  page,
+}) => {
+  await presentSession(page, "member");
+  await page.goto("/account/projects/33333333-3333-4333-8333-333333333333");
+  await expect(
+    page.getByRole("heading", { name: "Teams with access" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("No team has access to this project."),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Give access" })).toHaveCount(
+    0,
+  );
 });
 
 test("signing out flips the marketing nav without a manual reload", async ({
