@@ -42,11 +42,12 @@ const FULL_GATES = [
   "test:contracts",
   "verify:platform-contracts",
   "build:no-backend",
+  "probe:no-backend",
   "build",
   "test:browser",
   "test:browser:fixtures",
 ];
-const DOCS_GATES = ["lint", "format:check"];
+const DOCS_GATES = ["lint", "format:check", "doc-references"];
 
 function git(...args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();

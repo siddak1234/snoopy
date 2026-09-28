@@ -5,16 +5,38 @@
 // is refused rather than left to memory.
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:net";
 import { join } from "node:path";
+
+// Playwright's web server (playwright.config.ts) and the fixture edge
+// (scripts/run-browser-fixtures.mjs) take these.
+const SERVER_PORTS = [3001, 3443];
+// Every address a stale server could hold while it answers the suites at
+// 127.0.0.1: the gates' own servers bind 127.0.0.1; a standalone server.js with
+// no HOSTNAME binds 0.0.0.0; `next dev` and `next start` with no --hostname take
+// Node's default, `::`. All three are asked because a BSD kernel (macOS), under
+// the SO_REUSEADDR Node sets, refuses a bind only on the exact address held;
+// Linux refuses across them, so there the extra asks cost nothing.
+const SERVER_ADDRESSES = ["127.0.0.1", "0.0.0.0", "::"];
 
 /**
  * Refuses a clone that cannot give an honest answer, then holds the lock until
- * this process exits.
+ * this process exits. `ports` exists for the contract tests, which plant a
+ * listener on a port of their own rather than touch the servers'.
+ *
+ * The lock comes first: asking about a port binds it, and a bind made while
+ * another run holds the lock could take the port its server is about to listen
+ * on. A refused port gives the lock back.
  */
-export function preflight({ root, fail }) {
+export async function preflight({ root, fail, ports = SERVER_PORTS }) {
   refuseConflictCopies(root, fail);
-  refuseListeners(fail);
-  holdLock(root, fail);
+  const release = holdLock(root, fail);
+  try {
+    await refuseBusyPorts(ports, fail);
+  } catch (error) {
+    release();
+    throw error;
+  }
 }
 
 // macOS/iCloud Finder conflict copies ("file 2.ts") are invisible to git (the
@@ -49,18 +71,36 @@ function refuseConflictCopies(root, fail) {
 }
 
 // A stale dev or test server on either port would answer the browser suites
-// instead of this tree's build.
-function refuseListeners(fail) {
-  for (const port of [3001, 3443]) {
-    const listeners = spawnSync(
-      "lsof",
-      ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN"],
-      { encoding: "utf8" },
-    );
-    if (listeners.status === 0 && listeners.stdout.trim()) {
-      fail(`port ${port} has a listener; stop it first:\n${listeners.stdout}`);
+// instead of this tree's build. Asked by binding the port, which the kernel
+// answers whoever holds it: lsof 4.95 lists no socket for the process Next
+// renames `next-server (v16.3.3)`, so asking lsof let a live standalone server
+// on 3001 through (register F61).
+async function refuseBusyPorts(ports, fail) {
+  for (const port of ports) {
+    for (const host of SERVER_ADDRESSES) {
+      const code = await bindAndRelease(port, host);
+      if (code === "EADDRINUSE") {
+        fail(
+          `port ${port} is in use (a bind to ${host} was refused); stop whatever holds it first`,
+        );
+      } else if (code && code !== "EAFNOSUPPORT" && code !== "EADDRNOTAVAIL") {
+        // An address family this machine lacks (no IPv6) is one no server can
+        // hold either. Anything else leaves the question unanswered, and an
+        // unanswered question is not a free port.
+        fail(`could not ask whether port ${port} is free on ${host}: ${code}`);
+      }
     }
   }
+}
+
+// Resolves once the port is released again — the next address's bind must not
+// collide with this one — with the bind's error code, or null when it was free.
+function bindAndRelease(port, host) {
+  return new Promise((settle) => {
+    const server = createServer();
+    server.once("error", (error) => settle(error.code ?? error.message));
+    server.listen({ port, host }, () => server.close(() => settle(null)));
+  });
 }
 
 // Acquired atomically — `wx` refuses an existing file — so two runs started in
@@ -109,15 +149,22 @@ function holdLock(root, fail) {
   };
   acquire(true);
 
-  process.on("exit", () => {
+  const release = () => {
+    process.off("exit", release);
+    process.off("SIGINT", interrupted);
+    process.off("SIGTERM", terminated);
     try {
       rmSync(lockPath);
     } catch {
       /* already gone */
     }
-  });
-  process.on("SIGINT", () => process.exit(130));
-  process.on("SIGTERM", () => process.exit(143));
+  };
+  const interrupted = () => process.exit(130);
+  const terminated = () => process.exit(143);
+  process.on("exit", release);
+  process.on("SIGINT", interrupted);
+  process.on("SIGTERM", terminated);
+  return release;
 }
 
 /**

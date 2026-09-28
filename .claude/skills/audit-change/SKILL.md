@@ -10,11 +10,11 @@ Audit the change that is about to be pushed, and record the result the push hook
 1. **Preflight** — every item verified by command, none assumed:
    - `git fetch origin main` (the audit is against current `origin/main`; the marker records the baseline and goes stale if it moves).
    - `git status --porcelain` must show no tracked modifications. Commit or stash first — the audited artifact must be the pushed artifact.
-   - Ports 3001 and 3443 must be free (`lsof -nP -iTCP:<port> -sTCP:LISTEN`) and no stray `next dev` may be running — audits build and serve the real app.
+   - Ports 3001 and 3443 must be free and no stray `next dev` may be running — audits build and serve the real app. `scripts/audit/preflight.mjs` answers this by binding each port on 127.0.0.1, 0.0.0.0 and `::` (register F61: `lsof` does not see the process Next renames `next-server`), and `run-gates.mjs` runs it first.
    - If `.git/autom8x-audit/lock` names a live pid, another audit is running; wait.
 2. **Tier** the change: `BASE=$(git merge-base origin/main HEAD)`; changed files = `git diff --name-only $BASE..HEAD`.
    - Empty, or HEAD tree equals the base tree → report "nothing new ships" and stop; pushes of an already-merged tree are allowed without a marker.
-   - All changed paths in `docs/**` or `**/*.md` (and none in `.github/**`) → **docs-only**: run `node scripts/audit/run-gates.mjs`, then `node scripts/audit/record-pass.mjs --docs-only`.
+   - All changed paths in `docs/**` or `**/*.md` (and none in `.github/**`) → **docs-only**: run `node scripts/audit/run-gates.mjs` (lint, format:check and the document-reference check), then `node scripts/audit/record-pass.mjs --docs-only`.
    - Anything else → **full audit**: spawn the `change-auditor` agent (Agent tool, subagent_type `change-auditor`) with the branch context. Do not run the suites yourself in parallel with it — the ports are exclusive.
 3. **Record**: only if the agent's verdict is PASS, run `node scripts/audit/record-pass.mjs <verdict-file-path>`. That script is the sole marker writer and re-verifies everything; if it refuses, treat the refusal as a finding, fix, and re-audit. Never edit the marker, the evidence file, or the verdict file by hand — a hand-edited audit trail is worse than no audit.
 4. **Report**: verdict; the coverage table; `required_tests` (these are debt to schedule even on PASS); the marker path and its expiry. If the verdict is FAIL: the findings, then fix code or add the named tests and re-run this skill from step 1.

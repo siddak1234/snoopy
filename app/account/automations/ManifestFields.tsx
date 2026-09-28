@@ -1,4 +1,5 @@
 import { FormInput } from "@/components/ui/FormInput";
+import { RunFileField } from "./RunFileField";
 import type {
   AutomationRunInputField,
   AutomationSetupField,
@@ -62,27 +63,40 @@ export function SetupFields({
 }
 
 /**
- * A manual run's input fields. **An `artifact` field is not rendered**: it is a
- * file the run reads, and no published operation uploads one from the web, so the
- * run starts without a file — which the contract says is what such a client does.
+ * A manual run's input fields. An `artifact` field is a file the run reads: it
+ * is uploaded when chosen (backend FR-14) and carried as the file's id.
  */
 export function RunInputFields({
   runInput,
+  subscriptionId,
+  onUploadingChange,
+  fileRound,
 }: {
   runInput: AutomationRunInputField[];
+  subscriptionId: string;
+  onUploadingChange: (key: string, uploading: boolean) => void;
+  /** Changed to empty every file field — a file the platform will no longer take. */
+  fileRound: number;
 }) {
   return (
     <div className="space-y-4">
-      {runInput
-        .filter((field) => field.control !== "artifact")
-        .map((field) => (
+      {runInput.map((field) =>
+        field.control === "artifact" ? (
+          <RunFileField
+            key={`${field.key}:${fileRound}`}
+            field={field}
+            subscriptionId={subscriptionId}
+            onBusyChange={onUploadingChange}
+          />
+        ) : (
           <ManifestFieldInput
             key={field.key}
             field={field}
             value={undefined}
             prefix="input"
           />
-        ))}
+        ),
+      )}
     </div>
   );
 }

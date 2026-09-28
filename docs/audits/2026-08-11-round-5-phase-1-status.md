@@ -636,7 +636,7 @@ Each names the evidence a backend session can re-run.
 - **F1** `DELETE /v1/account` answers its 409 with the raw Access result `{deleted:false, workspaces, reason}` as `application/json` (`snoopy-backend/apps/api/src/app.ts:463-466`), while `snoopy-backend/docs/openapi.yaml:428-435` publishes `application/problem+json` `ApiProblem`; no backend test asserts the 409 at either route. The web branches on status only (#17).
 - **F3** `POST …/billing/portal`: the contract marks the body optional (`required: false`), the Edge answers 400 "Request body is required" on an empty body (`snoopy-backend/packages/http/src/index.ts:225-227`). The web sends `{}`.
 - **F4 / #158** `siddak1234/snoopy`'s GitHub Actions ran and passed on 2026-09-25 (`main` pushes `36140364318` @ `c97d557`, `36147960894` @ `fddcd17`, `36176059273` @ `ba4fd44`; PR runs `36147684131`, `36175809012`, `36186563329`) — §12.1 #158's billing block did not apply to this repository then; and `main` @ `43c2975` was RED on `test:contracts` whenever the sibling was present (fixed by #14) while CI was green without it.
-- **F10** Undocumented 502s on the billing operations (`apps/api/src/modules/entitlements/billing-routes.ts:323,351,368`).
+- **F10** Undocumented 502s on the billing operations (`snoopy-backend/apps/api/src/modules/entitlements/billing-routes.ts:323,351,368`).
 - **F12** SYSTEM-MANIFEST §9's fourth count command (`find . -name '*.test.*'`) counts `node_modules` (351 on this machine on 2026-09-26 — the number moves with `node_modules`); the facts file states `git ls-files --cached --others --exclude-standard` forms for all four units — §9 should quote the facts file.
 - **F14** "163 `@theme` tokens" (AGENTS.md:42, §9.2) is the whole-file custom-property count; 46 sit inside `@theme {}`, and 4 more in an `@theme inline {}` block.
 - **F20 (owner call)** The website offers no Archive/Remove action for a subscription; archiving is the backend's only way to free a plan slot (18.5.3), so a workspace at its plan limit cannot free one from the browser — 18.5.3's client half.
@@ -996,3 +996,155 @@ is fixed here:
 
 **Numbering.** F35 was never assigned; F11, F19 and F36 were closed or withdrawn as recorded
 above. F55 to F63 are new here, and no number is reused.
+
+## Round 15 — the backend's backlog, and the web halves that wait on it — 2026-09-28
+
+Opened in `snoopy-backend` on the owner's word (BUILD-PLAN **Phase 23**, Gate 23), with
+the owner's four decisions of that day. Its backend half landed first:
+- a team member can be taken off a team, and a team's access to a project withdrawn
+  (§12.1 #174), and a grant may name only a team its caller can see (#176);
+- a webhook automation's address is read and issued through the Edge, by an owner or
+  admin (#91, #109), and a subscription says what starts its runs (`triggerKind`);
+- a subscription moves to a newer version in place (#126);
+- a person uploads a file for a run straight to the store (FR-14), its size signed (#139);
+- a workspace is exported whole, as one file (#39).
+
+This repository then regenerated its client from that tree.
+
+| Item | Register | What changed here | Evidence |
+| --- | --- | --- | --- |
+| 23.7.1 | F64 | `.btn-ghost:hover` and `:active` draw the text in `--accent-strong` — 4.6:1 or better on every surface, both themes, where the accent on its own tint fell to 4.06:1 and, pressed, 3.60:1 (dark) | e2e "a ghost button keeps AA contrast when hovered and when pressed (register F64)", RED with `main`'s colours |
+| 23.7.2 | backend #174, #176 | Remove on each member of a team (an owner, admin or the team's manager) and on each team with access to a project (its owner or admin), each confirmed first, in one new `components/dashboard/ConfirmRemoveButton.tsx`; the team's removal acts on the workspace the page showed | e2e "taking someone off a team …" and "a project's owner removes a team's access …"; `test/tenancy-contract.test.mjs` |
+| 23.7.3 | backend #91, #109 | Webhook address on a webhook-started automation, for an owner or admin: create it, see the secret once, make a new one; the secret is never kept | e2e "an owner makes a webhook automation's address …" and "… offered to an admin and to no plain member"; `test/automation-contract.test.mjs` holds the refusal words to the contract's reasons |
+| 23.7.4 | backend #126 | Move to vN on a subscription pinned to an older version, confirmed first, each refusal the platform names said in words | e2e "a subscription pinned to an older version moves …" and "a move the platform holds for a pending approval …"; `test/automation-contract.test.mjs` |
+| 23.7.5 | backend FR-14 | The Run form renders an `artifact` field: choosing a file uploads it straight to the signed URL, cross-origin and with no cookie, and the form carries only its id; Start run waits for it | e2e ×3 in "a file for a run (backend FR-14)", the first reading at the fixture which file the run was given; `test/automation-contract.test.mjs` |
+| 23.7.6 | backend #39 | Export everything, beside the quick export: followed until ready, and its link asked for again when Download is clicked, because one is signed for minutes | e2e "everything is prepared as one file …" (the third read's link) and "… has been removed is said so …"; `test/export-contract.test.mjs` |
+| 23.8.1 | F60 | The account area's boundary asks the platform for the session before it claims anything: a session that ended reads "Your session has ended" with the way back in; one that is there still reads "You have not been signed out" | e2e "3, F60 — …" and the kept case in "a page whose own read fails …"; `test/session-contract.test.mjs` |
+| 23.8.2 | F61 | The shared preflight binds each port on 127.0.0.1, 0.0.0.0 and `::` rather than asking `lsof` | `test/verify-gate.test.mjs` "the preflight refuses a port a server holds, whatever its process is called (register F61)", seen failing on the old preflight |
+| 23.8.3 | F63 | The change audit's evidence keeps each gate's runner counts and both output tails | `test/verify-gate.test.mjs` "… keeps the runner's summary and counts …", seen failing on the old script |
+| 23.8.4 | the 29 surfaces | The register's 27 and F62's two run-time paths, each held: 25 in `e2e/account-surfaces.spec.ts` (each titled with its number), #12 (F47) beside its siblings in the fixture spec, #23 by rendering `app/global-error.tsx` in `test/global-error-render.test.mjs`, F62's session that ends between the proxy and the render in the surfaces spec, and the site with no backend by `npm run probe:no-backend`, a gate in `verify`, the change audit and CI | Each surface's mutation run RED — 27 browser, 1 render, 1 probe (below) |
+| 23.8.5 | the two mutations | `router.refresh()` left `CancelRunButton` inside #24, so that mutation names code `main` never held. `cancelRun`'s two `revalidatePath` calls each refresh both the run's page and Activity under Next 16.3.3 — a server function's revalidation "causes all previously visited pages to refresh when navigated to again", which Next's own `revalidatePath.md` calls temporary — so neither alone can go red. Both are kept, and the pair is held | e2e "the cancelled run reads as cancelled on its page, and Activity reached by Back says so too": both removed RED; each alone green, as the document says |
+| 23.8.6 | Round 14's NEXT | The document check reads what `snoopy-backend`'s copy reads: a strike only for a file a commit once added (a one-commit clone says "not checked"), strikes paired within a paragraph, a link from its own document's folder, another repository never read from disk unless asked, no link inside a code span, and titled, angled and defined links | `test/doc-references.test.mjs`: 11 new plant tests and one changed, each of the twelve seen failing on the old script |
+
+**Found this round, and closed in it:**
+
+- **F65**: CI's `gates` job cloned one commit deep, so the document check could never confirm
+  a strike: every struck path read "not checked". It now fetches the whole history
+  (`fetch-depth: 0`), held by `test/structure-contract.test.mjs`.
+- **F66**: a docs-only change audit ran lint and `format:check` and no document check — the
+  one check a docs-only change most needs. `scripts/audit/run-gates.mjs` runs it, and
+  `record-pass.mjs` requires it.
+- **F67**: the `audit-change` skill told the auditor to check the ports with `lsof`, the check
+  F61 found blind. It now describes the preflight's bind.
+- **F68**: this register named a platform file without its `snoopy-backend/` prefix (F10's
+  `billing-routes.ts`). The old check never read it, because it could not strip a list of
+  line numbers; the ported one did, and the path now carries its prefix.
+- **Not a finding, a fact the probe established**: a production runtime with no
+  `BACKEND_API_ORIGIN` refuses to start (`lib/env.ts`); a Vercel preview is
+  `VERCEL_ENV=preview`, which serves without one, so the probe runs as a preview.
+
+**Bites.** Every new assertion was run RED against the code it guards, each file restored
+with its hash checked:
+- browser, 43: the web halves' 13 (one first stayed green — the dialog also clears the
+  secret when it opens, so both clears were removed), the surfaces' 27 and three more
+  (Delete Account's colours, the kept session, the pair of revalidations);
+- contract, 19: C1–C13 on the web halves, C14–C19 on F60, F65, F62's gate, the render and
+  `verify`;
+- the probe, 1: with the proxy letting a site with no platform through, a visitor lost
+  their return address, and the probe said so.
+
+**Numbering.** F64 was filed by Round 14's fresh audit in `snoopy-backend`'s §0.1 and enters
+this register here. F65 to F68 are new, and no number is reused.
+
+**Review of this round's web half, 2026-09-28.** An adversarial review of the diff above
+found fourteen issues, numbered here as it numbered them. Thirteen are fixed, each held by
+a test seen failing with its fix taken out and the file restored with its hash checked; one
+is declined:
+
+1. A secret, a move's refusal or a removal's refusal was lost to Escape or a backdrop click
+   while its request was pending: fixed — `components/ui/Modal.tsx` takes `dismissible`,
+   false while the webhook, move and removal dialogs wait. e2e "a webhook address's dialog
+   cannot be dismissed …", "a move's dialog cannot be dismissed …", "a removal's dialog
+   cannot be dismissed …".
+2. One shared upload flag, never reset, with no abort and no timeout: fixed — uploads are
+   held per field, reset on close, stopped when the field goes, a superseded answer changes
+   nothing, and the PUT is given up after the signed URL's 15 minutes. e2e "a form closed
+   mid-upload stops the upload …", "an abandoned upload that ends never releases Start run
+   …", "an upload the store never answers is given up …".
+3. The complete export stopped following at one failed read, dropped a rejected read
+   unseen, and scheduled a read after the page had gone: fixed — a failed read is asked
+   again after twice the wait, three in a row are said with Export everything offered
+   again, and nothing is scheduled off the page. e2e ×4 in "following a complete export
+   when a read of it fails".
+4. Both exports acted on the session's workspace, not the page's: fixed — they carry the
+   workspace the page showed (register F28). e2e "an export from a page whose workspace was
+   switched away in another tab says so, and exports nothing (register F28)".
+5. A refused file stayed in its chooser, so the same file chosen again was no change:
+   fixed — it is emptied. e2e "a file of a type the automation does not take …".
+6. Declined: every 404 on the webhook read is "no address yet". The contract's
+   `readWebhookEndpoint` says only "404 when no address has been issued" and names no
+   reason, and the platform's read answers a bare 404 whether or not the subscription
+   exists, so nothing tells the two apart. Issuing an address for one that is gone is
+   refused, and said.
+7. `artifact_unavailable` read as "check each value": fixed — said in its own words, and
+   the file field emptied to choose again. e2e "a file the platform will no longer take …";
+   `test/automation-contract.test.mjs` holds the words to `createRun`'s reasons.
+8. The no-backend probe missed a server killed by a signal and then waited for an exit
+   already gone: fixed. `test/verify-gate.test.mjs` "the no-backend probe stops at once
+   …".
+9. The preflight bound the ports before taking the lock: fixed — the lock first, given back
+   when a port is refused. `test/verify-gate.test.mjs` "the preflight takes the lock before
+   it asks about a port …".
+10. The evidence's counts read TAP only: fixed — node:test's spec summary too, in the F63
+    test.
+11. The account boundary said "could not answer" while it asked: fixed — a neutral
+    "Loading…" until the answer. e2e "F60 — while the boundary asks for the session it
+    claims nothing …".
+12. Focus fell to the page after a move or a removal, and a new secret was not announced:
+    fixed — focus goes to the card's or the list's heading, and a polite status says a new
+    secret was made (never the secret). Asserted in the move, removal and webhook tests.
+13. A manager who took themselves off a team refreshed into not-found: fixed — they go to
+    their teams, as leaving a project does. e2e "a team's manager who takes themselves off
+    it goes back to their teams …".
+14. The switcher's focus test never checked the focus was on an option: fixed, in "10 — …".
+
+The backend's own review of its half (`snoopy-backend` BUILD-PLAN 23.6.3, merged as
+`215697c`, #118) changed three contracts this website reads, and the client is regenerated
+from that tree:
+
+- A move is also refused while a run of the automation is pending or running (409
+  `runs_in_flight`). It is said in words ("A run of this automation is still going. Wait
+  for it to finish, then move."). The e2e test "a move refused while a run of the
+  automation is still going …" went red without the words (it read "Conflict"), and
+  `test/automation-contract.test.mjs`'s check of `MOVE_REFUSALS` against the spec went red
+  before they were added.
+- A run's file is checked against the run's own pinned limits, and one outside them is
+  `artifact_unavailable`. That is item 7's words: nothing new to say.
+- The complete export states its one-file ceiling (`too_large`, already in words here), and
+  a deleted workspace withdraws its export (`workspace_deleted`), which no page of a
+  deleted workspace can show.
+
+**Change audit of `97021f9`, 2026-09-28.** It found **F-1**: in the light theme a ghost
+button's hovered and pressed text on the marketing band measured 4.23:1 and 3.87:1. Fixed by
+`--ghost-active-text`, and held by the pixel-measured e2e "a ghost button keeps AA contrast
+hovered and pressed: … (register F64)" in `e2e/accessibility.spec.ts`, which went red at 4.23
+without the light step. It also listed 21 surfaces that worked and that no test held. Each is
+now held by a test that was seen failing against the code it guards, with each file restored
+and its hash checked. The fixture Edge has a control for each refusal, reset by
+`initialState()`. The tests are in `e2e/public-edge-fixture.spec.ts` unless marked AS
+(`e2e/account-surfaces.spec.ts`) or VG (`test/verify-gate.test.mjs`): 1 → "each refusal of a
+move the platform names …"; 2 → "a webhook address the platform will not read …"; 3 → "an
+address the platform will not make …"; 4 → "an address the platform has no public origin for
+…"; 5 → "a file the store refuses … no cookie of the browser's" (the session cookie is
+SameSite=Lax and never crosses to the store's scheme anyway, so the test holds a cookie that
+may cross); 6 → "a file the store took but the platform finds did not arrive …"; 7 → "an empty
+file is refused in words …"; 8 → "each refusal of a file the platform names …"; 9 → "the Run
+dialog dismissed by Escape or by a click outside it mid-upload …"; 10 → "an export that failed
+says why …"; 11 → "an export that is ready but partial …"; 12 → "Export everything the platform
+refuses …"; 13 → "a download whose fresh link the platform cannot read …"; 14 → "a download
+after another tab switched workspace …"; 15 → AS "a team member's removal after another tab
+switched workspace …"; 16 → "a team's access the platform will not withdraw stays …"; 17 → AS
+"F60 — when the boundary's own session read fails …"; 18 → "a dialog that sends nothing yet
+closes on a click outside it …"; 19 → F-1's test; 20 → VG "a docs-only change audit runs the
+gates its marker requires …"; 21 → VG "the browser fixture run passes every spec that needs the
+fixture Edge, and no other".

@@ -2,6 +2,7 @@ import {
   newIdempotencyKey,
   platformServerJson,
   PlatformNotConfiguredError,
+  PlatformServerError,
   workspacePath as scope,
 } from "@/lib/platform-server";
 import type {
@@ -64,6 +65,15 @@ export type DecideApprovalResponse =
 export type CancelRunResponse =
   operations["cancelRun"]["responses"][200]["content"]["application/json"];
 export type RunStats = components["schemas"]["RunStats"];
+export type WebhookEndpoint = components["schemas"]["WebhookEndpoint"];
+export type IssuedWebhookEndpoint =
+  components["schemas"]["IssuedWebhookEndpoint"];
+export type UploadTicket = components["schemas"]["UploadTicket"];
+export type UploadedFile = components["schemas"]["UploadedFile"];
+export type OpenUploadRequest =
+  operations["openUpload"]["requestBody"]["content"]["application/json"];
+export type CompleteUploadResponse =
+  operations["completeUpload"]["responses"][200]["content"]["application/json"];
 export type RunStatusCounts = components["schemas"]["RunStatusCounts"];
 
 export function listAutomations(
@@ -152,7 +162,7 @@ export function updateSubscription(
   workspaceId: string,
   subscriptionId: string,
   body: UpdateSubscriptionRequest,
-  intent: "subscription-config" | "status" | "archive",
+  intent: "subscription-config" | "status" | "archive" | "version",
 ): Promise<UpdateSubscriptionResponse> {
   return platformServerJson<UpdateSubscriptionResponse>(
     `${scope(workspaceId)}/subscriptions/${encodeURIComponent(subscriptionId)}`,
@@ -162,6 +172,63 @@ export function updateSubscription(
       idempotencyKey: newIdempotencyKey(intent),
     },
   );
+}
+
+/**
+ * A subscription's webhook address, without its secret (backend §12.1 #91);
+ * `null` when none has been issued. Owner or admin only.
+ */
+export async function readWebhookEndpoint(
+  workspaceId: string,
+  subscriptionId: string,
+): Promise<WebhookEndpoint | null> {
+  try {
+    return await platformServerJson<WebhookEndpoint>(
+      `${scope(workspaceId)}/subscriptions/${encodeURIComponent(subscriptionId)}/webhook`,
+    );
+  } catch (error) {
+    if (error instanceof PlatformServerError && error.status === 404)
+      return null;
+    throw error;
+  }
+}
+
+/**
+ * Issues the address, or gives it a new secret — shown in this answer and
+ * never again. Not replayable, so it carries no idempotency key: a retry
+ * rotates again, and the secret last shown is the one that works.
+ */
+export function issueWebhookEndpoint(
+  workspaceId: string,
+  subscriptionId: string,
+): Promise<IssuedWebhookEndpoint> {
+  return platformServerJson<IssuedWebhookEndpoint>(
+    `${scope(workspaceId)}/subscriptions/${encodeURIComponent(subscriptionId)}/webhook`,
+    { method: "POST" },
+  );
+}
+
+/** Somewhere to put a file a run will read (FR-14): a URL to PUT it to. */
+export function openUpload(
+  workspaceId: string,
+  body: OpenUploadRequest,
+): Promise<UploadTicket> {
+  return platformServerJson<UploadTicket>(`${scope(workspaceId)}/uploads`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** The store's measurement of what arrived, as a file a run can be given. */
+export async function completeUpload(
+  workspaceId: string,
+  uploadSessionId: string,
+): Promise<UploadedFile> {
+  const response = await platformServerJson<CompleteUploadResponse>(
+    `${scope(workspaceId)}/uploads/${encodeURIComponent(uploadSessionId)}/complete`,
+    { method: "POST", body: "{}" },
+  );
+  return response.artifact;
 }
 
 /** The key is the caller's: a resubmitted run form must reuse its own. */

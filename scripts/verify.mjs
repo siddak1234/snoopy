@@ -47,7 +47,7 @@ function fail(message) {
 }
 
 // --- preflight: shared with the change audit (scripts/audit/preflight.mjs) ---
-preflight({ root, fail });
+await preflight({ root, fail });
 
 const siblingPresent = contractInputs.every((path) => existsSync(path));
 const gates = [
@@ -68,6 +68,9 @@ const gates = [
   // The site with no backend, as a Vercel preview builds it (register F62).
   // Before `build`, whose output the browser suite serves.
   { name: "build:no-backend" },
+  // And served as a preview serves it: the public pages load, the account area
+  // sends a visitor to sign in, and readiness says "not configured".
+  { name: "probe:no-backend" },
   {
     name: "build",
     env: { BACKEND_API_ORIGIN: buildOrigin },

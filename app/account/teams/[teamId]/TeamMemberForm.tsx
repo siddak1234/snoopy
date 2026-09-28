@@ -7,10 +7,10 @@ import { FormSelect } from "@/components/ui/FormSelect";
 import { upsertTeamMemberAction } from "../actions";
 
 /**
- * One control for both writes the platform offers: adding a workspace member to
- * the team, and changing the role of someone already on it — the same operation
- * (`upsertTeamMembership`). Nothing removes a member; no operation does (backend
- * §12.1 #174).
+ * One control for two writes: adding a workspace member to the team, and
+ * changing the role of someone already on it — the same operation
+ * (`upsertTeamMembership`). Taking someone off is each row's own control
+ * (backend §12.1 #174).
  */
 export function TeamMemberForm({
   workspaceId,
