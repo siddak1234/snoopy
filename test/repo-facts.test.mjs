@@ -28,7 +28,7 @@ const ALLOWED = [...REQUIRED, "gate"];
 let emitted;
 function emit() {
   // One emission serves every test: the result is immutable and each call
-  // spawns six shell processes.
+  // spawns ten shell processes.
   if (emitted) return emitted;
   const dir = mkdtempSync(join(tmpdir(), "repo-facts-"));
   try {
@@ -86,6 +86,22 @@ test("every count is an integer that names the command that produced it", () => 
       `${unit} is counted on a different basis: ${entry.command}`,
     );
   }
+});
+
+test("§9.2's four component rows sum to the components count (backend §12.2 #83)", () => {
+  const { counts } = emit().written;
+  const rows = [
+    "componentsUi",
+    "componentsDashboard",
+    "componentsMarketing",
+    "componentsOther",
+  ];
+  for (const row of rows) assert.ok(row in counts, `missing ${row}`);
+  assert.equal(
+    rows.reduce((sum, row) => sum + counts[row].value, 0),
+    counts.components.value,
+    "a component counted by no row, or by two",
+  );
 });
 
 test(

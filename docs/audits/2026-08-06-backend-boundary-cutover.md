@@ -56,20 +56,24 @@ still import the legacy Prisma database helper:
 1. `app/account/layout.tsx`
 2. `app/account/organization/actions.ts`
 3. `app/account/organization/page.tsx`
-4. `app/account/projects/[id]/invoices/flagged/actions.ts`
+4. ~~`app/account/projects/[id]/invoices/flagged/actions.ts`~~
 5. `app/account/projects/actions.ts`
 6. `app/account/projects/page.tsx`
 7. `app/account/settings/page.tsx`
 8. `app/onboarding/actions.ts`
 9. `app/onboarding/join-org/page.tsx`
 10. `app/onboarding/layout.tsx`
-11. `lib/auth.ts`
+11. ~~`lib/auth.ts`~~
 12. `lib/domain-utils.ts`
-13. `lib/project-rbac.ts`
-14. `lib/projects.ts`
-15. `lib/tenant.ts`
-16. `lib/workflows.ts`
-17. `lib/workspace-invites.ts`
+13. ~~`lib/project-rbac.ts`~~
+14. ~~`lib/projects.ts`~~
+15. ~~`lib/tenant.ts`~~
+16. ~~`lib/workflows.ts`~~
+17. ~~`lib/workspace-invites.ts`~~
+
+Struck through: files that no longer exist. Items 4 and 16 were removed with the
+verticals and the builder (`415e57a`, 2026-08-07). The other five went in Round 5's
+boundary change (`22ac738`, 2026-08-14). The list is as it stood on this audit's date.
 
 They remain because the Access and Automation Catalog persistence/API adapters do
 not exist. Deleting them now would remove working project, workspace, membership,
@@ -114,7 +118,7 @@ configure it.
 
 - The subsequent Access identity checkpoint extends this baseline to 55 backend
   tests and an Access build; see the backend
-  `docs/audits/2026-08-06-access-identity-checkpoint.md` record.
+  `snoopy-backend/docs/audits/2026-08-06-access-identity-checkpoint.md` record.
 - Backend full and production dependency audits: 0 vulnerabilities.
 - `snoopy npm run audit:boundaries`: passed; 0 browser Supabase/storage/manual
   login paths and 17 pinned transitional database files.

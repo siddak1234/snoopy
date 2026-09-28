@@ -1,7 +1,84 @@
 import Link from "next/link";
 import { getAppSession } from "@/lib/app-session";
-import { listAccessibleProjects } from "@/lib/tenancy";
+import {
+  formatWhen,
+  listAutomations,
+  listRuns,
+  listSubscriptions,
+  readRunStats,
+} from "@/lib/automations";
+import { listConnections } from "@/lib/connections";
+import {
+  PlatformNotConfiguredError,
+  PlatformServerError,
+} from "@/lib/platform-server";
+import {
+  listAccessibleProjects,
+  resolveActiveWorkspaceId,
+} from "@/lib/tenancy";
 import SectionCard from "@/components/dashboard/SectionCard";
+import { StatusPill } from "@/components/dashboard/StatusPill";
+
+/** The first instant of this month, UTC — the zone every date on these pages is in. */
+function startOfMonthUtc(now: Date): string {
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+  ).toISOString();
+}
+
+/**
+ * The workspace's own numbers, read from the platform rather than printed as
+ * zeros (register F54). Runs are the platform's tally (`readRunStats`, backend
+ * §12.1 #73's named alternative to a home-stats endpoint); automations and
+ * integrations are the lists those pages read. A recent run is named from the
+ * catalog, as Activity names it, and falls back to its template id. `null` when
+ * no workspace is active, so nothing is claimed about one.
+ *
+ * Each figure stands alone: one the platform refuses or cannot answer reads
+ * "Unavailable" and the rest still show, rather than one read taking the whole
+ * home with it. A session that ended is not a figure's to absorb, so it goes to
+ * the account area's boundary as every other page's does.
+ */
+async function readOverview(workspaceId: string | undefined) {
+  if (!workspaceId) return null;
+  const [subscriptions, stats, connections, runs, catalog] = await Promise.all([
+    figure(() => listSubscriptions(workspaceId)),
+    figure(() => readRunStats(workspaceId, startOfMonthUtc(new Date()))),
+    figure(() => listConnections(workspaceId)),
+    figure(() => listRuns(workspaceId)),
+    figure(() => listAutomations(workspaceId)),
+  ]);
+  const nameFor = new Map(
+    (catalog?.automations ?? []).map((entry) => [entry.templateId, entry.name]),
+  );
+  return {
+    automations:
+      subscriptions?.subscriptions.filter(
+        (entry) => entry.status !== "archived",
+      ).length ?? null,
+    runs: stats?.workspace ?? null,
+    integrations:
+      connections?.connections.filter((entry) => entry.status === "connected")
+        .length ?? null,
+    recent:
+      runs?.runs.slice(0, 3).map((run) => ({
+        run,
+        name: nameFor.get(run.templateId) ?? run.templateId,
+      })) ?? null,
+  };
+}
+
+async function figure<T>(read: () => Promise<T>): Promise<T | null> {
+  try {
+    return await read();
+  } catch (error) {
+    if (error instanceof PlatformNotConfiguredError) return null;
+    if (error instanceof PlatformServerError && error.status !== 401) {
+      return null;
+    }
+    throw error;
+  }
+}
 
 function getFirstName(name?: string | null): string | null {
   if (!name?.trim()) return null;
@@ -14,9 +91,12 @@ export default async function AccountDashboardPage() {
   const firstName = getFirstName(session?.user?.name);
   const greeting = firstName ? `Welcome, ${firstName}!` : "Welcome back!";
 
-  const topProjects = session
-    ? (await listAccessibleProjects()).slice(0, 3)
-    : [];
+  const [topProjects, overview] = session
+    ? await Promise.all([
+        listAccessibleProjects().then((projects) => projects.slice(0, 3)),
+        readOverview(await resolveActiveWorkspaceId(session)),
+      ])
+    : [[], null];
 
   // Show workspace name tags when the user's top projects span multiple workspaces
   const uniqueWorkspaceIds = new Set(
@@ -32,7 +112,7 @@ export default async function AccountDashboardPage() {
       primaryAction={
         <Link
           prefetch={false}
-          href="/solutions"
+          href="/account/automations"
           className="btn-primary inline-flex px-5"
         >
           Browse automations
@@ -41,7 +121,7 @@ export default async function AccountDashboardPage() {
       secondaryAction={
         <Link
           prefetch={false}
-          href="/account/settings"
+          href="/account/connections"
           className="btn-secondary inline-flex px-5"
         >
           Connect integration
@@ -55,7 +135,7 @@ export default async function AccountDashboardPage() {
         <div className="mt-3 flex flex-wrap gap-2">
           <Link
             prefetch={false}
-            href="/solutions"
+            href="/account/automations"
             className="btn-primary inline-flex px-4 py-2 text-sm"
           >
             Browse automations
@@ -63,14 +143,14 @@ export default async function AccountDashboardPage() {
           <Link
             prefetch={false}
             href="/account/projects"
-            className="inline-flex items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
+            className="inline-flex items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
           >
             View projects
           </Link>
           <Link
             prefetch={false}
-            href="/account/settings"
-            className="inline-flex items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
+            href="/account/connections"
+            className="inline-flex items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
           >
             Connect integration
           </Link>
@@ -81,27 +161,70 @@ export default async function AccountDashboardPage() {
         <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Workspace overview
         </h2>
-        <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:max-w-md">
-          <dt className="text-[var(--muted)]">Automations</dt>
-          <dd className="text-[var(--text)]">0</dd>
-          <dt className="text-[var(--muted)]">Runs this month</dt>
-          <dd className="text-[var(--text)]">0</dd>
-          <dt className="text-[var(--muted)]">Integrations</dt>
-          <dd className="text-[var(--text)]">0</dd>
-        </dl>
-        <p className="mt-3 text-xs text-[var(--muted)]">
-          Connect an integration to start automations.
-        </p>
+        {overview ? (
+          <>
+            <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:max-w-md">
+              <dt className="text-[var(--muted)]">Automations</dt>
+              <dd className="text-[var(--text)]">
+                {overview.automations ?? "Unavailable"}
+              </dd>
+              <dt className="text-[var(--muted)]">Runs this month</dt>
+              <dd className="text-[var(--text)]">
+                {overview.runs
+                  ? `${overview.runs.total} · ${overview.runs.succeeded} succeeded · ${overview.runs.failed} failed`
+                  : "Unavailable"}
+              </dd>
+              <dt className="text-[var(--muted)]">Integrations</dt>
+              <dd className="text-[var(--text)]">
+                {overview.integrations ?? "Unavailable"}
+              </dd>
+            </dl>
+            <p className="mt-3 text-xs text-[var(--muted)]">
+              Runs are counted from the first of the month, UTC.
+            </p>
+          </>
+        ) : (
+          <p className="mt-3 text-sm text-[var(--muted)]">
+            No workspace is active yet.
+          </p>
+        )}
       </div>
 
       <div className="py-5">
         <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Recent activity
         </h2>
-        <p className="mt-3 text-sm text-[var(--muted)]">No activity yet.</p>
-        <p className="mt-1 text-xs text-[var(--muted)]">
-          Subscribe to an automation to see runs and events here.
-        </p>
+        {overview && overview.recent === null ? (
+          <p className="mt-3 text-sm text-[var(--muted)]">
+            Recent activity could not be read just now.
+          </p>
+        ) : overview?.recent && overview.recent.length > 0 ? (
+          <ul className="mt-3 space-y-2">
+            {overview.recent.map(({ run, name }) => (
+              <li key={run.id}>
+                <Link
+                  prefetch={false}
+                  href={`/account/runs/${encodeURIComponent(run.id)}`}
+                  aria-label={`Run of ${name}, ${run.status}`}
+                  className="flex flex-wrap items-center gap-2 rounded-xl px-2 py-2 transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                >
+                  <span className="font-medium text-[var(--text)]">{name}</span>
+                  <StatusPill status={run.status} />
+                  <span className="text-xs text-[var(--muted)]">
+                    {formatWhen(run.createdAt)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <>
+            <p className="mt-3 text-sm text-[var(--muted)]">No activity yet.</p>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              Add an automation to see its runs here.
+            </p>
+          </>
+        )}
       </div>
 
       <div className="py-5">
@@ -129,7 +252,7 @@ export default async function AccountDashboardPage() {
                   <Link
                     prefetch={false}
                     href={`/account/projects/${project.id}`}
-                    className="flex flex-wrap items-center gap-2 rounded-xl px-2 py-2 transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none focus-visible:ring-inset"
+                    className="flex flex-wrap items-center gap-2 rounded-xl px-2 py-2 transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
                   >
                     <span className="font-medium text-[var(--text)]">
                       {project.name}
@@ -156,7 +279,7 @@ export default async function AccountDashboardPage() {
               <Link
                 prefetch={false}
                 href="/account/projects"
-                className="text-sm font-medium text-[var(--link)] transition hover:underline focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
+                className="text-sm font-medium text-[var(--link)] transition hover:underline focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
               >
                 View all projects
               </Link>
@@ -176,14 +299,14 @@ export default async function AccountDashboardPage() {
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
               prefetch={false}
-              href="/solutions"
+              href="/account/automations"
               className="btn-primary inline-flex px-5"
             >
               Browse automations
             </Link>
             <Link
               prefetch={false}
-              href="/account/settings"
+              href="/account/connections"
               className="btn-secondary inline-flex px-5"
             >
               Connect integration

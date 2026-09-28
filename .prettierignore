@@ -7,10 +7,6 @@ next-env.d.ts
 # Generated
 package-lock.json
 
-# Not app code: n8n source copies, LLM prompts, SQL, docs, infra
-prompts/
-running-total/
-supabase/
-prisma/migrations/
+# Prose is written, not formatted
 docs/
 *.md

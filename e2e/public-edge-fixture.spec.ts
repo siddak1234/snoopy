@@ -3,6 +3,8 @@ import { expect, test, type Page, type Request } from "@playwright/test";
 
 const requesterUserId = "66666666-6666-4666-8666-666666666666";
 const organizationWorkspaceId = "11111111-1111-4111-8111-111111111111";
+const personalWorkspaceId = "88888888-8888-4888-8888-888888888888";
+const busy = "The platform is busy right now. Try again in 30 seconds.";
 
 // Requests of one shape, observed as they leave the page.
 function observe(page: Page, matches: (request: Request) => boolean): string[] {
@@ -15,8 +17,12 @@ function observe(page: Page, matches: (request: Request) => boolean): string[] {
 const isLogout = (request: Request) =>
   request.method() === "POST" && request.url().includes("/v1/auth/logout");
 
-// WCAG 2.2 AA on whatever the page shows now — an open dialog included.
+// WCAG 2.2 AA on whatever the page shows now — an open dialog included. On a
+// settled document: a server action's re-render replaces the head, and a scan
+// that lands in that instant finds no <title> that is there before and after.
+// A title that never arrives still fails, here, by name.
 async function expectNoAxeViolations(page: Page) {
+  await expect(page).toHaveTitle(/\S/u);
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
     .analyze();
@@ -28,11 +34,30 @@ function automationCard(page: Page, name: string) {
   return page.getByRole("heading", { name }).locator("xpath=../../..");
 }
 
+// A provider's card under "Available connections", found by its name.
+function providerCard(page: Page, name: string) {
+  return page.getByText(name, { exact: true }).locator("xpath=../..");
+}
+
+// The fixture's own controls, never the published API.
+async function fixtureControl(name: string) {
+  const answer = await fetch(`https://127.0.0.1:3443/__fixture/${name}`, {
+    method: "POST",
+  });
+  expect(answer.status).toBe(204);
+}
+
 test.use({ storageState: process.env.PLAYWRIGHT_AUTH_STORAGE_STATE });
 test.skip(
   process.env.E2E_PUBLIC_EDGE_FIXTURE !== "1",
   "requires the local public Edge fixture",
 );
+
+// Every test starts from the fixture's first state (register F30, F48), so none
+// depends on the order the suite runs in and any one can run on its own.
+test.beforeEach(async () => {
+  await fixtureControl("reset");
+});
 
 test("the pasted-key 409 retry preserves the original connection intent", async ({
   page,
@@ -42,7 +67,9 @@ test("the pasted-key 409 retry preserves the original connection intent", async 
     (request) => request.method() === "POST",
   );
   await page.goto("/account/connections");
-  await page.getByRole("button", { name: "Connect" }).click();
+  await providerCard(page, "Fixture key provider")
+    .getByRole("button", { name: "Connect" })
+    .click();
   await expect(page.locator('input[name="idempotencyKey"]')).not.toHaveValue(
     "",
   );
@@ -51,9 +78,110 @@ test("the pasted-key 409 retry preserves the original connection intent", async 
   await expect(
     page.getByText("This request may still be in progress"),
   ).toBeVisible();
+  // The refusal is said once, in the dialog — not again by the page behind it
+  // (register F52).
+  await expect(
+    page
+      .getByRole("alert")
+      .filter({ hasText: "Connection verification is still in progress" }),
+  ).toHaveCount(1);
   await page.getByRole("button", { name: "Retry verification" }).click();
   await expect.poll(() => serverActionRequests.length).toBe(2);
   await expect(page.getByText("Fixture account")).toBeVisible();
+});
+
+test("Reconnect on a connection that already holds what it needs asks no consent, and says so (backend §12.1 #172)", async ({
+  page,
+}) => {
+  const consent = observe(page, (request) =>
+    request.url().startsWith("https://oauth.invalid/"),
+  );
+  await page.goto("/account/connections");
+  await providerCard(page, "Fixture OAuth provider")
+    .getByRole("button", { name: "Reconnect" })
+    .click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "already connected" }),
+  ).toHaveText(
+    "Fixture OAuth provider is already connected as Fixture OAuth account, with everything it needs — there is nothing to authorize.",
+  );
+  await expect(page).toHaveURL(/\/account\/connections$/);
+  expect(consent).toEqual([]);
+});
+
+test("a connection that needs reauthorization is repaired by Reconnect, not reused (backend §12.1 #175)", async ({
+  page,
+}) => {
+  await page.route("https://oauth.invalid/**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: "<h1>consent</h1>",
+    }),
+  );
+  await fixtureControl("oauth-connection-broken");
+  await page.goto("/account/connections");
+  await expect(
+    page.getByText("This connection needs attention before it can be used."),
+  ).toBeVisible();
+  await providerCard(page, "Fixture OAuth provider")
+    .getByRole("button", { name: "Reconnect" })
+    .click();
+  await page.waitForURL(/^https:\/\/oauth\.invalid\/authorize/);
+});
+
+test("Replace account is confirmed first, names the connection it replaces, and goes to the provider's consent (backend ADR-0026)", async ({
+  page,
+}) => {
+  await page.route("https://oauth.invalid/**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: "<h1>consent</h1>",
+    }),
+  );
+  await page.goto("/account/connections");
+  const replace = page.getByRole("button", { name: "Replace account" });
+  await replace.click();
+  const dialog = page.getByRole("dialog", {
+    name: "Replace Fixture OAuth account?",
+  });
+  await expect(dialog).toContainText(
+    "Fixture OAuth account stays connected until that sign-in completes",
+  );
+  await expectNoAxeViolations(page);
+  // Keeping the account changes nothing and hands focus back.
+  await dialog.getByRole("button", { name: "Keep this account" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(replace).toBeFocused();
+  await replace.click();
+  // The fixture asks for consent only when the id sent is the live one's.
+  await page
+    .getByRole("dialog", { name: "Replace Fixture OAuth account?" })
+    .getByRole("button", { name: "Replace account" })
+    .click();
+  await page.waitForURL(/^https:\/\/oauth\.invalid\/authorize/);
+});
+
+test("a replacement named after the connection changed is refused as stale, and nothing is replaced", async ({
+  page,
+}) => {
+  await page.goto("/account/connections");
+  // Another admin replaces it after this page read it.
+  await fixtureControl("oauth-connection-replaced");
+  await page.getByRole("button", { name: "Replace account" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Replace Fixture OAuth account?",
+  });
+  await dialog.getByRole("button", { name: "Replace account" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "This connection changed since the page loaded, so nothing was replaced. Reload the page to see it, then choose again.",
+  );
+  // Said once, in the dialog (register F52).
+  await expect(
+    page.getByRole("alert").filter({ hasText: "This connection changed" }),
+  ).toHaveCount(1);
+  await expect(page).toHaveURL(/\/account\/connections$/);
 });
 
 test("subscription refusals render only the two documented entitlement states", async ({
@@ -109,7 +237,10 @@ test("a live automation whose pinned version declares run input is started from 
 
 // Switches the fixture session this browser presents, mid-page — the platform
 // starting to refuse a person who is already looking at a form.
-async function presentSession(page: Page, value: "owner" | "throttled") {
+async function presentSession(
+  page: Page,
+  value: "owner" | "throttled" | "member" | "requester" | "admin",
+) {
   await page.context().addCookies([
     {
       name: "e2e-public-edge-session",
@@ -140,7 +271,8 @@ test("a refused start keeps what was typed and the same idempotency key, so resu
   expect(sent).toMatch(/^run-/);
   await presentSession(page, "throttled");
   await dialog.getByRole("button", { name: "Start run" }).click();
-  await expect(dialog.getByRole("alert")).toContainText("Too Many Requests");
+  // The wait the platform stated, in words — not its generic title.
+  await expect(dialog.getByRole("alert")).toHaveText(busy);
   await expect(dialog.getByLabel("Vendor")).toHaveValue("Acme Supplies");
   await expect(dialog.getByLabel("Amount")).toHaveValue("10");
   await expect(dialog.getByLabel("Invoice reference")).toHaveValue("R-1");
@@ -163,10 +295,15 @@ test("a refused set-up save stays in its dialog with the platform's answer and w
   const dialog = page.getByRole("dialog", { name: "Automation setup" });
   await expect(dialog.getByLabel("Spending limit")).toHaveValue("500");
   await expectNoAxeViolations(page);
+  // A notifications switch says what it switches, in words (register F22).
+  await expect(dialog.getByLabel("Failure notices")).toBeVisible();
+  await expect(dialog).toContainText(
+    "Controls the notification sent when a run fails.",
+  );
   await dialog.getByLabel("Spending limit").fill("99");
   await presentSession(page, "throttled");
   await dialog.getByRole("button", { name: "Save setup" }).click();
-  await expect(dialog.getByRole("alert")).toContainText("Too Many Requests");
+  await expect(dialog.getByRole("alert")).toHaveText(busy);
   await expect(dialog.getByLabel("Spending limit")).toHaveValue("99");
   await presentSession(page, "owner");
   await dialog.getByRole("button", { name: "Save setup" }).click();
@@ -204,6 +341,59 @@ test("a live automation that declares no run input offers no Run, and Archive is
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(card.getByRole("button", { name: "Add" })).toBeVisible();
   await expect(card.getByRole("button", { name: "Archive" })).toHaveCount(0);
+});
+
+test("Pause and Go live move a live subscription and back, and the card follows (register F38)", async ({
+  page,
+}) => {
+  await page.goto("/account/automations");
+  const card = automationCard(page, "Manual input automation");
+  await expect(card.getByText(/^live$/i)).toBeVisible();
+  await card.getByRole("button", { name: "Pause" }).click();
+  await expect(card.getByText(/^paused$/i)).toBeVisible();
+  // A paused automation starts nothing, so it offers no Run.
+  await expect(
+    card.getByRole("button", { name: "Run", exact: true }),
+  ).toHaveCount(0);
+  await card.getByRole("button", { name: "Go live" }).click();
+  await expect(card.getByText(/^live$/i)).toBeVisible();
+  await expect(card.getByRole("button", { name: "Pause" })).toBeVisible();
+});
+
+test("a card lists each subscription under its scope, and Add offers only the scopes it is not in yet (register F21)", async ({
+  page,
+}) => {
+  await page.goto("/account/automations");
+  // Already added to the project, as a draft: that row says where, and the only
+  // place left to add it is the whole workspace — so there is nothing to choose.
+  const planLimit = automationCard(page, "Plan-limit automation");
+  await expect(
+    planLimit.locator("p", { hasText: "Project: Fixture Project" }),
+  ).toBeVisible();
+  await expect(planLimit.getByRole("combobox")).toHaveCount(0);
+  await expect(planLimit.getByRole("button", { name: "Add" })).toBeVisible();
+
+  // Added nowhere: both scopes are offered, the workspace first.
+  const card = automationCard(page, "Project automation");
+  const where = card.getByRole("combobox", {
+    name: "Where to add Project automation",
+  });
+  await expect(where.locator("option")).toHaveText([
+    "Whole workspace",
+    "Project: Fixture Project",
+  ]);
+  await where.selectOption({ label: "Project: Fixture Project" });
+  await card.getByRole("button", { name: "Add" }).click();
+  await expect(
+    card.locator("p", { hasText: "Project: Fixture Project" }),
+  ).toBeVisible();
+  // What was chosen is gone from the offer; Add now means the workspace — the
+  // fixture answers 409 if the project is sent again.
+  await expect(card.getByRole("combobox")).toHaveCount(0);
+  await card.getByRole("button", { name: "Add" }).click();
+  await expect(card.locator("p", { hasText: "Whole workspace" })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
+  await expect(card.getByRole("alert")).toHaveCount(0);
 });
 
 test("the account area does not prefetch — a page view costs its own requests and no others", async ({
@@ -281,6 +471,109 @@ test("a run's outcome is read on its own page — failure reason and result summ
   await expect(
     page.getByText("Recorded the invoice and emailed the summary."),
   ).toBeVisible();
+  // A finished run offers nothing to cancel.
+  await expect(page.getByRole("button", { name: "Cancel run" })).toHaveCount(0);
+});
+
+test("a running run is cancelled from its page, confirmed first, and then reads as cancelled (cancelRun)", async ({
+  page,
+}) => {
+  await page.goto("/account/runs");
+  await page
+    .getByRole("link", { name: "Run of Manual input automation, running" })
+    .click();
+  await expect(page).toHaveURL(/\/account\/runs\/fixture-run-running$/);
+  const open = page.getByRole("button", { name: "Cancel run" });
+  await open.click();
+  const dialog = page.getByRole("dialog", { name: "Cancel this run?" });
+  await expect(dialog).toContainText("is not resumed");
+  await expectNoAxeViolations(page);
+  // Keeping it running changes nothing.
+  await dialog.getByRole("button", { name: "Keep it running" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator("main").getByText(/^running$/i)).toBeVisible();
+  await open.click();
+  await page
+    .getByRole("dialog", { name: "Cancel this run?" })
+    .getByRole("button", { name: "Cancel run" })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator("main").getByText(/^cancelled$/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cancel run" })).toHaveCount(0);
+});
+
+test("a figure the platform cannot answer reads Unavailable, and the rest of the dashboard still shows", async ({
+  page,
+}) => {
+  await fixtureControl("run-stats-failing");
+  await page.goto("/account");
+  const figure = (term: string) =>
+    page
+      .locator("dt", { hasText: term })
+      .locator("xpath=following-sibling::dd[1]");
+  await expect(figure("Runs this month")).toHaveText("Unavailable");
+  await expect(figure("Automations")).toHaveText("3");
+  await expect(figure("Integrations")).toHaveText("1");
+  await expect(
+    page.getByRole("link", { name: "Run of Manual input automation, running" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: /The platform (is busy|could not answer)/,
+    }),
+  ).toHaveCount(0);
+});
+
+test("Cancel on a run whose workspace was switched away in another tab says so, and cancels nothing", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/account/runs/fixture-run-running");
+  const other = await context.newPage();
+  try {
+    await other.goto("/account");
+    const trigger = other.getByRole("button", { name: "Switch workspace" });
+    await trigger.click();
+    await other.getByRole("button", { name: /Fixture Personal/ }).click();
+    await expect(trigger).toContainText("Fixture Personal");
+  } finally {
+    await other.close();
+  }
+  await page.getByRole("button", { name: "Cancel run" }).click();
+  const dialog = page.getByRole("dialog", { name: "Cancel this run?" });
+  await dialog.getByRole("button", { name: "Cancel run" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "The active workspace changed in another tab. Reload this page before continuing.",
+  );
+  await expect(page.locator("main").getByText(/^running$/i)).toBeVisible();
+});
+
+test("the dashboard shows the workspace's own numbers and names its recent runs (register F54)", async ({
+  page,
+}) => {
+  await page.goto("/account");
+  const figure = (term: string) =>
+    page
+      .locator("dt", { hasText: term })
+      .locator("xpath=following-sibling::dd[1]");
+  // Three subscriptions that are not archived; the platform's tally of this
+  // month's runs; no connected integration yet.
+  await expect(figure("Automations")).toHaveText("3");
+  await expect(figure("Runs this month")).toHaveText(
+    "3 · 1 succeeded · 1 failed",
+  );
+  await expect(figure("Integrations")).toHaveText("1");
+  await expect(
+    page.getByRole("link", { name: "Run of Manual input automation, running" }),
+  ).toBeVisible();
+  await expect(page.locator("main")).not.toContainText("fixture-manual-input");
+  // Its actions lead to the pages that do what they say (register F54).
+  await expect(
+    page.getByRole("link", { name: "Browse automations" }).first(),
+  ).toHaveAttribute("href", "/account/automations");
+  await expect(
+    page.getByRole("link", { name: "Connect integration" }).first(),
+  ).toHaveAttribute("href", "/account/connections");
 });
 
 test("domain discovery creates an approval request without an invite flow", async ({
@@ -338,10 +631,245 @@ test("the workspace switcher drives the public active-workspace operation", asyn
   await trigger.click();
   await page.getByRole("button", { name: /Fixture Personal/ }).click();
   await expect(trigger).toContainText("Fixture Personal");
-  // Restore the organization as active: later fixture tests depend on it.
+  // And back: the switcher moves both ways.
   await trigger.click();
   await page.getByRole("button", { name: /Fixture Organization/ }).click();
   await expect(trigger).toContainText("Fixture Organization");
+});
+
+const operationsTeam = "/account/teams/abababab-abab-4bab-8bab-abababababab";
+
+test("an owner sees every team and creates one; a team lists who is on it, and one control adds someone or changes a role (backend §12.1 #173)", async ({
+  page,
+}) => {
+  await page.goto("/account/teams");
+  await expect(
+    page.getByRole("link", { name: "Operations", exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("Team name").fill("Finance");
+  await page.getByLabel("Description").fill("Pays the invoices.");
+  await page.getByRole("button", { name: "Create team" }).click();
+  await expect(
+    page.getByRole("link", { name: "Finance", exact: true }),
+  ).toBeVisible();
+  // The form clears once the platform has the team.
+  await expect(page.getByLabel("Team name")).toHaveValue("");
+
+  await page.getByRole("link", { name: "Operations", exact: true }).click();
+  await expect(page).toHaveURL(operationsTeam);
+  const members = page.locator("main li");
+  await expect(members).toHaveCount(1);
+  await expect(members.first()).toContainText("Fixture Member");
+  await expect(members.first()).toContainText(/manager/i);
+  await expectNoAxeViolations(page);
+  // Adding someone …
+  await page
+    .getByLabel("Person")
+    .selectOption({ label: "Fixture Admin (admin@example.test)" });
+  await page.getByRole("button", { name: "Add or change role" }).click();
+  await expect(members).toHaveCount(2);
+  // … and changing a role are the same operation.
+  await page
+    .getByLabel("Person")
+    .selectOption({ label: "Fixture Member (member@example.test)" });
+  await page.getByLabel("Team role").selectOption("member");
+  await page.getByRole("button", { name: "Add or change role" }).click();
+  await expect(
+    members.filter({ hasText: "Fixture Member" }).locator("span"),
+  ).toHaveText(/^member$/i);
+  // No removal is offered: no operation publishes one (backend §12.1 #174).
+  await expect(page.getByRole("button", { name: /remove/i })).toHaveCount(0);
+  await expect(
+    page.getByText("Removing someone from a team is not available yet."),
+  ).toBeVisible();
+});
+
+test("a team's manager who is a plain member manages their team — and sees neither the others nor the organization page (backend ADR-0010)", async ({
+  page,
+}) => {
+  await presentSession(page, "member");
+  await page.goto("/account/teams");
+  const nav = page.getByRole("complementary", { name: "Dashboard navigation" });
+  await expect(nav.getByRole("link", { name: "Teams" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Organization" })).toHaveCount(0);
+  await expect(page.getByText("You are its manager.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Create team" })).toHaveCount(
+    0,
+  );
+  await page.getByRole("link", { name: "Operations", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Add or change role" }),
+  ).toBeVisible();
+  await page.goto("/account/organization");
+  await expect(page).toHaveURL(/\/account$/);
+});
+
+test("an admin reaches the organization page, where every operation admits them (register F55)", async ({
+  page,
+}) => {
+  await presentSession(page, "admin");
+  await page.goto("/account/organization");
+  await expect(page).toHaveURL(/\/account\/organization$/);
+  await expect(
+    page.getByRole("heading", { name: "Organization", exact: true }),
+  ).toBeVisible();
+  // Each member's badge is the role the platform holds — an admin reads as one.
+  const self = page.locator("main li").filter({ hasText: "(you)" });
+  await expect(self).toContainText("Fixture Admin");
+  await expect(self.getByText(/^admin$/i)).toBeVisible();
+  await expect(
+    page
+      .getByRole("complementary", { name: "Dashboard navigation" })
+      .getByRole("link", { name: "Organization" }),
+  ).toBeVisible();
+});
+
+test("a project's owner gives a team access, and the project lists the teams granted to it (backend §12.1 #173)", async ({
+  page,
+}) => {
+  await page.goto("/account/projects/33333333-3333-4333-8333-333333333333");
+  await expect(
+    page.getByText("No team has access to this project."),
+  ).toBeVisible();
+  await page
+    .getByLabel("Team", { exact: true })
+    .selectOption({ label: "Operations" });
+  await page.getByLabel("Role on this project").selectOption("admin");
+  await page.getByRole("button", { name: "Give access" }).click();
+  const granted = page.locator("main li").filter({ hasText: "Operations" });
+  await expect(granted).toContainText(/admin/i);
+  await expect(
+    page.getByText("No team has access to this project."),
+  ).toHaveCount(0);
+  await expectNoAxeViolations(page);
+});
+
+test("anyone on a project reads the teams granted to it, and only its owner or admin is offered the grant (backend ADR-0010)", async ({
+  page,
+}) => {
+  await presentSession(page, "member");
+  await page.goto("/account/projects/33333333-3333-4333-8333-333333333333");
+  await expect(
+    page.getByRole("heading", { name: "Teams with access" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("No team has access to this project."),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Give access" })).toHaveCount(
+    0,
+  );
+});
+
+test("an organization with no team yet tells its owner where teams are made, not which teams they can see", async ({
+  page,
+}) => {
+  await fixtureControl("org-without-teams");
+  await page.goto("/account/projects/33333333-3333-4333-8333-333333333333");
+  await expect(
+    page.getByText("This organization has no teams yet."),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Teams page" })).toHaveAttribute(
+    "href",
+    "/account/teams",
+  );
+  await expect(page.getByText("the teams you are on")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Give access" })).toHaveCount(
+    0,
+  );
+});
+
+test("an organization with no project yet creates its first team project, in the organization being worked in (register F57)", async ({
+  page,
+}) => {
+  await fixtureControl("org-without-projects");
+  await page.goto("/account/projects");
+  await expect(page.getByText("No projects yet.")).toBeVisible();
+  await page.getByRole("button", { name: "Create project" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("radio", { name: /team/i })).toBeEnabled();
+  await dialog
+    .locator("label")
+    .filter({ hasText: /^\s*team\s*$/i })
+    .click();
+  await expect(
+    dialog.getByText("Created in Fixture Organization."),
+  ).toBeVisible();
+  await dialog.getByLabel(/Project name/).fill("First team project");
+  await dialog.getByLabel(/Project type/).fill("Invoices");
+  await dialog.getByRole("button", { name: "Create project" }).click();
+  await dialog.getByRole("button", { name: "Done" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Fixture Organization Team Projects" }),
+  ).toBeVisible();
+  await expect(page.getByText("First team project")).toBeVisible();
+});
+
+test("working in a personal workspace, a team project is not offered until the organization is (register F57)", async ({
+  page,
+}) => {
+  await page.goto("/account");
+  const trigger = page.getByRole("button", { name: "Switch workspace" });
+  await trigger.click();
+  await page.getByRole("button", { name: /Fixture Personal/ }).click();
+  await expect(trigger).toContainText("Fixture Personal");
+  await page.goto("/account/projects");
+  await page.getByRole("button", { name: "Create project" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("radio", { name: /team/i })).toBeDisabled();
+  await expect(
+    dialog.getByText(
+      "Switch to your organization to create a team project in it.",
+    ),
+  ).toBeVisible();
+});
+
+test("Create team on a page whose workspace was switched away in another tab says so, and creates nothing", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/account/teams");
+  const other = await context.newPage();
+  try {
+    await other.goto("/account");
+    const trigger = other.getByRole("button", { name: "Switch workspace" });
+    await trigger.click();
+    await other.getByRole("button", { name: /Fixture Personal/ }).click();
+    await expect(trigger).toContainText("Fixture Personal");
+  } finally {
+    await other.close();
+  }
+  await page.getByLabel("Team name").fill("Stale tab team");
+  await page.getByRole("button", { name: "Create team" }).click();
+  await expect(page.locator("main").getByRole("alert")).toHaveText(
+    "The active workspace changed in another tab. Reload this page before continuing.",
+  );
+  await page.goto("/account");
+  const trigger = page.getByRole("button", { name: "Switch workspace" });
+  await trigger.click();
+  await page.getByRole("button", { name: /Fixture Organization/ }).click();
+  await expect(trigger).toContainText("Fixture Organization");
+  await page.goto("/account/teams");
+  await expect(page.getByRole("link", { name: "Operations" })).toBeVisible();
+  await expect(page.getByText("Stale tab team")).toHaveCount(0);
+});
+
+test("a grant on a project from a workspace that is not the active one goes to the project's own workspace", async ({
+  page,
+}) => {
+  await page.goto("/account");
+  const trigger = page.getByRole("button", { name: "Switch workspace" });
+  await trigger.click();
+  await page.getByRole("button", { name: /Fixture Personal/ }).click();
+  await expect(trigger).toContainText("Fixture Personal");
+  await page.goto("/account/projects/33333333-3333-4333-8333-333333333333");
+  await page
+    .getByLabel("Team", { exact: true })
+    .selectOption({ label: "Operations" });
+  await page.getByLabel("Role on this project").selectOption("member");
+  await page.getByRole("button", { name: "Give access" }).click();
+  await expect(
+    page.locator("main li").filter({ hasText: "Operations" }),
+  ).toContainText(/member/i);
 });
 
 test("signing out flips the marketing nav without a manual reload", async ({
@@ -403,39 +931,29 @@ test("the workspace switcher keeps keyboard focus — arrows move among workspac
     page
       .getByRole("dialog", { name: "Switch workspace" })
       .getByRole("button", { name: new RegExp(name) });
-  try {
-    await trigger.focus();
-    await page.keyboard.press("Enter");
-    // Opening lands on the workspace in use.
-    await expect(option("Fixture Organization")).toBeFocused();
-    await page.keyboard.press("ArrowDown");
-    await expect(option("Fixture Personal")).toBeFocused();
-    await page.keyboard.press("ArrowDown");
-    await expect(option("Fixture Organization")).toBeFocused();
-    await page.keyboard.press("ArrowUp");
-    await expect(option("Fixture Personal")).toBeFocused();
-    await page.keyboard.press("Home");
-    await expect(option("Fixture Organization")).toBeFocused();
-    await page.keyboard.press("End");
-    await expect(option("Fixture Personal")).toBeFocused();
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect(trigger).toBeFocused();
-    // A selection made from the keyboard also hands focus back.
-    await page.keyboard.press("Enter");
-    await page.keyboard.press("ArrowDown");
-    await page.keyboard.press("Enter");
-    await expect(trigger).toContainText("Fixture Personal");
-    await expect(trigger).toBeFocused();
-  } finally {
-    const restored = await page
-      .context()
-      .request.patch("/api/platform/v1/session/active-workspace", {
-        data: { workspaceId: organizationWorkspaceId },
-        headers: { origin: "http://127.0.0.1:3001" },
-      });
-    expect(restored.status()).toBe(200);
-  }
+  await trigger.focus();
+  await page.keyboard.press("Enter");
+  // Opening lands on the workspace in use.
+  await expect(option("Fixture Organization")).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(option("Fixture Personal")).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(option("Fixture Organization")).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await expect(option("Fixture Personal")).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(option("Fixture Organization")).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(option("Fixture Personal")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  // A selection made from the keyboard also hands focus back.
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(trigger).toContainText("Fixture Personal");
+  await expect(trigger).toBeFocused();
 });
 
 test("keyboard reaches dashboard navigation and preserves a visible focus target", async ({
@@ -444,9 +962,7 @@ test("keyboard reaches dashboard navigation and preserves a visible focus target
   await page.goto("/account/connections");
   await page.keyboard.press("Tab");
   await expect(page.locator(":focus")).toBeVisible();
-  // An earlier test connected the key provider, so its card now offers
-  // "Reconnect" rather than "Connect".
-  await page.getByRole("button", { name: "Reconnect", exact: true }).focus();
+  await page.getByRole("button", { name: "Connect", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(
     page.getByRole("heading", { name: "Connect Fixture key provider" }),
@@ -456,7 +972,7 @@ test("keyboard reaches dashboard navigation and preserves a visible focus target
     page.getByRole("heading", { name: "Connect Fixture key provider" }),
   ).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Reconnect", exact: true }),
+    page.getByRole("button", { name: "Connect", exact: true }),
   ).toBeFocused();
 });
 
@@ -471,10 +987,6 @@ test("a billing hand-off is refused when another tab changed the active workspac
   page,
   context,
 }) => {
-  // Runs while the workspace is still on the free floor (before the purchase
-  // below). The organization is restored as active in `finally`, through the
-  // same published operation the switcher uses, so a failure here cannot
-  // leave every later fixture test on the personal workspace.
   await page.goto("/account/billing");
   await expect(
     page.locator("main").getByText("Free", { exact: true }),
@@ -498,14 +1010,6 @@ test("a billing hand-off is refused when another tab changed the active workspac
     ).toBeVisible();
     await expect(page).toHaveURL(/\/account\/billing$/);
   } finally {
-    const restored = await context.request.patch(
-      "/api/platform/v1/session/active-workspace",
-      {
-        data: { workspaceId: organizationWorkspaceId },
-        headers: { origin: "http://127.0.0.1:3001" },
-      },
-    );
-    expect(restored.status()).toBe(200);
     await other.close();
   }
 });
@@ -613,6 +1117,69 @@ test("a member sees billing gated — not refused and not unavailable", async ({
   ).toHaveCount(0);
 });
 
+test("a member is offered no control the platform would refuse them — connections and export (register F8)", async ({
+  page,
+}) => {
+  await presentSession(page, "member");
+  await page.goto("/account/connections");
+  await expect(
+    page.getByText(
+      "Only an owner or admin of this workspace can connect or disconnect an account.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: /^(Connect|Reconnect|Disconnect|Replace account)$/,
+    }),
+  ).toHaveCount(0);
+  await page.goto("/account/settings");
+  await expect(
+    page.getByText("Exporting a workspace is for its owners and admins"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Prepare export" }),
+  ).toHaveCount(0);
+});
+
+test("each workspace holds its own plan — buying for the personal workspace leaves the organization's alone (register F31)", async ({
+  page,
+}) => {
+  await page.route("https://billing.invalid/**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: "<h1>hosted</h1>",
+    }),
+  );
+  const activate = async (workspaceId: string) => {
+    const answer = await page
+      .context()
+      .request.patch("/api/platform/v1/session/active-workspace", {
+        data: { workspaceId },
+        headers: { origin: "http://127.0.0.1:3001" },
+      });
+    expect(answer.status()).toBe(200);
+  };
+  await activate(personalWorkspaceId);
+  await page.goto("/account/billing");
+  await planCard(page, "Team")
+    .getByRole("button", { name: "Choose plan" })
+    .click();
+  await page.waitForURL(/billing\.invalid\/checkout\//);
+  await page.goto("/account/billing");
+  await expect(
+    planCard(page, "Team").getByRole("button", { name: "Current plan" }),
+  ).toBeDisabled();
+  await activate(organizationWorkspaceId);
+  await page.goto("/account/billing");
+  await expect(
+    page.locator("main").getByText("Free", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    planCard(page, "Team").getByRole("button", { name: "Choose plan" }),
+  ).toBeVisible();
+});
+
 test("the account-deletion confirmation says what ADR-0028 removes, and a refusal keeps the account", async ({
   page,
 }) => {
@@ -656,7 +1223,32 @@ test("a clean account deletion signs out and leaves", async ({ page }) => {
     .getByRole("dialog")
     .getByRole("button", { name: "Yes, delete my account" })
     .click();
-  await expect(page).toHaveURL(/\/login\?deleted=1$/);
+  // The page built to say so (register F2).
+  await expect(page).toHaveURL(/\/account-deleted$/);
+  await expect(
+    page.getByRole("heading", { name: "Account deleted" }),
+  ).toBeVisible();
+});
+
+test("the deletion itself signs the browser out — the sign-out after it is only a courtesy (register F34)", async ({
+  page,
+}) => {
+  // The Edge clears the session cookies with its 200. Losing the courtesy
+  // sign-out must neither keep the person signed in nor turn a finished
+  // deletion into "try again".
+  await presentSession(page, "requester");
+  await page.route(/\/api\/platform\/v1\/auth\/logout$/, (route) =>
+    route.abort("connectionreset"),
+  );
+  await page.goto("/account/settings");
+  await page.getByRole("button", { name: "Delete Account" }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Yes, delete my account" })
+    .click();
+  await expect(page).toHaveURL(/\/account-deleted$/);
+  await page.goto("/account");
+  await expect(page).toHaveURL(/\/login\?callbackUrl=%2Faccount$/);
 });
 
 // For a cookie caller every 502 on DELETE /v1/account means the Access hop
@@ -820,6 +1412,27 @@ test("a 401 right after a lost answer hedges — the account may already be gone
   await expect(page).toHaveURL(/\/account\/settings$/);
 });
 
+test("a session that ended while the settings page was open is said, with the way back in (register F40)", async ({
+  page,
+}) => {
+  await page.route(/\/api\/platform\/v1\/auth\/identities$/, (route) =>
+    route.fulfill(unauthenticated),
+  );
+  await page.goto("/account/settings");
+  const alert = page
+    .getByRole("alert")
+    .filter({ hasText: "Your session ended." });
+  await expect(alert).toHaveText(
+    "Your session ended. Sign in again to see your linked accounts.",
+  );
+  await expect(
+    alert.getByRole("link", { name: "Sign in again" }),
+  ).toHaveAttribute("href", "/login?callbackUrl=%2Faccount%2Fsettings");
+  await expect(page.getByText("Could not load linked accounts.")).toHaveCount(
+    0,
+  );
+});
+
 test("an answer lost behind the website's own proxy reads as unknown — and after Cancel, the retry's 401 still hedges", async ({
   page,
 }) => {
@@ -859,7 +1472,7 @@ test("an answer lost behind the website's own proxy reads as unknown — and aft
   expect(logouts).toHaveLength(0);
 });
 
-test("a refusal shows the server's own title, and focus returns to Try again", async ({
+test("a refusal says in words that the account was kept, and focus returns to Try again (register F46)", async ({
   page,
 }) => {
   await page.route(/\/api\/platform\/v1\/account$/, (route) =>
@@ -878,8 +1491,36 @@ test("a refusal shows the server's own title, and focus returns to Try again", a
   await page.getByRole("button", { name: "Delete Account" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "Yes, delete my account" }).click();
+  // The Edge's generic title tells a person nothing they can act on.
   await expect(dialog.getByRole("alert")).toHaveText(
-    "Request origin is not allowed",
+    "The platform refused this request, so your account was not deleted. Reload the page and try again; if it is refused again, contact support.",
+  );
+  await expect(dialog.getByRole("button", { name: "Try again" })).toBeFocused();
+  await expect(page).toHaveURL(/\/account\/settings$/);
+});
+
+test("a busy platform is said with its wait, and the account is kept", async ({
+  page,
+}) => {
+  await page.route(/\/api\/platform\/v1\/account$/, (route) =>
+    route.fulfill({
+      status: 429,
+      contentType: "application/problem+json",
+      headers: { "retry-after": "30" },
+      body: JSON.stringify({
+        type: "urn:autom8x:problem:rate-limited",
+        title: "Too Many Requests",
+        status: 429,
+        code: "RATE_LIMITED",
+      }),
+    }),
+  );
+  await page.goto("/account/settings");
+  await page.getByRole("button", { name: "Delete Account" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Yes, delete my account" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    `${busy} Your account was not deleted.`,
   );
   await expect(dialog.getByRole("button", { name: "Try again" })).toBeFocused();
   await expect(page).toHaveURL(/\/account\/settings$/);

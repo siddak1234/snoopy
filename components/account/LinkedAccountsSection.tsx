@@ -1,8 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { FormError } from "@/components/ui/FormError";
-import { platformApiJson, platformApiPath } from "@/lib/platform-api";
+import {
+  loginHref,
+  platformApiJson,
+  platformApiPath,
+  sessionEnded,
+} from "@/lib/platform-api";
 import type { operations } from "@/lib/generated/platform-contracts/platform";
 
 type IdentityResponse =
@@ -19,9 +26,13 @@ type State = {
   loading: boolean;
   linking: ProviderId | null;
   error: string | null;
+  // The session ended while the page was open: answered by signing in again,
+  // not by the generic failure (register F40).
+  ended: boolean;
 };
 
 export default function LinkedAccountsSection() {
+  const pathname = usePathname();
   const [state, setState] = useState<State>({
     linked: new Set(),
     primaryProvider: null,
@@ -29,10 +40,16 @@ export default function LinkedAccountsSection() {
     loading: true,
     linking: null,
     error: null,
+    ended: false,
   });
 
   const loadIdentities = useCallback(async () => {
-    setState((current) => ({ ...current, loading: true, error: null }));
+    setState((current) => ({
+      ...current,
+      loading: true,
+      error: null,
+      ended: false,
+    }));
     try {
       const [identityBody, providersBody] = await Promise.all([
         platformApiJson<IdentityResponse>("/v1/auth/identities"),
@@ -47,11 +64,13 @@ export default function LinkedAccountsSection() {
         primaryProvider:
           identities.find((identity) => identity.primary)?.provider ?? null,
       }));
-    } catch {
+    } catch (caught) {
+      const ended = sessionEnded(caught);
       setState((current) => ({
         ...current,
         loading: false,
-        error: "Could not load linked accounts.",
+        ended,
+        error: ended ? null : "Could not load linked accounts.",
       }));
     }
   }, []);
@@ -100,6 +119,18 @@ export default function LinkedAccountsSection() {
       {state.error ? (
         <FormError message={state.error} className="mt-2" />
       ) : null}
+      {state.ended ? (
+        <p role="alert" className="mt-2 text-sm text-[var(--error-text)]">
+          Your session ended.{" "}
+          <Link
+            href={loginHref(pathname)}
+            className="underline underline-offset-2"
+          >
+            Sign in again
+          </Link>{" "}
+          to see your linked accounts.
+        </p>
+      ) : null}
       <ul className="mt-4 space-y-2">
         {state.providers.map(({ id, label }) => {
           const isLinked = state.linked.has(id);
@@ -127,7 +158,7 @@ export default function LinkedAccountsSection() {
                     href={linkHref(id)}
                     onClick={() => handleLink(id)}
                     aria-disabled={isLinking}
-                    className="rounded-full border border-[var(--ring)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none disabled:opacity-50"
+                    className="rounded-full border border-[var(--ring)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-50"
                   >
                     {isLinking ? "Linking…" : "Link"}
                   </a>

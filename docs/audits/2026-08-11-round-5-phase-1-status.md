@@ -125,8 +125,8 @@ public-contract defects recorded above:
   generic.
 - The public root document now declares `WorkspaceExportResponse` and its
   service-section union. The generator now consumes all three authoritative
-  inputs: `docs/openapi.yaml`, `docs/openapi/automations.yaml`, and
-  `docs/openapi/connections.yaml`.
+  inputs: `snoopy-backend/docs/openapi.yaml`, `snoopy-backend/docs/openapi/automations.yaml`, and
+  `snoopy-backend/docs/openapi/connections.yaml`.
 
 `/account/settings` now presents an existing-design-system workspace export
 section. It requests the public Edge operation through a server action, renders
@@ -265,7 +265,7 @@ now follows that decision exactly:
   page's invite-link join control;
 - removed the pending-invite read from the organization page and adjusted only
   the now-inaccurate organization copy;
-- removed `lib/workspace-invites.ts` from the transitional database allowlist.
+- removed ~~`lib/workspace-invites.ts`~~ from the transitional database allowlist (the file is gone since).
 
 No replacement invite flow was added. The current public contract has no
 issue-or-accept invite operation, and a frontend substitute would violate the
@@ -300,7 +300,7 @@ This is a contract completeness finding, not permission to infer shapes:
   request/response bodies.
 - Root `openapi.yaml` declares no public workspace-name update or
   workspace-member removal operation.
-- Domain discovery and join creation exist in `docs/openapi/access.yaml` only
+- Domain discovery and join creation exist in `snoopy-backend/docs/openapi/access.yaml` only
   as private Access operations; they are not public website endpoints.
 
 The remaining 11 transitional files cannot be migrated correctly until the
@@ -332,8 +332,8 @@ This section supersedes the earlier Phase 1/2 blocker snapshots above. Those
 snapshots describe the contract state before the public Edge contract was
 merged. This implementation was audited against the sibling backend checkout at
 main commit `7b39746017d5bf861e1155f76d8b73fb4f5a73cb` and its public
-`docs/openapi.yaml`, `docs/openapi/automations.yaml`, and
-`docs/openapi/connections.yaml` documents only.
+`snoopy-backend/docs/openapi.yaml`, `snoopy-backend/docs/openapi/automations.yaml`, and
+`snoopy-backend/docs/openapi/connections.yaml` documents only.
 
 ### Tenancy replacement map
 
@@ -407,8 +407,8 @@ This final web-repository audit supersedes the previous sentence about an
 unauthenticated-only browser fixture. It read only the three published public
 contracts from sibling backend `main` at
 `7b39746017d5bf861e1155f76d8b73fb4f5a73cb`:
-`docs/openapi.yaml`, `docs/openapi/automations.yaml`, and
-`docs/openapi/connections.yaml`. The contracts matched that commit without a
+`snoopy-backend/docs/openapi.yaml`, `snoopy-backend/docs/openapi/automations.yaml`, and
+`snoopy-backend/docs/openapi/connections.yaml`. The contracts matched that commit without a
 diff.
 
 ### Credential-free authenticated observations
@@ -633,15 +633,15 @@ Each names the evidence a backend session can re-run.
 
 **Contract / Edge (the backend to decide or fix)**
 
-- **F1** `DELETE /v1/account` answers its 409 with the raw Access result `{deleted:false, workspaces, reason}` as `application/json` (`apps/api/src/app.ts:463-466`), while `docs/openapi.yaml:428-435` publishes `application/problem+json` `ApiProblem`; no backend test asserts the 409 at either route. The web branches on status only (#17).
-- **F3** `POST …/billing/portal`: the contract marks the body optional (`required: false`), the Edge answers 400 "Request body is required" on an empty body (`packages/http/src/index.ts:225-227`). The web sends `{}`.
+- **F1** `DELETE /v1/account` answers its 409 with the raw Access result `{deleted:false, workspaces, reason}` as `application/json` (`snoopy-backend/apps/api/src/app.ts:463-466`), while `snoopy-backend/docs/openapi.yaml:428-435` publishes `application/problem+json` `ApiProblem`; no backend test asserts the 409 at either route. The web branches on status only (#17).
+- **F3** `POST …/billing/portal`: the contract marks the body optional (`required: false`), the Edge answers 400 "Request body is required" on an empty body (`snoopy-backend/packages/http/src/index.ts:225-227`). The web sends `{}`.
 - **F4 / #158** `siddak1234/snoopy`'s GitHub Actions ran and passed on 2026-09-25 (`main` pushes `36140364318` @ `c97d557`, `36147960894` @ `fddcd17`, `36176059273` @ `ba4fd44`; PR runs `36147684131`, `36175809012`, `36186563329`) — §12.1 #158's billing block did not apply to this repository then; and `main` @ `43c2975` was RED on `test:contracts` whenever the sibling was present (fixed by #14) while CI was green without it.
 - **F10** Undocumented 502s on the billing operations (`apps/api/src/modules/entitlements/billing-routes.ts:323,351,368`).
 - **F12** SYSTEM-MANIFEST §9's fourth count command (`find . -name '*.test.*'`) counts `node_modules` (351 on this machine on 2026-09-26 — the number moves with `node_modules`); the facts file states `git ls-files --cached --others --exclude-standard` forms for all four units — §9 should quote the facts file.
 - **F14** "163 `@theme` tokens" (AGENTS.md:42, §9.2) is the whole-file custom-property count; 46 sit inside `@theme {}`, and 4 more in an `@theme inline {}` block.
 - **F20 (owner call)** The website offers no Archive/Remove action for a subscription; archiving is the backend's only way to free a plan slot (18.5.3), so a workspace at its plan limit cannot free one from the browser — 18.5.3's client half.
 - **F23** GitHub reported six Dependabot vulnerabilities on `main` (4 critical, 2 high) at the round's open and four (2 critical, 2 high) at the 2026-09-25 pushes — PRs #11–#13 (`next`, `sharp`, `js-yaml`/`@redocly/openapi-core`), whose own CI runs pass; owner's call, not this round's.
-- **F39** `DELETE /v1/account`'s documented 502 ("deleted, but the identity provider could not be reached to revoke the session") is raised only for a bearer caller: `apps/api/src/app.ts` (the `/v1/account` handler) throws it only when `revoking` is set, and `nativeLogoutSession` returns `undefined` for a request with no bearer — every request the website makes; a website's failed cookie revocation is folded into 200 (its cookies are cleared regardless). Every 502 a cookie caller can receive on that route is the Access client's `dependencyFailure` (`apps/api/src/modules/access/client.ts`: unreachable, invalid body, unexpected status) — the deletion did not run, or its outcome is unknown. Both outcomes share `DEPENDENCY_FAILURE` / `urn:autom8x:problem:dependency-failure`. The contract should say the 502 is bearer-only, and the two outcomes should carry distinct codes. (#17 had read the contract literally and signed the person out on any 502; #19 reverses it.) **F36** — the earlier note that the Edge should clear its cookies on its 502 path — is superseded by this reading: for a cookie caller it clears them before any 502 could be raised, and raises none.
+- **F39** `DELETE /v1/account`'s documented 502 ("deleted, but the identity provider could not be reached to revoke the session") is raised only for a bearer caller: `snoopy-backend/apps/api/src/app.ts` (the `/v1/account` handler) throws it only when `revoking` is set, and `nativeLogoutSession` returns `undefined` for a request with no bearer — every request the website makes; a website's failed cookie revocation is folded into 200 (its cookies are cleared regardless). Every 502 a cookie caller can receive on that route is the Access client's `dependencyFailure` (`snoopy-backend/apps/api/src/modules/access/client.ts`: unreachable, invalid body, unexpected status) — the deletion did not run, or its outcome is unknown. Both outcomes share `DEPENDENCY_FAILURE` / `urn:autom8x:problem:dependency-failure`. The contract should say the 502 is bearer-only, and the two outcomes should carry distinct codes. (#17 had read the contract literally and signed the person out on any 502; #19 reverses it.) **F36** — the earlier note that the Edge should clear its cookies on its 502 path — is superseded by this reading: for a cookie caller it clears them before any 502 could be raised, and raises none.
 
 **Web (this repository's next round; not this one)**
 
@@ -650,7 +650,7 @@ Each names the evidence a backend session can re-run.
 - **F6** `verify:platform-contracts` rewrites the generated files in place and does not restore on "stale". **F7** the generated files carry no source sha (the cell records it by hand).
 - **F8** Connections and Settings → Export have no UI role gate (the server enforces). **F9** action files interpolate the server-resolved workspace id without `encodeURIComponent` (the facades do).
 - **F13** `.claude/launch.json` references a nonexistent `npm run db:studio`. **F15** `scripts/audit/run-gates.mjs` omits `format:check` and `verify:platform-contracts` (both in `npm run verify`). **F16** the `browser` CI job is not a required check. **F17** local Node 24 vs the pinned 22 (`.nvmrc` added in #15).
-- **F18** the web had no handling for the contract's `archived` subscription status (now treated as absent, #14). **F21** `automations/page.tsx` `byTemplate` is keyed by `templateId`, last-wins over a `created_at DESC` list — with project-scoped subscriptions the oldest hides the newer. **F22** `AutomationSetupField.notifies` renders the raw wire token (`run-succeeded`, `approval-expiring`, …).
+- **F18** the web had no handling for the contract's `archived` subscription status (now treated as absent, #14). **F21** `app/account/automations/page.tsx` `byTemplate` is keyed by `templateId`, last-wins over a `created_at DESC` list — with project-scoped subscriptions the oldest hides the newer. **F22** `AutomationSetupField.notifies` renders the raw wire token (`run-succeeded`, `approval-expiring`, …).
 - **F24** `scripts/verify.mjs` duplicates `run-gates.mjs`'s preflight, lock and rewrite assertion (~70 lines); a shared `scripts/audit/preflight.mjs` would end it — touching the audit machinery was outside 20.4.1. **F25** `run-gates.mjs` itself acquires its lock non-atomically and treats an empty lock as pid 0 (`process.kill(0, 0)` signals its own group) — `verify.mjs` does neither.
 - **F26** The app has no `error.tsx` boundary at any level; a rethrown platform failure renders Next's default error page.
 - **F27** Pages call `getAppSession` → `listWorkspaces` → `resolveActiveWorkspaceId` sequentially, and the account layout already made the same calls (`cache: "no-store"`) — up to three extra round trips per render.
@@ -660,7 +660,7 @@ Each names the evidence a backend session can re-run.
 - **F31** The fixture keys its workspace routes to the organization (`isWorkspacePath`); a personal-workspace billing read is an undeclared route (501, "fail closed"). Per-workspace fixture billing would let the suite run in more than one worker.
 - **F32** From `/account/billing` the "no backend configured" path is unreachable (the account layout redirects first); the facade guard still serves its other callers.
 - **F33** (closed by #19) The error-to-copy mapping was written out in `ContactForm.tsx` and `DeleteAccountButton.tsx`; the dialog now has its own status table (`outcomeFor`), and `ContactForm.tsx` keeps the only generic mapping.
-- **F34** The loopback fixture's `DELETE /v1/account` 200 does not clear the session cookie the way the Edge does (`apps/api/src/app.ts:438-448`); harmless today because the component's courtesy sign-out clears it, but a future "signed out without the courtesy logout" test needs the fixture to mirror the Edge (#17's audit).
+- **F34** The loopback fixture's `DELETE /v1/account` 200 does not clear the session cookie the way the Edge does (`snoopy-backend/apps/api/src/app.ts:438-448`); harmless today because the component's courtesy sign-out clears it, but a future "signed out without the courtesy logout" test needs the fixture to mirror the Edge (#17's audit).
 - **F37** `e2e/accessibility.spec.ts`'s authenticated route list lacks seven of the fourteen authenticated pages — `/account/approvals`, `/account/projects/[id]`, `/account/runs`, `/account/runs/[runId]`, `/account/support`, `/onboarding/join-org`, `/onboarding/setup-org` — so axe never scans them (#18's audit named three; this PR's audit counted seven; pre-existing).
 - **F38** The loopback fixture declares no `PATCH /v1/workspaces/{id}/subscriptions/{id}`, so Pause / Go live / Set up can only surface a 501 refusal in the suite — the automation card's retained mutations have no positive fixture path (#18's audit; pre-existing).
 - **F40** Session expiry (401) is handled inside `DeleteAccountButton` only; `LinkedAccountsSection.tsx`, `OAuthButtons.tsx` and `hooks/use-app-session.ts` also call `platformApiJson` and none handle a 401 — one rule in `lib/platform-api.ts` (or a shared hook) would serve every caller, with the return target derived from the current path as the deletion dialog now does (#19's review).
@@ -729,3 +729,270 @@ subscription PATCH for a set-up save and the archive, not for Pause or Go live.
 **Mobile's half is not this repository's** — backend BUILD-PLAN 21.9.1 lists what
 `snoopy-mobile` adopts in its own round: the regenerated contracts, a Run control from
 `runInput`, Archive, and a 429 read as "try again", never as signed out.
+
+## Round 14 — the website completes against every published contract — 2026-09-28
+
+Opened in `snoopy-backend` on the owner's word (BUILD-PLAN **Phase 22**, Gate 22). Its
+backend half landed first, as backend #116 (`d663d69`):
+- The authorize answer is published as the union it is, and it takes the replace intent
+  (§12.1 #172).
+- The team operations publish their schemas (#173).
+- A connection that needs reauthorization is re-authorized, not reused (#175).
+
+This repository then regenerated its client from that tree. Each generated file now names
+the sha256 of the contract it came from.
+
+| Item | Register | What changed here | Evidence |
+| --- | --- | --- | --- |
+| 22.3.1 | F51 | Server calls send the request's cookies as `name=value` pairs (`lib/cookie-header.ts`) | `test/session-contract.test.mjs` runs Next's own response-cookie store; the fixture refuses any `Cookie` header carrying an attribute, so every action in the suite would fail if it came back |
+| 22.3.2 | F9 | Every write goes through a facade in `lib/*`, which encodes each id; the action files build no `/v1/` path | the contract tests of the automation, billing, connections and export modules |
+| 22.3.3 | F8 | Connect, Reconnect, Replace account, Disconnect and Export are offered to an owner or admin only; a member is told who can | `test/tenancy-contract.test.mjs`; e2e "a member is offered no control the platform would refuse them" |
+| 22.3.4 | F2 | A finished deletion lands on `/account-deleted` | e2e "a clean account deletion signs out and leaves" |
+| 22.3.5 | F21 | A card lists each subscription under its scope; Add offers only the scopes the automation is not in yet, and falls back to one still offered after a re-render | `test/automation-contract.test.mjs`; e2e "a card lists each subscription under its scope …" (the fixture answers 409 if a used scope is sent again) |
+| 22.3.6 | F22 | A notifications switch says in words what it switches | `test/automation-contract.test.mjs`; e2e (the set-up dialog) |
+| 22.3.7 | F40, F41 | One rule for a session that ends while a page is open (`sessionEnded`): the deletion dialog and the linked-accounts section say so and give the way back in; a problem's `title` is shown only when it is a non-empty string | e2e "a session that ended while the settings page was open …"; `test/structure-contract.test.mjs` |
+| 22.3.8 | F46, F47 | A refusal is explained in words, not the Edge's title; a 409 clears the memory of a lost answer | `test/account-deletion-contract.test.mjs`; e2e "a refusal says in words …" |
+| 22.3.9 | F52 | One refusal, one alert, in each connections dialog | `test/structure-contract.test.mjs`; e2e (the pasted-key retry, the stale replacement) |
+| 22.3.10 | F53 | `/automation-builder`'s sign-in link and the `?id=` redirect point at `/account/automations` | `test/structure-contract.test.mjs`. **The page's copy still describes the canvas that was removed — the owner's call, not rewritten here** |
+| 22.3.11 | backend #114 | A 429 says how long to wait, from `retry-after`, on the server and in the browser | `test/session-contract.test.mjs`; e2e (a refused start and a refused save: "Try again in 30 seconds.") |
+| 22.4.1 | F26 | `app/error.tsx` and `app/global-error.tsx` | `test/structure-contract.test.mjs` |
+| 22.4.2 | F27 | The workspace list is read once per request (React `cache`) | `test/tenancy-contract.test.mjs` |
+| 22.4.3 | F28, F29 | One `requireActiveWorkspaceId()` for every action module; one `EmptyRow` | `test/tenancy-contract.test.mjs`, `test/structure-contract.test.mjs` |
+| 22.4.4 | F42 | Every sign-in return is built by `loginHref()` | `test/structure-contract.test.mjs` |
+| 22.4.5 | F43, F44 | A `danger` Button variant; the dead `focus-visible:outline-none` removed (the global rule already won, so nothing renders differently) | `test/structure-contract.test.mjs`; the visual baselines are unchanged |
+| 22.4.6 | F32 | `app/api/session` (no caller) and `getProject` (no caller) removed; F32's branch is not special-cased | `test/structure-contract.test.mjs`, `test/billing-contract.test.mjs` |
+| 22.5.1 | — | Cancel on a `pending` or `running` run, confirmed first | e2e "a running run is cancelled from its page …" |
+| 22.5.2 | F54 | The dashboard reads the platform's run tally since the first of the month (UTC), the automations and integrations lists, and names its recent runs as Activity does | e2e "the dashboard shows the workspace's own numbers …" |
+| 22.5.3 | — | A `reused` answer says the account is already connected; **Replace account** is confirmed and names the exact connection; a stale one says the connection changed; Reconnect repairs a broken grant | e2e: reused, repair (#175), replace, stale |
+| 22.5.4 | F55 | **Teams**: a Teams page (all teams for an owner or admin, with Create; your own teams otherwise), a team's page (members, and one control to add someone or change a role, for an owner, admin or the team's manager), and a project's "Teams with access" (the grant, for its owner or admin). No removal is offered, because no operation publishes one (backend #174). Teams have their own page because a team's manager may be a plain member, and the organization page is for owners and admins | e2e: an owner's teams, a manager's, an admin's organization page, a project grant; axe on both new pages |
+| 22.6.1 | F30, F31, F34, F38, F48 | The fixture resets before every test; a personal workspace has its own billing; a deletion's 200 clears the cookie; Pause and Go live succeed; the personal workspace's reads are declared | e2e (every test starts from `/__fixture/reset`), and one test for each |
+| 22.6.2 | F37 | axe scans all sixteen authenticated pages: the fourteen, plus the two Teams pages | `e2e/accessibility.spec.ts` |
+| 22.6.3 | F50 | The visual test waits for the nav's "Sign in" (the baselines hold it) | `e2e/marketing.visual.spec.ts` |
+| 22.6.4 | F6, F7 | `verify:platform-contracts` restores what it finds stale; each generated file names its contract's sha256 | `test/platform-contracts.test.mjs` runs the real script on a stale copy |
+| 22.6.5 | F15, F24, F25 | One preflight module and one atomic lock for `verify` and the change audit; the audit runs `verify`'s gates, in order | `test/verify-gate.test.mjs` |
+| 22.6.6 | — | CI runs the authenticated fixture suite | `.github/workflows/ci.yml` `fixtures` |
+| 22.6.7 | backend §12.2 #8 | CI audits the runtime tree (blocking) and the tooling (reported), builds the image and scans it (fixable CRITICAL and HIGH block), and keeps a CycloneDX SBOM. The first real scan found 8 fixable HIGH in the base image's npm, which the image never runs; npm is now deleted from the runtime stage, as the platform image does | `.github/workflows/ci.yml` `scan`; the image rebuilt and rescanned (exit 0), serving `/` and `/login` |
+| 22.6.8 | NFR-36 | The functional and axe suites run in Chromium, Firefox and WebKit; the visual baselines stay Chromium's, under their old names | `playwright.config.ts` projects |
+| 22.6.9 | F14 | `audit:boundaries` refuses a raw hex colour outside `app/globals.css` and the OG image (comments are not code); `AGENTS.md` rule 3 states that rule, with no token count | `test/boundaries-contract.test.mjs` runs the real audit on planted files |
+| 22.6.10 | backend §12.2 #83 | The facts file carries §9.2's four component rows, each with its command, summing to `components` | `test/repo-facts.test.mjs` |
+| 22.7.1 | F13 | The documents re-read against the code: `AGENTS.md` rules 3, 4, 6 and 7, README, CONTRIBUTING, `docs/ARCHITECTURE.md`, `docs/REPO-STRUCTURE.md`, and the PR template. ~~`docs/STACK-HANDOFF.md`~~, ~~`docs/SOLUTION-DESIGN.md`~~, ~~`docs/DATABASE-MIGRATIONS.md`~~ and ~~`docs/AUTH-MICROSOFT-AZURE.md`~~ removed. `.claude/launch.json`'s Prisma Studio entry removed. `.prettierignore` no longer names paths that do not exist. No document names a file that does not exist: `scripts/audit-doc-references.mjs` lists every path the documents name, a path in the platform carries its `snoopy-backend/` prefix, and a removed file is struck through where a record names it | `test/structure-contract.test.mjs` (launch scripts; one Node major); `test/doc-references.test.mjs` runs the audit on this repository and on a planted one |
+
+**Every row's disposition, as of this round:**
+
+- **Closed here:** F2, F6, F7, F8, F9, F13, F14, F15, F17, F21, F22, F24, F25, F26
+  (Round 13 narrowed it), F27 (narrowed there too), F28, F29, F30, F31, F32, F34, F37,
+  F38 (narrowed there), F40, F41, F42, F43, F44, F46, F47, F48, F50, F51, F52, F54 — each
+  with the evidence above.
+  - F17 had `.nvmrc` since #15; a test now holds `.nvmrc`, CI and the Dockerfile to one
+    Node major.
+- **Closed before this round:** F1, F3, F10, F20, F39, F45 and F49 (Round 13); F12 (backend
+  §9 has quoted the facts file since Round 5's close); F18 (#14); F33 (#19).
+  - F23 is closed too: `npm audit` reports 0 on the runtime tree and on the whole tree at
+    this round's tree, and the three Dependabot PRs merged (#12 in Round 5's close, #11 and
+    #13 in Round 13).
+- **Narrowed, not closed:** F53. The links and the redirect are fixed. The page's copy is
+  the owner's call.
+- **Not this repository's to change:**
+  - F4: backend §12.1 #158 is the backend's account; this repository's Actions run.
+  - F5: the checkout's iCloud sync is the owner's machine. Both gates refuse Finder copies,
+    by the shared preflight.
+  - F16: which CI jobs are *required* is a branch-protection setting, the owner's. The new
+    `fixtures`, `scan` and `build-no-backend` jobs, and `browser`, should be required.
+- **New this round, all six closed here:**
+  - **F55**: the organization page admitted only its owner, while every operation on it
+    admits owner or admin. It now admits both, and the nav shows it where it renders.
+  - **F56**: four account pages read "Dashboard" in the small-screen header. Every page has
+    its title, held by a test.
+  - **F57**, found by this round's Compose journey. A new organization could not create
+    its first team project. The Projects page offered "team" only when one of an
+    organization's projects was visible, and a new organization has none. The create action
+    also put a team project in the first organization listed, not the one the person was
+    working in. Now the team option follows the active workspace. The action creates the
+    project in the organization the dialog named, while it is still active, through the
+    shared guard.
+    - `test/tenancy-contract.test.mjs`.
+    - e2e: "an organization with no project yet creates its first team project …" and
+      "working in a personal workspace, a team project is not offered …".
+  - **F58**, found by this round's first CI run. CI's Firefox could not launch, in both
+    browser jobs. A container job's HOME is `/github/home`, owned by the image's `pwuser`,
+    and Firefox will not start as root under a HOME another user owns. Chromium and WebKit
+    do not mind. A local `docker run` of the same image has HOME `/root`, so every local
+    run passed in all three engines. Both jobs now set HOME to `/root`, and
+    `test/structure-contract.test.mjs` holds every job in the image to it.
+  - **F59**, found by the same run. The document check looked for a file on disk, so a
+    built checkout passed three references that CI's clean one failed: they name
+    `.next/`, `node_modules/` and `.autom8x/`, which exist only after an install or a build.
+    A path is now found in what git sees: tracked files, and untracked ones it does not
+    ignore (the facts file's basis). A path git ignores is a build output and is reported
+    as not checked. `test/doc-references.test.mjs` plants one on disk and one not, and both
+    are not checked.
+  - **F62**, found by this PR's Vercel preview, which failed while CI was green. Round
+    14's settings page read the person's role before it had a session. A Vercel preview
+    builds with no `BACKEND_API_ORIGIN`, so that read threw while the page was
+    prerendered, and the build failed. CI builds with the origin set: the page reads its
+    cookies first, so it is never prerendered and CI could not see the failure.
+    Reproduced by `npm run build` with the origin unset: `main` passes, and the round's
+    tree fails on `/account/settings`. The cause was in `lib/platform-server.ts`: a
+    server read asked for the origin before it read the request's cookies, and reading
+    them is what makes a page dynamic. Cookies are read first now, so no page is
+    prerendered around a platform read, with or without a backend
+    (`test/session-contract.test.mjs`). The settings page also reads the role only with
+    a session, as it reads the workspace list (`test/tenancy-contract.test.mjs`).
+    `npm run build:no-backend` builds as a preview
+    does. It runs in `npm run verify`, in the change audit, and in CI's own
+    `build-no-backend` job, and `test/structure-contract.test.mjs` holds that job.
+- **Found by this round's change audit, open for the next round** (its verdict PASS; these
+  did not block it):
+  - **F60**: a session that ends while a page loads is told it was not signed out. The home
+    page sends a figure's 401 to the account boundary on purpose (`figure()` in
+    `app/account/page.tsx`), and the boundary (`components/dashboard/PlatformUnavailable.tsx`)
+    says "You have not been signed out, and nothing was lost." That is untrue for a 401.
+  - **F61**: the shared preflight cannot see the one server it exists to catch. It asks
+    `lsof` for a listener on 3001 and 3443, and lsof 4.95 reports nothing for the process
+    Next renames `next-server (v16.3.3)`; `lsof -p` on it is empty too. Observed: a
+    standalone server answering 200 on 127.0.0.1:3001 while
+    `lsof -nP -iTCP:3001 -sTCP:LISTEN` exited 1, and a plain Node listener on 3443
+    reported. The browser gates still refuse a stale server, because they run with
+    `CI=1`, which turns off `reuseExistingServer`. Binding each port would ask the
+    question directly.
+  - **F63**: the change audit's evidence file cannot show the browser suites' counts.
+    `scripts/audit/run-gates.mjs` keeps the last 30 lines of stdout, then stderr. For the
+    browser gates that is the web server's stderr, so the Playwright summary is cut off,
+    and the evidence records only exit codes and durations.
+  - **27 surfaces the change audit probed in a browser and no test asserts.** Each probe
+    passed; each is a test to write. A static test that reads the source does not count
+    as covering an interaction:
+    1. the home's recent-run link opens the run;
+    2. recent activity when the runs read fails, and in an empty workspace;
+    3. a figure's 401 goes to the boundary, the navigation stays, Try again recovers (F60);
+    4. the sidebar's Teams link, and Teams and Organization hidden in a personal workspace;
+    5. the small-screen title of every account page, and the menu's Teams link;
+    6. the unavailable panel's wait, in the account area and in onboarding;
+    7. `/contact`'s 429 wait, and a problem with no usable title;
+    8. the sign-in returns for a join link, setup-org, projects and a team's page;
+    9. the builder's sign-in link and the `?id=` redirect's 307;
+    10. the focus ring on the 21 controls F44 touched;
+    11. Delete Account's danger colours and focus ring (F43);
+    12. a 409 after a lost answer, then a 401 (F47);
+    13. Disconnect, then the provider offers Connect;
+    14. Replace answered `reused` names the account the platform answered with. The
+        platform never gives that answer to a replace, so this is the defensive branch,
+        held today by a static test;
+    15. an unmet connection's link, the version notice and a disabled Go live;
+    16. Cancel on a run another tab already stopped;
+    17. Approvals: the empty state, a decision, and a member offered none;
+    18. billing's 503;
+    19. a team project refused after another tab switched workspace;
+    20. the Teams pages' remaining states: personal, an unknown team, no teams, a plain
+        member, Back;
+    21. a team's member form refused after a switch;
+    22. `app/error.tsx` and its Try again;
+    23. `app/global-error.tsx`, which nothing in this tree can trigger, so it needs a build
+        or a unit render that can;
+    24. `GET /api/session` answers 404;
+    25. `GET /api/ready` keeps its 503;
+    26. the workspace list read once per request, counted at the fixture;
+    27. "A team you are not on", and a project's owner who is a plain member with no
+        team to offer.
+
+**The change review's ten findings** (`/code-review`, high, on `c974177`). Eight were fixed,
+each with a test that was run red against the old code. One was accepted with a reason, and
+one is the backend's:
+
+1. **Fixed.** One failed read took the whole home page with it. The dashboard's lists were
+   wrapped in `emptyWhenUnavailable`, which absorbs only a site with no backend, so a 404,
+   429 or 503 from any of them rethrew. Each figure now stands alone: a figure the platform
+   refuses reads "Unavailable", and recent activity says it could not be read. A session
+   that ended still goes to the boundary. e2e: "a figure the platform cannot answer reads
+   Unavailable …".
+2. **Fixed.** The fixture's team rules were not the platform's. A team grant is now judged on
+   the person's project role, as `requireEffectiveProjectRole` judges it: no role is 404,
+   and a grant needs owner or admin. A non-manager asking for a team's members is 403. e2e:
+   "anyone on a project reads the teams granted to it, and only its owner or admin is
+   offered the grant".
+3. **The backend's.** A project's owner who is a plain member of the organization sees only
+   their own teams. `listTeams` shows everyone else only the teams they are on, while
+   `grantProjectTeam` accepts any active team. So no operation lists the teams they may
+   grant. Filed for `snoopy-backend` as SYSTEM-MANIFEST §12.1 #176 at this round's close.
+   Until then the page says which teams can be offered.
+4. **Fixed.** The authenticated accessibility scan named the fixture's own records. Those
+   pages are now scanned against the fixture only. Every scanned page must now answer 200
+   at the address asked for. A not-found page keeps the address and renders its text
+   only once it is hydrated, so the first version of this check read the text. It
+   passed in a fast run and failed under tracing. The status is what the check reads
+   now.
+5. **Fixed.** Cancel acted on the active workspace, not the workspace the page showed. After
+   a switch in another tab, the 404 read as "already stopped" while the run went on. Cancel
+   and billing now share one guard, `activeWorkspaceIfShown`. e2e: "Cancel on a run whose
+   workspace was switched away in another tab …".
+6. **Accepted.** The home reads the catalog and a page of runs. The catalog is what names a
+   recent run, as Activity names it, and each read now degrades on its own (finding 1).
+7. **Fixed.** Join-org's sign-in return dropped `?w=`, so a person came back to create an
+   organization instead of joining one. `test/structure-contract.test.mjs`.
+8. **Fixed.** The organization page labelled every admin "Member". The badge is now the role
+   the platform holds. e2e: "an admin reaches the organization page …".
+9. **Fixed.** The hex rule's comment stripper was a regular expression, wrong both ways: a
+   `/*` in a glob string hid a real colour, and `href="#add"` failed as one.
+   `audit:boundaries` now parses each script with TypeScript and reads its string
+   literals, template text and JSX text, never an `href`. CSS drops only `/* */`.
+   `test/boundaries-contract.test.mjs` plants each case.
+10. **Fixed.** Replace account read a `reused` answer as a failure. It now says the account is
+    already connected. `test/structure-contract.test.mjs`.
+
+**The second change review** (`/code-review`, high, on `9854232`, `ca777bf` and
+`ec52e15`, the commits after `c974177`) found nine things. Five are fixed, each with a
+test that was run red against the old code. Four are accepted, each with its reason:
+
+1. **Fixed.** Both repositories' document checks ran only when their own URL equalled
+   `file://` plus the path they were started from. A URL percent-encodes a space, and the
+   owner's checkouts live under `Business Infra/`, so there the check never ran and exited
+   0: a silent pass. It now compares paths. `test/doc-references.test.mjs` runs it from a
+   folder with a space.
+2. **Fixed.** The check read only tracked documents, but looked files up among untracked
+   ones too, and counted a file deleted on disk as present. The documents and the files
+   are now one view: what git sees, less what is deleted. The same test plants an
+   untracked document and a deleted file.
+3. **Fixed.** Replace, answered `reused`, named the row's account rather than the one the
+   platform answered with. The platform never reuses a grant it was asked to replace
+   (`snoopy-backend/apps/connections/src/postgres-attempts.ts`), so no fixture gives this
+   answer. A static test holds the name (`test/structure-contract.test.mjs`), and the
+   interaction stays on the list of surfaces to test.
+4. **Fixed.** On a team project in an organization with no team yet, its owner was told
+   they could give access to "the teams you are on", and that owners and admins see every
+   team. That was true, and no help. They are now told the organization has no teams yet,
+   with a link to the Teams page. e2e: "an organization with no team yet tells its owner
+   where teams are made …".
+5. **Fixed.** The fixture's created projects had nine characters in their id's first
+   group from the tenth on; now always eight. The finding's other half, that a plain
+   member may create a project, is the platform's own rule (`requireWorkspaceMembership`),
+   so the fixture keeps it.
+6. **Accepted.** Only `snoopy-backend/…` and `../snoopy-backend/…` name the platform, so a
+   deeper relative link or a root-absolute one reads as missing. The check fails closed,
+   so such a form cannot pass unnoticed, and no document uses one.
+7. **Accepted.** `figure()` on the home page is a third degradation helper. On a site with
+   no backend it reads "Unavailable" where the lists' helpers read empty. It is meant to
+   differ, because a figure the platform refuses is not zero. And on a site with no
+   backend the account area is not reachable: the layout finds no session and sends the
+   person to sign in.
+8. **Accepted.** `audit:boundaries` still refuses a fragment that reads as a colour outside
+   an `href` (`router.push("#add")`, `querySelector("#cafe")`). None exists, and the rule
+   fails closed: one would be reported by file and line.
+9. **Accepted.** A team grant resolves its project through `findAccessibleProject`: one
+   read of the workspaces, and one of each workspace's projects. Every project action
+   resolves its project that way. A grant is an owner's or admin's occasional act, far
+   inside a person's 120 requests a minute.
+
+**`/security-review`** on 22.3.1, 22.3.3, 22.5.3 and 22.5.4, and on the rest of the diff:
+no finding at the bar. The website's server holds no platform credential and sends the
+browser's own cookies and Origin, so the Edge makes every decision. Its one functional note
+is fixed here:
+- A team grant posted to the active workspace, while a project's page can show a project
+  from another workspace. The grant now resolves the project's workspace on the server,
+  as every project action does.
+- The same pass put Create team and a team's member control behind the shared guard, so
+  a stale tab cannot create a team in another organization.
+- e2e: "Create team on a page whose workspace was switched away …" and "a grant on a
+  project from a workspace that is not the active one …".
+
+**Numbering.** F35 was never assigned; F11, F19 and F36 were closed or withdrawn as recorded
+above. F55 to F63 are new here, and no number is reused.

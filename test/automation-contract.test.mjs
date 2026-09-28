@@ -309,17 +309,20 @@ test("the website never sends a field the server refuses", () => {
   }
 });
 
-test("automation actions consume generated operation response types", () => {
+test("automation mutations consume generated operation response types", () => {
+  // The mutations live in the facade, where every id in a path is encoded
+  // (register F9); the actions decide what to send and what a refusal means.
   for (const type of [
     "CreateSubscriptionResponse",
     "UpdateSubscriptionResponse",
     "DecideApprovalResponse",
     "CreateRunResponse",
+    "CancelRunResponse",
   ]) {
     assert.match(
-      actions,
+      client,
       new RegExp(`platformServerJson<${type}>`),
-      `automation action must use ${type}`,
+      `the automations facade must use ${type}`,
     );
   }
   for (const type of [
@@ -335,9 +338,34 @@ test("automation actions consume generated operation response types", () => {
     );
   }
   assert.doesNotMatch(
-    actions,
+    client,
     /platformServerJson<\{\s*(?:subscription|run|approval):/,
-    "automation actions must not recreate generated response shapes",
+    "the facade must not recreate generated response shapes",
+  );
+});
+
+test("an action builds no platform path — every id reaches the Edge encoded (register F9)", () => {
+  // The facades build every workspace-scoped path through `workspacePath` and
+  // encode each id they append; an action that built its own path is how a
+  // form-supplied id went into a URL unencoded.
+  assert.doesNotMatch(actions, /platformServerJson|\/v1\//u);
+  for (const [id, pattern] of [
+    [
+      "subscriptionId",
+      /\/subscriptions\/\$\{encodeURIComponent\(subscriptionId\)\}/u,
+    ],
+    ["runId", /\/runs\/\$\{encodeURIComponent\(runId\)\}\/cancel/u],
+    [
+      "approvalId",
+      /\/approvals\/\$\{encodeURIComponent\(approvalId\)\}\/decision/u,
+    ],
+  ]) {
+    assert.match(client, pattern, `${id} is encoded where the path is built`);
+  }
+  assert.match(
+    platformServer,
+    /export function workspacePath\(workspaceId: string\): string \{\s*return `\/v1\/workspaces\/\$\{encodeURIComponent\(workspaceId\)\}`;/u,
+    "the workspace segment is encoded in one place",
   );
 });
 
@@ -371,7 +399,7 @@ test("a manual run is started only from the pinned version's declared input — 
   );
   assert.doesNotMatch(actions, /JSON\.parse/u, "no action accepts raw JSON");
   // Offered only when it can be honest: live, available, and declared.
-  assert.match(actionsUi, /subscription\?\.status === "live"/);
+  assert.match(actionsUi, /subscription\.status === "live"/);
   assert.match(actionsUi, /subscription\.runInput\?\.length \?\? 0\) > 0/);
   assert.match(
     actionsUi,
@@ -414,4 +442,87 @@ test("archiving is its own confirmed action, and the generic status action canno
   assert.match(actionsUi, /archiveSubscription\(/);
   assert.match(actionsUi, /This cannot be\s+undone/u);
   assert.match(actionsUi, /gives its plan slot back/);
+});
+
+test("a card lists every subscription it has, each under its own scope (register F21)", () => {
+  // One automation can hold a subscription per project (backend 18.6.2). Keyed
+  // by template alone, the last-written — the OLDEST, in a newest-first list —
+  // hid the rest.
+  assert.doesNotMatch(
+    page,
+    /new Map<string, Subscription>\(/u,
+    "no one-subscription-per-template map",
+  );
+  assert.match(
+    page,
+    /const byTemplate = new Map<string, Subscription\[\]>\(\);/u,
+  );
+  assert.match(page, /subscriptions\.map\(\(subscription\) => \(/u);
+  assert.match(page, /subscription\.projectId\s*\?\s*`Project: /u);
+  // Adding offers only the scopes not yet taken, and can name a project.
+  assert.match(
+    page,
+    /const taken = new Set\(subscriptions\.map\(\(entry\) => entry\.projectId \?\? null\)\);/u,
+  );
+  assert.match(actions, /projectId \? \{ projectId \} : \{\}/u);
+});
+
+test("a notifications toggle says what it switches, in words (register F22)", () => {
+  assert.match(
+    fields,
+    /const NOTIFIES: Record<\s*NonNullable<AutomationSetupField\["notifies"\]>,\s*string\s*> = \{/u,
+    "keyed by the generated enum, so a new value cannot render as its token",
+  );
+  assert.doesNotMatch(
+    fields,
+    /\{field\.notifies\}/u,
+    "the wire token is not rendered",
+  );
+  assert.match(
+    fields,
+    /Controls the notification sent when \{NOTIFIES\[field\.notifies\]\}/u,
+  );
+});
+
+test("a run that can still stop offers Cancel, and nothing else does (cancelRun)", () => {
+  const runPage = readFileSync(
+    resolve(import.meta.dirname, "../app/account/runs/[runId]/page.tsx"),
+    "utf8",
+  );
+  assert.match(
+    runPage,
+    /run\.status === "pending" \|\| run\.status === "running" \? \(\s*<div className="mt-4">\s*<CancelRunButton runId=\{run\.id\} workspaceId=\{run\.workspaceId\} \/>/u,
+  );
+  // The run the page showed, in the workspace it showed: after a switch in
+  // another tab the same id would 404 elsewhere and read as "already stopped".
+  assert.match(
+    actions,
+    /const workspaceId = await activeWorkspaceIfShown\(shownWorkspaceId\);\s*if \(!workspaceId\) return \{ ok: false, error: WORKSPACE_CHANGED \};\s*await cancelWorkspaceRun\(workspaceId, runId\);/u,
+  );
+  assert.match(
+    actions,
+    /export async function cancelRun\(formData: FormData\)/u,
+  );
+  assert.match(
+    actions,
+    /error\.status === 404\) \{\s*return \{\s*ok: false,\s*error: "This run has already stopped, so there is nothing to cancel\.",/u,
+  );
+});
+
+test("the account home shows the workspace's own numbers, not fixed zeros (register F54)", () => {
+  const home = readFileSync(
+    resolve(import.meta.dirname, "../app/account/page.tsx"),
+    "utf8",
+  );
+  assert.doesNotMatch(home, /<dd className="text-\[var\(--text\)\]">0<\/dd>/u);
+  assert.match(
+    home,
+    /readRunStats\(workspaceId, startOfMonthUtc\(new Date\(\)\)\)/u,
+  );
+  assert.match(client, /\/run-stats\$\{query\}/u);
+  assert.doesNotMatch(
+    home,
+    /href="\/solutions"|href="\/account\/settings"/u,
+    "the home's links go to the account's own automations and connections",
+  );
 });

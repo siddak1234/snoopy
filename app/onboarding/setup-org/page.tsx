@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
+import { loginHref } from "@/lib/platform-api";
 import { extractDomain } from "@/lib/domain-utils";
 import { SetupOrgForm } from "./SetupOrgForm";
 
@@ -9,7 +10,7 @@ export default async function SetupOrgPage() {
   const session = await getAppSession();
 
   // Layout handles the unauthenticated case, but we need the email here.
-  if (!session?.user.email) redirect("/login");
+  if (!session?.user.email) redirect(loginHref("/onboarding/setup-org"));
 
   const domain = extractDomain(session.user.email);
 

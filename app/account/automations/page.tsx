@@ -8,9 +8,15 @@ import {
   type Subscription,
 } from "@/lib/automations";
 import SectionCard from "@/components/dashboard/SectionCard";
+import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { AutomationActions } from "./AutomationActions";
-import { resolveActiveWorkspaceId } from "@/lib/tenancy";
+import { AddAutomation, type AddScope } from "./AddAutomation";
+import {
+  listWorkspaceProjects,
+  resolveActiveWorkspaceId,
+  type Project,
+} from "@/lib/tenancy";
 
 /**
  * The catalog, and what this workspace has done with it.
@@ -19,6 +25,13 @@ import { resolveActiveWorkspaceId } from "@/lib/tenancy";
  * global and says whether a workspace `subscribed`, while the subscription row
  * holds the status, the pinned version, and any unmet connections. Joining them
  * here is what lets one card show both "Added" and "Live".
+ *
+ * **One automation can hold a subscription per project** (backend 18.6.2): the
+ * workspace-wide one and one for each project it was added to, each visible
+ * only to the people who can see its project — the platform filters the list.
+ * So a card lists every subscription it has, each under its own scope, rather
+ * than one per template, which showed the oldest and hid the rest (register
+ * F21).
  */
 
 export const dynamic = "force-dynamic";
@@ -38,7 +51,7 @@ export default async function AutomationsPage() {
     );
   }
 
-  const [catalog, subscriptions] = await Promise.all([
+  const [catalog, subscriptions, projects] = await Promise.all([
     emptyWhenUnavailable(() => listAutomations(workspaceId), {
       automations: [],
       categories: [],
@@ -46,16 +59,23 @@ export default async function AutomationsPage() {
     emptyWhenUnavailable(() => listSubscriptions(workspaceId), {
       subscriptions: [],
     }),
+    emptyWhenUnavailable(() => listWorkspaceProjects(workspaceId), []),
   ]);
 
   // Archiving is one-way and is how a workspace gives a plan slot back; using
   // that automation again means subscribing afresh. The list's contract does not
-  // promise to omit archived rows, so one is treated as absent here: the card
-  // then offers Add rather than Pause or Go live.
-  const byTemplate = new Map<string, Subscription>(
-    subscriptions.subscriptions
-      .filter((entry) => entry.status !== "archived")
-      .map((entry) => [entry.templateId, entry]),
+  // promise to omit archived rows, so one is treated as absent here: its scope
+  // is then offered to Add again.
+  const byTemplate = new Map<string, Subscription[]>();
+  for (const entry of subscriptions.subscriptions) {
+    if (entry.status === "archived") continue;
+    byTemplate.set(entry.templateId, [
+      ...(byTemplate.get(entry.templateId) ?? []),
+      entry,
+    ]);
+  }
+  const openProjects = projects.filter(
+    (project) => project.status !== "archived",
   );
 
   return (
@@ -71,7 +91,8 @@ export default async function AutomationsPage() {
             <AutomationCard
               key={`${automation.templateId}.v${automation.version}`}
               automation={automation}
-              subscription={byTemplate.get(automation.templateId)}
+              subscriptions={byTemplate.get(automation.templateId) ?? []}
+              projects={openProjects}
             />
           ))}
         </div>
@@ -82,11 +103,29 @@ export default async function AutomationsPage() {
 
 function AutomationCard({
   automation,
-  subscription,
+  subscriptions,
+  projects,
 }: {
   automation: AutomationCatalogEntry;
-  subscription: Subscription | undefined;
+  subscriptions: Subscription[];
+  projects: Project[];
 }) {
+  const projectName = new Map(
+    projects.map((project) => [project.id, project.name]),
+  );
+  // Only the scopes this automation is not in yet: the platform holds one live
+  // subscription per template and project, the whole workspace included.
+  const taken = new Set(subscriptions.map((entry) => entry.projectId ?? null));
+  const scopes: AddScope[] = [
+    ...(taken.has(null) ? [] : [{ projectId: null, label: "Whole workspace" }]),
+    ...projects
+      .filter((project) => !taken.has(project.id))
+      .map((project) => ({
+        projectId: project.id,
+        label: `Project: ${project.name}`,
+      })),
+  ];
+
   return (
     <div className="bubble flex flex-col gap-3 p-5">
       <div className="flex items-start justify-between gap-3">
@@ -98,7 +137,6 @@ function AutomationCard({
             {automation.name}
           </h2>
         </div>
-        {subscription ? <StatusPill status={subscription.status} /> : null}
       </div>
 
       <p className="text-sm text-[var(--muted)]">{automation.description}</p>
@@ -126,57 +164,69 @@ function AutomationCard({
         </p>
       ) : null}
 
-      {subscription && subscription.unmetConnections.length > 0 ? (
-        <p className="text-xs text-[var(--warning-text)]">
-          <Link
-            prefetch={false}
-            href="/account/connections"
-            className="underline underline-offset-2"
-          >
-            Connect {subscription.unmetConnections.join(", ")}
-          </Link>{" "}
-          before going live.
-        </p>
-      ) : null}
+      {subscriptions.map((subscription) => (
+        <div
+          key={subscription.id}
+          className="flex flex-col gap-2 border-t border-[var(--ring)] pt-3"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-[var(--muted)]">
+              {subscription.projectId
+                ? `Project: ${projectName.get(subscription.projectId) ?? "a project"}`
+                : "Whole workspace"}
+            </p>
+            <StatusPill status={subscription.status} />
+          </div>
 
-      {/* A subscription runs the version it PINNED (backend ADR-0030), and adding
-          an automation pins the newest. The catalog does not say what a newer
-          version declares, so the card says only which version runs and how to
-          move — never that moving gives a Run. */}
-      {subscription && subscription.templateVersion < automation.version ? (
-        <p className="text-xs text-[var(--muted)]">
-          This runs v{subscription.templateVersion}. To move to v
-          {automation.version}, archive it and add it again.
-        </p>
-      ) : null}
+          {subscription.unmetConnections.length > 0 ? (
+            <p className="text-xs text-[var(--warning-text)]">
+              <Link
+                prefetch={false}
+                href="/account/connections"
+                className="underline underline-offset-2"
+              >
+                Connect {subscription.unmetConnections.join(", ")}
+              </Link>{" "}
+              before going live.
+            </p>
+          ) : null}
 
-      <AutomationActions
-        templateId={automation.templateId}
-        name={automation.name}
-        available={automation.available}
-        setup={automation.setup}
-        subscription={
-          subscription
-            ? {
-                id: subscription.id,
-                status: subscription.status,
-                canGoLive: subscription.unmetConnections.length === 0,
-                config: subscription.config,
-                ...(subscription.runInput
-                  ? { runInput: subscription.runInput }
-                  : {}),
-              }
-            : null
-        }
-      />
-    </div>
-  );
-}
+          {/* A subscription runs the version it PINNED (backend ADR-0030), and
+              adding an automation pins the newest. The catalog does not say what
+              a newer version declares, so the card says only which version runs
+              and how to move — never that moving gives a Run. */}
+          {subscription.templateVersion < automation.version ? (
+            <p className="text-xs text-[var(--muted)]">
+              This runs v{subscription.templateVersion}. To move to v
+              {automation.version}, archive it and add it again.
+            </p>
+          ) : null}
 
-function EmptyRow({ text }: { text: string }) {
-  return (
-    <div className="py-5 first:pt-0">
-      <p className="text-sm text-[var(--muted)]">{text}</p>
+          <AutomationActions
+            name={automation.name}
+            available={automation.available}
+            setup={automation.setup}
+            subscription={{
+              id: subscription.id,
+              status: subscription.status,
+              canGoLive: subscription.unmetConnections.length === 0,
+              config: subscription.config,
+              ...(subscription.runInput
+                ? { runInput: subscription.runInput }
+                : {}),
+            }}
+          />
+        </div>
+      ))}
+
+      <div className="mt-auto">
+        <AddAutomation
+          templateId={automation.templateId}
+          name={automation.name}
+          available={automation.available}
+          scopes={scopes}
+        />
+      </div>
     </div>
   );
 }

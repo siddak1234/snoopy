@@ -122,7 +122,7 @@ export function WorkspaceSwitcher({
         aria-label="Switch workspace"
         aria-expanded={open}
         aria-controls="workspace-switcher-menu"
-        className="flex h-10 max-w-[14rem] items-center gap-1.5 rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
+        className="flex h-10 max-w-[14rem] items-center gap-1.5 rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
       >
         <span className="truncate">{active?.name ?? "Workspace"}</span>
         <svg

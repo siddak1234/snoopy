@@ -4,12 +4,14 @@ import { revalidatePath } from "next/cache";
 import { getAppSession } from "@/lib/app-session";
 import { PlatformServerError } from "@/lib/platform-server";
 import {
+  activeWorkspaceIfShown,
   createProject,
   findAccessibleProject,
   listWorkspaces,
   removeProjectMembership,
   updateProject,
   upsertProjectMembership,
+  WORKSPACE_CHANGED,
   type ProjectRole,
 } from "@/lib/tenancy";
 
@@ -53,18 +55,30 @@ export async function createProjectAction(
       return { ok: false, error: "You must be signed in to create a project." };
     }
     const workspaces = await listWorkspaces();
-    const workspace = workspaces.find(
-      (candidate) =>
-        candidate.type === (scope === "personal" ? "personal" : "organization"),
+    let workspace = workspaces.find(
+      (candidate) => candidate.type === "personal",
     );
+    if (scope === "team") {
+      // The organization the dialog named, while it is still the active one —
+      // never the first organization on the list, which for a person in two put
+      // the project in whichever the platform listed first (register F57).
+      const workspaceId = await activeWorkspaceIfShown(
+        String(formData.get("workspaceId") ?? ""),
+      );
+      if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+      workspace = workspaces.find(
+        (candidate) =>
+          candidate.id === workspaceId && candidate.type === "organization",
+      );
+      if (!workspace) {
+        return {
+          ok: false,
+          error: "Switch to your organization to create a team project in it.",
+        };
+      }
+    }
     if (!workspace) {
-      return {
-        ok: false,
-        error:
-          scope === "team"
-            ? "Join an organization to create a team project."
-            : "No personal workspace is available.",
-      };
+      return { ok: false, error: "No personal workspace is available." };
     }
     const description = formData.get("description");
     const project = await createProject(workspace.id, {

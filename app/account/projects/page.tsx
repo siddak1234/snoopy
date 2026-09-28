@@ -1,6 +1,11 @@
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
-import { listAccessibleProjects } from "@/lib/tenancy";
+import { loginHref } from "@/lib/platform-api";
+import {
+  listAccessibleProjects,
+  listWorkspaces,
+  resolveActiveWorkspaceId,
+} from "@/lib/tenancy";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { ProjectList } from "@/components/dashboard/ProjectList";
 import type { ProjectListItem } from "@/components/dashboard/ProjectList";
@@ -8,9 +13,13 @@ import { CreateProjectButton } from "@/components/dashboard/CreateProjectButton"
 
 export default async function AccountProjectsPage() {
   const session = await getAppSession();
-  if (!session) redirect("/login?callbackUrl=/account/projects");
+  if (!session) redirect(loginHref("/account/projects"));
 
-  const accessible = await listAccessibleProjects();
+  const [accessible, workspaces, activeWorkspaceId] = await Promise.all([
+    listAccessibleProjects(),
+    listWorkspaces(),
+    resolveActiveWorkspaceId(session),
+  ]);
   const items = accessible
     .filter(({ project }) => project.status !== "archived")
     .map<ProjectListItem>(({ workspace, project }) => ({
@@ -30,8 +39,19 @@ export default async function AccountProjectsPage() {
       return map;
     }, new Map<string, { workspaceName: string; workspaceType: "personal" | "organization"; items: ProjectListItem[] }>()),
   );
-  const hasOrg = accessible.some(
-    ({ workspace }) => workspace.type === "organization",
+  // A team project goes to the organization the person is working in — the
+  // active workspace — whether or not it holds a project yet. Read from the
+  // projects, a new organization had none, so it could never create its first
+  // (register F57).
+  const active = workspaces.find(
+    (workspace) => workspace.id === activeWorkspaceId,
+  );
+  const teamWorkspace =
+    active?.type === "organization"
+      ? { id: active.id, name: active.name }
+      : null;
+  const inOrganization = workspaces.some(
+    (workspace) => workspace.type === "organization",
   );
 
   return (
@@ -44,7 +64,10 @@ export default async function AccountProjectsPage() {
       }
     >
       <div className="flex flex-wrap items-center justify-end gap-2 py-3 first:pt-0">
-        <CreateProjectButton hasOrg={hasOrg} />
+        <CreateProjectButton
+          teamWorkspace={teamWorkspace}
+          inOrganization={inOrganization}
+        />
       </div>
 
       {groups.length === 0 ? (

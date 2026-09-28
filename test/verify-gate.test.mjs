@@ -18,6 +18,20 @@ const recordPass = readFileSync(
   resolve(import.meta.dirname, "../scripts/audit/record-pass.mjs"),
   "utf8",
 );
+const runGates = readFileSync(
+  resolve(import.meta.dirname, "../scripts/audit/run-gates.mjs"),
+  "utf8",
+);
+const shared = readFileSync(
+  resolve(import.meta.dirname, "../scripts/audit/preflight.mjs"),
+  "utf8",
+);
+
+/** The gate names a runner's list declares, in order. */
+function gateNames(source, from, to) {
+  const block = source.slice(source.indexOf(from), source.indexOf(to));
+  return [...block.matchAll(/name: "([^"]+)"/gu)].map((match) => match[1]);
+}
 
 test("verify runs every gate the change audit records", () => {
   // record-pass.mjs is the marker writer, and its FULL_GATES is the list a PASS
@@ -70,8 +84,78 @@ test("verify pins the build origin, defeats server reuse, and asserts the gatewa
   assert.match(verify, /name: "build",[\s\S]{0,120}BACKEND_API_ORIGIN/u);
   assert.match(verify, /name: "test:browser",[\s\S]{0,240}CI: "1"/u);
   assert.match(verify, /name: "test:browser",[\s\S]{0,240}BACKEND_API_ORIGIN/u);
-  assert.match(verify, /routes-manifest\.json/u);
-  assert.match(verify, /startsWith\("\/api\/platform"\)/u);
+  assert.match(
+    verify,
+    /name: "build",[\s\S]{0,160}after: \(\) => assertPlatformRewrite\(root\)/u,
+  );
+  assert.match(shared, /routes-manifest\.json/u);
+  assert.match(shared, /startsWith\("\/api\/platform"\)/u);
+});
+
+test("verify and the change audit share one preflight, one lock and one rewrite check (register F24)", () => {
+  assert.match(
+    verify,
+    /import \{ assertPlatformRewrite, preflight \} from "\.\/audit\/preflight\.mjs";/u,
+  );
+  assert.match(
+    runGates,
+    /import \{ assertPlatformRewrite, preflight \} from "\.\/preflight\.mjs";/u,
+  );
+  for (const [name, source] of [
+    ["verify.mjs", verify],
+    ["run-gates.mjs", runGates],
+  ]) {
+    assert.match(source, /preflight\(\{ root, fail \}\);/u, name);
+    // No private copy of what the module holds.
+    assert.doesNotMatch(
+      source,
+      /"\* 2\.\*"/u,
+      `${name} checks conflict copies itself`,
+    );
+    assert.doesNotMatch(source, /lsof/u, `${name} checks listeners itself`);
+    assert.doesNotMatch(
+      source,
+      /lockPath|process\.kill\(/u,
+      `${name} takes a lock itself`,
+    );
+    assert.doesNotMatch(source, /function assertPlatformRewrite/u, name);
+  }
+});
+
+test("the lock is taken atomically, and an empty or garbled lock is never live (register F25)", () => {
+  assert.match(
+    shared,
+    /writeFileSync\(lockPath, String\(process\.pid\), \{ flag: "wx" \}\)/u,
+  );
+  assert.match(shared, /Number\.isInteger\(pid\) && pid > 0/u);
+  assert.doesNotMatch(
+    shared,
+    /existsSync\(lockPath\)/u,
+    "check-then-write is the race F25 names",
+  );
+});
+
+test("the change audit runs verify's gates, in verify's order, and the marker requires them all (register F15)", () => {
+  const verifyGates = gateNames(
+    verify,
+    "const gates = [",
+    "console.log(`verify: node",
+  );
+  const auditGates = gateNames(
+    runGates,
+    "const fullGates = [",
+    "const docsGates = [",
+  );
+  assert.deepEqual(auditGates, verifyGates);
+  const declared = /const FULL_GATES = \[([^\]]+)\]/u.exec(recordPass);
+  assert.ok(
+    declared,
+    "record-pass.mjs no longer declares FULL_GATES as a literal",
+  );
+  assert.deepEqual(
+    [...declared[1].matchAll(/"([^"]+)"/gu)].map((match) => match[1]),
+    auditGates,
+  );
 });
 
 test("verify emits the facts file only after the last gate", () => {

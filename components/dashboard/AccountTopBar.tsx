@@ -29,7 +29,7 @@ export function AccountTopBar({
         prefetch={false}
         href="/"
         aria-label="Autom8x home"
-        className="flex items-center rounded-full text-[var(--color-text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
+        className="flex items-center rounded-full text-[var(--color-text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
       >
         <LogoMark height={22} />
       </Link>

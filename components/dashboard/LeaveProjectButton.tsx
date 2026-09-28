@@ -57,7 +57,7 @@ export function LeaveProjectButton({
         type="button"
         onClick={onOpen}
         disabled={pending}
-        className="shrink-0 rounded-lg px-2 py-1.5 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none dark:hover:bg-[var(--surface-hover)]"
+        className="shrink-0 rounded-lg px-2 py-1.5 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] dark:hover:bg-[var(--surface-hover)]"
       >
         {pending ? "Leaving…" : "Leave project"}
       </button>

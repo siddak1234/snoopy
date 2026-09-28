@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { getAppSession } from "@/lib/app-session";
-import { listWorkspaces, resolveActiveWorkspaceId } from "@/lib/tenancy";
+import { resolveActiveWorkspaceId, roleInWorkspace } from "@/lib/tenancy";
 import {
   emptyWhenUnavailable,
   listApprovals,
   type Approval,
 } from "@/lib/automations";
 import SectionCard from "@/components/dashboard/SectionCard";
+import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { ApprovalDecision } from "./ApprovalDecision";
 
@@ -22,14 +23,13 @@ export const dynamic = "force-dynamic";
 
 export default async function ApprovalsPage() {
   const session = await getAppSession();
-  const workspaces = session ? await listWorkspaces() : [];
   const workspaceId = await resolveActiveWorkspaceId(session);
-  const role = workspaces.find((w) => w.id === workspaceId)?.role;
+  const role = await roleInWorkspace(workspaceId);
 
   if (!workspaceId) {
     return (
       <SectionCard title="Approvals" subheader="Runs waiting on a decision">
-        <Empty text="No workspace is active yet." />
+        <EmptyRow text="No workspace is active yet." />
       </SectionCard>
     );
   }
@@ -42,7 +42,7 @@ export default async function ApprovalsPage() {
   return (
     <SectionCard title="Approvals" subheader="Runs waiting on a decision">
       {pending.approvals.length === 0 ? (
-        <Empty text="Nothing is waiting on you." />
+        <EmptyRow text="Nothing is waiting on you." />
       ) : (
         pending.approvals.map((approval) => (
           <ApprovalRow
@@ -95,14 +95,6 @@ function ApprovalRow({
           Only {approval.eligibleRoles.join(" or ")} can decide this.
         </p>
       ) : null}
-    </div>
-  );
-}
-
-function Empty({ text }: { text: string }) {
-  return (
-    <div className="py-5 first:pt-0">
-      <p className="text-sm text-[var(--muted)]">{text}</p>
     </div>
   );
 }

@@ -493,9 +493,35 @@ html[data-theme="light"] .brand-mark {
   background: color-mix(in srgb, var(--color-accent) 18%, transparent);
 }
 
+/* The destructive action — deleting the account. The error tokens on a pill,
+   as the two deletion buttons carried inline before this class (register F43). */
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid var(--error-border-strong);
+  background: var(--error-bg);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+  color: var(--error-text);
+  transition: background 150ms ease;
+}
+
+.btn-danger:hover {
+  background: var(--error-bg-strong);
+}
+
+.btn-danger:focus-visible {
+  box-shadow: 0 0 0 2px var(--error-text);
+}
+
 .btn-primary:disabled,
 .btn-secondary:disabled,
-.btn-ghost:disabled {
+.btn-ghost:disabled,
+.btn-danger:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
@@ -673,7 +699,8 @@ html[data-theme="light"] .brand-mark {
   .bubble-soft,
   .interactive-card,
   .btn-primary,
-  .btn-secondary {
+  .btn-secondary,
+  .btn-danger {
     transition: none;
   }
 

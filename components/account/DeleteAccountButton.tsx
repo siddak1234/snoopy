@@ -9,6 +9,7 @@ import {
   loginHref,
   PlatformApiError,
   platformApiJson,
+  sessionEnded,
   signOutFromPlatform,
 } from "@/lib/platform-api";
 
@@ -31,6 +32,8 @@ const EXPIRED_COPY =
   "Your session ended, so this attempt did not run. Sign in again to come back here.";
 const EXPIRED_AFTER_UNKNOWN_COPY =
   "Your session ended, and your account may already have been removed by the earlier attempt. Sign in again to check.";
+const REFUSED_COPY =
+  "The platform refused this request, so your account was not deleted. Reload the page and try again; if it is refused again, contact support.";
 
 // What an attempt came to, with the words to show for it: a session that
 // ended, a refusal, or an answer that may have been lost. One value, so "Try
@@ -52,12 +55,16 @@ type Outcome = null | Settled;
 //   whatever stands between this page and the Edge: the standalone server's
 //   rewrite answers 500 when the Edge's answer is lost, a gateway 502 or 504.
 //   The account is never read as gone.
-// - Any other 4xx: a refusal, so the deletion did not run; the server's title.
+// - 429: the platform is busy; the deletion did not run, and the wait it
+//   stated is said.
+// - Any other 4xx: a refusal, so the deletion did not run. Said in words
+//   rather than as the Edge's generic title — "Forbidden" or "Request origin is
+//   not allowed" tells a person nothing they can act on (register F46).
 function outcomeFor(
   failure: PlatformApiError | null,
   anAttemptWasLost: boolean,
 ): Settled {
-  if (failure?.status === 401) {
+  if (sessionEnded(failure)) {
     return {
       kind: "expired",
       message: anAttemptWasLost ? EXPIRED_AFTER_UNKNOWN_COPY : EXPIRED_COPY,
@@ -69,7 +76,13 @@ function outcomeFor(
   if (!failure || failure.status >= 500) {
     return { kind: "unknown", message: UNKNOWN_COPY };
   }
-  return { kind: "failed", message: failure.message };
+  if (failure.status === 429) {
+    return {
+      kind: "failed",
+      message: `${failure.message} Your account was not deleted.`,
+    };
+  }
+  return { kind: "failed", message: REFUSED_COPY };
 }
 
 export default function DeleteAccountButton() {
@@ -109,6 +122,10 @@ export default function DeleteAccountButton() {
       const failure = caught instanceof PlatformApiError ? caught : null;
       const next = outcomeFor(failure, anAttemptWasLost.current);
       if (next.kind === "unknown") anAttemptWasLost.current = true;
+      // A 409 is the platform saying the account is still here: whatever the
+      // lost attempt did, it did not delete it, so a later 401 means only that
+      // the session ended — no hedge (register F47).
+      if (failure?.status === 409) anAttemptWasLost.current = false;
       setOutcome(next);
       setLoading(false);
       return;
@@ -120,7 +137,9 @@ export default function DeleteAccountButton() {
     } catch {
       /* the cookies are already cleared by the deletion */
     }
-    window.location.replace("/login?deleted=1");
+    // The page built to say so (register F2), not the sign-in page with a
+    // query parameter nothing read.
+    window.location.replace("/account-deleted");
   }
 
   function close() {
@@ -135,13 +154,9 @@ export default function DeleteAccountButton() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setConfirmOpen(true)}
-        className="rounded-full border border-[var(--error-border-strong)] bg-[var(--error-bg)] px-4 py-2 text-sm font-medium text-[var(--error-text)] transition hover:bg-[var(--error-bg-strong)] focus-visible:ring-2 focus-visible:ring-[var(--error-text)] focus-visible:outline-none"
-      >
+      <Button variant="danger" onClick={() => setConfirmOpen(true)}>
         Delete Account
-      </button>
+      </Button>
 
       {confirmOpen ? (
         <Modal onClose={close} ariaLabelledBy="delete-account-title" bubble>
@@ -174,19 +189,18 @@ export default function DeleteAccountButton() {
                 Sign in again
               </Button>
             ) : (
-              <button
+              <Button
                 ref={confirmRef}
-                type="button"
+                variant="danger"
                 onClick={handleConfirmDelete}
                 disabled={loading}
-                className="rounded-full border border-[var(--error-border-strong)] bg-[var(--error-bg)] px-4 py-2 text-sm font-medium text-[var(--error-text)] transition hover:bg-[var(--error-bg-strong)] focus-visible:ring-2 focus-visible:ring-[var(--error-text)] focus-visible:outline-none disabled:opacity-50"
               >
                 {loading
                   ? "Deleting…"
                   : outcome
                     ? "Try again"
                     : "Yes, delete my account"}
-              </button>
+              </Button>
             )}
             <button
               type="button"

@@ -1,4 +1,5 @@
 import SectionCard from "@/components/dashboard/SectionCard";
+import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { getAppSession } from "@/lib/app-session";
 import { formatWhen } from "@/lib/automations";
 import {
@@ -7,7 +8,11 @@ import {
   readWorkspaceBilling,
 } from "@/lib/billing";
 import { PlatformServerError } from "@/lib/platform-server";
-import { listWorkspaces, resolveActiveWorkspaceId } from "@/lib/tenancy";
+import {
+  administers,
+  resolveActiveWorkspaceId,
+  roleInWorkspace,
+} from "@/lib/tenancy";
 import { BillingPanel } from "./BillingPanel";
 
 /**
@@ -25,14 +30,13 @@ const REFUSED = "refused" as const;
 
 export default async function AccountBillingPage() {
   const session = await getAppSession();
-  const workspaces = session ? await listWorkspaces() : [];
   const workspaceId = await resolveActiveWorkspaceId(session);
-  const role = workspaces.find((w) => w.id === workspaceId)?.role;
+  const role = await roleInWorkspace(workspaceId);
 
   if (!workspaceId) {
     return (
       <SectionCard title="Billing">
-        <Empty text="No workspace is active yet." />
+        <EmptyRow text="No workspace is active yet." />
       </SectionCard>
     );
   }
@@ -40,10 +44,10 @@ export default async function AccountBillingPage() {
   // A plan, its dunning status and its renewal date are not a member's to see
   // (ADR-0025), so the read is not attempted for one: the gate is the page's,
   // the refusal would be the server's.
-  if (role !== "owner" && role !== "admin") {
+  if (!administers(role)) {
     return (
       <SectionCard title="Billing">
-        <Empty text="Billing is managed by the owners and admins of this workspace." />
+        <EmptyRow text="Billing is managed by the owners and admins of this workspace." />
       </SectionCard>
     );
   }
@@ -72,7 +76,7 @@ export default async function AccountBillingPage() {
   if (billing === REFUSED) {
     return (
       <SectionCard title="Billing">
-        <Empty text="You no longer have access to this workspace's billing." />
+        <EmptyRow text="You no longer have access to this workspace's billing." />
       </SectionCard>
     );
   }
@@ -82,7 +86,7 @@ export default async function AccountBillingPage() {
   if (!plans || !billing) {
     return (
       <SectionCard title="Billing">
-        <Empty text="Billing is unavailable right now." />
+        <EmptyRow text="Billing is unavailable right now." />
       </SectionCard>
     );
   }
@@ -102,13 +106,5 @@ export default async function AccountBillingPage() {
         />
       </div>
     </SectionCard>
-  );
-}
-
-function Empty({ text }: { text: string }) {
-  return (
-    <div className="py-5 first:pt-0">
-      <p className="text-sm text-[var(--muted)]">{text}</p>
-    </div>
   );
 }

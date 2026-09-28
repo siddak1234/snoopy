@@ -17,8 +17,9 @@ database URL, or object-store credential to this repository.
 
 - Work in one repository per session. Backend contract or deployment changes
   are findings for their owning repository, not changes to make here.
-- Use `lib/platform-api.ts` for browser calls and the generated public OpenAPI
-  types for responses. Do not write a new manual `fetch`.
+- Use `lib/platform-api.ts` for browser calls, `lib/platform-server.ts` for
+  server calls, and the generated public OpenAPI types for responses. Do not
+  write a new manual `fetch`.
 - Do not add Prisma, direct database, Supabase SDK, manual-password, or storage
   access. `npm run audit:boundaries` is the enforcement point.
 - Reuse `components/ui` and dashboard primitives. Keep marketing screenshot
@@ -30,8 +31,9 @@ database URL, or object-store credential to this repository.
 2. Create a focused branch; never commit directly to `main`.
 3. Stage only the files belonging to the change. Do not use `git add -A` in a
    mixed worktree without confirming every file belongs in the PR.
-4. Run the verification set in the README. UI work also requires browser
-   baselines; protected-flow work requires the loopback fixture audit.
+4. Run `npm run verify` (README) — it includes the browser baselines and the
+   loopback fixture suite. `/audit-change` must pass for the exact tree you
+   push (`AGENTS.md` rule 8).
 5. Include contract inputs, user impact, boundary impact, and exact commands in
    the PR body. Open a draft PR first unless it is explicitly ready for review.
 
