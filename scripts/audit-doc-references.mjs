@@ -9,11 +9,19 @@
 // one, as the contract tests read it; with no checkout it is reported as not
 // checked, never as found. A file that was removed stays namable in a record of
 // its removal, struck through: ~~`lib/auth.ts`~~ says it is gone.
-import { execFileSync } from "node:child_process";
+//
+// A path here is found in what git sees — tracked files, and untracked ones it
+// does not ignore, the facts file's basis — never in whatever is on disk. A path
+// git ignores is a build output (`.next/`, `node_modules/`, `.autom8x/`): it is
+// there only once this checkout is built, so it is reported as not checked.
+// Found on disk, CI's clean checkout failed three that a built one passed.
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, normalize, resolve } from "node:path";
 
-const root = resolve(process.argv[2] ?? resolve(import.meta.dirname, ".."));
+// `node scripts/audit-doc-references.mjs [repository] [--all]`, in either order.
+const [target] = process.argv.slice(2).filter((arg) => !arg.startsWith("--"));
+const root = resolve(target ?? resolve(import.meta.dirname, ".."));
 const backendRoot = resolve(
   root,
   process.env.SNOOPY_BACKEND_ROOT || "../snoopy-backend",
@@ -25,6 +33,17 @@ const OTHER_REPOSITORIES = [
   "snoopy-n8n/",
   "snoopy-automations/",
 ];
+const files = new Set(
+  execFileSync(
+    "git",
+    ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+    { cwd: root, encoding: "utf8" },
+  )
+    .split("\0")
+    .filter(Boolean),
+);
+const ignored = (path) =>
+  spawnSync("git", ["check-ignore", "-q", path], { cwd: root }).status === 0;
 
 const EXTENSION =
   /\.(?:ts|tsx|mts|mjs|cjs|js|jsx|json|ya?ml|md|sql|css|sh|toml|txt|html|png|svg)$/u;
@@ -50,10 +69,9 @@ function locate(doc, path) {
   }
   // Anything else is this repository's, so it is found here or it is missing —
   // with or without the platform's checkout, so CI holds the rule too.
-  return existsSync(join(root, path)) ||
-    existsSync(join(root, dirname(doc), path))
-    ? "found"
-    : "missing";
+  const here = [normalize(path), normalize(join(dirname(doc), path))];
+  if (here.some((candidate) => files.has(candidate))) return "found";
+  return here.some(ignored) ? "not checked" : "missing";
 }
 
 export function auditDocReferences() {

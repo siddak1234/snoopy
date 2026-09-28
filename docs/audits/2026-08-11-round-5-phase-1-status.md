@@ -798,7 +798,7 @@ the sha256 of the contract it came from.
     by the shared preflight.
   - F16: which CI jobs are *required* is a branch-protection setting, the owner's. The new
     `fixtures` and `scan` jobs, and `browser`, should be required.
-- **New this round, all three closed here:**
+- **New this round, all five closed here:**
   - **F55**: the organization page admitted only its owner, while every operation on it
     admits owner or admin. It now admits both, and the nav shows it where it renders.
   - **F56**: four account pages read "Dashboard" in the small-screen header. Every page has
@@ -813,6 +813,64 @@ the sha256 of the contract it came from.
     - `test/tenancy-contract.test.mjs`.
     - e2e: "an organization with no project yet creates its first team project …" and
       "working in a personal workspace, a team project is not offered …".
+  - **F58**, found by this round's first CI run. CI's Firefox could not launch, in both
+    browser jobs. A container job's HOME is `/github/home`, owned by the image's `pwuser`,
+    and Firefox will not start as root under a HOME another user owns. Chromium and WebKit
+    do not mind. A local `docker run` of the same image has HOME `/root`, so every local
+    run passed in all three engines. Both jobs now set HOME to `/root`, and
+    `test/structure-contract.test.mjs` holds every job in the image to it.
+  - **F59**, found by the same run. The document check looked for a file on disk, so a
+    built checkout passed three references that CI's clean one failed: they name
+    `.next/`, `node_modules/` and `.autom8x/`, which exist only after an install or a build.
+    A path is now found in what git sees: tracked files, and untracked ones it does not
+    ignore (the facts file's basis). A path git ignores is a build output and is reported
+    as not checked. `test/doc-references.test.mjs` plants one on disk and one not, and both
+    are not checked.
+- **Found by this round's change audit, open for the next round** (its verdict PASS; these
+  did not block it):
+  - **F60**: a session that ends while a page loads is told it was not signed out. The home
+    page sends a figure's 401 to the account boundary on purpose (`figure()` in
+    `app/account/page.tsx`), and the boundary (`components/dashboard/PlatformUnavailable.tsx`)
+    says "You have not been signed out, and nothing was lost." That is untrue for a 401.
+  - **F61**: the shared preflight cannot see the one server it exists to catch. It asks
+    `lsof` for a listener on 3001 and 3443, and lsof 4.95 reports nothing for the process
+    Next renames `next-server (v16.3.3)`; `lsof -p` on it is empty too. Observed: a
+    standalone server answering 200 on 127.0.0.1:3001 while
+    `lsof -nP -iTCP:3001 -sTCP:LISTEN` exited 1, and a plain Node listener on 3443
+    reported. The browser gates still refuse a stale server, because they run with
+    `CI=1`, which turns off `reuseExistingServer`. Binding each port would ask the
+    question directly.
+  - **27 surfaces the change audit probed in a browser and no test asserts.** Each probe
+    passed; each is a test to write:
+    1. the home's recent-run link opens the run;
+    2. recent activity when the runs read fails, and in an empty workspace;
+    3. a figure's 401 goes to the boundary, the navigation stays, Try again recovers (F60);
+    4. the sidebar's Teams link, and Teams and Organization hidden in a personal workspace;
+    5. the small-screen title of every account page, and the menu's Teams link;
+    6. the unavailable panel's wait, in the account area and in onboarding;
+    7. `/contact`'s 429 wait, and a problem with no usable title;
+    8. the sign-in returns for a join link, setup-org, projects and a team's page;
+    9. the builder's sign-in link and the `?id=` redirect's 307;
+    10. the focus ring on the 21 controls F44 touched;
+    11. Delete Account's danger colours and focus ring (F43);
+    12. a 409 after a lost answer, then a 401 (F47);
+    13. Disconnect, then the provider offers Connect;
+    14. Replace answered `reused` says the account is still connected;
+    15. an unmet connection's link, the version notice and a disabled Go live;
+    16. Cancel on a run another tab already stopped;
+    17. Approvals: the empty state, a decision, and a member offered none;
+    18. billing's 503;
+    19. a team project refused after another tab switched workspace;
+    20. the Teams pages' remaining states: personal, an unknown team, no teams, a plain
+        member, Back;
+    21. a team's member form refused after a switch;
+    22. `app/error.tsx` and its Try again;
+    23. `app/global-error.tsx`, which nothing in this tree can trigger, so it needs a build
+        or a unit render that can;
+    24. `GET /api/session` answers 404;
+    25. `GET /api/ready` keeps its 503;
+    26. the workspace list read once per request, counted at the fixture;
+    27. "A team you are not on", and an owner with no team to offer.
 
 **The change review's ten findings** (`/code-review`, high, on `c974177`). Eight were fixed,
 each with a test that was run red against the old code. One was accepted with a reason, and
@@ -871,4 +929,4 @@ is fixed here:
   project from a workspace that is not the active one …".
 
 **Numbering.** F35 was never assigned; F11, F19 and F36 were closed or withdrawn as recorded
-above. F55, F56 and F57 are new here, and no number is reused.
+above. F55 to F61 are new here, and no number is reused.

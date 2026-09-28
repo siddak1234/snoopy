@@ -108,6 +108,12 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
       options: --ipc=host
+    # Firefox will not start as root under a HOME another user owns, and a
+    # container job's HOME is /github/home, owned by the image's pwuser.
+    # Chromium and WebKit do not mind, so a local `docker run` of this image
+    # (HOME=/root) passed in all three engines while CI's Firefox could not launch.
+    env:
+      HOME: /root
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -129,6 +135,9 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
       options: --ipc=host
+    # Firefox needs a HOME that root owns, as in `browser`.
+    env:
+      HOME: /root
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

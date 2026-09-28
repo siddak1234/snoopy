@@ -169,6 +169,22 @@ test("one Node major everywhere — .nvmrc, CI and the image (register F17)", ()
   }
 });
 
+test("every CI job in the Playwright image runs with a HOME that root owns (register F58)", () => {
+  // A container job's HOME is /github/home, owned by the image's pwuser, and
+  // Firefox will not start as root under it: CI's Firefox failed to launch
+  // while every local run of the same image, with HOME=/root, passed.
+  const jobs = read(".github/workflows/ci.yml")
+    .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
+    .slice(1);
+  const inImage = jobs.filter((job) =>
+    job.includes("image: mcr.microsoft.com/playwright@"),
+  );
+  assert.ok(inImage.length > 0, "no CI job runs in the Playwright image");
+  for (const job of inImage) {
+    assert.match(job, /^ {4}env:\n {6}HOME: \/root$/mu, job.split("\n")[0]);
+  }
+});
+
 test("signing in from a join link returns to the organization it named", () => {
   assert.match(
     read("app/onboarding/join-org/page.tsx"),
