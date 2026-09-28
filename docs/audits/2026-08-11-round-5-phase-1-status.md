@@ -712,10 +712,19 @@ subscription PATCH for a set-up save and the archive, not for Pause or Go live.
   differed by 850 px — the nav showed its loading `…` where the baseline has "Sign in" (the
   suite's origin is unroutable, so that check ends in a DNS failure). Green on the re-run with
   nothing else running; the test waits for fonts, not for the nav.
-- **F51** The change audit's probes saw a server action send the Edge a cookie header shaped
-  `…=owner; Path=/; probe-ext=1; Path=/` — attributes inside the `Cookie` header. Observed
-  through the audit's own shim, which set a second cookie; pre-existing (`lib/platform-server.ts`
-  sends `cookies().toString()`), and NOT reproduced here: to be verified before it is fixed.
+- **F51** A server action or route handler sends the Edge a `Cookie` header with cookie
+  attributes in it: `e2e-public-edge-session=owner; Path=/`. **Reproduced by #22's change
+  audit on the merged tree**: 56 of 454 requests the website made to the Edge, every one
+  from a server action or a route handler and none of the 276 from a page render; the
+  fixture's single session cookie is enough. The line is `cookie: cookieStore.toString()`
+  in `lib/platform-server.ts`, which predates Round 13 (`c1ee25af`). The real Edge still
+  finds its own cookie in such a header — every action in the round's end-to-end run
+  worked — so this is a correctness defect waiting for a cookie attribute the Edge's parser
+  refuses, not an observed failure. The fix is to send `name=value` pairs only.
+- **F52** The connections dialog shows a refusal twice — in the panel's alert
+  (`app/account/connections/ConnectionsPanel.tsx:209`) and the dialog's (`:254`), two
+  `role=alert` elements for one answer. Found by #22's change audit; the file has not changed
+  since `43c2975`.
 
 **Mobile's half is not this repository's** — backend BUILD-PLAN 21.9.1 lists what
 `snoopy-mobile` adopts in its own round: the regenerated contracts, a Run control from
