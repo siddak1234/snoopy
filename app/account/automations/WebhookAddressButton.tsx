@@ -18,8 +18,11 @@ import { issueWebhookAddress, readWebhookAddress } from "./webhook-actions";
  * settings must be updated before its next delivery.
  */
 export function WebhookAddressButton({
+  workspaceId,
   subscriptionId,
 }: {
+  /** The workspace the page showed; both calls are refused once it is not active. */
+  workspaceId: string;
   subscriptionId: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -34,9 +37,12 @@ export function WebhookAddressButton({
   const show = () => {
     setError(null);
     setIssued(null);
+    // Read afresh each time: an address from an earlier opening is not shown
+    // beside a read the platform now refuses.
+    setEndpoint(undefined);
     setOpen(true);
     startTransition(async () => {
-      const result = await readWebhookAddress(subscriptionId);
+      const result = await readWebhookAddress(workspaceId, subscriptionId);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -48,7 +54,7 @@ export function WebhookAddressButton({
   const issue = () => {
     setError(null);
     startTransition(async () => {
-      const result = await issueWebhookAddress(subscriptionId);
+      const result = await issueWebhookAddress(workspaceId, subscriptionId);
       if (!result.ok) {
         setError(result.error);
         return;

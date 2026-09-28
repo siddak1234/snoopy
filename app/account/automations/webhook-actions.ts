@@ -7,7 +7,7 @@ import {
   type IssuedWebhookEndpoint,
   type WebhookEndpoint,
 } from "@/lib/automations";
-import { requireActiveWorkspaceId } from "@/lib/tenancy";
+import { activeWorkspaceIfShown, WORKSPACE_CHANGED } from "@/lib/tenancy";
 
 /**
  * A webhook automation's address (backend §12.1 #91, #109). Owner or admin —
@@ -15,6 +15,10 @@ import { requireActiveWorkspaceId } from "@/lib/tenancy";
  *
  * The secret comes back from `issue` only, is handed to the page that asked,
  * and is never stored here: the dialog shows it once and forgets it.
+ *
+ * Both act on the workspace the page showed (`activeWorkspaceIfShown`, register
+ * F28). After a switch in another tab the read would otherwise ask the other
+ * workspace, whose 404 reads as "no address yet" for an automation that has one.
  */
 
 export type WebhookReadResult =
@@ -28,10 +32,12 @@ const ISSUE_REFUSALS: Record<string, string> = {
 };
 
 export async function readWebhookAddress(
+  shownWorkspaceId: string,
   subscriptionId: string,
 ): Promise<WebhookReadResult> {
   try {
-    const workspaceId = await requireActiveWorkspaceId();
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspaceId);
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
     return {
       ok: true,
       endpoint: await readWebhookEndpoint(workspaceId, subscriptionId),
@@ -43,10 +49,12 @@ export async function readWebhookAddress(
 }
 
 export async function issueWebhookAddress(
+  shownWorkspaceId: string,
   subscriptionId: string,
 ): Promise<WebhookIssueResult> {
   try {
-    const workspaceId = await requireActiveWorkspaceId();
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspaceId);
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
     return {
       ok: true,
       issued: await issueWebhookEndpoint(workspaceId, subscriptionId),

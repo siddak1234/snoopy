@@ -100,6 +100,7 @@ export default async function AutomationsPage() {
               subscriptions={byTemplate.get(automation.templateId) ?? []}
               projects={openProjects}
               canAdminister={canAdminister}
+              workspaceId={workspaceId}
             />
           ))}
         </div>
@@ -113,11 +114,14 @@ function AutomationCard({
   subscriptions,
   projects,
   canAdminister,
+  workspaceId,
 }: {
   automation: AutomationCatalogEntry;
   subscriptions: Subscription[];
   projects: Project[];
   canAdminister: boolean;
+  /** The workspace this page shows; its actions are refused once it is not active. */
+  workspaceId: string;
 }) {
   const projectName = new Map(
     projects.map((project) => [project.id, project.name]),
@@ -231,7 +235,10 @@ function AutomationCard({
               as the platform allows no one else. */}
           {subscription.triggerKind === "webhook" && canAdminister ? (
             <div>
-              <WebhookAddressButton subscriptionId={subscription.id} />
+              <WebhookAddressButton
+                workspaceId={workspaceId}
+                subscriptionId={subscription.id}
+              />
             </div>
           ) : null}
 

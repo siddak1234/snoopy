@@ -651,6 +651,33 @@ test("a team member's removal after another tab switched workspace is refused, a
   await expect(member).toHaveCount(1);
 });
 
+test('a webhook address opened after another tab switched workspace is refused, never read as "no address yet" (register F28)', async ({
+  page,
+}) => {
+  await page.goto("/account/automations");
+  const open = automationCard(page, "Webhook automation").getByRole("button", {
+    name: "Webhook address",
+  });
+  const dialog = page.getByRole("dialog", { name: "Webhook address" });
+  await open.click();
+  await dialog.getByRole("button", { name: "Create address" }).click();
+  await expect(
+    dialog.locator("code").filter({ hasText: "/v1/webhooks/" }),
+  ).toHaveCount(1);
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await switchInAnotherTab(page, /Fixture Personal/);
+  await open.click();
+  await expect(dialog.getByRole("alert")).toHaveText(workspaceChanged);
+  await expect(
+    dialog.getByText("This automation has no address yet."),
+  ).toHaveCount(0);
+  await expect(
+    dialog.getByRole("button", { name: /Create address|Make a new secret/u }),
+  ).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await switchInAnotherTab(page, /Fixture Organization/);
+});
+
 test("22 — a page outside the account area that cannot load says so, and Try again loads it once it can", async ({
   page,
 }) => {

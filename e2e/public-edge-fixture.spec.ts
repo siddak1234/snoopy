@@ -599,6 +599,28 @@ test("a webhook address the platform will not read says so in its dialog, and of
   }
 });
 
+test("a webhook address read before is not shown again beside a read the platform now refuses (backend §12.1 #91)", async ({
+  page,
+}) => {
+  await page.goto("/account/automations");
+  const open = automationCard(page, "Webhook automation").getByRole("button", {
+    name: "Webhook address",
+  });
+  const dialog = page.getByRole("dialog", { name: "Webhook address" });
+  const address = dialog.locator("code").filter({ hasText: "/v1/webhooks/" });
+  await open.click();
+  await dialog.getByRole("button", { name: "Create address" }).click();
+  await expect(address).toHaveCount(1);
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await fixtureControl("webhook-read-refused?status=403");
+  await open.click();
+  await expect(dialog.getByRole("alert")).toHaveText("Forbidden");
+  await expect(address).toHaveCount(0);
+  await expect(
+    dialog.getByRole("button", { name: /Create address|Make a new secret/u }),
+  ).toHaveCount(0);
+});
+
 test("an address the platform will not make is said in words, and no secret is shown (backend §12.1 #91)", async ({
   page,
 }) => {

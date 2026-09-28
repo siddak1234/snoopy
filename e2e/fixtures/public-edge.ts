@@ -1317,6 +1317,11 @@ const server = createServer(
       };
       const answer = empty[read];
       if (answer) return respond(response, 200, answer);
+      // Another workspace's subscription has no address here: Runs reads an
+      // address by workspace and subscription together, and answers 404.
+      if (/^\/subscriptions\/[^/]+\/webhook$/u.test(read)) {
+        return respond(response, 404, problem(404, "Not Found"));
+      }
     }
     if (method === "GET" && isWorkspacePath(pathname, "/members")) {
       return respond(response, 200, {
