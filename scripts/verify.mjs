@@ -65,6 +65,9 @@ const gates = [
       ? null
       : `sibling checkout not present at ${backendRoot}; accepted dependency (§12.2 #78)`,
   },
+  // The site with no backend, as a Vercel preview builds it (register F62).
+  // Before `build`, whose output the browser suite serves.
+  { name: "build:no-backend" },
   {
     name: "build",
     env: { BACKEND_API_ORIGIN: buildOrigin },

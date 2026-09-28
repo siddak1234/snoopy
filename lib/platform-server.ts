@@ -88,10 +88,14 @@ export async function platformServerJson<T>(
   path: string,
   init?: RequestInit & { idempotencyKey?: string },
 ): Promise<T> {
+  // The request's cookies first: reading them makes the page dynamic, so no page
+  // is prerendered around a platform read. A site with no backend (a Vercel
+  // preview) threw below while it prerendered the settings page, and its build
+  // failed (register F62).
+  const cookieHeader = requestCookieHeader(await cookies());
   const origin = backendApiOrigin();
   if (!origin) throw new PlatformNotConfiguredError();
 
-  const cookieHeader = requestCookieHeader(await cookies());
   // The Edge refuses cookie-carrying mutations whose Origin is not the public
   // web origin (its CSRF check). Server-side fetch sends no Origin on its own,
   // so forward the caller's — a value Next has already verified against Host

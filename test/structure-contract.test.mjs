@@ -185,6 +185,26 @@ test("every CI job in the Playwright image runs with a HOME that root owns (regi
   }
 });
 
+test("CI builds the site with no backend, as a Vercel preview does (register F62)", () => {
+  // A platform read on the settings page failed every Vercel preview's build
+  // while CI, which builds with the origin set, stayed green.
+  const job = read(".github/workflows/ci.yml")
+    .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
+    .find((entry) => entry.startsWith("build-no-backend:"));
+  assert.ok(job, "CI has no build-no-backend job");
+  assert.match(job, /^ {6}- run: npm run build:no-backend$/mu);
+  assert.doesNotMatch(
+    job,
+    /continue-on-error|^\s+if:|^\s+needs:/mu,
+    "the job, and every step in it, must run and be able to fail",
+  );
+  assert.equal(
+    JSON.parse(read("package.json")).scripts["build:no-backend"],
+    "BACKEND_API_ORIGIN= npm run build",
+    "the origin is emptied for this build, whatever the shell holds",
+  );
+});
+
 test("signing in from a join link returns to the organization it named", () => {
   assert.match(
     read("app/onboarding/join-org/page.tsx"),

@@ -37,7 +37,8 @@ npm run verify
 One command, the whole offline gate, in this order: `format:check`, `lint`,
 `typecheck`, `audit:boundaries`, `test:contracts`, `verify:platform-contracts`
 (skipped out loud when `../snoopy-backend` is not checked out beside this
-repository), `build` with `BACKEND_API_ORIGIN=https://backend.invalid` plus the
+repository), `build:no-backend` (the site with no backend, as a Vercel preview
+builds it), `build` with `BACKEND_API_ORIGIN=https://backend.invalid` plus the
 `/api/platform` rewrite assertion CI makes, `test:browser`, and
 `test:browser:fixtures`. The browser suites run in Chromium, Firefox and WebKit
 (NFR-36); the marketing screenshots are Chromium's baselines alone. A run in
@@ -79,6 +80,7 @@ secret provisioning belongs to the deployment configuration round, not here.
 | --- | --- |
 | `npm run verify` | The whole offline gate in one command; emits the facts file |
 | `npm run build` | Production build |
+| `npm run build:no-backend` | The build a Vercel preview makes: no `BACKEND_API_ORIGIN` |
 | `npm run test:contracts` | Public-contract and boundary behavior tests |
 | `npm run generate:platform-contracts` | Regenerate the typed client from `../snoopy-backend`'s published contracts |
 | `npm run verify:platform-contracts` | Report a generated type that differs from its contract; changes nothing |

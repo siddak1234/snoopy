@@ -797,8 +797,8 @@ the sha256 of the contract it came from.
   - F5: the checkout's iCloud sync is the owner's machine. Both gates refuse Finder copies,
     by the shared preflight.
   - F16: which CI jobs are *required* is a branch-protection setting, the owner's. The new
-    `fixtures` and `scan` jobs, and `browser`, should be required.
-- **New this round, all five closed here:**
+    `fixtures`, `scan` and `build-no-backend` jobs, and `browser`, should be required.
+- **New this round, all six closed here:**
   - **F55**: the organization page admitted only its owner, while every operation on it
     admits owner or admin. It now admits both, and the nav shows it where it renders.
   - **F56**: four account pages read "Dashboard" in the small-screen header. Every page has
@@ -826,6 +826,21 @@ the sha256 of the contract it came from.
     ignore (the facts file's basis). A path git ignores is a build output and is reported
     as not checked. `test/doc-references.test.mjs` plants one on disk and one not, and both
     are not checked.
+  - **F62**, found by this PR's Vercel preview, which failed while CI was green. Round
+    14's settings page read the person's role before it had a session. A Vercel preview
+    builds with no `BACKEND_API_ORIGIN`, so that read threw while the page was
+    prerendered, and the build failed. CI builds with the origin set: the page reads its
+    cookies first, so it is never prerendered and CI could not see the failure.
+    Reproduced by `npm run build` with the origin unset: `main` passes, and the round's
+    tree fails on `/account/settings`. The cause was in `lib/platform-server.ts`: a
+    server read asked for the origin before it read the request's cookies, and reading
+    them is what makes a page dynamic. Cookies are read first now, so no page is
+    prerendered around a platform read, with or without a backend
+    (`test/session-contract.test.mjs`). The settings page also reads the role only with
+    a session, as it reads the workspace list (`test/tenancy-contract.test.mjs`).
+    `npm run build:no-backend` builds as a preview
+    does. It runs in `npm run verify`, in the change audit, and in CI's own
+    `build-no-backend` job, and `test/structure-contract.test.mjs` holds that job.
 - **Found by this round's change audit, open for the next round** (its verdict PASS; these
   did not block it):
   - **F60**: a session that ends while a page loads is told it was not signed out. The home
@@ -840,9 +855,13 @@ the sha256 of the contract it came from.
     reported. The browser gates still refuse a stale server, because they run with
     `CI=1`, which turns off `reuseExistingServer`. Binding each port would ask the
     question directly.
-  - **26 surfaces the change audit probed in a browser and no test asserts.** Each probe
-    passed; each is a test to write. (It named 27. The 27th, Replace answered `reused`,
-    is now held by a static test: the platform never gives that answer.)
+  - **F63**: the change audit's evidence file cannot show the browser suites' counts.
+    `scripts/audit/run-gates.mjs` keeps the last 30 lines of stdout, then stderr. For the
+    browser gates that is the web server's stderr, so the Playwright summary is cut off,
+    and the evidence records only exit codes and durations.
+  - **27 surfaces the change audit probed in a browser and no test asserts.** Each probe
+    passed; each is a test to write. A static test that reads the source does not count
+    as covering an interaction:
     1. the home's recent-run link opens the run;
     2. recent activity when the runs read fails, and in an empty workspace;
     3. a figure's 401 goes to the boundary, the navigation stays, Try again recovers (F60);
@@ -856,21 +875,24 @@ the sha256 of the contract it came from.
     11. Delete Account's danger colours and focus ring (F43);
     12. a 409 after a lost answer, then a 401 (F47);
     13. Disconnect, then the provider offers Connect;
-    14. an unmet connection's link, the version notice and a disabled Go live;
-    15. Cancel on a run another tab already stopped;
-    16. Approvals: the empty state, a decision, and a member offered none;
-    17. billing's 503;
-    18. a team project refused after another tab switched workspace;
-    19. the Teams pages' remaining states: personal, an unknown team, no teams, a plain
+    14. Replace answered `reused` names the account the platform answered with. The
+        platform never gives that answer to a replace, so this is the defensive branch,
+        held today by a static test;
+    15. an unmet connection's link, the version notice and a disabled Go live;
+    16. Cancel on a run another tab already stopped;
+    17. Approvals: the empty state, a decision, and a member offered none;
+    18. billing's 503;
+    19. a team project refused after another tab switched workspace;
+    20. the Teams pages' remaining states: personal, an unknown team, no teams, a plain
         member, Back;
-    20. a team's member form refused after a switch;
-    21. `app/error.tsx` and its Try again;
-    22. `app/global-error.tsx`, which nothing in this tree can trigger, so it needs a build
+    21. a team's member form refused after a switch;
+    22. `app/error.tsx` and its Try again;
+    23. `app/global-error.tsx`, which nothing in this tree can trigger, so it needs a build
         or a unit render that can;
-    23. `GET /api/session` answers 404;
-    24. `GET /api/ready` keeps its 503;
-    25. the workspace list read once per request, counted at the fixture;
-    26. "A team you are not on", and a project's owner who is a plain member with no
+    24. `GET /api/session` answers 404;
+    25. `GET /api/ready` keeps its 503;
+    26. the workspace list read once per request, counted at the fixture;
+    27. "A team you are not on", and a project's owner who is a plain member with no
         team to offer.
 
 **The change review's ten findings** (`/code-review`, high, on `c974177`). Eight were fixed,
@@ -933,7 +955,8 @@ test that was run red against the old code. Four are accepted, each with its rea
 3. **Fixed.** Replace, answered `reused`, named the row's account rather than the one the
    platform answered with. The platform never reuses a grant it was asked to replace
    (`snoopy-backend/apps/connections/src/postgres-attempts.ts`), so no fixture gives this
-   answer, and a static test holds the name instead (`test/structure-contract.test.mjs`).
+   answer. A static test holds the name (`test/structure-contract.test.mjs`), and the
+   interaction stays on the list of surfaces to test.
 4. **Fixed.** On a team project in an organization with no team yet, its owner was told
    they could give access to "the teams you are on", and that owners and admins see every
    team. That was true, and no help. They are now told the organization has no teams yet,
@@ -972,4 +995,4 @@ is fixed here:
   project from a workspace that is not the active one …".
 
 **Numbering.** F35 was never assigned; F11, F19 and F36 were closed or withdrawn as recorded
-above. F55 to F61 are new here, and no number is reused.
+above. F55 to F63 are new here, and no number is reused.

@@ -133,7 +133,11 @@ test("a page offers owner-or-admin controls by the platform's own rule (register
     settings,
     /<WorkspaceExportSection canExport=\{canExport\} \/>/u,
   );
-  assert.match(settings, /const canExport = administers\(/u);
+  // With a session only, and no export without one (register F62).
+  assert.match(
+    settings,
+    /const canExport = session\s*\?\s*administers\([^;]*?\)\s*:\s*false;/u,
+  );
   const exportSection = readFileSync(
     "app/account/settings/WorkspaceExportSection.tsx",
     "utf8",

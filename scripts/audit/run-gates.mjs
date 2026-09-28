@@ -66,6 +66,10 @@ const fullGates = [
     command: ["npm", "run", "verify:platform-contracts"],
   },
   {
+    name: "build:no-backend",
+    command: ["npm", "run", "build:no-backend"],
+  },
+  {
     name: "build",
     command: ["npm", "run", "build"],
     env: { BACKEND_API_ORIGIN: "https://backend.invalid" },

@@ -246,3 +246,18 @@ test("a refused request says when to try again, from retry-after (backend §12.1
   );
   assert.match(panel, /tryAgainIn\(busy \? retryAfterSeconds : undefined\)/u);
 });
+
+test("a server read takes the request's cookies before the origin, so no page is prerendered around it (register F62)", () => {
+  const server = readFileSync("lib/platform-server.ts", "utf8");
+  // Comments stripped, so a comment naming the call cannot stand in for it.
+  const read = server
+    .slice(server.indexOf("export async function platformServerJson"))
+    .replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/gu, "");
+  const cookiesAt = read.indexOf("await cookies()");
+  const originAt = read.indexOf("backendApiOrigin()");
+  assert.ok(cookiesAt > 0 && originAt > 0, "platformServerJson changed shape");
+  assert.ok(
+    cookiesAt < originAt,
+    "with no backend, a platform read before the cookies fails the build",
+  );
+});

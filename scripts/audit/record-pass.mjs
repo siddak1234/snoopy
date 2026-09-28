@@ -29,6 +29,7 @@ const MARKER_TTL_HOURS = 24;
 // fixtures 28s): low enough to pass a real run on this machine, high enough
 // that a fabricated instant "pass" cannot clear them.
 const DURATION_FLOORS = {
+  "build:no-backend": 10,
   build: 10,
   "test:browser": 3,
   "test:browser:fixtures": 15,
@@ -40,6 +41,7 @@ const FULL_GATES = [
   "audit:boundaries",
   "test:contracts",
   "verify:platform-contracts",
+  "build:no-backend",
   "build",
   "test:browser",
   "test:browser:fixtures",

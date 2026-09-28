@@ -90,6 +90,22 @@ jobs:
             console.log('OK: ' + hit.source + ' -> ' + hit.destination);
           "
 
+  # A Vercel preview builds with no BACKEND_API_ORIGIN: the site with no
+  # backend, whose account area sends everyone to sign in. A page that reads the
+  # platform with no session fails that build while it prerenders (register
+  # F62), and the build above, with the origin set, cannot see it.
+  build-no-backend:
+    name: Build with no backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:no-backend
+
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
