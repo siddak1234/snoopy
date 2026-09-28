@@ -156,6 +156,47 @@ function initialState() {
     // test created — so an organization can be new, with none (register F57).
     fixtureProjectListed: true,
     createdProjects: [] as Platform["ProjectSummary"][],
+    // FR-14: upload sessions the website opened, and the bytes each received.
+    uploads: new Map<
+      string,
+      {
+        filename: string;
+        contentType: string;
+        sizeBytes: number;
+        received?: number;
+      }
+    >(),
+    // Files completed, by id; a run may be given one once.
+    files: new Map<
+      string,
+      { filename: string; sizeBytes: number; runId?: string }
+    >(),
+    // Backend §12.1 #126: the version the webhook automation's subscription
+    // pins, and whether an approval still waits on it.
+    webhookVersion: 1,
+    approvalPendingOnMove: false,
+    // Backend §12.1 #91: the address once issued, and how many secrets so far.
+    webhookSecrets: 0,
+    // Backend §12.1 #39: the complete export, read as running once then ready.
+    exportJobReads: 0,
+    exportJobStarted: false,
+    exportExpired: false,
+    // Register F60 and F62's run-time path: a session the fixture ends on a
+    // schedule — once the layout has read it, or once the proxy has.
+    sessionEnded: false,
+    proxyReads: 0,
+    // The surfaces the Round 14 change audit probed and no test asserted
+    // (register § Round 15), each a state one test puts the platform in.
+    runsRead: "listed" as "listed" | "failing" | "empty",
+    workspaceListReads: 0,
+    replaceAnswersReused: false,
+    oauthDisconnected: false,
+    approvals: [] as Automations["Approval"][],
+    billingNotConfigured: false,
+    discoveryFailing: false,
+    notReady: false,
+    draftNeedsConnection: false,
+    memberOwnsProject: false,
   };
 }
 let state = initialState();
@@ -350,12 +391,37 @@ const archivableAutomation = automation(
 // project-scoped subscription is created on (backend 18.6.2).
 const projectAutomation = automation("fixture-projects", "Project automation");
 
+// Started by a vendor's webhook, and the catalog's newest is v2 while the
+// subscription still pins v1: the card offers Move (backend §12.1 #126) and,
+// to an owner or admin, the webhook address (§12.1 #91).
+const webhookAutomation = {
+  ...automation("fixture-webhook", "Webhook automation"),
+  version: 2,
+  subscribed: true,
+} satisfies Automations["AutomationCatalogEntry"];
+
+const webhookSubscriptionId = "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd";
+const webhookEndpointId = "efefefef-efef-4fef-8fef-efefefefefef";
+const exportJobId = "f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0";
+
+function webhookSubscription(): Automations["Subscription"] {
+  return {
+    ...manualSubscription,
+    id: webhookSubscriptionId,
+    templateId: webhookAutomation.templateId,
+    templateVersion: state.webhookVersion,
+    triggerKind: "webhook",
+    runInput: undefined,
+  };
+}
+
 function fixtureCatalog(): Automations["AutomationCatalogResponse"] {
   return {
     automations: [
       automation("fixture-plan-limit", "Plan-limit automation"),
       automation("fixture-entitlements", "Entitlements automation"),
       manualAutomation,
+      webhookAutomation,
       { ...archivableAutomation, subscribed: !state.archivableArchived },
       {
         ...projectAutomation,
@@ -375,9 +441,10 @@ const manualSubscription = {
   status: "live",
   config: {},
   unmetConnections: [],
+  triggerKind: "manual",
   // The shipped invoice-check v4's declaration (backend ADR-0030): three typed
-  // fields its container requires, and a file it reads when given one — which no
-  // web form supplies, so the website does not render it.
+  // fields its container requires, and a file it reads when given one — which
+  // the website uploads when a person chooses one (backend FR-14).
   runInput: [
     {
       key: "vendor",
@@ -509,6 +576,23 @@ function fixtureRun(runId: string): Automations["Run"] {
 
 const listedRunIds = [runningRunId, failedRunId, okRunId];
 
+// A run held for a person's decision: the running run, at a step only an owner
+// or admin may decide, as `invoice-check` holds a payment over its limit.
+function waitingApproval(): Automations["Approval"] {
+  return {
+    id: "a0a0a0a0-a0a0-4a0a-8a0a-a0a0a0a0a0a0",
+    runId: runningRunId,
+    workspaceId,
+    subscriptionId: manualSubscriptionId,
+    stepId: "confirm-payment",
+    status: "pending",
+    reason: "A payment over the spending limit needs a person to approve it.",
+    eligibleRoles: ["owner", "admin"],
+    createdAt: now,
+    expiresAt: new Date(Date.now() + 24 * 3_600_000).toISOString(),
+  };
+}
+
 /** The platform's tally of the listed runs, as `readRunStats` answers it. */
 function fixtureRunStats(since: string | null): Automations["RunStats"] {
   const counts = {
@@ -595,6 +679,13 @@ function fixtureSessionValue(
   if (value === `${fixtureCookie}=member`) return "member";
   if (value === `${fixtureCookie}=admin`) return "admin";
   if (value === departingSession) return state.departed ? null : "requester";
+  // Register F60: the owner, until a page's own read ends the session.
+  if (value === `${fixtureCookie}=ending`)
+    return state.sessionEnded ? null : "owner";
+  // F62's run-time path: the owner for the proxy's session read, and no one
+  // for the render that follows it.
+  if (value === `${fixtureCookie}=proxy-only`)
+    return state.proxyReads > 0 ? null : "owner";
   return null;
 }
 
@@ -603,7 +694,10 @@ function projectRoleOf(
 ): Platform["ProjectSummary"]["viewerRole"] | null {
   if (fixtureSession === "owner") return "owner";
   if (fixtureSession === "admin") return "admin";
-  if (fixtureSession === "member") return "member";
+  // A project's owner who is a plain member of the organization, when a test
+  // says so — the one who may grant only a team they are on (§12.1 #176).
+  if (fixtureSession === "member")
+    return state.memberOwnsProject ? "owner" : "member";
   return null;
 }
 
@@ -661,6 +755,55 @@ const server = createServer(
       response.writeHead(204, { "cache-control": "no-store" });
       return response.end();
     }
+    // One state each, for the surfaces the Round 14 change audit probed and no
+    // test asserted (register § Round 15).
+    const controls: Record<string, () => void> = {
+      "/__fixture/runs-failing": () => {
+        state.runsRead = "failing";
+      },
+      "/__fixture/runs-empty": () => {
+        state.runsRead = "empty";
+      },
+      "/__fixture/replace-answers-reused": () => {
+        state.replaceAnswersReused = true;
+      },
+      "/__fixture/approval-waiting": () => {
+        state.approvals = [waitingApproval()];
+      },
+      "/__fixture/billing-not-configured": () => {
+        state.billingNotConfigured = true;
+      },
+      "/__fixture/discovery-failing": () => {
+        state.discoveryFailing = true;
+      },
+      "/__fixture/not-ready": () => {
+        state.notReady = true;
+      },
+      "/__fixture/draft-needs-connection": () => {
+        state.draftNeedsConnection = true;
+      },
+      "/__fixture/member-owns-project": () => {
+        state.memberOwnsProject = true;
+      },
+      "/__fixture/member-plain-on-team": () => {
+        state.teamMemberships = state.teamMemberships.map((entry) =>
+          entry.userId === memberUserId ? { ...entry, role: "member" } : entry,
+        );
+      },
+    };
+    const control =
+      request.method === "POST" ? controls[url.pathname] : undefined;
+    if (control) {
+      control();
+      response.writeHead(204, { "cache-control": "no-store" });
+      return response.end();
+    }
+    // Register F27: how many times the workspace list was read.
+    if (request.method === "GET" && url.pathname === "/__fixture/counts") {
+      return respond(response, 200, {
+        workspaceListReads: state.workspaceListReads,
+      });
+    }
     if (
       request.method === "POST" &&
       url.pathname === "/__fixture/org-without-projects"
@@ -683,6 +826,71 @@ const server = createServer(
       url.pathname === "/__fixture/oauth-connection-broken"
     ) {
       state.oauthStatus = "reauthorization-required";
+      response.writeHead(204, { "cache-control": "no-store" });
+      return response.end();
+    }
+    // FR-14: the fixture plays the object store too. The browser PUTs a file
+    // here straight from the website's origin — cross-origin, so the preflight
+    // is answered for exactly the origin that asked, as the real store answers
+    // its configured one. The signed size is the size.
+    const storeObject = /^\/__fixture\/objects\/([^/]+)$/u.exec(url.pathname);
+    if (storeObject) {
+      const origin = request.headers.origin;
+      const cors: Record<string, string> = origin
+        ? { "access-control-allow-origin": origin, vary: "origin" }
+        : {};
+      if (request.method === "OPTIONS") {
+        response.writeHead(204, {
+          ...cors,
+          "access-control-allow-methods": "PUT, GET",
+          "access-control-allow-headers": "content-type",
+        });
+        return response.end();
+      }
+      const upload = state.uploads.get(storeObject[1] ?? "");
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(Buffer.from(chunk));
+      const size = Buffer.concat(chunks).byteLength;
+      if (request.method !== "PUT" || !upload || size !== upload.sizeBytes) {
+        response.writeHead(403, cors);
+        return response.end();
+      }
+      upload.received = size;
+      response.writeHead(200, { ...cors, "content-type": "application/json" });
+      return response.end("{}");
+    }
+    // FR-14: every completed file and the run it was given to, read by a test
+    // at the fixture, because the run's page does not show its input.
+    if (request.method === "GET" && url.pathname === "/__fixture/files") {
+      response.writeHead(200, {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+      });
+      return response.end(JSON.stringify([...state.files.values()]));
+    }
+    // Backend §12.1 #39: the staged file a complete export's link names.
+    if (request.method === "GET" && url.pathname === "/__fixture/export-file") {
+      response.writeHead(200, {
+        "content-type": "application/octet-stream",
+        "content-disposition": 'attachment; filename="workspace-export.json"',
+      });
+      return response.end(
+        JSON.stringify({ format: "autom8x.workspace-export.v1" }),
+      );
+    }
+    if (
+      request.method === "POST" &&
+      url.pathname === "/__fixture/approval-pending-on-move"
+    ) {
+      state.approvalPendingOnMove = true;
+      response.writeHead(204, { "cache-control": "no-store" });
+      return response.end();
+    }
+    if (
+      request.method === "POST" &&
+      url.pathname === "/__fixture/export-expired"
+    ) {
+      state.exportExpired = true;
       response.writeHead(204, { "cache-control": "no-store" });
       return response.end();
     }
@@ -709,6 +917,12 @@ const server = createServer(
       });
       return;
     }
+    // The Edge's readiness, which the website's `/api/ready` reports.
+    if (url.pathname === "/health/ready") {
+      return state.notReady
+        ? respond(response, 503, { status: "not-ready" })
+        : respond(response, 200, { status: "ready" });
+    }
     // Public, as the Edge serves it: no session is needed to list the ways in,
     // and the website reads it on the server with no cookie (§12.1 #160).
     if (request.method === "GET" && url.pathname === "/v1/auth/providers") {
@@ -720,9 +934,26 @@ const server = createServer(
       return respond(response, 200, providers);
     }
     const fixtureSession = fixtureSessionValue(request.headers.cookie);
+    const presented = fixtureCookieEntry(request.headers.cookie);
+    if (
+      presented === `${fixtureCookie}=proxy-only` &&
+      url.pathname === "/v1/session"
+    ) {
+      state.proxyReads += 1;
+    }
     if (!fixtureSession) {
       respond(response, 401, problem(401, "Authentication is required"));
       return;
+    }
+    // Register F60: the layout reads the session and the workspace list; the
+    // first read that is the page's own finds the session gone.
+    if (
+      presented === `${fixtureCookie}=ending` &&
+      url.pathname !== "/v1/session" &&
+      url.pathname !== "/v1/workspaces"
+    ) {
+      state.sessionEnded = true;
+      return respond(response, 401, problem(401, "Authentication is required"));
     }
     // A signed-in person the platform refuses (429) or cannot answer (503) —
     // backend §12.1 #160. Neither is "no session", and the website must not
@@ -820,6 +1051,7 @@ const server = createServer(
     if (method === "GET" && pathname === "/v1/auth/identities")
       return respond(response, 200, { identities: [] });
     if (method === "GET" && pathname === "/v1/workspaces") {
+      state.workspaceListReads += 1;
       const workspaces =
         fixtureSession === "owner"
           ? [workspace, personalWorkspace]
@@ -1059,6 +1291,52 @@ const server = createServer(
         } satisfies Platform["TeamMembershipMutationResponse"]);
       }
     }
+    // Backend §12.1 #174: taking someone off a team, by the same authority
+    // that adds them; absent is `removed: false`, not 404.
+    const teamMember = new RegExp(
+      `^/v1/workspaces/${workspaceId}/teams/([^/]+)/memberships/([^/]+)$`,
+      "u",
+    ).exec(pathname);
+    if (teamMember && method === "DELETE") {
+      const team = state.teams.find((entry) => entry.id === teamMember[1]);
+      if (!team) return respond(response, 404, problem(404, "Not Found"));
+      if (!administering && onTeam(team.id)?.role !== "manager") {
+        return respond(response, 403, problem(403, "Forbidden"));
+      }
+      if (!request.headers["idempotency-key"]) {
+        return respond(response, 400, problem(400, "Bad Request"));
+      }
+      const before = state.teamMemberships.length;
+      state.teamMemberships = state.teamMemberships.filter(
+        (entry) =>
+          !(entry.teamId === team.id && entry.userId === teamMember[2]),
+      );
+      return respond(response, 200, {
+        removed: state.teamMemberships.length < before,
+      } satisfies Platform["RemovalResponse"]);
+    }
+    const teamGrant = new RegExp(
+      `^/v1/workspaces/${workspaceId}/projects/${projectId}/team-grants/([^/]+)$`,
+      "u",
+    ).exec(pathname);
+    if (teamGrant && method === "DELETE") {
+      const projectRole = projectRoleOf(fixtureSession);
+      if (!projectRole)
+        return respond(response, 404, problem(404, "Not Found"));
+      if (projectRole !== "owner" && projectRole !== "admin") {
+        return respond(response, 403, problem(403, "Forbidden"));
+      }
+      if (!request.headers["idempotency-key"]) {
+        return respond(response, 400, problem(400, "Bad Request"));
+      }
+      const before = state.projectTeamGrants.length;
+      state.projectTeamGrants = state.projectTeamGrants.filter(
+        (entry) => entry.teamId !== teamGrant[1],
+      );
+      return respond(response, 200, {
+        revoked: state.projectTeamGrants.length < before,
+      } satisfies Platform["RevocationResponse"]);
+    }
     if (isWorkspacePath(pathname, `/projects/${projectId}/team-grants`)) {
       // Anyone with a role on the project reads its grants; anyone else is 404.
       // Granting is the project's effective owner's or admin's.
@@ -1085,7 +1363,12 @@ const server = createServer(
         ) {
           return respond(response, 400, problem(400, "Bad Request"));
         }
-        if (!state.teams.some((entry) => entry.id === body.teamId)) {
+        // Backend §12.1 #176: only a team the caller can see — every team for
+        // an owner or admin, otherwise a team they are on. Unseen is 404.
+        if (
+          !state.teams.some((entry) => entry.id === body.teamId) ||
+          (!administering && !onTeam(body.teamId as string))
+        ) {
           return respond(response, 404, problem(404, "Not Found"));
         }
         const grant = {
@@ -1127,6 +1410,9 @@ const server = createServer(
       } satisfies Platform["OrganizationJoinRequestMutationResponse"]);
     }
     if (method === "GET" && pathname === "/v1/organization-discovery") {
+      if (state.discoveryFailing) {
+        return respond(response, 503, problem(503, "Service Unavailable"));
+      }
       return respond(response, 200, {
         organizations: [
           {
@@ -1155,12 +1441,27 @@ const server = createServer(
       } satisfies ConnectionOperations["listConnectionProviders"]["responses"][200]["content"]["application/json"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/connections")) {
+      // A disconnected connection is not listed, as the platform lists them.
       return respond(response, 200, {
         connections: [
-          { ...oauthConnectionState(), usedByCount: 1 },
+          ...(state.oauthDisconnected
+            ? []
+            : [{ ...oauthConnectionState(), usedByCount: 1 }]),
           ...(state.fixtureConnectionCreated ? [connection] : []),
         ],
       } satisfies ConnectionOperations["listConnections"]["responses"][200]["content"]["application/json"]);
+    }
+    if (
+      method === "DELETE" &&
+      isWorkspacePath(pathname, `/connections/${state.oauthConnectionId}`)
+    ) {
+      if (state.oauthDisconnected) {
+        return respond(response, 404, problem(404, "Not Found"));
+      }
+      state.oauthDisconnected = true;
+      return respond(response, 200, {
+        connection: { ...oauthConnectionState(), status: "disconnected" },
+      } satisfies ConnectionOperations["disconnectConnection"]["responses"][200]["content"]["application/json"]);
     }
     if (
       method === "POST" &&
@@ -1180,6 +1481,24 @@ const server = createServer(
         body.replaceConnectionId !== state.oauthConnectionId
       ) {
         return respond(response, 409, problem(409, "Conflict"));
+      }
+      // The platform never reuses a grant it was asked to replace; this answer
+      // exists so the website's defensive branch is held by a test, and it
+      // names another account than the row's, as that branch must say.
+      if (
+        state.replaceAnswersReused &&
+        body.replaceConnectionId !== undefined
+      ) {
+        return respond(response, 200, {
+          outcome: "reused",
+          connection: {
+            ...oauthConnectionState(),
+            externalAccount: {
+              id: "fixture-other-account",
+              displayName: "Fixture other account",
+            },
+          },
+        } satisfies ConnectionOperations["beginConnectionAuthorization"]["responses"][200]["content"]["application/json"]);
       }
       // Reused only when the grant is connected and nothing is being replaced
       // (backend ADR-0019 §2, §12.1 #175); otherwise consent is asked for.
@@ -1242,8 +1561,14 @@ const server = createServer(
         subscriptions: [
           ...state.projectAutomationScopes.map(projectAutomationSubscription),
           { ...manualSubscription, status: state.manualStatus },
+          webhookSubscription(),
           ...(state.archivableArchived ? [] : [archivableSubscription]),
-          projectDraftSubscription,
+          {
+            ...projectDraftSubscription,
+            unmetConnections: state.draftNeedsConnection
+              ? [oauthProvider.providerId]
+              : [],
+          },
         ],
       } satisfies AutomationOperations["listSubscriptions"]["responses"][200]["content"]["application/json"]);
     }
@@ -1302,6 +1627,181 @@ const server = createServer(
           config,
         },
       } satisfies AutomationOperations["updateSubscription"]["responses"][200]["content"]["application/json"]);
+    }
+    // Backend §12.1 #126: a move to v2, refused while an approval waits.
+    if (
+      method === "PATCH" &&
+      isWorkspacePath(pathname, `/subscriptions/${webhookSubscriptionId}`)
+    ) {
+      const body = (await requestJson(request)) as { templateVersion?: number };
+      if (body.templateVersion !== 2 || !request.headers["idempotency-key"]) {
+        return respond(
+          response,
+          422,
+          problem(422, "Undeclared fixture subscription update"),
+        );
+      }
+      if (state.approvalPendingOnMove) {
+        return respond(response, 409, {
+          ...problem(409, "Conflict"),
+          details: { reason: "approvals_pending" },
+        });
+      }
+      state.webhookVersion = 2;
+      return respond(response, 200, {
+        subscription: webhookSubscription(),
+      } satisfies AutomationOperations["updateSubscription"]["responses"][200]["content"]["application/json"]);
+    }
+    // Backend §12.1 #91: the address, for an owner or admin only; the secret
+    // only in an issue's answer.
+    if (
+      isWorkspacePath(
+        pathname,
+        `/subscriptions/${webhookSubscriptionId}/webhook`,
+      )
+    ) {
+      if (!administering)
+        return respond(response, 403, {
+          ...problem(403, "Forbidden"),
+          details: { requiredRole: "admin" },
+        });
+      const address = `https://hooks.example.test/v1/webhooks/${webhookEndpointId}`;
+      if (method === "GET") {
+        if (state.webhookSecrets === 0) {
+          return respond(response, 404, problem(404, "Not Found"));
+        }
+        return respond(response, 200, {
+          endpointId: webhookEndpointId,
+          url: address,
+          createdAt: now,
+          lastDeliveryAt: now,
+          lastOutcome: "accepted",
+        } satisfies Automations["WebhookEndpoint"]);
+      }
+      if (method === "POST") {
+        state.webhookSecrets += 1;
+        return respond(response, 200, {
+          endpointId: webhookEndpointId,
+          url: address,
+          createdAt: now,
+          secret: `fixture-secret-${state.webhookSecrets}`,
+          rotated: state.webhookSecrets > 1,
+        } satisfies Automations["IssuedWebhookEndpoint"]);
+      }
+    }
+    // FR-14: an upload for the manual automation, which asks for a file.
+    if (method === "POST" && isWorkspacePath(pathname, "/uploads")) {
+      const body = (await requestJson(request)) as {
+        subscriptionId?: string;
+        filename?: string;
+        contentType?: string;
+        sizeBytes?: number;
+      };
+      if (body.subscriptionId !== manualSubscriptionId) {
+        return respond(response, 409, {
+          ...problem(409, "Conflict"),
+          details: { reason: "no_file_input" },
+        });
+      }
+      if (body.contentType !== "application/pdf") {
+        return respond(response, 400, {
+          ...problem(400, "Bad Request"),
+          details: { reason: "content_type_not_accepted" },
+        });
+      }
+      const uploadSessionId = crypto.randomUUID();
+      state.uploads.set(uploadSessionId, {
+        filename: body.filename ?? "file",
+        contentType: body.contentType,
+        sizeBytes: body.sizeBytes ?? 0,
+      });
+      return respond(response, 200, {
+        uploadSessionId,
+        uploadUrl: `https://127.0.0.1:${port}/__fixture/objects/${uploadSessionId}?size=${body.sizeBytes}`,
+        expiresAt: now,
+        maximumSizeBytes: 5_000_000,
+      } satisfies Automations["UploadTicket"]);
+    }
+    const uploadComplete = new RegExp(
+      `^/v1/workspaces/${workspaceId}/uploads/([^/]+)/complete$`,
+      "u",
+    ).exec(pathname);
+    if (method === "POST" && uploadComplete) {
+      const upload = state.uploads.get(uploadComplete[1] ?? "");
+      if (!upload) return respond(response, 404, problem(404, "Not Found"));
+      if (upload.received === undefined) {
+        return respond(response, 400, {
+          ...problem(400, "Bad Request"),
+          details: { reason: "no_object" },
+        });
+      }
+      state.uploads.delete(uploadComplete[1] ?? "");
+      const artifactId = crypto.randomUUID();
+      state.files.set(artifactId, {
+        filename: upload.filename,
+        sizeBytes: upload.received,
+      });
+      return respond(response, 200, {
+        artifact: {
+          artifactId,
+          filename: upload.filename,
+          contentType: upload.contentType,
+          sizeBytes: upload.received,
+        },
+      });
+    }
+    // Backend §12.1 #39: the complete export — running on its first read,
+    // ready with a signed link after, and expired when the fixture says so.
+    if (method === "POST" && isWorkspacePath(pathname, "/exports")) {
+      if (!administering)
+        return respond(response, 403, problem(403, "Forbidden"));
+      if (!request.headers["idempotency-key"]) {
+        return respond(response, 400, problem(400, "Bad Request"));
+      }
+      state.exportJobStarted = true;
+      state.exportJobReads = 0;
+      return respond(response, 200, {
+        export: { id: exportJobId, status: "running", createdAt: now },
+      } satisfies Platform["WorkspaceExportJobResponse"]);
+    }
+    if (
+      method === "GET" &&
+      isWorkspacePath(pathname, `/exports/${exportJobId}`)
+    ) {
+      if (!administering || !state.exportJobStarted) {
+        return respond(response, 404, problem(404, "Not Found"));
+      }
+      state.exportJobReads += 1;
+      if (state.exportExpired) {
+        return respond(response, 200, {
+          export: {
+            id: exportJobId,
+            status: "expired",
+            createdAt: now,
+            completedAt: now,
+            complete: true,
+          },
+        } satisfies Platform["WorkspaceExportJobResponse"]);
+      }
+      return respond(response, 200, {
+        export:
+          state.exportJobReads < 2
+            ? { id: exportJobId, status: "running", createdAt: now }
+            : {
+                id: exportJobId,
+                status: "ready",
+                createdAt: now,
+                completedAt: now,
+                complete: true,
+                file: {
+                  artifactId: exportJobId,
+                  filename: "workspace-export-2026-08-12.json",
+                  sizeBytes: 52,
+                  downloadUrl: `https://127.0.0.1:${port}/__fixture/export-file?read=${state.exportJobReads}`,
+                  expiresAt: now,
+                },
+              },
+      } satisfies Platform["WorkspaceExportJobResponse"]);
     }
     if (
       method === "PATCH" &&
@@ -1366,12 +1866,24 @@ const server = createServer(
         input?: Json;
       };
       const input = body.input ?? {};
+      const { artifactId, ...typed } = input;
+      // FR-14: a file field names a completed upload, given to this run once.
+      const file =
+        typeof artifactId === "string"
+          ? state.files.get(artifactId)
+          : undefined;
+      if (artifactId !== undefined && (!file || file.runId)) {
+        return respond(response, 422, {
+          ...problem(422, "The request could not be processed"),
+          details: { reason: "artifact_unavailable" },
+        });
+      }
       const exact =
         body.subscriptionId === manualSubscriptionId &&
-        Object.keys(input).sort().join() === "amount,reference,vendor" &&
-        typeof input.vendor === "string" &&
-        typeof input.amount === "number" &&
-        typeof input.reference === "string";
+        Object.keys(typed).sort().join() === "amount,reference,vendor" &&
+        typeof typed.vendor === "string" &&
+        typeof typed.amount === "number" &&
+        typeof typed.reference === "string";
       if (!request.headers["idempotency-key"] || !exact) {
         return respond(
           response,
@@ -1379,15 +1891,19 @@ const server = createServer(
           problem(422, "The request could not be processed"),
         );
       }
+      if (file) file.runId = startedRunId;
       return respond(response, 201, {
         run: { ...fixtureRun(startedRunId), status: "pending" },
       } satisfies AutomationOperations["createRun"]["responses"][201]["content"]["application/json"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/runs")) {
-      // Both deterministic runs, so Activity renders rows and the run pages are
-      // reached by a person rather than typed.
+      if (state.runsRead === "failing") {
+        return respond(response, 503, problem(503, "Service Unavailable"));
+      }
+      // The deterministic runs, so Activity renders rows and the run pages are
+      // reached by a person rather than typed — or none, for a new workspace.
       return respond(response, 200, {
-        runs: listedRunIds.map(fixtureRun),
+        runs: state.runsRead === "empty" ? [] : listedRunIds.map(fixtureRun),
       } satisfies AutomationOperations["listRuns"]["responses"][200]["content"]["application/json"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/run-stats")) {
@@ -1440,10 +1956,52 @@ const server = createServer(
         events: [],
       } satisfies AutomationOperations["readRun"]["responses"][200]["content"]["application/json"]);
     }
-    if (method === "GET" && isWorkspacePath(pathname, "/approvals")) {
+    const decision = new RegExp(
+      `^/v1/workspaces/${workspaceId}/approvals/([^/]+)/decision$`,
+      "u",
+    ).exec(pathname);
+    if (method === "POST" && decision) {
+      const approval = state.approvals.find(
+        (entry) => entry.id === decision[1],
+      );
+      if (!approval) return respond(response, 404, problem(404, "Not Found"));
+      const role =
+        fixtureSession === "owner" ||
+        fixtureSession === "admin" ||
+        fixtureSession === "member"
+          ? fixtureSession
+          : null;
+      if (!role || !approval.eligibleRoles.includes(role)) {
+        return respond(response, 403, problem(403, "Forbidden"));
+      }
+      const body = (await requestJson(request)) as { decision?: string };
+      if (
+        !request.headers["idempotency-key"] ||
+        (body.decision !== "approved" && body.decision !== "rejected")
+      ) {
+        return respond(response, 400, problem(400, "Bad Request"));
+      }
+      approval.status = body.decision;
+      approval.decidedAt = now;
+      approval.decidedByUserId = userId;
       return respond(response, 200, {
-        approvals: [],
+        approval,
+      } satisfies AutomationOperations["decideApproval"]["responses"][200]["content"]["application/json"]);
+    }
+    if (method === "GET" && isWorkspacePath(pathname, "/approvals")) {
+      const status = url.searchParams.get("status");
+      return respond(response, 200, {
+        approvals: state.approvals.filter(
+          (entry) => !status || entry.status === status,
+        ),
       } satisfies AutomationOperations["listApprovals"]["responses"][200]["content"]["application/json"]);
+    }
+    if (
+      method === "GET" &&
+      pathname === "/v1/plans" &&
+      state.billingNotConfigured
+    ) {
+      return respond(response, 503, problem(503, "Billing is not configured"));
     }
     if (method === "GET" && pathname === "/v1/plans") {
       // Any signed-in person may read the plan list; the free floor is never
@@ -1480,6 +2038,13 @@ const server = createServer(
           response,
           403,
           problem(403, "Billing requires an admin", { requiredRole: "admin" }),
+        );
+      }
+      if (state.billingNotConfigured) {
+        return respond(
+          response,
+          503,
+          problem(503, "Billing is not configured"),
         );
       }
       const subscribed = state.subscribedPlan.get(billedWorkspace);

@@ -1,7 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { loginHref } from "@/lib/platform-api";
 import { tryAgainIn } from "@/lib/retry-after";
 
 /**
@@ -18,12 +20,19 @@ export function PlatformUnavailable({
   busy = false,
   retryAfterSeconds,
   retry,
+  sessionKept = true,
 }: {
   /** The platform said "too many requests", as opposed to failing. */
   busy?: boolean;
   /** The wait the platform stated with its refusal (`retry-after`), if any. */
   retryAfterSeconds?: number;
   retry?: () => void;
+  /**
+   * Whether the session is known to be there. A layout knows — a 401 has
+   * already sent the person to sign in — but a page's boundary asks first, and
+   * until the answer comes it claims nothing about the session (register F60).
+   */
+  sessionKept?: boolean;
 }) {
   const router = useRouter();
   return (
@@ -41,7 +50,9 @@ export function PlatformUnavailable({
           : "The platform could not answer just now"}
       </h1>
       <p className="text-sm text-[var(--muted)]">
-        You have not been signed out, and nothing was lost.{" "}
+        {sessionKept
+          ? "You have not been signed out, and nothing was lost. "
+          : null}
         {tryAgainIn(busy ? retryAfterSeconds : undefined)}
       </p>
       <div>
@@ -52,6 +63,41 @@ export function PlatformUnavailable({
         >
           Try again
         </Button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The session ended while the page was loading (register F60) — the one failure
+ * a person answers by signing in again, not by waiting. Says so, and the way
+ * back returns to this page.
+ */
+export function SessionEnded() {
+  const pathname = usePathname();
+  return (
+    <section
+      role="alert"
+      aria-labelledby="session-ended-title"
+      className="bubble mx-auto mt-10 flex max-w-lg flex-col gap-3 p-6 sm:p-8"
+    >
+      <h1
+        id="session-ended-title"
+        className="text-xl font-medium text-[var(--text)]"
+      >
+        Your session has ended
+      </h1>
+      <p className="text-sm text-[var(--muted)]">
+        Sign in again to carry on where you were.
+      </p>
+      <div>
+        <Link
+          prefetch={false}
+          href={loginHref(pathname)}
+          className="btn-primary btn-sm inline-flex"
+        >
+          Sign in again
+        </Link>
       </div>
     </section>
   );

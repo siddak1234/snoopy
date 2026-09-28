@@ -636,7 +636,7 @@ Each names the evidence a backend session can re-run.
 - **F1** `DELETE /v1/account` answers its 409 with the raw Access result `{deleted:false, workspaces, reason}` as `application/json` (`snoopy-backend/apps/api/src/app.ts:463-466`), while `snoopy-backend/docs/openapi.yaml:428-435` publishes `application/problem+json` `ApiProblem`; no backend test asserts the 409 at either route. The web branches on status only (#17).
 - **F3** `POST …/billing/portal`: the contract marks the body optional (`required: false`), the Edge answers 400 "Request body is required" on an empty body (`snoopy-backend/packages/http/src/index.ts:225-227`). The web sends `{}`.
 - **F4 / #158** `siddak1234/snoopy`'s GitHub Actions ran and passed on 2026-09-25 (`main` pushes `36140364318` @ `c97d557`, `36147960894` @ `fddcd17`, `36176059273` @ `ba4fd44`; PR runs `36147684131`, `36175809012`, `36186563329`) — §12.1 #158's billing block did not apply to this repository then; and `main` @ `43c2975` was RED on `test:contracts` whenever the sibling was present (fixed by #14) while CI was green without it.
-- **F10** Undocumented 502s on the billing operations (`apps/api/src/modules/entitlements/billing-routes.ts:323,351,368`).
+- **F10** Undocumented 502s on the billing operations (`snoopy-backend/apps/api/src/modules/entitlements/billing-routes.ts:323,351,368`).
 - **F12** SYSTEM-MANIFEST §9's fourth count command (`find . -name '*.test.*'`) counts `node_modules` (351 on this machine on 2026-09-26 — the number moves with `node_modules`); the facts file states `git ls-files --cached --others --exclude-standard` forms for all four units — §9 should quote the facts file.
 - **F14** "163 `@theme` tokens" (AGENTS.md:42, §9.2) is the whole-file custom-property count; 46 sit inside `@theme {}`, and 4 more in an `@theme inline {}` block.
 - **F20 (owner call)** The website offers no Archive/Remove action for a subscription; archiving is the backend's only way to free a plan slot (18.5.3), so a workspace at its plan limit cannot free one from the browser — 18.5.3's client half.
@@ -996,3 +996,62 @@ is fixed here:
 
 **Numbering.** F35 was never assigned; F11, F19 and F36 were closed or withdrawn as recorded
 above. F55 to F63 are new here, and no number is reused.
+
+## Round 15 — the backend's backlog, and the web halves that wait on it — 2026-09-28
+
+Opened in `snoopy-backend` on the owner's word (BUILD-PLAN **Phase 23**, Gate 23), with
+the owner's four decisions of that day. Its backend half landed first:
+- a team member can be taken off a team, and a team's access to a project withdrawn
+  (§12.1 #174), and a grant may name only a team its caller can see (#176);
+- a webhook automation's address is read and issued through the Edge, by an owner or
+  admin (#91, #109), and a subscription says what starts its runs (`triggerKind`);
+- a subscription moves to a newer version in place (#126);
+- a person uploads a file for a run straight to the store (FR-14), its size signed (#139);
+- a workspace is exported whole, as one file (#39).
+
+This repository then regenerated its client from that tree.
+
+| Item | Register | What changed here | Evidence |
+| --- | --- | --- | --- |
+| 23.7.1 | F64 | `.btn-ghost:hover` and `:active` draw the text in `--accent-strong` — 4.6:1 or better on every surface, both themes, where the accent on its own tint fell to 4.06:1 and, pressed, 3.60:1 (dark) | e2e "a ghost button keeps AA contrast when hovered and when pressed (register F64)", RED with `main`'s colours |
+| 23.7.2 | backend #174, #176 | Remove on each member of a team (an owner, admin or the team's manager) and on each team with access to a project (its owner or admin), each confirmed first, in one new `components/dashboard/ConfirmRemoveButton.tsx`; the team's removal acts on the workspace the page showed | e2e "taking someone off a team …" and "a project's owner removes a team's access …"; `test/tenancy-contract.test.mjs` |
+| 23.7.3 | backend #91, #109 | Webhook address on a webhook-started automation, for an owner or admin: create it, see the secret once, make a new one; the secret is never kept | e2e "an owner makes a webhook automation's address …" and "… offered to an admin and to no plain member"; `test/automation-contract.test.mjs` holds the refusal words to the contract's reasons |
+| 23.7.4 | backend #126 | Move to vN on a subscription pinned to an older version, confirmed first, each refusal the platform names said in words | e2e "a subscription pinned to an older version moves …" and "a move the platform holds for a pending approval …"; `test/automation-contract.test.mjs` |
+| 23.7.5 | backend FR-14 | The Run form renders an `artifact` field: choosing a file uploads it straight to the signed URL, cross-origin and with no cookie, and the form carries only its id; Start run waits for it | e2e ×3 in "a file for a run (backend FR-14)", the first reading at the fixture which file the run was given; `test/automation-contract.test.mjs` |
+| 23.7.6 | backend #39 | Export everything, beside the quick export: followed until ready, and its link asked for again when Download is clicked, because one is signed for minutes | e2e "everything is prepared as one file …" (the third read's link) and "… has been removed is said so …"; `test/export-contract.test.mjs` |
+| 23.8.1 | F60 | The account area's boundary asks the platform for the session before it claims anything: a session that ended reads "Your session has ended" with the way back in; one that is there still reads "You have not been signed out" | e2e "3, F60 — …" and the kept case in "a page whose own read fails …"; `test/session-contract.test.mjs` |
+| 23.8.2 | F61 | The shared preflight binds each port on 127.0.0.1, 0.0.0.0 and `::` rather than asking `lsof` | `test/verify-gate.test.mjs` "the preflight refuses a port a server holds, whatever its process is called (register F61)", seen failing on the old preflight |
+| 23.8.3 | F63 | The change audit's evidence keeps each gate's runner counts and both output tails | `test/verify-gate.test.mjs` "… keeps the runner's summary and counts …", seen failing on the old script |
+| 23.8.4 | the 29 surfaces | The register's 27 and F62's two run-time paths, each held: 25 in `e2e/account-surfaces.spec.ts` (each titled with its number), #12 (F47) beside its siblings in the fixture spec, #23 by rendering `app/global-error.tsx` in `test/global-error-render.test.mjs`, F62's session that ends between the proxy and the render in the surfaces spec, and the site with no backend by `npm run probe:no-backend`, a gate in `verify`, the change audit and CI | Each surface's mutation run RED — 27 browser, 1 render, 1 probe (below) |
+| 23.8.5 | the two mutations | `router.refresh()` left `CancelRunButton` inside #24, so that mutation names code `main` never held. `cancelRun`'s two `revalidatePath` calls each refresh both the run's page and Activity under Next 16.3.3 — a server function's revalidation "causes all previously visited pages to refresh when navigated to again", which Next's own `revalidatePath.md` calls temporary — so neither alone can go red. Both are kept, and the pair is held | e2e "the cancelled run reads as cancelled on its page, and Activity reached by Back says so too": both removed RED; each alone green, as the document says |
+| 23.8.6 | Round 14's NEXT | The document check reads what `snoopy-backend`'s copy reads: a strike only for a file a commit once added (a one-commit clone says "not checked"), strikes paired within a paragraph, a link from its own document's folder, another repository never read from disk unless asked, no link inside a code span, and titled, angled and defined links | `test/doc-references.test.mjs`: 11 new plant tests and one changed, each of the twelve seen failing on the old script |
+
+**Found this round, and closed in it:**
+
+- **F65**: CI's `gates` job cloned one commit deep, so the document check could never confirm
+  a strike: every struck path read "not checked". It now fetches the whole history
+  (`fetch-depth: 0`), held by `test/structure-contract.test.mjs`.
+- **F66**: a docs-only change audit ran lint and `format:check` and no document check — the
+  one check a docs-only change most needs. `scripts/audit/run-gates.mjs` runs it, and
+  `record-pass.mjs` requires it.
+- **F67**: the `audit-change` skill told the auditor to check the ports with `lsof`, the check
+  F61 found blind. It now describes the preflight's bind.
+- **F68**: this register named a platform file without its `snoopy-backend/` prefix (F10's
+  `billing-routes.ts`). The old check never read it, because it could not strip a list of
+  line numbers; the ported one did, and the path now carries its prefix.
+- **Not a finding, a fact the probe established**: a production runtime with no
+  `BACKEND_API_ORIGIN` refuses to start (`lib/env.ts`); a Vercel preview is
+  `VERCEL_ENV=preview`, which serves without one, so the probe runs as a preview.
+
+**Bites.** Every new assertion was run RED against the code it guards, each file restored
+with its hash checked:
+- browser, 43: the web halves' 13 (one first stayed green — the dialog also clears the
+  secret when it opens, so both clears were removed), the surfaces' 27 and three more
+  (Delete Account's colours, the kept session, the pair of revalidations);
+- contract, 19: C1–C13 on the web halves, C14–C19 on F60, F65, F62's gate, the render and
+  `verify`;
+- the probe, 1: with the proxy letting a site with no platform through, a visitor lost
+  their return address, and the probe said so.
+
+**Numbering.** F64 was filed by Round 14's fresh audit in `snoopy-backend`'s §0.1 and enters
+this register here. F65 to F68 are new, and no number is reused.

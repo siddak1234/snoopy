@@ -98,3 +98,31 @@ export async function signOutFromPlatform(): Promise<void> {
     throw new Error("Could not sign out");
   }
 }
+
+/**
+ * Sends a file straight to the store, at a URL the platform signed for it
+ * (backend FR-14) — not a platform call, so no cookie and no `/api/platform`.
+ * The size is signed into the URL, and the browser sets `Content-Length` from
+ * the file itself, so only this file fits it.
+ */
+export async function putFileToSignedUrl(
+  url: string,
+  file: Blob,
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "PUT",
+      body: file,
+      credentials: "omit",
+    });
+  } catch {
+    throw new PlatformApiError("The file could not be sent. Try again.", 0);
+  }
+  if (!response.ok) {
+    throw new PlatformApiError(
+      "The file was not accepted. Choose it again.",
+      response.status,
+    );
+  }
+}

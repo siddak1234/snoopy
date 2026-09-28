@@ -403,12 +403,10 @@ test("a manual run is started only from the pinned version's declared input — 
   assert.match(actionsUi, /subscription\.runInput\?\.length \?\? 0\) > 0/);
   assert.match(
     actionsUi,
-    /<RunInputFields runInput=\{subscription\.runInput\}/,
+    /<RunInputFields\s+runInput=\{subscription\.runInput\}/,
   );
   // The pinned version's declaration, not the catalog's newest.
   assert.match(page, /runInput: subscription\.runInput/);
-  // A file field is not rendered: no published operation uploads one here.
-  assert.match(fields, /field\.control !== "artifact"/);
   assert.match(fields, /prefix="input"/);
   // The run is created through the generated client, once per key, and the
   // person is taken to its page.
@@ -525,4 +523,139 @@ test("the account home shows the workspace's own numbers, not fixed zeros (regis
     /href="\/solutions"|href="\/account\/settings"/u,
     "the home's links go to the account's own automations and connections",
   );
+});
+
+/**
+ * The `details.reason` tokens one operation's description names — the words
+ * a person is shown are keyed by them, so each must be one the platform sends.
+ */
+function specReasons(operationId) {
+  const start = spec.indexOf(`operationId: ${operationId}\n`);
+  assert.ok(start > 0, `${operationId} is missing from the specification`);
+  const end = spec.slice(start).search(/\n\s+(?:parameters|requestBody):/u);
+  return [
+    ...new Set(
+      [
+        ...spec.slice(start, start + end).matchAll(/`([a-z]+(?:_[a-z]+)+)`/gu),
+      ].map((match) => match[1]),
+    ),
+  ].sort();
+}
+
+/** The keys of one `Record<string, string>` of refusals in a source file. */
+function refusalKeys(source, name) {
+  const block = new RegExp(
+    `const ${name}: Record<string, string> = \\{([\\s\\S]*?)\\n\\};`,
+    "u",
+  ).exec(source);
+  assert.ok(block, `${name} not found`);
+  return [...block[1].matchAll(/^\s{2}(\w+):/gmu)]
+    .map((match) => match[1])
+    .sort();
+}
+
+const read = (path) =>
+  readFileSync(resolve(import.meta.dirname, "..", path), "utf8");
+
+test("a run's file goes straight to the store, and the run carries only its id (backend FR-14)", () => {
+  const fileField = read("app/account/automations/RunFileField.tsx");
+  const uploads = read("app/account/automations/upload-actions.ts");
+  const browserApi = read("lib/platform-api.ts");
+  // An artifact field is rendered as a file chooser; every other control as
+  // before.
+  assert.match(fields, /field\.control === "artifact" \? \(\s*<RunFileField/u);
+  // The form carries the file's id under the same `input:<key>` name every
+  // other control uses, so the run's input is built one way.
+  assert.match(
+    fileField,
+    /name=\{`input-control:\$\{field\.key\}`\}\s*value="artifact"/u,
+  );
+  assert.match(
+    fileField,
+    /name=\{`input:\$\{field\.key\}`\}\s*value=\{state\.artifactId\}/u,
+  );
+  // The bytes go to the URL the platform signed — never through the website
+  // or the platform's API, and with no cookie.
+  assert.match(
+    fileField,
+    /await putFileToSignedUrl\(opened\.ticket\.uploadUrl, file\)/u,
+  );
+  assert.doesNotMatch(fileField, /platformServerJson|\/api\/platform/u);
+  assert.match(
+    browserApi,
+    /method: "PUT",\s*body: file,\s*credentials: "omit",/u,
+  );
+  // The run waits for the file.
+  assert.match(actionsUi, /disabled=\{pending \|\| uploading\}/u);
+  // Through the generated client, every id encoded where the path is built.
+  assert.match(
+    client,
+    /platformServerJson<UploadTicket>\(`\$\{scope\(workspaceId\)\}\/uploads`/u,
+  );
+  assert.match(
+    client,
+    /platformServerJson<CompleteUploadResponse>\(\s*`\$\{scope\(workspaceId\)\}\/uploads\/\$\{encodeURIComponent\(uploadSessionId\)\}\/complete`/u,
+  );
+  assert.match(uploads, /requireActiveWorkspaceId\(\)/u);
+  if (available) {
+    assert.deepEqual(
+      refusalKeys(uploads, "UPLOAD_REFUSALS"),
+      [...specReasons("openUpload"), ...specReasons("completeUpload")].sort(),
+      "every refusal the two upload operations name is said in words, and no other",
+    );
+  }
+});
+
+test("a subscription moves to the newest version in place, and each refusal the platform names is said in words (backend §12.1 #126)", () => {
+  assert.match(
+    actions,
+    /await updateSubscription\(\s*workspaceId,\s*subscriptionId,\s*\{ templateVersion \},\s*"version",\s*\);\s*revalidatePath\("\/account\/automations"\);/u,
+  );
+  assert.match(
+    page,
+    /subscription\.templateVersion < automation\.version \? \([\s\S]*?<MoveVersionButton/u,
+  );
+  assert.doesNotMatch(page, /archive it and add it again/u);
+  if (available) {
+    assert.deepEqual(
+      refusalKeys(actions, "MOVE_REFUSALS"),
+      specReasons("updateSubscription"),
+    );
+  }
+});
+
+test("a webhook address is offered for a webhook-started automation to an owner or admin only, and its secret is never kept (backend §12.1 #91, #109)", () => {
+  const button = read("app/account/automations/WebhookAddressButton.tsx");
+  const webhook = read("app/account/automations/webhook-actions.ts");
+  assert.match(
+    page,
+    /subscription\.triggerKind === "webhook" && canAdminister \? \(\s*<div>\s*<WebhookAddressButton/u,
+  );
+  assert.match(page, /const canAdminister = administers\(role\);/u);
+  // Shown once, in the dialog, and forgotten when it closes.
+  assert.doesNotMatch(
+    button,
+    /localStorage|sessionStorage|document\.cookie|console\./u,
+  );
+  assert.match(
+    button,
+    /const close = \(\) => \{\s*setOpen\(false\);[\s\S]*?setIssued\(null\);/u,
+  );
+  assert.doesNotMatch(webhook, /console\.|revalidatePath/u);
+  // Issuing takes no idempotency key: a replay would mean storing the secret.
+  assert.match(
+    client,
+    /platformServerJson<IssuedWebhookEndpoint>\(\s*`\$\{scope\(workspaceId\)\}\/subscriptions\/\$\{encodeURIComponent\(subscriptionId\)\}\/webhook`,\s*\{ method: "POST" \},\s*\);/u,
+  );
+  // None issued yet is not an error.
+  assert.match(
+    client,
+    /error instanceof PlatformServerError && error\.status === 404\)\s*return null;/u,
+  );
+  if (available) {
+    assert.deepEqual(
+      refusalKeys(webhook, "ISSUE_REFUSALS"),
+      specReasons("issueWebhookEndpoint"),
+    );
+  }
 });

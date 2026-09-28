@@ -90,7 +90,22 @@ test("no session means 401 — a refused or failed read is not a sign-out", () =
   assert.match(layout, /<PlatformUnavailable/);
   assert.match(layout, /error\.status === 429/);
   const boundary = readFileSync("app/account/error.tsx", "utf8");
-  assert.match(boundary, /<PlatformUnavailable retry=\{retry\} \/>/);
+  // A page's boundary cannot tell a 401 from a 503 — the error reaches the
+  // browser as a digest — so it asks, and claims nothing until the answer
+  // (register F60).
+  assert.match(boundary, /platformApiJson\("\/v1\/session"\)/);
+  assert.match(
+    boundary,
+    /setSession\(sessionEnded\(error\) \? "ended" : "unknown"\)/,
+  );
+  assert.match(
+    boundary,
+    /if \(session === "ended"\) return <SessionEnded \/>;/,
+  );
+  assert.match(
+    boundary,
+    /<PlatformUnavailable retry=\{retry\} sessionKept=\{session === "kept"\} \/>/,
+  );
   // The proxy reads the session too, before any page: it may send a person to
   // sign in on a 401 (or a site with no platform), and on nothing else.
   const proxy = readFileSync("proxy.ts", "utf8");

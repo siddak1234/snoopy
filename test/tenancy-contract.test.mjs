@@ -251,3 +251,46 @@ test("a team's writes act on the workspace the page showed; a grant on the proje
     );
   }
 });
+
+test("taking someone off a team and a team's access away are the published DELETEs, keyed and encoded, each confirmed first (backend §12.1 #174)", () => {
+  assert.match(
+    tenancy,
+    /`\$\{teamPath\(workspaceId, teamId\)\}\/memberships\/\$\{encodeURIComponent\(userId\)\}`,\s*\{\s*method: "DELETE",\s*idempotencyKey: newIdempotencyKey\("team-member-remove"\),/u,
+  );
+  assert.match(
+    tenancy,
+    /`\$\{projectPath\(workspaceId, projectId\)\}\/team-grants\/\$\{encodeURIComponent\(teamId\)\}`,\s*\{\s*method: "DELETE",\s*idempotencyKey: newIdempotencyKey\("project-team-revoke"\),/u,
+  );
+  const actions = readFileSync("app/account/teams/actions.ts", "utf8");
+  // A removal acts on the workspace the team's page showed (register F28); a
+  // revocation on the project's own workspace, resolved on the server.
+  assert.match(
+    actions,
+    /const workspaceId = await activeWorkspaceIfShown\(shownWorkspaceId\);\s*if \(!workspaceId\) return \{ ok: false, error: WORKSPACE_CHANGED \};\s*await removeTeamMembership\(workspaceId, teamId, userId\);/u,
+  );
+  assert.match(
+    actions,
+    /const context = await findAccessibleProject\(projectId\);[\s\S]*?await revokeProjectTeam\(context\.workspace\.id, projectId, teamId\);/u,
+  );
+  const team = readFileSync("app/account/teams/[teamId]/page.tsx", "utf8");
+  assert.match(
+    team,
+    /action=\{removeTeamMemberAction\.bind\(\s*null,\s*workspace\.id,\s*team\.id,\s*membership\.userId,\s*\)\}/u,
+  );
+  assert.doesNotMatch(team, /not available yet/u);
+  // Offered to the project's owner or admin only, as the grant is.
+  const project = readFileSync("app/account/projects/[id]/page.tsx", "utf8");
+  assert.match(
+    project,
+    /\{canManage \? \(\s*<ConfirmRemoveButton[\s\S]*?action=\{revokeProjectTeamAction\.bind\(\s*null,\s*project\.id,\s*grant\.teamId,\s*\)\}/u,
+  );
+  const confirm = readFileSync(
+    "components/dashboard/ConfirmRemoveButton.tsx",
+    "utf8",
+  );
+  assert.match(confirm, /<Modal[\s\S]*?ariaLabelledBy=/u);
+  assert.match(
+    confirm,
+    /const result = await action\(\);\s*if \(!result\.ok\) \{\s*setError\(result\.error\);\s*return;\s*\}/u,
+  );
+});

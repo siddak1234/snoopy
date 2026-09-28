@@ -1,51 +1,22 @@
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test, type Page, type Request } from "@playwright/test";
+import {
+  automationCard,
+  expectNoAxeViolations,
+  fixtureControl,
+  fixtureRead,
+  observe,
+  presentSession,
+  providerCard,
+} from "./helpers";
 
 const requesterUserId = "66666666-6666-4666-8666-666666666666";
 const organizationWorkspaceId = "11111111-1111-4111-8111-111111111111";
 const personalWorkspaceId = "88888888-8888-4888-8888-888888888888";
 const busy = "The platform is busy right now. Try again in 30 seconds.";
 
-// Requests of one shape, observed as they leave the page.
-function observe(page: Page, matches: (request: Request) => boolean): string[] {
-  const seen: string[] = [];
-  page.on("request", (request) => {
-    if (matches(request)) seen.push(request.url());
-  });
-  return seen;
-}
 const isLogout = (request: Request) =>
   request.method() === "POST" && request.url().includes("/v1/auth/logout");
-
-// WCAG 2.2 AA on whatever the page shows now — an open dialog included. On a
-// settled document: a server action's re-render replaces the head, and a scan
-// that lands in that instant finds no <title> that is there before and after.
-// A title that never arrives still fails, here, by name.
-async function expectNoAxeViolations(page: Page) {
-  await expect(page).toHaveTitle(/\S/u);
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-    .analyze();
-  expect(results.violations).toEqual([]);
-}
-
-// An automation's card on the automations page, found by its heading.
-function automationCard(page: Page, name: string) {
-  return page.getByRole("heading", { name }).locator("xpath=../../..");
-}
-
-// A provider's card under "Available connections", found by its name.
-function providerCard(page: Page, name: string) {
-  return page.getByText(name, { exact: true }).locator("xpath=../..");
-}
-
-// The fixture's own controls, never the published API.
-async function fixtureControl(name: string) {
-  const answer = await fetch(`https://127.0.0.1:3443/__fixture/${name}`, {
-    method: "POST",
-  });
-  expect(answer.status).toBe(204);
-}
 
 test.use({ storageState: process.env.PLAYWRIGHT_AUTH_STORAGE_STATE });
 test.skip(
@@ -220,12 +191,15 @@ test("a live automation whose pinned version declares run input is started from 
     name: "Run Manual input automation",
   });
   await expect(dialog).toBeVisible();
-  // The declared fields, in order; the file field is not rendered, because no
-  // published operation uploads one from a form.
+  // The declared fields, in order. The file is optional, so a run starts
+  // without one (backend FR-14; a file is chosen in the tests below).
   await expect(dialog.getByLabel("Vendor")).toBeVisible();
   await expect(dialog.getByLabel("Amount")).toHaveAttribute("type", "number");
   await expect(dialog.getByLabel("Invoice reference")).toBeVisible();
-  await expect(dialog.getByText("Invoice file")).toHaveCount(0);
+  await expect(dialog.getByLabel("Invoice file")).toHaveAttribute(
+    "type",
+    "file",
+  );
   await expectNoAxeViolations(page);
   await dialog.getByLabel("Vendor").fill("Acme Supplies");
   await dialog.getByLabel("Amount").fill("120.50");
@@ -234,22 +208,6 @@ test("a live automation whose pinned version declares run input is started from 
   await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
   await expect(page.getByText("Manual", { exact: true })).toBeVisible();
 });
-
-// Switches the fixture session this browser presents, mid-page — the platform
-// starting to refuse a person who is already looking at a form.
-async function presentSession(
-  page: Page,
-  value: "owner" | "throttled" | "member" | "requester" | "admin",
-) {
-  await page.context().addCookies([
-    {
-      name: "e2e-public-edge-session",
-      value,
-      domain: "127.0.0.1",
-      path: "/",
-    },
-  ]);
-}
 
 test("a refused start keeps what was typed and the same idempotency key, so resubmitting cannot start a second run", async ({
   page,
@@ -358,6 +316,251 @@ test("Pause and Go live move a live subscription and back, and the card follows 
   await card.getByRole("button", { name: "Go live" }).click();
   await expect(card.getByText(/^live$/i)).toBeVisible();
   await expect(card.getByRole("button", { name: "Pause" })).toBeVisible();
+});
+
+test("a subscription pinned to an older version moves to the newest in place, confirmed first (backend §12.1 #126)", async ({
+  page,
+}) => {
+  await page.goto("/account/automations");
+  const card = automationCard(page, "Webhook automation");
+  await expect(card).toContainText("This runs v1; v2 is available.");
+  const move = card.getByRole("button", { name: "Move to v2" });
+  await move.click();
+  const dialog = page.getByRole("dialog", {
+    name: "Move Webhook automation to v2?",
+  });
+  await expect(dialog).toContainText(
+    "New runs use v2; runs v1 already made are kept as they are.",
+  );
+  await expectNoAxeViolations(page);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(move).toBeFocused();
+  await move.click();
+  await dialog.getByRole("button", { name: "Move to v2" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // It runs the newest now, so nothing is offered to move to.
+  await expect(card.getByText("This runs v1; v2 is available.")).toHaveCount(0);
+  await expect(card.getByRole("button", { name: "Move to v2" })).toHaveCount(0);
+});
+
+test("a move the platform holds for a pending approval is said in words, and the subscription stays where it was (backend §12.1 #126)", async ({
+  page,
+}) => {
+  await fixtureControl("approval-pending-on-move");
+  await page.goto("/account/automations");
+  const card = automationCard(page, "Webhook automation");
+  await card.getByRole("button", { name: "Move to v2" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Move Webhook automation to v2?",
+  });
+  await dialog.getByRole("button", { name: "Move to v2" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "An approval for this automation is still waiting. Decide it first, then move.",
+  );
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await page.reload();
+  await expect(card).toContainText("This runs v1; v2 is available.");
+});
+
+test("an owner makes a webhook automation's address, sees its secret once, and a new secret keeps the address (backend §12.1 #91, #109)", async ({
+  page,
+}) => {
+  const address =
+    "https://hooks.example.test/v1/webhooks/efefefef-efef-4fef-8fef-efefefefefef";
+  await page.goto("/account/automations");
+  const card = automationCard(page, "Webhook automation");
+  // A manual automation has no address to give.
+  await expect(
+    automationCard(page, "Manual input automation").getByRole("button", {
+      name: "Webhook address",
+    }),
+  ).toHaveCount(0);
+  const open = card.getByRole("button", { name: "Webhook address" });
+  await open.click();
+  const dialog = page.getByRole("dialog", { name: "Webhook address" });
+  await expect(
+    dialog.getByText("This automation has no address yet."),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Create address" }).click();
+  await expect(dialog.getByText("fixture-secret-1")).toBeVisible();
+  await expect(dialog).toContainText(address);
+  await expectNoAxeViolations(page);
+  // A new secret keeps the address and replaces the one shown.
+  await dialog.getByRole("button", { name: "Make a new secret" }).click();
+  await expect(dialog.getByText("fixture-secret-2")).toBeVisible();
+  await expect(dialog.getByText("fixture-secret-1")).toHaveCount(0);
+  await expect(dialog).toContainText(address);
+  // Closed, the secret is gone; opened again, the address and its last
+  // delivery are read, and no secret is.
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await open.click();
+  await expect(dialog).toContainText(address);
+  await expect(dialog).toContainText("Last delivery");
+  await expect(dialog.getByText(/fixture-secret/u)).toHaveCount(0);
+  await expect(
+    dialog.getByRole("button", { name: "Make a new secret" }),
+  ).toBeVisible();
+});
+
+test("a webhook automation's address is offered to an admin and to no plain member (backend §12.1 #109)", async ({
+  page,
+}) => {
+  await presentSession(page, "admin");
+  await page.goto("/account/automations");
+  await expect(
+    automationCard(page, "Webhook automation").getByRole("button", {
+      name: "Webhook address",
+    }),
+  ).toBeVisible();
+  await presentSession(page, "member");
+  await page.reload();
+  const card = automationCard(page, "Webhook automation");
+  await expect(card.getByRole("button", { name: "Move to v2" })).toBeVisible();
+  await expect(
+    card.getByRole("button", { name: "Webhook address" }),
+  ).toHaveCount(0);
+});
+
+// What the fixture's object store holds, read at the fixture: the run's page
+// does not show the input it was started with.
+function fixtureFiles() {
+  return fixtureRead<{ filename: string; sizeBytes: number; runId?: string }[]>(
+    "files",
+  );
+}
+
+// The Run dialog of the manual automation, with its three typed fields filled.
+async function openFilledRun(page: Page) {
+  await page.goto("/account/automations");
+  await automationCard(page, "Manual input automation")
+    .getByRole("button", { name: "Run", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "Run Manual input automation",
+  });
+  await dialog.getByLabel("Vendor").fill("Acme Supplies");
+  await dialog.getByLabel("Amount").fill("120.50");
+  await dialog.getByLabel("Invoice reference").fill("INV-1001");
+  return dialog;
+}
+
+const invoicePdf = {
+  name: "invoice.pdf",
+  mimeType: "application/pdf",
+  buffer: Buffer.from("%PDF-1.4 fixture invoice"),
+};
+
+test.describe("a file for a run (backend FR-14)", () => {
+  // The browser PUTs the file straight to the fixture's object store, whose
+  // certificate is the fixture's own.
+  test.use({ ignoreHTTPSErrors: true });
+
+  test("a chosen file goes straight to the object store, cross-origin, and the run is started with it", async ({
+    page,
+  }) => {
+    const puts = observe(
+      page,
+      (request) =>
+        request.method() === "PUT" &&
+        request.url().startsWith("https://127.0.0.1:3443/__fixture/objects/"),
+    );
+    const dialog = await openFilledRun(page);
+    await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
+    await expect(
+      dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+    ).toBeVisible();
+    expect(puts).toHaveLength(1);
+    await expectNoAxeViolations(page);
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
+    // The platform received the file's id, and gave the file to that run.
+    expect(await fixtureFiles()).toEqual([
+      { filename: "invoice.pdf", sizeBytes: 24, runId: "fixture-run-started" },
+    ]);
+  });
+
+  test("the run waits for the file: Start run is held while it uploads", async ({
+    page,
+  }) => {
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(
+      "https://127.0.0.1:3443/__fixture/objects/**",
+      async (route) => {
+        await held;
+        await route.continue();
+      },
+    );
+    const dialog = await openFilledRun(page);
+    await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
+    await expect(dialog.getByText("Uploading invoice.pdf…")).toBeVisible();
+    await expect(
+      dialog.getByRole("button", { name: "Uploading…" }),
+    ).toBeDisabled();
+    release();
+    await expect(
+      dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole("button", { name: "Start run" }),
+    ).toBeEnabled();
+  });
+
+  test("a file of a type the automation does not take is refused in words, and nothing is sent", async ({
+    page,
+  }) => {
+    const puts = observe(
+      page,
+      (request) =>
+        request.method() === "PUT" && request.url().includes("/__fixture/"),
+    );
+    const dialog = await openFilledRun(page);
+    await dialog.getByLabel("Invoice file").setInputFiles({
+      name: "invoice.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("not an invoice"),
+    });
+    await expect(dialog.getByRole("alert")).toHaveText(
+      "This automation does not accept that type of file.",
+    );
+    expect(puts).toEqual([]);
+    // The file is optional: the run still starts, with no file.
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
+    expect(await fixtureFiles()).toEqual([]);
+  });
+});
+
+test("a ghost button keeps AA contrast when hovered and when pressed (register F64)", async ({
+  page,
+}) => {
+  await page.goto("/account/automations");
+  const archive = automationCard(page, "Archivable automation").getByRole(
+    "button",
+    { name: "Archive" },
+  );
+  // Each state is scanned once its transition has finished.
+  const settled = () =>
+    archive.evaluate((element) =>
+      Promise.all(
+        element.getAnimations().map((animation) => animation.finished),
+      ),
+    );
+  const contrast = () =>
+    new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
+  await archive.hover();
+  await settled();
+  expect((await contrast()).violations).toEqual([]);
+  await page.mouse.down();
+  await settled();
+  expect((await contrast()).violations).toEqual([]);
+  // Released elsewhere, so nothing is archived.
+  await page.mouse.move(0, 0);
+  await page.mouse.up();
 });
 
 test("a card lists each subscription under its scope, and Add offers only the scopes it is not in yet (register F21)", async ({
@@ -512,7 +715,7 @@ test("a figure the platform cannot answer reads Unavailable, and the rest of the
       .locator("dt", { hasText: term })
       .locator("xpath=following-sibling::dd[1]");
   await expect(figure("Runs this month")).toHaveText("Unavailable");
-  await expect(figure("Automations")).toHaveText("3");
+  await expect(figure("Automations")).toHaveText("4");
   await expect(figure("Integrations")).toHaveText("1");
   await expect(
     page.getByRole("link", { name: "Run of Manual input automation, running" }),
@@ -556,9 +759,9 @@ test("the dashboard shows the workspace's own numbers and names its recent runs 
     page
       .locator("dt", { hasText: term })
       .locator("xpath=following-sibling::dd[1]");
-  // Three subscriptions that are not archived; the platform's tally of this
-  // month's runs; no connected integration yet.
-  await expect(figure("Automations")).toHaveText("3");
+  // Four subscriptions that are not archived; the platform's tally of this
+  // month's runs; the one connected integration.
+  await expect(figure("Automations")).toHaveText("4");
   await expect(figure("Runs this month")).toHaveText(
     "3 · 1 succeeded · 1 failed",
   );
@@ -622,6 +825,56 @@ test("workspace export distinguishes complete and partial public responses", asy
   await expect(page.getByText("This is a partial export.")).toBeVisible();
 });
 
+test.describe("the complete export (backend §12.1 #39)", () => {
+  // The download link is the fixture's own, as a signed store URL would be.
+  test.use({ ignoreHTTPSErrors: true });
+
+  test("everything is prepared as one file, and Download asks for a fresh link when it is clicked", async ({
+    page,
+  }) => {
+    await page.goto("/account/settings");
+    await page.getByRole("button", { name: "Export everything" }).click();
+    await expect(
+      page.getByRole("button", { name: "Preparing everything…" }),
+    ).toBeDisabled();
+    // Read as running once, then ready: the page asks again on its own.
+    await expect(
+      page.getByText("Ready. The file holds the whole workspace."),
+    ).toBeVisible({ timeout: 15_000 });
+    await expectNoAxeViolations(page);
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download file" }).click();
+    const file = await download;
+    expect(file.suggestedFilename()).toBe("workspace-export.json");
+    // The third read's link — asked for at the click, not kept from the second.
+    expect(new URL(file.url()).searchParams.get("read")).toBe("3");
+  });
+});
+
+test("a complete export's file that has been removed is said so, and nothing is downloaded (backend §12.1 #39)", async ({
+  page,
+}) => {
+  const downloads: string[] = [];
+  page.on("download", (download) => downloads.push(download.url()));
+  await page.goto("/account/settings");
+  await page.getByRole("button", { name: "Export everything" }).click();
+  await expect(
+    page.getByText("Ready. The file holds the whole workspace."),
+  ).toBeVisible({ timeout: 15_000 });
+  await fixtureControl("export-expired");
+  await page.getByRole("button", { name: "Download file" }).click();
+  await expect(
+    page.getByText("That file has been removed. Export again for a new one."),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Download file" })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByRole("button", { name: "Export everything" }),
+  ).toBeEnabled();
+  expect(downloads).toEqual([]);
+});
+
 test("the workspace switcher drives the public active-workspace operation", async ({
   page,
 }) => {
@@ -677,11 +930,39 @@ test("an owner sees every team and creates one; a team lists who is on it, and o
   await expect(
     members.filter({ hasText: "Fixture Member" }).locator("span"),
   ).toHaveText(/^member$/i);
-  // No removal is offered: no operation publishes one (backend §12.1 #174).
-  await expect(page.getByRole("button", { name: /remove/i })).toHaveCount(0);
-  await expect(
-    page.getByText("Removing someone from a team is not available yet."),
-  ).toBeVisible();
+});
+
+test("taking someone off a team is confirmed first, a refusal keeps them on it, and the team's list follows (backend §12.1 #174)", async ({
+  page,
+}) => {
+  await page.goto(operationsTeam);
+  const members = page.locator("main li");
+  await expect(members).toHaveCount(1);
+  const remove = members
+    .filter({ hasText: "Fixture Member" })
+    .getByRole("button", { name: "Remove" });
+  await remove.click();
+  const dialog = page.getByRole("dialog", {
+    name: "Remove Fixture Member from Operations?",
+  });
+  await expect(dialog).toContainText(
+    "They lose any project access the team gave them.",
+  );
+  await expectNoAxeViolations(page);
+  // Cancel changes nothing and hands focus back.
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(remove).toBeFocused();
+  await expect(members).toHaveCount(1);
+  // A refusal is said in the dialog, and the person is still on the team.
+  await remove.click();
+  await presentSession(page, "throttled");
+  await dialog.getByRole("button", { name: "Remove" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(busy);
+  await presentSession(page, "owner");
+  await dialog.getByRole("button", { name: "Remove" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByText("No one is on this team yet.")).toBeVisible();
 });
 
 test("a team's manager who is a plain member manages their team — and sees neither the others nor the organization page (backend ADR-0010)", async ({
@@ -742,6 +1023,42 @@ test("a project's owner gives a team access, and the project lists the teams gra
     page.getByText("No team has access to this project."),
   ).toHaveCount(0);
   await expectNoAxeViolations(page);
+});
+
+test("a project's owner removes a team's access, confirmed first, and a plain member on the project is offered no removal (backend §12.1 #174)", async ({
+  page,
+}) => {
+  const project = "/account/projects/33333333-3333-4333-8333-333333333333";
+  await page.goto(project);
+  await page
+    .getByLabel("Team", { exact: true })
+    .selectOption({ label: "Operations" });
+  await page.getByLabel("Role on this project").selectOption("member");
+  await page.getByRole("button", { name: "Give access" }).click();
+  const granted = page.locator("main li").filter({ hasText: "Operations" });
+  await expect(granted).toContainText(/member/i);
+
+  // A plain member reads the grant and is offered nothing to change it.
+  await presentSession(page, "member");
+  await page.reload();
+  await expect(granted).toContainText(/member/i);
+  await expect(granted.getByRole("button", { name: "Remove" })).toHaveCount(0);
+
+  await presentSession(page, "owner");
+  await page.reload();
+  await granted.getByRole("button", { name: "Remove" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Remove Operations's access to Fixture Project?",
+  });
+  await expect(dialog).toContainText(
+    "Its members keep any access they hold on their own.",
+  );
+  await expectNoAxeViolations(page);
+  await dialog.getByRole("button", { name: "Remove access" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    page.getByText("No team has access to this project."),
+  ).toBeVisible();
 });
 
 test("anyone on a project reads the teams granted to it, and only its owner or admin is offered the grant (backend ADR-0010)", async ({
@@ -910,6 +1227,9 @@ test("a page whose own read fails says so inside the account shell, and Try agai
     page.getByRole("link", { name: "Billing", exact: true }).first(),
   ).toBeVisible();
   await expect(page).toHaveURL(/\/account\/billing$/);
+  // The boundary asked, and the session is still there, so it says so
+  // (register F60).
+  await expect(page.getByText("You have not been signed out")).toBeVisible();
   await expectNoAxeViolations(page);
   const before = billingReads.length;
   await page.getByRole("button", { name: "Try again" }).click();
@@ -1137,7 +1457,7 @@ test("a member is offered no control the platform would refuse them — connecti
     page.getByText("Exporting a workspace is for its owners and admins"),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Prepare export" }),
+    page.getByRole("button", { name: /^(Prepare export|Export everything)$/ }),
   ).toHaveCount(0);
 });
 
@@ -1410,6 +1730,50 @@ test("a 401 right after a lost answer hedges — the account may already be gone
     dialog.getByRole("link", { name: "Sign in again" }),
   ).toBeVisible();
   await expect(page).toHaveURL(/\/account\/settings$/);
+});
+
+test("a 409 after a lost answer clears the hedge — the account is still here, so a later 401 is only a session that ended (register F47)", async ({
+  page,
+}) => {
+  const answers: ("lost" | "partial" | "expired")[] = [
+    "lost",
+    "partial",
+    "expired",
+  ];
+  await page.route(/\/api\/platform\/v1\/account$/, (route) => {
+    const answer = answers.shift();
+    if (answer === "lost") {
+      return route.fulfill({
+        status: 502,
+        contentType: "text/html",
+        body: "<!doctype html><title>502</title><p>Bad Gateway</p>",
+      });
+    }
+    if (answer === "partial") {
+      return route.fulfill({
+        status: 409,
+        contentType: "application/problem+json",
+        body: JSON.stringify({ title: "Conflict", status: 409 }),
+      });
+    }
+    return route.fulfill(unauthenticated);
+  });
+  await page.goto("/account/settings");
+  await page.getByRole("button", { name: "Delete Account" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Yes, delete my account" }).click();
+  await expect(dialog.getByRole("alert")).toContainText(UNKNOWN_OUTCOME);
+  await dialog.getByRole("button", { name: "Try again" }).click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "so your account is still here",
+  );
+  await dialog.getByRole("button", { name: "Try again" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Your session ended, so this attempt did not run. Sign in again to come back here.",
+  );
+  await expect(
+    dialog.getByRole("link", { name: "Sign in again" }),
+  ).toBeVisible();
 });
 
 test("a session that ended while the settings page was open is said, with the way back in (register F40)", async ({

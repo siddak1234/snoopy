@@ -485,11 +485,17 @@ html[data-theme="light"] .brand-mark {
     color 150ms ease;
 }
 
+/* The tint darkens the ground under accent text (register F64): the resting
+   accent passes WCAG AA on every surface, but on the tinted hover and pressed
+   grounds it fell to 4.06:1 (dark, on a surface) and 3.60:1 (dark, pressed).
+   The stronger accent step keeps both at 4.6:1 or above, in both themes. */
 .btn-ghost:hover {
+  color: var(--accent-strong);
   background: color-mix(in srgb, var(--color-accent) 10%, transparent);
 }
 
 .btn-ghost:active {
+  color: var(--accent-strong);
   background: color-mix(in srgb, var(--color-accent) 18%, transparent);
 }
 

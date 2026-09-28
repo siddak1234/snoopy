@@ -38,7 +38,9 @@ One command, the whole offline gate, in this order: `format:check`, `lint`,
 `typecheck`, `audit:boundaries`, `test:contracts`, `verify:platform-contracts`
 (skipped out loud when `../snoopy-backend` is not checked out beside this
 repository), `build:no-backend` (the site with no backend, as a Vercel preview
-builds it), `build` with `BACKEND_API_ORIGIN=https://backend.invalid` plus the
+builds it), `probe:no-backend` (that build served as a preview serves it: the
+public pages load, the account area sends a visitor to sign in, and readiness
+says "not configured"), `build` with `BACKEND_API_ORIGIN=https://backend.invalid` plus the
 `/api/platform` rewrite assertion CI makes, `test:browser`, and
 `test:browser:fixtures`. The browser suites run in Chromium, Firefox and WebKit
 (NFR-36); the marketing screenshots are Chromium's baselines alone. A run in
@@ -48,14 +50,20 @@ this repository's facts file to `.autom8x/repo-facts/snoopy.json` (gitignored;
 skip the sibling gate says so and emits nothing. Run it on Node 22 (`.nvmrc`), the version
 CI and the container use. Running it while `/audit-change` runs, or the reverse,
 is refused — both build into `.next` and serve on ports 3001 and 3443, so they
-share one lock.
+share one lock, and a port anything already listens on is refused before either
+starts (the preflight binds each one; `lsof` cannot see a renamed `next-server`).
 
 `npm run test:browser:fixtures` starts a loopback-only HTTPS Edge fixture with
 a temporary certificate and scans every authenticated page with axe. Its tests
 drive the published operations the website calls — automations and runs,
-connections, teams and project access, billing, export, account deletion, and
-the platform's refusals — without real accounts or credentials, and each test
-starts from the fixture's first state. The playbook's human keyboard
+a run's file (PUT straight to the fixture's object store, across origins),
+moving a subscription to a newer version, a webhook automation's address,
+connections, teams and project access (given and taken away), billing, the
+quick and the complete export, account deletion, and the platform's refusals —
+without real accounts or credentials, and each test starts from the fixture's
+first state. Three specs: `e2e/accessibility.spec.ts`,
+`e2e/public-edge-fixture.spec.ts` and `e2e/account-surfaces.spec.ts` (every
+surface a change audit probed and no test asserted), sharing `e2e/helpers.ts`. The playbook's human keyboard
 traversal (NFR-35) has a hand-over test in the same suite:
 `KEYBOARD_JOURNEY=1 node scripts/run-browser-fixtures.mjs --headed --grep "keyboard journey"`
 opens the built site against the fixture, signed in, and pauses for the person
@@ -81,6 +89,7 @@ secret provisioning belongs to the deployment configuration round, not here.
 | `npm run verify` | The whole offline gate in one command; emits the facts file |
 | `npm run build` | Production build |
 | `npm run build:no-backend` | The build a Vercel preview makes: no `BACKEND_API_ORIGIN` |
+| `npm run probe:no-backend` | Serve that build as a preview does, and check what a visitor gets |
 | `npm run test:contracts` | Public-contract and boundary behavior tests |
 | `npm run generate:platform-contracts` | Regenerate the typed client from `../snoopy-backend`'s published contracts |
 | `npm run verify:platform-contracts` | Report a generated type that differs from its contract; changes nothing |

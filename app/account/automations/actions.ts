@@ -243,6 +243,55 @@ export async function archiveSubscription(
   return result;
 }
 
+/**
+ * The refusals a move can meet that a person can act on (backend §12.1 #126),
+ * in words. Anything else is the platform's own message.
+ */
+const MOVE_REFUSALS: Record<string, string> = {
+  approvals_pending:
+    "An approval for this automation is still waiting. Decide it first, then move.",
+  version_unavailable: "That version is no longer available.",
+  subscription_archived: "An archived automation cannot move.",
+  invalid_config:
+    "Its settings do not fit that version. Open Set up, fix them, then move.",
+  unmet_connections:
+    "That version needs an account this workspace has not connected. Connect it first, or pause the automation and move.",
+  setup_incomplete:
+    "That version needs a setting this automation does not have yet. Pause it, move, then finish Set up.",
+};
+
+/** Moves a subscription to another version of its automation (backend §12.1 #126). */
+export async function moveSubscriptionVersion(
+  formData: FormData,
+): Promise<ActionResult> {
+  const subscriptionId = String(formData.get("subscriptionId") ?? "");
+  const templateVersion = Number(formData.get("templateVersion"));
+  if (
+    !subscriptionId ||
+    !Number.isInteger(templateVersion) ||
+    templateVersion < 1
+  ) {
+    return { ok: false, error: "Choose a version to move to." };
+  }
+  try {
+    const workspaceId = await requireActiveWorkspaceId();
+    await updateSubscription(
+      workspaceId,
+      subscriptionId,
+      { templateVersion },
+      "version",
+    );
+    revalidatePath("/account/automations");
+    return { ok: true };
+  } catch (error) {
+    if (!(error instanceof PlatformServerError)) throw error;
+    const reason = error.details?.reason;
+    const known =
+      typeof reason === "string" ? MOVE_REFUSALS[reason] : undefined;
+    return { ok: false, error: known ?? error.message };
+  }
+}
+
 export async function setSubscriptionStatus(
   formData: FormData,
 ): Promise<ActionResult> {

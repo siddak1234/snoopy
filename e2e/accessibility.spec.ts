@@ -1,5 +1,6 @@
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { fixtureControl, presentSession } from "./helpers";
 
 const publicRoutes = [
   "/",
@@ -75,10 +76,7 @@ test.describe("authenticated product accessibility baseline", () => {
   // Against the fixture, from its first state, as the fixture suite starts.
   test.beforeEach(async () => {
     if (!againstFixture) return;
-    const reset = await fetch("https://127.0.0.1:3443/__fixture/reset", {
-      method: "POST",
-    });
-    expect(reset.status).toBe(204);
+    await fixtureControl("reset");
   });
 
   for (const { path, fixture } of authenticatedRoutes) {
@@ -88,16 +86,7 @@ test.describe("authenticated product accessibility baseline", () => {
         "names the fixture's own records; scanned against the fixture only",
       );
       const session = fixture?.session;
-      if (session) {
-        await page.context().addCookies([
-          {
-            name: "e2e-public-edge-session",
-            value: session,
-            domain: "127.0.0.1",
-            path: "/",
-          },
-        ]);
-      }
+      if (session) await presentSession(page, session);
       await page.emulateMedia({ reducedMotion: "reduce" });
       const response = await page.goto(path);
       // Still on the page asked for — not sent to sign-in or elsewhere.

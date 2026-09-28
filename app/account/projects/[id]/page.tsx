@@ -16,6 +16,8 @@ import { ProjectMemberPicker } from "@/components/dashboard/ProjectMemberPicker"
 import { ProjectMemberList } from "@/components/dashboard/ProjectMemberList";
 import type { MemberRow } from "@/components/dashboard/ProjectMemberList";
 import type { AvailableMember } from "@/components/dashboard/ProjectMemberPicker";
+import { ConfirmRemoveButton } from "@/components/dashboard/ConfirmRemoveButton";
+import { revokeProjectTeamAction } from "@/app/account/teams/actions";
 import { ProjectTeamGrantForm } from "./ProjectTeamGrantForm";
 
 export default async function ProjectDetailPage({
@@ -139,9 +141,25 @@ export default async function ProjectDetailPage({
                   <span className="text-sm font-medium text-[var(--text)]">
                     {teamName.get(grant.teamId) ?? "A team you are not on"}
                   </span>
-                  <span className="text-xs text-[var(--muted)] capitalize">
-                    {grant.role}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-[var(--muted)] capitalize">
+                      {grant.role}
+                    </span>
+                    {canManage ? (
+                      <ConfirmRemoveButton
+                        label="Remove"
+                        busyLabel="Removing…"
+                        title={`Remove ${teamName.get(grant.teamId) ?? "this team"}'s access to ${project.name}?`}
+                        description="Its members keep any access they hold on their own. You can give the team access again."
+                        confirmLabel="Remove access"
+                        action={revokeProjectTeamAction.bind(
+                          null,
+                          project.id,
+                          grant.teamId,
+                        )}
+                      />
+                    ) : null}
+                  </div>
                 </li>
               ))}
             </ul>

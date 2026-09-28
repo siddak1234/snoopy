@@ -57,6 +57,8 @@ export function AutomationActions({
   // One run per key: made when the Run dialog opens and again whenever a value
   // changes, so only a resubmission of the same values reuses it.
   const [runKey, setRunKey] = useState("");
+  // A file field uploads as soon as a file is chosen; the run waits for it.
+  const [uploading, setUploading] = useState(false);
   const newRunKey = () => setRunKey(`run-${crypto.randomUUID()}`);
 
   const submit = (
@@ -293,7 +295,11 @@ export function AutomationActions({
               value={subscription.id}
             />
             <input type="hidden" name="idempotencyKey" value={runKey} />
-            <RunInputFields runInput={subscription.runInput} />
+            <RunInputFields
+              runInput={subscription.runInput}
+              subscriptionId={subscription.id}
+              onUploadingChange={setUploading}
+            />
             <FormError message={error} />
             <div className="flex flex-wrap gap-2 pt-2">
               <Button
@@ -304,8 +310,8 @@ export function AutomationActions({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={pending}>
-                {pending ? "Starting…" : "Start run"}
+              <Button type="submit" disabled={pending || uploading}>
+                {pending ? "Starting…" : uploading ? "Uploading…" : "Start run"}
               </Button>
             </div>
           </form>

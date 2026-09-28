@@ -11,6 +11,8 @@ import {
 } from "@/lib/tenancy";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
+import { ConfirmRemoveButton } from "@/components/dashboard/ConfirmRemoveButton";
+import { removeTeamMemberAction } from "../actions";
 import { TeamMemberForm } from "./TeamMemberForm";
 
 export const dynamic = "force-dynamic";
@@ -94,9 +96,24 @@ export default async function TeamPage({
                         </p>
                       ) : null}
                     </div>
-                    <span className="text-xs text-[var(--muted)] capitalize">
-                      {membership.role}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[var(--muted)] capitalize">
+                        {membership.role}
+                      </span>
+                      <ConfirmRemoveButton
+                        label="Remove"
+                        busyLabel="Removing…"
+                        title={`Remove ${label(membership.userId)} from ${team.name}?`}
+                        description="They lose any project access the team gave them. You can add them again."
+                        confirmLabel="Remove"
+                        action={removeTeamMemberAction.bind(
+                          null,
+                          workspace.id,
+                          team.id,
+                          membership.userId,
+                        )}
+                      />
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -116,9 +133,6 @@ export default async function TeamPage({
                   : member.email,
               }))}
             />
-            <p className="mt-3 text-xs text-[var(--muted)]">
-              Removing someone from a team is not available yet.
-            </p>
           </div>
         </>
       ) : (
