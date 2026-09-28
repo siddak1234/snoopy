@@ -27,7 +27,10 @@ test("tenancy facade aliases generated public schemas", () => {
 });
 
 test("tenancy mutations use unique idempotency keys", () => {
-  assert.match(tenancy, /import \{ newIdempotencyKey, platformServerJson \}/);
+  assert.match(
+    tenancy,
+    /import \{[^}]*\bnewIdempotencyKey\b[^}]*\bplatformServerJson\b[^}]*\} from "@\/lib\/platform-server"/su,
+  );
   for (const prefix of [
     "workspace-create",
     "workspace-update",
@@ -63,19 +66,82 @@ test("bounded session previews are never used as workspace authority", () => {
   assert.match(tenancy, /activeWorkspaceId/);
   assert.doesNotMatch(tenancy, /\[0\]\?\.id/);
   for (const file of [
-    "app/account/automations/actions.ts",
     "app/account/automations/page.tsx",
-    "app/account/connections/actions.ts",
     "app/account/connections/page.tsx",
     "app/account/runs/page.tsx",
     "app/account/runs/[runId]/page.tsx",
-    "app/account/settings/export-actions.ts",
     "app/account/approvals/page.tsx",
+    "app/account/billing/page.tsx",
   ]) {
     const source = readFileSync(file, "utf8");
     assert.match(source, /resolveActiveWorkspaceId/);
     assert.doesNotMatch(source, /session\?\.workspaces|session\.workspaces/);
   }
+  // Every action module resolves its workspace through ONE helper (register
+  // F28), which reads the session, never a workspace the form names.
+  for (const file of [
+    "app/account/automations/actions.ts",
+    "app/account/billing/actions.ts",
+    "app/account/connections/actions.ts",
+    "app/account/settings/export-actions.ts",
+  ]) {
+    const source = readFileSync(file, "utf8");
+    assert.match(source, /requireActiveWorkspaceId\(\)/u, file);
+    assert.doesNotMatch(
+      source,
+      /async function activeWorkspaceId|resolveActiveWorkspaceId|session\?\.workspaces|session\.workspaces/u,
+      `${file} keeps no private copy of the workspace resolution`,
+    );
+  }
+  assert.match(
+    tenancy,
+    /export async function requireActiveWorkspaceId\(\): Promise<string> \{\s*const workspaceId = await resolveActiveWorkspaceId\(await getAppSession\(\)\);/u,
+  );
+});
+
+test("a page offers owner-or-admin controls by the platform's own rule (register F8)", () => {
+  // Connections, the workspace export and billing are owner-or-admin at the
+  // Edge; a page reads the role from the workspace list and offers the controls
+  // only to those it will not refuse.
+  assert.match(
+    tenancy,
+    /export function administers\(role: WorkspaceRole \| undefined\): boolean \{\s*return role === "owner" \|\| role === "admin";\s*\}/u,
+  );
+  assert.match(
+    tenancy,
+    /return \(await listWorkspaces\(\)\)\.find\(\(entry\) => entry\.id === workspaceId\)\s*\?\.role;/u,
+  );
+  const connections = readFileSync("app/account/connections/page.tsx", "utf8");
+  assert.match(connections, /canManage=\{administers\(role\)\}/u);
+  const panel = readFileSync(
+    "app/account/connections/ConnectionsPanel.tsx",
+    "utf8",
+  );
+  // Every control that changes the connection sits behind the gate.
+  assert.equal(
+    (panel.match(/\{canManage \? \(/gu) ?? []).length,
+    2,
+    "Disconnect and Connect/Reconnect are each behind canManage",
+  );
+  const settings = readFileSync("app/account/settings/page.tsx", "utf8");
+  assert.match(
+    settings,
+    /<WorkspaceExportSection canExport=\{canExport\} \/>/u,
+  );
+  assert.match(settings, /const canExport = administers\(/u);
+  const exportSection = readFileSync(
+    "app/account/settings/WorkspaceExportSection.tsx",
+    "utf8",
+  );
+  assert.match(exportSection, /\{canExport \? \(/u);
+});
+
+test("the workspace list is read once per request (register F27)", () => {
+  assert.match(
+    tenancy,
+    /const listWorkspaceCollection = cache\(/u,
+    "memoised like getAppSession: the layout and the page share one read",
+  );
 });
 
 test("organization lifecycle UI uses only documented domain and join operations", () => {

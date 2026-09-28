@@ -1,5 +1,7 @@
 import { cookies, headers } from "next/headers";
 import { backendApiOrigin } from "@/lib/backend-origin";
+import { requestCookieHeader } from "@/lib/cookie-header";
+import { busyMessage, retryAfterSeconds } from "@/lib/retry-after";
 
 /**
  * Server-side calls to the backend, from a Server Component or a Server Action.
@@ -24,6 +26,8 @@ export class PlatformServerError extends Error {
     public readonly code?: string,
     /** Public, structured details. Callers must whitelist what they render. */
     public readonly details?: Record<string, unknown>,
+    /** From a 429's `retry-after`: how long the platform asked to be left. */
+    public readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = "PlatformServerError";
@@ -70,6 +74,16 @@ function publicProblem(value: unknown): Problem {
   };
 }
 
+/**
+ * The path of one workspace's resources — every workspace-scoped call builds its
+ * path here, so an id is always encoded (register F9). The id comes from the
+ * server's own session read, but a path that could be steered by one is a path
+ * built in one place.
+ */
+export function workspacePath(workspaceId: string): string {
+  return `/v1/workspaces/${encodeURIComponent(workspaceId)}`;
+}
+
 export async function platformServerJson<T>(
   path: string,
   init?: RequestInit & { idempotencyKey?: string },
@@ -77,7 +91,7 @@ export async function platformServerJson<T>(
   const origin = backendApiOrigin();
   if (!origin) throw new PlatformNotConfiguredError();
 
-  const cookieStore = await cookies();
+  const cookieHeader = requestCookieHeader(await cookies());
   // The Edge refuses cookie-carrying mutations whose Origin is not the public
   // web origin (its CSRF check). Server-side fetch sends no Origin on its own,
   // so forward the caller's — a value Next has already verified against Host
@@ -93,7 +107,7 @@ export async function platformServerJson<T>(
       ...request,
       headers: {
         "content-type": "application/json",
-        cookie: cookieStore.toString(),
+        cookie: cookieHeader,
         origin: requestOrigin,
         ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
         ...request.headers,
@@ -110,6 +124,16 @@ export async function platformServerJson<T>(
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     const problem = publicProblem(body);
+    if (response.status === 429) {
+      const wait = retryAfterSeconds(response.headers.get("retry-after"));
+      throw new PlatformServerError(
+        busyMessage(wait),
+        429,
+        problem.code,
+        problem.details,
+        wait,
+      );
+    }
     throw new PlatformServerError(
       problem.title ?? fallbackProblemTitle(response.status),
       response.status,
@@ -150,6 +174,16 @@ export async function platformPublicJson<T>(
   }
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
+    if (response.status === 429) {
+      const wait = retryAfterSeconds(response.headers.get("retry-after"));
+      throw new PlatformServerError(
+        busyMessage(wait),
+        429,
+        undefined,
+        undefined,
+        wait,
+      );
+    }
     throw new PlatformServerError(
       fallbackProblemTitle(response.status),
       response.status,

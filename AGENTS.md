@@ -24,9 +24,10 @@ repository; this repo **reads** them and never edits them.
 
 > That path is outside this working directory. Run `/add-dir ../snoopy-backend`
 > at the start of the session (or launch with `--add-dir`) so the read succeeds
-> without a prompt. **Read access only.** From Round 5 you will also read
-> `docs/openapi/*.yaml` from there to generate the API client — reading a
-> contract is correct; editing one from a web session is not.
+> without a prompt. **Read access only.** `npm run generate:platform-contracts`
+> also reads `docs/openapi.yaml`, `docs/openapi/automations.yaml` and
+> `docs/openapi/connections.yaml` from there to generate the API client —
+> reading a contract is correct; editing one from a web session is not.
 
 **If §0 STATUS does not name `snoopy` as the open repository, you are in the
 wrong repo.** Say so and stop. Then read the current round's card in
@@ -39,18 +40,22 @@ wrong repo.** Say so and stop. Then read the current round's card in
 2. **The design system is the asset.** Reuse `components/ui` primitives and
    `components/dashboard`; no new component may duplicate one that exists.
    Marketing pages must render byte-identically — screenshot diff.
-3. **No raw hex** outside the 163 `@theme` tokens in `app/globals.css`.
-   (`app/opengraph-image.tsx` is the one exemption: OG image generation cannot
-   read CSS custom properties.)
-4. **No hand-written `fetch`.** Use `lib/platform-api.ts`; from Round 5 the
-   response types are generated from the backend's `docs/openapi/*.yaml`.
+3. **No raw hex** outside `app/globals.css`, where the design tokens are
+   defined. (`app/opengraph-image.tsx` is the one exemption: OG image
+   generation cannot read CSS custom properties.) `npm run audit:boundaries`
+   refuses a hex colour anywhere else; comments are not code.
+4. **No hand-written `fetch`.** Use `lib/platform-api.ts` in the browser and
+   `lib/platform-server.ts` on the server. The response types are generated
+   from the backend's published contracts into
+   `lib/generated/platform-contracts/` — regenerate, never hand-edit; each
+   file names the sha256 of the contract it came from.
 5. **The browser holds no secret** — no Supabase key, no database URL, no
    provider token. `npm run audit:boundaries` enforces this in CI and a direct
    database import is an unconditional failure.
-6. **Prisma is being removed, in Round 5, via plan items 4.6.4–4.6.7.** The 17
-   files still importing it are tracked work — do not delete them ad hoc, and do
-   not add an eighteenth.
-7. `npm run build` and `npm run lint` clean before every commit.
+6. **Prisma is gone** — removed in Round 5 (plan items 4.6.4–4.6.7). Rule 5's
+   audit refuses it, a direct database import, or a Supabase SDK coming back.
+7. **`npm run verify` green before every commit** — the whole offline gate in
+   one command, listed in the README.
 8. **No push without a passing change audit.** `/audit-change` must PASS for the
    exact tree being pushed — it maps the blast radius of the change and tests
    it, not just the changed feature. The Claude hook in `.claude/settings.json`

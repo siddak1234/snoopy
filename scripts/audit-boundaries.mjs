@@ -48,10 +48,33 @@ const removedRouteFiles = [
   "app/api/job-descriptions/file/route.ts",
 ];
 
+// Colour lives in the design tokens (register F14): a hex literal anywhere but
+// app/globals.css, where the tokens are defined, is a colour the theme cannot
+// change. app/opengraph-image.tsx is the one exemption — image generation cannot
+// read CSS custom properties. Comments are not code: "§12.1 #160" names a
+// register row, not a colour.
+const hexColour =
+  /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9A-Za-z_-])/u;
+const hexAllowed = new Set(["app/globals.css", "app/opengraph-image.tsx"]);
+
+function withoutComments(source) {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//gu, "")
+    .replace(/(^|[^:"'`\\])\/\/.*$/gmu, "$1");
+}
+
 const failures = [];
 for (const file of files) {
   const content = readFileSync(file, "utf8");
   const path = relative(root, file);
+  if (!hexAllowed.has(path)) {
+    const colour = withoutComments(content).match(hexColour);
+    if (colour) {
+      failures.push(
+        `${path}: raw hex colour ${colour[0]} — use a design token from app/globals.css`,
+      );
+    }
+  }
   for (const rule of forbiddenRuntimePatterns) {
     if (rule.pattern.test(content)) failures.push(`${path}: ${rule.label}`);
   }
@@ -83,7 +106,7 @@ if (failures.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    "Boundary audit passed. Browser secrets, direct database, storage, and manual-login paths: 0.",
+    "Boundary audit passed. Browser secrets, direct database, storage, manual-login paths and raw hex colours: 0.",
   );
 }
 
@@ -94,7 +117,7 @@ function walk(path) {
     const candidate = join(path, entry);
     const stats = statSync(candidate);
     if (stats.isDirectory()) output.push(...walk(candidate));
-    else if ([".ts", ".tsx"].includes(extname(candidate)))
+    else if ([".ts", ".tsx", ".css"].includes(extname(candidate)))
       output.push(candidate);
   }
   return output;

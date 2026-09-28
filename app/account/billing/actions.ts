@@ -1,13 +1,13 @@
 "use server";
 
-import { getAppSession } from "@/lib/app-session";
-import type {
-  BillingCheckoutRequest,
-  BillingPortalRequest,
-  HostedBillingSession,
+import {
+  createBillingCheckout,
+  createBillingPortal,
+  type BillingCheckoutRequest,
+  type HostedBillingSession,
 } from "@/lib/billing";
-import { platformServerJson, PlatformServerError } from "@/lib/platform-server";
-import { resolveActiveWorkspaceId } from "@/lib/tenancy";
+import { PlatformServerError } from "@/lib/platform-server";
+import { requireActiveWorkspaceId } from "@/lib/tenancy";
 
 /**
  * Checkout and the portal are provider-hosted (ADR-0025): the platform answers
@@ -27,13 +27,6 @@ export type BillingActionResult =
 // workspace the server resolves, never one the browser names.
 const WORKSPACE_CHANGED =
   "The active workspace changed in another tab. Reload this page before continuing.";
-
-async function activeWorkspaceId(): Promise<string> {
-  const session = await getAppSession();
-  const workspaceId = await resolveActiveWorkspaceId(session);
-  if (!workspaceId) throw new PlatformServerError("No active workspace", 401);
-  return workspaceId;
-}
 
 // A hosted session is a capability, not a credential, and it is only ever an
 // https URL. Anything else is refused here rather than navigated to.
@@ -69,18 +62,14 @@ export async function beginBillingCheckout(
 ): Promise<BillingActionResult> {
   if (!planId) return { ok: false, error: "A plan is required" };
   try {
-    const workspaceId = await activeWorkspaceId();
+    const workspaceId = await requireActiveWorkspaceId();
     if (workspaceId !== shownWorkspaceId) {
       return { ok: false, error: WORKSPACE_CHANGED };
     }
     // No successUrl or cancelUrl: the platform defaults to the deployment's own
     // configured return URL and refuses any other origin.
     const body: BillingCheckoutRequest = { planId };
-    const session = await platformServerJson<HostedBillingSession>(
-      `/v1/workspaces/${workspaceId}/billing/checkout`,
-      { method: "POST", body: JSON.stringify(body) },
-    );
-    return hosted(session);
+    return hosted(await createBillingCheckout(workspaceId, body));
   } catch (error) {
     return failure(error);
   }
@@ -90,19 +79,12 @@ export async function openBillingPortal(
   shownWorkspaceId: string,
 ): Promise<BillingActionResult> {
   try {
-    const workspaceId = await activeWorkspaceId();
+    const workspaceId = await requireActiveWorkspaceId();
     if (workspaceId !== shownWorkspaceId) {
       return { ok: false, error: WORKSPACE_CHANGED };
     }
-    // The contract marks the body optional; the Edge still requires a JSON
-    // body, so an empty object is sent rather than none. No returnUrl, for the
-    // same reason as above.
-    const body: BillingPortalRequest = {};
-    const session = await platformServerJson<HostedBillingSession>(
-      `/v1/workspaces/${workspaceId}/billing/portal`,
-      { method: "POST", body: JSON.stringify(body) },
-    );
-    return hosted(session);
+    // No returnUrl, for the same reason as above.
+    return hosted(await createBillingPortal(workspaceId));
   } catch (error) {
     // The portal answers 409 when the workspace has no billing account yet: the
     // client sends the person to checkout rather than showing a conflict. Only

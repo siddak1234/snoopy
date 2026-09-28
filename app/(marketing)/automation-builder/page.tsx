@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Button } from "@/components/ui/Button";
+import { loginHref } from "@/lib/platform-api";
 import { Container, Section } from "@/components/ui/Section";
 import { Kicker } from "@/components/ui/Kicker";
 import { NumberedStep } from "@/components/ui/NumberedStep";
@@ -11,6 +12,11 @@ export const metadata: Metadata = {
   description:
     "Draw the workflow. Watch it run. Design visually, wire in AI agents, set review points — then put it to work.",
 };
+
+// The drag-and-drop builder was removed from the account area (`415e57a`), so a
+// customer signing in from here lands on their automations — the page that
+// exists (register F53). What this page's copy promises is the owner's call.
+const SIGN_IN = loginHref("/account/automations");
 
 const features = [
   {
@@ -42,10 +48,7 @@ export default function AutomationBuilderPage() {
             to work.
           </p>
           <div className="mt-7 flex flex-wrap gap-2.5">
-            <Button
-              href="/login?callbackUrl=%2Faccount%2Fbuilder"
-              variant="primary"
-            >
+            <Button href={SIGN_IN} variant="primary">
               Log in to the Builder
             </Button>
             <Button href="/contact" variant="ghost">
@@ -84,10 +87,7 @@ export default function AutomationBuilderPage() {
             Already a customer? Your automations are waiting.
           </h2>
           <div className="flex flex-wrap gap-2.5">
-            <Button
-              href="/login?callbackUrl=%2Faccount%2Fbuilder"
-              variant="primary"
-            >
+            <Button href={SIGN_IN} variant="primary">
               Log in
             </Button>
             <Button href="/contact" variant="ghost">

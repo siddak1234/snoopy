@@ -5,13 +5,14 @@ import type {
   RefAttributes,
 } from "react";
 
-type Variant = "primary" | "secondary" | "ghost";
+type Variant = "primary" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
 
 const variantClass: Record<Variant, string> = {
   primary: "btn-primary",
   secondary: "btn-secondary",
   ghost: "btn-ghost",
+  danger: "btn-danger",
 };
 
 const sizeClass: Record<Size, string> = {

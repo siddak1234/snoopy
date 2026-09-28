@@ -1,7 +1,7 @@
 # Snoopy website architecture
 
-Status: **Round 5 web boundary implemented for incremental merge; Round 5 exit
-gates remain open**
+This describes what the code does. Where the project stands — the round, the
+open repository, what is next — is `snoopy-backend`'s MASTER-PLAN §0.1.
 
 Snoopy is the Autom8x web client and same-origin BFF surface. The backend Edge
 API owns identity, tenancy, product data, provider credentials, artifacts,
@@ -16,7 +16,9 @@ browser ──same origin──> /api/platform/v1/* ──> Edge API ──> own
 `BACKEND_API_ORIGIN` is the website's only build/runtime setting. Next bakes the
 same-origin rewrite into the production build; the origin is never exposed as a
 browser configuration value. Server components, actions, and proxy session
-lookups forward only the browser's host-only session cookies to Edge.
+lookups forward the request's cookies to Edge as `name=value` pairs and nothing
+else (register F51); the Edge's host-only session cookies are the only cookies
+this origin holds.
 
 ## Rules enforced in this repository
 
@@ -36,7 +38,10 @@ Login is backend-mediated OAuth. The website renders only the provider policy
 published by Edge; OAuth client registration, redirect allowlists, PKCE, token
 exchange, refresh, and provider secrets stay backend-managed. Connector OAuth
 is distinct from login identity and follows the public connection-provider
-contract.
+contract: Reconnect keeps the connected account, and **Replace account** is a
+separate, confirmed owner-or-admin intent that names the exact connection it
+replaces (backend ADR-0019 §4, ADR-0026). A grant that already holds what the
+provider asks for is reused without consent, and the page says so.
 
 ## Container and operations
 
@@ -49,19 +54,14 @@ Infrastructure resource allocation and production secret management are
 deployment concerns. This repository deliberately proves the interfaces with
 typed, credential-free fixtures rather than storing local resource settings.
 
-Round 5 was re-entered on 2026-09-24 as BUILD-PLAN Phase 20 and its items
-landed here — the regenerated client (#14), `npm run verify` and the facts file
-(#15), the billing page on ADR-0025's four operations (#16), ADR-0028's
-account-deletion copy (#17, #19), and the retired Run-now dialog (#18). The
-re-read register and the evidence behind Gate 20 are in the Round 5 audit
-(`docs/audits/2026-08-11-round-5-phase-1-status.md`, "Round 5 re-entry
-disposition"); Gate 20's cells and boxes are filled in the backend-owned
-BUILD-PLAN at the close, which this repository cannot edit. Live observation is
-still carried — production answers 503.
+What each round changed is recorded in the backend-owned BUILD-PLAN; this
+repository's findings and their dispositions are the register in
+`docs/audits/2026-08-11-round-5-phase-1-status.md`.
 
 ## Verification
 
 Run the commands in the README. The fixture browser audit provides disposable
 HTTPS, an authenticated cookie-only session, and deterministic public Edge
 responses; it is not a substitute for a real non-production OAuth-provider
-observation when that environment is provisioned.
+observation when that environment is provisioned — whose provider registration
+must then allow the audit origin `http://127.0.0.1:3001` explicitly.

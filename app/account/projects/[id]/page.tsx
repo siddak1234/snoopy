@@ -4,6 +4,8 @@ import { getAppSession } from "@/lib/app-session";
 import {
   findAccessibleProject,
   listProjectMemberships,
+  listProjectTeamGrants,
+  listTeams,
   listWorkspaceMembers,
 } from "@/lib/tenancy";
 import SectionCard from "@/components/dashboard/SectionCard";
@@ -13,6 +15,7 @@ import { ProjectMemberPicker } from "@/components/dashboard/ProjectMemberPicker"
 import { ProjectMemberList } from "@/components/dashboard/ProjectMemberList";
 import type { MemberRow } from "@/components/dashboard/ProjectMemberList";
 import type { AvailableMember } from "@/components/dashboard/ProjectMemberPicker";
+import { ProjectTeamGrantForm } from "./ProjectTeamGrantForm";
 
 export default async function ProjectDetailPage({
   params,
@@ -28,9 +31,17 @@ export default async function ProjectDetailPage({
   const isTeamProject = workspace.type === "organization";
   const canManage =
     project.viewerRole === "owner" || project.viewerRole === "admin";
-  const memberships = isTeamProject
-    ? await listProjectMemberships(workspace.id, project.id)
-    : [];
+  // Teams exist only in an organization. Anyone with a role on the project
+  // reads its grants; the names come from the teams this person may see, so a
+  // team they are not on reads as one (backend ADR-0010).
+  const [memberships, grants, teams] = isTeamProject
+    ? await Promise.all([
+        listProjectMemberships(workspace.id, project.id),
+        listProjectTeamGrants(workspace.id, project.id),
+        listTeams(workspace.id),
+      ])
+    : [[], [], []];
+  const teamName = new Map(teams.map((team) => [team.id, team.name]));
   const workspaceMembers = canManage
     ? await listWorkspaceMembers(workspace.id)
     : [];
@@ -105,6 +116,41 @@ export default async function ProjectDetailPage({
             members={memberRows}
             leaveRedirect="/account/projects"
           />
+        </div>
+      ) : null}
+
+      {isTeamProject ? (
+        <div className="border-t border-[var(--ring)] py-5 pb-0">
+          <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
+            Teams with access
+          </h2>
+          {grants.length === 0 ? (
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              No team has access to this project.
+            </p>
+          ) : (
+            <ul className="mt-3 divide-y divide-[var(--ring)]">
+              {grants.map((grant) => (
+                <li
+                  key={grant.teamId}
+                  className="flex flex-wrap items-center justify-between gap-2 py-3"
+                >
+                  <span className="text-sm font-medium text-[var(--text)]">
+                    {teamName.get(grant.teamId) ?? "A team you are not on"}
+                  </span>
+                  <span className="text-xs text-[var(--muted)] capitalize">
+                    {grant.role}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {canManage && teams.length > 0 ? (
+            <ProjectTeamGrantForm
+              projectId={project.id}
+              teams={teams.map((team) => ({ id: team.id, name: team.name }))}
+            />
+          ) : null}
         </div>
       ) : null}
     </SectionCard>

@@ -1,15 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { loginHref } from "@/lib/platform-api";
 import { fetchPlatformSessionForProxy } from "@/lib/platform-proxy";
 
 function loginRedirect(request: NextRequest): NextResponse {
-  const destination = request.nextUrl.clone();
-  destination.pathname = "/login";
-  destination.search = "";
-  destination.searchParams.set(
-    "callbackUrl",
-    `${request.nextUrl.pathname}${request.nextUrl.search}`,
+  return NextResponse.redirect(
+    new URL(
+      loginHref(`${request.nextUrl.pathname}${request.nextUrl.search}`),
+      request.url,
+    ),
   );
-  return NextResponse.redirect(destination);
 }
 
 export default async function proxy(request: NextRequest) {

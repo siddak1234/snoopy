@@ -4,6 +4,25 @@ export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
   reporter: process.env.CI ? "github" : "list",
+  // The visual baselines are Chromium's and keep the names they had before the
+  // other engines joined — no project in the name — so they are not re-recorded.
+  snapshotPathTemplate:
+    "{snapshotDir}/{testFileDir}/{testFileName}-snapshots/{arg}{-snapshotSuffix}{ext}",
+  // NFR-36: the functional and accessibility suites run in all three engines;
+  // the marketing baselines are one engine's pixels, so they stay Chromium's.
+  projects: [
+    { name: "chromium", use: { browserName: "chromium" } },
+    {
+      name: "firefox",
+      use: { browserName: "firefox" },
+      testIgnore: /marketing\.visual\.spec\.ts/,
+    },
+    {
+      name: "webkit",
+      use: { browserName: "webkit" },
+      testIgnore: /marketing\.visual\.spec\.ts/,
+    },
+  ],
   use: {
     baseURL: "http://127.0.0.1:3001",
     viewport: { width: 1440, height: 1000 },

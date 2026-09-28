@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -46,6 +47,17 @@ for (const { input, output } of contracts) {
     cwd: root,
     stdio: "inherit",
   });
+  // Each file names the contract it came from by the hash of that contract's
+  // bytes (register F7), so which version of the backend's contract the website
+  // was built against is read from the file, not recorded by hand beside it.
+  const source = relative(backendRoot, input);
+  const sha256 = createHash("sha256").update(readFileSync(input)).digest("hex");
+  writeFileSync(
+    output,
+    `// From snoopy-backend ${source}, sha256 ${sha256}.\n` +
+      "// Regenerate with `npm run generate:platform-contracts`; never edit by hand.\n" +
+      readFileSync(output, "utf8"),
+  );
   execFileSync(prettier, [output, "--write"], {
     cwd: root,
     stdio: "inherit",

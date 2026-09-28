@@ -5,7 +5,11 @@ import {
   listConnectionProviders,
   listConnections,
 } from "@/lib/connections";
-import { resolveActiveWorkspaceId } from "@/lib/tenancy";
+import {
+  administers,
+  resolveActiveWorkspaceId,
+  roleInWorkspace,
+} from "@/lib/tenancy";
 import { ConnectionsPanel } from "./ConnectionsPanel";
 
 export const dynamic = "force-dynamic";
@@ -30,11 +34,12 @@ export default async function ConnectionsPage({
     );
   }
 
-  const [providers, connections] = await Promise.all([
+  const [providers, connections, role] = await Promise.all([
     emptyConnectionsWhenUnavailable(listConnectionProviders, { providers: [] }),
     emptyConnectionsWhenUnavailable(() => listConnections(workspaceId), {
       connections: [],
     }),
+    roleInWorkspace(workspaceId),
   ]);
 
   return (
@@ -45,6 +50,7 @@ export default async function ConnectionsPage({
       <ConnectionsPanel
         connections={connections.connections}
         providers={providers.providers}
+        canManage={administers(role)}
         callbackStatus={
           status === "connected" || status === "error" ? status : null
         }

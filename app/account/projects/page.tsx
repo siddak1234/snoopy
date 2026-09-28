@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
+import { loginHref } from "@/lib/platform-api";
 import { listAccessibleProjects } from "@/lib/tenancy";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { ProjectList } from "@/components/dashboard/ProjectList";
@@ -8,7 +9,7 @@ import { CreateProjectButton } from "@/components/dashboard/CreateProjectButton"
 
 export default async function AccountProjectsPage() {
   const session = await getAppSession();
-  if (!session) redirect("/login?callbackUrl=/account/projects");
+  if (!session) redirect(loginHref("/account/projects"));
 
   const accessible = await listAccessibleProjects();
   const items = accessible

@@ -34,10 +34,12 @@ const DURATION_FLOORS = {
   "test:browser:fixtures": 15,
 };
 const FULL_GATES = [
+  "format:check",
   "lint",
   "typecheck",
   "audit:boundaries",
   "test:contracts",
+  "verify:platform-contracts",
   "build",
   "test:browser",
   "test:browser:fixtures",

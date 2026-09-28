@@ -1,24 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getAppSession } from "@/lib/app-session";
+import { PlatformServerError } from "@/lib/platform-server";
 import {
-  newIdempotencyKey,
-  platformServerJson,
-  PlatformServerError,
-} from "@/lib/platform-server";
-import type {
-  CreateRunRequest,
-  CreateRunResponse,
-  CreateSubscriptionRequest,
-  CreateSubscriptionResponse,
-  DecideApprovalRequest,
-  DecideApprovalResponse,
-  UpdateSubscriptionRequest,
-  UpdateSubscriptionResponse,
+  cancelRun as cancelWorkspaceRun,
+  createRun,
+  createSubscription,
+  decideApproval as decideWorkspaceApproval,
+  updateSubscription,
+  type CreateRunRequest,
+  type CreateSubscriptionRequest,
+  type DecideApprovalRequest,
+  type UpdateSubscriptionRequest,
 } from "@/lib/automations";
 import { subscriptionEntitlementState } from "@/lib/subscription-entitlements";
-import { resolveActiveWorkspaceId } from "@/lib/tenancy";
+import { requireActiveWorkspaceId } from "@/lib/tenancy";
 
 /**
  * Mutations on the automation surface.
@@ -47,19 +43,12 @@ export type ActionResult =
       state?: "plan-limit" | "entitlements-unavailable";
     };
 
-async function activeWorkspaceId(): Promise<string> {
-  const session = await getAppSession();
-  const workspaceId = await resolveActiveWorkspaceId(session);
-  if (!workspaceId) throw new PlatformServerError("No active workspace", 401);
-  return workspaceId;
-}
-
 /** Turns a refusal into something renderable, and lets the unexpected surface. */
 async function attempt(
   run: (workspaceId: string) => Promise<unknown>,
 ): Promise<ActionResult> {
   try {
-    await run(await activeWorkspaceId());
+    await run(await requireActiveWorkspaceId());
     return { ok: true };
   } catch (error) {
     if (error instanceof PlatformServerError) {
@@ -99,17 +88,18 @@ export async function subscribeToAutomation(
 ): Promise<ActionResult> {
   const templateId = String(formData.get("templateId") ?? "");
   if (!templateId) return { ok: false, error: "An automation is required" };
+  // Empty is "the whole workspace"; anything else names a project the platform
+  // checks the person can see (18.6.2) — one they cannot is 404, not a hint.
+  const projectId = String(formData.get("projectId") ?? "");
 
-  const body: CreateSubscriptionRequest = { templateId };
+  const body: CreateSubscriptionRequest = {
+    templateId,
+    ...(projectId ? { projectId } : {}),
+  };
   try {
-    const workspaceId = await activeWorkspaceId();
-    const response = await platformServerJson<CreateSubscriptionResponse>(
-      `/v1/workspaces/${workspaceId}/subscriptions`,
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-        idempotencyKey: newIdempotencyKey("subscribe"),
-      },
+    const response = await createSubscription(
+      await requireActiveWorkspaceId(),
+      body,
     );
     revalidatePath("/account/automations");
     return { ok: true, subscriptionId: response.subscription.id };
@@ -163,13 +153,11 @@ export async function saveSubscriptionConfiguration(
 
   const body: UpdateSubscriptionRequest = { config };
   const result = await attempt((workspaceId) =>
-    platformServerJson<UpdateSubscriptionResponse>(
-      `/v1/workspaces/${workspaceId}/subscriptions/${subscriptionId}`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(body),
-        idempotencyKey: newIdempotencyKey("subscription-config"),
-      },
+    updateSubscription(
+      workspaceId,
+      subscriptionId,
+      body,
+      "subscription-config",
     ),
   );
   if (result.ok) revalidatePath("/account/automations");
@@ -202,14 +190,10 @@ export async function startRun(formData: FormData): Promise<ActionResult> {
     input: declaredValues(formData, "input"),
   };
   try {
-    const workspaceId = await activeWorkspaceId();
-    const response = await platformServerJson<CreateRunResponse>(
-      `/v1/workspaces/${workspaceId}/runs`,
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-        idempotencyKey,
-      },
+    const response = await createRun(
+      await requireActiveWorkspaceId(),
+      body,
+      idempotencyKey,
     );
     revalidatePath("/account/runs");
     return { ok: true, runId: response.run.id };
@@ -246,14 +230,7 @@ export async function archiveSubscription(
 
   const body: UpdateSubscriptionRequest = { status: "archived" };
   const result = await attempt((workspaceId) =>
-    platformServerJson<UpdateSubscriptionResponse>(
-      `/v1/workspaces/${workspaceId}/subscriptions/${subscriptionId}`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(body),
-        idempotencyKey: newIdempotencyKey("archive"),
-      },
-    ),
+    updateSubscription(workspaceId, subscriptionId, body, "archive"),
   );
   if (result.ok) {
     revalidatePath("/account/automations");
@@ -273,14 +250,7 @@ export async function setSubscriptionStatus(
 
   const body: UpdateSubscriptionRequest = { status };
   const result = await attempt((workspaceId) =>
-    platformServerJson<UpdateSubscriptionResponse>(
-      `/v1/workspaces/${workspaceId}/subscriptions/${subscriptionId}`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(body),
-        idempotencyKey: newIdempotencyKey("status"),
-      },
-    ),
+    updateSubscription(workspaceId, subscriptionId, body, "status"),
   );
   if (result.ok) revalidatePath("/account/automations");
   return result;
@@ -297,20 +267,37 @@ export async function decideApproval(
 
   const body: DecideApprovalRequest = { decision };
   const result = await attempt((workspaceId) =>
-    platformServerJson<DecideApprovalResponse>(
-      `/v1/workspaces/${workspaceId}/approvals/${approvalId}/decision`,
-      {
-        method: "POST",
-        // Only the decision. The actor and their role come from the session —
-        // sending actorRole is refused as an unsupported field.
-        body: JSON.stringify(body),
-        idempotencyKey: newIdempotencyKey("decision"),
-      },
-    ),
+    decideWorkspaceApproval(workspaceId, approvalId, body),
   );
   if (result.ok) {
     revalidatePath("/account/approvals");
     revalidatePath("/account/runs");
   }
   return result;
+}
+
+/**
+ * Cancel a run that has not ended (`cancelRun`). The platform cancels only a
+ * `pending` or `running` run and answers 404 for any other — already finished,
+ * held for approval, or not this workspace's — so a 404 here is said as "it has
+ * already stopped", the one thing a person on the run's page can act on.
+ */
+export async function cancelRun(formData: FormData): Promise<ActionResult> {
+  const runId = String(formData.get("runId") ?? "");
+  if (!runId) return { ok: false, error: "A run is required." };
+  try {
+    await cancelWorkspaceRun(await requireActiveWorkspaceId(), runId);
+    revalidatePath(`/account/runs/${encodeURIComponent(runId)}`);
+    revalidatePath("/account/runs");
+    return { ok: true, runId };
+  } catch (error) {
+    if (!(error instanceof PlatformServerError)) throw error;
+    if (error.status === 404) {
+      return {
+        ok: false,
+        error: "This run has already stopped, so there is nothing to cancel.",
+      };
+    }
+    return { ok: false, error: error.message };
+  }
 }

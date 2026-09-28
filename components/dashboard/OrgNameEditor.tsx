@@ -88,7 +88,7 @@ export function OrgNameEditor({ workspaceId, initialName }: Props) {
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="rounded-lg px-2 py-1 text-xs font-medium text-[var(--muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
+          className="rounded-lg px-2 py-1 text-xs font-medium text-[var(--muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
         >
           Edit
         </button>

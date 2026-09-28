@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
+import { loginHref } from "@/lib/platform-api";
 import { discoverOrganizations } from "@/lib/tenancy";
 import { JoinOrgForm } from "./JoinOrgForm";
 
@@ -14,7 +15,7 @@ export default async function JoinOrgPage({
   if (!workspaceId) redirect("/onboarding/setup-org");
 
   const session = await getAppSession();
-  if (!session?.user.email) redirect("/login");
+  if (!session?.user.email) redirect(loginHref("/onboarding/join-org"));
 
   const organizations = await discoverOrganizations();
   const organization = organizations.find(

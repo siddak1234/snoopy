@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { getAppSession } from "@/lib/app-session";
-import { listWorkspaces } from "@/lib/tenancy";
+import {
+  administers,
+  listWorkspaces,
+  resolveActiveWorkspaceId,
+  roleInWorkspace,
+} from "@/lib/tenancy";
 import { extractDomain, isPublicDomain } from "@/lib/domain-utils";
 import SectionCard from "@/components/dashboard/SectionCard";
 import DeleteAccountButton from "@/components/account/DeleteAccountButton";
@@ -23,6 +28,10 @@ export default async function AccountSettingsPage() {
       )
     : undefined;
 
+  const canExport = administers(
+    await roleInWorkspace(await resolveActiveWorkspaceId(session)),
+  );
+
   const showOrgCreate = isCustomDomain && !orgMembership;
   const showOrgLink = isCustomDomain && !!orgMembership;
 
@@ -30,7 +39,8 @@ export default async function AccountSettingsPage() {
     <SectionCard title="Settings">
       <div className="py-5 first:pt-0">
         <p className="text-sm text-[var(--muted)]">
-          Account and workspace settings. Connect integrations here.
+          Account and workspace settings. Connected accounts for automations are
+          on the Connections page.
         </p>
       </div>
       <LinkedAccountsSection />
@@ -71,7 +81,7 @@ export default async function AccountSettingsPage() {
         </div>
       ) : null}
 
-      <WorkspaceExportSection />
+      <WorkspaceExportSection canExport={canExport} />
 
       <div className="border-t border-[var(--ring)] pt-5">
         <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">

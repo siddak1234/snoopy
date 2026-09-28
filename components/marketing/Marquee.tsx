@@ -18,7 +18,7 @@ function MarqueeEntry({ quote, attribution, href }: MarqueeItem) {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-xs whitespace-nowrap text-[var(--color-accent-300)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
+        className="text-xs whitespace-nowrap text-[var(--color-accent-300)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
         aria-label={`Open source: ${attribution}`}
       >
         {attribution} ↗

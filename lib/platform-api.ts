@@ -1,3 +1,5 @@
+import { busyMessage, retryAfterSeconds } from "@/lib/retry-after";
+
 const PLATFORM_API_BASE_PATH = "/api/platform";
 const DEFAULT_RETURN_TO = "/account";
 const RETURN_TO_VALIDATION_ORIGIN = "https://return-target.invalid";
@@ -24,8 +26,8 @@ export function safePlatformReturnTo(value: string | null | undefined): string {
 /**
  * The sign-in page with a return to `returnTo`, validated the same way the
  * login page reads it back, so a caller cannot build a return the page would
- * refuse. New callers use this; the older hand-built redirects are recorded to
- * migrate (F42).
+ * refuse. Every sign-in return is built here (register F42); a plain "Sign in"
+ * link with nowhere to come back to is just `/login`.
  */
 export function loginHref(returnTo: string | null | undefined): string {
   return `/login?callbackUrl=${encodeURIComponent(safePlatformReturnTo(returnTo))}`;
@@ -40,10 +42,22 @@ export class PlatformApiError extends Error {
   public constructor(
     message: string,
     public readonly status: number,
+    /** From a 429's `retry-after`: how long the platform asked to be left. */
+    public readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = "PlatformApiError";
   }
+}
+
+/**
+ * The session ended while the page was open — the one failure a person answers
+ * by signing in again, rather than by waiting or retrying (register F40). One
+ * rule for every browser caller; each pairs it with `loginHref()` so the way
+ * back returns to where they were.
+ */
+export function sessionEnded(error: unknown): boolean {
+  return error instanceof PlatformApiError && error.status === 401;
 }
 
 export async function platformApiJson<T>(
@@ -54,17 +68,23 @@ export async function platformApiJson<T>(
     credentials: "same-origin",
     ...init,
   });
-  const body = (await response.json().catch(() => null)) as
-    { title?: string } | T | null;
+  const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
+    if (response.status === 429) {
+      const wait = retryAfterSeconds(response.headers.get("retry-after"));
+      throw new PlatformApiError(busyMessage(wait), 429, wait);
+    }
+    // Only a non-empty string is a title (register F41): anything else a JSON
+    // intermediary put there would render as "[object Object]" or as nothing.
     const title =
-      body && typeof body === "object" && "title" in body
+      body !== null &&
+      typeof body === "object" &&
+      "title" in body &&
+      typeof body.title === "string" &&
+      body.title.length > 0
         ? body.title
-        : undefined;
-    throw new PlatformApiError(
-      title || `Platform request failed with status ${response.status}`,
-      response.status,
-    );
+        : `Platform request failed with status ${response.status}`;
+    throw new PlatformApiError(title, response.status);
   }
   return body as T;
 }

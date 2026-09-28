@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
+import { loginHref } from "@/lib/platform-api";
 import { PlatformServerError } from "@/lib/platform-server";
 import { listWorkspaces } from "@/lib/tenancy";
 import { PlatformUnavailable } from "@/components/dashboard/PlatformUnavailable";
@@ -28,7 +29,10 @@ export default async function OnboardingLayout({
   let existing: boolean;
   try {
     const session = await getAppSession();
-    if (!session?.user.id) redirect("/login");
+    // A layout does not know which of its pages was asked for, so this returns
+    // to the account; `proxy.ts`, which does know, sends the common case back to
+    // the exact onboarding page before this runs.
+    if (!session?.user.id) redirect(loginHref(null));
     // Only redirect if the user already has an org workspace — a pre-existing
     // personal workspace must not block org creation/joining.
     existing = (await listWorkspaces()).some(
@@ -36,8 +40,13 @@ export default async function OnboardingLayout({
     );
   } catch (error) {
     if (!(error instanceof PlatformServerError)) throw error;
-    if (error.status === 401) redirect("/login");
-    return <PlatformUnavailable busy={error.status === 429} />;
+    if (error.status === 401) redirect(loginHref(null));
+    return (
+      <PlatformUnavailable
+        busy={error.status === 429}
+        retryAfterSeconds={error.retryAfterSeconds}
+      />
+    );
   }
 
   if (existing) redirect("/account");
@@ -48,7 +57,7 @@ export default async function OnboardingLayout({
         <Link
           href="/"
           aria-label="Autom8x home"
-          className="flex items-center rounded-full text-[var(--color-text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:outline-none"
+          className="flex items-center rounded-full text-[var(--color-text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
         >
           <LogoMark height={22} />
         </Link>

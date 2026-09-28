@@ -3,19 +3,12 @@
 // The auditing agent INVOKES this script but cannot author its output — that
 // split is what keeps a PASS honest.
 import { execFileSync, spawnSync } from "node:child_process";
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { renameSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { assertPlatformRewrite, preflight } from "./preflight.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 const auditDir = join(root, ".git/autom8x-audit");
-const lockPath = join(auditDir, "lock");
 
 function git(...args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
@@ -26,74 +19,8 @@ function fail(message) {
   process.exit(1);
 }
 
-// --- preflight -------------------------------------------------------------
-// macOS/iCloud Finder conflict copies ("file 2.ts") are invisible to git
-// (the repo's own `* 2.*` ignore rule) yet poison typecheck, the test glob,
-// and visual baselines — the first audit run failed on exactly this.
-// Both patterns: "file 2.ts" AND the dotless "pre-push 2" — the latter dodged
-// the gitignore rule and reached a commit before the audit caught it.
-const conflictCopies = spawnSync(
-  "find",
-  [
-    ".",
-    "-path",
-    "./node_modules",
-    "-prune",
-    "-o",
-    "(",
-    "-name",
-    "* 2.*",
-    "-o",
-    "-name",
-    "* 2",
-    ")",
-    "-print",
-  ],
-  { cwd: root, encoding: "utf8" },
-).stdout.trim();
-if (conflictCopies) {
-  fail(
-    `Finder conflict copies contaminate the clone (invisible to git, poison the gates):\n${conflictCopies}\nDelete them and re-run:\n  find . -path ./node_modules -prune -o -name '* 2.*' -print -delete`,
-  );
-}
-
-for (const port of [3001, 3443]) {
-  const listeners = spawnSync(
-    "lsof",
-    ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN"],
-    { encoding: "utf8" },
-  );
-  if (listeners.status === 0 && listeners.stdout.trim()) {
-    fail(
-      `port ${port} has a listener; stop it first (a stale dev/test server would corrupt the audit):\n${listeners.stdout}`,
-    );
-  }
-}
-
-mkdirSync(auditDir, { recursive: true });
-if (existsSync(lockPath)) {
-  const pid = Number(readFileSync(lockPath, "utf8"));
-  let alive = false;
-  try {
-    process.kill(pid, 0);
-    alive = true;
-  } catch {
-    alive = false;
-  }
-  if (alive) fail(`another audit is running (pid ${pid}); wait for it`);
-  rmSync(lockPath);
-}
-writeFileSync(lockPath, String(process.pid));
-const releaseLock = () => {
-  try {
-    rmSync(lockPath);
-  } catch {
-    /* already gone */
-  }
-};
-process.on("exit", releaseLock);
-process.on("SIGINT", () => process.exit(130));
-process.on("SIGTERM", () => process.exit(143));
+// --- preflight: shared with `npm run verify` (./preflight.mjs, register F24) ---
+preflight({ root, fail });
 
 // --- what changed ----------------------------------------------------------
 const tree = git("rev-parse", "HEAD^{tree}");
@@ -122,18 +49,27 @@ const docsOnly =
 const mode = docsOnly ? "docs-only" : "full";
 
 // --- the gates -------------------------------------------------------------
-// Order matters: the fixture suite rebuilds .next with its own origin, so it
-// runs LAST or it would invalidate the build gate's output.
+// `npm run verify`'s list, in its order (register F15: this omitted
+// format:check and verify:platform-contracts). The fixture suite rebuilds .next
+// with its own origin, so it runs LAST or it would invalidate the build gate's
+// output. verify:platform-contracts reads the backend checkout beside this one;
+// an audit without it cannot say the client matches the contract, so it fails
+// rather than skipping.
 const fullGates = [
+  { name: "format:check", command: ["npm", "run", "format:check"] },
   { name: "lint", command: ["npm", "run", "lint"] },
   { name: "typecheck", command: ["npm", "run", "typecheck"] },
   { name: "audit:boundaries", command: ["npm", "run", "audit:boundaries"] },
   { name: "test:contracts", command: ["npm", "run", "test:contracts"] },
   {
+    name: "verify:platform-contracts",
+    command: ["npm", "run", "verify:platform-contracts"],
+  },
+  {
     name: "build",
     command: ["npm", "run", "build"],
     env: { BACKEND_API_ORIGIN: "https://backend.invalid" },
-    after: assertPlatformRewrite,
+    after: () => assertPlatformRewrite(root),
   },
   {
     name: "test:browser",
@@ -152,27 +88,6 @@ const docsGates = [
   { name: "format:check", command: ["npm", "run", "format:check"] },
 ];
 const gates = mode === "docs-only" ? docsGates : fullGates;
-
-// Mirrors the CI build job: a build without the /api/platform rewrite exits 0
-// while every browser API call would 404 in production.
-function assertPlatformRewrite() {
-  const manifest = JSON.parse(
-    readFileSync(join(root, ".next/routes-manifest.json"), "utf8"),
-  );
-  const rewrites = Array.isArray(manifest.rewrites)
-    ? manifest.rewrites
-    : [
-        ...(manifest.rewrites?.beforeFiles ?? []),
-        ...(manifest.rewrites?.afterFiles ?? []),
-        ...(manifest.rewrites?.fallback ?? []),
-      ];
-  const hit = rewrites.find(
-    (entry) =>
-      typeof entry.source === "string" &&
-      entry.source.startsWith("/api/platform"),
-  );
-  if (!hit) throw new Error("build output contains no /api/platform rewrite");
-}
 
 const startedAt = new Date().toISOString();
 const results = [];

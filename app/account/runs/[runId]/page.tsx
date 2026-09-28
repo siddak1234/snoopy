@@ -12,6 +12,7 @@ import SectionCard from "@/components/dashboard/SectionCard";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { Kicker } from "@/components/ui/Kicker";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
+import { CancelRunButton } from "./CancelRunButton";
 
 /**
  * One run, step by step.
@@ -76,6 +77,13 @@ export default async function RunDetailPage(
           />
           <Fact label="Trigger" value={ORIGIN_LABEL[run.origin]} />
         </dl>
+
+        {/* Only the two states the platform cancels; any other answers 404. */}
+        {run.status === "pending" || run.status === "running" ? (
+          <div className="mt-4">
+            <CancelRunButton runId={run.id} />
+          </div>
+        ) : null}
 
         {/* A continuation belongs to the run it continues. The link is how a
             person follows the chain rather than reading two unrelated runs. */}

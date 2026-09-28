@@ -729,3 +729,80 @@ subscription PATCH for a set-up save and the archive, not for Pause or Go live.
 **Mobile's half is not this repository's** — backend BUILD-PLAN 21.9.1 lists what
 `snoopy-mobile` adopts in its own round: the regenerated contracts, a Run control from
 `runInput`, Archive, and a 429 read as "try again", never as signed out.
+
+## Round 14 — the website completes against every published contract — 2026-09-28
+
+Opened in `snoopy-backend` on the owner's word (BUILD-PLAN **Phase 22**, Gate 22). Its
+backend half landed first, as backend #116 (`d663d69`):
+- The authorize answer is published as the union it is, and it takes the replace intent
+  (§12.1 #172).
+- The team operations publish their schemas (#173).
+- A connection that needs reauthorization is re-authorized, not reused (#175).
+
+This repository then regenerated its client from that tree. Each generated file now names
+the sha256 of the contract it came from.
+
+| Item | Register | What changed here | Evidence |
+| --- | --- | --- | --- |
+| 22.3.1 | F51 | Server calls send the request's cookies as `name=value` pairs (`lib/cookie-header.ts`) | `test/session-contract.test.mjs` runs Next's own response-cookie store; the fixture refuses any `Cookie` header carrying an attribute, so every action in the suite would fail if it came back |
+| 22.3.2 | F9 | Every write goes through a facade in `lib/*`, which encodes each id; the action files build no `/v1/` path | the contract tests of the automation, billing, connections and export modules |
+| 22.3.3 | F8 | Connect, Reconnect, Replace account, Disconnect and Export are offered to an owner or admin only; a member is told who can | `test/tenancy-contract.test.mjs`; e2e "a member is offered no control the platform would refuse them" |
+| 22.3.4 | F2 | A finished deletion lands on `/account-deleted` | e2e "a clean account deletion signs out and leaves" |
+| 22.3.5 | F21 | A card lists each subscription under its scope; Add offers only the scopes the automation is not in yet, and falls back to one still offered after a re-render | `test/automation-contract.test.mjs`; e2e "a card lists each subscription under its scope …" (the fixture answers 409 if a used scope is sent again) |
+| 22.3.6 | F22 | A notifications switch says in words what it switches | `test/automation-contract.test.mjs`; e2e (the set-up dialog) |
+| 22.3.7 | F40, F41 | One rule for a session that ends while a page is open (`sessionEnded`): the deletion dialog and the linked-accounts section say so and give the way back in; a problem's `title` is shown only when it is a non-empty string | e2e "a session that ended while the settings page was open …"; `test/structure-contract.test.mjs` |
+| 22.3.8 | F46, F47 | A refusal is explained in words, not the Edge's title; a 409 clears the memory of a lost answer | `test/account-deletion-contract.test.mjs`; e2e "a refusal says in words …" |
+| 22.3.9 | F52 | One refusal, one alert, in each connections dialog | `test/structure-contract.test.mjs`; e2e (the pasted-key retry, the stale replacement) |
+| 22.3.10 | F53 | `/automation-builder`'s sign-in link and the `?id=` redirect point at `/account/automations` | `test/structure-contract.test.mjs`. **The page's copy still describes the canvas that was removed — the owner's call, not rewritten here** |
+| 22.3.11 | backend #114 | A 429 says how long to wait, from `retry-after`, on the server and in the browser | `test/session-contract.test.mjs`; e2e (a refused start and a refused save: "Try again in 30 seconds.") |
+| 22.4.1 | F26 | `app/error.tsx` and `app/global-error.tsx` | `test/structure-contract.test.mjs` |
+| 22.4.2 | F27 | The workspace list is read once per request (React `cache`) | `test/tenancy-contract.test.mjs` |
+| 22.4.3 | F28, F29 | One `requireActiveWorkspaceId()` for every action module; one `EmptyRow` | `test/tenancy-contract.test.mjs`, `test/structure-contract.test.mjs` |
+| 22.4.4 | F42 | Every sign-in return is built by `loginHref()` | `test/structure-contract.test.mjs` |
+| 22.4.5 | F43, F44 | A `danger` Button variant; the dead `focus-visible:outline-none` removed (the global rule already won, so nothing renders differently) | `test/structure-contract.test.mjs`; the visual baselines are unchanged |
+| 22.4.6 | F32 | `app/api/session` (no caller) and `getProject` (no caller) removed; F32's branch is not special-cased | `test/structure-contract.test.mjs`, `test/billing-contract.test.mjs` |
+| 22.5.1 | — | Cancel on a `pending` or `running` run, confirmed first | e2e "a running run is cancelled from its page …" |
+| 22.5.2 | F54 | The dashboard reads the platform's run tally since the first of the month (UTC), the automations and integrations lists, and names its recent runs as Activity does | e2e "the dashboard shows the workspace's own numbers …" |
+| 22.5.3 | — | A `reused` answer says the account is already connected; **Replace account** is confirmed and names the exact connection; a stale one says the connection changed; Reconnect repairs a broken grant | e2e: reused, repair (#175), replace, stale |
+| 22.5.4 | F55 | **Teams**: a Teams page (all teams for an owner or admin, with Create; your own teams otherwise), a team's page (members, and one control to add someone or change a role, for an owner, admin or the team's manager), and a project's "Teams with access" (the grant, for its owner or admin). No removal is offered, because no operation publishes one (backend #174). Teams have their own page because a team's manager may be a plain member, and the organization page is for owners and admins | e2e: an owner's teams, a manager's, an admin's organization page, a project grant; axe on both new pages |
+| 22.6.1 | F30, F31, F34, F38, F48 | The fixture resets before every test; a personal workspace has its own billing; a deletion's 200 clears the cookie; Pause and Go live succeed; the personal workspace's reads are declared | e2e (every test starts from `/__fixture/reset`), and one test for each |
+| 22.6.2 | F37 | axe scans all sixteen authenticated pages: the fourteen, plus the two Teams pages | `e2e/accessibility.spec.ts` |
+| 22.6.3 | F50 | The visual test waits for the nav's "Sign in" (the baselines hold it) | `e2e/marketing.visual.spec.ts` |
+| 22.6.4 | F6, F7 | `verify:platform-contracts` restores what it finds stale; each generated file names its contract's sha256 | `test/platform-contracts.test.mjs` runs the real script on a stale copy |
+| 22.6.5 | F15, F24, F25 | One preflight module and one atomic lock for `verify` and the change audit; the audit runs `verify`'s gates, in order | `test/verify-gate.test.mjs` |
+| 22.6.6 | — | CI runs the authenticated fixture suite | `.github/workflows/ci.yml` `fixtures` |
+| 22.6.7 | backend §12.2 #8 | CI audits the runtime tree (blocking) and the tooling (reported), builds the image and scans it (fixable CRITICAL and HIGH block), and keeps a CycloneDX SBOM. The first real scan found 8 fixable HIGH in the base image's npm, which the image never runs; npm is now deleted from the runtime stage, as the platform image does | `.github/workflows/ci.yml` `scan`; the image rebuilt and rescanned (exit 0), serving `/` and `/login` |
+| 22.6.8 | NFR-36 | The functional and axe suites run in Chromium, Firefox and WebKit; the visual baselines stay Chromium's, under their old names | `playwright.config.ts` projects |
+| 22.6.9 | F14 | `audit:boundaries` refuses a raw hex colour outside `app/globals.css` and the OG image (comments are not code); `AGENTS.md` rule 3 states that rule, with no token count | `test/boundaries-contract.test.mjs` runs the real audit on planted files |
+| 22.6.10 | backend §12.2 #83 | The facts file carries §9.2's four component rows, each with its command, summing to `components` | `test/repo-facts.test.mjs` |
+| 22.7.1 | F13 | The documents re-read against the code: `AGENTS.md` rules 3, 4, 6 and 7, README, CONTRIBUTING, `docs/ARCHITECTURE.md`, `docs/REPO-STRUCTURE.md`, and the PR template. `docs/STACK-HANDOFF.md`, `docs/SOLUTION-DESIGN.md`, `docs/DATABASE-MIGRATIONS.md` and `docs/AUTH-MICROSOFT-AZURE.md` removed. `.claude/launch.json`'s Prisma Studio entry removed. `.prettierignore` no longer names paths that do not exist | `test/structure-contract.test.mjs` (launch scripts; one Node major) |
+
+**Every row's disposition, as of this round:**
+
+- **Closed here:** F2, F6, F7, F8, F9, F13, F14, F15, F17, F21, F22, F24, F25, F26
+  (Round 13 narrowed it), F27 (narrowed there too), F28, F29, F30, F31, F32, F34, F37,
+  F38 (narrowed there), F40, F41, F42, F43, F44, F46, F47, F48, F50, F51, F52, F54 — each
+  with the evidence above.
+  - F17 had `.nvmrc` since #15; a test now holds `.nvmrc`, CI and the Dockerfile to one
+    Node major.
+- **Closed before this round:** F1, F3, F10, F20, F39, F45 and F49 (Round 13); F12 (backend
+  §9 has quoted the facts file since Round 5's close); F18 (#14); F33 (#19).
+  - F23 is closed too: `npm audit` reports 0 on the runtime tree and on the whole tree at
+    this round's tree, and the three Dependabot PRs merged (#12 in Round 5's close, #11 and
+    #13 in Round 13).
+- **Narrowed, not closed:** F53. The links and the redirect are fixed. The page's copy is
+  the owner's call.
+- **Not this repository's to change:**
+  - F4: backend §12.1 #158 is the backend's account; this repository's Actions run.
+  - F5: the checkout's iCloud sync is the owner's machine. Both gates refuse Finder copies,
+    by the shared preflight.
+  - F16: which CI jobs are *required* is a branch-protection setting, the owner's. The new
+    `fixtures` and `scan` jobs, and `browser`, should be required.
+- **New this round, both closed here:**
+  - **F55**: the organization page admitted only its owner, while every operation on it
+    admits owner or admin. It now admits both, and the nav shows it where it renders.
+  - **F56**: four account pages read "Dashboard" in the small-screen header. Every page has
+    its title, held by a test.
+
+**Numbering.** F35 was never assigned; F11, F19 and F36 were closed or withdrawn as recorded
+above. F55 and F56 are new here, and no number is reused.
