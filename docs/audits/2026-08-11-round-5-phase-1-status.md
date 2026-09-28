@@ -1123,3 +1123,28 @@ from that tree:
 - The complete export states its one-file ceiling (`too_large`, already in words here), and
   a deleted workspace withdraws its export (`workspace_deleted`), which no page of a
   deleted workspace can show.
+
+**Change audit of `97021f9`, 2026-09-28.** It found **F-1**: in the light theme a ghost
+button's hovered and pressed text on the marketing band measured 4.23:1 and 3.87:1. Fixed by
+`--ghost-active-text`, and held by the pixel-measured e2e "a ghost button keeps AA contrast
+hovered and pressed: … (register F64)" in `e2e/accessibility.spec.ts`, which went red at 4.23
+without the light step. It also listed 21 surfaces that worked and that no test held. Each is
+now held by a test that was seen failing against the code it guards, with each file restored
+and its hash checked. The fixture Edge has a control for each refusal, reset by
+`initialState()`. The tests are in `e2e/public-edge-fixture.spec.ts` unless marked AS
+(`e2e/account-surfaces.spec.ts`) or VG (`test/verify-gate.test.mjs`): 1 → "each refusal of a
+move the platform names …"; 2 → "a webhook address the platform will not read …"; 3 → "an
+address the platform will not make …"; 4 → "an address the platform has no public origin for
+…"; 5 → "a file the store refuses … no cookie of the browser's" (the session cookie is
+SameSite=Lax and never crosses to the store's scheme anyway, so the test holds a cookie that
+may cross); 6 → "a file the store took but the platform finds did not arrive …"; 7 → "an empty
+file is refused in words …"; 8 → "each refusal of a file the platform names …"; 9 → "the Run
+dialog dismissed by Escape or by a click outside it mid-upload …"; 10 → "an export that failed
+says why …"; 11 → "an export that is ready but partial …"; 12 → "Export everything the platform
+refuses …"; 13 → "a download whose fresh link the platform cannot read …"; 14 → "a download
+after another tab switched workspace …"; 15 → AS "a team member's removal after another tab
+switched workspace …"; 16 → "a team's access the platform will not withdraw stays …"; 17 → AS
+"F60 — when the boundary's own session read fails …"; 18 → "a dialog that sends nothing yet
+closes on a click outside it …"; 19 → F-1's test; 20 → VG "a docs-only change audit runs the
+gates its marker requires …"; 21 → VG "the browser fixture run passes every spec that needs the
+fixture Edge, and no other".

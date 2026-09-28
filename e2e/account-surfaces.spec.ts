@@ -126,6 +126,36 @@ test("F60 — while the boundary asks for the session it claims nothing: no aler
   ).toBeVisible();
 });
 
+// The change audit of 97021f9's #17 (register § Round 15).
+test("F60 — when the boundary's own session read fails it claims nothing about the session, and offers Try again", async ({
+  page,
+}) => {
+  // The billing read fails; so does the boundary's question — neither a 401,
+  // so the session may or may not be there.
+  await presentSession(page, "page-failing");
+  await page.route("**/api/platform/v1/session", (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/problem+json",
+      body: JSON.stringify({ title: "Service Unavailable", status: 503 }),
+    }),
+  );
+  await page.goto("/account/billing");
+  await expect(
+    page.getByRole("heading", {
+      name: "The platform could not answer just now",
+    }),
+  ).toBeVisible();
+  await expect(page.getByText("You have not been signed out")).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Your session has ended" }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Billing", exact: true }).first(),
+  ).toBeVisible();
+});
+
 test("F62 — a session that ends between the proxy's read and the render goes to sign in, and no page throws on the way", async ({
   page,
 }) => {
@@ -600,6 +630,25 @@ test("21 — a team's member form submitted after another tab switched workspace
   await expect(page.locator("main").getByRole("alert")).toHaveText(
     workspaceChanged,
   );
+});
+
+// The change audit of 97021f9's #15 (register § Round 15).
+test("a team member's removal after another tab switched workspace is refused, and they stay on the team (register F28)", async ({
+  page,
+}) => {
+  await page.goto(operationsTeam);
+  const member = page.locator("main li").filter({ hasText: "Fixture Member" });
+  await expect(member).toHaveCount(1);
+  await switchInAnotherTab(page, /Fixture Personal/);
+  await member.getByRole("button", { name: "Remove" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Remove Fixture Member from Operations?",
+  });
+  await dialog.getByRole("button", { name: "Remove" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(workspaceChanged);
+  await switchInAnotherTab(page, /Fixture Organization/);
+  await page.goto(operationsTeam);
+  await expect(member).toHaveCount(1);
 });
 
 test("22 — a page outside the account area that cannot load says so, and Try again loads it once it can", async ({

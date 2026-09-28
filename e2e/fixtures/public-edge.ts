@@ -200,6 +200,28 @@ function initialState() {
     notReady: false,
     draftNeedsConnection: false,
     memberOwnsProject: false,
+    // The surfaces the change audit of 97021f9 probed and no test asserted
+    // (register § Round 15): the refusals each operation names, answered as
+    // the contract answers them, and what the object store saw arrive.
+    moveRefusal: null as { status: number; reason: string } | null,
+    webhookReadRefusal: null as number | null,
+    webhookIssueRefusal: null as string | null,
+    // Whether the platform has a public origin to put in an address, and what
+    // the last delivery to it came to.
+    webhookOrigin: true,
+    webhookLastOutcome: "accepted",
+    uploadRefusal: null as {
+      stage: "open" | "complete";
+      status: number;
+      reason: string;
+    } | null,
+    storeRefusing: false,
+    storePuts: 0,
+    storePutsWithCookie: 0,
+    // The complete export ends failed — with this reason, or none when empty —
+    // or ready but partial.
+    exportFailure: null as string | null,
+    exportPartial: false,
   };
 }
 let state = initialState();
@@ -656,6 +678,24 @@ function problem(status: number, title: string, details?: Json): Json {
   } satisfies Platform["ApiProblem"];
 }
 
+// A refusal a test names: its status's own title, and the reason the contract
+// puts in `details` — so a reason the website does not name reads as the title.
+const statusTitles: Record<number, string> = {
+  400: "Bad Request",
+  403: "Forbidden",
+  409: "Conflict",
+  422: "Unprocessable Content",
+  503: "Service Unavailable",
+};
+
+function refusal(status: number, reason?: string): Json {
+  return problem(
+    status,
+    statusTitles[status] ?? "Refused",
+    reason ? { reason } : undefined,
+  );
+}
+
 // A requester whose account deletion runs and whose answer is then lost on the
 // way back — the case only a real hop can show. Until its deletion runs it IS
 // the requester; afterwards its session went with the account, so every request
@@ -760,7 +800,9 @@ const server = createServer(
     }
     // One state each, for the surfaces the Round 14 change audit probed and no
     // test asserted (register § Round 15).
-    const controls: Record<string, () => void> = {
+    // A control that takes a value answers 400 for one it cannot use, so a
+    // test that names a wrong one fails there rather than testing nothing.
+    const controls: Record<string, () => boolean | void> = {
       "/__fixture/runs-failing": () => {
         state.runsRead = "failing";
       },
@@ -805,12 +847,67 @@ const server = createServer(
       "/__fixture/export-read-failing": () => {
         state.exportReadsFailing = Number.POSITIVE_INFINITY;
       },
+      // The change audit of 97021f9's surfaces (register § Round 15). Each
+      // refusal holds until the next control or a reset.
+      // Backend §12.1 #126: a move refused with a reason — 409 or 422.
+      "/__fixture/move-refused": () => {
+        const status = Number(url.searchParams.get("status"));
+        const reason = url.searchParams.get("reason");
+        if ((status !== 409 && status !== 422) || !reason) return false;
+        state.moveRefusal = { status, reason };
+      },
+      // Backend §12.1 #91: the address's read refused (403) or failed (503).
+      "/__fixture/webhook-read-refused": () => {
+        const status = Number(url.searchParams.get("status"));
+        if (status !== 403 && status !== 503) return false;
+        state.webhookReadRefusal = status;
+      },
+      // Issuing refused (409) with a reason.
+      "/__fixture/webhook-issue-refused": () => {
+        const reason = url.searchParams.get("reason");
+        if (!reason) return false;
+        state.webhookIssueRefusal = reason;
+      },
+      // A platform with no public origin answers an address without its url.
+      "/__fixture/webhook-no-origin": () => {
+        state.webhookOrigin = false;
+      },
+      "/__fixture/webhook-last-outcome": () => {
+        const outcome = url.searchParams.get("outcome");
+        if (!outcome) return false;
+        state.webhookLastOutcome = outcome;
+      },
+      // FR-14: opening an upload, or completing one, refused with a reason.
+      "/__fixture/upload-refused": () => {
+        const stage = url.searchParams.get("stage");
+        const status = Number(url.searchParams.get("status") ?? "400");
+        const reason = url.searchParams.get("reason");
+        if (
+          (stage !== "open" && stage !== "complete") ||
+          (status !== 400 && status !== 409) ||
+          !reason
+        ) {
+          return false;
+        }
+        state.uploadRefusal = { stage, status, reason };
+      },
+      // The store refuses the PUT, as it refuses one whose signature fails.
+      "/__fixture/store-refusing": () => {
+        state.storeRefusing = true;
+      },
+      // Backend §12.1 #39: the complete export fails — with a reason, or none.
+      "/__fixture/export-failed": () => {
+        state.exportFailure = url.searchParams.get("reason") ?? "";
+      },
+      "/__fixture/export-partial": () => {
+        state.exportPartial = true;
+      },
     };
     const control =
       request.method === "POST" ? controls[url.pathname] : undefined;
     if (control) {
-      control();
-      response.writeHead(204, { "cache-control": "no-store" });
+      const usable = control() !== false;
+      response.writeHead(usable ? 204 : 400, { "cache-control": "no-store" });
       return response.end();
     }
     // Register F27: how many times the workspace list was read — and the
@@ -821,6 +918,10 @@ const server = createServer(
         exportJobReads: state.exportJobReads,
         exportCount: state.exportCount,
         exportJobStarted: state.exportJobStarted,
+        // What reached the object store, and how much of it carried a cookie.
+        storePuts: state.storePuts,
+        storePutsWithCookie: state.storePutsWithCookie,
+        projectTeamGrants: state.projectTeamGrants.length,
       });
     }
     if (
@@ -851,12 +952,19 @@ const server = createServer(
     // FR-14: the fixture plays the object store too. The browser PUTs a file
     // here straight from the website's origin — cross-origin, so the preflight
     // is answered for exactly the origin that asked, as the real store answers
-    // its configured one. The signed size is the size.
+    // its configured one. The signed size is the size. It would take the
+    // browser's credentials too, so nothing but the website's own
+    // `credentials: "omit"` keeps off a PUT a cookie the browser would send
+    // this host — and each PUT that carried one is counted.
     const storeObject = /^\/__fixture\/objects\/([^/]+)$/u.exec(url.pathname);
     if (storeObject) {
       const origin = request.headers.origin;
       const cors: Record<string, string> = origin
-        ? { "access-control-allow-origin": origin, vary: "origin" }
+        ? {
+            "access-control-allow-origin": origin,
+            "access-control-allow-credentials": "true",
+            vary: "origin",
+          }
         : {};
       if (request.method === "OPTIONS") {
         response.writeHead(204, {
@@ -870,7 +978,16 @@ const server = createServer(
       const chunks: Buffer[] = [];
       for await (const chunk of request) chunks.push(Buffer.from(chunk));
       const size = Buffer.concat(chunks).byteLength;
-      if (request.method !== "PUT" || !upload || size !== upload.sizeBytes) {
+      if (request.method === "PUT") {
+        state.storePuts += 1;
+        if (request.headers.cookie) state.storePutsWithCookie += 1;
+      }
+      if (
+        request.method !== "PUT" ||
+        !upload ||
+        size !== upload.sizeBytes ||
+        state.storeRefusing
+      ) {
         response.writeHead(403, cors);
         return response.end();
       }
@@ -1674,6 +1791,10 @@ const server = createServer(
           details: { reason: "approvals_pending" },
         });
       }
+      if (state.moveRefusal) {
+        const { status, reason } = state.moveRefusal;
+        return respond(response, status, refusal(status, reason));
+      }
       // The Edge refuses a move while a run of the subscription is pending or
       // running, whose callbacks the move would break (backend 23.6.3).
       if (state.runsInFlightOnMove) {
@@ -1700,24 +1821,42 @@ const server = createServer(
           ...problem(403, "Forbidden"),
           details: { requiredRole: "admin" },
         });
-      const address = `https://hooks.example.test/v1/webhooks/${webhookEndpointId}`;
+      // The contract's `url` is absent only where the platform has no public
+      // origin to put in it.
+      const address = state.webhookOrigin
+        ? { url: `https://hooks.example.test/v1/webhooks/${webhookEndpointId}` }
+        : {};
       if (method === "GET") {
+        if (state.webhookReadRefusal) {
+          return respond(
+            response,
+            state.webhookReadRefusal,
+            refusal(state.webhookReadRefusal),
+          );
+        }
         if (state.webhookSecrets === 0) {
           return respond(response, 404, problem(404, "Not Found"));
         }
         return respond(response, 200, {
           endpointId: webhookEndpointId,
-          url: address,
+          ...address,
           createdAt: now,
           lastDeliveryAt: now,
-          lastOutcome: "accepted",
+          lastOutcome: state.webhookLastOutcome,
         } satisfies Automations["WebhookEndpoint"]);
       }
       if (method === "POST") {
+        if (state.webhookIssueRefusal) {
+          return respond(
+            response,
+            409,
+            refusal(409, state.webhookIssueRefusal),
+          );
+        }
         state.webhookSecrets += 1;
         return respond(response, 200, {
           endpointId: webhookEndpointId,
-          url: address,
+          ...address,
           createdAt: now,
           secret: `fixture-secret-${state.webhookSecrets}`,
           rotated: state.webhookSecrets > 1,
@@ -1744,6 +1883,10 @@ const server = createServer(
           details: { reason: "content_type_not_accepted" },
         });
       }
+      if (state.uploadRefusal?.stage === "open") {
+        const { status, reason } = state.uploadRefusal;
+        return respond(response, status, refusal(status, reason));
+      }
       const uploadSessionId = crypto.randomUUID();
       state.uploads.set(uploadSessionId, {
         filename: body.filename ?? "file",
@@ -1764,6 +1907,10 @@ const server = createServer(
     if (method === "POST" && uploadComplete) {
       const upload = state.uploads.get(uploadComplete[1] ?? "");
       if (!upload) return respond(response, 404, problem(404, "Not Found"));
+      if (state.uploadRefusal?.stage === "complete") {
+        const { status, reason } = state.uploadRefusal;
+        return respond(response, status, refusal(status, reason));
+      }
       if (upload.received === undefined) {
         return respond(response, 400, {
           ...problem(400, "Bad Request"),
@@ -1811,6 +1958,19 @@ const server = createServer(
         return respond(response, 503, problem(503, "Service Unavailable"));
       }
       state.exportJobReads += 1;
+      if (state.exportFailure !== null) {
+        return respond(response, 200, {
+          export: {
+            id: exportJobId,
+            status: "failed",
+            createdAt: now,
+            completedAt: now,
+            ...(state.exportFailure
+              ? { failureReason: state.exportFailure }
+              : {}),
+          },
+        } satisfies Platform["WorkspaceExportJobResponse"]);
+      }
       if (state.exportExpired) {
         return respond(response, 200, {
           export: {
@@ -1831,7 +1991,7 @@ const server = createServer(
                 status: "ready",
                 createdAt: now,
                 completedAt: now,
-                complete: true,
+                complete: !state.exportPartial,
                 file: {
                   artifactId: exportJobId,
                   filename: "workspace-export-2026-08-12.json",

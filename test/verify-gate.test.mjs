@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -303,6 +304,70 @@ test("the change audit runs verify's gates, in verify's order, and the marker re
     [...declared[1].matchAll(/"([^"]+)"/gu)].map((match) => match[1]),
     auditGates,
   );
+});
+
+test("a docs-only change audit runs the gates its marker requires, the document check among them (register F66)", () => {
+  // run-gates.mjs runs `docsGates` for a docs-only change; record-pass.mjs
+  // refuses a docs-only PASS without every one of DOCS_GATES. Two lists apart
+  // make a marker that cannot be earned, or one earned without the check.
+  const runner = gateNames(
+    runGates,
+    "const docsGates = [",
+    "const gates = mode",
+  );
+  const declared = /const DOCS_GATES = \[([^\]]+)\]/u.exec(recordPass);
+  assert.ok(
+    declared,
+    "record-pass.mjs no longer declares DOCS_GATES as a literal",
+  );
+  const marker = [...declared[1].matchAll(/"([^"]+)"/gu)].map(
+    (match) => match[1],
+  );
+  assert.deepEqual([...runner].sort(), [...marker].sort());
+  assert.ok(
+    runner.includes("doc-references"),
+    "a docs-only audit runs no document check",
+  );
+  const block = runGates.slice(
+    runGates.indexOf("const docsGates = ["),
+    runGates.indexOf("const gates = mode"),
+  );
+  assert.match(
+    block,
+    /name: "doc-references",\s*command: \["node", "scripts\/audit-doc-references\.mjs"\]/u,
+    "doc-references does not run the document check",
+  );
+});
+
+test("the browser fixture run passes every spec that needs the fixture Edge, and no other", () => {
+  // scripts/run-browser-fixtures.mjs names its specs; one left out is a suite
+  // the gate reports green without having run (e2e/account-surfaces.spec.ts,
+  // Round 15).
+  const runner = readFileSync(
+    resolve(import.meta.dirname, "../scripts/run-browser-fixtures.mjs"),
+    "utf8",
+  );
+  const block = runner.slice(
+    runner.indexOf('"node_modules/@playwright/test/cli.js"'),
+    runner.indexOf('"--workers=1"'),
+  );
+  const listed = [...block.matchAll(/"(e2e\/[^"]+\.spec\.ts)"/gu)].map(
+    (match) => match[1],
+  );
+  assert.deepEqual(listed, [
+    "e2e/accessibility.spec.ts",
+    "e2e/public-edge-fixture.spec.ts",
+    "e2e/account-surfaces.spec.ts",
+  ]);
+  // And derived: every spec that reads the fixture's switch is one of them.
+  const e2e = resolve(import.meta.dirname, "../e2e");
+  const needFixture = readdirSync(e2e)
+    .filter((name) => name.endsWith(".spec.ts"))
+    .filter((name) =>
+      readFileSync(join(e2e, name), "utf8").includes("E2E_PUBLIC_EDGE_FIXTURE"),
+    )
+    .map((name) => `e2e/${name}`);
+  assert.deepEqual([...listed].sort(), needFixture.sort());
 });
 
 test("verify emits the facts file only after the last gate", () => {

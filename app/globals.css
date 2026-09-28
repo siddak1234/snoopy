@@ -119,6 +119,9 @@
   --muted: var(--color-neutral-400);
   --accent: var(--color-accent);
   --accent-strong: var(--color-accent-400);
+  /* A ghost button's text while hovered or pressed (register F64). The dark
+     theme's stronger step; the light theme's is set below. */
+  --ghost-active-text: var(--color-accent-400);
   --ring: var(--color-neutral-700);
   --toggle-bg: color-mix(in srgb, var(--color-surface) 92%, transparent);
   --chip-bg: color-mix(in srgb, var(--color-accent) 15%, transparent);
@@ -231,6 +234,10 @@ html[data-theme="light"] {
   --color-accent-2-700: #c3bcec;
   --color-accent-2-800: #dcd8f4;
   --color-accent-2-900: #e9e6f8;
+
+  /* A light band is itself a tint of the accent, so a ghost button on it
+     needs the darker step once its own tint is added (register F64). */
+  --ghost-active-text: var(--color-accent-200);
 
   --color-section: #e4e1f6; /* (ds) */
   --color-section-glow: #cfc8f0; /* (ds) */
@@ -485,17 +492,20 @@ html[data-theme="light"] .brand-mark {
     color 150ms ease;
 }
 
-/* The tint darkens the ground under accent text (register F64): the resting
-   accent passes WCAG AA on every surface, but on the tinted hover and pressed
-   grounds it fell to 4.06:1 (dark, on a surface) and 3.60:1 (dark, pressed).
-   The stronger accent step keeps both at 4.6:1 or above, in both themes. */
+/* The tint darkens the ground under accent text (register F64): on the tinted
+   hover and pressed grounds the resting accent fell to 4.06:1 (dark, on a
+   surface) and 3.60:1 (dark, pressed). `--ghost-active-text` is the step that
+   keeps both at 4.5:1 or above on every ground a ghost button sits on, in both
+   themes — the light theme's darker one because the marketing band is already
+   a tint of the accent (the change audit measured 3.87:1 pressed there with the
+   dark theme's step). `e2e/accessibility.spec.ts` measures each from pixels. */
 .btn-ghost:hover {
-  color: var(--accent-strong);
+  color: var(--ghost-active-text);
   background: color-mix(in srgb, var(--color-accent) 10%, transparent);
 }
 
 .btn-ghost:active {
-  color: var(--accent-strong);
+  color: var(--ghost-active-text);
   background: color-mix(in srgb, var(--color-accent) 18%, transparent);
 }
 
