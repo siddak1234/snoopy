@@ -760,6 +760,100 @@ test("anyone on a project reads the teams granted to it, and only its owner or a
   );
 });
 
+test("an organization with no project yet creates its first team project, in the organization being worked in (register F57)", async ({
+  page,
+}) => {
+  await fixtureControl("org-without-projects");
+  await page.goto("/account/projects");
+  await expect(page.getByText("No projects yet.")).toBeVisible();
+  await page.getByRole("button", { name: "Create project" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("radio", { name: /team/i })).toBeEnabled();
+  await dialog
+    .locator("label")
+    .filter({ hasText: /^\s*team\s*$/i })
+    .click();
+  await expect(
+    dialog.getByText("Created in Fixture Organization."),
+  ).toBeVisible();
+  await dialog.getByLabel(/Project name/).fill("First team project");
+  await dialog.getByLabel(/Project type/).fill("Invoices");
+  await dialog.getByRole("button", { name: "Create project" }).click();
+  await dialog.getByRole("button", { name: "Done" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Fixture Organization Team Projects" }),
+  ).toBeVisible();
+  await expect(page.getByText("First team project")).toBeVisible();
+});
+
+test("working in a personal workspace, a team project is not offered until the organization is (register F57)", async ({
+  page,
+}) => {
+  await page.goto("/account");
+  const trigger = page.getByRole("button", { name: "Switch workspace" });
+  await trigger.click();
+  await page.getByRole("button", { name: /Fixture Personal/ }).click();
+  await expect(trigger).toContainText("Fixture Personal");
+  await page.goto("/account/projects");
+  await page.getByRole("button", { name: "Create project" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("radio", { name: /team/i })).toBeDisabled();
+  await expect(
+    dialog.getByText(
+      "Switch to your organization to create a team project in it.",
+    ),
+  ).toBeVisible();
+});
+
+test("Create team on a page whose workspace was switched away in another tab says so, and creates nothing", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/account/teams");
+  const other = await context.newPage();
+  try {
+    await other.goto("/account");
+    const trigger = other.getByRole("button", { name: "Switch workspace" });
+    await trigger.click();
+    await other.getByRole("button", { name: /Fixture Personal/ }).click();
+    await expect(trigger).toContainText("Fixture Personal");
+  } finally {
+    await other.close();
+  }
+  await page.getByLabel("Team name").fill("Stale tab team");
+  await page.getByRole("button", { name: "Create team" }).click();
+  await expect(page.locator("main").getByRole("alert")).toHaveText(
+    "The active workspace changed in another tab. Reload this page before continuing.",
+  );
+  await page.goto("/account");
+  const trigger = page.getByRole("button", { name: "Switch workspace" });
+  await trigger.click();
+  await page.getByRole("button", { name: /Fixture Organization/ }).click();
+  await expect(trigger).toContainText("Fixture Organization");
+  await page.goto("/account/teams");
+  await expect(page.getByRole("link", { name: "Operations" })).toBeVisible();
+  await expect(page.getByText("Stale tab team")).toHaveCount(0);
+});
+
+test("a grant on a project from a workspace that is not the active one goes to the project's own workspace", async ({
+  page,
+}) => {
+  await page.goto("/account");
+  const trigger = page.getByRole("button", { name: "Switch workspace" });
+  await trigger.click();
+  await page.getByRole("button", { name: /Fixture Personal/ }).click();
+  await expect(trigger).toContainText("Fixture Personal");
+  await page.goto("/account/projects/33333333-3333-4333-8333-333333333333");
+  await page
+    .getByLabel("Team", { exact: true })
+    .selectOption({ label: "Operations" });
+  await page.getByLabel("Role on this project").selectOption("member");
+  await page.getByRole("button", { name: "Give access" }).click();
+  await expect(
+    page.locator("main li").filter({ hasText: "Operations" }),
+  ).toContainText(/member/i);
+});
+
 test("signing out flips the marketing nav without a manual reload", async ({
   page,
 }) => {

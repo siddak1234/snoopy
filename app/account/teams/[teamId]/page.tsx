@@ -107,6 +107,7 @@ export default async function TeamPage({
               Add someone, or change their role
             </h2>
             <TeamMemberForm
+              workspaceId={workspace.id}
               teamId={team.id}
               people={workspaceMembers.map((member) => ({
                 userId: member.userId,

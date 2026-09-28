@@ -798,11 +798,21 @@ the sha256 of the contract it came from.
     by the shared preflight.
   - F16: which CI jobs are *required* is a branch-protection setting, the owner's. The new
     `fixtures` and `scan` jobs, and `browser`, should be required.
-- **New this round, both closed here:**
+- **New this round, all three closed here:**
   - **F55**: the organization page admitted only its owner, while every operation on it
     admits owner or admin. It now admits both, and the nav shows it where it renders.
   - **F56**: four account pages read "Dashboard" in the small-screen header. Every page has
     its title, held by a test.
+  - **F57**, found by this round's Compose journey. A new organization could not create
+    its first team project. The Projects page offered "team" only when one of an
+    organization's projects was visible, and a new organization has none. The create action
+    also put a team project in the first organization listed, not the one the person was
+    working in. Now the team option follows the active workspace. The action creates the
+    project in the organization the dialog named, while it is still active, through the
+    shared guard.
+    - `test/tenancy-contract.test.mjs`.
+    - e2e: "an organization with no project yet creates its first team project …" and
+      "working in a personal workspace, a team project is not offered …".
 
 **The change review's ten findings** (`/code-review`, high, on `c974177`). Eight were fixed,
 each with a test that was run red against the old code. One was accepted with a reason, and
@@ -848,5 +858,17 @@ one is the backend's:
 10. **Fixed.** Replace account read a `reused` answer as a failure. It now says the account is
     already connected. `test/structure-contract.test.mjs`.
 
+**`/security-review`** on 22.3.1, 22.3.3, 22.5.3 and 22.5.4, and on the rest of the diff:
+no finding at the bar. The website's server holds no platform credential and sends the
+browser's own cookies and Origin, so the Edge makes every decision. Its one functional note
+is fixed here:
+- A team grant posted to the active workspace, while a project's page can show a project
+  from another workspace. The grant now resolves the project's workspace on the server,
+  as every project action does.
+- The same pass put Create team and a team's member control behind the shared guard, so
+  a stale tab cannot create a team in another organization.
+- e2e: "Create team on a page whose workspace was switched away …" and "a grant on a
+  project from a workspace that is not the active one …".
+
 **Numbering.** F35 was never assigned; F11, F19 and F36 were closed or withdrawn as recorded
-above. F55 and F56 are new here, and no number is reused.
+above. F55, F56 and F57 are new here, and no number is reused.

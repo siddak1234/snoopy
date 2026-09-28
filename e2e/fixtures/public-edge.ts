@@ -152,6 +152,10 @@ function initialState() {
       },
     ] as Platform["TeamMembershipSummary"][],
     projectTeamGrants: [] as Platform["ProjectTeamGrantSummary"][],
+    // Whether the organization lists its fixture project, and the projects a
+    // test created — so an organization can be new, with none (register F57).
+    fixtureProjectListed: true,
+    createdProjects: [] as Platform["ProjectSummary"][],
   };
 }
 let state = initialState();
@@ -659,6 +663,14 @@ const server = createServer(
     }
     if (
       request.method === "POST" &&
+      url.pathname === "/__fixture/org-without-projects"
+    ) {
+      state.fixtureProjectListed = false;
+      response.writeHead(204, { "cache-control": "no-store" });
+      return response.end();
+    }
+    if (
+      request.method === "POST" &&
       url.pathname === "/__fixture/oauth-connection-broken"
     ) {
       state.oauthStatus = "reauthorization-required";
@@ -819,8 +831,37 @@ const server = createServer(
       // organization admin (effective admin), or a plain member on it.
       const viewerRole = projectRoleOf(fixtureSession);
       return respond(response, 200, {
-        projects: viewerRole ? [{ ...project, viewerRole }] : [],
+        projects: [
+          ...(viewerRole && state.fixtureProjectListed
+            ? [{ ...project, viewerRole }]
+            : []),
+          ...state.createdProjects,
+        ],
       } satisfies Platform["ProjectListResponse"]);
+    }
+    // Creating a project in the organization: its creator owns it, as Access
+    // records the owner membership in the same transaction.
+    if (method === "POST" && isWorkspacePath(pathname, "/projects")) {
+      const body = (await requestJson(request)) as {
+        name?: string;
+        type?: string;
+      };
+      if (!body.name || !body.type) {
+        return respond(response, 400, problem(400, "Bad Request"));
+      }
+      const created = {
+        id: `5555555${state.createdProjects.length}-5555-4555-8555-555555555555`,
+        workspaceId,
+        name: body.name,
+        type: body.type,
+        status: "active",
+        viewerRole: "owner",
+        createdAt: now,
+      } satisfies Platform["ProjectSummary"];
+      state.createdProjects.push(created);
+      return respond(response, 200, {
+        project: created,
+      } satisfies Platform["ProjectMutationResponse"]);
     }
     if (
       method === "GET" &&

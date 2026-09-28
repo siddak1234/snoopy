@@ -13,9 +13,11 @@ import { upsertTeamMemberAction } from "../actions";
  * §12.1 #174).
  */
 export function TeamMemberForm({
+  workspaceId,
   teamId,
   people,
 }: {
+  workspaceId: string;
   teamId: string;
   people: { userId: string; label: string }[];
 }) {
@@ -34,6 +36,7 @@ export function TeamMemberForm({
 
   return (
     <form onSubmit={submit} className="mt-3 grid gap-3 sm:max-w-md">
+      <input type="hidden" name="workspaceId" value={workspaceId} />
       <input type="hidden" name="teamId" value={teamId} />
       <FormSelect id="team-member-person" name="userId" label="Person" required>
         {people.map((person) => (

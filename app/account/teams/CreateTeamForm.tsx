@@ -9,9 +9,10 @@ import { createTeamAction } from "./actions";
 /**
  * Creating a team is an owner's or an admin's, and the page renders this only
  * for them. Submitted from onSubmit, not a form action, so a refusal keeps what
- * was typed.
+ * was typed. It names the workspace the page showed, so a switch in another tab
+ * is refused rather than creating the team elsewhere.
  */
-export function CreateTeamForm() {
+export function CreateTeamForm({ workspaceId }: { workspaceId: string }) {
   const form = useRef<HTMLFormElement>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +33,7 @@ export function CreateTeamForm() {
 
   return (
     <form ref={form} onSubmit={submit} className="mt-3 grid gap-3 sm:max-w-md">
+      <input type="hidden" name="workspaceId" value={workspaceId} />
       <FormInput
         id="team-name"
         name="name"

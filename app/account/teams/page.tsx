@@ -82,7 +82,7 @@ export default async function TeamsPage() {
           <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
             Create a team
           </h2>
-          <CreateTeamForm />
+          <CreateTeamForm workspaceId={workspace.id} />
         </div>
       ) : null}
     </SectionCard>

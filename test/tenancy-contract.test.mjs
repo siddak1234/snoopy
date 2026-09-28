@@ -89,7 +89,7 @@ test("bounded session previews are never used as workspace authority", () => {
     const source = readFileSync(file, "utf8");
     assert.match(
       source,
-      /requireActiveWorkspaceId\(\)|activeWorkspaceIfShown\(shownWorkspaceId\)/u,
+      /requireActiveWorkspaceId\(\)|activeWorkspaceIfShown\(/u,
       file,
     );
     assert.doesNotMatch(
@@ -184,6 +184,8 @@ test("an action on a page's workspace refuses once another tab changed it — bi
   for (const file of [
     "app/account/billing/actions.ts",
     "app/account/automations/actions.ts",
+    "app/account/projects/actions.ts",
+    "app/account/teams/actions.ts",
   ]) {
     const source = readFileSync(file, "utf8");
     assert.doesNotMatch(
@@ -192,5 +194,56 @@ test("an action on a page's workspace refuses once another tab changed it — bi
       `${file} keeps no private copy of the guard`,
     );
     assert.match(source, /error: WORKSPACE_CHANGED/u, file);
+  }
+});
+
+test("a team project is created in the organization the dialog showed, while it is still the active one (register F57)", () => {
+  const actions = readFileSync("app/account/projects/actions.ts", "utf8");
+  assert.match(
+    actions,
+    /if \(scope === "team"\) \{[\s\S]*?const workspaceId = await activeWorkspaceIfShown\(\s*String\(formData\.get\("workspaceId"\) \?\? ""\),\s*\);\s*if \(!workspaceId\) return \{ ok: false, error: WORKSPACE_CHANGED \};[\s\S]*?candidate\.id === workspaceId && candidate\.type === "organization"/u,
+    "the active organization the dialog named — never the first organization listed",
+  );
+  const page = readFileSync("app/account/projects/page.tsx", "utf8");
+  assert.match(
+    page,
+    /active\?\.type === "organization"/u,
+    "the team option follows the active workspace",
+  );
+  assert.doesNotMatch(
+    page,
+    /accessible\.some\(/u,
+    "not whether one of an organization's projects is visible — a new organization has none",
+  );
+});
+
+test("a team's writes act on the workspace the page showed; a grant on the project's own workspace", () => {
+  const actions = readFileSync("app/account/teams/actions.ts", "utf8");
+  for (const operation of ["createTeam", "upsertTeamMembership"]) {
+    assert.match(
+      actions,
+      new RegExp(
+        `const workspaceId = await activeWorkspaceIfShown\\(\\s*String\\(formData\\.get\\("workspaceId"\\) \\?\\? ""\\),\\s*\\);\\s*if \\(!workspaceId\\) return \\{ ok: false, error: WORKSPACE_CHANGED \\};\\s*await ${operation}\\(workspaceId,`,
+        "u",
+      ),
+      `${operation} is refused once another tab changed the workspace`,
+    );
+  }
+  assert.match(
+    actions,
+    /const context = await findAccessibleProject\(projectId\);[\s\S]*?await grantProjectTeam\(context\.workspace\.id, projectId,/u,
+    "a grant goes to the workspace that holds the project, resolved on the server",
+  );
+  for (const [page, form] of [
+    [
+      "app/account/teams/page.tsx",
+      "<CreateTeamForm workspaceId={workspace.id} />",
+    ],
+    ["app/account/teams/[teamId]/page.tsx", "workspaceId={workspace.id}"],
+  ]) {
+    assert.ok(
+      readFileSync(page, "utf8").includes(form),
+      `${page} names its workspace`,
+    );
   }
 });

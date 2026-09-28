@@ -3,19 +3,25 @@
 import { revalidatePath } from "next/cache";
 import { PlatformServerError } from "@/lib/platform-server";
 import {
+  activeWorkspaceIfShown,
   createTeam,
+  findAccessibleProject,
   grantProjectTeam,
-  requireActiveWorkspaceId,
   upsertTeamMembership,
+  WORKSPACE_CHANGED,
   type ProjectTeamGrantRole,
   type TeamRole,
 } from "@/lib/tenancy";
 
 /**
- * The three team writes (backend ADR-0010, §12.1 #173). Each acts on the
- * session's active workspace (register F28) and shows the platform's refusal in
- * place: who may do what is the platform's to decide, and a page only avoids
- * offering what it would refuse.
+ * The three team writes (backend ADR-0010, §12.1 #173), each showing the
+ * platform's refusal in place: who may do what is the platform's to decide, and
+ * a page only avoids offering what it would refuse. A team's two writes act on
+ * the session's active workspace while it is still the one the page showed
+ * (register F28), so a switch in another tab cannot create a team elsewhere. A
+ * grant acts on the project's own workspace, resolved here as every project
+ * action resolves it, because a project's page may show one from a workspace
+ * that is not the active one.
  */
 
 export type TeamActionResult = { ok: true } | { ok: false; error: string };
@@ -40,7 +46,11 @@ export async function createTeamAction(
     return { ok: false, error: "A team name needs at least two characters." };
   }
   try {
-    await createTeam(await requireActiveWorkspaceId(), {
+    const workspaceId = await activeWorkspaceIfShown(
+      String(formData.get("workspaceId") ?? ""),
+    );
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+    await createTeam(workspaceId, {
       name,
       ...(description ? { description } : {}),
     });
@@ -65,7 +75,11 @@ export async function upsertTeamMemberAction(
     return { ok: false, error: "Choose manager or member." };
   }
   try {
-    await upsertTeamMembership(await requireActiveWorkspaceId(), teamId, {
+    const workspaceId = await activeWorkspaceIfShown(
+      String(formData.get("workspaceId") ?? ""),
+    );
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+    await upsertTeamMembership(workspaceId, teamId, {
       userId,
       role,
     });
@@ -90,7 +104,11 @@ export async function grantProjectTeamAction(
     return { ok: false, error: "Choose admin or member." };
   }
   try {
-    await grantProjectTeam(await requireActiveWorkspaceId(), projectId, {
+    const context = await findAccessibleProject(projectId);
+    if (!context) {
+      return { ok: false, error: "The project is unavailable." };
+    }
+    await grantProjectTeam(context.workspace.id, projectId, {
       teamId,
       role,
     });
