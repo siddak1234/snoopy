@@ -489,6 +489,43 @@ test("a move's dialog cannot be dismissed while the platform decides, so its ref
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
+test("a move's dialog closes on an Escape pressed the moment its answer enables Move again (register F72)", async ({
+  page,
+}) => {
+  await fixtureControl("approval-pending-on-move");
+  await page.goto("/account/automations");
+  await automationCard(page, "Webhook automation")
+    .getByRole("button", { name: "Move to v2" })
+    .click();
+  const move = await holdRequest(
+    page,
+    "**/account/automations",
+    isServerAction,
+  );
+  await page
+    .getByRole("dialog", { name: "Move Webhook automation to v2?" })
+    .getByRole("button", { name: "Move to v2" })
+    .click();
+  await move.arrived;
+  // Escape in the same moment React enables Move again, before any effect that
+  // runs after the commit: the dialog must already be dismissible then.
+  await page.evaluate(() => {
+    const button = [
+      ...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button'),
+    ].find((candidate) => candidate.textContent?.trim() === "Moving…");
+    if (!button) throw new Error("the pending Move button is not shown");
+    new MutationObserver((_, observer) => {
+      if (button.disabled) return;
+      observer.disconnect();
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    }).observe(button, { attributes: true, attributeFilter: ["disabled"] });
+  });
+  move.release();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
 test("an owner makes a webhook automation's address, sees its secret once, and a new secret keeps the address (backend §12.1 #91, #109)", async ({
   page,
 }) => {

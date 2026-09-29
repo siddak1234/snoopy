@@ -1207,9 +1207,19 @@ than carried.
   test does (F50). 18 cases × 5 repeats in three engines: 90 of 90.
 - **F72**: "a move's dialog cannot be dismissed while the platform decides …" pressed Escape
   the moment the refusal showed, but `setError` after an `await` inside `startTransition`
-  renders before the transition's `pending` ends — 1 red in 30 WebKit runs on `main`'s code (2
-  in 120 with `Modal`'s ref synced in a layout effect, which is not the cause). The test waits
-  for Move to be enabled first, as its sibling does: 0 in 120.
+  renders before the transition's `pending` ends — 1 red in 30 WebKit runs on `main`'s code. The
+  test waits for Move to be enabled first, as its sibling does: 0 in 120.
+
+  That was half of it. The change audit of `b134a4f` met it again, once in WebKit, after the
+  wait: Move enabled, Escape pressed, the dialog still open. `Modal` synced `dismissible` into
+  its ref in a passive effect, which runs after the commit that enables Move, so an Escape in
+  that gap was ignored. This register had said a layout effect was "not the cause". That was
+  measured without the wait, when the dialog was rightly not dismissible, so it could not show
+  this. Measured before it was changed: a test that presses Escape the instant Move is enabled
+  again kept the dialog open 15 of 15 times in three engines. `Modal` now syncs the ref in a
+  layout effect, in the same commit, and the same test closed it 15 of 15. That test is now in
+  the suite ("a move's dialog closes on an Escape pressed the moment its answer enables Move
+  again"). With the passive effect put back, it failed 6 of 6.
 - **F73**: "4, 20 — the sidebar's Teams link opens Teams …" failed once in Firefox, in `verify`
   on this change's tree: `page.goto: NS_BINDING_ABORTED`. The switch's action can show the new
   workspace before the `router.refresh()` after it returns, and the test navigated then. Firefox
