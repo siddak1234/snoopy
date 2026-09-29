@@ -848,7 +848,8 @@ const server = createServer(
         state.exportReadsFailing = Number.POSITIVE_INFINITY;
       },
       // The change audit of 97021f9's surfaces (register § Round 15). Each
-      // refusal holds until the next control or a reset.
+      // refusal holds until the fixture is reset, before every test — another
+      // control does not clear it (register F71).
       // Backend §12.1 #126: a move refused with a reason — 409 or 422.
       "/__fixture/move-refused": () => {
         const status = Number(url.searchParams.get("status"));
@@ -922,6 +923,9 @@ const server = createServer(
         storePuts: state.storePuts,
         storePutsWithCookie: state.storePutsWithCookie,
         projectTeamGrants: state.projectTeamGrants.length,
+        // Each approval's status: a decision leaves the page, and which it was
+        // is read here.
+        approvalStatuses: state.approvals.map((entry) => entry.status),
       });
     }
     if (
@@ -1650,10 +1654,12 @@ const server = createServer(
         } satisfies ConnectionOperations["beginConnectionAuthorization"]["responses"][200]["content"]["application/json"]);
       }
       // Reused only when the grant is connected and nothing is being replaced
-      // (backend ADR-0019 §2, §12.1 #175); otherwise consent is asked for.
+      // (backend ADR-0019 §2, §12.1 #175); otherwise consent is asked for. A
+      // disconnected grant is not connected, whatever status it had.
       const answer =
         body.replaceConnectionId === undefined &&
-        state.oauthStatus === "connected"
+        state.oauthStatus === "connected" &&
+        !state.oauthDisconnected
           ? ({
               outcome: "reused",
               connection: oauthConnectionState(),

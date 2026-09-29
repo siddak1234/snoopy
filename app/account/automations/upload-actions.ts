@@ -7,12 +7,16 @@ import {
   type UploadedFile,
   type UploadTicket,
 } from "@/lib/automations";
-import { requireActiveWorkspaceId } from "@/lib/tenancy";
+import { activeWorkspaceIfShown, WORKSPACE_CHANGED } from "@/lib/tenancy";
 
 /**
  * A file for a run (FR-14). The bytes never pass through here: `open` answers
  * a signed URL the browser PUTs the file to directly, and `complete` asks the
  * platform what arrived. Only the file's id reaches the run's input.
+ *
+ * Both act on the workspace the page showed (register F28, F70): after a switch
+ * in another tab, the file is neither opened in nor completed against another
+ * workspace, and the refusal is said in words.
  */
 
 export type OpenUploadResult =
@@ -40,6 +44,8 @@ function refused(error: unknown): { ok: false; error: string } {
 }
 
 export async function openRunUpload(input: {
+  /** The workspace the page showed. */
+  workspaceId: string;
   subscriptionId: string;
   filename: string;
   contentType: string;
@@ -49,7 +55,8 @@ export async function openRunUpload(input: {
     return { ok: false, error: "The file is empty." };
   }
   try {
-    const workspaceId = await requireActiveWorkspaceId();
+    const workspaceId = await activeWorkspaceIfShown(input.workspaceId);
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
     return {
       ok: true,
       ticket: await openUpload(workspaceId, {
@@ -67,10 +74,12 @@ export async function openRunUpload(input: {
 }
 
 export async function completeRunUpload(
+  shownWorkspaceId: string,
   uploadSessionId: string,
 ): Promise<CompleteUploadResult> {
   try {
-    const workspaceId = await requireActiveWorkspaceId();
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspaceId);
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
     return {
       ok: true,
       file: await completeUpload(workspaceId, uploadSessionId),

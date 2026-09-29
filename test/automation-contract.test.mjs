@@ -599,7 +599,9 @@ test("a run's file goes straight to the store, and the run carries only its id (
     client,
     /platformServerJson<CompleteUploadResponse>\(\s*`\$\{scope\(workspaceId\)\}\/uploads\/\$\{encodeURIComponent\(uploadSessionId\)\}\/complete`/u,
   );
-  assert.match(uploads, /requireActiveWorkspaceId\(\)/u);
+  // Both act on the workspace the page showed (register F70), never the active one.
+  assert.match(uploads, /activeWorkspaceIfShown\(input\.workspaceId\)/u);
+  assert.match(uploads, /activeWorkspaceIfShown\(shownWorkspaceId\)/u);
   if (available) {
     assert.deepEqual(
       refusalKeys(uploads, "UPLOAD_REFUSALS"),

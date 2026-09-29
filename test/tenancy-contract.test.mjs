@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 
 const tenancy = readFileSync("lib/tenancy.ts", "utf8");
@@ -78,20 +79,18 @@ test("bounded session previews are never used as workspace authority", () => {
     assert.doesNotMatch(source, /session\?\.workspaces|session\.workspaces/);
   }
   // Every action module resolves its workspace through ONE helper (register
-  // F28), which reads the session, never a workspace the form names.
+  // F28), which reads the session and only compares the id the page sent.
   for (const file of [
     "app/account/automations/actions.ts",
+    "app/account/automations/upload-actions.ts",
+    "app/account/automations/webhook-actions.ts",
     "app/account/billing/actions.ts",
     "app/account/connections/actions.ts",
     "app/account/settings/export-actions.ts",
     "app/account/teams/actions.ts",
   ]) {
     const source = readFileSync(file, "utf8");
-    assert.match(
-      source,
-      /requireActiveWorkspaceId\(\)|activeWorkspaceIfShown\(/u,
-      file,
-    );
+    assert.match(source, /activeWorkspaceIfShown\(/u, file);
     assert.doesNotMatch(
       source,
       /async function activeWorkspaceId|resolveActiveWorkspaceId|session\?\.workspaces|session\.workspaces/u,
@@ -295,4 +294,64 @@ test("taking someone off a team and a team's access away are the published DELET
     confirm,
     /const result = await action\(\);\s*if \(!result\.ok\) \{\s*setError\(result\.error\);\s*return;\s*\}/u,
   );
+});
+
+/** Every server-action module in the app, found by its directive. */
+function serverActionFiles(directory = "app") {
+  const found = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) found.push(...serverActionFiles(path));
+    else if (
+      /\.tsx?$/u.test(entry.name) &&
+      /^"use server";/u.test(readFileSync(path, "utf8"))
+    ) {
+      found.push(path);
+    }
+  }
+  return found;
+}
+
+test("no server action acts on the workspace active NOW rather than the one its page showed (register F28, F70)", () => {
+  const files = serverActionFiles();
+  assert.ok(
+    files.includes("app/account/automations/actions.ts") &&
+      files.includes("app/account/connections/actions.ts"),
+    "the walk found no action modules; it is now blind",
+  );
+  for (const file of files) {
+    // `requireActiveWorkspaceId()` is the active workspace whatever the page
+    // showed: after a switch in another tab, Add or Connect through it writes
+    // into a workspace the person was not looking at.
+    assert.doesNotMatch(
+      readFileSync(file, "utf8"),
+      /requireActiveWorkspaceId\(/u,
+      `${file} reads the active workspace unguarded; compare it with the page's (activeWorkspaceIfShown)`,
+    );
+  }
+  // Each form sends the workspace its page rendered, under one name.
+  for (const [file, sends] of [
+    [
+      "app/account/automations/AutomationActions.tsx",
+      /data\.set\("workspaceId", workspaceId\)/u,
+    ],
+    [
+      "app/account/automations/AddAutomation.tsx",
+      /data\.append\("workspaceId", workspaceId\)/u,
+    ],
+    [
+      "app/account/automations/MoveVersionButton.tsx",
+      /data\.append\("workspaceId", workspaceId\)/u,
+    ],
+    [
+      "app/account/approvals/ApprovalDecision.tsx",
+      /data\.append\("workspaceId", workspaceId\)/u,
+    ],
+    [
+      "app/account/connections/ConnectionsPanel.tsx",
+      /data\.set\("workspaceId", workspaceId\)/u,
+    ],
+  ]) {
+    assert.match(readFileSync(file, "utf8"), sends, file);
+  }
 });

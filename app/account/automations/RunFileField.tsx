@@ -21,10 +21,13 @@ import { completeRunUpload, openRunUpload } from "./upload-actions";
  */
 export function RunFileField({
   field,
+  workspaceId,
   subscriptionId,
   onBusyChange,
 }: {
   field: AutomationRunInputField;
+  /** The workspace the page showed; the upload is refused once it is not active. */
+  workspaceId: string;
   subscriptionId: string;
   onBusyChange: (key: string, busy: boolean) => void;
 }) {
@@ -65,6 +68,7 @@ export function RunFileField({
     onBusyChange(field.key, true);
     try {
       const opened = await openRunUpload({
+        workspaceId,
         subscriptionId,
         filename: file.name,
         contentType: file.type,
@@ -73,7 +77,10 @@ export function RunFileField({
       if (upload.signal.aborted) return;
       if (!opened.ok) throw new Error(opened.error);
       await putFileToSignedUrl(opened.ticket.uploadUrl, file, upload.signal);
-      const completed = await completeRunUpload(opened.ticket.uploadSessionId);
+      const completed = await completeRunUpload(
+        workspaceId,
+        opened.ticket.uploadSessionId,
+      );
       if (upload.signal.aborted) return;
       if (!completed.ok) throw new Error(completed.error);
       setState({

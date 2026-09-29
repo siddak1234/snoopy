@@ -10,6 +10,8 @@ import {
   observe,
   presentSession,
   providerCard,
+  settledAnimations,
+  worstContrast,
 } from "./helpers";
 
 const requesterUserId = "66666666-6666-4666-8666-666666666666";
@@ -477,8 +479,50 @@ test("a move's dialog cannot be dismissed while the platform decides, so its ref
   await expect(dialog.getByRole("alert")).toHaveText(
     "An approval for this automation is still waiting. Decide it first, then move.",
   );
+  // The refusal renders a moment before the transition ends (register F72): the
+  // dialog is dismissible again once its buttons are.
+  await expect(
+    dialog.getByRole("button", { name: "Move to v2" }),
+  ).toBeEnabled();
   // Answered, it closes as before.
   await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("a move's dialog closes on an Escape pressed the moment its answer enables Move again (register F72)", async ({
+  page,
+}) => {
+  await fixtureControl("approval-pending-on-move");
+  await page.goto("/account/automations");
+  await automationCard(page, "Webhook automation")
+    .getByRole("button", { name: "Move to v2" })
+    .click();
+  const move = await holdRequest(
+    page,
+    "**/account/automations",
+    isServerAction,
+  );
+  await page
+    .getByRole("dialog", { name: "Move Webhook automation to v2?" })
+    .getByRole("button", { name: "Move to v2" })
+    .click();
+  await move.arrived;
+  // Escape in the same moment React enables Move again, before any effect that
+  // runs after the commit: the dialog must already be dismissible then.
+  await page.evaluate(() => {
+    const button = [
+      ...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button'),
+    ].find((candidate) => candidate.textContent?.trim() === "Moving…");
+    if (!button) throw new Error("the pending Move button is not shown");
+    new MutationObserver((_, observer) => {
+      if (button.disabled) return;
+      observer.disconnect();
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    }).observe(button, { attributes: true, attributeFilter: ["disabled"] });
+  });
+  move.release();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
@@ -798,6 +842,37 @@ test.describe("a file for a run (backend FR-14)", () => {
     expect(await fixtureFiles()).toEqual([]);
   });
 
+  test("a file opened before another tab switched workspace is refused as it completes, and nothing is recorded (register F70)", async ({
+    page,
+    context,
+  }) => {
+    const put = await holdRequest(
+      page,
+      "https://127.0.0.1:3443/__fixture/objects/**",
+      (request) => request.method() === "PUT",
+    );
+    const dialog = await openFilledRun(page);
+    await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
+    // Opened on the workspace the page showed: the PUT is on its way.
+    await put.arrived;
+    const other = await context.newPage();
+    try {
+      await other.goto("/account");
+      const trigger = other.getByRole("button", { name: "Switch workspace" });
+      await trigger.click();
+      await other.getByRole("button", { name: /Fixture Personal/ }).click();
+      await expect(trigger).toContainText("Fixture Personal");
+    } finally {
+      await other.close();
+    }
+    put.release();
+    await expect(dialog.getByRole("alert")).toHaveText(
+      "The active workspace changed in another tab. Reload this page before continuing.",
+    );
+    await expect(dialog.getByText(/^Ready: invoice\.pdf/u)).toHaveCount(0);
+    expect(await fixtureFiles()).toEqual([]);
+  });
+
   test("an abandoned upload that ends never releases Start run while the file chosen since is still uploading", async ({
     page,
   }) => {
@@ -1101,20 +1176,22 @@ test("a ghost button keeps AA contrast when hovered and when pressed (register F
     "button",
     { name: "Archive" },
   );
-  // Each state is scanned once its transition has finished.
-  const settled = () =>
-    archive.evaluate((element) =>
-      Promise.all(
-        element.getAnimations().map((animation) => animation.finished),
-      ),
-    );
+  // Each state is measured once its transition has finished: the button from
+  // pixels, the one measure the marketing test uses too (register F71), and the
+  // rest of the page by axe.
   const contrast = () =>
     new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
   await archive.hover();
-  await settled();
+  await settledAnimations(archive);
+  expect(await worstContrast(page, archive), "hovered").toBeGreaterThanOrEqual(
+    4.5,
+  );
   expect((await contrast()).violations).toEqual([]);
   await page.mouse.down();
-  await settled();
+  await settledAnimations(archive);
+  expect(await worstContrast(page, archive), "pressed").toBeGreaterThanOrEqual(
+    4.5,
+  );
   expect((await contrast()).violations).toEqual([]);
   // Released elsewhere, so nothing is archived.
   await page.mouse.move(0, 0);
@@ -2067,6 +2144,76 @@ test("a grant on a project from a workspace that is not the active one goes to t
   await expect(
     page.locator("main li").filter({ hasText: "Operations" }),
   ).toContainText(/member/i);
+});
+
+const fixtureProject = "/account/projects/33333333-3333-4333-8333-333333333333";
+
+test("Leave project's dialog gives focus back to Leave project when it closes (register F75)", async ({
+  page,
+}) => {
+  await presentSession(page, "admin");
+  await page.goto(fixtureProject);
+  const trigger = page
+    .locator("main")
+    .getByRole("button", { name: "Leave project" });
+  await trigger.click();
+  const dialog = page.getByRole("dialog", {
+    name: "Leave “Fixture Project”?",
+  });
+  await expect(dialog.getByLabel("Confirmation")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+});
+
+test("Leave project's dialog holds while the platform decides, and says its refusal (register F76)", async ({
+  page,
+}) => {
+  await presentSession(page, "admin");
+  await page.goto(fixtureProject);
+  await page
+    .locator("main")
+    .getByRole("button", { name: "Leave project" })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "Leave “Fixture Project”?",
+  });
+  await dialog.getByLabel("Confirmation").fill("DELETE");
+  const leave = await holdRequest(page, `**${fixtureProject}`, isServerAction);
+  await presentSession(page, "throttled");
+  await dialog.getByRole("button", { name: "Leave project" }).click();
+  await leave.arrived;
+  // Neither Escape nor the backdrop closes it while the answer is on its way.
+  await page.keyboard.press("Escape");
+  await page.mouse.click(4, 4);
+  await expect(dialog).toBeVisible();
+  leave.release();
+  await expect(dialog.getByText(busy)).toBeVisible();
+});
+
+test("Create project closes on Escape and asks for the list once, as Done does (register F77)", async ({
+  page,
+}) => {
+  const actions = observe(page, isServerAction);
+  await page.goto("/account/projects");
+  await page
+    .locator("main")
+    .getByRole("button", { name: "Create project" })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Create project" });
+  await dialog
+    .locator("label")
+    .filter({ hasText: /^\s*team\s*$/i })
+    .click();
+  await dialog.getByLabel(/Project name/).fill("Escaped project");
+  await dialog.getByLabel(/Project type/).fill("Invoices");
+  await dialog.getByRole("button", { name: "Create project" }).click();
+  await expect(dialog).toContainText("Your project was created.");
+  const before = actions.length;
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByText("Escaped project")).toBeVisible();
+  expect(actions.length - before).toBe(1);
 });
 
 test("signing out flips the marketing nav without a manual reload", async ({

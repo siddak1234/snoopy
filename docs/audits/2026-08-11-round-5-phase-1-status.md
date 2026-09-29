@@ -1013,7 +1013,7 @@ This repository then regenerated its client from that tree.
 
 | Item | Register | What changed here | Evidence |
 | --- | --- | --- | --- |
-| 23.7.1 | F64 | `.btn-ghost:hover` and `:active` draw the text in `--accent-strong` — 4.6:1 or better on every surface, both themes, where the accent on its own tint fell to 4.06:1 and, pressed, 3.60:1 (dark) | e2e "a ghost button keeps AA contrast when hovered and when pressed (register F64)", RED with `main`'s colours |
+| 23.7.1 | F64 | `.btn-ghost:hover` and `:active` draw the text in `--ghost-active-text` — the accent's 400 step in the dark theme and its 200 step in the light — where the accent on its own tint fell to 4.06:1 and, pressed, 3.60:1 (dark). _Corrected at Round 15's close: this row first said `--accent-strong` at "4.6:1 or better on every surface, both themes"; the change audit then measured the light theme's band at 4.23:1 hovered and 3.87:1 pressed (F-1), and `--ghost-active-text` is the fix_ | e2e "a ghost button keeps AA contrast when hovered and when pressed (register F64)", RED with `main`'s colours, and the pixel-measured marketing test (F-1) |
 | 23.7.2 | backend #174, #176 | Remove on each member of a team (an owner, admin or the team's manager) and on each team with access to a project (its owner or admin), each confirmed first, in one new `components/dashboard/ConfirmRemoveButton.tsx`; the team's removal acts on the workspace the page showed | e2e "taking someone off a team …" and "a project's owner removes a team's access …"; `test/tenancy-contract.test.mjs` |
 | 23.7.3 | backend #91, #109 | Webhook address on a webhook-started automation, for an owner or admin: create it, see the secret once, make a new one; the secret is never kept | e2e "an owner makes a webhook automation's address …" and "… offered to an admin and to no plain member"; `test/automation-contract.test.mjs` holds the refusal words to the contract's reasons |
 | 23.7.4 | backend #126 | Move to vN on a subscription pinned to an older version, confirmed first, each refusal the platform names said in words | e2e "a subscription pinned to an older version moves …" and "a move the platform holds for a pending approval …"; `test/automation-contract.test.mjs` |
@@ -1148,3 +1148,151 @@ switched workspace …"; 16 → "a team's access the platform will not withdraw 
 closes on a click outside it …"; 19 → F-1's test; 20 → VG "a docs-only change audit runs the
 gates its marker requires …"; 21 → VG "the browser fixture run passes every spec that needs the
 fixture Edge, and no other".
+
+**Change audit of `f5e8493`, 2026-09-28.** It found **F-2**: the webhook address dialog read
+and issued for the ACTIVE workspace, so after a switch in another tab it read the other
+workspace's 404 as "no address yet". Both webhook actions now take the workspace the page
+showed (`activeWorkspaceIfShown`), fixed in `a2e6d74` and held by AS "a webhook address opened
+after another tab switched workspace is refused, never read as \"no address yet\" (register
+F28)", with the fixture answering the personal workspace's read with a 404 as the platform
+does; it went red with the fix taken out. The audit of `a2e6d74` then PASSED, with 14
+surfaces probed and passing that no test held — test debt, carried in `snoopy-backend`'s
+MASTER-PLAN §0.1 NEXT.
+
+## Round 15's close — the findings it made, fixed before it closed — 2026-09-29
+
+`snoopy-backend`'s close of Round 15 ran this repository's `verify` at `main` `de40e65` and a
+`/code-review` of `97021f9..de40e65`, and measured the marketing band. On the owner's word
+("complete the items then merge … i dont want buggy items"), each finding is fixed here rather
+than carried.
+
+- **F69**: the ghost text AT REST on a section band — "Contact support" on
+  `/automation-builder` — measured 3.92:1 (dark) and 3.99:1 (light) at its worst pixel. A band
+  now carries `section-band` (`components/ui/Section.tsx`), and a ghost button on one draws its
+  text in `--ghost-active-text` at rest too. The marketing test measures each ghost button AT
+  REST as well as hovered and pressed; without the rule it went red at 3.87–3.99:1. The marketing
+  baselines are unchanged: the recoloured text is within Playwright's default per-pixel
+  threshold, and all six pages still pass.
+- **F70**: every action on the automations, approvals and connections pages acted on the
+  workspace active NOW — after a switch in another tab, Add and Connect wrote into a workspace
+  the person was not looking at, and the rest read its 404 as this page's answer. Each now
+  sends the workspace its page rendered and is refused in words (`WORKSPACE_CHANGED`) once that
+  is not the active one: `app/account/automations/actions.ts` (Add, Set up, Run, Pause and Go
+  live, Archive, Move, Approve and Reject), `upload-actions.ts` (a run's file),
+  `app/account/connections/actions.ts` (Connect, Reconnect, Replace, a pasted key, Disconnect).
+  Held by `test/tenancy-contract.test.mjs` "no server action acts on the workspace active NOW
+  …", which walks every `"use server"` module. Browser tests switch the workspace in another
+  tab, use each control, expect the refusal words, and find nothing changed once switched
+  back:
+  - automations, two tests: Add, Pause, Move, Archive, Run, and a file refused as it is opened;
+    then Set up and Go live;
+  - approvals, two tests: Approve and Reject, each still pending at the platform;
+  - connections, two tests: Reconnect, Disconnect, a pasted key and Replace; then a fresh
+    Connect, which asks the provider for no consent;
+  - "a file opened before another tab switched workspace is refused as it completes …".
+
+  Eight mutations — each guard handed the ACTIVE workspace, as the old code did — each ran RED.
+  The first version held only 11 of these 16 controls; the change audit found the other five
+  (below).
+- **F71**: the review's test findings. The fixture said a refusal control holds "until the
+  next control" — it holds until reset. The pixel measure could score a sample outside the
+  screenshot as transparent black; it now refuses a box outside the image. F64's button was
+  measured two ways, by pixels in one test and by axe in the other: both tests now measure it
+  with one `worstContrast` in `e2e/helpers.ts`, and the account test still scans the rest of
+  its page with axe.
+  Proving F69 found two timing faults in that test, each measured before it was changed: a
+  stored theme fades every colour in on load, and a read at 17–92% of that fade gave 4.30:1 —
+  it now waits for the page's finite transitions (`settledPage`); and in WebKit the hero was
+  replaced once the nav's session check answered — it now waits for that answer, as the visual
+  test does (F50). 18 cases × 5 repeats in three engines: 90 of 90.
+- **F72**: "a move's dialog cannot be dismissed while the platform decides …" pressed Escape
+  the moment the refusal showed, but `setError` after an `await` inside `startTransition`
+  renders before the transition's `pending` ends — 1 red in 30 WebKit runs on `main`'s code. The
+  test waits for Move to be enabled first, as its sibling does: 0 in 120.
+
+  That was half of it. The change audit of `b134a4f` met it again, once in WebKit, after the
+  wait: Move enabled, Escape pressed, the dialog still open. `Modal` synced `dismissible` into
+  its ref in a passive effect, which runs after the commit that enables Move, so an Escape in
+  that gap was ignored. This register had said a layout effect was "not the cause". That was
+  measured without the wait, when the dialog was rightly not dismissible, so it could not show
+  this. Measured before it was changed: a test that presses Escape the instant Move is enabled
+  again kept the dialog open 15 of 15 times in three engines. `Modal` now syncs the ref in a
+  layout effect, in the same commit, and the same test closed it 15 of 15. That test is now in
+  the suite ("a move's dialog closes on an Escape pressed the moment its answer enables Move
+  again"). With the passive effect put back, it failed 6 of 6.
+- **F73**: "4, 20 — the sidebar's Teams link opens Teams …" failed once in Firefox, in `verify`
+  on this change's tree: `page.goto: NS_BINDING_ABORTED`. The switch's action can show the new
+  workspace before the `router.refresh()` after it returns, and the test navigated then. Firefox
+  cancels a page's requests when a navigation starts, before `pagehide`. Next reads that cancelled
+  refresh as a failure and falls back to a browser navigation back to `/account/teams`
+  (`Failed to fetch RSC payload … Falling back to browser navigation`). That navigation aborts
+  the test's. Measured before it was changed:
+  - the test's own steps failed 1 in 100 in Firefox under CPU load, with that console line;
+  - with the refresh held, a navigation during it failed 5 of 5 in Firefox and WebKit, and one
+    after it ended passed 15 of 15.
+
+  The test now waits for the refresh to end, finished or failed: Chromium's Next can abort it
+  itself once the action's answer is shown. It passed 60 of 60 in three engines, and 100 of 100
+  in Firefox under the same load. The fallback itself is Next's, and a person would meet it only
+  by starting a browser navigation in that instant, so the website is not changed.
+
+- **F74**: the fixture Edge answered a Connect after a Disconnect as "reused", already
+  connected. The platform does not: a disconnected grant is not connected (backend ADR-0019
+  §2). The change audit of `fd93da4` found it (A-1). The fixture now asks for consent, and test
+  13 follows Connect to the provider's consent page; with the old rule it timed out.
+
+- **F75, F76, F77**: the change audit of `a06d43e` mapped every dialog `Modal` serves (15),
+  and found three older faults. Each was fixed on the owner's word, with a test proved red
+  without its fix:
+  - **F75**: Leave project did not give focus back to its button when closed. The Confirmation
+    field's `autoFocus` took focus before `Modal` recorded what opened it. `Modal` still focuses
+    that field first.
+  - **F76**: Leave project closed on Escape while the leave was on its way, and the platform's
+    refusal was then shown nowhere. It now holds, as Move does.
+  - **F77**: Create project listened for Escape itself as well as through `Modal`, so one
+    Escape asked for the project list twice. Only `Modal` listens now.
+
+F69 to F77 are new, and no number is reused.
+
+**Filed for this repository's next round** — found by the same audit, not fixed here:
+
+- 51 dialog behaviours no test holds: Escape, the backdrop and focus return across the 15
+  dialogs; the hold on Cancel run, Delete account, the organization's Remove member, Replace
+  account and a team's access; the Escape-at-re-enable case on every dialog that holds but
+  Move. The organization's Remove member, Leave project and Add team members were never
+  opened by a test. The audit's sketch of each is its verdict's `required_tests`.
+- Create project and Add team members do not hold while their request is on its way, as F76
+  did not (read in the code, not probed).
+- The audit also measured that `a06d43e` closes the Escape-at-re-enable gap on all 8 dialogs
+  that hold, not only Move: with the passive effect put back, all 8 ignored it.
+
+The `/code-review` of this change found eight things. Four were `snoopy-backend`'s, in the same
+round (§12.1 #182). Two are fixed here:
+
+- a transition cancelled by the next state rejects its `finished`, which failed the wait for it
+  (`settledAnimations` now treats that as settled, as `settledPage` does);
+- the account test had lost its axe scan of the rest of the page when it moved to pixels.
+
+`cancelRun` now reads the shown workspace with the same helper as the rest of its file. Two are
+accepted, with the reason:
+
+- F69 recolours a marketing page's ghost text at rest, where `AGENTS.md` rule 2 asks for byte-identical
+  marketing pages. That recolour is the fix, and the screenshot diff still passes at Playwright's
+  default threshold.
+- Four action modules each read `workspaceId` from their form in one line. A shared helper
+  across modules is a refactor of code this change did not otherwise need.
+
+The change audit of `fd93da4` passed, and named seven required tests: five controls no test
+used after a switch, a Reject no test clicked, and a fresh Connect. On the owner's word each
+is added here, not carried:
+
+- Set up and Go live refused, with nothing saved and the automation still paused;
+- Reject refused and still pending, and Reject recorded as rejected (the fixture's `counts`
+  now reads each approval's status);
+- a file refused as it completes, with no file recorded;
+- a fresh Connect refused, with no consent asked for;
+- Connect after a Disconnect goes to consent (F74).
+
+The comment that said the automations test refused a completion is corrected. Five mutations
+each turned its test red: the shared guard, a completion unguarded, a fresh Connect
+unguarded, the fixture reusing a disconnected grant, and Reject sending "approved".

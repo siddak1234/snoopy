@@ -69,6 +69,7 @@ export function LeaveProjectButton({
           ariaDescribedBy="leave-project-desc"
           bubble
           zIndex={105}
+          dismissible={!pending}
         >
           <h2
             id="leave-project-title"
@@ -91,7 +92,6 @@ export function LeaveProjectButton({
               type="text"
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
-              autoFocus
               placeholder="Type DELETE"
               disabled={pending}
               className="placeholder:text-[var(--muted)]/50"

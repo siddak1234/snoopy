@@ -68,11 +68,14 @@ export function SetupFields({
  */
 export function RunInputFields({
   runInput,
+  workspaceId,
   subscriptionId,
   onUploadingChange,
   fileRound,
 }: {
   runInput: AutomationRunInputField[];
+  /** The workspace the page showed, which a file's upload is checked against. */
+  workspaceId: string;
   subscriptionId: string;
   onUploadingChange: (key: string, uploading: boolean) => void;
   /** Changed to empty every file field — a file the platform will no longer take. */
@@ -85,6 +88,7 @@ export function RunInputFields({
           <RunFileField
             key={`${field.key}:${fileRound}`}
             field={field}
+            workspaceId={workspaceId}
             subscriptionId={subscriptionId}
             onBusyChange={onUploadingChange}
           />

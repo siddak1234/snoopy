@@ -33,11 +33,14 @@ export function ConnectionsPanel({
   providers,
   canManage,
   callbackStatus,
+  workspaceId,
 }: {
   connections: Connection[];
   providers: ConnectionProvider[];
   canManage: boolean;
   callbackStatus: "connected" | "error" | null;
+  /** The workspace this page shows; every action is refused once it is not active. */
+  workspaceId: string;
 }) {
   const router = useRouter();
   const [selectedProvider, setSelectedProvider] =
@@ -72,7 +75,10 @@ export function ConnectionsPanel({
       return;
     }
     startTransition(async () => {
-      const result = await beginConnectionAuthorization(provider.providerId);
+      const result = await beginConnectionAuthorization(
+        workspaceId,
+        provider.providerId,
+      );
       if (result.ok && result.alreadyConnectedAs) {
         setNotice(
           `${provider.displayName} is already connected as ${result.alreadyConnectedAs}, with everything it needs — there is nothing to authorize.`,
@@ -98,6 +104,7 @@ export function ConnectionsPanel({
     setReplaceError(null);
     startTransition(async () => {
       const result = await beginConnectionAuthorization(
+        workspaceId,
         connection.providerId,
         connection.id,
       );
@@ -138,14 +145,16 @@ export function ConnectionsPanel({
 
   const submitKeyForm = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    submitKey(new FormData(event.currentTarget));
+    const data = new FormData(event.currentTarget);
+    data.set("workspaceId", workspaceId);
+    submitKey(data);
   };
 
   const disconnect = async (connectionId: string) => {
     setError(null);
     setDisconnecting(connectionId);
     try {
-      const result = await disconnectConnection(connectionId);
+      const result = await disconnectConnection(workspaceId, connectionId);
       if (!result.ok) setError(result.error);
       else router.refresh();
     } finally {

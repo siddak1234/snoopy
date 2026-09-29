@@ -14,11 +14,7 @@ import {
   type UpdateSubscriptionRequest,
 } from "@/lib/automations";
 import { subscriptionEntitlementState } from "@/lib/subscription-entitlements";
-import {
-  activeWorkspaceIfShown,
-  requireActiveWorkspaceId,
-  WORKSPACE_CHANGED,
-} from "@/lib/tenancy";
+import { activeWorkspaceIfShown, WORKSPACE_CHANGED } from "@/lib/tenancy";
 
 /**
  * Mutations on the automation surface.
@@ -28,10 +24,13 @@ import {
  * (backend §12.1 #160) that re-render is the "busy" panel — replacing the dialog,
  * its refusal and what the person typed. A refusal changed nothing to re-read.
  *
- * The workspace is resolved from the session here rather than accepted from the
- * form. The Edge would refuse a workspace the session does not name anyway, but
- * a form field that cannot influence the outcome is worth not having: it reads
- * as though it could.
+ * **Each acts on the workspace the page showed** (register F28, F70). The form
+ * carries the id the page rendered as `workspaceId`; it is only compared with the
+ * session's active workspace, and the path always uses the one the server
+ * resolves. After a switch in another tab the two differ, and the action refuses
+ * in words rather than writing into a workspace the person was not looking at —
+ * an Add or a Connect would succeed there — or reading another's 404 as this
+ * page's answer.
  *
  * **Resolved inside each action's `try`** (backend §12.1 #160): the session read
  * throws when the platform refuses it, and an action that rejected would take the
@@ -47,12 +46,20 @@ export type ActionResult =
       state?: "plan-limit" | "entitlements-unavailable" | "file-unavailable";
     };
 
+/** The workspace the page showed, which the form sends (register F28). */
+function shownWorkspace(formData: FormData): string {
+  return String(formData.get("workspaceId") ?? "");
+}
+
 /** Turns a refusal into something renderable, and lets the unexpected surface. */
 async function attempt(
+  formData: FormData,
   run: (workspaceId: string) => Promise<unknown>,
 ): Promise<ActionResult> {
   try {
-    await run(await requireActiveWorkspaceId());
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+    await run(workspaceId);
     return { ok: true };
   } catch (error) {
     if (error instanceof PlatformServerError) {
@@ -101,10 +108,9 @@ export async function subscribeToAutomation(
     ...(projectId ? { projectId } : {}),
   };
   try {
-    const response = await createSubscription(
-      await requireActiveWorkspaceId(),
-      body,
-    );
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+    const response = await createSubscription(workspaceId, body);
     revalidatePath("/account/automations");
     return { ok: true, subscriptionId: response.subscription.id };
   } catch (error) {
@@ -156,7 +162,7 @@ export async function saveSubscriptionConfiguration(
   const config = declaredValues(formData, "config");
 
   const body: UpdateSubscriptionRequest = { config };
-  const result = await attempt((workspaceId) =>
+  const result = await attempt(formData, (workspaceId) =>
     updateSubscription(
       workspaceId,
       subscriptionId,
@@ -203,11 +209,9 @@ export async function startRun(formData: FormData): Promise<ActionResult> {
     input: declaredValues(formData, "input"),
   };
   try {
-    const response = await createRun(
-      await requireActiveWorkspaceId(),
-      body,
-      idempotencyKey,
-    );
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+    const response = await createRun(workspaceId, body, idempotencyKey);
     revalidatePath("/account/runs");
     return { ok: true, runId: response.run.id };
   } catch (error) {
@@ -253,7 +257,7 @@ export async function archiveSubscription(
     return { ok: false, error: "A subscription is required." };
 
   const body: UpdateSubscriptionRequest = { status: "archived" };
-  const result = await attempt((workspaceId) =>
+  const result = await attempt(formData, (workspaceId) =>
     updateSubscription(workspaceId, subscriptionId, body, "archive"),
   );
   if (result.ok) {
@@ -296,7 +300,8 @@ export async function moveSubscriptionVersion(
     return { ok: false, error: "Choose a version to move to." };
   }
   try {
-    const workspaceId = await requireActiveWorkspaceId();
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
     await updateSubscription(
       workspaceId,
       subscriptionId,
@@ -324,7 +329,7 @@ export async function setSubscriptionStatus(
   }
 
   const body: UpdateSubscriptionRequest = { status };
-  const result = await attempt((workspaceId) =>
+  const result = await attempt(formData, (workspaceId) =>
     updateSubscription(workspaceId, subscriptionId, body, "status"),
   );
   if (result.ok) revalidatePath("/account/automations");
@@ -341,7 +346,7 @@ export async function decideApproval(
   }
 
   const body: DecideApprovalRequest = { decision };
-  const result = await attempt((workspaceId) =>
+  const result = await attempt(formData, (workspaceId) =>
     decideWorkspaceApproval(workspaceId, approvalId, body),
   );
   if (result.ok) {
@@ -359,7 +364,7 @@ export async function decideApproval(
  */
 export async function cancelRun(formData: FormData): Promise<ActionResult> {
   const runId = String(formData.get("runId") ?? "");
-  const shownWorkspaceId = String(formData.get("workspaceId") ?? "");
+  const shownWorkspaceId = shownWorkspace(formData);
   if (!runId) return { ok: false, error: "A run is required." };
   try {
     // The run the page showed, in the workspace it showed: after a switch in
