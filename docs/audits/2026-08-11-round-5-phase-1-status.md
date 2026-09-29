@@ -1241,7 +1241,30 @@ than carried.
   §2). The change audit of `fd93da4` found it (A-1). The fixture now asks for consent, and test
   13 follows Connect to the provider's consent page; with the old rule it timed out.
 
-F69 to F74 are new, and no number is reused.
+- **F75, F76, F77**: the change audit of `a06d43e` mapped every dialog `Modal` serves (15),
+  and found three older faults. Each was fixed on the owner's word, with a test proved red
+  without its fix:
+  - **F75**: Leave project did not give focus back to its button when closed. The Confirmation
+    field's `autoFocus` took focus before `Modal` recorded what opened it. `Modal` still focuses
+    that field first.
+  - **F76**: Leave project closed on Escape while the leave was on its way, and the platform's
+    refusal was then shown nowhere. It now holds, as Move does.
+  - **F77**: Create project listened for Escape itself as well as through `Modal`, so one
+    Escape asked for the project list twice. Only `Modal` listens now.
+
+F69 to F77 are new, and no number is reused.
+
+**Filed for this repository's next round** — found by the same audit, not fixed here:
+
+- 51 dialog behaviours no test holds: Escape, the backdrop and focus return across the 15
+  dialogs; the hold on Cancel run, Delete account, the organization's Remove member, Replace
+  account and a team's access; the Escape-at-re-enable case on every dialog that holds but
+  Move. The organization's Remove member, Leave project and Add team members were never
+  opened by a test. The audit's sketch of each is its verdict's `required_tests`.
+- Create project and Add team members do not hold while their request is on its way, as F76
+  did not (read in the code, not probed).
+- The audit also measured that `a06d43e` closes the Escape-at-re-enable gap on all 8 dialogs
+  that hold, not only Move: with the passive effect put back, all 8 ignored it.
 
 The `/code-review` of this change found eight things. Four were `snoopy-backend`'s, in the same
 round (§12.1 #182). Two are fixed here:

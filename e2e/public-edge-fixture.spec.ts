@@ -2146,6 +2146,76 @@ test("a grant on a project from a workspace that is not the active one goes to t
   ).toContainText(/member/i);
 });
 
+const fixtureProject = "/account/projects/33333333-3333-4333-8333-333333333333";
+
+test("Leave project's dialog gives focus back to Leave project when it closes (register F75)", async ({
+  page,
+}) => {
+  await presentSession(page, "admin");
+  await page.goto(fixtureProject);
+  const trigger = page
+    .locator("main")
+    .getByRole("button", { name: "Leave project" });
+  await trigger.click();
+  const dialog = page.getByRole("dialog", {
+    name: "Leave “Fixture Project”?",
+  });
+  await expect(dialog.getByLabel("Confirmation")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+});
+
+test("Leave project's dialog holds while the platform decides, and says its refusal (register F76)", async ({
+  page,
+}) => {
+  await presentSession(page, "admin");
+  await page.goto(fixtureProject);
+  await page
+    .locator("main")
+    .getByRole("button", { name: "Leave project" })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "Leave “Fixture Project”?",
+  });
+  await dialog.getByLabel("Confirmation").fill("DELETE");
+  const leave = await holdRequest(page, `**${fixtureProject}`, isServerAction);
+  await presentSession(page, "throttled");
+  await dialog.getByRole("button", { name: "Leave project" }).click();
+  await leave.arrived;
+  // Neither Escape nor the backdrop closes it while the answer is on its way.
+  await page.keyboard.press("Escape");
+  await page.mouse.click(4, 4);
+  await expect(dialog).toBeVisible();
+  leave.release();
+  await expect(dialog.getByText(busy)).toBeVisible();
+});
+
+test("Create project closes on Escape and asks for the list once, as Done does (register F77)", async ({
+  page,
+}) => {
+  const actions = observe(page, isServerAction);
+  await page.goto("/account/projects");
+  await page
+    .locator("main")
+    .getByRole("button", { name: "Create project" })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Create project" });
+  await dialog
+    .locator("label")
+    .filter({ hasText: /^\s*team\s*$/i })
+    .click();
+  await dialog.getByLabel(/Project name/).fill("Escaped project");
+  await dialog.getByLabel(/Project type/).fill("Invoices");
+  await dialog.getByRole("button", { name: "Create project" }).click();
+  await expect(dialog).toContainText("Your project was created.");
+  const before = actions.length;
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByText("Escaped project")).toBeVisible();
+  expect(actions.length - before).toBe(1);
+});
+
 test("signing out flips the marketing nav without a manual reload", async ({
   page,
 }) => {
