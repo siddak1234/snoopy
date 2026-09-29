@@ -1181,10 +1181,19 @@ than carried.
   live, Archive, Move, Approve and Reject), `upload-actions.ts` (a run's file),
   `app/account/connections/actions.ts` (Connect, Reconnect, Replace, a pasted key, Disconnect).
   Held by `test/tenancy-contract.test.mjs` "no server action acts on the workspace active NOW
-  …", which walks every `"use server"` module, and by three AS tests "… on a page whose
-  workspace another tab switched away …" (automations, approvals, connections), each ending
-  with the workspace switched back and nothing changed. Eight mutations — each guard handed the
-  ACTIVE workspace, as the old code did — each ran RED.
+  …", which walks every `"use server"` module. Browser tests switch the workspace in another
+  tab, use each control, expect the refusal words, and find nothing changed once switched
+  back:
+  - automations, two tests: Add, Pause, Move, Archive, Run, and a file refused as it is opened;
+    then Set up and Go live;
+  - approvals, two tests: Approve and Reject, each still pending at the platform;
+  - connections, two tests: Reconnect, Disconnect, a pasted key and Replace; then a fresh
+    Connect, which asks the provider for no consent;
+  - "a file opened before another tab switched workspace is refused as it completes …".
+
+  Eight mutations — each guard handed the ACTIVE workspace, as the old code did — each ran RED.
+  The first version held only 11 of these 16 controls; the change audit found the other five
+  (below).
 - **F71**: the review's test findings. The fixture said a refusal control holds "until the
   next control" — it holds until reset. The pixel measure could score a sample outside the
   screenshot as transparent black; it now refuses a box outside the image. F64's button was
@@ -1217,7 +1226,12 @@ than carried.
   in Firefox under the same load. The fallback itself is Next's, and a person would meet it only
   by starting a browser navigation in that instant, so the website is not changed.
 
-F69 to F73 are new, and no number is reused.
+- **F74**: the fixture Edge answered a Connect after a Disconnect as "reused", already
+  connected. The platform does not: a disconnected grant is not connected (backend ADR-0019
+  §2). The change audit of `fd93da4` found it (A-1). The fixture now asks for consent, and test
+  13 follows Connect to the provider's consent page; with the old rule it timed out.
+
+F69 to F74 are new, and no number is reused.
 
 The `/code-review` of this change found eight things. Four were `snoopy-backend`'s, in the same
 round (§12.1 #182). Two are fixed here:
@@ -1234,3 +1248,18 @@ accepted, with the reason:
   default threshold.
 - Four action modules each read `workspaceId` from their form in one line. A shared helper
   across modules is a refactor of code this change did not otherwise need.
+
+The change audit of `fd93da4` passed, and named seven required tests: five controls no test
+used after a switch, a Reject no test clicked, and a fresh Connect. On the owner's word each
+is added here, not carried:
+
+- Set up and Go live refused, with nothing saved and the automation still paused;
+- Reject refused and still pending, and Reject recorded as rejected (the fixture's `counts`
+  now reads each approval's status);
+- a file refused as it completes, with no file recorded;
+- a fresh Connect refused, with no consent asked for;
+- Connect after a Disconnect goes to consent (F74).
+
+The comment that said the automations test refused a completion is corrected. Five mutations
+each turned its test red: the shared guard, a completion unguarded, a fresh Connect
+unguarded, the fixture reusing a disconnected grant, and Reject sending "approved".

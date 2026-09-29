@@ -923,6 +923,9 @@ const server = createServer(
         storePuts: state.storePuts,
         storePutsWithCookie: state.storePutsWithCookie,
         projectTeamGrants: state.projectTeamGrants.length,
+        // Each approval's status: a decision leaves the page, and which it was
+        // is read here.
+        approvalStatuses: state.approvals.map((entry) => entry.status),
       });
     }
     if (
@@ -1651,10 +1654,12 @@ const server = createServer(
         } satisfies ConnectionOperations["beginConnectionAuthorization"]["responses"][200]["content"]["application/json"]);
       }
       // Reused only when the grant is connected and nothing is being replaced
-      // (backend ADR-0019 §2, §12.1 #175); otherwise consent is asked for.
+      // (backend ADR-0019 §2, §12.1 #175); otherwise consent is asked for. A
+      // disconnected grant is not connected, whatever status it had.
       const answer =
         body.replaceConnectionId === undefined &&
-        state.oauthStatus === "connected"
+        state.oauthStatus === "connected" &&
+        !state.oauthDisconnected
           ? ({
               outcome: "reused",
               connection: oauthConnectionState(),

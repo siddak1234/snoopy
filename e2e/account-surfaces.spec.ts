@@ -41,6 +41,12 @@ function figure(page: Page, term: string) {
     .locator("xpath=following-sibling::dd[1]");
 }
 
+// Each approval's status at the platform: a decision leaves the page.
+async function approvalStatuses() {
+  return (await fixtureRead<{ approvalStatuses: string[] }>("counts"))
+    .approvalStatuses;
+}
+
 // Moves the session's active workspace from another tab, as a person does.
 async function switchInAnotherTab(page: Page, to: RegExp) {
   const other = await page.context().newPage();
@@ -460,11 +466,18 @@ test("13 — a disconnected account leaves its provider offering Connect", async
   await page.goto("/account/connections");
   await page.getByRole("button", { name: "Disconnect" }).click();
   await expect(page.getByRole("button", { name: "Disconnect" })).toHaveCount(0);
-  await expect(
-    providerCard(page, "Fixture OAuth provider").getByRole("button", {
-      name: "Connect",
-    }),
-  ).toBeVisible();
+  const connect = providerCard(page, "Fixture OAuth provider").getByRole(
+    "button",
+    { name: "Connect", exact: true },
+  );
+  await expect(connect).toBeVisible();
+  // Connect asks the provider for consent again: a disconnected grant is not
+  // reused.
+  await page.route("https://oauth.invalid/**", (route) =>
+    route.fulfill({ contentType: "text/html", body: "<h1>Consent</h1>" }),
+  );
+  await connect.click();
+  await page.waitForURL(/^https:\/\/oauth\.invalid\/authorize/);
 });
 
 test("14 — a replacement answered 'reused' names the account the platform answered with", async ({
@@ -572,6 +585,17 @@ test("17 — Approvals: nothing waiting, a decision by an eligible role, and non
   await expectNoAxeViolations(page);
   await page.getByRole("button", { name: "Approve" }).click();
   await expect(page.getByText("Nothing is waiting on you.")).toBeVisible();
+});
+
+test("17 — Reject is recorded as rejected, and nothing waits", async ({
+  page,
+}) => {
+  await fixtureControl("approval-waiting");
+  await page.goto("/account/approvals");
+  await page.getByRole("button", { name: "Reject" }).click();
+  await expect(page.getByText("Nothing is waiting on you.")).toBeVisible();
+  await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
+  expect(await approvalStatuses()).toEqual(["rejected"]);
 });
 
 test("18 — billing with no provider configured (503) is said to be unavailable, and offers nothing", async ({
@@ -737,7 +761,8 @@ test("every automation control on a page whose workspace another tab switched aw
 
   await manual.getByRole("button", { name: "Run", exact: true }).click();
   const run = page.getByRole("dialog", { name: "Run Manual input automation" });
-  // A file is neither opened in nor completed against the other workspace.
+  // A file chosen now is refused as it is opened. One opened before the switch
+  // is refused as it completes ("a file opened before another tab switched …").
   await run.getByLabel("Invoice file").setInputFiles({
     name: "invoice.pdf",
     mimeType: "application/pdf",
@@ -768,6 +793,35 @@ test("every automation control on a page whose workspace another tab switched aw
   ).toBeVisible();
 });
 
+test("Set up and Go live on a page whose workspace another tab switched away are refused in words, and nothing is saved or goes live (register F70)", async ({
+  page,
+}) => {
+  await page.goto("/account/automations");
+  const manual = automationCard(page, "Manual input automation");
+  await manual.getByRole("button", { name: "Pause" }).click();
+  await expect(manual.getByText(/^paused$/i)).toBeVisible();
+  await manual.getByRole("button", { name: "Set up" }).click();
+  const setup = page.getByRole("dialog", { name: "Automation setup" });
+  await expect(setup.getByLabel("Spending limit")).toHaveValue("500");
+  await setup.getByLabel("Spending limit").fill("99");
+  await switchInAnotherTab(page, /Fixture Personal/);
+
+  await setup.getByRole("button", { name: "Save setup" }).click();
+  await expect(setup.getByRole("alert")).toHaveText(workspaceChanged);
+  await expect(setup.getByLabel("Spending limit")).toHaveValue("99");
+  await setup.getByRole("button", { name: "Cancel" }).click();
+
+  await manual.getByRole("button", { name: "Go live" }).click();
+  await expect(manual.getByRole("alert")).toHaveText(workspaceChanged);
+
+  // Back on the workspace the page showed, nothing moved.
+  await switchInAnotherTab(page, /Fixture Organization/);
+  await page.reload();
+  await expect(manual.getByText(/^paused$/i)).toBeVisible();
+  await manual.getByRole("button", { name: "Set up" }).click();
+  await expect(setup.getByLabel("Spending limit")).toHaveValue("500");
+});
+
 test("an approval decided on a page whose workspace another tab switched away is refused, and still waits (register F70)", async ({
   page,
 }) => {
@@ -779,9 +833,27 @@ test("an approval decided on a page whose workspace another tab switched away is
   await expect(page.locator("main").getByRole("alert")).toHaveText(
     workspaceChanged,
   );
+  expect(await approvalStatuses()).toEqual(["pending"]);
   await switchInAnotherTab(page, /Fixture Organization/);
   await page.reload();
   await expect(page.getByRole("button", { name: "Approve" })).toBeVisible();
+});
+
+test("a rejection on a page whose workspace another tab switched away is refused, and still waits (register F70)", async ({
+  page,
+}) => {
+  await fixtureControl("approval-waiting");
+  await page.goto("/account/approvals");
+  await expect(page.getByRole("button", { name: "Reject" })).toBeVisible();
+  await switchInAnotherTab(page, /Fixture Personal/);
+  await page.getByRole("button", { name: "Reject" }).click();
+  await expect(page.locator("main").getByRole("alert")).toHaveText(
+    workspaceChanged,
+  );
+  expect(await approvalStatuses()).toEqual(["pending"]);
+  await switchInAnotherTab(page, /Fixture Organization/);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Reject" })).toBeVisible();
 });
 
 test("a connection started, replaced or removed on a page whose workspace another tab switched away is refused, and nothing is connected or removed (register F70)", async ({
@@ -824,6 +896,31 @@ test("a connection started, replaced or removed on a page whose workspace anothe
   await expect(disconnect).toBeVisible();
   await expect(page.getByText("Fixture account")).toHaveCount(0);
   await expect(key.getByRole("button", { name: "Connect" })).toBeVisible();
+});
+
+test("a provider connected on a page whose workspace another tab switched away is refused, and no consent is asked for (register F70)", async ({
+  page,
+}) => {
+  const consent = observe(page, (request) =>
+    request.url().startsWith("https://oauth.invalid/"),
+  );
+  await page.goto("/account/connections");
+  await page.getByRole("button", { name: "Disconnect" }).click();
+  const connect = providerCard(page, "Fixture OAuth provider").getByRole(
+    "button",
+    { name: "Connect", exact: true },
+  );
+  await expect(connect).toBeVisible();
+  await switchInAnotherTab(page, /Fixture Personal/);
+  await connect.click();
+  await expect(page.locator("main").getByRole("alert")).toHaveText(
+    workspaceChanged,
+  );
+  await expect(page).toHaveURL(/\/account\/connections$/);
+  expect(consent).toEqual([]);
+  await switchInAnotherTab(page, /Fixture Organization/);
+  await page.reload();
+  await expect(connect).toBeVisible();
 });
 
 test("22 — a page outside the account area that cannot load says so, and Try again loads it once it can", async ({

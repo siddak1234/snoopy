@@ -805,6 +805,37 @@ test.describe("a file for a run (backend FR-14)", () => {
     expect(await fixtureFiles()).toEqual([]);
   });
 
+  test("a file opened before another tab switched workspace is refused as it completes, and nothing is recorded (register F70)", async ({
+    page,
+    context,
+  }) => {
+    const put = await holdRequest(
+      page,
+      "https://127.0.0.1:3443/__fixture/objects/**",
+      (request) => request.method() === "PUT",
+    );
+    const dialog = await openFilledRun(page);
+    await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
+    // Opened on the workspace the page showed: the PUT is on its way.
+    await put.arrived;
+    const other = await context.newPage();
+    try {
+      await other.goto("/account");
+      const trigger = other.getByRole("button", { name: "Switch workspace" });
+      await trigger.click();
+      await other.getByRole("button", { name: /Fixture Personal/ }).click();
+      await expect(trigger).toContainText("Fixture Personal");
+    } finally {
+      await other.close();
+    }
+    put.release();
+    await expect(dialog.getByRole("alert")).toHaveText(
+      "The active workspace changed in another tab. Reload this page before continuing.",
+    );
+    await expect(dialog.getByText(/^Ready: invoice\.pdf/u)).toHaveCount(0);
+    expect(await fixtureFiles()).toEqual([]);
+  });
+
   test("an abandoned upload that ends never releases Start run while the file chosen since is still uploading", async ({
     page,
   }) => {
