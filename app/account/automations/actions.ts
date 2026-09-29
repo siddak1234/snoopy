@@ -364,7 +364,7 @@ export async function decideApproval(
  */
 export async function cancelRun(formData: FormData): Promise<ActionResult> {
   const runId = String(formData.get("runId") ?? "");
-  const shownWorkspaceId = String(formData.get("workspaceId") ?? "");
+  const shownWorkspaceId = shownWorkspace(formData);
   if (!runId) return { ok: false, error: "A run is required." };
   try {
     // The run the page showed, in the workspace it showed: after a switch in

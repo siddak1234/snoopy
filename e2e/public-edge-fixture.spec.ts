@@ -1,3 +1,4 @@
+import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test, type Page, type Request } from "@playwright/test";
 import {
   automationCard,
@@ -1107,18 +1108,23 @@ test("a ghost button keeps AA contrast when hovered and when pressed (register F
     "button",
     { name: "Archive" },
   );
-  // Each state is measured once its transition has finished, from pixels — the
-  // one measure the marketing test uses too (register F71).
+  // Each state is measured once its transition has finished: the button from
+  // pixels, the one measure the marketing test uses too (register F71), and the
+  // rest of the page by axe.
+  const contrast = () =>
+    new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
   await archive.hover();
   await settledAnimations(archive);
   expect(await worstContrast(page, archive), "hovered").toBeGreaterThanOrEqual(
     4.5,
   );
+  expect((await contrast()).violations).toEqual([]);
   await page.mouse.down();
   await settledAnimations(archive);
   expect(await worstContrast(page, archive), "pressed").toBeGreaterThanOrEqual(
     4.5,
   );
+  expect((await contrast()).violations).toEqual([]);
   // Released elsewhere, so nothing is archived.
   await page.mouse.move(0, 0);
   await page.mouse.up();

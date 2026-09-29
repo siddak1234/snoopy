@@ -132,8 +132,13 @@ export function settledPage(page: Page) {
 
 /** Waits for an element's transitions to finish, so a state is read settled. */
 export function settledAnimations(locator: Locator) {
+  // A transition cancelled by the next state rejects `finished`; that is settled too.
   return locator.evaluate((element) =>
-    Promise.all(element.getAnimations().map((animation) => animation.finished)),
+    Promise.all(
+      element
+        .getAnimations()
+        .map((animation) => animation.finished.catch(() => undefined)),
+    ),
   );
 }
 

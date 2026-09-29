@@ -1187,8 +1187,10 @@ than carried.
   ACTIVE workspace, as the old code did — each ran RED.
 - **F71**: the review's test findings. The fixture said a refusal control holds "until the
   next control" — it holds until reset. The pixel measure could score a sample outside the
-  screenshot as transparent black; it now refuses a box outside the image. F64 was measured
-  twice, by axe and by pixels: both tests now use one `worstContrast` in `e2e/helpers.ts`.
+  screenshot as transparent black; it now refuses a box outside the image. F64's button was
+  measured two ways, by pixels in one test and by axe in the other: both tests now measure it
+  with one `worstContrast` in `e2e/helpers.ts`, and the account test still scans the rest of
+  its page with axe.
   Proving F69 found two timing faults in that test, each measured before it was changed: a
   stored theme fades every colour in on load, and a read at 17–92% of that fade gave 4.30:1 —
   it now waits for the page's finite transitions (`settledPage`); and in WebKit the hero was
@@ -1199,5 +1201,36 @@ than carried.
   renders before the transition's `pending` ends — 1 red in 30 WebKit runs on `main`'s code (2
   in 120 with `Modal`'s ref synced in a layout effect, which is not the cause). The test waits
   for Move to be enabled first, as its sibling does: 0 in 120.
+- **F73**: "4, 20 — the sidebar's Teams link opens Teams …" failed once in Firefox, in `verify`
+  on this change's tree: `page.goto: NS_BINDING_ABORTED`. The switch's action can show the new
+  workspace before the `router.refresh()` after it returns, and the test navigated then. Firefox
+  cancels a page's requests when a navigation starts, before `pagehide`. Next reads that cancelled
+  refresh as a failure and falls back to a browser navigation back to `/account/teams`
+  (`Failed to fetch RSC payload … Falling back to browser navigation`). That navigation aborts
+  the test's. Measured before it was changed:
+  - the test's own steps failed 1 in 100 in Firefox under CPU load, with that console line;
+  - with the refresh held, a navigation during it failed 5 of 5 in Firefox and WebKit, and one
+    after it ended passed 15 of 15.
 
-F69 to F72 are new, and no number is reused.
+  The test now waits for the refresh to end, finished or failed: Chromium's Next can abort it
+  itself once the action's answer is shown. It passed 60 of 60 in three engines, and 100 of 100
+  in Firefox under the same load. The fallback itself is Next's, and a person would meet it only
+  by starting a browser navigation in that instant, so the website is not changed.
+
+F69 to F73 are new, and no number is reused.
+
+The `/code-review` of this change found eight things. Four were `snoopy-backend`'s, in the same
+round (§12.1 #182). Two are fixed here:
+
+- a transition cancelled by the next state rejects its `finished`, which failed the wait for it
+  (`settledAnimations` now treats that as settled, as `settledPage` does);
+- the account test had lost its axe scan of the rest of the page when it moved to pixels.
+
+`cancelRun` now reads the shown workspace with the same helper as the rest of its file. Two are
+accepted, with the reason:
+
+- F69 recolours a marketing page's ghost text at rest, where `AGENTS.md` rule 2 asks for byte-identical
+  marketing pages. That recolour is the fix, and the screenshot diff still passes at Playwright's
+  default threshold.
+- Four action modules each read `workspaceId` from their form in one line. A shared helper
+  across modules is a refactor of code this change did not otherwise need.

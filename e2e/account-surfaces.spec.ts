@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Request } from "@playwright/test";
 import {
   automationCard,
   expectNoAxeViolations,
@@ -179,8 +179,28 @@ test("4, 20 — the sidebar's Teams link opens Teams; a personal workspace shows
   ).toBeVisible();
   const trigger = page.getByRole("button", { name: "Switch workspace" });
   await trigger.click();
+  // The switch refreshes this page, and its action's answer can show the new
+  // workspace before that refresh returns. In Firefox a navigation started then
+  // cancels the refresh, and Next answers a cancelled refresh by navigating back
+  // here — which aborts the goto (register F73). The refresh ends first, however
+  // it ends: Next may abort it itself once the action's answer is shown.
+  const refreshed = new Promise<void>((resolve) => {
+    const ended = (request: Request) => {
+      const url = new URL(request.url());
+      if (
+        request.method() === "GET" &&
+        url.pathname === "/account/teams" &&
+        url.searchParams.has("_rsc") &&
+        !request.headers()["next-router-prefetch"]
+      )
+        resolve();
+    };
+    page.on("requestfinished", ended);
+    page.on("requestfailed", ended);
+  });
   await page.getByRole("button", { name: /Fixture Personal/ }).click();
   await expect(trigger).toContainText("Fixture Personal");
+  await refreshed;
   await page.goto("/account");
   await expect(nav.getByRole("link", { name: "Teams" })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Organization" })).toHaveCount(0);
