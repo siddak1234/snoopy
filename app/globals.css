@@ -509,6 +509,14 @@ html[data-theme="light"] .brand-mark {
   background: color-mix(in srgb, var(--color-accent) 18%, transparent);
 }
 
+/* On a section band the ground is already the accent's own hue, and the
+   resting accent measured 3.92:1 (dark) and 3.99:1 (light) at its worst pixel
+   on "Contact support" (register F69). There the text takes the stronger step
+   at rest too, as it does hovered and pressed. */
+.section-band .btn-ghost {
+  color: var(--ghost-active-text);
+}
+
 /* The destructive action — deleting the account. The error tokens on a pill,
    as the two deletion buttons carried inline before this class (register F43). */
 .btn-danger {

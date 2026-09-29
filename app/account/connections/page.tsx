@@ -48,6 +48,7 @@ export default async function ConnectionsPage({
       subheader="Connect the accounts your automations use"
     >
       <ConnectionsPanel
+        workspaceId={workspaceId}
         connections={connections.connections}
         providers={providers.providers}
         canManage={administers(role)}

@@ -848,7 +848,8 @@ const server = createServer(
         state.exportReadsFailing = Number.POSITIVE_INFINITY;
       },
       // The change audit of 97021f9's surfaces (register § Round 15). Each
-      // refusal holds until the next control or a reset.
+      // refusal holds until the fixture is reset, before every test — another
+      // control does not clear it (register F71).
       // Backend §12.1 #126: a move refused with a reason — 409 or 422.
       "/__fixture/move-refused": () => {
         const status = Number(url.searchParams.get("status"));

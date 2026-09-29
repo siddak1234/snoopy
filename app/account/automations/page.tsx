@@ -120,7 +120,7 @@ function AutomationCard({
   subscriptions: Subscription[];
   projects: Project[];
   canAdminister: boolean;
-  /** The workspace this page shows; its actions are refused once it is not active. */
+  /** The workspace this page shows; every action on the card is refused once it is not active. */
   workspaceId: string;
 }) {
   const projectName = new Map(
@@ -221,6 +221,7 @@ function AutomationCard({
                 is available.
               </p>
               <MoveVersionButton
+                workspaceId={workspaceId}
                 subscriptionId={subscription.id}
                 name={automation.name}
                 from={subscription.templateVersion}
@@ -243,6 +244,7 @@ function AutomationCard({
           ) : null}
 
           <AutomationActions
+            workspaceId={workspaceId}
             name={automation.name}
             available={automation.available}
             setup={automation.setup}
@@ -261,6 +263,7 @@ function AutomationCard({
 
       <div className="mt-auto">
         <AddAutomation
+          workspaceId={workspaceId}
           templateId={automation.templateId}
           name={automation.name}
           available={automation.available}

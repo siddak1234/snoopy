@@ -1013,7 +1013,7 @@ This repository then regenerated its client from that tree.
 
 | Item | Register | What changed here | Evidence |
 | --- | --- | --- | --- |
-| 23.7.1 | F64 | `.btn-ghost:hover` and `:active` draw the text in `--accent-strong` — 4.6:1 or better on every surface, both themes, where the accent on its own tint fell to 4.06:1 and, pressed, 3.60:1 (dark) | e2e "a ghost button keeps AA contrast when hovered and when pressed (register F64)", RED with `main`'s colours |
+| 23.7.1 | F64 | `.btn-ghost:hover` and `:active` draw the text in `--ghost-active-text` — the accent's 400 step in the dark theme and its 200 step in the light — where the accent on its own tint fell to 4.06:1 and, pressed, 3.60:1 (dark). _Corrected at Round 15's close: this row first said `--accent-strong` at "4.6:1 or better on every surface, both themes"; the change audit then measured the light theme's band at 4.23:1 hovered and 3.87:1 pressed (F-1), and `--ghost-active-text` is the fix_ | e2e "a ghost button keeps AA contrast when hovered and when pressed (register F64)", RED with `main`'s colours, and the pixel-measured marketing test (F-1) |
 | 23.7.2 | backend #174, #176 | Remove on each member of a team (an owner, admin or the team's manager) and on each team with access to a project (its owner or admin), each confirmed first, in one new `components/dashboard/ConfirmRemoveButton.tsx`; the team's removal acts on the workspace the page showed | e2e "taking someone off a team …" and "a project's owner removes a team's access …"; `test/tenancy-contract.test.mjs` |
 | 23.7.3 | backend #91, #109 | Webhook address on a webhook-started automation, for an owner or admin: create it, see the secret once, make a new one; the secret is never kept | e2e "an owner makes a webhook automation's address …" and "… offered to an admin and to no plain member"; `test/automation-contract.test.mjs` holds the refusal words to the contract's reasons |
 | 23.7.4 | backend #126 | Move to vN on a subscription pinned to an older version, confirmed first, each refusal the platform names said in words | e2e "a subscription pinned to an older version moves …" and "a move the platform holds for a pending approval …"; `test/automation-contract.test.mjs` |
@@ -1148,3 +1148,56 @@ switched workspace …"; 16 → "a team's access the platform will not withdraw 
 closes on a click outside it …"; 19 → F-1's test; 20 → VG "a docs-only change audit runs the
 gates its marker requires …"; 21 → VG "the browser fixture run passes every spec that needs the
 fixture Edge, and no other".
+
+**Change audit of `f5e8493`, 2026-09-28.** It found **F-2**: the webhook address dialog read
+and issued for the ACTIVE workspace, so after a switch in another tab it read the other
+workspace's 404 as "no address yet". Both webhook actions now take the workspace the page
+showed (`activeWorkspaceIfShown`), fixed in `a2e6d74` and held by AS "a webhook address opened
+after another tab switched workspace is refused, never read as \"no address yet\" (register
+F28)", with the fixture answering the personal workspace's read with a 404 as the platform
+does; it went red with the fix taken out. The audit of `a2e6d74` then PASSED, with 14
+surfaces probed and passing that no test held — test debt, carried in `snoopy-backend`'s
+MASTER-PLAN §0.1 NEXT.
+
+## Round 15's close — the findings it made, fixed before it closed — 2026-09-29
+
+`snoopy-backend`'s close of Round 15 ran this repository's `verify` at `main` `de40e65` and a
+`/code-review` of `97021f9..de40e65`, and measured the marketing band. On the owner's word
+("complete the items then merge … i dont want buggy items"), each finding is fixed here rather
+than carried.
+
+- **F69**: the ghost text AT REST on a section band — "Contact support" on
+  `/automation-builder` — measured 3.92:1 (dark) and 3.99:1 (light) at its worst pixel. A band
+  now carries `section-band` (`components/ui/Section.tsx`), and a ghost button on one draws its
+  text in `--ghost-active-text` at rest too. The marketing test measures each ghost button AT
+  REST as well as hovered and pressed; without the rule it went red at 3.87–3.99:1. The marketing
+  baselines are unchanged: the recoloured text is within Playwright's default per-pixel
+  threshold, and all six pages still pass.
+- **F70**: every action on the automations, approvals and connections pages acted on the
+  workspace active NOW — after a switch in another tab, Add and Connect wrote into a workspace
+  the person was not looking at, and the rest read its 404 as this page's answer. Each now
+  sends the workspace its page rendered and is refused in words (`WORKSPACE_CHANGED`) once that
+  is not the active one: `app/account/automations/actions.ts` (Add, Set up, Run, Pause and Go
+  live, Archive, Move, Approve and Reject), `upload-actions.ts` (a run's file),
+  `app/account/connections/actions.ts` (Connect, Reconnect, Replace, a pasted key, Disconnect).
+  Held by `test/tenancy-contract.test.mjs` "no server action acts on the workspace active NOW
+  …", which walks every `"use server"` module, and by three AS tests "… on a page whose
+  workspace another tab switched away …" (automations, approvals, connections), each ending
+  with the workspace switched back and nothing changed. Eight mutations — each guard handed the
+  ACTIVE workspace, as the old code did — each ran RED.
+- **F71**: the review's test findings. The fixture said a refusal control holds "until the
+  next control" — it holds until reset. The pixel measure could score a sample outside the
+  screenshot as transparent black; it now refuses a box outside the image. F64 was measured
+  twice, by axe and by pixels: both tests now use one `worstContrast` in `e2e/helpers.ts`.
+  Proving F69 found two timing faults in that test, each measured before it was changed: a
+  stored theme fades every colour in on load, and a read at 17–92% of that fade gave 4.30:1 —
+  it now waits for the page's finite transitions (`settledPage`); and in WebKit the hero was
+  replaced once the nav's session check answered — it now waits for that answer, as the visual
+  test does (F50). 18 cases × 5 repeats in three engines: 90 of 90.
+- **F72**: "a move's dialog cannot be dismissed while the platform decides …" pressed Escape
+  the moment the refusal showed, but `setError` after an `await` inside `startTransition`
+  renders before the transition's `pending` ends — 1 red in 30 WebKit runs on `main`'s code (2
+  in 120 with `Modal`'s ref synced in a layout effect, which is not the cause). The test waits
+  for Move to be enabled first, as its sibling does: 0 in 120.
+
+F69 to F72 are new, and no number is reused.

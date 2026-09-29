@@ -678,6 +678,134 @@ test('a webhook address opened after another tab switched workspace is refused, 
   await switchInAnotherTab(page, /Fixture Organization/);
 });
 
+// Register F70 (Round 15's close): every action on these pages acted on the
+// workspace active NOW. After a switch in another tab, Add and Connect wrote into
+// a workspace the person was not looking at; the rest read its 404 as this
+// page's answer. Each is refused in words, and nothing changes.
+test("every automation control on a page whose workspace another tab switched away is refused in words, and changes nothing (register F70)", async ({
+  page,
+}) => {
+  await page.goto("/account/automations");
+  const project = automationCard(page, "Project automation");
+  const manual = automationCard(page, "Manual input automation");
+  const webhook = automationCard(page, "Webhook automation");
+  const archivable = automationCard(page, "Archivable automation");
+  await expect(project.getByRole("button", { name: "Add" })).toBeVisible();
+  await switchInAnotherTab(page, /Fixture Personal/);
+
+  await project.getByRole("button", { name: "Add" }).click();
+  await expect(project.getByRole("alert")).toHaveText(workspaceChanged);
+
+  await manual.getByRole("button", { name: "Pause" }).click();
+  await expect(manual.getByRole("alert")).toHaveText(workspaceChanged);
+
+  await webhook.getByRole("button", { name: "Move to v2" }).click();
+  const move = page.getByRole("dialog", {
+    name: "Move Webhook automation to v2?",
+  });
+  await move.getByRole("button", { name: "Move to v2" }).click();
+  await expect(move.getByRole("alert")).toHaveText(workspaceChanged);
+  await move.getByRole("button", { name: "Cancel" }).click();
+
+  await archivable.getByRole("button", { name: "Archive" }).click();
+  const archive = page.getByRole("dialog", {
+    name: "Archive Archivable automation?",
+  });
+  await archive.getByRole("button", { name: "Archive" }).click();
+  await expect(archive.getByRole("alert")).toHaveText(workspaceChanged);
+  await archive.getByRole("button", { name: "Cancel" }).click();
+
+  await manual.getByRole("button", { name: "Run", exact: true }).click();
+  const run = page.getByRole("dialog", { name: "Run Manual input automation" });
+  // A file is neither opened in nor completed against the other workspace.
+  await run.getByLabel("Invoice file").setInputFiles({
+    name: "invoice.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4 fixture"),
+  });
+  await expect(run.getByRole("alert")).toHaveText(workspaceChanged);
+  await run.getByLabel("Invoice file").setInputFiles([]);
+  await run.getByLabel("Vendor").fill("Acme Supplies");
+  await run.getByLabel("Amount").fill("120.50");
+  await run.getByLabel("Invoice reference").fill("INV-1001");
+  await run.getByRole("button", { name: "Start run" }).click();
+  await expect(run.getByRole("alert")).toHaveText(workspaceChanged);
+  await expect(page).toHaveURL(/\/account\/automations$/);
+  await run.getByRole("button", { name: "Cancel" }).click();
+
+  // Back on the workspace the page showed, nothing moved.
+  await switchInAnotherTab(page, /Fixture Organization/);
+  await page.reload();
+  await expect(
+    project
+      .getByRole("combobox", { name: "Where to add Project automation" })
+      .locator("option"),
+  ).toHaveCount(2);
+  await expect(manual.getByText(/^live$/i)).toBeVisible();
+  await expect(webhook).toContainText("This runs v1; v2 is available.");
+  await expect(
+    archivable.getByRole("button", { name: "Archive" }),
+  ).toBeVisible();
+});
+
+test("an approval decided on a page whose workspace another tab switched away is refused, and still waits (register F70)", async ({
+  page,
+}) => {
+  await fixtureControl("approval-waiting");
+  await page.goto("/account/approvals");
+  await expect(page.getByRole("button", { name: "Approve" })).toBeVisible();
+  await switchInAnotherTab(page, /Fixture Personal/);
+  await page.getByRole("button", { name: "Approve" }).click();
+  await expect(page.locator("main").getByRole("alert")).toHaveText(
+    workspaceChanged,
+  );
+  await switchInAnotherTab(page, /Fixture Organization/);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Approve" })).toBeVisible();
+});
+
+test("a connection started, replaced or removed on a page whose workspace another tab switched away is refused, and nothing is connected or removed (register F70)", async ({
+  page,
+}) => {
+  await page.goto("/account/connections");
+  const oauth = providerCard(page, "Fixture OAuth provider");
+  const key = providerCard(page, "Fixture key provider");
+  // The one live connection, and the controls on it.
+  const disconnect = page.getByRole("button", { name: "Disconnect" });
+  await expect(disconnect).toBeVisible();
+  await switchInAnotherTab(page, /Fixture Personal/);
+
+  await oauth.getByRole("button", { name: "Reconnect" }).click();
+  await expect(page.locator("main").getByRole("alert")).toHaveText(
+    workspaceChanged,
+  );
+
+  await disconnect.click();
+  await expect(page.locator("main").getByRole("alert")).toHaveText(
+    workspaceChanged,
+  );
+
+  await key.getByRole("button", { name: "Connect" }).click();
+  const connect = page.getByRole("dialog", {
+    name: "Connect Fixture key provider",
+  });
+  await connect.getByLabel("API key").fill("fixture-value");
+  await connect.getByRole("button", { name: "Verify and connect" }).click();
+  await expect(connect.getByRole("alert")).toHaveText(workspaceChanged);
+  await connect.getByRole("button", { name: "Cancel" }).click();
+
+  await page.getByRole("button", { name: "Replace account" }).click();
+  const replace = page.getByRole("dialog");
+  await replace.getByRole("button", { name: "Replace account" }).click();
+  await expect(replace.getByRole("alert")).toHaveText(workspaceChanged);
+
+  await switchInAnotherTab(page, /Fixture Organization/);
+  await page.goto("/account/connections");
+  await expect(disconnect).toBeVisible();
+  await expect(page.getByText("Fixture account")).toHaveCount(0);
+  await expect(key.getByRole("button", { name: "Connect" })).toBeVisible();
+});
+
 test("22 — a page outside the account area that cannot load says so, and Try again loads it once it can", async ({
   page,
 }) => {

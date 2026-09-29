@@ -1,4 +1,3 @@
-import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test, type Page, type Request } from "@playwright/test";
 import {
   automationCard,
@@ -10,6 +9,8 @@ import {
   observe,
   presentSession,
   providerCard,
+  settledAnimations,
+  worstContrast,
 } from "./helpers";
 
 const requesterUserId = "66666666-6666-4666-8666-666666666666";
@@ -477,6 +478,11 @@ test("a move's dialog cannot be dismissed while the platform decides, so its ref
   await expect(dialog.getByRole("alert")).toHaveText(
     "An approval for this automation is still waiting. Decide it first, then move.",
   );
+  // The refusal renders a moment before the transition ends (register F72): the
+  // dialog is dismissible again once its buttons are.
+  await expect(
+    dialog.getByRole("button", { name: "Move to v2" }),
+  ).toBeEnabled();
   // Answered, it closes as before.
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -1101,21 +1107,18 @@ test("a ghost button keeps AA contrast when hovered and when pressed (register F
     "button",
     { name: "Archive" },
   );
-  // Each state is scanned once its transition has finished.
-  const settled = () =>
-    archive.evaluate((element) =>
-      Promise.all(
-        element.getAnimations().map((animation) => animation.finished),
-      ),
-    );
-  const contrast = () =>
-    new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
+  // Each state is measured once its transition has finished, from pixels — the
+  // one measure the marketing test uses too (register F71).
   await archive.hover();
-  await settled();
-  expect((await contrast()).violations).toEqual([]);
+  await settledAnimations(archive);
+  expect(await worstContrast(page, archive), "hovered").toBeGreaterThanOrEqual(
+    4.5,
+  );
   await page.mouse.down();
-  await settled();
-  expect((await contrast()).violations).toEqual([]);
+  await settledAnimations(archive);
+  expect(await worstContrast(page, archive), "pressed").toBeGreaterThanOrEqual(
+    4.5,
+  );
   // Released elsewhere, so nothing is archived.
   await page.mouse.move(0, 0);
   await page.mouse.up();

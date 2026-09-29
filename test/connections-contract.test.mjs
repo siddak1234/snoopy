@@ -111,7 +111,7 @@ test("pasted-key retries preserve one client intent and send its key as a header
   // The form's key goes to the facade, which sends it as the header.
   assert.match(
     actions,
-    /connectWithKey\(\s*await requireActiveWorkspaceId\(\),\s*body,\s*idempotencyKey,?\s*\)/u,
+    /connectWithKey\(\s*workspaceId,\s*body,\s*idempotencyKey,?\s*\)/u,
   );
   assert.match(
     facade,

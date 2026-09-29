@@ -8,7 +8,7 @@ import {
   type ConnectProviderWithKeyRequest,
 } from "@/lib/connections";
 import { PlatformServerError } from "@/lib/platform-server";
-import { requireActiveWorkspaceId } from "@/lib/tenancy";
+import { activeWorkspaceIfShown, WORKSPACE_CHANGED } from "@/lib/tenancy";
 
 export type ConnectionActionResult =
   | { ok: true; authorizationUrl?: string; alreadyConnectedAs?: string }
@@ -19,6 +19,14 @@ export type ConnectionActionResult =
 // it — so nothing was started (backend ADR-0019 §4).
 const REPLACEMENT_WAS_STALE =
   "This connection changed since the page loaded, so nothing was replaced. Reload the page to see it, then choose again.";
+
+// Every action here acts on the workspace the page showed (register F28, F70):
+// after a switch in another tab, Connect would otherwise authorize an account
+// into a workspace the person was not looking at.
+const workspaceChanged: ConnectionActionResult = {
+  ok: false,
+  error: WORKSPACE_CHANGED,
+};
 
 function failure(error: unknown): ConnectionActionResult {
   if (error instanceof PlatformServerError) {
@@ -42,11 +50,14 @@ function failure(error: unknown): ConnectionActionResult {
  * reauthorization is never reused (backend §12.1 #175) — Reconnect repairs it.
  */
 export async function beginConnectionAuthorization(
+  shownWorkspaceId: string,
   providerId: string,
   replaceConnectionId?: string,
 ): Promise<ConnectionActionResult> {
   try {
-    const result = await beginAuthorization(await requireActiveWorkspaceId(), {
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspaceId);
+    if (!workspaceId) return workspaceChanged;
+    const result = await beginAuthorization(workspaceId, {
       providerId,
       ...(replaceConnectionId ? { replaceConnectionId } : {}),
     });
@@ -90,12 +101,12 @@ export async function connectProviderWithKey(
   }
 
   try {
-    const body: ConnectProviderWithKeyRequest = { providerId, credentials };
-    await connectWithKey(
-      await requireActiveWorkspaceId(),
-      body,
-      idempotencyKey,
+    const workspaceId = await activeWorkspaceIfShown(
+      String(formData.get("workspaceId") ?? ""),
     );
+    if (!workspaceId) return workspaceChanged;
+    const body: ConnectProviderWithKeyRequest = { providerId, credentials };
+    await connectWithKey(workspaceId, body, idempotencyKey);
     revalidatePath("/account/connections");
     return { ok: true };
   } catch (error) {
@@ -104,10 +115,13 @@ export async function connectProviderWithKey(
 }
 
 export async function disconnectConnection(
+  shownWorkspaceId: string,
   connectionId: string,
 ): Promise<ConnectionActionResult> {
   try {
-    await disconnect(await requireActiveWorkspaceId(), connectionId);
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspaceId);
+    if (!workspaceId) return workspaceChanged;
+    await disconnect(workspaceId, connectionId);
     revalidatePath("/account/connections");
     return { ok: true };
   } catch (error) {
