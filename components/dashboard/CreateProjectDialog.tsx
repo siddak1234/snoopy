@@ -54,18 +54,6 @@ export function CreateProjectDialog({
     onClose();
   }, [created, onClose, onSuccess]);
 
-  useEffect(() => {
-    if (!open) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        void handleClose();
-      }
-    };
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [handleClose, open]);
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);

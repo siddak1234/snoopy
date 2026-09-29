@@ -52,6 +52,7 @@ export default async function ApprovalsPage() {
             // server checks it again and refuses with 403 — this only avoids
             // offering a button that is certain to be refused.
             canDecide={Boolean(role && approval.eligibleRoles.includes(role))}
+            workspaceId={workspaceId}
           />
         ))
       )}
@@ -62,9 +63,12 @@ export default async function ApprovalsPage() {
 function ApprovalRow({
   approval,
   canDecide,
+  workspaceId,
 }: {
   approval: Approval;
   canDecide: boolean;
+  /** The workspace this page shows; a decision is refused once it is not active. */
+  workspaceId: string;
 }) {
   return (
     <div className="flex flex-col gap-3 py-5 first:pt-0">
@@ -80,7 +84,11 @@ function ApprovalRow({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <ApprovalDecision approvalId={approval.id} canDecide={canDecide} />
+        <ApprovalDecision
+          approvalId={approval.id}
+          canDecide={canDecide}
+          workspaceId={workspaceId}
+        />
         <Link
           href={`/account/runs/${approval.runId}`}
           prefetch={false}

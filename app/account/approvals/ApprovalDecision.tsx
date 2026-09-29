@@ -7,17 +7,21 @@ import { decideApproval } from "@/app/account/automations/actions";
 /**
  * Approve or reject one held run.
  *
- * The form carries only the decision. The actor and their workspace role come
- * from the session server-side — a body naming its own role is refused as an
+ * The form carries the decision and the workspace the page showed, which is only
+ * compared with the active one (register F28, F70). The actor and their
+ * workspace role come from the session server-side — a body naming its own role is refused as an
  * unsupported field, because a caller choosing its own role would make the
  * approval's eligible roles a formality.
  */
 export function ApprovalDecision({
   approvalId,
   canDecide,
+  workspaceId,
 }: {
   approvalId: string;
   canDecide: boolean;
+  /** The workspace this page shows. */
+  workspaceId: string;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +32,7 @@ export function ApprovalDecision({
       const data = new FormData();
       data.append("approvalId", approvalId);
       data.append("decision", decision);
+      data.append("workspaceId", workspaceId);
       const result = await decideApproval(data);
       if (!result.ok) setError(result.error);
     });

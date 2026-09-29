@@ -35,8 +35,9 @@ export function Section({
   ...rest
 }: SectionProps) {
   const classes = [
+    // `section-band` is the hook for what sits on the band (globals.css).
     band
-      ? "bg-[radial-gradient(900px_420px_at_85%_-40%,color-mix(in_srgb,var(--color-section-glow)_70%,transparent),transparent_64%),linear-gradient(var(--color-section),var(--color-section))]"
+      ? "section-band bg-[radial-gradient(900px_420px_at_85%_-40%,color-mix(in_srgb,var(--color-section-glow)_70%,transparent),transparent_64%),linear-gradient(var(--color-section),var(--color-section))]"
       : "",
     flush ? "" : band ? "py-16 sm:py-20" : "py-14 sm:py-20",
     className,

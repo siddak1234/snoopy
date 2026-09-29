@@ -21,11 +21,14 @@ export function AddAutomation({
   name,
   available,
   scopes,
+  workspaceId,
 }: {
   templateId: string;
   name: string;
   available: boolean;
   scopes: AddScope[];
+  /** The workspace this page shows; Add is refused once it is not active. */
+  workspaceId: string;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +48,7 @@ export function AddAutomation({
     startTransition(async () => {
       const data = new FormData();
       data.append("templateId", templateId);
+      data.append("workspaceId", workspaceId);
       if (scope) data.append("projectId", scope);
       const result = await subscribeToAutomation(data);
       if (!result.ok) setError(result.error);

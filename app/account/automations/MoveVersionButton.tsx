@@ -18,12 +18,15 @@ import { moveSubscriptionVersion } from "./actions";
  * handed to `focusAfter` — the id of something the card keeps.
  */
 export function MoveVersionButton({
+  workspaceId,
   subscriptionId,
   name,
   from,
   to,
   focusAfter,
 }: {
+  /** The workspace this page shows; the move is refused once it is not active. */
+  workspaceId: string;
   subscriptionId: string;
   name: string;
   from: number;
@@ -39,6 +42,7 @@ export function MoveVersionButton({
     setError(null);
     startTransition(async () => {
       const data = new FormData();
+      data.append("workspaceId", workspaceId);
       data.append("subscriptionId", subscriptionId);
       data.append("templateVersion", String(to));
       const result = await moveSubscriptionVersion(data);

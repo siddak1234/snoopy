@@ -35,6 +35,7 @@ export function AutomationActions({
   available,
   setup,
   subscription,
+  workspaceId,
 }: {
   name: string;
   available: boolean;
@@ -47,6 +48,8 @@ export function AutomationActions({
     /** The PINNED version's run input (backend ADR-0030); absent means no Run. */
     runInput?: AutomationRunInputField[];
   };
+  /** The workspace this page shows; every action is refused once it is not active. */
+  workspaceId: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -88,9 +91,11 @@ export function AutomationActions({
     });
   };
 
+  // Every action carries the workspace the page showed (register F28, F70).
   const field = (entries: Record<string, string>): FormData => {
     const data = new FormData();
     for (const [key, value] of Object.entries(entries)) data.append(key, value);
+    data.set("workspaceId", workspaceId);
     return data;
   };
 
@@ -113,7 +118,9 @@ export function AutomationActions({
     (handler: (data: FormData) => void) =>
     (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      handler(new FormData(event.currentTarget));
+      const data = new FormData(event.currentTarget);
+      data.set("workspaceId", workspaceId);
+      handler(data);
     };
 
   const submitSetup = (data: FormData) => {
@@ -320,6 +327,7 @@ export function AutomationActions({
             <input type="hidden" name="idempotencyKey" value={runKey} />
             <RunInputFields
               runInput={subscription.runInput}
+              workspaceId={workspaceId}
               subscriptionId={subscription.id}
               onUploadingChange={onUploadingChange}
               fileRound={fileRound}

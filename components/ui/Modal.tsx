@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
 const FOCUSABLE_SELECTOR = [
@@ -59,7 +59,9 @@ export default function Modal({
   const onCloseRef = useRef(onClose);
   const dismissibleRef = useRef(dismissible);
 
-  useEffect(() => {
+  // In the commit that renders them, not after it: a key pressed the moment
+  // the buttons are enabled again must find the dialog dismissible (F72).
+  useLayoutEffect(() => {
     onCloseRef.current = onClose;
     dismissibleRef.current = dismissible;
   }, [onClose, dismissible]);
