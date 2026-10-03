@@ -1,4 +1,10 @@
-import { expect, test, type Page, type Request } from "@playwright/test";
+import {
+  expect,
+  test,
+  type Locator,
+  type Page,
+  type Request,
+} from "@playwright/test";
 import {
   automationCard,
   expectNoAxeViolations,
@@ -8,6 +14,7 @@ import {
   observe,
   presentSession,
   providerCard,
+  settledAnimations,
 } from "./helpers";
 
 /**
@@ -475,6 +482,327 @@ test("11 — Delete Account wears the error tokens, and its keyboard focus is th
   }
   await expect(trigger).toBeFocused();
   expect((await worn()).ring).toContain(tokens.text);
+});
+
+/*
+ * Test 11's probe, for every action that removes or ends something (the
+ * owner's build 12, #5; register F85): red where it sits and where it is
+ * confirmed — the danger variant's three tokens on a button, the error text on
+ * a word — and nothing red where the action can be undone.
+ */
+
+// The error tokens and the accent, as this page resolves them.
+async function resolvedTokens(page: Page) {
+  return page.evaluate(() => {
+    const probe = document.createElement("div");
+    document.body.append(probe);
+    const resolve = (token: string) => {
+      probe.style.color = `var(${token})`;
+      return getComputedStyle(probe).color;
+    };
+    const resolved = {
+      text: resolve("--error-text"),
+      border: resolve("--error-border-strong"),
+      background: resolve("--error-bg"),
+      accent: resolve("--color-accent"),
+      accentText: resolve("--color-accent-2"),
+    };
+    probe.remove();
+    return resolved;
+  });
+}
+type Tokens = Awaited<ReturnType<typeof resolvedTokens>>;
+
+// A control's colours at rest: the pointer off it and its transitions done,
+// so a hover is never read for its rest.
+async function atRest(control: Locator) {
+  await expect(control).toBeVisible();
+  await control.page().mouse.move(0, 0);
+  await settledAnimations(control);
+  return control.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      text: style.color,
+      border: style.borderTopColor,
+      background: style.backgroundColor,
+    };
+  });
+}
+
+// Red as a button, as Delete Account is.
+async function expectDanger(control: Locator, tokens: Tokens, name: string) {
+  expect(await atRest(control), name).toEqual({
+    text: tokens.text,
+    border: tokens.border,
+    background: tokens.background,
+  });
+}
+
+// Red as a word.
+async function expectErrorText(control: Locator, tokens: Tokens, name: string) {
+  expect((await atRest(control)).text, name).toBe(tokens.text);
+}
+
+// Not red at all.
+async function expectNotRed(control: Locator, tokens: Tokens, name: string) {
+  const drawn = await atRest(control);
+  expect(drawn.text, name).not.toBe(tokens.text);
+  expect(drawn.background, name).not.toBe(tokens.background);
+}
+
+test("11 — every action that removes or ends something wears the error tokens, on its page and in its confirm: Sign out, Archive flow, Cancel run, Unlink, Disconnect, Delete team and Remove member (the owner's build 12, #5)", async ({
+  page,
+}) => {
+  await page.goto("/account/flows");
+  const tokens = await resolvedTokens(page);
+  await expectDanger(
+    page.getByRole("button", { name: "Sign out" }),
+    tokens,
+    "Sign out (the account area)",
+  );
+  const card = automationCard(page, "Archivable automation");
+  await expectDanger(
+    card.getByRole("button", { name: "Archive flow" }),
+    tokens,
+    "Archive flow",
+  );
+  await card.getByRole("button", { name: "Archive flow" }).click();
+  let dialog = page.getByRole("dialog", {
+    name: "Archive Archivable automation?",
+  });
+  await expectDanger(
+    dialog.getByRole("button", { name: "Archive", exact: true }),
+    tokens,
+    "Archive, confirming",
+  );
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await page.goto("/account/runs/fixture-run-running");
+  await expectDanger(
+    page.getByRole("button", { name: "Cancel run" }),
+    tokens,
+    "Cancel run",
+  );
+  await page.getByRole("button", { name: "Cancel run" }).click();
+  dialog = page.getByRole("dialog", { name: "Cancel this run?" });
+  await expectDanger(
+    dialog.getByRole("button", { name: "Cancel run" }),
+    tokens,
+    "Cancel run, confirming",
+  );
+  await dialog.getByRole("button", { name: "Keep it running" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await page.goto("/account/settings");
+  const unlink = page
+    .locator("main li")
+    .filter({ hasText: "Microsoft" })
+    .getByRole("button", { name: "Unlink" });
+  await expectDanger(unlink, tokens, "Unlink");
+  // At full strength: the linked row dims its words, never its Unlink.
+  expect(
+    await unlink.evaluate((element) => {
+      for (let at: Element | null = element; at; at = at.parentElement)
+        if (getComputedStyle(at).opacity !== "1") return at.outerHTML;
+      return null;
+    }),
+    "Unlink sits under a dimmed element",
+  ).toBeNull();
+  await unlink.click();
+  dialog = page.getByRole("dialog", { name: "Unlink Microsoft?" });
+  await expectDanger(
+    dialog.getByRole("button", { name: "Unlink" }),
+    tokens,
+    "Unlink, confirming",
+  );
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await page.goto("/account/connections");
+  await expectDanger(
+    page.getByRole("button", { name: "Disconnect" }),
+    tokens,
+    "Disconnect",
+  );
+
+  // Red at rest, not only hovered. Its confirm is the browser's own, which
+  // takes no colour.
+  await page.goto(organizationProject);
+  await expectErrorText(
+    page.getByRole("button", { name: "Delete team general" }),
+    tokens,
+    "Delete team, on its page",
+  );
+  await page.goto("/account/teams");
+  await expectErrorText(
+    page.getByRole("button", { name: "Delete team general" }),
+    tokens,
+    "Delete team, in Teams",
+  );
+
+  await page.goto("/account/organization");
+  const member = page
+    .locator("main li")
+    .filter({ hasText: "Fixture Member" })
+    .filter({ has: page.getByRole("button", { name: "Remove" }) });
+  await expectErrorText(
+    member.getByRole("button", { name: "Remove" }),
+    tokens,
+    "Remove",
+  );
+  await member.getByRole("button", { name: "Remove" }).click();
+  dialog = page.getByRole("dialog", { name: "Remove Fixture Member?" });
+  await expectDanger(
+    dialog.getByRole("button", { name: "Remove member" }),
+    tokens,
+    "Remove member, confirming",
+  );
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("11 — a member's Leave team, the Leave on their own row, and the Leave team that confirms it wear the error tokens (the owner's build 12, #5)", async ({
+  page,
+}) => {
+  await presentSession(page, "member");
+  await page.goto(organizationProject);
+  const tokens = await resolvedTokens(page);
+  const leave = page
+    .locator("main")
+    .getByRole("button", { name: "Leave team" });
+  const own = page
+    .locator("main li")
+    .filter({ hasText: "(you)" })
+    .getByRole("button", { name: "Leave", exact: true });
+  await expectErrorText(leave, tokens, "Leave team");
+  await expectErrorText(own, tokens, "Leave, on their own row");
+  // Hovered, still red, on the error tint — never the neutral hover that
+  // greyed them, a dark system theme's included (this suite's scheme).
+  for (const [control, name] of [
+    [leave, "Leave team, hovered"],
+    [own, "Leave, on their own row, hovered"],
+  ] as const) {
+    await control.hover();
+    await settledAnimations(control);
+    expect(
+      await control.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { text: style.color, background: style.backgroundColor };
+      }),
+      name,
+    ).toEqual({ text: tokens.text, background: tokens.background });
+  }
+  await leave.click();
+  const dialog = page.getByRole("dialog", { name: "Leave “general”?" });
+  // Typed, so the confirm is read enabled.
+  await dialog.getByLabel("Confirmation").fill("DELETE");
+  await expectDanger(
+    dialog.getByRole("button", { name: "Leave team" }),
+    tokens,
+    "Leave team, confirming",
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("11 — Sign out wears the error text in the marketing nav and in the small-screen menu (the owner's build 12, #5)", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const tokens = await resolvedTokens(page);
+  await expectErrorText(
+    page
+      .getByRole("navigation", { name: "Main navigation" })
+      .getByRole("button", { name: "Sign out" }),
+    tokens,
+    "Sign out (the marketing nav)",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Open menu" }).click();
+  await expectErrorText(
+    page
+      .getByRole("dialog", { name: "Main navigation" })
+      .getByRole("button", { name: "Sign out" }),
+    tokens,
+    "Sign out (the small-screen menu)",
+  );
+});
+
+test("11 — what can be undone is not red: Pause, Deny, Reject, Cancel request and Withdraw, whose confirm is the accent (the owner's build 12, #5)", async ({
+  page,
+}) => {
+  await page.goto("/account/flows");
+  const tokens = await resolvedTokens(page);
+  await expectNotRed(
+    automationCard(page, "Archivable automation").getByRole("button", {
+      name: "Pause",
+    }),
+    tokens,
+    "Pause",
+  );
+
+  await page.goto(organizationProject);
+  await expectNotRed(
+    page
+      .locator("main li")
+      .filter({ hasText: "Fixture Newcomer" })
+      .getByRole("button", { name: "Deny" }),
+    tokens,
+    "Deny",
+  );
+
+  await page.goto("/account/organization");
+  await expectNotRed(
+    page
+      .locator("main li")
+      .filter({ hasText: "Fixture Requester" })
+      .getByRole("button", { name: "Reject" }),
+    tokens,
+    "Reject, a request to join",
+  );
+
+  await fixtureControl("approval-waiting");
+  await page.goto("/account/approvals");
+  await expectNotRed(
+    page.getByRole("button", { name: "Reject" }),
+    tokens,
+    "Reject, an approval",
+  );
+
+  await presentSession(page, "member");
+  await page.goto("/account/teams");
+  const operations = page.locator("main li").filter({ hasText: "Operations" });
+  await operations.getByRole("button", { name: "Request to join" }).click();
+  await expectNotRed(
+    operations.getByRole("button", { name: "Withdraw" }),
+    tokens,
+    "Withdraw",
+  );
+  await operations.getByRole("button", { name: "Withdraw" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Withdraw your request to join Operations?",
+  });
+  // The person can ask again any time: the accent outline, Button's default.
+  expect(
+    await atRest(dialog.getByRole("button", { name: "Withdraw" })),
+    "Withdraw, confirming",
+  ).toEqual({
+    text: tokens.accentText,
+    border: tokens.accent,
+    background: "rgba(0, 0, 0, 0)",
+  });
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await presentSession(page, "requester");
+  await page.goto(joinLink);
+  await page.getByRole("button", { name: "Join Fixture Organization" }).click();
+  await expectNotRed(
+    page.getByRole("button", { name: "Cancel request" }),
+    tokens,
+    "Cancel request",
+  );
 });
 
 test("13 — a disconnected account leaves its provider offering Connect", async ({

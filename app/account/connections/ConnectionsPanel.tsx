@@ -257,8 +257,10 @@ export function ConnectionsPanel({
                       Replace account
                     </Button>
                   ) : null}
+                  {/* Red: it ends the connection every flow here acts
+                      through (the owner's build 12, #5). */}
                   <Button
-                    variant="ghost"
+                    variant="danger"
                     size="sm"
                     disabled={pending || disconnecting === connection.id}
                     onClick={() => disconnect(connection.id)}

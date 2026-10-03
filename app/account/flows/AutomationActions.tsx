@@ -24,7 +24,8 @@ import { RunInputFields, SetupFields } from "./ManifestFields";
  * `AddAutomation`'s, since one flow can be added once per team. Archive flow
  * archives it: it stops, keeps its runs in Activity, and is listed under
  * Archived flows (BUILD-PLAN 24.11.11; the owner's word, build 9, in the app's
- * words).
+ * words). It ends the flow, so it is red, and so is its confirm; Pause is not,
+ * since Resume undoes it (the owner's build 12, #5).
  *
  * A client component only because it holds pending state and the last refusal.
  * The work happens in server actions, so nothing here knows the backend origin
@@ -236,7 +237,7 @@ export function AutomationActions({
           </Button>
         )}
         <Button
-          variant="ghost"
+          variant="danger"
           size="sm"
           disabled={pending}
           onClick={() => open("archive")}
@@ -384,7 +385,12 @@ export function AutomationActions({
             >
               Cancel
             </Button>
-            <Button type="button" onClick={confirmArchive} disabled={pending}>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={confirmArchive}
+              disabled={pending}
+            >
               {pending ? "Archiving…" : "Archive"}
             </Button>
           </div>

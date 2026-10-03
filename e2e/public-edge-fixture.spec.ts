@@ -1214,15 +1214,55 @@ test("a ghost button keeps AA contrast when hovered and when pressed (register F
   page,
 }) => {
   await page.goto("/account/flows");
-  const archive = automationCard(page, "Archivable automation").getByRole(
-    "button",
-    { name: "Archive flow" },
-  );
+  // Archive flow was this test's ghost until it turned red (the owner's build
+  // 12, #5; register F85). The ghost measured now is its dialog's Cancel, on
+  // the same surface.
+  await automationCard(page, "Archivable automation")
+    .getByRole("button", { name: "Archive flow" })
+    .click();
+  const ghost = page
+    .getByRole("dialog", { name: "Archive Archivable automation?" })
+    .getByRole("button", { name: "Cancel" });
+  await expect(ghost).toHaveClass(/btn-ghost/);
   // Each state is measured once its transition has finished: the button from
   // pixels, the one measure the marketing test uses too (register F71), and the
   // rest of the page by axe.
   const contrast = () =>
     new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
+  await ghost.hover();
+  await settledAnimations(ghost);
+  expect(await worstContrast(page, ghost), "hovered").toBeGreaterThanOrEqual(
+    4.5,
+  );
+  expect((await contrast()).violations).toEqual([]);
+  await page.mouse.down();
+  await settledAnimations(ghost);
+  expect(await worstContrast(page, ghost), "pressed").toBeGreaterThanOrEqual(
+    4.5,
+  );
+  expect((await contrast()).violations).toEqual([]);
+  // Released elsewhere, so nothing is pressed.
+  await page.mouse.move(0, 0);
+  await page.mouse.up();
+});
+
+test("a danger button keeps AA contrast at rest, hovered and pressed: Archive flow (the owner's build 12, #5; register F85)", async ({
+  page,
+}) => {
+  await page.goto("/account/flows");
+  const archive = automationCard(page, "Archivable automation").getByRole(
+    "button",
+    { name: "Archive flow" },
+  );
+  await expect(archive).toHaveClass(/btn-danger/);
+  // Hovered, the stronger tint darkens the ground under the red: its resting
+  // text computes to 4.45:1 there, so the hover takes the hover step.
+  const contrast = () =>
+    new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
+  await settledAnimations(archive);
+  expect(await worstContrast(page, archive), "at rest").toBeGreaterThanOrEqual(
+    4.5,
+  );
   await archive.hover();
   await settledAnimations(archive);
   expect(await worstContrast(page, archive), "hovered").toBeGreaterThanOrEqual(

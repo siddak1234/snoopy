@@ -1604,3 +1604,79 @@ join Operations" at the same moment. Found by this branch's change audit (probe 
 The fixture's directory now lists the teams a test creates, and lists its fixed Operations team
 only while the organization has teams at all, as the platform's directory would. F84 is the last
 number. Build 10's proofs ran in Chromium, each guard's tests alone, against the fixture.
+
+### Build 12's #5 — red for what removes or ends something — 2026-10-03
+
+The owner on build 12 (2026-10-03, 15:52Z): "Could delete account be in red. Things like remove,
+sign out, stop, and such should be in red right". Decided as option A with its defaults: red marks
+an action that removes or ends something and cannot be undone with a tap, on the page and where it
+is confirmed; Pause (Resume undoes it), Reject and Deny (an answer, not a removal), Withdraw and
+Cancel request (the person can ask again) stay as they were; the light theme keeps `#dc2626`; and
+the website changes in the same round, its three Sign outs included. The app's half is
+`snoopy-mobile`'s. This repository's half is **F85**:
+
+- **Red where it sits.** The danger variant (`btn-danger`, F43) on the buttons: Archive flow,
+  Cancel run, Unlink, Disconnect, and Sign out in the account area's top bar. The error text on
+  the words: Leave team, Delete team — red at rest now, not only hovered — Leave on a person's
+  own row in a team's members, and Sign out in the marketing nav and in the small-screen menu,
+  both shown only when signed in, so the signed-out marketing baselines do not move. A team's and
+  an organization's Remove, and Revoke, were red already.
+- **Red where it is confirmed.** The button in each dialog — Archive, Cancel run, Leave team,
+  Unlink and Remove member — is the danger variant, as Delete Account's was. Delete team, and a
+  team's Remove and Leave, are confirmed by the browser's own `confirm()`, which takes no colour.
+- **What can be undone keeps its colour:** Pause, Reject (an approval, a request to join), Deny,
+  Cancel request, and Withdraw, whose confirm stays the accent — this website's rule already
+  (`components/dashboard/ConfirmRemoveButton.tsx`), and now the app's.
+- **Found on the way, fixed with it:**
+  - the danger variant's hover failed AA in the dark theme. Hovered on a surface,
+    `--error-text` on `--error-bg-strong` computes to 4.45:1 — Delete Account's since F43, and
+    F64's test, whose button was Archive flow, would have read it the moment it turned red. A
+    hovered danger button now takes `--error-text-hover`: 6.49:1 there, 4.99:1 on a light card,
+    as F64 gave the ghost its stronger step. This is the change's one line of CSS, in a rule that
+    was there (`app/globals.css`).
+  - a linked sign-in account's row was dimmed whole (`opacity-75`), Unlink with it. Red under
+    the dim computes to 3.45:1, and the authenticated axe scan of Settings reads it. The dim is
+    now the account's words', never its Unlink's (`components/account/LinkedAccountsSection.tsx`).
+  - Leave team carried a `dark:hover:` neutral that would have taken the red hover's place under a
+    dark system theme; it went.
+- **Tests.** `test/structure-contract.test.mjs` parses each file and holds how every one of these
+  buttons is drawn — the page's, then the confirm's — that none sits under a dimmed element, that
+  what can be undone is drawn as it was, and the danger hover's step. Test 11's probe
+  (`e2e/account-surfaces.spec.ts`) is extended to each control in the browser — as the owner, as a
+  member, and in the marketing nav and its small-screen menu — with a member's two Leaves read
+  hovered too, and to what can be undone, with Withdraw's confirm read as the accent. Flipped,
+  and said so here: F64's test measured Archive flow as its ghost; it now measures the archive
+  dialog's Cancel, a ghost on the same surface, and a new test beside it holds the danger button
+  at AA at rest, hovered and pressed (`e2e/public-edge-fixture.spec.ts`).
+- **Not here.** The app's half, and the platform's records. The light theme's red stays `#dc2626`
+  (decision (c)): on the danger variant's tint it computes to 4.23:1 on a card and 3.90:1 on the
+  page, below AA as the bare red is on the page (4.44:1) — the separate change (c) names. Disconnect
+  still acts with no confirm, where the app asks first.
+
+Proved red by hand, each file restored by SHA-256:
+
+| Guard | Broken by | Red |
+| --- | --- | --- |
+| Archive flow, and Archive confirming, are red | the ghost; Button's default | the structure test "every action that removes or ends something is red …"; test 11 "every action that removes or ends something wears the error tokens …" |
+| Cancel run, and Cancel run confirming, are red | secondary; Button's default | the same two |
+| Unlink, and Unlink confirming, are red | secondary; Button's default | the same two |
+| Unlink is never under a dim | `opacity-75` back on the linked row | the same two; "authenticated accessibility baseline: /account/settings" |
+| Disconnect is red | the ghost | the same two |
+| Sign out in the account area is red | `btn-ghost` | the same two |
+| Delete team is red at rest | the muted class it had, red only hovered | the same two |
+| Remove member confirming is red | `btn-primary` | the same two |
+| An organization's Remove stays red | made muted | the same two |
+| A team's Remove, Revoke and Delete Account stay red | each made muted, or secondary | the structure test "every action that removes or ends something is red …" |
+| Leave team, and Leave team confirming, are red | the muted word that greyed on hover; `btn-primary` | the structure test (as above); test 11 "a member's Leave team …" |
+| Leave on a person's own row is red | the muted word | the structure test (as above); test 11 "a member's Leave team …" |
+| Leave team, and Leave on a person's own row, stay red hovered, on the error tint | the neutral hover put back — for Leave team, the dark system theme's | test 11 "a member's Leave team …" |
+| Sign out in the marketing nav, and in the small-screen menu, is red | neutral-300, the accent hovered; the menu's text colour | the structure test (as above); test 11 "Sign out wears the error text …" |
+| Pause, Reject (both), Deny and Cancel request are not red | each made danger | the structure test "what can be undone keeps its colour …"; test 11 "what can be undone is not red …" |
+| Withdraw's confirm is the accent, and its trigger the muted word | the confirm made danger; the trigger given the error text | the structure test (as above); test 11 (as above) for the confirm |
+| A hovered danger button keeps AA | the hover colour removed (4.45:1) | the structure test "a danger button keeps AA contrast hovered …"; "a danger button keeps AA contrast at rest, hovered and pressed …" |
+| A hovered ghost keeps AA, on F64's new subject | the ghost's hover step removed | "a ghost button keeps AA contrast when hovered and when pressed" |
+
+The structure test's 28 breaks were run here, each read red from the test runner's own events,
+each file restored by SHA-256, and the working tree's hashes matched after the last. The browser
+tests named are read red the same way in CI's Playwright image — in Chromium, each guard's test
+alone, against the fixture — before the push. F85 is the last number.

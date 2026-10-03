@@ -39,10 +39,11 @@ export function AccountTopBar({
           activeWorkspaceId={activeWorkspaceId}
         />
         <ThemeToggle />
+        {/* Red, as in the app: it ends the session (the owner's build 12, #5). */}
         <button
           type="button"
           onClick={handleSignOut}
-          className="btn-ghost btn-sm"
+          className="btn-danger btn-sm"
         >
           Sign out
         </button>
