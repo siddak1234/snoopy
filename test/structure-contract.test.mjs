@@ -67,6 +67,8 @@ test("a whole page with nothing on it is the app's empty screen, and a section s
     ["app/account/teams/page.tsx", "No teams yet"],
     ["app/account/runs/page.tsx", "No activity yet"],
     ["app/account/approvals/page.tsx", "Nothing needs review"],
+    // The catalog with nothing to add (the owner's build 10).
+    ["app/account/flows/page.tsx", "No flows to add yet"],
   ]) {
     assert.match(
       read(page),

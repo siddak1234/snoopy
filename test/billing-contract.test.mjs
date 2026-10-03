@@ -405,6 +405,34 @@ test("three cards: Free, drawn here at no cost and Enrolled on the free floor, t
   assert.match(panel, /md:grid-cols-3/u);
 });
 
+test("Pro is drawn at the owner's price while the platform lists none, gives way to the platform's Pro, and opens neither door; the cards are compact (the owner's build 10)", () => {
+  assert.match(panel, /const PRO_NAME = "Pro";/u);
+  assert.match(
+    panel,
+    /const PRO_PRICE = \{ amount: 1000, currency: "usd", interval: "month" \} as const;/u,
+  );
+  assert.equal(
+    formatPlanPrice({ amount: 1000, currency: "usd", interval: "month" }),
+    "$10.00 per month",
+  );
+  // By the name a person reads: a plan's id is the platform's to choose, and
+  // the fixture's Pro is not production's.
+  assert.match(
+    panel,
+    /const proListed = plans\.some\(\(plan\) => plan\.displayName === PRO_NAME\);/u,
+  );
+  // Drawn after the platform's plans, with no control: a checkout for it would
+  // be refused, and the portal has no Pro to change to.
+  assert.match(
+    panel,
+    /\{proListed \? null : \(\s*<PlanCard\s+name=\{PRO_NAME\}\s+price=\{formatPlanPrice\(PRO_PRICE\) \?\? ""\}\s*\/>\s*\)\}\s*<\/ul>/u,
+  );
+  // Compact: no minimum height, nothing pushed to a card's bottom, and no card
+  // stretched to the tallest in its row.
+  assert.doesNotMatch(panel, /min-h-|mt-auto/u);
+  assert.match(panel, /md:grid-cols-3 md:items-start/u);
+});
+
 test("every billing status the contract names has a tone in StatusPill", () => {
   // One status pill for every vocabulary the platform returns: billing status
   // renders through it, never through a private copy of its job.
