@@ -533,7 +533,13 @@ html[data-theme="light"] .brand-mark {
   line-height: 1.25rem;
   font-weight: 500;
   color: var(--error-text);
-  transition: background 150ms ease;
+  /* The text moves with the ground. With only the background animated, leaving
+     a hovered button snapped the text back to the resting red while the ground
+     was still the hover tint: 4.45:1 for 150 ms, which WebKit's axe scan read
+     (build 13). Moving together, the pair stays at or above 5.00:1 throughout. */
+  transition:
+    background 150ms ease,
+    color 150ms ease;
 }
 
 /* The stronger tint darkens the ground under the red: hovered on a dark
