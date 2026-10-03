@@ -40,6 +40,23 @@ test.beforeEach(async () => {
   await fixtureControl("reset");
 });
 
+// A second team in the organization, made as a person makes one: a flow is
+// added to a team and nowhere else (the owner's build 10), so a flow already in
+// the fixture's one team has somewhere left to go only once there are two.
+async function createOperationsTeam(page: Page) {
+  await page.goto("/account/teams");
+  await page
+    .locator("main")
+    .getByRole("button", { name: "Create a team" })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Create a team" });
+  await dialog
+    .getByLabel("Kind of team", { exact: true })
+    .selectOption("Operations");
+  await dialog.getByRole("button", { name: "Create team" }).click();
+  await page.getByRole("button", { name: "Done" }).click();
+}
+
 test("the pasted-key 409 retry preserves the original connection intent", async ({
   page,
 }) => {
@@ -198,6 +215,10 @@ test("a replacement named after the connection changed is refused as stale, and 
 test("subscription refusals render only the two documented entitlement states", async ({
   page,
 }) => {
+  // The plan-limit flow is already in the fixture's one team, so a second is
+  // where Add can still send it (the owner's build 10); the platform's refusal
+  // is the same whatever the team.
+  await createOperationsTeam(page);
   await page.goto("/account/flows");
   const planLimitCard = page
     .getByRole("heading", { name: "Plan-limit automation" })
@@ -1219,12 +1240,16 @@ test("a ghost button keeps AA contrast when hovered and when pressed (register F
   await page.mouse.up();
 });
 
-test("a card lists each subscription under its scope, and Add offers only the scopes it is not in yet (register F21)", async ({
+test("a card lists each subscription under its team, and Add offers only the teams it is not in yet — never the whole workspace (register F21, the owner's build 10)", async ({
   page,
 }) => {
+  // A second team, so there is a choice to make: the fixture's general, and
+  // Operations.
+  await createOperationsTeam(page);
+
   await page.goto("/account/flows");
-  // Already added to the project, as a draft: that row says where, and the only
-  // place left to add it is the whole workspace — so there is nothing to choose.
+  // Already in the general team, as a draft: that row says where, and the only
+  // team left to add it to is Operations — so there is nothing to choose.
   const planLimit = automationCard(page, "Plan-limit automation");
   await expect(
     planLimit.locator("p", { hasText: "Team: general" }),
@@ -1232,25 +1257,85 @@ test("a card lists each subscription under its scope, and Add offers only the sc
   await expect(planLimit.getByRole("combobox")).toHaveCount(0);
   await expect(planLimit.getByRole("button", { name: "Add" })).toBeVisible();
 
-  // Added nowhere: both scopes are offered, the workspace first.
+  // Added nowhere: both teams are offered, and the whole workspace is not.
   const card = automationCard(page, "Project automation");
   const where = card.getByRole("combobox", {
     name: "Where to add Project automation",
   });
   await expect(where.locator("option")).toHaveText([
-    "Whole workspace",
     "Team: general",
+    "Team: Operations",
   ]);
-  await where.selectOption({ label: "Team: general" });
+  await where.selectOption({ label: "Team: Operations" });
   await card.getByRole("button", { name: "Add" }).click();
-  await expect(card.locator("p", { hasText: "Team: general" })).toBeVisible();
-  // What was chosen is gone from the offer; Add now means the workspace — the
-  // fixture answers 409 if the project is sent again.
+  await expect(
+    card.locator("p", { hasText: "Team: Operations" }),
+  ).toBeVisible();
+  // What was chosen is gone from the offer; Add now means the one team left —
+  // the fixture answers 409 if Operations is sent again.
   await expect(card.getByRole("combobox")).toHaveCount(0);
   await card.getByRole("button", { name: "Add" }).click();
-  await expect(card.locator("p", { hasText: "Whole workspace" })).toBeVisible();
+  await expect(card.locator("p", { hasText: "Team: general" })).toBeVisible();
+  // In every team: nothing is left to add, and the workspace was never a place.
   await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
+  await expect(card.locator("p", { hasText: "Whole workspace" })).toHaveCount(
+    0,
+  );
   await expect(card.getByRole("alert")).toHaveCount(0);
+});
+
+test("with no team yet, no flow can be added: an owner or admin is told to create a team first, with the way to Teams, and a plain member who does (the owner's build 10)", async ({
+  page,
+}) => {
+  await fixtureControl("org-without-projects");
+  await page.goto("/account/flows");
+  const card = automationCard(page, "Project automation");
+  await expect(card.getByText("Create a team first.")).toBeVisible();
+  const create = card.getByRole("link", { name: "Create a team" });
+  await expect(create).toHaveAttribute("href", "/account/teams");
+  await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
+  await expect(card.getByRole("combobox")).toHaveCount(0);
+  // Every card says it, the ones already added to the whole workspace included:
+  // adding to a team is what needs one.
+  const manual = automationCard(page, "Manual input automation");
+  await expect(
+    manual.locator("p", { hasText: "Whole workspace" }),
+  ).toBeVisible();
+  await expect(manual.getByText("Create a team first.")).toBeVisible();
+  await expectNoAxeViolations(page);
+  await create.click();
+  await expect(page).toHaveURL(/\/account\/teams$/);
+  await expect(
+    page.locator("main").getByRole("heading", { name: "No teams yet" }),
+  ).toBeVisible();
+
+  // A plain member cannot make one, and is told who does — and offered nothing.
+  await presentSession(page, "member");
+  await page.goto("/account/flows");
+  await expect(
+    card.getByText("An owner or admin creates the first team."),
+  ).toBeVisible();
+  await expect(card.getByText("Create a team first.")).toHaveCount(0);
+  await expect(card.getByRole("link", { name: "Create a team" })).toHaveCount(
+    0,
+  );
+  await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
+  await expectNoAxeViolations(page);
+});
+
+test("a catalog with nothing to add is the app's empty screen — No flows to add yet — not a line in the section (the owner's build 10)", async ({
+  page,
+}) => {
+  await fixtureControl("catalog-empty");
+  await page.goto("/account/flows");
+  const main = page.locator("main");
+  await expect(
+    main.getByRole("heading", { name: "No flows to add yet" }),
+  ).toBeVisible();
+  await expect(main.getByText("More are on the way.")).toBeVisible();
+  await expect(main.getByText("No flows are available yet.")).toHaveCount(0);
+  await expect(main.getByRole("button", { name: "Add" })).toHaveCount(0);
+  await expectNoAxeViolations(page);
 });
 
 test("the account area does not prefetch — a page view costs its own requests and no others", async ({
@@ -2673,6 +2758,10 @@ test("three cards side by side — Free, then the platform's plans by price — 
   await expect(planCard(page, "Free")).toContainText("$0.00 per month");
   await expect(planCard(page, "Plus")).toContainText("$5.00 per month");
   await expect(planCard(page, "Pro")).toContainText("$10.00 per month");
+  // The platform's Pro, not the one drawn in its absence: it can be bought.
+  await expect(
+    planCard(page, "Pro").getByRole("button", { name: "Choose plan" }),
+  ).toBeVisible();
   // On the free floor Free is the workspace's own, and offers nothing.
   await expect(planCard(page, "Free")).toContainText("Enrolled");
   await expect(planCard(page, "Free").getByRole("button")).toHaveCount(0);
@@ -2780,6 +2869,44 @@ test("a plan whose price the provider cannot state says it is shown at checkout,
   await expect(cards.nth(1)).toContainText("Plus");
   await expect(cards.nth(2)).toContainText("Pro");
   await expect(planCard(page, "Pro")).toContainText("Price shown at checkout");
+});
+
+test("a platform listing no Pro: Pro is drawn last at $10.00 per month and opens neither checkout nor Manage billing — paying or not (the owner's build 10)", async ({
+  page,
+  context,
+}) => {
+  await stubHostedPages(context);
+  await fixtureControl("plan-pro-unlisted");
+  await page.goto("/account/billing");
+  const cards = page.locator("main li");
+  // Still three: Free, Plus, and the Pro the website draws until the platform
+  // has one — its name and the owner's price, and no control.
+  await expect(cards).toHaveCount(3);
+  await expect(cards.nth(0)).toContainText("Free");
+  await expect(cards.nth(1)).toContainText("Plus");
+  await expect(cards.nth(2)).toContainText("Pro");
+  const pro = planCard(page, "Pro");
+  await expect(pro).toContainText("$10.00 per month");
+  await expect(pro.getByRole("button")).toHaveCount(0);
+  await expect(pro).not.toContainText("Enrolled");
+  await expect(pro).not.toContainText("Price shown at checkout");
+  await expect(
+    planCard(page, "Plus").getByRole("button", { name: "Choose plan" }),
+  ).toBeVisible();
+  await expectNoAxeViolations(page);
+  // Once paying, every other card opens Manage billing — not the drawn Pro,
+  // which the portal has nothing to change to.
+  await planCard(page, "Plus")
+    .getByRole("button", { name: "Choose plan" })
+    .click();
+  await page.waitForURL(/billing\.invalid\/checkout\//);
+  await page.goto("/account/billing");
+  await expect(planCard(page, "Plus")).toContainText("Enrolled");
+  await expect(pro.getByRole("button")).toHaveCount(0);
+  await expect(
+    planCard(page, "Free").getByRole("button", { name: "Choose plan" }),
+  ).toBeVisible();
+  expect(await checkoutAttempts()).toBe(1);
 });
 
 test("billing renders no identifier that is not this platform's own", async ({

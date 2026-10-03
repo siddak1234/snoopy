@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FlowArrowIcon } from "@phosphor-icons/react/dist/ssr/FlowArrow";
 import { getAppSession } from "@/lib/app-session";
 import {
   emptyWhenUnavailable,
@@ -33,11 +34,15 @@ import {
  * here is what lets one card show both "Added" and "Live".
  *
  * **One flow can be added once per team** (backend 18.6.2; a team is a project
- * in the platform's contract): the workspace-wide one and one for each team it
- * was added to, each visible only to the people who can see its team — the
- * platform filters the list. So a card lists every subscription it has, each
- * under its own scope, rather than one per template, which showed the oldest
- * and hid the rest (register F21).
+ * in the platform's contract): one for each team it was added to, each visible
+ * only to the people who can see its team — the platform filters the list. So a
+ * card lists every subscription it has, each under its own scope, rather than
+ * one per template, which showed the oldest and hid the rest (register F21).
+ *
+ * **A flow is added to a team** (the owner, build 10): the whole workspace is
+ * no longer offered, and with no team yet nothing can be added — an owner or
+ * admin is sent to make one. The platform is unchanged: a flow added to the
+ * whole workspace before stays, listed and labelled "Whole workspace".
  *
  * Archived flows are read by name (`status=archived`, backend §12.1 #203) and
  * listed last, each with the day it was archived (BUILD-PLAN 24.11.11).
@@ -104,7 +109,13 @@ export default async function FlowsPage() {
       subheader="Browse flows and add them to your workspace"
     >
       {catalog.automations.length === 0 ? (
-        <EmptyRow text="No flows are available yet." />
+        // The whole page is empty: the app's empty screen, in its words (the
+        // owner, build 10). There is nowhere to go until the catalog has one.
+        <EmptyRow
+          icon={<FlowArrowIcon size={32} />}
+          title="No flows to add yet"
+          text="More are on the way."
+        />
       ) : (
         <div className="grid gap-4 py-5 first:pt-0 sm:grid-cols-2">
           {catalog.automations.map((automation) => (
@@ -176,18 +187,16 @@ function AutomationCard({
   const projectName = new Map(
     projects.map((project) => [project.id, project.type]),
   );
-  // Only the scopes this automation is not in yet: the platform holds one live
-  // subscription per template and project, the whole workspace included.
+  // Only the teams this automation is not in yet: the platform holds one live
+  // subscription per template and project. The whole workspace is not offered
+  // (the owner, build 10) — a row added there before keeps its place above.
   const taken = new Set(subscriptions.map((entry) => entry.projectId ?? null));
-  const scopes: AddScope[] = [
-    ...(taken.has(null) ? [] : [{ projectId: null, label: "Whole workspace" }]),
-    ...projects
-      .filter((project) => !taken.has(project.id))
-      .map((project) => ({
-        projectId: project.id,
-        label: `Team: ${project.type}`,
-      })),
-  ];
+  const scopes: AddScope[] = projects
+    .filter((project) => !taken.has(project.id))
+    .map((project) => ({
+      projectId: project.id,
+      label: `Team: ${project.type}`,
+    }));
 
   return (
     <div className="bubble flex flex-col gap-3 p-5">
@@ -318,6 +327,8 @@ function AutomationCard({
           name={automation.name}
           available={automation.available}
           scopes={scopes}
+          hasTeam={projects.length > 0}
+          canAdminister={canAdminister}
         />
       </div>
     </div>

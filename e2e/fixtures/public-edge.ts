@@ -188,6 +188,11 @@ function initialState() {
     domainPending: false,
     // Pro's price, unstated: the provider could not give one flat figure.
     proPriceUnstated: false,
+    // A platform with no Pro yet — its row unseeded, as production's is until
+    // the owner creates its price — so the plan list is Plus alone (build 10).
+    proUnlisted: false,
+    // A catalog with nothing to add yet (build 10).
+    catalogEmpty: false,
     // FR-14: upload sessions the website opened, and the bytes each received.
     uploads: new Map<
       string,
@@ -479,6 +484,8 @@ function webhookSubscription(): Automations["Subscription"] {
 }
 
 function fixtureCatalog(): Automations["AutomationCatalogResponse"] {
+  // Nothing to add yet (build 10): the catalog a new platform answers.
+  if (state.catalogEmpty) return { automations: [], categories: [] };
   return {
     automations: [
       automation("fixture-plan-limit", "Plan-limit automation"),
@@ -571,9 +578,14 @@ function projectAutomationSubscription(
 ): Automations["Subscription"] {
   return {
     ...manualSubscription,
-    id: scope
-      ? "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
-      : "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    // One row per scope, each with its own id: the whole workspace, the fixture
+    // project, or a team a test created, told apart by its id's first group.
+    id:
+      scope === null
+        ? "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+        : scope === projectId
+          ? "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+          : `cccccccc-cccc-4ccc-8ccc-${scope.slice(0, 8)}cccc`,
     templateId: projectAutomation.templateId,
     status: "draft",
     runInput: undefined,
@@ -702,7 +714,9 @@ const proPlan = {
   price: { amount: 1000, currency: "usd", interval: "month" },
 } satisfies Platform["PurchasablePlan"];
 function listedPlans(): Platform["PurchasablePlan"][] {
-  // An unstated price is absent from the answer, as the contract has it.
+  // A platform with no Pro row lists Plus alone (build 10); an unstated price
+  // is absent from the answer, as the contract has it.
+  if (state.proUnlisted) return [plusPlan];
   return [
     state.proPriceUnstated ? { ...proPlan, price: undefined } : proPlan,
     plusPlan,
@@ -893,6 +907,14 @@ const server = createServer(
       // Backend ADR-0031: a plan whose price the provider cannot state.
       "/__fixture/plan-price-unstated": () => {
         state.proPriceUnstated = true;
+      },
+      // A platform listing no Pro at all (build 10): the website draws one.
+      "/__fixture/plan-pro-unlisted": () => {
+        state.proUnlisted = true;
+      },
+      // A catalog with no flow to add (build 10).
+      "/__fixture/catalog-empty": () => {
+        state.catalogEmpty = true;
       },
       // FR-14: every completed file collected, so a run named one is refused
       // with `artifact_unavailable`, as a file that is gone is.
@@ -2191,9 +2213,14 @@ const server = createServer(
       };
       if (body.templateId === projectAutomation.templateId) {
         // One live subscription per template and scope; a project the person
-        // cannot see is 404, as the catalog answers it.
+        // cannot see is 404, as the catalog answers it. The fixture project
+        // and the teams a test created are the ones there are.
         const scope = body.projectId ?? null;
-        if (scope !== null && scope !== projectId) {
+        if (
+          scope !== null &&
+          scope !== projectId &&
+          !createdIn(workspaceId).some((team) => team.id === scope)
+        ) {
           return respond(response, 404, problem(404, "Not Found"));
         }
         if (state.projectAutomationScopes.includes(scope)) {
@@ -2436,10 +2463,11 @@ const server = createServer(
       if (method === "POST" && operation === "/checkout") {
         state.checkoutAttempts += 1;
         const body = (await requestJson(request)) as { planId?: string };
-        const plan = [plusPlan, proPlan].find(
+        const plan = listedPlans().find(
           (candidate) => candidate.planId === body.planId,
         );
-        // The Edge answers 404 for a plan that is not purchasable.
+        // The Edge answers 404 for a plan that is not purchasable — one it
+        // does not list.
         if (!plan) {
           return respond(
             response,

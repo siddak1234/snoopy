@@ -1525,3 +1525,74 @@ Proved red by hand, each file restored by SHA-256:
 
 F78 to F83 are new, and no number is reused. Build 9's proofs ran in Chromium, each test alone,
 against the fixture.
+
+### The owner's build 10 decisions — 2026-10-03
+
+Build 10 gave nine decisions (backend BUILD-PLAN 24.13), and build 11 one shared wording that
+the backend, the app and this website use word for word. Three reach this website:
+
+- D2 — Billing: compact cards at their natural height — name, price, the status line — and Pro
+  drawn at "$10.00 per month" until its price exists at the provider, not tappable; a Pro the
+  platform lists replaces the drawn one;
+- D4 — Teams: a flow is added to a team, in both clients, with no whole-workspace choice; with no
+  team yet an owner or admin reads "Create a team first." and a plain member "An owner or admin
+  creates the first team."; the flows added to the whole workspace before stay, labelled; the
+  platform is unchanged;
+- D6 — Flows: the website's catalog with nothing to add is the whole-page empty screen, "No flows
+  to add yet" / "More are on the way."
+
+This repository's half:
+
+- **Compact cards, and Pro drawn** (D2). A plan's card is as tall as its name, its price and
+  whatever its status adds: the minimum height and the bottom-pinned status went
+  (`app/account/billing/BillingPanel.tsx`), and a card is not stretched to the tallest in its
+  row. Pro is drawn last, at "$10.00 per month", while no listed plan is named Pro — by the
+  name a person reads, since a plan's id is the platform's to choose and the fixture's Pro
+  (`fixture-pro`) is not production's — with no control at all: a checkout for it would be
+  refused (the Edge answers 404 for a plan it does not list) and the portal has no Pro to change
+  to, so it opens neither door, paying or not. The platform's Pro, once listed, takes its place
+  and can be bought. The order stays Free, Plus, Pro.
+- **A team when adding** (D4). Add offers the teams the flow is not in yet, and no whole
+  workspace (`app/account/flows/page.tsx`, `app/account/flows/AddAutomation.tsx`); the team is
+  sent every time, and an Add that names none is refused before any call with the shared
+  wording's "Pick a team." (`app/account/flows/actions.ts`). With no open team in the workspace
+  nothing can be added, and the card says so in the app's words: an owner or admin reads
+  "Create a team first." with a Create a team link to Teams, where Create a team is; a plain
+  member, whom the platform would refuse, reads "An owner or admin creates the first team." —
+  the role is the workspace list's (F8). Neither is offered Add, and nothing is sent. A flow in
+  every team shows its rows and nothing to add, as before. A flow added to the whole workspace
+  before stays listed, labelled "Whole workspace" — the platform still accepts the scope, and
+  this website never sends it again.
+- **No flows to add yet** (D6). The catalog with nothing in it is the whole-page empty screen
+  — `EmptyRow` with its title, the flow icon and one line, "More are on the way." — in place of
+  the one-line section row; `test/structure-contract.test.mjs` lists Flows with Teams, Activity
+  and Approvals.
+- **The fixture** (`e2e/fixtures/public-edge.ts`) can list no Pro (`plan-pro-unlisted`), and a
+  checkout for a plan it does not list is 404, as the Edge answers; can answer an empty catalog
+  (`catalog-empty`); and accepts a flow added to a team a test created, each team's row with its
+  own id. The no-team cases use the control that was there, `org-without-projects`.
+- **Tests flipped to the decided behaviour, and said so here**: the F21 browser test ("a card
+  lists each subscription under its team …") no longer expects "Whole workspace" among the
+  options and makes a second team so there is a choice; "subscription refusals render only the
+  two documented entitlement states" makes that second team first, since the plan-limit flow is
+  already in the fixture's one team and had nowhere left to be added — it went red in the full
+  run before this; the F70 surfaces test reads Add with nothing to choose, where it read a
+  two-option list; the automation contract test's `projectId ? { projectId } : {}` is now the
+  body that always carries the team.
+- **Not here.** D1, D3, D5, D7, D8 and D9 are the app's; the platform's Pro row (A1) and device
+  push (A2) are the platform's.
+
+Proved red by hand, each file restored by SHA-256:
+
+| Guard | Broken by | Red |
+| --- | --- | --- |
+| Pro is drawn only while the platform lists none | the platform's Pro never looked for, so a second Pro drawn beside it | the billing test "Pro is drawn at the owner's price …"; "three cards side by side …" (four cards) |
+| The drawn Pro opens no door | a Choose plan button on the drawn card | "a platform listing no Pro: Pro is drawn last …" |
+| No whole workspace to add to | the entry put back first in the offer | "a card lists each subscription under its team …" (a list to choose from where there was one team); the surfaces test "every automation control on a page whose workspace another tab switched away …" (Add read "Pick a team.", not the workspace line); the automation test "a flow is added to a team …" |
+| No team yet is said, not nothing | `return null` with no team | "with no team yet, no flow can be added …"; the automation test "a flow is added to a team …" |
+| A plain member reads who makes the first team | the owner's line for everyone | "with no team yet, no flow can be added …" (the member's half) |
+| The team is sent every time | the body sent without it when empty, and no refusal | the automation tests "a flow is added to a team …" and "a card lists every subscription it has …" |
+| An empty catalog is the whole-page empty screen | the one-line row put back | "a catalog with nothing to add is the app's empty screen …"; the structure test "a whole page with nothing on it …" |
+
+No new finding number: F83 stays the last. Build 10's proofs ran in Chromium, each guard's tests
+alone, against the fixture.

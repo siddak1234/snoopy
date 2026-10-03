@@ -23,8 +23,13 @@ import {
  * Three cards, side by side (the owner, build 9): Free, then the platform's
  * plans by price — each its name and its price, nothing more. Free is not on
  * the platform's list (a plan with no provider price is left off it), so its
- * card is drawn here, at no cost. The workspace's own plan, from its billing
- * state, says Enrolled, with its status and when it renews or ends.
+ * card is drawn here, at no cost. So is Pro, until the platform lists it (the
+ * owner, build 10): at the price the owner set, with no way to buy it — the
+ * platform has nothing to sell under that name until its price exists — and
+ * replaced by the platform's Pro once listed. Each card is its natural height
+ * (build 10): name, price, the status line, no stretching. The workspace's own
+ * plan, from its billing state, says Enrolled, with its status and when it
+ * renews or ends.
  *
  * Buying and changing are different doors (ADR-0025 §1). A workspace with no
  * live subscription buys the plan it picks through checkout; one with a live
@@ -37,6 +42,12 @@ import {
 const FREE_PRICE = { amount: 0, currency: "usd", interval: "month" } as const;
 // The Free card's control: never a plan id, which the platform's list holds.
 const FREE_CARD = "free-card";
+// Pro, before the platform lists it: the owner's price (build 10), said as the
+// formatter says every price. Drawn only while no listed plan is named Pro —
+// the platform's own Pro, under any id, takes its place — and never a door to
+// checkout or the portal, which have no Pro to offer yet.
+const PRO_NAME = "Pro";
+const PRO_PRICE = { amount: 1000, currency: "usd", interval: "month" } as const;
 
 /** A plan's place among the cards: by price, one the provider left unstated last. */
 function priceOrder(plan: PurchasablePlan): number {
@@ -52,14 +63,15 @@ function PlanCard({
   price: string;
   children?: ReactNode;
 }) {
+  // Compact (the owner, build 10): the card is as tall as its name, its price
+  // and whatever its status adds — no minimum height, nothing pushed to the
+  // bottom.
   return (
-    <li className="bubble flex min-h-56 flex-col gap-2 p-6">
+    <li className="bubble flex flex-col gap-1 p-4">
       <p className="text-lg font-medium text-[var(--text)]">{name}</p>
       <p className="text-2xl font-semibold text-[var(--text)]">{price}</p>
       {children ? (
-        <div className="mt-auto flex flex-col items-start gap-3 pt-4">
-          {children}
-        </div>
+        <div className="flex flex-col items-start gap-3 pt-3">{children}</div>
       ) : null}
     </li>
   );
@@ -117,6 +129,10 @@ export function BillingPanel({
   // The free floor reports no status; a plan whose access ended leaves the
   // workspace on Free too.
   const onFree = billing.status === undefined || accessEnded;
+  // Whether the platform lists a Pro of its own, by the name a person reads:
+  // its id is the platform's to choose, and the fixture's differs from
+  // production's.
+  const proListed = plans.some((plan) => plan.displayName === PRO_NAME);
 
   const navigate = (
     action: string,
@@ -191,7 +207,9 @@ export function BillingPanel({
             : "This workspace has no billing account yet, and no plan can be bought right now."}
         </p>
       ) : null}
-      <ul className="grid gap-4 md:grid-cols-3">
+      {/* Side by side, each at its own height: a card is not stretched to
+          the tallest in its row. */}
+      <ul className="grid gap-4 md:grid-cols-3 md:items-start">
         <PlanCard name="Free" price={formatPlanPrice(FREE_PRICE) ?? ""}>
           {onFree ? (
             enrolled(false)
@@ -247,6 +265,12 @@ export function BillingPanel({
               </PlanCard>
             );
           })}
+        {/* Pro, last — the dearest — while the platform has none to sell: its
+            name and the owner's price, and no control, since a checkout for it
+            would be refused and the portal cannot change to it. */}
+        {proListed ? null : (
+          <PlanCard name={PRO_NAME} price={formatPlanPrice(PRO_PRICE) ?? ""} />
+        )}
       </ul>
       {plans.length === 0 ? (
         <p className="text-sm text-[var(--muted)]">
