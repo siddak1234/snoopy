@@ -41,8 +41,9 @@ test.beforeEach(async () => {
 });
 
 // A second team in the organization, made as a person makes one: a flow is
-// added to a team and nowhere else (the owner's build 10), so a flow already in
-// the fixture's one team has somewhere left to go only once there are two.
+// added to a team and nowhere else (the owner's build 10), so with two there is
+// a choice for a flow held nowhere — and a team left that a held flow is still
+// not offered (the owner's build 12, #9).
 async function createOperationsTeam(page: Page) {
   await page.goto("/account/teams");
   await page
@@ -215,10 +216,9 @@ test("a replacement named after the connection changed is refused as stale, and 
 test("subscription refusals render only the two documented entitlement states", async ({
   page,
 }) => {
-  // The plan-limit flow is already in the fixture's one team, so a second is
-  // where Add can still send it (the owner's build 10); the platform's refusal
-  // is the same whatever the team.
-  await createOperationsTeam(page);
+  // Neither flow is held anywhere, so Add sends each to the fixture's one team
+  // (the owner's build 10, and build 12's #9); the platform's refusal is the
+  // same whatever the team.
   await page.goto("/account/flows");
   const planLimitCard = page
     .getByRole("heading", { name: "Plan-limit automation" })
@@ -340,6 +340,10 @@ test("a live flow that declares no run input offers no Run; Archive flow is conf
   await expect(
     card.getByRole("button", { name: "Run", exact: true }),
   ).toHaveCount(0);
+  // Held, so its card says where, and offers no Add (the owner's build 12, #9).
+  const held = card.getByRole("link", { name: "Added · Whole workspace" });
+  await expect(held).toBeVisible();
+  await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Archived flows" }),
   ).toHaveCount(0);
@@ -348,8 +352,9 @@ test("a live flow that declares no run input offers no Run; Archive flow is conf
   const dialog = page.getByRole("dialog", {
     name: "Archive Archivable automation?",
   });
+  // It can be unarchived (the owner's build 12, #4).
   await expect(dialog).toContainText(
-    "It stops and moves to Archived flows. Its runs stay in Activity, and you can add it again later.",
+    "It stops and moves to Archived flows. Its runs stay in Activity, and you can unarchive it later.",
   );
   await expectNoAxeViolations(page);
   // Cancel changes nothing and hands focus back to the control that opened it.
@@ -363,7 +368,9 @@ test("a live flow that declares no run input offers no Run; Archive flow is conf
     .getByRole("button", { name: "Archive", exact: true })
     .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
+  // An archived flow holds nothing: Add is back, and "Added" is gone.
   await expect(card.getByRole("button", { name: "Add" })).toBeVisible();
+  await expect(held).toHaveCount(0);
   await expect(card.getByRole("button", { name: "Archive flow" })).toHaveCount(
     0,
   );
@@ -372,7 +379,7 @@ test("a live flow that declares no run input offers no Run; Archive flow is conf
   ).toBeVisible();
   await expect(
     page.getByText(
-      "An archived flow keeps its history here. Add it again any time.",
+      "An archived flow keeps its history here. Unarchive it any time.",
     ),
   ).toBeVisible();
   const archived = page
@@ -1280,24 +1287,33 @@ test("a danger button keeps AA contrast at rest, hovered and pressed: Archive fl
   await page.mouse.up();
 });
 
-test("a card lists each subscription under its team, and Add offers only the teams it is not in yet — never the whole workspace (register F21, the owner's build 10)", async ({
+test("a flow is held once per workspace: its card, whatever teams are left, offers no team and no Add and says where the flow is, going to it; a flow held nowhere is offered every team, never the whole workspace (the owner's build 12, #9; register F87, superseding F21's offer)", async ({
   page,
 }) => {
-  // A second team, so there is a choice to make: the fixture's general, and
-  // Operations.
+  // A second team, so a team is left that a held flow is not in: the
+  // fixture's general, and Operations.
   await createOperationsTeam(page);
 
   await page.goto("/account/flows");
-  // Already in the general team, as a draft: that row says where, and the only
-  // team left to add it to is Operations — so there is nothing to choose.
-  const planLimit = automationCard(page, "Plan-limit automation");
-  await expect(
-    planLimit.locator("p", { hasText: "Team: general" }),
-  ).toBeVisible();
-  await expect(planLimit.getByRole("combobox")).toHaveCount(0);
-  await expect(planLimit.getByRole("button", { name: "Add" })).toBeVisible();
+  // In the general team, as a draft: its row says where, and the card offers
+  // nothing — not Operations — but says where the flow is, going to its row.
+  const draft = automationCard(page, "Team draft automation");
+  await expect(draft.locator("p", { hasText: "Team: general" })).toBeVisible();
+  await expect(draft.getByRole("combobox")).toHaveCount(0);
+  await expect(draft.getByRole("button", { name: "Add" })).toHaveCount(0);
+  const held = draft.getByRole("link", { name: "Added · Team: general" });
+  await expect(held).toHaveAttribute(
+    "href",
+    "#flow-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  );
+  await expectNoAxeViolations(page);
+  await held.click();
+  await expect(page).toHaveURL(/#flow-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb$/u);
+  const row = page.locator("#flow-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+  await expect(row).toContainText("Team: general");
+  await expect(row.getByRole("button", { name: "Go live" })).toBeVisible();
 
-  // Added nowhere: both teams are offered, and the whole workspace is not.
+  // Held nowhere: both teams are offered, and the whole workspace is not.
   const card = automationCard(page, "Project automation");
   const where = card.getByRole("combobox", {
     name: "Where to add Project automation",
@@ -1306,22 +1322,94 @@ test("a card lists each subscription under its team, and Add offers only the tea
     "Team: general",
     "Team: Operations",
   ]);
+  await expect(card.getByRole("link", { name: /^Added · /u })).toHaveCount(0);
   await where.selectOption({ label: "Team: Operations" });
   await card.getByRole("button", { name: "Add" }).click();
+  // Added: its row says where, and the card now offers nothing — not the
+  // general team either — and says where the flow is.
   await expect(
     card.locator("p", { hasText: "Team: Operations" }),
   ).toBeVisible();
-  // What was chosen is gone from the offer; Add now means the one team left —
-  // the fixture answers 409 if Operations is sent again.
+  await expect(
+    card.getByRole("link", { name: "Added · Team: Operations" }),
+  ).toBeVisible();
   await expect(card.getByRole("combobox")).toHaveCount(0);
-  await card.getByRole("button", { name: "Add" }).click();
-  await expect(card.locator("p", { hasText: "Team: general" })).toBeVisible();
-  // In every team: nothing is left to add, and the workspace was never a place.
   await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
   await expect(card.locator("p", { hasText: "Whole workspace" })).toHaveCount(
     0,
   );
   await expect(card.getByRole("alert")).toHaveCount(0);
+});
+
+test("Add on a page drawn before another tab added that flow is refused in words, and no second copy is made — though the platform would still take another team (the owner's build 12, #9; register F87)", async ({
+  page,
+  context,
+}) => {
+  await createOperationsTeam(page);
+  await page.goto("/account/flows");
+  const card = automationCard(page, "Project automation");
+  const where = card.getByRole("combobox", {
+    name: "Where to add Project automation",
+  });
+  await expect(where.locator("option")).toHaveText([
+    "Team: general",
+    "Team: Operations",
+  ]);
+
+  // Another tab adds it to the general team.
+  const other = await context.newPage();
+  try {
+    await other.goto("/account/flows");
+    const there = automationCard(other, "Project automation");
+    await there
+      .getByRole("combobox", { name: "Where to add Project automation" })
+      .selectOption({ label: "Team: general" });
+    await there.getByRole("button", { name: "Add" }).click();
+    await expect(
+      there.getByRole("link", { name: "Added · Team: general" }),
+    ).toBeVisible();
+  } finally {
+    await other.close();
+  }
+
+  // This page still offers both teams, and the platform — one per team until
+  // its own guard lands — would take Operations.
+  await where.selectOption({ label: "Team: Operations" });
+  await card.getByRole("button", { name: "Add" }).click();
+  await expect(card.getByRole("alert")).toHaveText(
+    "This flow is already in this workspace.",
+  );
+
+  // Nothing was sent: read again, the flow is in the general team alone.
+  await page.reload();
+  await expect(card.locator("p", { hasText: "Team: general" })).toBeVisible();
+  await expect(card.locator("p", { hasText: "Team: Operations" })).toHaveCount(
+    0,
+  );
+  await expect(
+    card.getByRole("link", { name: "Added · Team: general" }),
+  ).toBeVisible();
+  await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
+});
+
+test("a flow held twice from before one flow per workspace keeps both copies listed, each under its place, and its card offers nothing more (the owner's build 12, #9; register F87)", async ({
+  page,
+}) => {
+  // As production's one duplicate: a team's copy and the whole workspace's.
+  // Nothing deletes or hides either; Operations, a team neither is in, is
+  // not offered.
+  await fixtureControl("flow-held-twice");
+  await createOperationsTeam(page);
+  await page.goto("/account/flows");
+  const card = automationCard(page, "Project automation");
+  await expect(card.locator("p", { hasText: "Team: general" })).toBeVisible();
+  await expect(card.locator("p", { hasText: "Whole workspace" })).toBeVisible();
+  await expect(card.getByRole("combobox")).toHaveCount(0);
+  await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
+  // The newer copy, listed first, is the one named.
+  await expect(card.getByRole("link", { name: /^Added · /u })).toHaveText(
+    "Added · Team: general",
+  );
 });
 
 test("with no team yet, no flow can be added: an owner or admin is told to create a team first, with the way to Teams, and a plain member who does (the owner's build 10)", async ({
@@ -1335,13 +1423,16 @@ test("with no team yet, no flow can be added: an owner or admin is told to creat
   await expect(create).toHaveAttribute("href", "/account/teams");
   await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
   await expect(card.getByRole("combobox")).toHaveCount(0);
-  // Every card says it, the ones already added to the whole workspace included:
-  // adding to a team is what needs one.
+  // A flow the workspace holds already says where it is instead: held, there
+  // is nothing to add, team or none (the owner's build 12, #9).
   const manual = automationCard(page, "Manual input automation");
   await expect(
     manual.locator("p", { hasText: "Whole workspace" }),
   ).toBeVisible();
-  await expect(manual.getByText("Create a team first.")).toBeVisible();
+  await expect(
+    manual.getByRole("link", { name: "Added · Whole workspace" }),
+  ).toBeVisible();
+  await expect(manual.getByText("Create a team first.")).toHaveCount(0);
   await expectNoAxeViolations(page);
   await create.click();
   await expect(page).toHaveURL(/\/account\/teams$/);

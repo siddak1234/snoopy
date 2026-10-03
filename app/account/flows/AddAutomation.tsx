@@ -11,8 +11,11 @@ export type AddScope = { projectId: string; label: string };
 /**
  * Add an automation to a team, so that only the people who can see that team
  * see it (backend 18.6.2). A flow is added to a team and nowhere else (the
- * owner, build 10): only the teams this automation is not already in are
- * offered, and with just one to choose it is the single "Add" it always was.
+ * owner, build 10), and a workspace holds it once (the owner, build 12's #9):
+ * the card draws this only while the flow is held nowhere, so every open team
+ * is offered, and with just one to choose it is the single "Add" it always
+ * was. A held flow's card says where it is instead, and the action refuses a
+ * second copy that a page drawn earlier would still send.
  *
  * With no team in the workspace yet, nothing can be added, and the card says so
  * in the app's words: an owner or admin is told to create a team first, with the
@@ -36,7 +39,7 @@ export function AddAutomation({
   name: string;
   available: boolean;
   scopes: AddScope[];
-  /** Whether the workspace has an open team at all — the scopes offered are the ones left. */
+  /** Whether the workspace has an open team at all — each one is offered. */
   hasTeam: boolean;
   /** Owner or admin, from the workspace list: who may create the first team. */
   canAdminister: boolean;
@@ -79,13 +82,8 @@ export function AddAutomation({
     );
   }
 
-  // In every team already: each row above says where, and nothing is left to
-  // add.
-  if (scopes.length === 0) return null;
-
-  // What was chosen, while it is still on offer. The page re-renders after an
-  // Add with that scope gone, and this state outlives the render: sending it
-  // again would add the automation where it already is.
+  // What was chosen, while it is still on offer: this state outlives a
+  // re-render, and a team archived since is no longer one to send.
   const scope = scopes.some((option) => option.projectId === chosen)
     ? chosen
     : (scopes[0]?.projectId ?? "");

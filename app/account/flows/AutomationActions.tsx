@@ -21,11 +21,12 @@ import { RunInputFields, SetupFields } from "./ManifestFields";
 
 /**
  * The buttons for one subscription on a flow's card — adding is
- * `AddAutomation`'s, since one flow can be added once per team. Archive flow
- * archives it: it stops, keeps its runs in Activity, and is listed under
- * Archived flows (BUILD-PLAN 24.11.11; the owner's word, build 9, in the app's
- * words). It ends the flow, so it is red, and so is its confirm; Pause is not,
- * since Resume undoes it (the owner's build 12, #5).
+ * `AddAutomation`'s, and a workspace holds each flow once (the owner's build
+ * 12, #9). Archive flow archives it: it stops, keeps its runs in Activity, and
+ * is listed under Archived flows, to be unarchived later (BUILD-PLAN 24.11.11;
+ * the owner's word, build 9, and build 12's #4, in the app's words). It ends
+ * the flow, so it is red, and so is its confirm; Pause is not, since Resume
+ * undoes it (the owner's build 12, #5).
  *
  * A client component only because it holds pending state and the last refusal.
  * The work happens in server actions, so nothing here knows the backend origin
@@ -373,7 +374,7 @@ export function AutomationActions({
             className="mt-1 text-sm text-[var(--muted)]"
           >
             It stops and moves to Archived flows. Its runs stay in Activity, and
-            you can add it again later.
+            you can unarchive it later.
           </p>
           <FormError message={error} />
           <div className="mt-6 flex flex-wrap gap-2">

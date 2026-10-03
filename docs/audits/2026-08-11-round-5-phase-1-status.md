@@ -650,7 +650,7 @@ Each names the evidence a backend session can re-run.
 - **F6** `verify:platform-contracts` rewrites the generated files in place and does not restore on "stale". **F7** the generated files carry no source sha (the cell records it by hand).
 - **F8** Connections and Settings → Export have no UI role gate (the server enforces). **F9** action files interpolate the server-resolved workspace id without `encodeURIComponent` (the facades do).
 - **F13** `.claude/launch.json` references a nonexistent `npm run db:studio`. **F15** `scripts/audit/run-gates.mjs` omits `format:check` and `verify:platform-contracts` (both in `npm run verify`). **F16** the `browser` CI job is not a required check. **F17** local Node 24 vs the pinned 22 (`.nvmrc` added in #15).
-- **F18** the web had no handling for the contract's `archived` subscription status (now treated as absent, #14). **F21** ~~`app/account/automations/page.tsx`~~ `byTemplate` is keyed by `templateId`, last-wins over a `created_at DESC` list — with project-scoped subscriptions the oldest hides the newer. **F22** `AutomationSetupField.notifies` renders the raw wire token (`run-succeeded`, `approval-expiring`, …).
+- **F18** the web had no handling for the contract's `archived` subscription status (now treated as absent, #14). **F21** ~~`app/account/automations/page.tsx`~~ `byTemplate` is keyed by `templateId`, last-wins over a `created_at DESC` list — with project-scoped subscriptions the oldest hides the newer (its fix's offer of the teams a flow is not in yet is superseded by **F87**). **F22** `AutomationSetupField.notifies` renders the raw wire token (`run-succeeded`, `approval-expiring`, …).
 - **F24** `scripts/verify.mjs` duplicates `run-gates.mjs`'s preflight, lock and rewrite assertion (~70 lines); a shared `scripts/audit/preflight.mjs` would end it — touching the audit machinery was outside 20.4.1. **F25** `run-gates.mjs` itself acquires its lock non-atomically and treats an empty lock as pid 0 (`process.kill(0, 0)` signals its own group) — `verify.mjs` does neither.
 - **F26** The app has no `error.tsx` boundary at any level; a rethrown platform failure renders Next's default error page.
 - **F27** Pages call `getAppSession` → `listWorkspaces` → `resolveActiveWorkspaceId` sequentially, and the account layout already made the same calls (`cache: "no-store"`) — up to three extra round trips per render.
@@ -748,7 +748,7 @@ the sha256 of the contract it came from.
 | 22.3.2 | F9 | Every write goes through a facade in `lib/*`, which encodes each id; the action files build no `/v1/` path | the contract tests of the automation, billing, connections and export modules |
 | 22.3.3 | F8 | Connect, Reconnect, Replace account, Disconnect and Export are offered to an owner or admin only; a member is told who can | `test/tenancy-contract.test.mjs`; e2e "a member is offered no control the platform would refuse them" |
 | 22.3.4 | F2 | A finished deletion lands on `/account-deleted` | e2e "a clean account deletion signs out and leaves" |
-| 22.3.5 | F21 | A card lists each subscription under its scope; Add offers only the scopes the automation is not in yet, and falls back to one still offered after a re-render | `test/automation-contract.test.mjs`; e2e "a card lists each subscription under its scope …" (the fixture answers 409 if a used scope is sent again) |
+| 22.3.5 | F21 | A card lists each subscription under its scope; Add offers only the scopes the automation is not in yet, and falls back to one still offered after a re-render. **Superseded by F87** (the owner's build 12, #9): the listing stays; a flow held anywhere in the workspace is offered no team | `test/automation-contract.test.mjs`; e2e "a card lists each subscription under its scope …" (the fixture answers 409 if a used scope is sent again) — since F87, "a flow is held once per workspace: its card …" and "a flow held twice from before …" |
 | 22.3.6 | F22 | A notifications switch says in words what it switches | `test/automation-contract.test.mjs`; e2e (the set-up dialog) |
 | 22.3.7 | F40, F41 | One rule for a session that ends while a page is open (`sessionEnded`): the deletion dialog and the linked-accounts section say so and give the way back in; a problem's `title` is shown only when it is a non-empty string | e2e "a session that ended while the settings page was open …"; `test/structure-contract.test.mjs` |
 | 22.3.8 | F46, F47 | A refusal is explained in words, not the Edge's title; a 409 clears the memory of a lost answer | `test/account-deletion-contract.test.mjs`; e2e "a refusal says in words …" |
@@ -1720,3 +1720,76 @@ The session test's three breaks were run here, each read red from the test runne
 each file restored by SHA-256, and the working tree's hashes matched after the last. The browser
 test is read red the same way in CI's Playwright image — in Chromium, alone, against the fixture
 — before the push. F86 is the last number.
+
+### Build 12's #4 and #9 — Unarchive, and one flow per workspace — 2026-10-03
+
+The owner on build 12 (2026-10-03): #4 (15:45Z), "Rather than add it again what if we say
+unarchive"; #9 (16:05Z), "Why do i have two of the same automations across teams. Teams cannot
+have the same flows. One flow per account type. Personal or org not multiple of the same in account
+type. This is a bug". Decided the same day, with no platform change in this build: #4 is a rename —
+unarchiving is still adding the flow afresh, as the old words did, and the platform's archive
+stays one-way (backend §12.1 #92); #9 is one copy of a flow per workspace — Personal is one, each
+organization one — enforced by the clients now and by the platform's own guard later. A flow is
+held while a subscription of it is not archived, in any team or the whole workspace. A duplicate
+from before (production has one, the owner's own) still displays: nothing deletes or hides it. The
+app's half is `snoopy-mobile`'s. This repository's half is **F87**:
+
+- **Unarchive** (#4). The archive's confirm ends "and you can unarchive it later."
+  (`app/account/flows/AutomationActions.tsx`), and the Archived flows note reads "An archived flow
+  keeps its history here. Unarchive it any time." (`app/account/flows/page.tsx`). Nothing else
+  moves: an archived row has no control of its own on this website, and a flow is unarchived —
+  added afresh — through its card's Add, as before.
+- **Held once per workspace** (#9). `lib/held-flow.ts`'s `heldCopy` says, once for the page and
+  for the Add action, which copy holds a flow: the first listed that is not archived — the newest,
+  as the platform lists — in any team or the whole workspace. A held flow's card draws no Add and
+  no team, whatever teams are left or whether there is one — not Create a team first either — and
+  says where the flow is: "Added · Team: {kind}" or "Added · Whole workspace", the app's Added with
+  its team, a link to the flow's own row on the card (`#flow-{id}`), where its controls are. A flow
+  held nowhere is offered every open team, and never the whole workspace (D4).
+- **A second copy is refused before anything is sent** (#9). The platform still takes one per team
+  (backend 18.6.2) until its guard lands, so the Add action, after the workspace check, reads the
+  workspace's subscriptions and, when the flow is held, answers "This flow is already in this
+  workspace." without calling the platform (`app/account/flows/actions.ts`): a page drawn before
+  another tab or person added it. It reads what the person may see; a copy in a team hidden from
+  them is left to the platform's guard.
+- **F21 superseded.** Its listing stays — a card lists every subscription it has, so a duplicate
+  from before is listed, never hidden. Its offer — the teams a flow is not in yet — went.
+- **The fixture** (`e2e/fixtures/public-edge.ts`). The draft held in its team moves to a card of
+  its own, "Team draft automation", so the plan-limit and entitlements automations are held nowhere
+  and their Add still reaches the platform's refusals; `flow-held-twice` lists the project
+  automation in its team and the whole workspace, as production's duplicate is. It still takes a
+  second team, as the platform does, so only the action's refusal stops one.
+- **Tests flipped to the decided behaviour, and said so here**: the F21 browser test is now "a flow
+  is held once per workspace: its card …", with "Add on a page drawn before another tab added that
+  flow …" and "a flow held twice from before …" beside it; "subscription refusals render only the
+  two documented entitlement states" makes no second team now; "with no team yet, no flow can be
+  added …" reads Manual input automation, held in the whole workspace, as "Added · Whole
+  workspace" where it read Create a team first; "a live flow that declares no run input …" reads
+  the new words, and "Added" there until the flow is archived; the surfaces test 15 reads the draft
+  on its new card. The automation contract tests read the new words and the offer of every open
+  team, and three are new: the words of #4 with no source file saying the old ones, `heldCopy`
+  run on lists, and the card and the action.
+- **Not here.** The app's half; the platform's guard — one per workspace in the database, and a
+  409 that names it — and its records. An Unarchive control on an archived row is not built: #4 is
+  the word.
+
+Proved red by hand, each file restored by SHA-256:
+
+| Guard | Broken by | Red |
+| --- | --- | --- |
+| The archive's confirm says unarchive | the old words put back | the automation tests "archiving is its own confirmed action …" and "an archived flow is unarchived in every word …"; "a live flow that declares no run input offers no Run; Archive flow is confirmed …" |
+| The Archived flows note says unarchive | the old note put back | the automation test "an archived flow is unarchived in every word …"; "a live flow that declares no run input …" |
+| An archived copy holds nothing | `heldCopy` counting archived copies | the automation test "a flow is held once per workspace: by a copy that is not archived …" — no browser test: the list a page reads holds no archived row |
+| A copy holds whatever its status but archived | only a live copy counted | the same; "a flow is held once per workspace: its card …" (the draft is offered Add) |
+| A copy holds in any team | only a whole-workspace copy counted | the same two |
+| A held card offers no team and no Add, and says where | the card never asking what is held | the automation test "a held flow's card offers no team …"; "a flow is held once per workspace: its card …" |
+| Held, it says where with no team as well | Add drawn while there is no team | the automation test "a held flow's card …"; "with no team yet, no flow can be added …" |
+| "Added" goes to the flow's own row | the row's id dropped | the automation test "a held flow's card …"; "a flow is held once per workspace: its card …" |
+| Add refuses a second copy before anything is sent | the check dropped | the automation test "a held flow's card …"; "Add on a page drawn before another tab added that flow …" |
+| A duplicate from before is listed, never hidden | the first copy listed only | the automation test "a card lists every subscription it has …"; "a flow held twice from before …" |
+
+The automation test's ten breaks were run here, each read red from the test runner's own events,
+each file restored by SHA-256, and the working tree's hashes matched after the last; each browser
+break was type-checked too, so the site still builds with it. The browser tests named are read red
+the same way in CI's Playwright image — in Chromium, each guard's test alone, against the fixture —
+before the push. F87 is the last number.

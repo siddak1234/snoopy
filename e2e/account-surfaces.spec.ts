@@ -847,7 +847,8 @@ test("15 — an unmet connection links to Connections, and Go live waits for it"
 }) => {
   await fixtureControl("draft-needs-connection");
   await page.goto("/account/flows");
-  const card = automationCard(page, "Plan-limit automation");
+  // The fixture's draft, held in its team (the owner's build 12, #9).
+  const card = automationCard(page, "Team draft automation");
   const connect = card.getByRole("link", { name: "Connect fixture-oauth" });
   await expect(connect).toHaveAttribute("href", "/account/connections");
   await expect(card.getByRole("button", { name: "Go live" })).toBeDisabled();

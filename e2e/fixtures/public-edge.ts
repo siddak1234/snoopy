@@ -459,6 +459,15 @@ const archivableAutomation = automation(
 // project-scoped subscription is created on (backend 18.6.2).
 const projectAutomation = automation("fixture-projects", "Project automation");
 
+// Already in the fixture project, as a draft (`projectDraftSubscription`):
+// held, its card offers no team, a second one included (the owner's build 12,
+// #9). The plan-limit and entitlements automations are held nowhere, so their
+// Add reaches the platform's refusals.
+const teamDraftAutomation = {
+  ...automation("fixture-team-draft", "Team draft automation"),
+  subscribed: true,
+} satisfies Automations["AutomationCatalogEntry"];
+
 // Started by a vendor's webhook, and the catalog's newest is v2 while the
 // subscription still pins v1: the card offers Move (backend §12.1 #126) and,
 // to an owner or admin, the webhook address (§12.1 #91).
@@ -497,6 +506,7 @@ function fixtureCatalog(): Automations["AutomationCatalogResponse"] {
         ...projectAutomation,
         subscribed: state.projectAutomationScopes.length > 0,
       },
+      teamDraftAutomation,
     ],
     categories: ["All", "Operations"],
   };
@@ -561,13 +571,13 @@ const archivableSubscription = {
   runInput: undefined,
 } satisfies Automations["Subscription"];
 
-// The plan-limit automation, already added to the fixture project and still a
-// draft: its card lists this row under the project and offers Add for the
-// whole workspace only (register F21).
+// The team draft automation, already added to the fixture project and still a
+// draft: its card lists this row under the project and, the flow held, offers
+// no team (register F21; the owner's build 12, #9).
 const projectDraftSubscription = {
   ...manualSubscription,
   id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-  templateId: "fixture-plan-limit",
+  templateId: teamDraftAutomation.templateId,
   status: "draft",
   runInput: undefined,
   projectId,
@@ -885,6 +895,12 @@ const server = createServer(
       },
       "/__fixture/draft-needs-connection": () => {
         state.draftNeedsConnection = true;
+      },
+      // The project automation held twice, as production's one duplicate from
+      // before one flow per workspace is (the owner's build 12, #9): in the
+      // fixture project, listed first as the newer, and the whole workspace.
+      "/__fixture/flow-held-twice": () => {
+        state.projectAutomationScopes = [projectId, null];
       },
       "/__fixture/member-owns-project": () => {
         state.memberOwnsProject = true;
