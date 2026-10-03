@@ -58,12 +58,30 @@ const nextConfig: NextConfig = {
       { source: "/dashboard", destination: "/account", permanent: false },
       // Saved-workflow deep links into the old public builder. The canvas was
       // removed with the account area's builder (`415e57a`), so a saved link
-      // lands on the automations it could have started (register F53).
+      // lands on the flows it could have started (register F53).
       {
         source: "/automation-builder",
         has: [{ type: "query", key: "id" }],
-        destination: "/account/automations",
+        destination: "/account/flows",
         permanent: false,
+      },
+      // 2026-10 BUILD-PLAN 24.11.11: Automations became Flows, and Projects
+      // became Teams (a team is a project in the platform's contract). A saved
+      // link lands on the same place under its new name.
+      {
+        source: "/account/automations",
+        destination: "/account/flows",
+        permanent: true,
+      },
+      {
+        source: "/account/projects",
+        destination: "/account/teams",
+        permanent: true,
+      },
+      {
+        source: "/account/projects/:id",
+        destination: "/account/teams/:id",
+        permanent: true,
       },
     ];
   },

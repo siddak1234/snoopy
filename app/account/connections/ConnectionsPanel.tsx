@@ -233,8 +233,7 @@ export function ConnectionsPanel({
                     set up, not running — so the label says "live" to match. */}
                 <p className="mt-1 text-sm text-[var(--muted)]">
                   {connection.providerId} · Used by {connection.usedByCount}{" "}
-                  live{" "}
-                  {connection.usedByCount === 1 ? "automation" : "automations"}
+                  live {connection.usedByCount === 1 ? "flow" : "flows"}
                 </p>
                 {connection.errorCode ? (
                   <p className="mt-1 text-xs text-[var(--warning-text)]">
@@ -353,9 +352,9 @@ export function ConnectionsPanel({
             You will sign in to{" "}
             {providerNamed.get(replacing.providerId)?.displayName ??
               replacing.providerId}{" "}
-            with the account every automation that uses this connection should
-            act as from now on. {replacing.externalAccount.displayName} stays
-            connected until that sign-in completes.
+            with the account every flow that uses this connection should act as
+            from now on. {replacing.externalAccount.displayName} stays connected
+            until that sign-in completes.
           </p>
           <FormError message={replaceError} className="mt-3" />
           <div className="mt-6 flex flex-wrap gap-2">

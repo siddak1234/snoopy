@@ -29,13 +29,12 @@ const authenticatedRoutes: ReadonlyArray<{
 }> = [
   { path: "/account" },
   { path: "/account/approvals" },
-  { path: "/account/automations" },
+  { path: "/account/flows" },
   { path: "/account/billing" },
   { path: "/account/connections" },
   { path: "/account/organization" },
-  { path: "/account/projects" },
   {
-    path: "/account/projects/33333333-3333-4333-8333-333333333333",
+    path: "/account/teams/33333333-3333-4333-8333-333333333333",
     fixture: {},
   },
   { path: "/account/runs" },
@@ -43,7 +42,6 @@ const authenticatedRoutes: ReadonlyArray<{
   { path: "/account/settings" },
   { path: "/account/support" },
   { path: "/account/teams" },
-  { path: "/account/teams/abababab-abab-4bab-8bab-abababababab", fixture: {} },
   { path: "/onboarding/setup-org", fixture: { session: "requester" } },
   {
     path: "/onboarding/join-org?w=11111111-1111-4111-8111-111111111111",

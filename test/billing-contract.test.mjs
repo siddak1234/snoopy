@@ -141,8 +141,10 @@ test("the two hosted hand-offs use the generated types and send only what the Ed
     /url\.protocol !== "https:"/u,
     "a hosted session is navigated to only when it is an https URL",
   );
-  // Only the portal documents a 409 (no billing account yet → checkout). The
-  // rule lives in the portal's handler; nothing before it maps a conflict.
+  // The portal's 409 is "no billing account yet" → checkout. Checkout's one
+  // conflict is a workspace that already has a plan (backend 24.12,
+  // `plan_exists`): it opens the portal, where a plan is changed (build 10).
+  // Nothing else is mapped as a conflict.
   const portalAt = actions.indexOf("export async function openBillingPortal");
   assert.ok(portalAt > 0, "openBillingPortal not found; this test is blind");
   assert.match(
@@ -150,10 +152,21 @@ test("the two hosted hand-offs use the generated types and send only what the Ed
     /error\.status === 409\) \{\s*return \{ ok: false, error: error\.message, needsCheckout: true \}/u,
     "the portal's 409 must send the person to checkout",
   );
+  const checkout = actions.slice(0, portalAt);
+  assert.match(
+    checkout,
+    /error instanceof PlatformServerError &&\s*error\.status === 409 &&\s*error\.details\?\.reason === "plan_exists"\s*\) \{\s*return openBillingPortal\(shownWorkspaceId\);\s*\}\s*return failure\(error\);/u,
+    "a checkout refused for a plan the workspace has opens Manage billing",
+  );
+  assert.equal(
+    (checkout.match(/409/gu) ?? []).length,
+    1,
+    "checkout maps one conflict, plan_exists, and no other",
+  );
   assert.doesNotMatch(
-    actions.slice(0, portalAt),
-    /409|needsCheckout: true/u,
-    "checkout's failures are shown as they are, never as 'no billing account yet'",
+    checkout,
+    /needsCheckout: true/u,
+    "checkout's failures are never 'no billing account yet'",
   );
 });
 
@@ -201,12 +214,16 @@ test("checkout is offered only when the provider holds no subscription, and an e
   );
   // Checkout starts a NEW subscription: only the free floor (no status) or a
   // canceled one may use it. `unpaid` and `incomplete` are subscriptions the
-  // provider still holds — paid, changed or cancelled in the portal.
+  // provider still holds — paid, changed or cancelled in the portal, where a
+  // card picked then goes (the owner, build 9).
   assert.match(
     panel,
     /const portalManaged =\s*billing\.status !== undefined && billing\.status !== "canceled";/u,
   );
-  assert.match(panel, /\) : portalManaged \? null : \(/u);
+  assert.match(
+    panel,
+    /portalManaged\s*\? navigate\(plan\.planId, \(\) =>\s*openBillingPortal\(workspaceId\),\s*\)\s*: navigate\(plan\.planId, \(\) =>\s*beginBillingCheckout\(workspaceId, plan\.planId\),\s*\)/u,
+  );
   assert.equal(
     (panel.match(/beginBillingCheckout\(/gu) ?? []).length,
     1,
@@ -346,16 +363,46 @@ test("a plan's price is the provider's minor units, divided by that currency's s
   );
 });
 
-test("every capability the panel shows has words, and an unlabelled key is not printed", () => {
-  // The card read "workspace.rate 120" — a key, not a sentence (§12.1 #163).
-  assert.match(panel, /"automation\.subscribe": "Automations"/);
-  assert.match(panel, /"workspace\.rate": "Requests per minute"/);
-  assert.match(panel, /Object\.hasOwn\(capabilityCopy, capability\)/);
-  assert.doesNotMatch(
+test("a plan card is its name and its price, and prints no capability (the owner, build 9)", () => {
+  // The card once read "workspace.rate 120" (§12.1 #163); now it reads no
+  // capability at all.
+  assert.doesNotMatch(panel, /capabilit/iu);
+  assert.match(
     panel,
-    /capabilityCopy\[capability\] \?\? capability/u,
-    "an unknown key must not fall back to printing itself",
+    /<PlanCard\s+key=\{plan\.planId\}\s+name=\{plan\.displayName\}/u,
   );
+});
+
+test("three cards: Free, drawn here at no cost and Enrolled on the free floor, then the platform's plans by price (the owner, build 9)", () => {
+  // The platform lists only what can be bought, by id — Pro before Plus — so
+  // the order is the website's: by price, an unstated one last.
+  assert.match(
+    panel,
+    /const FREE_PRICE = \{ amount: 0, currency: "usd", interval: "month" \} as const;/u,
+  );
+  assert.equal(
+    formatPlanPrice({ amount: 0, currency: "usd", interval: "month" }),
+    "$0.00 per month",
+  );
+  assert.match(
+    panel,
+    /<PlanCard name="Free" price=\{formatPlanPrice\(FREE_PRICE\) \?\? ""\}>\s*\{onFree \? \(\s*enrolled\(false\)/u,
+  );
+  assert.match(
+    panel,
+    /const onFree = billing\.status === undefined \|\| accessEnded;/u,
+  );
+  assert.match(
+    panel,
+    /return plan\.price\?\.amount \?\? Number\.MAX_SAFE_INTEGER;/u,
+  );
+  assert.match(
+    panel,
+    /\.sort\(\(a, b\) => priceOrder\(a\) - priceOrder\(b\)\)/u,
+  );
+  assert.match(panel, /\{current \? \(\s*enrolled\(true\)/u);
+  assert.match(panel, />\s*Enrolled\s*</u);
+  assert.match(panel, /md:grid-cols-3/u);
 });
 
 test("every billing status the contract names has a tone in StatusPill", () => {

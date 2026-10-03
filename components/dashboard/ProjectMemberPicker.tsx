@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { addMemberToProjectAction } from "@/app/account/projects/actions";
+import { addMemberToProjectAction } from "@/app/account/teams/actions";
 import Modal from "@/components/ui/Modal";
 import { FormError } from "@/components/ui/FormError";
 import type { ProjectRole } from "@/lib/tenancy";
@@ -71,7 +71,7 @@ export function ProjectMemberPicker({
         onClick={() => setOpen(true)}
         className="btn-primary inline-flex !min-h-0 !px-4 !py-1.5 text-sm"
       >
-        Add team members
+        Add members
       </button>
 
       {open ? (
@@ -85,15 +85,15 @@ export function ProjectMemberPicker({
             id="member-picker-title"
             className="text-lg font-semibold text-[var(--text)]"
           >
-            Add team members
+            Add members
           </h3>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            Select workspace members to add to this project.
+            Pick people in this organization to add to the team.
           </p>
 
           {available.length === 0 ? (
             <p className="mt-4 text-sm text-[var(--muted)]">
-              All workspace members are already in this project.
+              Everyone in this organization is already on the team.
             </p>
           ) : (
             <ul className="mt-4 max-h-80 divide-y divide-[var(--ring)] overflow-y-auto">

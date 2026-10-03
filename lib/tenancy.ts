@@ -23,18 +23,13 @@ export type OrganizationJoinRequest = Schema["OrganizationJoinRequest"];
 export type OrganizationJoinRequestDecision =
   Schema["DecideOrganizationJoinRequest"]["decision"];
 export type DiscoverableOrganization = Schema["DiscoverableOrganization"];
-export type Team = Schema["TeamSummary"];
-export type TeamMembership = Schema["TeamMembershipSummary"];
-export type TeamRole = TeamMembership["role"];
-export type ProjectTeamGrant = Schema["ProjectTeamGrantSummary"];
-export type ProjectTeamGrantRole = ProjectTeamGrant["role"];
+/** A team in the organization's directory, and where this person stands with it (backend 24.11.4). */
+export type TeamDirectoryEntry = Schema["ProjectDirectoryEntry"];
+/** A request to join a team (backend 24.11.2). */
+export type AccessRequest = Schema["ProjectAccessRequest"];
 
 function projectPath(workspaceId: string, projectId: string): string {
   return `${workspacePath(workspaceId)}/projects/${encodeURIComponent(projectId)}`;
-}
-
-function teamPath(workspaceId: string, teamId: string): string {
-  return `${workspacePath(workspaceId)}/teams/${encodeURIComponent(teamId)}`;
 }
 
 /** Cursors are opaque values: this only encodes them for HTTP transport. */
@@ -433,121 +428,86 @@ export async function cancelOrganizationJoinRequest(
   );
 }
 
-/* --- Teams (backend ADR-0010, §12.1 #173) -----------------------------------
- * Who may do what is the platform's rule, restated only so a page does not
- * offer what would be refused: an owner or admin creates teams and sees every
- * one; anyone else sees the teams they are on. An owner, an admin or the team's
- * manager lists and adds its members. A project's effective owner or admin
- * grants it — only a team they can see, as their own list shows it (backend
- * §12.1 #176) — and anyone with a role on the project reads its grants. The
- * same authority takes a member off a team, or a team's access away (§12.1
- * #174); absent is `false`, not an error. */
+/* --- Teams: asking to join one (backend 24.11.2, 24.11.4) --------------------
+ * A team is a project in the platform's contract. The directory lists every
+ * open team in an organization by name and kind, and where this person stands
+ * with each; a person asks onto one, withdraws their own request, and a team's
+ * owner or admin — or the organization's — approves or denies. The platform
+ * decides who may do what; these only ask. */
 
-export async function listTeams(workspaceId: string): Promise<Team[]> {
+export async function listTeamDirectory(
+  workspaceId: string,
+): Promise<TeamDirectoryEntry[]> {
   return collectPages(async (cursor) => {
-    const response = await platformServerJson<Schema["TeamListResponse"]>(
-      withCursor(`${workspacePath(workspaceId)}/teams`, cursor),
+    const response = await platformServerJson<
+      Schema["ProjectDirectoryResponse"]
+    >(withCursor(`${workspacePath(workspaceId)}/project-directory`, cursor));
+    return { items: response.projects, nextCursor: response.nextCursor };
+  });
+}
+
+export async function listAccessRequests(
+  workspaceId: string,
+  projectId: string,
+): Promise<AccessRequest[]> {
+  return collectPages(async (cursor) => {
+    const response = await platformServerJson<
+      Schema["ProjectAccessRequestListResponse"]
+    >(
+      withCursor(
+        `${projectPath(workspaceId, projectId)}/access-requests`,
+        cursor,
+      ),
     );
-    return { items: response.teams, nextCursor: response.nextCursor };
+    return { items: response.requests, nextCursor: response.nextCursor };
   });
 }
 
-export async function createTeam(
+export async function requestProjectAccess(
   workspaceId: string,
-  input: Schema["CreateTeamRequest"],
-): Promise<Team> {
-  const response = await platformServerJson<Schema["TeamMutationResponse"]>(
-    `${workspacePath(workspaceId)}/teams`,
+  projectId: string,
+): Promise<AccessRequest> {
+  const response = await platformServerJson<
+    Schema["ProjectAccessRequestMutationResponse"]
+  >(`${projectPath(workspaceId, projectId)}/access-requests`, {
+    method: "POST",
+    idempotencyKey: newIdempotencyKey("project-access-request"),
+  });
+  return response.request;
+}
+
+export async function decideProjectAccess(
+  workspaceId: string,
+  projectId: string,
+  requestId: string,
+  decision: Schema["DecideProjectAccessRequest"]["decision"],
+): Promise<AccessRequest> {
+  const response = await platformServerJson<
+    Schema["ProjectAccessRequestMutationResponse"]
+  >(
+    `${projectPath(workspaceId, projectId)}/access-requests/${encodeURIComponent(requestId)}`,
     {
-      method: "POST",
-      body: JSON.stringify(input),
-      idempotencyKey: newIdempotencyKey("team-create"),
+      method: "PATCH",
+      body: JSON.stringify({ decision }),
+      idempotencyKey: newIdempotencyKey("project-access-decision"),
     },
   );
-  return response.team;
+  return response.request;
 }
 
-/** Names are not carried: a member is resolved against the workspace's list. */
-export async function listTeamMemberships(
-  workspaceId: string,
-  teamId: string,
-): Promise<TeamMembership[]> {
-  return collectPages(async (cursor) => {
-    const response = await platformServerJson<
-      Schema["TeamMembershipListResponse"]
-    >(withCursor(`${teamPath(workspaceId, teamId)}/memberships`, cursor));
-    return { items: response.memberships, nextCursor: response.nextCursor };
-  });
-}
-
-/** Adds a workspace member to the team, or changes their team role. */
-export async function upsertTeamMembership(
-  workspaceId: string,
-  teamId: string,
-  input: Schema["UpsertTeamMembershipRequest"],
-): Promise<TeamMembership> {
-  const response = await platformServerJson<
-    Schema["TeamMembershipMutationResponse"]
-  >(`${teamPath(workspaceId, teamId)}/memberships`, {
-    method: "POST",
-    body: JSON.stringify(input),
-    idempotencyKey: newIdempotencyKey("team-member"),
-  });
-  return response.membership;
-}
-
-export async function listProjectTeamGrants(
+export async function cancelProjectAccess(
   workspaceId: string,
   projectId: string,
-): Promise<ProjectTeamGrant[]> {
-  return collectPages(async (cursor) => {
-    const response = await platformServerJson<
-      Schema["ProjectTeamGrantListResponse"]
-    >(withCursor(`${projectPath(workspaceId, projectId)}/team-grants`, cursor));
-    return { items: response.grants, nextCursor: response.nextCursor };
-  });
-}
-
-/** Grants a team a role on the project, or changes it. Never ownership. */
-export async function grantProjectTeam(
-  workspaceId: string,
-  projectId: string,
-  input: Schema["GrantProjectTeamRequest"],
-): Promise<ProjectTeamGrant> {
+  requestId: string,
+): Promise<AccessRequest> {
   const response = await platformServerJson<
-    Schema["ProjectTeamGrantMutationResponse"]
-  >(`${projectPath(workspaceId, projectId)}/team-grants`, {
-    method: "POST",
-    body: JSON.stringify(input),
-    idempotencyKey: newIdempotencyKey("project-team"),
-  });
-  return response.grant;
-}
-
-export async function removeTeamMembership(
-  workspaceId: string,
-  teamId: string,
-  userId: string,
-): Promise<Schema["RemovalResponse"]> {
-  return platformServerJson<Schema["RemovalResponse"]>(
-    `${teamPath(workspaceId, teamId)}/memberships/${encodeURIComponent(userId)}`,
+    Schema["ProjectAccessRequestMutationResponse"]
+  >(
+    `${projectPath(workspaceId, projectId)}/access-requests/${encodeURIComponent(requestId)}`,
     {
       method: "DELETE",
-      idempotencyKey: newIdempotencyKey("team-member-remove"),
+      idempotencyKey: newIdempotencyKey("project-access-cancel"),
     },
   );
-}
-
-export async function revokeProjectTeam(
-  workspaceId: string,
-  projectId: string,
-  teamId: string,
-): Promise<Schema["RevocationResponse"]> {
-  return platformServerJson<Schema["RevocationResponse"]>(
-    `${projectPath(workspaceId, projectId)}/team-grants/${encodeURIComponent(teamId)}`,
-    {
-      method: "DELETE",
-      idempotencyKey: newIdempotencyKey("project-team-revoke"),
-    },
-  );
+  return response.request;
 }

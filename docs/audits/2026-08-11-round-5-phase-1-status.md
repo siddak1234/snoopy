@@ -650,7 +650,7 @@ Each names the evidence a backend session can re-run.
 - **F6** `verify:platform-contracts` rewrites the generated files in place and does not restore on "stale". **F7** the generated files carry no source sha (the cell records it by hand).
 - **F8** Connections and Settings → Export have no UI role gate (the server enforces). **F9** action files interpolate the server-resolved workspace id without `encodeURIComponent` (the facades do).
 - **F13** `.claude/launch.json` references a nonexistent `npm run db:studio`. **F15** `scripts/audit/run-gates.mjs` omits `format:check` and `verify:platform-contracts` (both in `npm run verify`). **F16** the `browser` CI job is not a required check. **F17** local Node 24 vs the pinned 22 (`.nvmrc` added in #15).
-- **F18** the web had no handling for the contract's `archived` subscription status (now treated as absent, #14). **F21** `app/account/automations/page.tsx` `byTemplate` is keyed by `templateId`, last-wins over a `created_at DESC` list — with project-scoped subscriptions the oldest hides the newer. **F22** `AutomationSetupField.notifies` renders the raw wire token (`run-succeeded`, `approval-expiring`, …).
+- **F18** the web had no handling for the contract's `archived` subscription status (now treated as absent, #14). **F21** ~~`app/account/automations/page.tsx`~~ `byTemplate` is keyed by `templateId`, last-wins over a `created_at DESC` list — with project-scoped subscriptions the oldest hides the newer. **F22** `AutomationSetupField.notifies` renders the raw wire token (`run-succeeded`, `approval-expiring`, …).
 - **F24** `scripts/verify.mjs` duplicates `run-gates.mjs`'s preflight, lock and rewrite assertion (~70 lines); a shared `scripts/audit/preflight.mjs` would end it — touching the audit machinery was outside 20.4.1. **F25** `run-gates.mjs` itself acquires its lock non-atomically and treats an empty lock as pid 0 (`process.kill(0, 0)` signals its own group) — `verify.mjs` does neither.
 - **F26** The app has no `error.tsx` boundary at any level; a rethrown platform failure renders Next's default error page.
 - **F27** Pages call `getAppSession` → `listWorkspaces` → `resolveActiveWorkspaceId` sequentially, and the account layout already made the same calls (`cache: "no-store"`) — up to three extra round trips per render.
@@ -665,7 +665,7 @@ Each names the evidence a backend session can re-run.
 - **F38** The loopback fixture declares no `PATCH /v1/workspaces/{id}/subscriptions/{id}`, so Pause / Go live / Set up can only surface a 501 refusal in the suite — the automation card's retained mutations have no positive fixture path (#18's audit; pre-existing).
 - **F40** Session expiry (401) is handled inside `DeleteAccountButton` only; `LinkedAccountsSection.tsx`, `OAuthButtons.tsx` and `hooks/use-app-session.ts` also call `platformApiJson` and none handle a 401 — one rule in `lib/platform-api.ts` (or a shared hook) would serve every caller, with the return target derived from the current path as the deletion dialog now does (#19's review).
 - **F41** `platformApiJson` reads `body.title` untyped: a JSON intermediary answering `{"title": {}}` would render "[object Object]" through `FormError`; gate on `typeof body.title === "string" && body.title.length > 0` (#19's review; pre-existing).
-- **F42** The sign-in return URL is still hand-built at four sites (`proxy.ts`, `app/account/layout.tsx`, `app/account/projects/page.tsx`, `app/(marketing)/automation-builder/page.tsx`) with slightly different rules (the proxy keeps the query string); #19 added `loginHref()` beside `safePlatformReturnTo` in `lib/platform-api.ts` and uses it in the deletion dialog — the other four should call it (#19's review).
+- **F42** The sign-in return URL is still hand-built at four sites (`proxy.ts`, `app/account/layout.tsx`, ~~`app/account/projects/page.tsx`~~, `app/(marketing)/automation-builder/page.tsx`) with slightly different rules (the proxy keeps the query string); #19 added `loginHref()` beside `safePlatformReturnTo` in `lib/platform-api.ts` and uses it in the deletion dialog — the other four should call it (#19's review).
 - **F43** The account-deletion trigger and its confirm button carry the same hand-written error-styled class string (`rounded-full border border-[var(--error-border-strong)] bg-[var(--error-bg)] …`) rather than a `Button` variant; a `danger` variant on `components/ui/Button` would end the duplication (#19's review; the confirm button's missing focus-visible ring was fixed there).
 - **F44** `focus-visible:outline-none` does nothing wherever it is used: the unlayered global `:focus-visible` rule in `app/globals.css` wins over Tailwind's layered utilities, so keyboard focus shows the accent outline and the utility's ring together (the account-deletion trigger and confirm button among them; #19's audit). Either drop the dead utility or scope the global rule.
 - **F45** The loopback fixture checks the session before it answers `GET /v1/auth/providers`, so a signed-out request gets 401 and no signed-out login-page test can run against it (#19's audit).
@@ -1177,7 +1177,7 @@ than carried.
   workspace active NOW — after a switch in another tab, Add and Connect wrote into a workspace
   the person was not looking at, and the rest read its 404 as this page's answer. Each now
   sends the workspace its page rendered and is refused in words (`WORKSPACE_CHANGED`) once that
-  is not the active one: `app/account/automations/actions.ts` (Add, Set up, Run, Pause and Go
+  is not the active one: ~~`app/account/automations/actions.ts`~~ (Add, Set up, Run, Pause and Go
   live, Archive, Move, Approve and Reject), `upload-actions.ts` (a run's file),
   `app/account/connections/actions.ts` (Connect, Reconnect, Replace, a pasted key, Disconnect).
   Held by `test/tenancy-contract.test.mjs` "no server action acts on the workspace active NOW
@@ -1296,3 +1296,232 @@ is added here, not carried:
 The comment that said the automations test refused a completion is corrected. Five mutations
 each turned its test red: the shared guard, a completion unguarded, a fresh Connect
 unguarded, the fixture reusing a disconnected grant, and Reject sending "approved".
+
+## Round 16 — Flows and Teams, as the app has them — 2026-10-02
+
+The owner's decisions after build 7 (backend BUILD-PLAN 24.11): "Flows will be the name we use
+from now on"; a team is the sub-organization with its own flows — what the platform's contract
+calls a project; a person asks to join one, is on it or leaves it; an organization's owners and
+admins see every team; the old Teams (people groups granted onto projects) go; Unlink now; the
+website matches the app end to end. This repository's half is 24.11.11, on `snoopy-backend`
+#138–#140, matching `snoopy-mobile` #31 and #32.
+
+- **Flows for Automations.** `/account/automations` is `/account/flows`; the nav, the page, the
+  home and every sentence on the signed-in pages say flow. Archive is **Archive flow** (build
+  9's decision 4, below; it read Remove flow until then), in the app's words: "It stops and
+  moves to Archived flows. Its runs stay in Activity, and you can add it again later." Archived
+  flows are listed last on Flows, each with the day it was archived, read by name
+  (`status=archived`, backend §12.1 #203); only archived rows are kept, since a platform from
+  before the SEVENTEENTH promotion answers the live list. The webhook dialog's first sentence
+  says what the address is for.
+- **Teams for Projects.** `/account/projects` is `/account/teams`. Teams lists every team the
+  person is on, in every workspace, grouped by workspace. Create a team takes the kind from a
+  dropdown, "Other" opening a field for their own words (`lib/team-types.ts`, the app's list) —
+  in the workspace being worked in, since build 9 (below). In each organization, the teams they can ask to join:
+  Request, or Requested and Withdraw, confirmed first (backend 24.11.2, 24.11.4). A team's
+  page: its members (Add members, a role, Remove, Leave), the requests to join for its owner or
+  admin and the organization's (Approve, Deny), and Delete for its owner. An organization admin
+  who is not on a team sees it and decides, with nothing to leave (24.11.3). The directory and
+  the requests answer 404 before the promotion: the asking parts are left out, never the page.
+  The delete sentence no longer promises that anything reattaches — creating makes a new team.
+- **The old Teams are gone**: their pages (~~`app/account/teams/[teamId]/page.tsx`~~,
+  ~~`app/account/teams/CreateTeamForm.tsx`~~), a project's team grants
+  (~~`app/account/projects/[id]/ProjectTeamGrantForm.tsx`~~), and the team functions in
+  `lib/tenancy.ts`. The old addresses redirect (308): `/account/automations`,
+  `/account/projects` and `/account/projects/:id` land on Flows, Teams and the team.
+- **Unlink** on Settings' linked accounts: on a linked account, never the primary, confirmed
+  first. It is called from the browser through `/api/platform`, so the renewed session cookie
+  the answer carries reaches the browser, which a server action would drop. A refusal is said in
+  the app's words for the reason the platform names (build 9, below) — never a problem's title
+  (F41).
+- **F57 and F28, revisited — then restored.** F57 held that a team project is created in the
+  organization being worked in, and refused once another tab changed it. For a while Create a
+  team named its workspace in the form — the organization picked, as the app then did — and the
+  server accepted any workspace the person was in, without `WORKSPACE_CHANGED`. Build 9's
+  decision 2 reverses that (below): F57's rule is back, for a personal workspace too. A team's
+  other changes act on the workspace that holds it, resolved on the server, as a project's
+  always did, and F28's walk of every action module still finds none that reads the active
+  workspace unguarded.
+- **F78** (new): a team's member list kept the rows it was first given, so someone added with
+  Add members, or approved onto the team, appeared only after a reload — older than this round;
+  Round 15's close filed that no test had opened Add members. It now follows the server's list
+  after each refresh. Held by "a team's owner adds someone …" and "a team's owner approves …".
+- **F79** (new): `worstContrast` (`e2e/helpers.ts`) took its hiding rule away and returned while
+  the text faded back in from transparent, so the F64 test's axe scan, run next, could read it
+  half-faded: "Remove flow" (now Archive flow) pressed measured 2.33:1 in Chromium. The button was never
+  disabled — a probe read it enabled, with no dimmed ancestor, at every step. It now waits for
+  the text to settle before returning.
+- **Vocabulary.** `test/structure-contract.test.mjs` parses the account pages and the dashboard
+  components and fails on "project" or "automation" in copy; the code keeps the contract's
+  names. The marketing pages keep "automation" where it names what Autom8x is.
+- **The fixture** (`e2e/fixtures/public-edge.ts`) answers the directory and the requests (and
+  who may decide them), keeps a team's members in state (add, remove, approve), lists linked
+  accounts and answers Unlink with the platform's refusal sentences, reads the archived flows by
+  name, offers Microsoft as a provider, publishes `requiredConnections` on the catalog as the
+  platform does, and can be a platform from before the promotion (`team-access-missing`). The
+  old team routes and their switches are gone, and the export carries no `teams`, as the
+  platform's does not.
+- Contracts regenerated from `snoopy-backend` main at #140.
+
+### The owner's decisions on build 9 — 2026-10-02
+
+Build 9 gave twelve decisions (backend BUILD-PLAN 24.12), and build 10 one shared wording that
+the backend, the app and this website use word for word:
+
+1. a team IS its kind — no separate name; one team per kind in a workspace, an archived team
+   freeing its kind;
+2. teams in the personal workspace too, made in the workspace the person is in, with no picker;
+   in an organization only its owners and admins create one (the owner's word that day: "owners
+   and admins can create a team in an org. but on personal it shouldnt matter. personal is
+   private.");
+3. no description on create;
+4. "Archive flow" and "Archived flows";
+5. the join link: an organization accepts only people at its verified email domain — today's
+   platform rule, no backend change — and a personal workspace stays private;
+6. the centred empty state on whole empty screens only;
+7. plans Free (saying Enrolled when on it), Plus — the `team` plan renamed, its id kept — and
+   Pro once the owner creates its price; each card its name and its price, filling the screen;
+8. a plan picked opens the provider's checkout for it; once paying, a change goes through Manage
+   billing;
+9. Connections is third-party integrations only;
+10. Settings in categories, Sign out at the bottom;
+11. bigger type across the app;
+12. "Other" kind words, 2 to 60 characters.
+
+This repository's half:
+
+- **A team is its kind** (decisions 1–3, 12). Create a team is the kind of team alone, from the
+  app's list, "Other" opening a field for the person's own words, 2 to 60 characters — the
+  platform's limit on a team's name, since the kind is sent as both its name and its type. There
+  is no name, no description and no workspace picker: one line says where it goes ("In Fixture
+  Organization." or "In your personal workspace."), and the team is made in the workspace being
+  worked in, a personal one included. In an organization only its owners and admins create one;
+  a plain member is offered no Create (F8). One team per kind: the platform's refusals are the
+  app's sentences — `team_kind_taken` (409, matched without case, an archived team not counted)
+  "This workspace already has a team for Finance.", and 403 "Only an owner or admin can create a
+  team here." The success line names people only where there can be any. A team's title is its
+  kind, said once — on Teams, in the asking list and on a team's page, whose line under it no
+  longer starts with the kind; a team made before keeps a separate name at the platform, which
+  is not shown.
+- **F57 restored** (decision 2). `createProjectAction` again compares the workspace the page
+  showed with the active one (`activeWorkspaceIfShown`) and refuses with `WORKSPACE_CHANGED`
+  once another tab has changed it, and creates in the one the server resolved.
+  `app/account/teams/actions.ts` is back in both of `test/tenancy-contract.test.mjs`'s lists,
+  and the browser tests main had are back for the new dialog ("Create a team on a page whose
+  workspace was switched away …", "19 — a team created after another tab switched workspace
+  …"). The action no longer refreshes the page under its dialog: the dialog's close does, as it
+  did, and on an empty Teams page the refresh had taken the dialog away with the empty screen
+  before it could say the team was made.
+- **Archive flow and Archived flows** (decision 4), in the build 10 wording: the button, its
+  dialog, the list's note ("An archived flow keeps its history here. Add it again any time."),
+  each row's day ("Archived Sep 30, 2026"), the two refusals ("An archived flow cannot move.",
+  "An archived flow has no address.") and the team delete line ("… until you archive them in
+  Flows."). The dialog's variant for a team's flow went with the sentence that needed it.
+- **Copy join link** (decision 5), on the organization page its owners and admins alone reach:
+  the join page's address for the organization, on the clipboard, with "Copied" said; a refused
+  clipboard leaves the address selected in a field to copy by hand. The line under it
+  (`joinLinkLine`, the app's words) says what the link does, by the joining policy of the
+  verified domain people can find the organization through: approval "People at example.test
+  can ask to join. You approve them here.", automatic "… join as soon as they open it.", invite
+  only "Joining at … is invite only, so the link lets no one in."; a verified domain not shown
+  for matching emails "People at … cannot find it until "Show for matching verified email
+  domains" is on."; none "Verify your email domain first — only people at it can ask to join."
+  The platform's rule is unchanged (only a person at a verified, shown domain can ask), so a
+  personal workspace stays private, and no element is named for an invite (D4, 4.6.4).
+- **Who is asking, and which account** (backend 24.12.2, 24.12.4; the contracts regenerated from
+  its #142). A join request shows the person's name and address, not their id; each linked
+  sign-in account shows the address its provider reports, so two accounts can be told apart.
+- **A team is its kind everywhere** (decisions 1 and 2): the dashboard's team list and Flows'
+  "Team: …" read a team's kind, as Teams does; the dashboard's Create a team, with no team yet,
+  is offered to an owner or admin of the active workspace alone, as on Teams.
+- **Whole empty screens** (decision 6). `EmptyRow` takes an optional title, icon and action;
+  with a title it is the app's empty screen — centred, an accent-tinted icon, the title, one
+  line, somewhere to go — used only where a whole page is empty: Teams ("No teams yet", whose one
+  Create a team replaces the top row's while it is empty), Activity ("No activity yet", Browse
+  flows) and Approvals ("Nothing needs review"), in the app's words. Without a title it is F29's
+  row, and every section inside a page keeps it.
+- **Billing** (decisions 7 and 8). Three cards side by side: Free, then the platform's plans by
+  price — the platform lists them by id, Pro before Plus, and one whose price the provider cannot
+  state goes last. Each is its name and its price; Free, which the platform does not list since
+  nothing buys it, is drawn here at "$0.00 per month". The workspace's plan says Enrolled, with
+  its status and when it renews or ends, and Manage billing. With nothing paid, a plan picked
+  opens the provider's checkout for that plan; once paying, any other card opens Manage billing
+  (ADR-0025), and so does a checkout the platform refuses with `plan_exists` (backend 24.12). No
+  card prints a capability. A member still sees billing gated, with no action.
+- **Unlink in the app's words.** `PlatformApiError` keeps the problem's `details` (an object)
+  in place of its `detail`. A 404 naming a method and a path is a platform with no unlink yet
+  ("Unlinking isn't available yet."); any other 404 is "That sign-in account is not linked.";
+  the reasons `primary`, `last` and `refused` are their sentences; anything else is "The account
+  could not be unlinked."
+- **Found on the way:**
+  - **F80** (new): a connection read "Used by 1 live automation" — the vocabulary test reads only
+    copy with a space or a capital, so the one lowercase word passed it. It reads "flow".
+  - **F81** (new): `formatWhen` lost its comment when `formatDay` was put between them
+    (`lib/automations.ts`); the comment is back above it.
+  - **F82** (new): the join page said "Join your team" for an organization — older than this
+    round. It names the organization ("Join Fixture Organization").
+  - **F83** (new): CI's dependency scan failed on this change's first push — a critical advisory
+    published 2026-09-30, GHSA-vcvr-r3jv-pc5j (Node `ImageResponse` from `next/og`, remote code
+    execution where a request's values reach the image), covers `next` 16.2.0–16.3.5, and this
+    site pinned 16.3.3. Its one `ImageResponse` (`app/opengraph-image.tsx`) draws fixed text, so
+    nothing a request sends reaches it, and the advisory names such sites unaffected. `next` is
+    16.3.6, the first release with the fix; `npm audit --omit=dev --audit-level=high` finds 0.
+- **The fixture** creates a team in the organization or the owner's personal workspace — an
+  organization's by its owner or admin only (403), one per kind (409 `team_kind_taken`) — and
+  lists each workspace's own; offers Plus and Pro at the provider's prices, by id, refuses a
+  second plan (409 `plan_exists`) and can leave Pro's price unstated (`plan-price-unstated`);
+  refuses an unlink with any reason (`unlink-refused?reason=`), says a not-linked 404 with its
+  sentence, and can be an Edge with no unlink route (`unlink-route-missing`); and can leave the
+  organization's domain unverified (`domain-pending`). Its counts list the teams created and
+  the checkouts asked for.
+- **Not here.** Decisions 9–11 — Connections, the settings categories and the bigger type — are
+  the app's in this change. The wording's accessibility label "Archive {name}" is not given to Archive flow: a name that does
+  not hold the button's visible words fails WCAG 2.5.3 (label in name), and the dialog it opens
+  names the flow. The wording's empty catalog and empty Connections were not in this change.
+
+Proved red by hand, each file restored by SHA-256:
+
+| Guard | Broken by | Red |
+| --- | --- | --- |
+| The signed-in pages say Flows | the nav saying Automations | the vocabulary test |
+| Archived flows are the archived ones | the filter keeping every row | "archived flows are read by name …" (re-proved under its build 9 name) |
+| No directory yet is not a failure | the 404 thrown | the tenancy test, and the browser test "before the platform has a directory …" |
+| A team is made in the workspace the page showed, while it is still the active one (F57, build 9) | the shown id taken as it came, never compared | "Create a team on a page whose workspace was switched away …"; the tenancy test "a team is its kind, created in the workspace the page showed …" |
+| The member list follows the server (F78) | the list frozen | "a team's owner adds someone …" |
+| An unlink refusal is the app's sentence for its reason (build 9) | a 400 not read for its reason | "Unlink takes a linked sign-in account off …" |
+| Approve approves | Approve sending deny | "a team's owner approves …", 10 of 10 |
+| The contrast measure reads settled text (F79) | the wait removed | F64, 10 of 10 in Chromium |
+| One team per kind, said in words | `team_kind_taken` not recognised | "a kind the workspace already has a team for …" (it read "Conflict"); the tenancy test "Create's refusals …" |
+| A plain member's create, refused in words | the 403 not recognised | "a plain member of an organization is offered no Create a team …" (it read "Forbidden") |
+| A plain member is offered no Create a team | the owner-or-admin check always true | "a plain member of an organization is offered no Create a team …" |
+| The kind is the team's name too | " team" added to the name | "Create a team is the kind alone …" |
+| Other's words are 2 to 60 characters | the lower bound removed | "Create a team is the kind alone …" (it read "Bad Request") |
+| The dialog says where the team goes | the line replaced | "Create a team is the kind alone …" |
+| A personal team's success names no one to add | the organization's line for both | "working in the personal workspace, a team is made there …" |
+| A team's title is its kind | the team's page titled by its name; the Teams list titled by its name | "a plain member on a team sees no requests …"; "a plain member asks to join a team …" |
+| An empty Teams page has one Create a team | the top row drawn while empty | "an organization with no team yet shows the empty screen …" (two buttons) |
+| Creating a team leaves its dialog to say so | the action's refresh put back | "an organization with no team yet shows the empty screen …" (no Done) |
+| A whole empty page is the app's empty screen | Activity's title removed; Approvals' title removed | "Activity with no run is the app's empty screen …"; "17 — Approvals: nothing waiting …" |
+| A section inside a page stays one line | the untitled row restyled | the structure test "a whole page with nothing on it …" |
+| Archive is said Archive | the button saying Remove flow | "archiving is its own confirmed action …" |
+| The cards are in price order | the sort removed | "three cards side by side …" (Pro second); the billing test "three cards: …" |
+| Free is Enrolled on the free floor | Free never the workspace's | "three cards side by side …" |
+| No card prints a capability | the capabilities printed | the billing test "a plan card is its name and its price …" |
+| Once paying, another card opens Manage billing, never a checkout | the portal branch never taken | "a plan picked opens the provider's checkout …" (two checkouts asked for, not one) |
+| A `plan_exists` refusal opens Manage billing | the reason not recognised | "a checkout for a workspace that already has a plan …"; the billing test "the two hosted hand-offs …" |
+| Copy join link says Copied | Copied never set | "Copy join link puts …" |
+| A refused clipboard leaves the link to copy by hand | no field shown | "a refused clipboard leaves the join link …" |
+| The domain line names the verified domain | a pending domain looked for | "Copy join link puts …" |
+| An unlink 404 naming a route is a platform with no unlink yet | the method read as a number | "each unlink refusal is said …" (it read "not linked") |
+| The browser keeps a problem's details | the details dropped | "each unlink refusal is said …" |
+| A connection's count says flows (F80) | "automations" back | "a connection says how many live flows use it …" |
+| The join page names the organization (F82) | "Join your team" back | "domain discovery creates an approval request …" |
+| The join link's line follows the domain's joining policy | the automatic policy read as approval | the tenancy test "the join link's line follows …" |
+| A join request names the person, not an id | the id shown | "organization request controls use the public join-request operation …" |
+| A linked account names its address | the address not drawn | "Unlink takes a linked sign-in account off …" |
+| The dashboard titles a team by its kind | the dashboard titled by the name | "the dashboard titles a team by its kind …" |
+| The dashboard's Create a team is an owner's or admin's | Create offered to everyone | "the dashboard titles a team by its kind …" |
+| Flows' "Team: …" is the team's kind | the scope labelled by the name | "a card lists each subscription under its scope …" |
+
+F78 to F83 are new, and no number is reused. Build 9's proofs ran in Chromium, each test alone,
+against the fixture.

@@ -34,8 +34,9 @@ export default async function JoinOrgPage({
   return (
     <div className="flex min-h-screen items-center justify-center px-4 py-16">
       <div className="bubble w-full max-w-md px-8 py-8">
+        {/* An organization, not a team: a team is now a part of one. */}
         <h1 className="text-2xl font-medium text-[var(--text)]">
-          Join your team
+          Join {organization.name}
         </h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
           Your verified email domain is registered to{" "}

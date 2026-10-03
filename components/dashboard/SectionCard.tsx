@@ -19,8 +19,8 @@ export default function SectionCard({
   children: React.ReactNode;
 }) {
   const defaultSubheader: Record<string, string> = {
-    Dashboard: "Your automation workspace",
-    Projects: "Manage your projects",
+    Dashboard: "Your workspace",
+    Teams: "Your teams",
     "Workflow Design": "Design and manage workflows",
     Billing: "Billing and subscription",
     Settings: "Account and workspace settings",

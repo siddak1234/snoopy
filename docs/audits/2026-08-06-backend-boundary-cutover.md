@@ -57,8 +57,8 @@ still import the legacy Prisma database helper:
 2. `app/account/organization/actions.ts`
 3. `app/account/organization/page.tsx`
 4. ~~`app/account/projects/[id]/invoices/flagged/actions.ts`~~
-5. `app/account/projects/actions.ts`
-6. `app/account/projects/page.tsx`
+5. ~~`app/account/projects/actions.ts`~~
+6. ~~`app/account/projects/page.tsx`~~
 7. `app/account/settings/page.tsx`
 8. `app/onboarding/actions.ts`
 9. `app/onboarding/join-org/page.tsx`

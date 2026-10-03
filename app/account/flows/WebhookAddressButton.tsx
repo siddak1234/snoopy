@@ -99,9 +99,9 @@ export function WebhookAddressButton({
             id={`${titleId}-desc`}
             className="mt-1 text-sm text-[var(--muted)]"
           >
-            Give this address and secret to the service that sends the events.
-            It sends the secret as the <code>x-autom8x-webhook-secret</code>{" "}
-            header.
+            Where a service sends the events that start this flow — give it this
+            address and the secret, which it sends as the{" "}
+            <code>x-autom8x-webhook-secret</code> header.
           </p>
           {endpoint === undefined && !error ? (
             <p className="mt-4 text-sm text-[var(--muted)]">Loading…</p>
@@ -145,7 +145,7 @@ export function WebhookAddressButton({
           ) : null}
           {endpoint === null ? (
             <p className="mt-4 text-sm text-[var(--muted)]">
-              This automation has no address yet.
+              This flow has no address yet.
             </p>
           ) : null}
           <FormError message={error} className="mt-3" />

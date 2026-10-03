@@ -92,6 +92,23 @@ export function listSubscriptions(
   );
 }
 
+/**
+ * The archived flows, asked for by name (backend §12.1 #203): the list above
+ * never holds them. A platform from before the SEVENTEENTH promotion ignores the
+ * filter and answers the live list, so only rows that ARE archived are kept — a
+ * live flow is never shown as archived.
+ */
+export async function listArchivedSubscriptions(
+  workspaceId: string,
+): Promise<Subscription[]> {
+  const response = await platformServerJson<ListSubscriptionsResponse>(
+    `${scope(workspaceId)}/subscriptions?status=archived`,
+  );
+  return response.subscriptions.filter(
+    (subscription) => subscription.status === "archived",
+  );
+}
+
 export function listRuns(
   workspaceId: string,
   subscriptionId?: string,
@@ -289,6 +306,14 @@ export async function emptyWhenUnavailable<T>(
     if (error instanceof PlatformNotConfiguredError) return fallback;
     throw error;
   }
+}
+
+/** A day, as Archived flows says it ("Sep 30, 2026"); fixed as `formatWhen` is. */
+export function formatDay(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  });
 }
 
 /**

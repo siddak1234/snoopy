@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
+import ts from "typescript";
 
 /**
  * The structure the register asked for (backend BUILD-PLAN 22.3, 22.4) — each
@@ -51,6 +52,31 @@ test("one empty-row component, not a private copy per page (register F29)", () =
     );
   }
   assert.ok(existsSync("components/dashboard/EmptyRow.tsx"));
+});
+
+test("a whole page with nothing on it is the app's empty screen, and a section stays one line (register F29, the owner's build 9)", () => {
+  const row = read("components/dashboard/EmptyRow.tsx");
+  // Without a title, the row it always was.
+  assert.match(
+    row,
+    /if \(!title\) \{\s*return \(\s*<div className="py-5 first:pt-0">\s*<p className="text-sm text-\[var\(--muted\)\]">\{text\}<\/p>\s*<\/div>\s*\);\s*\}/u,
+  );
+  // With one: the icon, decorative, then the title, its line and the action.
+  assert.match(row, /<span\s+aria-hidden/u);
+  for (const [page, title] of [
+    ["app/account/teams/page.tsx", "No teams yet"],
+    ["app/account/runs/page.tsx", "No activity yet"],
+    ["app/account/approvals/page.tsx", "Nothing needs review"],
+  ]) {
+    assert.match(
+      read(page),
+      new RegExp(
+        `<EmptyRow\\s+icon=\\{<\\w+Icon size=\\{32\\} />\\}\\s+title="${title}"`,
+        "u",
+      ),
+      page,
+    );
+  }
 });
 
 test("the destructive action is a Button variant (register F43)", () => {
@@ -142,7 +168,6 @@ test('every account page has its small-screen title, not "Dashboard" (register F
     ...[...nav.matchAll(/\{ href: "(\/account[^"]*)", label:/gu)].map(
       (m) => m[1],
     ),
-    "/account/teams",
     "/account/organization",
   ];
   for (const href of linked)
@@ -246,4 +271,49 @@ test("a replace answered as reused says so, rather than failing", () => {
     replace,
     /setNotice\(\s*`\$\{result\.alreadyConnectedAs\} is still connected/u,
   );
+});
+
+test("the signed-in pages say team and flow, never project or automation (BUILD-PLAN 24.11.11)", () => {
+  // The owner's words: a team is what the platform's contract calls a project,
+  // and "Flows will be the name we use from now on". The code keeps the
+  // contract's names; copy is what a person reads, found by parsing — JSX text,
+  // and a string or template's text that holds a space or begins with a
+  // capital. An identifier, a path, a key and an import are never copy.
+  const retired = /\b(projects?|automations?)\b/iu;
+  const found = [];
+  for (const path of [
+    ...sources("app/account"),
+    ...sources("components/dashboard"),
+  ]) {
+    const source = ts.createSourceFile(
+      path,
+      read(path),
+      ts.ScriptTarget.Latest,
+      true,
+      path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+    );
+    const visit = (node) => {
+      let text = null;
+      if (ts.isJsxText(node)) text = node.getText(source);
+      else if (
+        ts.isStringLiteral(node) ||
+        ts.isNoSubstitutionTemplateLiteral(node) ||
+        ts.isTemplateHead(node) ||
+        ts.isTemplateMiddle(node) ||
+        ts.isTemplateTail(node)
+      ) {
+        const words = node.text.trim();
+        const moduleName =
+          ts.isImportDeclaration(node.parent) ||
+          ts.isExportDeclaration(node.parent);
+        if (!moduleName && (/\s/u.test(words) || /^[A-Z]/u.test(words)))
+          text = node.text;
+      }
+      if (text && retired.test(text))
+        found.push(`${path}: ${JSON.stringify(text.trim())}`);
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  assert.deepEqual(found, []);
 });

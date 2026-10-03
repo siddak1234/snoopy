@@ -92,7 +92,7 @@ export function WorkspaceExportSection({
       ) : (
         <p className="mt-3 text-sm text-[var(--muted)]">
           Exporting a workspace is for its owners and admins, because the export
-          holds every member&apos;s email and every project.
+          holds every member&apos;s email and every team.
         </p>
       )}
       <FormError message={error} className="mt-3" />

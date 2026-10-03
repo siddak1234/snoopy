@@ -28,6 +28,11 @@ export function RolePill({ role }: { role: Project["viewerRole"] }) {
   );
 }
 
+/**
+ * The teams a person is on. A team's title is its kind (the owner, build 9: a
+ * team IS its kind), printed once — a team made before that keeps a separate
+ * name in the platform, which is not shown.
+ */
 export function ProjectList({ projects }: { projects: ProjectListItem[] }) {
   if (projects.length === 0) return null;
   return (
@@ -37,25 +42,22 @@ export function ProjectList({ projects }: { projects: ProjectListItem[] }) {
           <div className="flex items-start gap-3 rounded-xl px-2 py-3 transition hover:bg-[var(--surface-hover)]">
             <Link
               prefetch={false}
-              href={`/account/projects/${project.id}`}
+              href={`/account/teams/${project.id}`}
               className="min-w-0 flex-1 rounded-lg focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-[var(--text)]">
-                  {project.name}
+                  {project.type}
                 </span>
                 <StatusPill status={project.status as ProjectStatus} />
               </div>
-              <span className="mt-0.5 block text-sm text-[var(--muted)]">
-                {project.type}
-              </span>
             </Link>
             <div className="flex shrink-0 items-center gap-2 pt-1">
               <RolePill role={project.viewerRole} />
               {project.viewerRole === "owner" ? (
                 <DeleteProjectButton
                   projectId={project.id}
-                  projectName={project.name}
+                  projectName={project.type}
                 />
               ) : null}
             </div>

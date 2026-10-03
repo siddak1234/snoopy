@@ -13,8 +13,10 @@ import {
   PlatformServerError,
 } from "@/lib/platform-server";
 import {
+  administers,
   listAccessibleProjects,
   resolveActiveWorkspaceId,
+  roleInWorkspace,
 } from "@/lib/tenancy";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { StatusPill } from "@/components/dashboard/StatusPill";
@@ -91,12 +93,23 @@ export default async function AccountDashboardPage() {
   const firstName = getFirstName(session?.user?.name);
   const greeting = firstName ? `Welcome, ${firstName}!` : "Welcome back!";
 
-  const [topProjects, overview] = session
+  const activeWorkspaceId = session
+    ? await resolveActiveWorkspaceId(session)
+    : undefined;
+  const [topProjects, overview, canCreateTeam] = session
     ? await Promise.all([
-        listAccessibleProjects().then((projects) => projects.slice(0, 3)),
-        readOverview(await resolveActiveWorkspaceId(session)),
+        // A deleted team is archived, and leaves every team list — this one too.
+        listAccessibleProjects().then((projects) =>
+          projects
+            .filter(({ project }) => project.status !== "archived")
+            .slice(0, 3),
+        ),
+        readOverview(activeWorkspaceId),
+        // Only an owner or admin creates a team (backend 24.12.1), so Create
+        // is offered to them alone, as on the Teams page.
+        roleInWorkspace(activeWorkspaceId).then(administers),
       ])
-    : [[], null];
+    : [[], null, false];
 
   // Show workspace name tags when the user's top projects span multiple workspaces
   const uniqueWorkspaceIds = new Set(
@@ -112,10 +125,10 @@ export default async function AccountDashboardPage() {
       primaryAction={
         <Link
           prefetch={false}
-          href="/account/automations"
+          href="/account/flows"
           className="btn-primary inline-flex px-5"
         >
-          Browse automations
+          Browse flows
         </Link>
       }
       secondaryAction={
@@ -135,17 +148,17 @@ export default async function AccountDashboardPage() {
         <div className="mt-3 flex flex-wrap gap-2">
           <Link
             prefetch={false}
-            href="/account/automations"
+            href="/account/flows"
             className="btn-primary inline-flex px-4 py-2 text-sm"
           >
-            Browse automations
+            Browse flows
           </Link>
           <Link
             prefetch={false}
-            href="/account/projects"
+            href="/account/teams"
             className="inline-flex items-center justify-center rounded-full border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
           >
-            View projects
+            View teams
           </Link>
           <Link
             prefetch={false}
@@ -164,7 +177,7 @@ export default async function AccountDashboardPage() {
         {overview ? (
           <>
             <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:max-w-md">
-              <dt className="text-[var(--muted)]">Automations</dt>
+              <dt className="text-[var(--muted)]">Flows</dt>
               <dd className="text-[var(--text)]">
                 {overview.automations ?? "Unavailable"}
               </dd>
@@ -221,7 +234,7 @@ export default async function AccountDashboardPage() {
           <>
             <p className="mt-3 text-sm text-[var(--muted)]">No activity yet.</p>
             <p className="mt-1 text-xs text-[var(--muted)]">
-              Add an automation to see its runs here.
+              Add a flow to see its runs here.
             </p>
           </>
         )}
@@ -229,20 +242,22 @@ export default async function AccountDashboardPage() {
 
       <div className="py-5">
         <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-          Projects
+          Teams
         </h2>
         {topProjects.length === 0 ? (
           <>
-            <p className="mt-3 text-sm text-[var(--muted)]">No projects yet.</p>
-            <div className="mt-3">
-              <Link
-                prefetch={false}
-                href="/account/projects"
-                className="btn-secondary inline-flex px-4 py-2 text-sm"
-              >
-                Create project
-              </Link>
-            </div>
+            <p className="mt-3 text-sm text-[var(--muted)]">No teams yet.</p>
+            {canCreateTeam ? (
+              <div className="mt-3">
+                <Link
+                  prefetch={false}
+                  href="/account/teams"
+                  className="btn-secondary inline-flex px-4 py-2 text-sm"
+                >
+                  Create a team
+                </Link>
+              </div>
+            ) : null}
           </>
         ) : (
           <>
@@ -251,11 +266,12 @@ export default async function AccountDashboardPage() {
                 <li key={project.id}>
                   <Link
                     prefetch={false}
-                    href={`/account/projects/${project.id}`}
+                    href={`/account/teams/${project.id}`}
                     className="flex flex-wrap items-center gap-2 rounded-xl px-2 py-2 transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
                   >
+                    {/* A team is its kind (the owner, build 9). */}
                     <span className="font-medium text-[var(--text)]">
-                      {project.name}
+                      {project.type}
                     </span>
                     <span className="inline-flex rounded-full bg-[var(--chip-bg)] px-2.5 py-0.5 text-xs font-medium text-[var(--chip-text)]">
                       {project.status === "active"
@@ -278,10 +294,10 @@ export default async function AccountDashboardPage() {
             <div className="mt-3">
               <Link
                 prefetch={false}
-                href="/account/projects"
+                href="/account/teams"
                 className="text-sm font-medium text-[var(--link)] transition hover:underline focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
               >
-                View all projects
+                View all teams
               </Link>
             </div>
           </>
@@ -294,15 +310,15 @@ export default async function AccountDashboardPage() {
             Get started
           </h3>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            Browse the automations available and connect the accounts one needs.
+            Browse the flows available and connect the accounts one needs.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
               prefetch={false}
-              href="/account/automations"
+              href="/account/flows"
               className="btn-primary inline-flex px-5"
             >
-              Browse automations
+              Browse flows
             </Link>
             <Link
               prefetch={false}

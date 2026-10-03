@@ -20,8 +20,11 @@ import {
 import { RunInputFields, SetupFields } from "./ManifestFields";
 
 /**
- * The buttons for one subscription on an automation card — adding is
- * `AddAutomation`'s, since one automation can hold a subscription per project.
+ * The buttons for one subscription on a flow's card — adding is
+ * `AddAutomation`'s, since one flow can be added once per team. Archive flow
+ * archives it: it stops, keeps its runs in Activity, and is listed under
+ * Archived flows (BUILD-PLAN 24.11.11; the owner's word, build 9, in the app's
+ * words).
  *
  * A client component only because it holds pending state and the last refusal.
  * The work happens in server actions, so nothing here knows the backend origin
@@ -238,7 +241,7 @@ export function AutomationActions({
           disabled={pending}
           onClick={() => open("archive")}
         >
-          Archive
+          Archive flow
         </Button>
       </div>
 
@@ -260,13 +263,13 @@ export function AutomationActions({
             id={`automation-setup-${subscription.id}-title`}
             className="text-xl font-semibold text-[var(--text)]"
           >
-            Automation setup
+            Flow setup
           </h2>
           <p
             id={`automation-setup-${subscription.id}-description`}
             className="mt-1 text-sm text-[var(--muted)]"
           >
-            Complete the settings supplied by this automation.
+            Complete the settings supplied by this flow.
           </p>
           <form onSubmit={fromForm(submitSetup)} className="mt-6 space-y-6">
             <input
@@ -368,9 +371,8 @@ export function AutomationActions({
             id={`automation-archive-${subscription.id}-description`}
             className="mt-1 text-sm text-[var(--muted)]"
           >
-            It stops running and gives its plan slot back. This cannot be
-            undone: to use it again, add it afresh. Runs it already made stay in
-            Activity.
+            It stops and moves to Archived flows. Its runs stay in Activity, and
+            you can add it again later.
           </p>
           <FormError message={error} />
           <div className="mt-6 flex flex-wrap gap-2">

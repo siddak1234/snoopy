@@ -188,6 +188,12 @@ export async function worstContrast(
   });
   const png = await button.screenshot();
   await hide.evaluate((node) => (node as Element).remove());
+  // Taking the hiding rule away gives the transition back, and the text fades
+  // in from transparent. Whatever reads the page next — axe, in the F64 test —
+  // must see it settled, not half-faded: read mid-fade, the archive button
+  // ("Remove flow" then, "Archive flow" now) pressed measured 2.33:1
+  // (BUILD-PLAN 24.11.11).
+  await settledAnimations(button);
   const ground = await page.evaluate(
     async ([encoded, area]) => {
       const image = new Image();

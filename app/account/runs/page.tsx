@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { getAppSession } from "@/lib/app-session";
 import {
   emptyWhenUnavailable,
@@ -50,7 +51,22 @@ export default async function RunsPage() {
   return (
     <SectionCard title="Activity" subheader="Every run in this workspace">
       {runs.runs.length === 0 ? (
-        <EmptyRow text="No runs yet. Once an automation is live, its runs appear here." />
+        // The whole page is empty: the app's empty screen, with the way to a
+        // first flow (the owner, build 9).
+        <EmptyRow
+          icon={<CheckCircleIcon size={32} />}
+          title="No activity yet"
+          text="Every run lands here the moment your first agent goes live."
+          action={
+            <Link
+              prefetch={false}
+              href="/account/flows"
+              className="btn-primary inline-flex px-5"
+            >
+              Browse flows
+            </Link>
+          }
+        />
       ) : (
         runs.runs.map((run) => (
           <RunRow
