@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import Modal from "@/components/ui/Modal";
-import { cancelRun } from "@/app/account/automations/actions";
+import { cancelRun } from "@/app/account/flows/actions";
 
 /**
  * Cancel a run that has not ended (`cancelRun`). Rendered only for a `pending`

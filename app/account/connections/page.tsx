@@ -25,7 +25,7 @@ export default async function ConnectionsPage({
     return (
       <SectionCard
         title="Connections"
-        subheader="Connect the accounts your automations use"
+        subheader="Connect the accounts your flows use"
       >
         <p className="py-5 text-sm text-[var(--muted)]">
           No workspace is active yet.
@@ -45,7 +45,7 @@ export default async function ConnectionsPage({
   return (
     <SectionCard
       title="Connections"
-      subheader="Connect the accounts your automations use"
+      subheader="Connect the accounts your flows use"
     >
       <ConnectionsPanel
         workspaceId={workspaceId}

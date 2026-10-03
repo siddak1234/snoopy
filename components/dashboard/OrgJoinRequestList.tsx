@@ -52,9 +52,24 @@ export function OrgJoinRequestList({
               key={request.id}
               className="flex flex-wrap items-center gap-3 py-3"
             >
-              <span className="min-w-0 flex-1 truncate font-mono text-xs text-[var(--muted)]">
-                {request.userId}
-              </span>
+              {/* The person asking, by name and address (backend 24.12.4):
+                  an owner or admin approves a person, not an id. */}
+              {request.displayName || request.email ? (
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm text-[var(--text)]">
+                    {request.displayName ?? request.email}
+                  </span>
+                  {request.displayName && request.email ? (
+                    <span className="block truncate text-xs text-[var(--muted)]">
+                      {request.email}
+                    </span>
+                  ) : null}
+                </span>
+              ) : (
+                <span className="min-w-0 flex-1 truncate font-mono text-xs text-[var(--muted)]">
+                  {request.userId}
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => decide(request.id, "approve")}

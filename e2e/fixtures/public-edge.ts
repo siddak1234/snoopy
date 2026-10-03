@@ -99,9 +99,15 @@ const organizationMembers = [
   },
 ] satisfies Platform["WorkspaceMember"][];
 
-// One team, managed by the plain member — the case that needs teams to have a
-// page of their own (backend ADR-0010).
+// A team the plain member is not on, which they may ask to join (backend
+// 24.11.2): the organization's directory lists it. The fixture keeps it out of
+// the owner's and the admin's lists, so theirs stay the one fixture project.
 const operationsTeamId = "abababab-abab-4bab-8bab-abababababab";
+// Someone in the organization asking onto the fixture project, for its owner
+// to answer.
+const newcomerUserId = "13131313-1313-4131-8131-131313131313";
+const newcomerRequestId = "14141414-1414-4141-8141-141414141414";
+const memberRequestId = "15151515-1515-4151-8151-151515151515";
 
 /**
  * Everything a test can change, in one place, reset by `POST /__fixture/reset`
@@ -121,6 +127,8 @@ function initialState() {
     exportCount: 0,
     // Per workspace, so a personal workspace has billing of its own (F31).
     subscribedPlan: new Map<string, Platform["PurchasablePlan"]>(),
+    // Every checkout asked for, bought or refused.
+    checkoutAttempts: 0,
     departed: false,
     runningCancelled: false,
     // Scopes the project automation was added to: a project id, or null for
@@ -132,30 +140,54 @@ function initialState() {
     oauthStatus: "connected" as "connected" | "reauthorization-required",
     // The run tally the dashboard reads, when the platform cannot answer it.
     runStatsFailing: false,
-    teams: [
+    // Who is on the fixture project: its owner and the plain member. The admin
+    // is not — an organization admin sees every team from outside (backend
+    // 24.11.3), and is the one an owner can add.
+    projectMembers: [
       {
-        id: operationsTeamId,
+        projectId,
         workspaceId,
-        name: "Operations",
-        description: "Runs the invoice automations.",
-        status: "active",
+        userId,
+        role: "owner",
+        displayName: "Fixture Owner",
+        email: "owner@example.test",
         createdAt: now,
       },
-    ] as Platform["TeamSummary"][],
-    teamMemberships: [
       {
-        teamId: operationsTeamId,
+        projectId,
         workspaceId,
         userId: memberUserId,
-        role: "manager",
+        role: "member",
+        displayName: "Fixture Member",
+        email: "member@example.test",
         createdAt: now,
       },
-    ] as Platform["TeamMembershipSummary"][],
-    projectTeamGrants: [] as Platform["ProjectTeamGrantSummary"][],
-    // Whether the organization lists its fixture project, and the projects a
-    // test created — so an organization can be new, with none (register F57).
+    ] as Platform["ProjectMembership"][],
+    // Backend 24.11.2: the newcomer's request onto the fixture project, and the
+    // member's onto Operations — absent until they ask.
+    newcomerRequest: "pending" as Platform["ProjectAccessRequest"]["status"],
+    memberRequest: null as Platform["ProjectAccessRequest"]["status"] | null,
+    // Backend 24.11.4: a platform from before the SEVENTEENTH promotion has no
+    // directory and no requests, and answers 404 for both.
+    teamAccessMissing: false,
+    // Backend 24.11.1: the sign-in accounts linked, the first the primary; the
+    // reason the platform refuses the next unlink with, if it does; and whether
+    // it is a platform from before the promotion, with no unlink route at all.
+    identities: [
+      "google",
+      "microsoft",
+    ] as Platform["LoginIdentitySummary"]["provider"][],
+    unlinkRefusal: null as string | null,
+    unlinkRouteMissing: false,
+    // Whether the organization lists its fixture project, and the teams a test
+    // created, in either workspace — so an organization can be new, with none
+    // (register F57).
     fixtureProjectListed: true,
     createdProjects: [] as Platform["ProjectSummary"][],
+    // Whether the organization's domain is still waiting to be verified.
+    domainPending: false,
+    // Pro's price, unstated: the provider could not give one flat figure.
+    proPriceUnstated: false,
     // FR-14: upload sessions the website opened, and the bytes each received.
     uploads: new Map<
       string,
@@ -270,12 +302,15 @@ const domain = {
   createdAt: now,
 } satisfies Platform["OrganizationDomain"];
 
+// Backend 24.12.4: a join request names the person asking.
 function joinRequest(): Platform["OrganizationJoinRequest"] {
   return state.joinRequestStatus === "approved"
     ? {
         id: joinRequestId,
         workspaceId,
         userId: requesterUserId,
+        displayName: requesterSession.user.displayName,
+        email: requesterSession.user.email,
         status: "approved",
         createdAt: now,
         decidedAt: now,
@@ -285,6 +320,8 @@ function joinRequest(): Platform["OrganizationJoinRequest"] {
         id: joinRequestId,
         workspaceId,
         userId: requesterUserId,
+        displayName: requesterSession.user.displayName,
+        email: requesterSession.user.email,
         status: "pending",
         createdAt: now,
       };
@@ -357,6 +394,7 @@ const automation = (templateId: string, name: string) =>
     monthlyPriceUsd: 0,
     subscribed: false,
     available: true,
+    requiredConnections: [],
     setup: [],
     pipeline: [
       {
@@ -644,25 +682,32 @@ function fixtureRunStats(since: string | null): Automations["RunStats"] {
 // Billing (ADR-0025): the free floor never appears in the plan list, and a
 // workspace that has never paid reports the free plan with no status. A
 // checkout makes the bought plan `active` — the fixture's stand-in for the
-// provider webhook that does it in production. Nothing in the published API
-// restores it (like the connection and export state above, it lives for one
-// fixture process), so the billing tests order their own steps. Two plans, so
-// that a live subscription offering no second checkout is observable.
-// Team carries the provider's price (backend ADR-0031) and both capabilities the
-// production plans grant; Pro has no price — the provider could not state one
-// flat figure — and a capability the website has no words for, which it must
-// not print as a raw key.
-const teamPlan = {
+// provider webhook that does it in production — and, once a workspace has a
+// plan, a second checkout is refused with `plan_exists` (backend 24.12). Each
+// test starts from the fixture's first state. Two plans, at the provider's
+// prices (backend ADR-0031), listed by id as the platform lists them — Pro
+// before Plus — so the website's own order is by price. Plus is the platform's
+// `team` plan renamed: its id stays (build 10). Each carries capabilities, as
+// the contract requires, which no card prints.
+const plusPlan = {
   planId: "fixture-team",
-  displayName: "Team",
+  displayName: "Plus",
   capabilities: { "automation.subscribe": 10, "workspace.rate": 120 },
   price: { amount: 500, currency: "usd", interval: "month" },
 } satisfies Platform["PurchasablePlan"];
 const proPlan = {
   planId: "fixture-pro",
   displayName: "Pro",
-  capabilities: { "automation.subscribe": 50, "fixture.unlabelled": 7 },
+  capabilities: { "automation.subscribe": 50, "workspace.rate": 240 },
+  price: { amount: 1000, currency: "usd", interval: "month" },
 } satisfies Platform["PurchasablePlan"];
+function listedPlans(): Platform["PurchasablePlan"][] {
+  // An unstated price is absent from the answer, as the contract has it.
+  return [
+    state.proPriceUnstated ? { ...proPlan, price: undefined } : proPlan,
+    plusPlan,
+  ];
+}
 const hostedExpiry = "2026-08-12T12:30:00.000Z";
 
 function problem(status: number, title: string, details?: Json): Json {
@@ -830,10 +875,24 @@ const server = createServer(
       "/__fixture/member-owns-project": () => {
         state.memberOwnsProject = true;
       },
-      "/__fixture/member-plain-on-team": () => {
-        state.teamMemberships = state.teamMemberships.map((entry) =>
-          entry.userId === memberUserId ? { ...entry, role: "member" } : entry,
-        );
+      "/__fixture/team-access-missing": () => {
+        state.teamAccessMissing = true;
+      },
+      // Backend 24.11.1: the next unlink refused with a reason — `refused`
+      // unless one is named — or met by a platform with no unlink route yet.
+      "/__fixture/unlink-refused": () => {
+        state.unlinkRefusal = url.searchParams.get("reason") ?? "refused";
+      },
+      "/__fixture/unlink-route-missing": () => {
+        state.unlinkRouteMissing = true;
+      },
+      // The organization's domain claimed but not verified yet.
+      "/__fixture/domain-pending": () => {
+        state.domainPending = true;
+      },
+      // Backend ADR-0031: a plan whose price the provider cannot state.
+      "/__fixture/plan-price-unstated": () => {
+        state.proPriceUnstated = true;
       },
       // FR-14: every completed file collected, so a run named one is refused
       // with `artifact_unavailable`, as a file that is gone is.
@@ -922,10 +981,18 @@ const server = createServer(
         // What reached the object store, and how much of it carried a cookie.
         storePuts: state.storePuts,
         storePutsWithCookie: state.storePutsWithCookie,
-        projectTeamGrants: state.projectTeamGrants.length,
         // Each approval's status: a decision leaves the page, and which it was
         // is read here.
         approvalStatuses: state.approvals.map((entry) => entry.status),
+        // Every checkout asked for: a refused one leaves no plan behind.
+        checkoutAttempts: state.checkoutAttempts,
+        // Every team a test created — where, and the name and kind it was
+        // sent with — and, by its absence, every one refused.
+        createdTeams: state.createdProjects.map((team) => ({
+          workspaceId: team.workspaceId,
+          name: team.name,
+          type: team.type,
+        })),
       });
     }
     if (
@@ -933,15 +1000,6 @@ const server = createServer(
       url.pathname === "/__fixture/org-without-projects"
     ) {
       state.fixtureProjectListed = false;
-      response.writeHead(204, { "cache-control": "no-store" });
-      return response.end();
-    }
-    if (
-      request.method === "POST" &&
-      url.pathname === "/__fixture/org-without-teams"
-    ) {
-      state.teams = [];
-      state.teamMemberships = [];
       response.writeHead(204, { "cache-control": "no-store" });
       return response.end();
     }
@@ -1075,7 +1133,11 @@ const server = createServer(
     // and the website reads it on the server with no cookie (§12.1 #160).
     if (request.method === "GET" && url.pathname === "/v1/auth/providers") {
       const providers = {
-        providers: [{ id: "google", label: "Google" }],
+        // Microsoft too, so a second linked account has a row (backend 24.11.1).
+        providers: [
+          { id: "google", label: "Google" },
+          { id: "microsoft", label: "Microsoft" },
+        ],
         passwordLoginEnabled: false,
         magicLinkLoginEnabled: false,
       } satisfies Platform["LoginProvidersResponse"];
@@ -1196,8 +1258,62 @@ const server = createServer(
         activeWorkspaceId: state.activeWorkspaceId,
       } satisfies Platform["ActiveWorkspaceResponse"]);
     }
+    // Backend 24.11.1: what is linked, and Unlink — never the account signed
+    // up with, refused with the platform's sentence and its reason.
+    // Backend 24.12.2: each account with the address its provider reports
+    // (an account whose provider reports none carries no `email`).
+    const identityEmail: Partial<
+      Record<Platform["LoginIdentitySummary"]["provider"], string>
+    > = {
+      google: "owner@example.test",
+      microsoft: "fixture.owner@outlook.test",
+    };
+    const identities = () =>
+      ({
+        identities: state.identities.map((provider, index) => ({
+          provider,
+          primary: index === 0,
+          ...(identityEmail[provider]
+            ? { email: identityEmail[provider] }
+            : {}),
+        })),
+      }) satisfies Platform["LoginIdentitiesResponse"];
     if (method === "GET" && pathname === "/v1/auth/identities")
-      return respond(response, 200, { identities: [] });
+      return respond(response, 200, identities());
+    const unlink = /^\/v1\/auth\/identities\/(google|microsoft|apple)$/u.exec(
+      pathname,
+    );
+    if (method === "DELETE" && unlink) {
+      // A platform from before the SEVENTEENTH promotion: the Edge's own
+      // answer to a route it does not have, naming the method and the path.
+      if (state.unlinkRouteMissing)
+        return respond(response, 404, {
+          ...problem(404, "Not Found", { method, path: pathname }),
+          detail: "Route is not implemented",
+          code: "NOT_FOUND",
+        });
+      const provider =
+        unlink[1] as Platform["LoginIdentitySummary"]["provider"];
+      const at = state.identities.indexOf(provider);
+      if (at === -1)
+        return respond(response, 404, {
+          ...problem(404, "Not Found"),
+          detail: "That sign-in account is not linked",
+        });
+      const sentences: Record<string, string> = {
+        primary: "The account you signed up with stays linked",
+        last: "The last sign-in account stays linked",
+        refused: "This sign-in account cannot be unlinked",
+      };
+      const reason = at === 0 ? "primary" : state.unlinkRefusal;
+      if (reason)
+        return respond(response, 400, {
+          ...problem(400, "Bad Request", { reason }),
+          detail: sentences[reason] ?? "Bad Request",
+        });
+      state.identities = state.identities.filter((entry) => entry !== provider);
+      return respond(response, 200, identities());
+    }
     if (method === "GET" && pathname === "/v1/workspaces") {
       state.workspaceListReads += 1;
       const workspaces =
@@ -1215,6 +1331,11 @@ const server = createServer(
           : { activeWorkspaceId: state.activeWorkspaceId }),
       } satisfies Platform["WorkspaceListResponse"]);
     }
+    // The teams a test created in one workspace. An organization's are listed
+    // to its owner and its admin — the creator and someone who sees every team
+    // (backend 24.11.3) — and never to a plain member who is on none of them.
+    const createdIn = (where: string) =>
+      state.createdProjects.filter((team) => team.workspaceId === where);
     if (method === "GET" && isWorkspacePath(pathname, "/projects")) {
       // The role each person holds on the fixture project: its owner, an
       // organization admin (effective admin), or a plain member on it.
@@ -1224,25 +1345,60 @@ const server = createServer(
           ...(viewerRole && state.fixtureProjectListed
             ? [{ ...project, viewerRole }]
             : []),
-          ...state.createdProjects,
+          ...(fixtureSession === "owner" || fixtureSession === "admin"
+            ? createdIn(workspaceId)
+            : []),
         ],
       } satisfies Platform["ProjectListResponse"]);
     }
-    // Creating a project in the organization: its creator owns it, as Access
-    // records the owner membership in the same transaction.
-    if (method === "POST" && isWorkspacePath(pathname, "/projects")) {
+    // Creating a team, in the organization or in the owner's personal
+    // workspace: its creator owns it, as Access records the owner membership in
+    // the same transaction. Backend 24.12: in an organization only its owners
+    // and admins create one (403), and a workspace holds one team per kind —
+    // matched without case, an archived team not counted (409
+    // `team_kind_taken`).
+    const creating = /^\/v1\/workspaces\/([^/]+)\/projects$/u.exec(pathname);
+    if (
+      method === "POST" &&
+      creating &&
+      (creating[1] === workspaceId || creating[1] === personalWorkspaceId)
+    ) {
+      const where = creating[1]!;
+      const allowed =
+        where === personalWorkspaceId
+          ? fixtureSession === "owner"
+          : fixtureSession === "owner" || fixtureSession === "admin";
+      if (!allowed) return respond(response, 403, problem(403, "Forbidden"));
+      if (!request.headers["idempotency-key"])
+        return respond(response, 400, problem(400, "Bad Request"));
       const body = (await requestJson(request)) as {
         name?: string;
         type?: string;
       };
-      if (!body.name || !body.type) {
+      const name = body.name?.trim() ?? "";
+      if (name.length < 2 || name.length > 60 || !body.type) {
         return respond(response, 400, problem(400, "Bad Request"));
       }
+      const kind = body.type.toLowerCase();
+      const held = [
+        ...(where === workspaceId && state.fixtureProjectListed
+          ? [project]
+          : []),
+        ...createdIn(where),
+      ].some(
+        (team) =>
+          team.status !== "archived" && team.type.toLowerCase() === kind,
+      );
+      if (held)
+        return respond(response, 409, {
+          ...problem(409, "Conflict", { reason: "team_kind_taken" }),
+          detail: "This workspace already has a team of this kind",
+        });
       const created = {
         // Eight hex digits in the first group, however many are created.
         id: `${String(state.createdProjects.length).padStart(8, "5")}-5555-4555-8555-555555555555`,
-        workspaceId,
-        name: body.name,
+        workspaceId: where,
+        name,
         type: body.type,
         status: "active",
         viewerRole: "owner",
@@ -1253,30 +1409,82 @@ const server = createServer(
         project: created,
       } satisfies Platform["ProjectMutationResponse"]);
     }
-    if (
-      method === "GET" &&
-      isWorkspacePath(pathname, `/projects/${projectId}/memberships`)
-    ) {
-      // The project page lists who is on the project (register F37: axe had
-      // never scanned it, because this read was undeclared here).
-      return respond(response, 200, {
-        memberships: [
-          {
-            projectId,
-            workspaceId,
-            userId,
-            role: "owner",
-            displayName: "Fixture Owner",
-            email: "owner@example.test",
-            createdAt: now,
-          },
-        ],
-      } satisfies Platform["ProjectMembershipListResponse"]);
+    // Who is on a team, and the changes its owner or admin makes — or the
+    // organization's (backend 24.11.3). A team created here has its creator.
+    const memberships = new RegExp(
+      `^/v1/workspaces/${workspaceId}/projects/([^/]+)/memberships(?:/([^/]+))?$`,
+      "u",
+    ).exec(pathname);
+    if (memberships) {
+      const [, teamId, memberId] = memberships;
+      const created = state.createdProjects.find(
+        (entry) => entry.id === teamId,
+      );
+      if (teamId !== projectId && !created)
+        return respond(response, 404, problem(404, "Not Found"));
+      if (method === "GET" && !memberId) {
+        return respond(response, 200, {
+          memberships: created
+            ? [{ ...state.projectMembers[0]!, projectId: created.id }]
+            : state.projectMembers,
+        } satisfies Platform["ProjectMembershipListResponse"]);
+      }
+      const deciding =
+        fixtureSession === "owner" ||
+        fixtureSession === "admin" ||
+        projectRoleOf(fixtureSession) === "owner";
+      if (!request.headers["idempotency-key"])
+        return respond(response, 400, problem(400, "Bad Request"));
+      if (method === "POST" && !memberId && teamId === projectId) {
+        const body = (await requestJson(request)) as {
+          userId?: string;
+          role?: Platform["ProjectMembership"]["role"];
+        };
+        const person = organizationMembers.find(
+          (entry) => entry.userId === body.userId,
+        );
+        if (!deciding) return respond(response, 403, problem(403, "Forbidden"));
+        if (!person || !body.role)
+          return respond(response, 400, problem(400, "Bad Request"));
+        const membership = {
+          projectId,
+          workspaceId,
+          userId: person.userId,
+          role: body.role,
+          displayName: person.displayName,
+          email: person.email,
+          createdAt: now,
+        } satisfies Platform["ProjectMembership"];
+        state.projectMembers = [
+          ...state.projectMembers.filter(
+            (entry) => entry.userId !== person.userId,
+          ),
+          membership,
+        ];
+        return respond(response, 200, {
+          membership,
+        } satisfies Platform["ProjectMembershipMutationResponse"]);
+      }
+      if (method === "DELETE" && memberId && teamId === projectId) {
+        const self =
+          (fixtureSession === "member" && memberId === memberUserId) ||
+          (fixtureSession === "owner" && memberId === userId);
+        if (!deciding && !self)
+          return respond(response, 403, problem(403, "Forbidden"));
+        state.projectMembers = state.projectMembers.filter(
+          (entry) => entry.userId !== memberId,
+        );
+        return respond(response, 200, {
+          removed: true,
+        } satisfies Platform["RemovalResponse"]);
+      }
+      return respond(response, 404, problem(404, "Not Found"));
     }
-    // The owner's personal workspace holds nothing but its own billing (below):
-    // every list the account pages read for it is empty, as the Edge answers a
-    // workspace with nothing in it, and the catalog is the same catalog with
-    // nothing subscribed. A test that switches to it reads real pages, not 501s.
+    // The owner's personal workspace holds nothing but its own billing (below)
+    // and the teams a test creates in it: every other list the account pages
+    // read for it is empty, as the Edge answers a workspace with nothing in it,
+    // and the catalog is the same catalog with nothing subscribed. A test that
+    // switches to it reads real pages, not 501s.
     if (
       method === "GET" &&
       pathname.startsWith(`/v1/workspaces/${personalWorkspaceId}/`)
@@ -1294,7 +1502,9 @@ const server = createServer(
         cancelled: 0,
       };
       const empty: Record<string, Json> = {
-        "/projects": { projects: [] } satisfies Platform["ProjectListResponse"],
+        "/projects": {
+          projects: createdIn(personalWorkspaceId),
+        } satisfies Platform["ProjectListResponse"],
         "/subscriptions": {
           subscriptions: [],
         } satisfies AutomationOperations["listSubscriptions"]["responses"][200]["content"]["application/json"],
@@ -1332,219 +1542,148 @@ const server = createServer(
         members: organizationMembers,
       } satisfies Platform["WorkspaceMemberListResponse"]);
     }
-    // Teams, as backend ADR-0010 and the published descriptions hold them: an
-    // owner or admin sees and creates every team; anyone else sees the teams
-    // they are on. An owner, an admin or the team's manager reads and changes
-    // its members. A project's owner or admin grants it to a team.
-    const viewer =
-      fixtureSession === "owner"
-        ? userId
-        : fixtureSession === "admin"
-          ? adminUserId
-          : fixtureSession === "member"
-            ? memberUserId
-            : requesterUserId;
     const administering =
       fixtureSession === "owner" || fixtureSession === "admin";
-    const onTeam = (teamId: string) =>
-      state.teamMemberships.find(
-        (entry) => entry.teamId === teamId && entry.userId === viewer,
-      );
-    if (isWorkspacePath(pathname, "/teams")) {
-      if (method === "GET") {
-        return respond(response, 200, {
-          teams: state.teams.flatMap((team) => {
-            const mine = onTeam(team.id);
-            if (!administering && !mine) return [];
-            return [{ ...team, ...(mine ? { viewerRole: mine.role } : {}) }];
-          }),
-        } satisfies Platform["TeamListResponse"]);
-      }
-      if (method === "POST") {
-        if (!administering) {
-          return respond(response, 403, problem(403, "Forbidden"));
-        }
-        const body = (await requestJson(request)) as {
-          name?: string;
-          description?: string;
-        };
-        if (
-          !request.headers["idempotency-key"] ||
-          typeof body.name !== "string" ||
-          body.name.length < 2 ||
-          body.name.length > 120
-        ) {
-          return respond(response, 400, problem(400, "Bad Request"));
-        }
-        const team = {
-          id: crypto.randomUUID(),
-          workspaceId,
-          name: body.name,
-          ...(body.description ? { description: body.description } : {}),
-          status: "active",
-          createdAt: now,
-        } satisfies Platform["TeamSummary"];
-        state.teams.unshift(team);
-        return respond(response, 200, {
-          team,
-        } satisfies Platform["TeamMutationResponse"]);
-      }
-    }
-    const teamMembers = new RegExp(
-      `^/v1/workspaces/${workspaceId}/teams/([^/]+)/memberships$`,
-      "u",
-    ).exec(pathname);
-    if (teamMembers) {
-      const team = state.teams.find((entry) => entry.id === teamMembers[1]);
-      if (!team) return respond(response, 404, problem(404, "Not Found"));
-      // An owner, an admin or the team's manager; any other member is 403.
-      if (!administering && onTeam(team.id)?.role !== "manager") {
-        return respond(response, 403, problem(403, "Forbidden"));
-      }
-      if (method === "GET") {
-        return respond(response, 200, {
-          memberships: state.teamMemberships.filter(
-            (entry) => entry.teamId === team.id,
-          ),
-        } satisfies Platform["TeamMembershipListResponse"]);
-      }
-      if (method === "POST") {
-        const body = (await requestJson(request)) as {
-          userId?: string;
-          role?: string;
-        };
-        if (
-          !request.headers["idempotency-key"] ||
-          (body.role !== "manager" && body.role !== "member")
-        ) {
-          return respond(response, 400, problem(400, "Bad Request"));
-        }
-        // Only someone already in the workspace can join one of its teams.
-        if (
-          !organizationMembers.some((entry) => entry.userId === body.userId)
-        ) {
-          return respond(response, 404, problem(404, "Not Found"));
-        }
-        const membership = {
-          teamId: team.id,
-          workspaceId,
-          userId: body.userId as string,
-          role: body.role,
-          createdAt: now,
-        } satisfies Platform["TeamMembershipSummary"];
-        state.teamMemberships = [
-          membership,
-          ...state.teamMemberships.filter(
-            (entry) =>
-              !(entry.teamId === team.id && entry.userId === body.userId),
-          ),
-        ];
-        return respond(response, 200, {
-          membership,
-        } satisfies Platform["TeamMembershipMutationResponse"]);
-      }
-    }
-    // Backend §12.1 #174: taking someone off a team, by the same authority
-    // that adds them; absent is `removed: false`, not 404.
-    const teamMember = new RegExp(
-      `^/v1/workspaces/${workspaceId}/teams/([^/]+)/memberships/([^/]+)$`,
-      "u",
-    ).exec(pathname);
-    if (teamMember && method === "DELETE") {
-      const team = state.teams.find((entry) => entry.id === teamMember[1]);
-      if (!team) return respond(response, 404, problem(404, "Not Found"));
-      if (!administering && onTeam(team.id)?.role !== "manager") {
-        return respond(response, 403, problem(403, "Forbidden"));
-      }
-      if (!request.headers["idempotency-key"]) {
-        return respond(response, 400, problem(400, "Bad Request"));
-      }
-      const before = state.teamMemberships.length;
-      state.teamMemberships = state.teamMemberships.filter(
-        (entry) =>
-          !(entry.teamId === team.id && entry.userId === teamMember[2]),
-      );
-      return respond(response, 200, {
-        removed: state.teamMemberships.length < before,
-      } satisfies Platform["RemovalResponse"]);
-    }
-    const teamGrant = new RegExp(
-      `^/v1/workspaces/${workspaceId}/projects/${projectId}/team-grants/([^/]+)$`,
-      "u",
-    ).exec(pathname);
-    if (teamGrant && method === "DELETE") {
-      const projectRole = projectRoleOf(fixtureSession);
-      if (!projectRole)
+    // Backend 24.11.4: the organization's directory — every open team, and
+    // where this person stands with each. Operations is listed to the plain
+    // member only (see operationsTeamId).
+    if (method === "GET" && isWorkspacePath(pathname, "/project-directory")) {
+      if (state.teamAccessMissing)
         return respond(response, 404, problem(404, "Not Found"));
-      if (projectRole !== "owner" && projectRole !== "admin") {
-        return respond(response, 403, problem(403, "Forbidden"));
-      }
-      if (!request.headers["idempotency-key"]) {
-        return respond(response, 400, problem(400, "Bad Request"));
-      }
-      const before = state.projectTeamGrants.length;
-      state.projectTeamGrants = state.projectTeamGrants.filter(
-        (entry) => entry.teamId !== teamGrant[1],
-      );
       return respond(response, 200, {
-        revoked: state.projectTeamGrants.length < before,
-      } satisfies Platform["RevocationResponse"]);
+        projects: [
+          ...(state.fixtureProjectListed
+            ? [
+                {
+                  id: projectId,
+                  workspaceId,
+                  name: project.name,
+                  type: project.type,
+                  status: project.status,
+                  access: projectRoleOf(fixtureSession) ? "member" : "none",
+                  createdAt: now,
+                } satisfies Platform["ProjectDirectoryEntry"],
+              ]
+            : []),
+          ...(fixtureSession === "member"
+            ? [
+                {
+                  id: operationsTeamId,
+                  workspaceId,
+                  name: "Operations",
+                  type: "Operations",
+                  status: "active",
+                  access:
+                    state.memberRequest === "pending" ? "requested" : "none",
+                  createdAt: now,
+                } satisfies Platform["ProjectDirectoryEntry"],
+              ]
+            : []),
+        ],
+      } satisfies Platform["ProjectDirectoryResponse"]);
     }
-    if (isWorkspacePath(pathname, `/projects/${projectId}/team-grants`)) {
-      // Anyone with a role on the project reads its grants; anyone else is 404.
-      // Granting is the project's effective owner's or admin's.
-      const projectRole = projectRoleOf(fixtureSession);
-      if (!projectRole) {
+    // Backend 24.11.2: asking to join a team. The fixture project's owner and
+    // the organization's owner and admin read and answer its requests — anyone
+    // else reads only their own, and is refused an answer. The member asks
+    // onto Operations, and withdraws their own request.
+    const accessRequests = new RegExp(
+      `^/v1/workspaces/${workspaceId}/projects/([^/]+)/access-requests(?:/([^/]+))?$`,
+      "u",
+    ).exec(pathname);
+    if (accessRequests) {
+      if (state.teamAccessMissing)
         return respond(response, 404, problem(404, "Not Found"));
-      }
-      if (method === "GET") {
-        return respond(response, 200, {
-          grants: state.projectTeamGrants,
-        } satisfies Platform["ProjectTeamGrantListResponse"]);
-      }
-      if (method === "POST") {
-        if (projectRole !== "owner" && projectRole !== "admin") {
-          return respond(response, 403, problem(403, "Forbidden"));
-        }
-        const body = (await requestJson(request)) as {
-          teamId?: string;
-          role?: string;
-        };
-        if (
-          !request.headers["idempotency-key"] ||
-          (body.role !== "admin" && body.role !== "member")
-        ) {
-          return respond(response, 400, problem(400, "Bad Request"));
-        }
-        // Backend §12.1 #176: only a team the caller can see — every team for
-        // an owner or admin, otherwise a team they are on. Unseen is 404.
-        if (
-          !state.teams.some((entry) => entry.id === body.teamId) ||
-          (!administering && !onTeam(body.teamId as string))
-        ) {
-          return respond(response, 404, problem(404, "Not Found"));
-        }
-        const grant = {
-          projectId,
-          teamId: body.teamId as string,
+      const [, teamId, requestId] = accessRequests;
+      if (method !== "GET" && !request.headers["idempotency-key"])
+        return respond(response, 400, problem(400, "Bad Request"));
+      const newcomer = {
+        id: newcomerRequestId,
+        projectId,
+        workspaceId,
+        userId: newcomerUserId,
+        status: state.newcomerRequest,
+        displayName: "Fixture Newcomer",
+        email: "newcomer@example.test",
+        createdAt: now,
+      } satisfies Platform["ProjectAccessRequest"];
+      const own = () =>
+        ({
+          id: memberRequestId,
+          projectId: operationsTeamId,
           workspaceId,
-          role: body.role,
+          userId: memberUserId,
+          status: state.memberRequest ?? "pending",
+          displayName: "Fixture Member",
+          email: "member@example.test",
           createdAt: now,
-        } satisfies Platform["ProjectTeamGrantSummary"];
-        state.projectTeamGrants = [
-          grant,
-          ...state.projectTeamGrants.filter(
-            (entry) => entry.teamId !== body.teamId,
-          ),
-        ];
-        return respond(response, 200, {
-          grant,
-        } satisfies Platform["ProjectTeamGrantMutationResponse"]);
+        }) satisfies Platform["ProjectAccessRequest"];
+      if (teamId === projectId) {
+        const deciding =
+          administering || projectRoleOf(fixtureSession) === "owner";
+        if (method === "GET" && !requestId)
+          return respond(response, 200, {
+            requests: deciding ? [newcomer] : [],
+          } satisfies Platform["ProjectAccessRequestListResponse"]);
+        if (method === "PATCH" && requestId === newcomerRequestId) {
+          if (!deciding)
+            return respond(response, 403, problem(403, "Forbidden"));
+          if (state.newcomerRequest !== "pending")
+            return respond(response, 409, problem(409, "Conflict"));
+          const body = (await requestJson(request)) as { decision?: string };
+          if (body.decision !== "approve" && body.decision !== "deny")
+            return respond(response, 400, problem(400, "Bad Request"));
+          state.newcomerRequest =
+            body.decision === "approve" ? "approved" : "denied";
+          // Approve puts them on the team as a member, in the same step.
+          if (body.decision === "approve")
+            state.projectMembers = [
+              ...state.projectMembers,
+              {
+                projectId,
+                workspaceId,
+                userId: newcomerUserId,
+                role: "member",
+                displayName: "Fixture Newcomer",
+                email: "newcomer@example.test",
+                createdAt: now,
+              },
+            ];
+          return respond(response, 200, {
+            request: { ...newcomer, status: state.newcomerRequest },
+          } satisfies Platform["ProjectAccessRequestMutationResponse"]);
+        }
       }
+      if (teamId === operationsTeamId && fixtureSession === "member") {
+        if (method === "GET" && !requestId)
+          return respond(response, 200, {
+            requests: state.memberRequest ? [own()] : [],
+          } satisfies Platform["ProjectAccessRequestListResponse"]);
+        if (method === "POST" && !requestId) {
+          if (state.memberRequest === "pending")
+            return respond(response, 409, problem(409, "Conflict"));
+          state.memberRequest = "pending";
+          return respond(response, 200, {
+            request: own(),
+          } satisfies Platform["ProjectAccessRequestMutationResponse"]);
+        }
+        if (method === "DELETE" && requestId === memberRequestId) {
+          if (state.memberRequest !== "pending")
+            return respond(response, 409, problem(409, "Conflict"));
+          state.memberRequest = "cancelled";
+          return respond(response, 200, {
+            request: own(),
+          } satisfies Platform["ProjectAccessRequestMutationResponse"]);
+        }
+      }
+      return respond(response, 404, problem(404, "Not Found"));
     }
     if (method === "GET" && isWorkspacePath(pathname, "/domains")) {
       return respond(response, 200, {
-        domains: [domain],
+        domains: [
+          state.domainPending
+            ? { ...domain, status: "pending", verifiedAt: undefined }
+            : domain,
+        ],
       } satisfies Platform["OrganizationDomainListResponse"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/join-requests")) {
@@ -1712,6 +1851,19 @@ const server = createServer(
       return respond(response, 200, fixtureCatalog());
     }
     if (method === "GET" && isWorkspacePath(pathname, "/subscriptions")) {
+      // Backend §12.1 #203: the archived ones, asked for by name.
+      if (url.searchParams.get("status") === "archived")
+        return respond(response, 200, {
+          subscriptions: state.archivableArchived
+            ? [
+                {
+                  ...archivableSubscription,
+                  status: "archived",
+                  updatedAt: "2026-09-30T12:00:00.000Z",
+                },
+              ]
+            : [],
+        } satisfies AutomationOperations["listSubscriptions"]["responses"][200]["content"]["application/json"]);
       return respond(response, 200, {
         subscriptions: [
           ...state.projectAutomationScopes.map(projectAutomationSubscription),
@@ -2217,7 +2369,7 @@ const server = createServer(
       // Any signed-in person may read the plan list; the free floor is never
       // on it (a plan with no provider price is omitted).
       const body = {
-        plans: [teamPlan, proPlan],
+        plans: listedPlans(),
       } satisfies Platform["PlanListResponse"];
       return respond(response, 200, body);
     }
@@ -2282,8 +2434,9 @@ const server = createServer(
         return respond(response, 200, body);
       }
       if (method === "POST" && operation === "/checkout") {
+        state.checkoutAttempts += 1;
         const body = (await requestJson(request)) as { planId?: string };
-        const plan = [teamPlan, proPlan].find(
+        const plan = [plusPlan, proPlan].find(
           (candidate) => candidate.planId === body.planId,
         );
         // The Edge answers 404 for a plan that is not purchasable.
@@ -2293,6 +2446,15 @@ const server = createServer(
             404,
             problem(404, "The plan is not purchasable"),
           );
+        }
+        // Backend 24.12: a workspace that already has a plan changes it in the
+        // portal; a second checkout would bill both.
+        if (subscribed) {
+          return respond(response, 409, {
+            ...problem(409, "Conflict", { reason: "plan_exists" }),
+            detail:
+              "This workspace already has a plan. Change it in Manage billing.",
+          });
         }
         state.subscribedPlan.set(billedWorkspace, plan);
         return respond(response, 201, {
@@ -2332,7 +2494,6 @@ const server = createServer(
               workspace: null,
               members: [],
               projects: [],
-              teams: [],
               domains: [],
               truncated: !complete,
             },

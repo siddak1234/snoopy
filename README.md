@@ -55,11 +55,16 @@ starts (the preflight binds each one; `lsof` cannot see a renamed `next-server`)
 
 `npm run test:browser:fixtures` starts a loopback-only HTTPS Edge fixture with
 a temporary certificate and scans every authenticated page with axe. Its tests
-drive the published operations the website calls — automations and runs,
-a run's file (PUT straight to the fixture's object store, across origins),
-moving a subscription to a newer version, a webhook automation's address,
-connections, teams and project access (given and taken away), billing, the
-quick and the complete export, account deletion, and the platform's refusals —
+drive the published operations the website calls — flows and runs, archiving
+a flow and the archived ones, a run's file (PUT straight to the fixture's object
+store, across origins), moving a subscription to a newer version, a webhook
+flow's address, connections, teams (a team is a project in the platform's
+contract: creating one in the organization or the personal workspace — one per
+kind, by its owners and admins — its members, asking to join and the answers),
+the organization's join link, unlinking a sign-in account (each refusal, and a
+platform with no unlink yet), billing (Free, Plus and Pro, and a second plan
+refused), the quick and the complete export, account deletion, and the
+platform's refusals —
 without real accounts or credentials, and each test starts from the fixture's
 first state. Three specs: `e2e/accessibility.spec.ts`,
 `e2e/public-edge-fixture.spec.ts` and `e2e/account-surfaces.spec.ts` (every

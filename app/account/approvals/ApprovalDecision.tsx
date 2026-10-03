@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
-import { decideApproval } from "@/app/account/automations/actions";
+import { decideApproval } from "@/app/account/flows/actions";
 
 /**
  * Approve or reject one held run.

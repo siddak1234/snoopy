@@ -25,14 +25,13 @@ export type CompleteUploadResult =
   { ok: true; file: UploadedFile } | { ok: false; error: string };
 
 const UPLOAD_REFUSALS: Record<string, string> = {
-  content_type_not_accepted:
-    "This automation does not accept that type of file.",
-  file_too_large: "The file is larger than this automation accepts.",
-  subscription_not_live: "Go live first; a paused automation takes no files.",
-  no_file_input: "This automation does not take a file.",
+  content_type_not_accepted: "This flow does not accept that type of file.",
+  file_too_large: "The file is larger than this flow accepts.",
+  subscription_not_live: "Go live first; a paused flow takes no files.",
+  no_file_input: "This flow does not take a file.",
   session_expired: "The upload took too long. Choose the file again.",
   no_object: "The file did not arrive. Choose it again.",
-  too_large: "The file is larger than this automation accepts.",
+  too_large: "The file is larger than this flow accepts.",
 };
 
 function refused(error: unknown): { ok: false; error: string } {

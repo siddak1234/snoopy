@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/ui/Modal";
-import { leaveProjectAction } from "@/app/account/projects/actions";
+import { leaveProjectAction } from "@/app/account/teams/actions";
 import { FormInput } from "@/components/ui/FormInput";
 import { FormError } from "@/components/ui/FormError";
 
@@ -14,7 +14,7 @@ export function LeaveProjectButton({
 }: {
   projectId: string;
   projectName: string;
-  /** If set, navigate here after successful leave (e.g. from project detail page). */
+  /** If set, navigate here after successful leave (e.g. from the team's page). */
   redirectAfterLeave?: string;
 }) {
   const router = useRouter();
@@ -59,7 +59,7 @@ export function LeaveProjectButton({
         disabled={pending}
         className="shrink-0 rounded-lg px-2 py-1.5 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] dark:hover:bg-[var(--surface-hover)]"
       >
-        {pending ? "Leaving…" : "Leave project"}
+        {pending ? "Leaving…" : "Leave team"}
       </button>
 
       {open ? (
@@ -81,7 +81,8 @@ export function LeaveProjectButton({
             id="leave-project-desc"
             className="mt-1 text-sm text-[var(--muted)]"
           >
-            You will be removed from this project. To confirm, type{" "}
+            You will be removed from this team and stop seeing its flows. To
+            confirm, type{" "}
             <span className="font-semibold text-[var(--text)]">DELETE</span>.
           </p>
 
@@ -117,7 +118,7 @@ export function LeaveProjectButton({
                 disabled={!canConfirm || pending}
                 className="btn-primary inline-flex px-5 disabled:pointer-events-none disabled:opacity-50"
               >
-                {pending ? "Leaving…" : "Leave project"}
+                {pending ? "Leaving…" : "Leave team"}
               </button>
             </div>
           </div>

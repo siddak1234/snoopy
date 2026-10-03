@@ -1,14 +1,17 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
+
+import { joinLinkLine } from "../lib/join-link.ts";
 
 const tenancy = readFileSync("lib/tenancy.ts", "utf8");
 const generated = readFileSync(
   "lib/generated/platform-contracts/platform.d.ts",
   "utf8",
 );
-const actions = readFileSync("app/account/projects/actions.ts", "utf8");
+// A team is a project in the platform's contract (BUILD-PLAN 24.11.11).
+const actions = readFileSync("app/account/teams/actions.ts", "utf8");
 
 test("tenancy facade aliases generated public schemas", () => {
   assert.match(
@@ -22,6 +25,8 @@ test("tenancy facade aliases generated public schemas", () => {
     "ProjectMembership",
     "OrganizationDomain",
     "OrganizationJoinRequest",
+    "ProjectDirectoryEntry",
+    "ProjectAccessRequest",
   ]) {
     assert.match(generated, new RegExp(`\\b${schema}:`));
   }
@@ -47,6 +52,9 @@ test("tenancy mutations use unique idempotency keys", () => {
     "domain-verify",
     "join-request-decision",
     "join-request-cancel",
+    "project-access-request",
+    "project-access-decision",
+    "project-access-cancel",
   ]) {
     assert.match(tenancy, new RegExp(`newIdempotencyKey\\("${prefix}"\\)`));
   }
@@ -67,7 +75,7 @@ test("bounded session previews are never used as workspace authority", () => {
   assert.match(tenancy, /activeWorkspaceId/);
   assert.doesNotMatch(tenancy, /\[0\]\?\.id/);
   for (const file of [
-    "app/account/automations/page.tsx",
+    "app/account/flows/page.tsx",
     "app/account/connections/page.tsx",
     "app/account/runs/page.tsx",
     "app/account/runs/[runId]/page.tsx",
@@ -81,9 +89,9 @@ test("bounded session previews are never used as workspace authority", () => {
   // Every action module resolves its workspace through ONE helper (register
   // F28), which reads the session and only compares the id the page sent.
   for (const file of [
-    "app/account/automations/actions.ts",
-    "app/account/automations/upload-actions.ts",
-    "app/account/automations/webhook-actions.ts",
+    "app/account/flows/actions.ts",
+    "app/account/flows/upload-actions.ts",
+    "app/account/flows/webhook-actions.ts",
     "app/account/billing/actions.ts",
     "app/account/connections/actions.ts",
     "app/account/settings/export-actions.ts",
@@ -188,8 +196,7 @@ test("an action on a page's workspace refuses once another tab changed it — bi
   );
   for (const file of [
     "app/account/billing/actions.ts",
-    "app/account/automations/actions.ts",
-    "app/account/projects/actions.ts",
+    "app/account/flows/actions.ts",
     "app/account/teams/actions.ts",
   ]) {
     const source = readFileSync(file, "utf8");
@@ -202,98 +209,151 @@ test("an action on a page's workspace refuses once another tab changed it — bi
   }
 });
 
-test("a team project is created in the organization the dialog showed, while it is still the active one (register F57)", () => {
-  const actions = readFileSync("app/account/projects/actions.ts", "utf8");
+test("a team is its kind, created in the workspace the page showed while it is still the active one — no picker, no name, no description (register F57, the owner's build 9)", () => {
+  const create =
+    /export async function createProjectAction\([\s\S]*?\n\}/u.exec(actions);
+  assert.ok(create, "createProjectAction not found; this test is blind");
+  // Compared before anything is created, and created where the server
+  // resolved — never the first organization listed, never another tab's.
+  assert.match(
+    create[0],
+    /const workspaceId = await activeWorkspaceIfShown\(\s*String\(formData\.get\("workspaceId"\) \?\? ""\),\s*\);\s*if \(!workspaceId\) return \{ ok: false, error: WORKSPACE_CHANGED \};\s*const project = await createProject\(workspaceId, \{ name: type, type \}\);/u,
+  );
+  assert.doesNotMatch(create[0], /description|workspaceTheyAreIn/u);
+  // Other's own words are the team's name as well: the platform's 2 to 60.
+  assert.match(create[0], /if \(type\.length < 2 \|\| type\.length > 60\) \{/u);
+  const dialog = readFileSync(
+    "components/dashboard/CreateTeamDialog.tsx",
+    "utf8",
+  );
+  assert.match(dialog, /data\.set\("workspaceId", workspace\.id\);/u);
+  assert.doesNotMatch(
+    dialog,
+    /name="(?:workspaceId|name|description)"/u,
+    "the workspace is the page's, and a team has no name or description field",
+  );
+  // The active workspace — a personal one included — for its owners and
+  // admins only: a plain member of an organization is offered no Create, as
+  // the platform would refuse it (register F8).
+  const page = readFileSync("app/account/teams/page.tsx", "utf8");
+  assert.match(
+    page,
+    /const active = workspaces\.find\(\s*\(workspace\) => workspace\.id === activeWorkspaceId,\s*\);\s*const create =\s*active && administers\(active\.role\) \? \(\s*<CreateTeamButton\s+workspace=\{\{ id: active\.id, name: active\.name, type: active\.type \}\}/u,
+  );
+  assert.doesNotMatch(page, /places=|initialWorkspaceId=/u);
+});
+
+test("Create's refusals are the app's sentences — a kind the workspace already has, and a plain member of an organization (build 10)", () => {
   assert.match(
     actions,
-    /if \(scope === "team"\) \{[\s\S]*?const workspaceId = await activeWorkspaceIfShown\(\s*String\(formData\.get\("workspaceId"\) \?\? ""\),\s*\);\s*if \(!workspaceId\) return \{ ok: false, error: WORKSPACE_CHANGED \};[\s\S]*?candidate\.id === workspaceId && candidate\.type === "organization"/u,
-    "the active organization the dialog named — never the first organization listed",
+    /if \(error\.status === 409 && error\.details\?\.reason === "team_kind_taken"\)\s*return `This workspace already has a team for \$\{kind\}\.`;/u,
   );
-  const page = readFileSync("app/account/projects/page.tsx", "utf8");
   assert.match(
-    page,
-    /active\?\.type === "organization"/u,
-    "the team option follows the active workspace",
+    actions,
+    /if \(error\.status === 403\)\s*return "Only an owner or admin can create a team here\.";/u,
   );
-  assert.doesNotMatch(
-    page,
-    /accessible\.some\(/u,
-    "not whether one of an organization's projects is visible — a new organization has none",
+  assert.match(
+    actions,
+    /return \{ ok: false, error: createRefusal\(error, type\) \};/u,
   );
 });
 
-test("a team's writes act on the workspace the page showed; a grant on the project's own workspace", () => {
-  const actions = readFileSync("app/account/teams/actions.ts", "utf8");
-  for (const operation of ["createTeam", "upsertTeamMembership"]) {
+test("a team's changes act on the workspace that holds it, resolved on the server; asking onto one names the organization whose directory listed it", () => {
+  for (const operation of [
+    "updateProject",
+    "upsertProjectMembership",
+    "removeProjectMembership",
+    "decideProjectAccess",
+  ]) {
     assert.match(
       actions,
       new RegExp(
-        `const workspaceId = await activeWorkspaceIfShown\\(\\s*String\\(formData\\.get\\("workspaceId"\\) \\?\\? ""\\),\\s*\\);\\s*if \\(!workspaceId\\) return \\{ ok: false, error: WORKSPACE_CHANGED \\};\\s*await ${operation}\\(workspaceId,`,
+        `const \\{ workspace \\} = await projectContext\\(projectId\\);[\\s\\S]*?await ${operation}\\(workspace\\.id, projectId,`,
         "u",
       ),
-      `${operation} is refused once another tab changed the workspace`,
+      operation,
     );
   }
-  assert.match(
-    actions,
-    /const context = await findAccessibleProject\(projectId\);[\s\S]*?await grantProjectTeam\(context\.workspace\.id, projectId,/u,
-    "a grant goes to the workspace that holds the project, resolved on the server",
-  );
-  for (const [page, form] of [
-    [
-      "app/account/teams/page.tsx",
-      "<CreateTeamForm workspaceId={workspace.id} />",
-    ],
-    ["app/account/teams/[teamId]/page.tsx", "workspaceId={workspace.id}"],
+  for (const action of [
+    "requestTeamAccessAction",
+    "withdrawTeamAccessAction",
   ]) {
-    assert.ok(
-      readFileSync(page, "utf8").includes(form),
-      `${page} names its workspace`,
+    assert.match(
+      actions,
+      new RegExp(
+        `export async function ${action}\\([\\s\\S]*?if \\(!\\(await workspaceTheyAreIn\\(workspaceId\\)\\)\\) \\{`,
+        "u",
+      ),
+      action,
     );
   }
 });
 
-test("taking someone off a team and a team's access away are the published DELETEs, keyed and encoded, each confirmed first (backend §12.1 #174)", () => {
+test("asking to join a team is the published operations, keyed, and absent before the promotion rather than failing (backend 24.11.2, 24.11.4)", () => {
   assert.match(
     tenancy,
-    /`\$\{teamPath\(workspaceId, teamId\)\}\/memberships\/\$\{encodeURIComponent\(userId\)\}`,\s*\{\s*method: "DELETE",\s*idempotencyKey: newIdempotencyKey\("team-member-remove"\),/u,
+    /withCursor\(`\$\{workspacePath\(workspaceId\)\}\/project-directory`, cursor\)/u,
   );
   assert.match(
     tenancy,
-    /`\$\{projectPath\(workspaceId, projectId\)\}\/team-grants\/\$\{encodeURIComponent\(teamId\)\}`,\s*\{\s*method: "DELETE",\s*idempotencyKey: newIdempotencyKey\("project-team-revoke"\),/u,
-  );
-  const actions = readFileSync("app/account/teams/actions.ts", "utf8");
-  // A removal acts on the workspace the team's page showed (register F28); a
-  // revocation on the project's own workspace, resolved on the server.
-  assert.match(
-    actions,
-    /const workspaceId = await activeWorkspaceIfShown\(shownWorkspaceId\);\s*if \(!workspaceId\) return \{ ok: false, error: WORKSPACE_CHANGED \};\s*await removeTeamMembership\(workspaceId, teamId, userId\);/u,
+    /`\$\{projectPath\(workspaceId, projectId\)\}\/access-requests`, \{\s*method: "POST",\s*idempotencyKey: newIdempotencyKey\("project-access-request"\),/u,
   );
   assert.match(
-    actions,
-    /const context = await findAccessibleProject\(projectId\);[\s\S]*?await revokeProjectTeam\(context\.workspace\.id, projectId, teamId\);/u,
+    tenancy,
+    /method: "PATCH",\s*body: JSON\.stringify\(\{ decision \}\),\s*idempotencyKey: newIdempotencyKey\("project-access-decision"\),/u,
   );
-  const team = readFileSync("app/account/teams/[teamId]/page.tsx", "utf8");
   assert.match(
-    team,
-    /action=\{removeTeamMemberAction\.bind\(\s*null,\s*workspace\.id,\s*team\.id,\s*membership\.userId,\s*\)\}/u,
+    tenancy,
+    /method: "DELETE",\s*idempotencyKey: newIdempotencyKey\("project-access-cancel"\),/u,
   );
-  assert.doesNotMatch(team, /not available yet/u);
-  // Offered to the project's owner or admin only, as the grant is.
-  const project = readFileSync("app/account/projects/[id]/page.tsx", "utf8");
+  // A platform from before the SEVENTEENTH promotion answers 404 for both: the
+  // asking parts are left out, never the page.
+  for (const page of [
+    "app/account/teams/page.tsx",
+    "app/account/teams/[id]/page.tsx",
+  ]) {
+    assert.match(
+      readFileSync(page, "utf8"),
+      /if \(error instanceof PlatformServerError && error\.status === 404\) return \[\];\s*throw error;/u,
+      page,
+    );
+  }
+  // The requests are drawn for those who decide, never for a plain member.
   assert.match(
-    project,
-    /\{canManage \? \(\s*<ConfirmRemoveButton[\s\S]*?action=\{revokeProjectTeamAction\.bind\(\s*null,\s*project\.id,\s*grant\.teamId,\s*\)\}/u,
+    readFileSync("app/account/teams/[id]/page.tsx", "utf8"),
+    /\{organization && canManage \? \([\s\S]*?<TeamAccessRequests projectId=\{project\.id\} requests=\{requests\} \/>/u,
   );
-  const confirm = readFileSync(
-    "components/dashboard/ConfirmRemoveButton.tsx",
-    "utf8",
-  );
-  assert.match(confirm, /<Modal[\s\S]*?ariaLabelledBy=/u);
+  // A request is withdrawn only after a confirmation.
   assert.match(
-    confirm,
-    /const result = await action\(\);\s*if \(!result\.ok\) \{\s*setError\(result\.error\);\s*return;\s*\}/u,
+    readFileSync("components/dashboard/AskToJoinList.tsx", "utf8"),
+    /<ConfirmRemoveButton\s+label="Withdraw"[\s\S]*?action=\{withdrawTeamAccessAction\.bind\(/u,
   );
+});
+
+test("the old Teams pages and the team grants are gone, and their old addresses land on the new ones (BUILD-PLAN 24.11.11)", () => {
+  for (const gone of [
+    "app/account/projects",
+    "app/account/automations",
+    "app/account/teams/[teamId]",
+    "app/account/teams/CreateTeamForm.tsx",
+    "components/dashboard/CreateProjectDialog.tsx",
+  ])
+    assert.ok(!existsSync(gone), `${gone} is gone`);
+  assert.doesNotMatch(tenancy, /team-grants|teamPath\(|\/teams`/u);
+  const config = readFileSync("next.config.ts", "utf8");
+  for (const [from, to] of [
+    ["/account/automations", "/account/flows"],
+    ["/account/projects", "/account/teams"],
+    ["/account/projects/:id", "/account/teams/:id"],
+  ])
+    assert.match(
+      config,
+      new RegExp(
+        `source: "${from}",\\s*destination: "${to}",\\s*permanent: true`,
+        "u",
+      ),
+      from,
+    );
 });
 
 /** Every server-action module in the app, found by its directive. */
@@ -315,7 +375,7 @@ function serverActionFiles(directory = "app") {
 test("no server action acts on the workspace active NOW rather than the one its page showed (register F28, F70)", () => {
   const files = serverActionFiles();
   assert.ok(
-    files.includes("app/account/automations/actions.ts") &&
+    files.includes("app/account/flows/actions.ts") &&
       files.includes("app/account/connections/actions.ts"),
     "the walk found no action modules; it is now blind",
   );
@@ -332,15 +392,15 @@ test("no server action acts on the workspace active NOW rather than the one its 
   // Each form sends the workspace its page rendered, under one name.
   for (const [file, sends] of [
     [
-      "app/account/automations/AutomationActions.tsx",
+      "app/account/flows/AutomationActions.tsx",
       /data\.set\("workspaceId", workspaceId\)/u,
     ],
     [
-      "app/account/automations/AddAutomation.tsx",
+      "app/account/flows/AddAutomation.tsx",
       /data\.append\("workspaceId", workspaceId\)/u,
     ],
     [
-      "app/account/automations/MoveVersionButton.tsx",
+      "app/account/flows/MoveVersionButton.tsx",
       /data\.append\("workspaceId", workspaceId\)/u,
     ],
     [
@@ -351,7 +411,55 @@ test("no server action acts on the workspace active NOW rather than the one its 
       "app/account/connections/ConnectionsPanel.tsx",
       /data\.set\("workspaceId", workspaceId\)/u,
     ],
+    [
+      "components/dashboard/CreateTeamDialog.tsx",
+      /data\.set\("workspaceId", workspace\.id\)/u,
+    ],
   ]) {
     assert.match(readFileSync(file, "utf8"), sends, file);
+  }
+});
+
+// The owner's build 9 (decision 5): the line under Copy join link says what the
+// link does, by the joining policy of the domain people can find it through —
+// words the app shares (snoopy-mobile `joinLinkLine`).
+test("the join link's line follows the verified domain's joining policy", () => {
+  const verified = {
+    domain: "acme.co",
+    status: "verified",
+    joinPolicy: "approval",
+    discoveryEnabled: true,
+  };
+  assert.equal(
+    joinLinkLine([verified]),
+    "People at acme.co can ask to join. You approve them here.",
+  );
+  assert.equal(
+    joinLinkLine([{ ...verified, joinPolicy: "automatic" }]),
+    "People at acme.co join as soon as they open it.",
+  );
+  assert.equal(
+    joinLinkLine([{ ...verified, joinPolicy: "invite_only" }]),
+    "Joining at acme.co is invite only, so the link lets no one in.",
+  );
+  // Verified but not shown for matching emails: no one at it can find it.
+  assert.equal(
+    joinLinkLine([{ ...verified, discoveryEnabled: false }]),
+    'People at acme.co cannot find it until "Show for matching verified email domains" is on.',
+  );
+  // A domain people can find wins over one they cannot, whatever the order.
+  assert.equal(
+    joinLinkLine([
+      { ...verified, domain: "old.acme.co", discoveryEnabled: false },
+      { ...verified, joinPolicy: "automatic" },
+    ]),
+    "People at acme.co join as soon as they open it.",
+  );
+  // Claimed, not verified — or none at all.
+  for (const domains of [[{ ...verified, status: "pending" }], []]) {
+    assert.equal(
+      joinLinkLine(domains),
+      "Verify your email domain first — only people at it can ask to join.",
+    );
   }
 });
