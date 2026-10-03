@@ -650,7 +650,7 @@ Each names the evidence a backend session can re-run.
 - **F6** `verify:platform-contracts` rewrites the generated files in place and does not restore on "stale". **F7** the generated files carry no source sha (the cell records it by hand).
 - **F8** Connections and Settings → Export have no UI role gate (the server enforces). **F9** action files interpolate the server-resolved workspace id without `encodeURIComponent` (the facades do).
 - **F13** `.claude/launch.json` references a nonexistent `npm run db:studio`. **F15** `scripts/audit/run-gates.mjs` omits `format:check` and `verify:platform-contracts` (both in `npm run verify`). **F16** the `browser` CI job is not a required check. **F17** local Node 24 vs the pinned 22 (`.nvmrc` added in #15).
-- **F18** the web had no handling for the contract's `archived` subscription status (now treated as absent, #14). **F21** ~~`app/account/automations/page.tsx`~~ `byTemplate` is keyed by `templateId`, last-wins over a `created_at DESC` list — with project-scoped subscriptions the oldest hides the newer. **F22** `AutomationSetupField.notifies` renders the raw wire token (`run-succeeded`, `approval-expiring`, …).
+- **F18** the web had no handling for the contract's `archived` subscription status (now treated as absent, #14). **F21** ~~`app/account/automations/page.tsx`~~ `byTemplate` is keyed by `templateId`, last-wins over a `created_at DESC` list — with project-scoped subscriptions the oldest hides the newer (its fix's offer of the teams a flow is not in yet is superseded by **F87**). **F22** `AutomationSetupField.notifies` renders the raw wire token (`run-succeeded`, `approval-expiring`, …).
 - **F24** `scripts/verify.mjs` duplicates `run-gates.mjs`'s preflight, lock and rewrite assertion (~70 lines); a shared `scripts/audit/preflight.mjs` would end it — touching the audit machinery was outside 20.4.1. **F25** `run-gates.mjs` itself acquires its lock non-atomically and treats an empty lock as pid 0 (`process.kill(0, 0)` signals its own group) — `verify.mjs` does neither.
 - **F26** The app has no `error.tsx` boundary at any level; a rethrown platform failure renders Next's default error page.
 - **F27** Pages call `getAppSession` → `listWorkspaces` → `resolveActiveWorkspaceId` sequentially, and the account layout already made the same calls (`cache: "no-store"`) — up to three extra round trips per render.
@@ -748,7 +748,7 @@ the sha256 of the contract it came from.
 | 22.3.2 | F9 | Every write goes through a facade in `lib/*`, which encodes each id; the action files build no `/v1/` path | the contract tests of the automation, billing, connections and export modules |
 | 22.3.3 | F8 | Connect, Reconnect, Replace account, Disconnect and Export are offered to an owner or admin only; a member is told who can | `test/tenancy-contract.test.mjs`; e2e "a member is offered no control the platform would refuse them" |
 | 22.3.4 | F2 | A finished deletion lands on `/account-deleted` | e2e "a clean account deletion signs out and leaves" |
-| 22.3.5 | F21 | A card lists each subscription under its scope; Add offers only the scopes the automation is not in yet, and falls back to one still offered after a re-render | `test/automation-contract.test.mjs`; e2e "a card lists each subscription under its scope …" (the fixture answers 409 if a used scope is sent again) |
+| 22.3.5 | F21 | A card lists each subscription under its scope; Add offers only the scopes the automation is not in yet, and falls back to one still offered after a re-render. **Superseded by F87** (the owner's build 12, #9): the listing stays; a flow held anywhere in the workspace is offered no team | `test/automation-contract.test.mjs`; e2e "a card lists each subscription under its scope …" (the fixture answers 409 if a used scope is sent again) — since F87, "a flow is held once per workspace: its card …" and "a flow held twice from before …" |
 | 22.3.6 | F22 | A notifications switch says in words what it switches | `test/automation-contract.test.mjs`; e2e (the set-up dialog) |
 | 22.3.7 | F40, F41 | One rule for a session that ends while a page is open (`sessionEnded`): the deletion dialog and the linked-accounts section say so and give the way back in; a problem's `title` is shown only when it is a non-empty string | e2e "a session that ended while the settings page was open …"; `test/structure-contract.test.mjs` |
 | 22.3.8 | F46, F47 | A refusal is explained in words, not the Edge's title; a 409 clears the memory of a lost answer | `test/account-deletion-contract.test.mjs`; e2e "a refusal says in words …" |
@@ -1604,3 +1604,224 @@ join Operations" at the same moment. Found by this branch's change audit (probe 
 The fixture's directory now lists the teams a test creates, and lists its fixed Operations team
 only while the organization has teams at all, as the platform's directory would. F84 is the last
 number. Build 10's proofs ran in Chromium, each guard's tests alone, against the fixture.
+
+### Build 12's #5 — red for what removes or ends something — 2026-10-03
+
+The owner on build 12 (2026-10-03, 15:52Z): "Could delete account be in red. Things like remove,
+sign out, stop, and such should be in red right". Decided as option A with its defaults: red marks
+an action that removes or ends something and cannot be undone with a tap, on the page and where it
+is confirmed; Pause (Resume undoes it), Reject and Deny (an answer, not a removal), Withdraw and
+Cancel request (the person can ask again) stay as they were; the light theme keeps `#dc2626`; and
+the website changes in the same round, its three Sign outs included. The app's half is
+`snoopy-mobile`'s. This repository's half is **F85**:
+
+- **Red where it sits.** The danger variant (`btn-danger`, F43) on the buttons: Archive flow,
+  Cancel run, Unlink, Disconnect, and Sign out in the account area's top bar. The error text on
+  the words: Leave team, Delete team — red at rest now, not only hovered — Leave on a person's
+  own row in a team's members, and Sign out in the marketing nav and in the small-screen menu,
+  both shown only when signed in, so the signed-out marketing baselines do not move. A team's and
+  an organization's Remove, and Revoke, were red already.
+- **Red where it is confirmed.** The button in each dialog — Archive, Cancel run, Leave team,
+  Unlink and Remove member — is the danger variant, as Delete Account's was. Delete team, and a
+  team's Remove and Leave, are confirmed by the browser's own `confirm()`, which takes no colour.
+- **What can be undone keeps its colour:** Pause, Reject (an approval, a request to join), Deny,
+  Cancel request, and Withdraw, whose confirm stays the accent — this website's rule already
+  (`components/dashboard/ConfirmRemoveButton.tsx`), and now the app's.
+- **Found on the way, fixed with it:**
+  - the danger variant's hover failed AA in the dark theme. Hovered on a surface,
+    `--error-text` on `--error-bg-strong` computes to 4.45:1 — Delete Account's since F43, and
+    F64's test, whose button was Archive flow, would have read it the moment it turned red. A
+    hovered danger button now takes `--error-text-hover`: 6.49:1 there, 4.99:1 on a light card,
+    as F64 gave the ghost its stronger step. This is the change's one line of CSS, in a rule that
+    was there (`app/globals.css`).
+  - a linked sign-in account's row was dimmed whole (`opacity-75`), Unlink with it. Red under
+    the dim computes to 3.45:1, and the authenticated axe scan of Settings reads it. The dim is
+    now the account's words', never its Unlink's (`components/account/LinkedAccountsSection.tsx`).
+  - Leave team carried a `dark:hover:` neutral that would have taken the red hover's place under a
+    dark system theme; it went.
+- **Tests.** `test/structure-contract.test.mjs` parses each file and holds how every one of these
+  buttons is drawn — the page's, then the confirm's — that none sits under a dimmed element, that
+  what can be undone is drawn as it was, and the danger hover's step. Test 11's probe
+  (`e2e/account-surfaces.spec.ts`) is extended to each control in the browser — as the owner, as a
+  member, and in the marketing nav and its small-screen menu — with a member's two Leaves read
+  hovered too, and to what can be undone, with Withdraw's confirm read as the accent. Flipped,
+  and said so here: F64's test measured Archive flow as its ghost; it now measures the archive
+  dialog's Cancel, a ghost on the same surface, and a new test beside it holds the danger button
+  at AA at rest, hovered and pressed (`e2e/public-edge-fixture.spec.ts`).
+- **Not here.** The app's half, and the platform's records. The light theme's red stays `#dc2626`
+  (decision (c)): on the danger variant's tint it computes to 4.23:1 on a card and 3.90:1 on the
+  page, below AA as the bare red is on the page (4.44:1) — the separate change (c) names. Disconnect
+  still acts with no confirm, where the app asks first.
+
+Proved red by hand, each file restored by SHA-256:
+
+| Guard | Broken by | Red |
+| --- | --- | --- |
+| Archive flow, and Archive confirming, are red | the ghost; Button's default | the structure test "every action that removes or ends something is red …"; test 11 "every action that removes or ends something wears the error tokens …" |
+| Cancel run, and Cancel run confirming, are red | secondary; Button's default | the same two |
+| Unlink, and Unlink confirming, are red | secondary; Button's default | the same two |
+| Unlink is never under a dim | `opacity-75` back on the linked row | the same two; "authenticated accessibility baseline: /account/settings" |
+| Disconnect is red | the ghost | the same two |
+| Sign out in the account area is red | `btn-ghost` | the same two |
+| Delete team is red at rest | the muted class it had, red only hovered | the same two |
+| Remove member confirming is red | `btn-primary` | the same two |
+| An organization's Remove stays red | made muted | the same two |
+| A team's Remove, Revoke and Delete Account stay red | each made muted, or secondary | the structure test "every action that removes or ends something is red …" |
+| Leave team, and Leave team confirming, are red | the muted word that greyed on hover; `btn-primary` | the structure test (as above); test 11 "a member's Leave team …" |
+| Leave on a person's own row is red | the muted word | the structure test (as above); test 11 "a member's Leave team …" |
+| Leave team, and Leave on a person's own row, stay red hovered, on the error tint | the neutral hover put back — for Leave team, the dark system theme's | test 11 "a member's Leave team …" |
+| Sign out in the marketing nav, and in the small-screen menu, is red | neutral-300, the accent hovered; the menu's text colour | the structure test (as above); test 11 "Sign out wears the error text …" |
+| Pause, Reject (both), Deny and Cancel request are not red | each made danger | the structure test "what can be undone keeps its colour …"; test 11 "what can be undone is not red …" |
+| Withdraw's confirm is the accent, and its trigger the muted word | the confirm made danger; the trigger given the error text | the structure test (as above); test 11 (as above) for the confirm |
+| A hovered danger button keeps AA | the hover colour removed (4.45:1) | the structure test "a danger button keeps AA contrast hovered …"; "a danger button keeps AA contrast at rest, hovered and pressed …" |
+| A hovered ghost keeps AA, on F64's new subject | the ghost's hover step removed | "a ghost button keeps AA contrast when hovered and when pressed" |
+
+The structure test's 28 breaks were run here, each read red from the test runner's own events,
+each file restored by SHA-256, and the working tree's hashes matched after the last. The browser
+tests named are read red the same way in CI's Playwright image — in Chromium, each guard's test
+alone, against the fixture — before the push. F85 is the last number.
+
+### Build 12's #8 — what a linked account does, said where it is linked — 2026-10-03
+
+The owner on build 12 (2026-10-03, 16:00Z), a question rather than a defect: "Lets say i link
+microsoft and apple then log out the app. If i log back in will it let me use apple?" Yes. A person
+is one account at the platform, and Google, Microsoft and Apple are sign-ins attached to it; a
+linked one is matched by the provider's own id for the person, not by the address, so a linked
+Apple sign-in opens the same account — the same workspaces, teams, flows and runs — in the app
+and on this website, which both sign in through the platform. The page did not say so: its lead
+spoke of "additional sign-in options", and only Unlink's confirmation said a linked account signs
+in. Nor did it say the one way to go wrong: signing in with a provider before linking it can start
+a separate account. Decided as option A: the same two sentences open the lead in both clients.
+The app's half is `snoopy-mobile`'s. This repository's half is **F86**:
+
+- **The lead** (`components/account/LinkedAccountsSection.tsx`) opens "Any account linked here
+  signs you in to this same account, in the app and on the website. Link an account before you
+  first sign in with it." in place of "Link additional sign-in options to this account." The
+  credentials sentence after it stays, and nothing else changes: no route, no contract, nothing
+  on the platform.
+- **Tests.** `test/session-contract.test.mjs` reads the paragraph under the heading as a person
+  reads it — exactly the lead — and the old sentence gone from the file; a browser test beside
+  Unlink's (`e2e/public-edge-fixture.spec.ts`) reads the lead on Settings once the accounts are
+  read, and the old sentence nowhere on the page.
+- **Ships** with the next website deploy, once the owner's first Apple sign-in is observed
+  (backend 24.7.3 still lists it), so the page never promises a way in not yet seen working.
+- **Not here.** The app's lead, and the platform's records. A refusal that says why a link
+  failed — that provider's account already belongs to another — is option C, not taken.
+
+Proved red by hand, each file restored by SHA-256:
+
+| Guard | Broken by | Red |
+| --- | --- | --- |
+| The lead says a linked account signs you in to this same account, in the app and on the website | the old first sentence put back | the session test "the Linked accounts lead says a linked account signs you in …"; "Settings shows the Linked accounts lead …" |
+| The lead says to link an account before its first sign-in | that sentence dropped | the same two |
+| The old sentence is nowhere on the page | the old sentence back as a paragraph of its own, the lead kept | the same two |
+
+The session test's three breaks were run here, each read red from the test runner's own events,
+each file restored by SHA-256, and the working tree's hashes matched after the last. The browser
+test is read red the same way in CI's Playwright image — in Chromium, alone, against the fixture
+— before the push. F86 is the last number.
+
+### Build 12's #4 and #9 — Unarchive, and one flow per workspace — 2026-10-03
+
+The owner on build 12 (2026-10-03): #4 (15:45Z), "Rather than add it again what if we say
+unarchive"; #9 (16:05Z), "Why do i have two of the same automations across teams. Teams cannot
+have the same flows. One flow per account type. Personal or org not multiple of the same in account
+type. This is a bug". Decided the same day, with no platform change in this build: #4 is a rename —
+unarchiving is still adding the flow afresh, as the old words did, and the platform's archive
+stays one-way (backend §12.1 #92); #9 is one copy of a flow per workspace — Personal is one, each
+organization one — enforced by the clients now and by the platform's own guard later. A flow is
+held while a subscription of it is not archived, in any team or the whole workspace. A duplicate
+from before (production has one, the owner's own) still displays: nothing deletes or hides it. The
+app's half is `snoopy-mobile`'s. This repository's half is **F87**:
+
+- **Unarchive** (#4). The archive's confirm ends "and you can unarchive it later."
+  (`app/account/flows/AutomationActions.tsx`), and the Archived flows note reads "An archived flow
+  keeps its history here. Unarchive it any time." (`app/account/flows/page.tsx`).
+- **Unarchive on each archived row** (#4, as the app's archived page has it). The row draws its
+  card's own Add (`app/account/flows/AddAutomation.tsx`) as Unarchive — "Unarchive {name}" to a
+  screen reader, its list of teams "Where to unarchive {name}" — so it is the same action, the
+  same teams and the same refusals, in words, and unarchiving adds the flow afresh: to the team it
+  had while that team is open; from the whole workspace, or a team deleted since, to a team as the
+  card offers them — the one there is, or a choice — never the whole workspace, and with no team,
+  the card's words (D4). Held again, in any team or the whole workspace (`heldCopy`), a row offers
+  no Unarchive and says where instead — "Added · Team: {kind}" or "Added · Whole workspace", a link
+  to that copy's row on its card — D3's live twin. A flow the catalog no longer lists has no card,
+  so its row offers neither. Unarchive has no action of its own: the platform's archive stays
+  one-way, and the archived row stays listed.
+- **Held once per workspace** (#9). `lib/held-flow.ts`'s `heldCopy` says, once for the page and
+  for the Add action, which copy holds a flow: the first listed that is not archived — the newest,
+  as the platform lists — in any team or the whole workspace. A held flow's card draws no Add and
+  no team, whatever teams are left or whether there is one — not Create a team first either — and
+  says where the flow is: "Added · Team: {kind}" or "Added · Whole workspace", the app's Added with
+  its team, a link to the flow's own row on the card (`#flow-{id}`), where its controls are. A flow
+  held nowhere is offered every open team, and never the whole workspace (D4).
+- **A second copy is refused before anything is sent** (#9). The platform still takes one per team
+  (backend 18.6.2) until its guard lands, so the Add action, after the workspace check, reads the
+  workspace's subscriptions and, when the flow is held, answers "This flow is already in this
+  workspace." without calling the platform (`app/account/flows/actions.ts`): a page drawn before
+  another tab or person added it. It reads what the person may see; a copy in a team hidden from
+  them is left to the platform's guard.
+- **F21 superseded.** Its listing stays — a card lists every subscription it has, so a duplicate
+  from before is listed, never hidden. Its offer — the teams a flow is not in yet — went.
+- **The fixture** (`e2e/fixtures/public-edge.ts`). The draft held in its team moves to a card of
+  its own, "Team draft automation", so the plan-limit and entitlements automations are held nowhere
+  and their Add still reaches the platform's refusals; `flow-held-twice` lists the project
+  automation in its team and the whole workspace, as production's duplicate is. It still takes a
+  second team, as the platform does, so only the action's refusal stops one. Unarchived, the
+  archivable automation is added afresh (`archivableAgain`): a new draft where it is sent, newest
+  in the list, the archived one kept.
+- **Tests flipped to the decided behaviour, and said so here**: the F21 browser test is now "a flow
+  is held once per workspace: its card …", with "Add on a page drawn before another tab added that
+  flow …" and "a flow held twice from before …" beside it; "subscription refusals render only the
+  two documented entitlement states" makes no second team now; "with no team yet, no flow can be
+  added …" reads Manual input automation, held in the whole workspace, as "Added · Whole
+  workspace" where it read Create a team first; "a live flow that declares no run input …" reads
+  the new words, and "Added" there until the flow is archived; the surfaces test 15 reads the draft
+  on its new card. The automation contract tests read the new words and the offer of every open
+  team, and three are new: the words of #4 with no source file saying the old ones, `heldCopy`
+  run on lists, and the card and the action.
+- **Unarchive's tests**, both new: the automation test "an archived flow's row offers Unarchive …"
+  holds the row's two branches and every prop its Add is given, Unarchive's words and names, the
+  team it had, and no action of its own; the browser test "Unarchive on an archived flow adds it
+  afresh …" archives the archivable automation from the whole workspace with two teams, reads the
+  row's Unarchive by its name with both teams and not the whole workspace, scans the page with axe,
+  unarchives it to Operations, and reads the row — held now — say "Added · Team: Operations",
+  going to the fresh copy's row, with no Unarchive, and the same after a reload.
+- **Not here.** The app's half; the platform's guard — one per workspace in the database, and a
+  409 that names it — and its records.
+
+Proved red by hand, each file restored by SHA-256:
+
+| Guard | Broken by | Red |
+| --- | --- | --- |
+| The archive's confirm says unarchive | the old words put back | the automation tests "archiving is its own confirmed action …" and "an archived flow is unarchived in every word …"; "a live flow that declares no run input offers no Run; Archive flow is confirmed …" |
+| The Archived flows note says unarchive | the old note put back | the automation test "an archived flow is unarchived in every word …"; "a live flow that declares no run input …" |
+| An archived copy holds nothing | `heldCopy` counting archived copies | the automation test "a flow is held once per workspace: by a copy that is not archived …" — no browser test: the list a page reads holds no archived row |
+| A copy holds whatever its status but archived | only a live copy counted | the same; "a flow is held once per workspace: its card …" (the draft is offered Add) |
+| A copy holds in any team | only a whole-workspace copy counted | the same two |
+| A held card offers no team and no Add, and says where | the card never asking what is held | the automation test "a held flow's card offers no team …"; "a flow is held once per workspace: its card …" |
+| Held, it says where with no team as well | Add drawn while there is no team | the automation test "a held flow's card …"; "with no team yet, no flow can be added …" |
+| "Added" goes to the flow's own row | the row's id dropped | the automation test "a held flow's card …"; "a flow is held once per workspace: its card …" |
+| Add refuses a second copy before anything is sent | the check dropped | the automation test "a held flow's card …"; "Add on a page drawn before another tab added that flow …" |
+| A duplicate from before is listed, never hidden | the first copy listed only | the automation test "a card lists every subscription it has …"; "a flow held twice from before …" |
+| Held nowhere, an archived row offers Unarchive | Unarchive drawn for no row | the automation test "an archived flow's row offers Unarchive …"; "Unarchive on an archived flow adds it afresh …" |
+| Unarchive is named for its flow, "Unarchive {name}" | the button's name dropped | the same two |
+| The row's button says Unarchive | the card's words on the row | the same two |
+| Its list of teams is named for unarchiving | the card's name for the list | the same two |
+| Unarchive adds afresh the flow that was archived | the archived subscription's id sent as the flow | the same two (the platform's refusal, not Added) |
+| From the whole workspace, the card's teams are offered: a team is required (D4) | no team offered | the same two |
+| To the team it had, while that team is open | the team it had never looked for | the automation test "an archived flow's row offers Unarchive …" — no browser test: the fixture's archived flow was in the whole workspace |
+| Held again, in any team, a row offers no Unarchive and says where (D3) | the row never asking what is held | the automation test "an archived flow's row offers Unarchive …"; "Unarchive on an archived flow adds it afresh …" |
+| "Added" on the row goes to the held copy's own row | the archived row's id in its place | the same two |
+| "Added" on the row says where the held copy is | the archived copy's place said | the same two |
+| A flow the catalog no longer lists offers nothing | Unarchive drawn without the catalog's entry | the automation test "an archived flow's row offers Unarchive …" — no browser test: the fixture's catalog lists every flow it archives |
+| With no team, the row says what the card says (D4) | a team taken to be there | the same automation test — no browser test: the fixture's flow is archived where there are teams |
+| Unarchive has no action of its own | an unarchive action planted beside Add's | the same automation test — no browser test: nothing on a page would call it |
+
+The automation tests' breaks — ten, and Unarchive's thirteen — were run here, each read red from
+the test runner's own events, each file restored by SHA-256, and the working tree's hashes matched
+after the last; each browser break was type-checked too, so the site still builds with it. The ten
+were read red again on Unarchive's tree, and every earlier browser break (F85's, F86's and these)
+applied once and restored on it. The browser tests named are read red the same way in CI's
+Playwright image — in Chromium, each guard's test alone, against the fixture — before the push.
+F87 is the last number.

@@ -40,13 +40,15 @@ export function DeleteProjectButton({
     });
   }
 
+  // Red at rest, not only when hovered: deleting ends the team (the owner's
+  // build 12, #5). The browser's own confirm() cannot be coloured.
   return (
     <button
       type="button"
       onClick={handleClick}
       disabled={pending}
       aria-label={`Delete team ${projectName}`}
-      className="shrink-0 rounded-lg px-2 py-1.5 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--error-bg)] hover:text-[var(--error-text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-50"
+      className="shrink-0 rounded-lg px-2 py-1.5 text-sm font-medium text-[var(--error-text)] transition hover:bg-[var(--error-bg)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-50"
     >
       {pending ? "Deleting…" : "Delete"}
     </button>

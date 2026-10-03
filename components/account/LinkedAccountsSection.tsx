@@ -189,14 +189,19 @@ export default function LinkedAccountsSection() {
     );
   }
 
+  // The lead says what linking does, in the app's words too (the owner's build
+  // 12, #8; register F86): a linked account signs in to this same account, and
+  // one signed in with before it is linked can start a separate account.
   return (
     <div className="border-t border-[var(--ring)] pt-5">
       <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
         Linked accounts
       </h2>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        Link additional sign-in options to this account. Provider credentials
-        are handled by the Autom8x backend and never exposed to this page.
+        Any account linked here signs you in to this same account, in the app
+        and on the website. Link an account before you first sign in with it.
+        Provider credentials are handled by the Autom8x backend and never
+        exposed to this page.
       </p>
       {state.error ? (
         <FormError message={state.error} className="mt-2" />
@@ -221,16 +226,19 @@ export default function LinkedAccountsSection() {
           // Which account it is, so two sign-ins can be told apart.
           const email = isLinked ? state.emails.get(id) : undefined;
 
+          // A linked account's words are dimmed, never its Unlink: under the
+          // dim its red would compute to 3.45:1, and a control would read as
+          // disabled (the owner's build 12, #5; register F85).
           return (
             <li key={id}>
               <div
                 className={`flex items-center justify-between rounded-xl border px-4 py-3 ${
                   isLinked
-                    ? "cursor-default border-[var(--ring)] bg-[var(--surface)] opacity-75"
+                    ? "cursor-default border-[var(--ring)] bg-[var(--surface)]"
                     : "cursor-pointer border-[var(--ring)] bg-[var(--card)] transition focus-within:ring-2 focus-within:ring-[var(--accent-strong)] hover:bg-[var(--surface-hover)]"
                 }`}
               >
-                <span className="min-w-0">
+                <span className={isLinked ? "min-w-0 opacity-75" : "min-w-0"}>
                   <span className="block text-sm font-medium text-[var(--text)]">
                     {label}
                   </span>
@@ -241,12 +249,17 @@ export default function LinkedAccountsSection() {
                   ) : null}
                 </span>
                 {isLinked && isPrimary ? (
-                  <span className="text-xs text-[var(--muted)]">Primary</span>
+                  <span className="text-xs text-[var(--muted)] opacity-75">
+                    Primary
+                  </span>
                 ) : isLinked ? (
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-[var(--muted)]">Linked</span>
-                    <button
-                      type="button"
+                    <span className="text-xs text-[var(--muted)] opacity-75">
+                      Linked
+                    </span>
+                    <Button
+                      variant="danger"
+                      size="sm"
                       onClick={() =>
                         setState((current) => ({
                           ...current,
@@ -255,10 +268,9 @@ export default function LinkedAccountsSection() {
                         }))
                       }
                       disabled={state.unlinkPending}
-                      className="rounded-full border border-[var(--ring)] bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-50"
                     >
                       Unlink
-                    </button>
+                    </Button>
                   </div>
                 ) : (
                   <a
@@ -315,6 +327,7 @@ export default function LinkedAccountsSection() {
             </Button>
             <Button
               type="button"
+              variant="danger"
               onClick={() => {
                 if (state.unlinking) void confirmUnlink(state.unlinking);
               }}

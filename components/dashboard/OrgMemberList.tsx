@@ -158,12 +158,14 @@ export function OrgMemberList({
 
           <FormError message={removeError} className="mt-3" />
 
+          {/* Red, as the Remove that opened it: it cannot be undone (the
+              owner's build 12, #5). */}
           <div className="mt-6 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={handleConfirmRemove}
               disabled={removing}
-              className="btn-primary inline-flex px-5 disabled:opacity-60"
+              className="btn-danger inline-flex px-5 disabled:opacity-60"
             >
               {removing ? "Removing…" : "Remove member"}
             </button>

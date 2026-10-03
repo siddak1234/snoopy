@@ -220,13 +220,14 @@ function MemberRowItem({
         </span>
       )}
 
-      {/* Action buttons */}
+      {/* Action buttons — Leave and Remove both red: each ends a place on
+          the team (the owner's build 12, #5). */}
       {isOwnerRow ? null : isOwnRow ? (
         <button
           type="button"
           onClick={handleLeave}
           disabled={busy}
-          className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-[var(--muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
+          className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-[var(--error-text)] transition hover:bg-[var(--error-bg)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-60"
         >
           {busy ? "Leaving…" : "Leave"}
         </button>

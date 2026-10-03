@@ -517,8 +517,10 @@ html[data-theme="light"] .brand-mark {
   color: var(--ghost-active-text);
 }
 
-/* The destructive action — deleting the account. The error tokens on a pill,
-   as the two deletion buttons carried inline before this class (register F43). */
+/* The destructive action — deleting the account, and since the owner's build 12
+   every action that removes or ends something (register F85). The error tokens
+   on a pill, as the two deletion buttons carried inline before this class
+   (register F43). */
 .btn-danger {
   display: inline-flex;
   align-items: center;
@@ -531,11 +533,22 @@ html[data-theme="light"] .brand-mark {
   line-height: 1.25rem;
   font-weight: 500;
   color: var(--error-text);
-  transition: background 150ms ease;
+  /* The text moves with the ground. With only the background animated, leaving
+     a hovered button snapped the text back to the resting red while the ground
+     was still the hover tint: 4.45:1 for 150 ms, which WebKit's axe scan read
+     (build 13). Moving together, the pair stays at or above 5.00:1 throughout. */
+  transition:
+    background 150ms ease,
+    color 150ms ease;
 }
 
+/* The stronger tint darkens the ground under the red: hovered on a dark
+   surface the resting text computes to 4.45:1. The hover step keeps it at
+   6.49:1 there and 4.99:1 on a light card (register F85, as F64 did for the
+   ghost). */
 .btn-danger:hover {
   background: var(--error-bg-strong);
+  color: var(--error-text-hover);
 }
 
 .btn-danger:focus-visible {

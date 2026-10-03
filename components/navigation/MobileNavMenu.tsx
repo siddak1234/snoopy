@@ -90,6 +90,8 @@ export default function MobileNavMenu() {
                 <Link href="/account" className={pillClass} onClick={closeMenu}>
                   Account
                 </Link>
+                {/* A menu row like the others, in red: it ends the session
+                    (the owner's build 12, #5). */}
                 <button
                   type="button"
                   onClick={async () => {
@@ -97,7 +99,7 @@ export default function MobileNavMenu() {
                     await signOutFromPlatform();
                     window.location.replace("/");
                   }}
-                  className={`${linkClass} w-full text-center`}
+                  className="block w-full rounded-[var(--radius-md)] px-4 py-3 text-center text-[var(--error-text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
                 >
                   Sign out
                 </button>

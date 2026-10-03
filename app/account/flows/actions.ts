@@ -7,12 +7,14 @@ import {
   createRun,
   createSubscription,
   decideApproval as decideWorkspaceApproval,
+  listSubscriptions,
   updateSubscription,
   type CreateRunRequest,
   type CreateSubscriptionRequest,
   type DecideApprovalRequest,
   type UpdateSubscriptionRequest,
 } from "@/lib/automations";
+import { heldCopy } from "@/lib/held-flow";
 import { subscriptionEntitlementState } from "@/lib/subscription-entitlements";
 import { activeWorkspaceIfShown, WORKSPACE_CHANGED } from "@/lib/tenancy";
 
@@ -94,6 +96,9 @@ function subscriptionFailure(error: unknown): ActionResult {
   return { ok: false, error: error.message };
 }
 
+/** A second copy of a flow the workspace holds (the owner, build 12's #9). */
+const ALREADY_IN_WORKSPACE = "This flow is already in this workspace.";
+
 export async function subscribeToAutomation(
   formData: FormData,
 ): Promise<ActionResult> {
@@ -111,6 +116,15 @@ export async function subscribeToAutomation(
   try {
     const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
     if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+    // A workspace holds each flow once (the owner, build 12's #9). The
+    // platform still takes one per team (backend 18.6.2) until its own guard
+    // lands, so a page drawn before another tab or person added the flow is
+    // refused here, in words, and nothing is sent. Only what this person may
+    // see is listed: a copy in a team hidden from them is the platform's to
+    // refuse.
+    const { subscriptions } = await listSubscriptions(workspaceId);
+    if (heldCopy(subscriptions, templateId))
+      return { ok: false, error: ALREADY_IN_WORKSPACE };
     const response = await createSubscription(workspaceId, body);
     revalidatePath("/account/flows");
     return { ok: true, subscriptionId: response.subscription.id };
@@ -247,7 +261,8 @@ export async function startRun(formData: FormData): Promise<ActionResult> {
 /**
  * Archive a subscription — backend §12.1 #92 and #169. ONE-WAY by the platform's
  * rule: it gives the plan slot back, and using the automation again means adding
- * it afresh. Its own action, rather than a status the generic one accepts, so the
+ * it afresh — what the page calls unarchiving it (the owner, build 12's #4).
+ * Its own action, rather than a status the generic one accepts, so the
  * irreversible transition is only ever reached through its confirmation.
  */
 export async function archiveSubscription(

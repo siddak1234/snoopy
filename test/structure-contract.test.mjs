@@ -93,6 +93,233 @@ test("the destructive action is a Button variant (register F43)", () => {
   );
 });
 
+/**
+ * Every button a file draws, parsed: its words (its text, and the strings it
+ * picks between — never a nested element's), its `variant`, its classes (every
+ * string a class expression can give), the source of its `onClick`, and the
+ * classes of each element around it in the same file.
+ */
+function buttons(path) {
+  const source = ts.createSourceFile(
+    path,
+    read(path),
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const strings = (node) => {
+    if (
+      ts.isStringLiteral(node) ||
+      ts.isNoSubstitutionTemplateLiteral(node) ||
+      ts.isTemplateHead(node) ||
+      ts.isTemplateMiddle(node) ||
+      ts.isTemplateTail(node)
+    )
+      return [node.text];
+    if (
+      ts.isJsxElement(node) ||
+      ts.isJsxSelfClosingElement(node) ||
+      ts.isJsxFragment(node)
+    )
+      return [];
+    // A block, not an expression: forEachChild stops at a truthy return.
+    const found = [];
+    ts.forEachChild(node, (child) => {
+      found.push(...strings(child));
+    });
+    return found;
+  };
+  const attribute = (opening, name) => {
+    const found = opening.attributes.properties.find(
+      (property) =>
+        ts.isJsxAttribute(property) && property.name.getText(source) === name,
+    );
+    return found?.initializer ?? null;
+  };
+  const classes = (opening) => {
+    const value = attribute(opening, "className");
+    return value ? strings(value).join(" ") : "";
+  };
+  const found = [];
+  const visit = (node, around) => {
+    if (ts.isJsxElement(node)) {
+      const opening = node.openingElement;
+      const tag = opening.tagName.getText(source);
+      if (tag === "button" || tag === "Button") {
+        const variant = attribute(opening, "variant");
+        found.push({
+          tag,
+          words: node.children
+            .flatMap((child) =>
+              ts.isJsxText(child)
+                ? [child.text]
+                : ts.isJsxExpression(child)
+                  ? strings(child)
+                  : [],
+            )
+            .map((words) => words.trim())
+            .filter(Boolean),
+          variant: variant && ts.isStringLiteral(variant) ? variant.text : null,
+          className: classes(opening),
+          onClick:
+            attribute(opening, "onClick")?.expression?.getText(source) ?? null,
+          around,
+        });
+      }
+      const own = classes(opening);
+      ts.forEachChild(node, (child) =>
+        visit(child, own ? [...around, own] : around),
+      );
+      return;
+    }
+    ts.forEachChild(node, (child) => visit(child, around));
+  };
+  visit(source, []);
+  return found;
+}
+
+const named = (path, words) =>
+  buttons(path).filter((button) => button.words.includes(words));
+
+// Drawn red as a button: the danger variant, or its class on a plain button.
+const isDanger = (button) =>
+  button.tag === "Button"
+    ? button.variant === "danger"
+    : /(?:^|\s)btn-danger(?:\s|$)/u.test(button.className);
+// Drawn red as a word: the error text, and every text colour it sets — at rest
+// or hovered — an error token, so it never turns grey under the pointer.
+const isErrorText = (button) => {
+  const colours = [
+    ...button.className.matchAll(
+      /(?:^|\s)(?:hover:)?text-\[var\(--([a-z0-9-]+)\)\]/gu,
+    ),
+  ].map((match) => match[1]);
+  return (
+    colours.includes("error-text") &&
+    colours.every((colour) => colour.startsWith("error-"))
+  );
+};
+
+test("every action that removes or ends something is red, on its page and in its confirm — the danger variant on a button, the error text on a word, never under a dim (the owner's build 12, #5; register F85)", () => {
+  // Each file, the words, and how each button with those words is drawn, in
+  // the order the file draws them: the page's button, then its confirm.
+  for (const [path, words, drawn] of [
+    ["app/account/flows/AutomationActions.tsx", "Archive flow", ["danger"]],
+    ["app/account/flows/AutomationActions.tsx", "Archive", ["danger"]],
+    [
+      "app/account/runs/[runId]/CancelRunButton.tsx",
+      "Cancel run",
+      ["danger", "danger"],
+    ],
+    [
+      "components/dashboard/LeaveProjectButton.tsx",
+      "Leave team",
+      ["text", "danger"],
+    ],
+    ["components/dashboard/DeleteProjectButton.tsx", "Delete", ["text"]],
+    [
+      "components/account/LinkedAccountsSection.tsx",
+      "Unlink",
+      ["danger", "danger"],
+    ],
+    ["app/account/connections/ConnectionsPanel.tsx", "Disconnect", ["danger"]],
+    ["components/dashboard/ProjectMemberList.tsx", "Leave", ["text"]],
+    ["components/dashboard/ProjectMemberList.tsx", "Remove", ["text"]],
+    ["components/dashboard/OrgMemberList.tsx", "Remove", ["text"]],
+    ["components/dashboard/OrgMemberList.tsx", "Remove member", ["danger"]],
+    ["components/dashboard/OrgDomainSection.tsx", "Revoke", ["text"]],
+    [
+      "components/account/DeleteAccountButton.tsx",
+      "Delete Account",
+      ["danger"],
+    ],
+    ["components/dashboard/AccountTopBar.tsx", "Sign out", ["danger"]],
+    ["components/marketing/MarketingNav.tsx", "Sign out", ["text"]],
+    ["components/navigation/MobileNavMenu.tsx", "Sign out", ["text"]],
+  ]) {
+    const found = named(path, words);
+    assert.deepEqual(
+      found.map((button) =>
+        isDanger(button) ? "danger" : isErrorText(button) ? "text" : "plain",
+      ),
+      drawn,
+      `${path}: "${words}"`,
+    );
+    for (const button of found) {
+      assert.ok(
+        button.around.every((around) => !/(?:^|\s)opacity-\d/u.test(around)),
+        `${path}: "${words}" sits under a dimmed element`,
+      );
+    }
+  }
+});
+
+test("what can be undone keeps its colour: Pause, Reject, Deny and Cancel request stay as they were, and Withdraw's confirm is the accent (the owner's build 12, #5)", () => {
+  for (const [path, words, variant, className] of [
+    ["app/account/flows/AutomationActions.tsx", "Pause", "secondary", null],
+    ["app/account/approvals/ApprovalDecision.tsx", "Reject", "secondary", null],
+    [
+      "components/dashboard/OrgJoinRequestList.tsx",
+      "Reject",
+      null,
+      "btn-secondary",
+    ],
+    [
+      "components/dashboard/TeamAccessRequests.tsx",
+      "Deny",
+      null,
+      "btn-secondary",
+    ],
+    [
+      "app/onboarding/join-org/JoinOrgForm.tsx",
+      "Cancel request",
+      null,
+      "btn-secondary",
+    ],
+  ]) {
+    const found = named(path, words);
+    assert.equal(found.length, 1, `${path}: "${words}"`);
+    const [button] = found;
+    assert.equal(button.variant, variant, `${path}: "${words}"`);
+    if (className)
+      assert.match(
+        button.className,
+        new RegExp(`(?:^|\\s)${className}(?:\\s|$)`, "u"),
+        `${path}: "${words}"`,
+      );
+    assert.doesNotMatch(button.className, /danger|--error-/u, path);
+  }
+  // Withdraw asks again any time: its confirm is Button's default, the accent
+  // outline, and its trigger the muted word it was.
+  const withdraw = buttons("components/dashboard/ConfirmRemoveButton.tsx");
+  const confirm = withdraw.filter((button) => button.onClick === "confirm");
+  assert.equal(confirm.length, 1);
+  assert.equal(confirm[0].tag, "Button");
+  assert.equal(confirm[0].variant, null);
+  assert.doesNotMatch(
+    read("components/dashboard/ConfirmRemoveButton.tsx"),
+    /danger|--error-/u,
+  );
+  assert.ok(
+    withdraw.some(
+      (button) =>
+        button.tag === "button" &&
+        button.className.includes("text-[var(--muted)]"),
+    ),
+    "the Withdraw trigger is the muted word it was",
+  );
+});
+
+test("a danger button keeps AA contrast hovered: its text takes the hover step on the stronger tint (register F85)", () => {
+  // Hovered on a dark surface, --error-text on --error-bg-strong computes to
+  // 4.45:1; --error-text-hover keeps it at 6.49:1, and 4.99:1 on a light card.
+  // The browser test measures it from pixels.
+  assert.match(
+    read("app/globals.css"),
+    /^\.btn-danger:hover \{\s*background: var\(--error-bg-strong\);\s*color: var\(--error-text-hover\);\s*\}/mu,
+  );
+});
+
 test("no dead focus utility — the global :focus-visible rule decides (register F44)", () => {
   // `app/globals.css` sets :focus-visible unlayered, and Tailwind v4 emits
   // utilities in `@layer utilities`, so an unlayered rule always wins: the

@@ -38,10 +38,12 @@ export function MarketingNav() {
       </span>
     ) : session?.user ? (
       <>
+        {/* Red, as in the app: it ends the session (the owner's build 12,
+            #5). Signed in only, so the signed-out baselines do not move. */}
         <button
           type="button"
           onClick={handleSignOut}
-          className="hidden text-sm text-[var(--color-neutral-300)] transition hover:text-[var(--color-accent)] md:inline"
+          className="hidden text-sm text-[var(--error-text)] transition hover:text-[var(--error-text-hover)] md:inline"
         >
           Sign out
         </button>
