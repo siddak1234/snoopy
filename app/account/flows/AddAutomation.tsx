@@ -24,6 +24,10 @@ export type AddScope = { projectId: string; label: string };
  *
  * A refusal is shown rather than swallowed: the plan limit and an unconfigured
  * billing service are answers a person needs.
+ *
+ * An archived flow's row draws this too, as Unarchive (the owner, build 12's
+ * #4): unarchiving is adding the flow afresh, so it is this Add — the same
+ * action, teams and refusals — in that word.
  */
 export function AddAutomation({
   templateId,
@@ -34,6 +38,7 @@ export function AddAutomation({
   canAdminister,
   canAskToJoin,
   workspaceId,
+  unarchive = false,
 }: {
   templateId: string;
   name: string;
@@ -47,6 +52,8 @@ export function AddAutomation({
   canAskToJoin: boolean;
   /** The workspace this page shows; Add is refused once it is not active. */
   workspaceId: string;
+  /** Drawn on an archived flow's row: "Unarchive", named for its flow. */
+  unarchive?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +117,7 @@ export function AddAutomation({
               value={scope}
               onChange={(event) => setChosen(event.target.value)}
               disabled={pending}
-              aria-label={`Where to add ${name}`}
+              aria-label={`Where to ${unarchive ? "unarchive" : "add"} ${name}`}
               className="rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)] px-2 py-1 text-sm text-[var(--text)]"
             >
               {scopes.map((option) => (
@@ -126,8 +133,15 @@ export function AddAutomation({
           size="sm"
           disabled={pending || !available}
           onClick={add}
+          aria-label={unarchive ? `Unarchive ${name}` : undefined}
         >
-          {pending ? "Adding…" : "Add"}
+          {unarchive
+            ? pending
+              ? "Unarchiving…"
+              : "Unarchive"
+            : pending
+              ? "Adding…"
+              : "Add"}
         </Button>
       </div>
       {error ? (

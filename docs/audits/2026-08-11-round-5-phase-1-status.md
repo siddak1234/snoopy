@@ -1736,9 +1736,18 @@ app's half is `snoopy-mobile`'s. This repository's half is **F87**:
 
 - **Unarchive** (#4). The archive's confirm ends "and you can unarchive it later."
   (`app/account/flows/AutomationActions.tsx`), and the Archived flows note reads "An archived flow
-  keeps its history here. Unarchive it any time." (`app/account/flows/page.tsx`). Nothing else
-  moves: an archived row has no control of its own on this website, and a flow is unarchived —
-  added afresh — through its card's Add, as before.
+  keeps its history here. Unarchive it any time." (`app/account/flows/page.tsx`).
+- **Unarchive on each archived row** (#4, as the app's archived page has it). The row draws its
+  card's own Add (`app/account/flows/AddAutomation.tsx`) as Unarchive — "Unarchive {name}" to a
+  screen reader, its list of teams "Where to unarchive {name}" — so it is the same action, the
+  same teams and the same refusals, in words, and unarchiving adds the flow afresh: to the team it
+  had while that team is open; from the whole workspace, or a team deleted since, to a team as the
+  card offers them — the one there is, or a choice — never the whole workspace, and with no team,
+  the card's words (D4). Held again, in any team or the whole workspace (`heldCopy`), a row offers
+  no Unarchive and says where instead — "Added · Team: {kind}" or "Added · Whole workspace", a link
+  to that copy's row on its card — D3's live twin. A flow the catalog no longer lists has no card,
+  so its row offers neither. Unarchive has no action of its own: the platform's archive stays
+  one-way, and the archived row stays listed.
 - **Held once per workspace** (#9). `lib/held-flow.ts`'s `heldCopy` says, once for the page and
   for the Add action, which copy holds a flow: the first listed that is not archived — the newest,
   as the platform lists — in any team or the whole workspace. A held flow's card draws no Add and
@@ -1758,7 +1767,9 @@ app's half is `snoopy-mobile`'s. This repository's half is **F87**:
   its own, "Team draft automation", so the plan-limit and entitlements automations are held nowhere
   and their Add still reaches the platform's refusals; `flow-held-twice` lists the project
   automation in its team and the whole workspace, as production's duplicate is. It still takes a
-  second team, as the platform does, so only the action's refusal stops one.
+  second team, as the platform does, so only the action's refusal stops one. Unarchived, the
+  archivable automation is added afresh (`archivableAgain`): a new draft where it is sent, newest
+  in the list, the archived one kept.
 - **Tests flipped to the decided behaviour, and said so here**: the F21 browser test is now "a flow
   is held once per workspace: its card …", with "Add on a page drawn before another tab added that
   flow …" and "a flow held twice from before …" beside it; "subscription refusals render only the
@@ -1769,9 +1780,15 @@ app's half is `snoopy-mobile`'s. This repository's half is **F87**:
   on its new card. The automation contract tests read the new words and the offer of every open
   team, and three are new: the words of #4 with no source file saying the old ones, `heldCopy`
   run on lists, and the card and the action.
+- **Unarchive's tests**, both new: the automation test "an archived flow's row offers Unarchive …"
+  holds the row's two branches and every prop its Add is given, Unarchive's words and names, the
+  team it had, and no action of its own; the browser test "Unarchive on an archived flow adds it
+  afresh …" archives the archivable automation from the whole workspace with two teams, reads the
+  row's Unarchive by its name with both teams and not the whole workspace, scans the page with axe,
+  unarchives it to Operations, and reads the row — held now — say "Added · Team: Operations",
+  going to the fresh copy's row, with no Unarchive, and the same after a reload.
 - **Not here.** The app's half; the platform's guard — one per workspace in the database, and a
-  409 that names it — and its records. An Unarchive control on an archived row is not built: #4 is
-  the word.
+  409 that names it — and its records.
 
 Proved red by hand, each file restored by SHA-256:
 
@@ -1787,9 +1804,24 @@ Proved red by hand, each file restored by SHA-256:
 | "Added" goes to the flow's own row | the row's id dropped | the automation test "a held flow's card …"; "a flow is held once per workspace: its card …" |
 | Add refuses a second copy before anything is sent | the check dropped | the automation test "a held flow's card …"; "Add on a page drawn before another tab added that flow …" |
 | A duplicate from before is listed, never hidden | the first copy listed only | the automation test "a card lists every subscription it has …"; "a flow held twice from before …" |
+| Held nowhere, an archived row offers Unarchive | Unarchive drawn for no row | the automation test "an archived flow's row offers Unarchive …"; "Unarchive on an archived flow adds it afresh …" |
+| Unarchive is named for its flow, "Unarchive {name}" | the button's name dropped | the same two |
+| The row's button says Unarchive | the card's words on the row | the same two |
+| Its list of teams is named for unarchiving | the card's name for the list | the same two |
+| Unarchive adds afresh the flow that was archived | the archived subscription's id sent as the flow | the same two (the platform's refusal, not Added) |
+| From the whole workspace, the card's teams are offered: a team is required (D4) | no team offered | the same two |
+| To the team it had, while that team is open | the team it had never looked for | the automation test "an archived flow's row offers Unarchive …" — no browser test: the fixture's archived flow was in the whole workspace |
+| Held again, in any team, a row offers no Unarchive and says where (D3) | the row never asking what is held | the automation test "an archived flow's row offers Unarchive …"; "Unarchive on an archived flow adds it afresh …" |
+| "Added" on the row goes to the held copy's own row | the archived row's id in its place | the same two |
+| "Added" on the row says where the held copy is | the archived copy's place said | the same two |
+| A flow the catalog no longer lists offers nothing | Unarchive drawn without the catalog's entry | the automation test "an archived flow's row offers Unarchive …" — no browser test: the fixture's catalog lists every flow it archives |
+| With no team, the row says what the card says (D4) | a team taken to be there | the same automation test — no browser test: the fixture's flow is archived where there are teams |
+| Unarchive has no action of its own | an unarchive action planted beside Add's | the same automation test — no browser test: nothing on a page would call it |
 
-The automation test's ten breaks were run here, each read red from the test runner's own events,
-each file restored by SHA-256, and the working tree's hashes matched after the last; each browser
-break was type-checked too, so the site still builds with it. The browser tests named are read red
-the same way in CI's Playwright image — in Chromium, each guard's test alone, against the fixture —
-before the push. F87 is the last number.
+The automation tests' breaks — ten, and Unarchive's thirteen — were run here, each read red from
+the test runner's own events, each file restored by SHA-256, and the working tree's hashes matched
+after the last; each browser break was type-checked too, so the site still builds with it. The ten
+were read red again on Unarchive's tree, and every earlier browser break (F85's, F86's and these)
+applied once and restored on it. The browser tests named are read red the same way in CI's
+Playwright image — in Chromium, each guard's test alone, against the fixture — before the push.
+F87 is the last number.

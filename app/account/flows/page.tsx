@@ -53,7 +53,11 @@ import {
  * whole workspace before stays, listed and labelled "Whole workspace".
  *
  * Archived flows are read by name (`status=archived`, backend §12.1 #203) and
- * listed last, each with the day it was archived (BUILD-PLAN 24.11.11).
+ * listed last, each with the day it was archived (BUILD-PLAN 24.11.11) and
+ * Unarchive (the owner, build 12's #4): the card's own Add, which adds the
+ * flow afresh — the platform's archive is one-way — to the team it had, or,
+ * from the whole workspace, to a team as the card offers them (D4). A flow
+ * held again says where it is instead, as its card does.
  */
 
 export const dynamic = "force-dynamic";
@@ -113,14 +117,26 @@ export default async function FlowsPage() {
           (entry) => entry.access !== "member",
         )
       : false;
-  const catalogName = new Map(
-    catalog.automations.map((entry) => [entry.templateId, entry.name]),
+  const catalogEntry = new Map(
+    catalog.automations.map((entry) => [entry.templateId, entry]),
   );
   // An archived flow keeps the team it was in, deleted or not. A team is its
   // kind (the owner, build 9).
   const teamName = new Map(
     projects.map((project) => [project.id, project.type]),
   );
+  const place = (copy: Subscription) =>
+    copy.projectId
+      ? `Team: ${teamName.get(copy.projectId) ?? "a team"}`
+      : "Whole workspace";
+  // Unarchiving is adding afresh, by the card's own Add (the owner, build
+  // 12's #4): to the team the flow had while that team is open; otherwise —
+  // the whole workspace, or a team deleted since — to a team, offered as the
+  // card offers them, and never the whole workspace (D4).
+  const teamsOffered: AddScope[] = openProjects.map((project) => ({
+    projectId: project.id,
+    label: `Team: ${project.type}`,
+  }));
 
   return (
     <SectionCard
@@ -160,28 +176,63 @@ export default async function FlowsPage() {
             An archived flow keeps its history here. Unarchive it any time.
           </p>
           <ul className="mt-3 divide-y divide-[var(--ring)]">
-            {archived.map((subscription) => (
-              <li
-                key={subscription.id}
-                className="flex flex-wrap items-center justify-between gap-2 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-[var(--text)]">
-                    {subscription.name ??
-                      catalogName.get(subscription.templateId) ??
-                      subscription.templateId}
-                  </p>
-                  <p className="text-xs text-[var(--muted)]">
-                    {subscription.projectId
-                      ? `Team: ${teamName.get(subscription.projectId) ?? "a team"}`
-                      : "Whole workspace"}
-                  </p>
-                </div>
-                <span className="text-xs text-[var(--muted)]">
-                  Archived {formatDay(subscription.updatedAt)}
-                </span>
-              </li>
-            ))}
+            {archived.map((subscription) => {
+              const entry = catalogEntry.get(subscription.templateId);
+              const name =
+                subscription.name ?? entry?.name ?? subscription.templateId;
+              // Held again, in any team or the whole workspace (#9), the row
+              // says where, as the card does, and goes to it: there is nothing
+              // to unarchive (D3's live twin).
+              const twin = heldCopy(
+                subscriptions.subscriptions,
+                subscription.templateId,
+              );
+              const had = teamsOffered.find(
+                (scope) => scope.projectId === subscription.projectId,
+              );
+              return (
+                <li
+                  key={subscription.id}
+                  className="flex flex-wrap items-center justify-between gap-2 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-[var(--text)]">
+                      {name}
+                    </p>
+                    <p className="text-xs text-[var(--muted)]">
+                      {place(subscription)}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className="text-xs text-[var(--muted)]">
+                      Archived {formatDay(subscription.updatedAt)}
+                    </span>
+                    {/* A flow the catalog no longer lists has no card: nothing
+                        to add afresh, and no row to go to. */}
+                    {!entry ? null : twin ? (
+                      <a
+                        href={`#flow-${twin.id}`}
+                        className="inline-flex min-h-6 items-center text-xs text-[var(--muted)] underline underline-offset-2"
+                      >
+                        Added · {place(twin)}
+                      </a>
+                    ) : (
+                      <AddAutomation
+                        workspaceId={workspaceId}
+                        templateId={subscription.templateId}
+                        name={name}
+                        available={entry.available}
+                        scopes={had ? [had] : teamsOffered}
+                        hasTeam={teamsOffered.length > 0}
+                        canAdminister={canAdminister}
+                        canAskToJoin={canAskToJoin}
+                        unarchive
+                      />
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       ) : null}

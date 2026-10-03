@@ -1412,6 +1412,75 @@ test("a flow held twice from before one flow per workspace keeps both copies lis
   );
 });
 
+test("Unarchive on an archived flow adds it afresh by its card's own Add — a team required, the card's teams offered — and the row then says where the flow is, going to it, with no Unarchive (the owner's build 12, #4 and #9; register F87)", async ({
+  page,
+}) => {
+  // Two teams, so a flow archived from the whole workspace has a team to
+  // choose: a team is required (the owner's build 10).
+  await createOperationsTeam(page);
+  await page.goto("/account/flows");
+  const card = automationCard(page, "Archivable automation");
+  await card.getByRole("button", { name: "Archive flow" }).click();
+  await page
+    .getByRole("dialog", { name: "Archive Archivable automation?" })
+    .getByRole("button", { name: "Archive", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  // Held nowhere: the row offers Unarchive, named for its flow, with the teams
+  // its card's Add offers — never the whole workspace it was in.
+  const row = page
+    .locator("main li")
+    .filter({ hasText: "Archivable automation" });
+  await expect(row).toContainText("Whole workspace");
+  const unarchive = row.getByRole("button", {
+    name: "Unarchive Archivable automation",
+  });
+  await expect(unarchive).toHaveText("Unarchive");
+  const where = row.getByRole("combobox", {
+    name: "Where to unarchive Archivable automation",
+  });
+  await expect(where.locator("option")).toHaveText([
+    "Team: general",
+    "Team: Operations",
+  ]);
+  await expect(row.getByRole("link", { name: /^Added · /u })).toHaveCount(0);
+  await expectNoAxeViolations(page);
+  await where.selectOption({ label: "Team: Operations" });
+  await unarchive.click();
+
+  // A fresh copy, in Operations. The row, held now, says where it is and goes
+  // to it, and offers Unarchive no more; the card lists the copy and says the
+  // same. The archived row stays: the archive is one-way.
+  const added = row.getByRole("link", { name: "Added · Team: Operations" });
+  await expect(added).toHaveAttribute(
+    "href",
+    "#flow-a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2",
+  );
+  await expect(row.getByRole("button")).toHaveCount(0);
+  await expect(row.getByRole("combobox")).toHaveCount(0);
+  await expect(
+    card.locator("p", { hasText: "Team: Operations" }),
+  ).toBeVisible();
+  await expect(
+    card.getByRole("link", { name: "Added · Team: Operations" }),
+  ).toBeVisible();
+  await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
+  await added.click();
+  await expect(page).toHaveURL(/#flow-a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2$/u);
+  await expect(
+    page.locator("#flow-a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2"),
+  ).toContainText("Team: Operations");
+
+  // Read again: the platform's list says the same.
+  await page.reload();
+  await expect(row).toContainText("Archived Sep 30, 2026");
+  await expect(
+    row.getByRole("link", { name: "Added · Team: Operations" }),
+  ).toBeVisible();
+  await expect(row.getByRole("button")).toHaveCount(0);
+});
+
 test("with no team yet, no flow can be added: an owner or admin is told to create a team first, with the way to Teams, and a plain member who does (the owner's build 10)", async ({
   page,
 }) => {

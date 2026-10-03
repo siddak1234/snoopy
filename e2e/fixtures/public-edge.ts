@@ -121,6 +121,9 @@ function initialState() {
     activeWorkspaceId: workspaceId as string,
     joinRequestStatus: "pending" as "pending" | "approved",
     archivableArchived: false,
+    // The fresh copy unarchiving the archivable automation made (the owner's
+    // build 12, #4): the archived one stays archived.
+    archivableAgain: null as Automations["Subscription"] | null,
     manualStatus: "live" as "live" | "paused",
     connectionAttemptKey: null as string | null,
     fixtureConnectionCreated: false,
@@ -449,7 +452,8 @@ const manualAutomation = {
 // Live, and its pinned version declares no run input: the card offers Pause and
 // Archive and no Run. Archiving it (backend §12.1 #169) is one-way, so the
 // fixture forgets the subscription and the card offers Add again — state that,
-// like billing's, lives for one fixture process.
+// like billing's, lives for one fixture process. Unarchived, it is added afresh
+// (`archivableAgain`, the owner's build 12, #4).
 const archivableAutomation = automation(
   "fixture-archivable",
   "Archivable automation",
@@ -501,7 +505,10 @@ function fixtureCatalog(): Automations["AutomationCatalogResponse"] {
       automation("fixture-entitlements", "Entitlements automation"),
       manualAutomation,
       webhookAutomation,
-      { ...archivableAutomation, subscribed: !state.archivableArchived },
+      {
+        ...archivableAutomation,
+        subscribed: !state.archivableArchived || state.archivableAgain !== null,
+      },
       {
         ...projectAutomation,
         subscribed: state.projectAutomationScopes.length > 0,
@@ -570,6 +577,8 @@ const archivableSubscription = {
   templateId: archivableAutomation.templateId,
   runInput: undefined,
 } satisfies Automations["Subscription"];
+// Its fresh copy, once unarchived: a new subscription, as the platform makes one.
+const archivableAgainId = "a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2";
 
 // The team draft automation, already added to the fixture project and still a
 // draft: its card lists this row under the project and, the flow held, offers
@@ -1926,6 +1935,8 @@ const server = createServer(
         } satisfies AutomationOperations["listSubscriptions"]["responses"][200]["content"]["application/json"]);
       return respond(response, 200, {
         subscriptions: [
+          // The newest first, as the platform lists them.
+          ...(state.archivableAgain ? [state.archivableAgain] : []),
           ...state.projectAutomationScopes.map(projectAutomationSubscription),
           { ...manualSubscription, status: state.manualStatus },
           webhookSubscription(),
@@ -2271,6 +2282,32 @@ const server = createServer(
         state.projectAutomationScopes.push(scope);
         return respond(response, 200, {
           subscription: projectAutomationSubscription(scope),
+        } satisfies AutomationOperations["createSubscription"]["responses"][200]["content"]["application/json"]);
+      }
+      if (
+        body.templateId === archivableAutomation.templateId &&
+        state.archivableArchived &&
+        !state.archivableAgain
+      ) {
+        // Unarchiving is adding afresh (the owner's build 12, #4): its one
+        // copy archived, the archivable automation takes a new subscription —
+        // a draft, where it is sent — and the archived one stays as it was.
+        const scope = body.projectId ?? null;
+        if (
+          scope !== null &&
+          scope !== projectId &&
+          !createdIn(workspaceId).some((team) => team.id === scope)
+        ) {
+          return respond(response, 404, problem(404, "Not Found"));
+        }
+        state.archivableAgain = {
+          ...archivableSubscription,
+          id: archivableAgainId,
+          status: "draft",
+          projectId: scope,
+        };
+        return respond(response, 200, {
+          subscription: state.archivableAgain,
         } satisfies AutomationOperations["createSubscription"]["responses"][200]["content"]["application/json"]);
       }
       const reason =
