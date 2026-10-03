@@ -1460,6 +1460,12 @@ This repository's half:
     (`lib/automations.ts`); the comment is back above it.
   - **F82** (new): the join page said "Join your team" for an organization — older than this
     round. It names the organization ("Join Fixture Organization").
+  - **F83** (new): CI's dependency scan failed on this change's first push — a critical advisory
+    published 2026-09-30, GHSA-vcvr-r3jv-pc5j (Node `ImageResponse` from `next/og`, remote code
+    execution where a request's values reach the image), covers `next` 16.2.0–16.3.5, and this
+    site pinned 16.3.3. Its one `ImageResponse` (`app/opengraph-image.tsx`) draws fixed text, so
+    nothing a request sends reaches it, and the advisory names such sites unaffected. `next` is
+    16.3.6, the first release with the fix; `npm audit --omit=dev --audit-level=high` finds 0.
 - **The fixture** creates a team in the organization or the owner's personal workspace — an
   organization's by its owner or admin only (403), one per kind (409 `team_kind_taken`) — and
   lists each workspace's own; offers Plus and Pro at the provider's prices, by id, refuses a
@@ -1517,5 +1523,5 @@ Proved red by hand, each file restored by SHA-256:
 | The dashboard's Create a team is an owner's or admin's | Create offered to everyone | "the dashboard titles a team by its kind …" |
 | Flows' "Team: …" is the team's kind | the scope labelled by the name | "a card lists each subscription under its scope …" |
 
-F78 to F82 are new, and no number is reused. Build 9's proofs ran in Chromium, each test alone,
+F78 to F83 are new, and no number is reused. Build 9's proofs ran in Chromium, each test alone,
 against the fixture.
