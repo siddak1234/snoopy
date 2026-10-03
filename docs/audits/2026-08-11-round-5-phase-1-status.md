@@ -1680,3 +1680,43 @@ The structure test's 28 breaks were run here, each read red from the test runner
 each file restored by SHA-256, and the working tree's hashes matched after the last. The browser
 tests named are read red the same way in CI's Playwright image — in Chromium, each guard's test
 alone, against the fixture — before the push. F85 is the last number.
+
+### Build 12's #8 — what a linked account does, said where it is linked — 2026-10-03
+
+The owner on build 12 (2026-10-03, 16:00Z), a question rather than a defect: "Lets say i link
+microsoft and apple then log out the app. If i log back in will it let me use apple?" Yes. A person
+is one account at the platform, and Google, Microsoft and Apple are sign-ins attached to it; a
+linked one is matched by the provider's own id for the person, not by the address, so a linked
+Apple sign-in opens the same account — the same workspaces, teams, flows and runs — in the app
+and on this website, which both sign in through the platform. The page did not say so: its lead
+spoke of "additional sign-in options", and only Unlink's confirmation said a linked account signs
+in. Nor did it say the one way to go wrong: signing in with a provider before linking it can start
+a separate account. Decided as option A: the same two sentences open the lead in both clients.
+The app's half is `snoopy-mobile`'s. This repository's half is **F86**:
+
+- **The lead** (`components/account/LinkedAccountsSection.tsx`) opens "Any account linked here
+  signs you in to this same account, in the app and on the website. Link an account before you
+  first sign in with it." in place of "Link additional sign-in options to this account." The
+  credentials sentence after it stays, and nothing else changes: no route, no contract, nothing
+  on the platform.
+- **Tests.** `test/session-contract.test.mjs` reads the paragraph under the heading as a person
+  reads it — exactly the lead — and the old sentence gone from the file; a browser test beside
+  Unlink's (`e2e/public-edge-fixture.spec.ts`) reads the lead on Settings once the accounts are
+  read, and the old sentence nowhere on the page.
+- **Ships** with the next website deploy, once the owner's first Apple sign-in is observed
+  (backend 24.7.3 still lists it), so the page never promises a way in not yet seen working.
+- **Not here.** The app's lead, and the platform's records. A refusal that says why a link
+  failed — that provider's account already belongs to another — is option C, not taken.
+
+Proved red by hand, each file restored by SHA-256:
+
+| Guard | Broken by | Red |
+| --- | --- | --- |
+| The lead says a linked account signs you in to this same account, in the app and on the website | the old first sentence put back | the session test "the Linked accounts lead says a linked account signs you in …"; "Settings shows the Linked accounts lead …" |
+| The lead says to link an account before its first sign-in | that sentence dropped | the same two |
+| The old sentence is nowhere on the page | the old sentence back as a paragraph of its own, the lead kept | the same two |
+
+The session test's three breaks were run here, each read red from the test runner's own events,
+each file restored by SHA-256, and the working tree's hashes matched after the last. The browser
+test is read red the same way in CI's Playwright image — in Chromium, alone, against the fixture
+— before the push. F86 is the last number.

@@ -189,14 +189,19 @@ export default function LinkedAccountsSection() {
     );
   }
 
+  // The lead says what linking does, in the app's words too (the owner's build
+  // 12, #8; register F86): a linked account signs in to this same account, and
+  // one signed in with before it is linked can start a separate account.
   return (
     <div className="border-t border-[var(--ring)] pt-5">
       <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
         Linked accounts
       </h2>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        Link additional sign-in options to this account. Provider credentials
-        are handled by the Autom8x backend and never exposed to this page.
+        Any account linked here signs you in to this same account, in the app
+        and on the website. Link an account before you first sign in with it.
+        Provider credentials are handled by the Autom8x backend and never
+        exposed to this page.
       </p>
       {state.error ? (
         <FormError message={state.error} className="mt-2" />

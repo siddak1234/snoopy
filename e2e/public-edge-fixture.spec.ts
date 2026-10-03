@@ -2002,6 +2002,24 @@ test("an export from a page whose workspace was switched away in another tab say
   ).toMatchObject({ exportCount: 0, exportJobStarted: false });
 });
 
+test("Settings shows the Linked accounts lead: a linked account signs you in to this same account, in the app and on the website — link one before signing in with it (the owner's build 12, #8; register F86)", async ({
+  page,
+}) => {
+  await page.goto("/account/settings");
+  // The paragraph under the heading, once the accounts are read: the app's two
+  // sentences, then this page's own about credentials.
+  const lead = page
+    .locator("main")
+    .getByRole("heading", { name: "Linked accounts" })
+    .locator("xpath=following-sibling::p[1]");
+  await expect(lead).toHaveText(
+    "Any account linked here signs you in to this same account, in the app and on the website. Link an account before you first sign in with it. Provider credentials are handled by the Autom8x backend and never exposed to this page.",
+  );
+  await expect(
+    page.getByText("Link additional sign-in options to this account."),
+  ).toHaveCount(0);
+});
+
 test("Unlink takes a linked sign-in account off, confirmed first; the one signed up with has none; a refusal is said in the app's words (backend 24.11.1, build 10)", async ({
   page,
 }) => {
