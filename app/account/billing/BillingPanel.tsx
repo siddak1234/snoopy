@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
@@ -13,28 +13,57 @@ import {
 } from "./actions";
 
 /**
- * The billing surface: the workspace's plan, and the way to change it.
+ * The billing surface: the plans, as cards, and the way to change one.
  *
  * A client component only because it holds pending state and the last refusal.
  * Checkout and the portal are hosted pages the browser navigates to; nothing
  * here renders a card field or any identifier that is not this platform's own
  * plan id.
  *
+ * Three cards, side by side (the owner, build 9): Free, then the platform's
+ * plans by price — each its name and its price, nothing more. Free is not on
+ * the platform's list (a plan with no provider price is left off it), so its
+ * card is drawn here, at no cost. The workspace's own plan, from its billing
+ * state, says Enrolled, with its status and when it renews or ends.
+ *
  * Buying and changing are different doors (ADR-0025 §1). A workspace with no
- * live subscription buys through checkout; one with a live subscription changes
- * or cancels it in the portal — a second checkout would start a second
- * subscription for the same workspace.
+ * live subscription buys the plan it picks through checkout; one with a live
+ * subscription changes or cancels it in the portal — a second checkout would
+ * start a second subscription for the same workspace. The platform refuses one
+ * (backend 24.12, `plan_exists`), and that refusal opens the portal too.
  */
 
-// Capabilities are data (ADR-0016): a plan lists what it allows by name and
-// number. Each one the platform grants reads as a person would say it. A name
-// with no label here is NOT printed — backend §12.1 #163 found the card reading
-// "workspace.rate 120", a key rather than a sentence; a new capability is shown
-// once it is given words.
-const capabilityCopy: Record<string, string> = {
-  "automation.subscribe": "Automations",
-  "workspace.rate": "Requests per minute",
-};
+// Free costs nothing, said as the formatter says every price.
+const FREE_PRICE = { amount: 0, currency: "usd", interval: "month" } as const;
+// The Free card's control: never a plan id, which the platform's list holds.
+const FREE_CARD = "free-card";
+
+/** A plan's place among the cards: by price, one the provider left unstated last. */
+function priceOrder(plan: PurchasablePlan): number {
+  return plan.price?.amount ?? Number.MAX_SAFE_INTEGER;
+}
+
+function PlanCard({
+  name,
+  price,
+  children,
+}: {
+  name: string;
+  price: string;
+  children?: ReactNode;
+}) {
+  return (
+    <li className="bubble flex min-h-56 flex-col gap-2 p-6">
+      <p className="text-lg font-medium text-[var(--text)]">{name}</p>
+      <p className="text-2xl font-semibold text-[var(--text)]">{price}</p>
+      {children ? (
+        <div className="mt-auto flex flex-col items-start gap-3 pt-4">
+          {children}
+        </div>
+      ) : null}
+    </li>
+  );
+}
 
 export function BillingPanel({
   workspaceId,
@@ -85,6 +114,9 @@ export function BillingPanel({
   // portal (ADR-0025 §1); a checkout beside it would be a second subscription.
   const portalManaged =
     billing.status !== undefined && billing.status !== "canceled";
+  // The free floor reports no status; a plan whose access ended leaves the
+  // workspace on Free too.
+  const onFree = billing.status === undefined || accessEnded;
 
   const navigate = (
     action: string,
@@ -115,130 +147,112 @@ export function BillingPanel({
 
   const opening = (action: string) => busy && pendingAction === action;
 
-  return (
-    <div className="flex flex-col gap-6">
-      <section aria-labelledby="billing-current">
-        <h2
-          id="billing-current"
-          className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
-        >
-          Current plan
-        </h2>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <p className="text-base font-medium text-[var(--text)]">
-            {billing.displayName}
-          </p>
+  // The workspace's own plan: Enrolled, and — for a paid one — its status, when
+  // it renews or ends, and Manage billing.
+  const enrolled = (paid: boolean) => (
+    <>
+      <span className="inline-flex rounded-full bg-[var(--chip-bg)] px-2.5 py-0.5 text-xs font-medium text-[var(--chip-text)]">
+        Enrolled
+      </span>
+      {paid ? (
+        <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--muted)]">
           {billing.status ? <StatusPill status={billing.status} /> : null}
-        </div>
-        {/* A period line only while access lasts: once it has ended, the pill
-            says so, and a period end can lie in the future. */}
-        {periodEnd && !accessEnded ? (
-          <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-[var(--muted)]">
-            <div className="flex gap-1">
+          {/* A period line only while access lasts: once it has ended, the
+              pill says so, and a period end can lie in the future. */}
+          {periodEnd && !accessEnded ? (
+            <dl className="flex gap-1">
               <dt>{billing.cancelAtPeriodEnd ? "Ends" : "Renews"}</dt>
               <dd className="text-[var(--text)]">{periodEnd}</dd>
-            </div>
-          </dl>
-        ) : null}
-        <div className="mt-3">
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={busy}
-            onClick={() =>
-              navigate("portal", () => openBillingPortal(workspaceId))
-            }
-          >
-            {opening("portal") ? "Opening…" : "Manage billing"}
-          </Button>
+            </dl>
+          ) : null}
         </div>
-        {needsCheckout ? (
-          <p className="mt-2 text-sm text-[var(--muted)]">
-            {plans.length > 0
-              ? "This workspace has no billing account yet. Choose a plan below to start one."
-              : "This workspace has no billing account yet, and no plan can be bought right now."}
-          </p>
-        ) : null}
-      </section>
-
-      <section
-        aria-labelledby="billing-plans"
-        className="border-t border-[var(--ring)] pt-5"
-      >
-        <h2
-          id="billing-plans"
-          className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
+      ) : null}
+      {portalManaged ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={busy}
+          onClick={() =>
+            navigate("portal", () => openBillingPortal(workspaceId))
+          }
         >
-          Plans
-        </h2>
-        {portalManaged ? (
-          <p className="mt-2 text-sm text-[var(--muted)]">
-            To change or cancel your plan, or to finish a payment, use Manage
-            billing.
-          </p>
-        ) : null}
-        {plans.length === 0 ? (
-          <p className="mt-2 text-sm text-[var(--muted)]">
-            No plans are available to purchase right now.
-          </p>
-        ) : (
-          <ul className="mt-3 grid gap-3 sm:grid-cols-2">
-            {plans.map((plan) => {
-              const current = !accessEnded && plan.planId === billing.planId;
-              return (
-                <li
-                  key={plan.planId}
-                  className="bubble flex flex-col gap-2 p-4"
-                >
-                  <p className="text-base font-medium text-[var(--text)]">
-                    {plan.displayName}
-                  </p>
-                  {/* The provider's own figure when it can state one flat
-                      amount (ADR-0031); otherwise said, not guessed. */}
-                  <p className="text-sm text-[var(--text)]">
-                    {(plan.price && formatPlanPrice(plan.price)) ??
-                      "Price shown at checkout"}
-                  </p>
-                  <dl className="flex flex-col gap-1 text-xs text-[var(--muted)]">
-                    {Object.entries(plan.capabilities)
-                      .filter(([capability]) =>
-                        Object.hasOwn(capabilityCopy, capability),
-                      )
-                      .map(([capability, allowance]) => (
-                        <div key={capability} className="flex gap-1">
-                          <dt>{capabilityCopy[capability]}</dt>
-                          <dd className="text-[var(--text)]">{allowance}</dd>
-                        </div>
-                      ))}
-                  </dl>
-                  {current ? (
-                    <div className="mt-auto pt-2">
-                      <Button variant="secondary" size="sm" disabled>
-                        Current plan
-                      </Button>
-                    </div>
-                  ) : portalManaged ? null : (
-                    <div className="mt-auto pt-2">
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        disabled={busy}
-                        onClick={() =>
-                          navigate(plan.planId, () =>
+          {opening("portal") ? "Opening…" : "Manage billing"}
+        </Button>
+      ) : null}
+    </>
+  );
+
+  return (
+    <div className="flex flex-col gap-4">
+      {needsCheckout ? (
+        <p className="text-sm text-[var(--muted)]">
+          {plans.length > 0
+            ? "This workspace has no billing account yet. Choose a plan below to start one."
+            : "This workspace has no billing account yet, and no plan can be bought right now."}
+        </p>
+      ) : null}
+      <ul className="grid gap-4 md:grid-cols-3">
+        <PlanCard name="Free" price={formatPlanPrice(FREE_PRICE) ?? ""}>
+          {onFree ? (
+            enrolled(false)
+          ) : (
+            // Back to Free is a cancellation: the portal's.
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={busy}
+              onClick={() =>
+                navigate(FREE_CARD, () => openBillingPortal(workspaceId))
+              }
+            >
+              {opening(FREE_CARD) ? "Opening…" : "Choose plan"}
+            </Button>
+          )}
+        </PlanCard>
+        {[...plans]
+          .sort((a, b) => priceOrder(a) - priceOrder(b))
+          .map((plan) => {
+            const current = !accessEnded && plan.planId === billing.planId;
+            return (
+              <PlanCard
+                key={plan.planId}
+                name={plan.displayName}
+                // The provider's own figure when it can state one flat amount
+                // (ADR-0031); otherwise said, not guessed.
+                price={
+                  (plan.price && formatPlanPrice(plan.price)) ??
+                  "Price shown at checkout"
+                }
+              >
+                {current ? (
+                  enrolled(true)
+                ) : (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() =>
+                      portalManaged
+                        ? navigate(plan.planId, () =>
+                            openBillingPortal(workspaceId),
+                          )
+                        : navigate(plan.planId, () =>
                             beginBillingCheckout(workspaceId, plan.planId),
                           )
-                        }
-                      >
-                        {opening(plan.planId) ? "Opening…" : "Choose plan"}
-                      </Button>
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+                    }
+                  >
+                    {opening(plan.planId) ? "Opening…" : "Choose plan"}
+                  </Button>
+                )}
+              </PlanCard>
+            );
+          })}
+      </ul>
+      {plans.length === 0 ? (
+        <p className="text-sm text-[var(--muted)]">
+          No plans are available to purchase right now.
+        </p>
+      ) : null}
 
       <FormError message={error} />
     </div>

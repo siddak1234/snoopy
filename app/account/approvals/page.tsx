@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { getAppSession } from "@/lib/app-session";
 import { resolveActiveWorkspaceId, roleInWorkspace } from "@/lib/tenancy";
 import {
@@ -42,7 +43,12 @@ export default async function ApprovalsPage() {
   return (
     <SectionCard title="Approvals" subheader="Runs waiting on a decision">
       {pending.approvals.length === 0 ? (
-        <EmptyRow text="Nothing is waiting on you." />
+        // The whole page is empty: the app's empty screen (the owner, build 9).
+        <EmptyRow
+          icon={<CheckCircleIcon size={32} />}
+          title="Nothing needs review"
+          text="When an agent pauses for a human decision, it waits for you here."
+        />
       ) : (
         pending.approvals.map((approval) => (
           <ApprovalRow

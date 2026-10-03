@@ -8,7 +8,7 @@ import {
   changeMemberRoleAction,
   removeMemberFromProjectAction,
   leaveProjectAction,
-} from "@/app/account/projects/actions";
+} from "@/app/account/teams/actions";
 import { formatDateMediumUTC } from "@/lib/date";
 
 // ---------------------------------------------------------------------------
@@ -29,7 +29,7 @@ type Props = {
   viewerUserId: string;
   viewerRole: ProjectRole;
   members: MemberRow[];
-  /** Pass "/account/projects" so the viewer is redirected after leaving. */
+  /** Pass "/account/teams" so the viewer is redirected after leaving. */
   leaveRedirect?: string;
 };
 
@@ -45,6 +45,14 @@ export function ProjectMemberList({
   leaveRedirect,
 }: Props) {
   const [members, setMembers] = useState(initialMembers);
+  // The server's list, once a refresh brings it: someone added by the picker,
+  // or approved onto the team, appears without a reload. A removal or a role
+  // change shows at once, then the refresh confirms it (BUILD-PLAN 24.11.11).
+  const [shown, setShown] = useState(initialMembers);
+  if (shown !== initialMembers) {
+    setShown(initialMembers);
+    setMembers(initialMembers);
+  }
   const router = useRouter();
 
   function handleRemoved(userId: string) {
@@ -140,7 +148,7 @@ function MemberRowItem({
   }
 
   async function handleRemove() {
-    if (!confirm(`Remove ${m.name || m.email} from this project?`)) return;
+    if (!confirm(`Remove ${m.name || m.email} from this team?`)) return;
     setBusy(true);
     setError(null);
     const result = await removeMemberFromProjectAction(projectId, m.userId);
@@ -153,7 +161,11 @@ function MemberRowItem({
   }
 
   async function handleLeave() {
-    if (!confirm("Leave this project? You will lose access immediately."))
+    if (
+      !confirm(
+        "Leave this team? You will lose access to its flows immediately.",
+      )
+    )
       return;
     setBusy(true);
     setError(null);

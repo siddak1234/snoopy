@@ -44,6 +44,13 @@ export class PlatformApiError extends Error {
     public readonly status: number,
     /** From a 429's `retry-after`: how long the platform asked to be left. */
     public readonly retryAfterSeconds?: number,
+    /**
+     * The problem's public, structured `details` — an unlink's refusal names its
+     * `reason` (backend 24.11.1), and a route the platform does not have yet
+     * names its `method` and `path`. Only an object; callers whitelist what
+     * they read, as `PlatformServerError`'s do.
+     */
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "PlatformApiError";
@@ -84,7 +91,16 @@ export async function platformApiJson<T>(
       body.title.length > 0
         ? body.title
         : `Platform request failed with status ${response.status}`;
-    throw new PlatformApiError(title, response.status);
+    const details =
+      body !== null &&
+      typeof body === "object" &&
+      "details" in body &&
+      body.details !== null &&
+      typeof body.details === "object" &&
+      !Array.isArray(body.details)
+        ? (body.details as Record<string, unknown>)
+        : undefined;
+    throw new PlatformApiError(title, response.status, undefined, details);
   }
   return body as T;
 }

@@ -98,7 +98,7 @@ export async function subscribeToAutomation(
   formData: FormData,
 ): Promise<ActionResult> {
   const templateId = String(formData.get("templateId") ?? "");
-  if (!templateId) return { ok: false, error: "An automation is required" };
+  if (!templateId) return { ok: false, error: "A flow is required" };
   // Empty is "the whole workspace"; anything else names a project the platform
   // checks the person can see (18.6.2) — one they cannot is 404, not a hint.
   const projectId = String(formData.get("projectId") ?? "");
@@ -111,7 +111,7 @@ export async function subscribeToAutomation(
     const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
     if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
     const response = await createSubscription(workspaceId, body);
-    revalidatePath("/account/automations");
+    revalidatePath("/account/flows");
     return { ok: true, subscriptionId: response.subscription.id };
   } catch (error) {
     return subscriptionFailure(error);
@@ -170,7 +170,7 @@ export async function saveSubscriptionConfiguration(
       "subscription-config",
     ),
   );
-  if (result.ok) revalidatePath("/account/automations");
+  if (result.ok) revalidatePath("/account/flows");
   return result;
 }
 
@@ -236,7 +236,7 @@ export async function startRun(formData: FormData): Promise<ActionResult> {
     if (error.status === 409) {
       return {
         ok: false,
-        error: "This automation is not live, so it cannot run.",
+        error: "This flow is not live, so it cannot run.",
       };
     }
     return { ok: false, error: error.message };
@@ -261,7 +261,7 @@ export async function archiveSubscription(
     updateSubscription(workspaceId, subscriptionId, body, "archive"),
   );
   if (result.ok) {
-    revalidatePath("/account/automations");
+    revalidatePath("/account/flows");
     revalidatePath("/account/billing");
   }
   return result;
@@ -273,17 +273,17 @@ export async function archiveSubscription(
  */
 const MOVE_REFUSALS: Record<string, string> = {
   approvals_pending:
-    "An approval for this automation is still waiting. Decide it first, then move.",
+    "An approval for this flow is still waiting. Decide it first, then move.",
   runs_in_flight:
-    "A run of this automation is still going. Wait for it to finish, then move.",
+    "A run of this flow is still going. Wait for it to finish, then move.",
   version_unavailable: "That version is no longer available.",
-  subscription_archived: "An archived automation cannot move.",
+  subscription_archived: "An archived flow cannot move.",
   invalid_config:
     "Its settings do not fit that version. Open Set up, fix them, then move.",
   unmet_connections:
-    "That version needs an account this workspace has not connected. Connect it first, or pause the automation and move.",
+    "That version needs an account this workspace has not connected. Connect it first, or pause the flow and move.",
   setup_incomplete:
-    "That version needs a setting this automation does not have yet. Pause it, move, then finish Set up.",
+    "That version needs a setting this flow does not have yet. Pause it, move, then finish Set up.",
 };
 
 /** Moves a subscription to another version of its automation (backend §12.1 #126). */
@@ -308,7 +308,7 @@ export async function moveSubscriptionVersion(
       { templateVersion },
       "version",
     );
-    revalidatePath("/account/automations");
+    revalidatePath("/account/flows");
     return { ok: true };
   } catch (error) {
     if (!(error instanceof PlatformServerError)) throw error;
@@ -332,7 +332,7 @@ export async function setSubscriptionStatus(
   const result = await attempt(formData, (workspaceId) =>
     updateSubscription(workspaceId, subscriptionId, body, "status"),
   );
-  if (result.ok) revalidatePath("/account/automations");
+  if (result.ok) revalidatePath("/account/flows");
   return result;
 }
 

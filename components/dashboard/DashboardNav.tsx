@@ -6,11 +6,11 @@ import { useEffect, useRef, useState } from "react";
 
 export const dashboardNavItems = [
   { href: "/account", label: "Home" },
-  { href: "/account/automations", label: "Automations" },
+  { href: "/account/flows", label: "Flows" },
   { href: "/account/connections", label: "Connections" },
   { href: "/account/runs", label: "Activity" },
   { href: "/account/approvals", label: "Approvals" },
-  { href: "/account/projects", label: "Projects" },
+  { href: "/account/teams", label: "Teams" },
   { href: "/account/billing", label: "Billing" },
   { href: "/account/settings", label: "Settings" },
   { href: "/account/support", label: "Support" },
@@ -20,15 +20,15 @@ const navLinkClass =
   "block rounded-xl px-4 py-3 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset";
 
 /**
- * The two organization links show only where their pages render: Teams in an
- * organization workspace, Organization for its owners and admins (register F55).
+ * The Organization link shows only where its page renders: for an
+ * organization's owners and admins (register F55). Teams is for everyone — a
+ * person's own workspace holds teams too (BUILD-PLAN 24.11.11).
  */
-type OrganizationLinks = { showOrgSettings?: boolean; showTeams?: boolean };
+type OrganizationLinks = { showOrgSettings?: boolean };
 
 function NavLinks({
   currentPath,
   showOrgSettings,
-  showTeams,
   onNavigate,
 }: OrganizationLinks & {
   currentPath: string;
@@ -55,24 +55,6 @@ function NavLinks({
         );
       })}
 
-      {showTeams ? (
-        <Link
-          prefetch={false}
-          href="/account/teams"
-          onClick={onNavigate}
-          className={`${navLinkClass} ${
-            currentPath.startsWith("/account/teams")
-              ? "bg-[var(--surface-hover)] font-medium"
-              : ""
-          }`}
-          aria-current={
-            currentPath.startsWith("/account/teams") ? "page" : undefined
-          }
-        >
-          Teams
-        </Link>
-      ) : null}
-
       {showOrgSettings ? (
         <Link
           prefetch={false}
@@ -94,10 +76,7 @@ function NavLinks({
   );
 }
 
-export function DashboardSidebar({
-  showOrgSettings,
-  showTeams,
-}: OrganizationLinks) {
+export function DashboardSidebar({ showOrgSettings }: OrganizationLinks) {
   const pathname = usePathname();
   return (
     <aside
@@ -108,7 +87,6 @@ export function DashboardSidebar({
         <NavLinks
           currentPath={pathname ?? ""}
           showOrgSettings={showOrgSettings}
-          showTeams={showTeams}
         />
       </nav>
     </aside>
@@ -119,11 +97,10 @@ export function DashboardSidebar({
 // read "Dashboard").
 const pathToTitle: Record<string, string> = {
   "/account": "Dashboard",
-  "/account/automations": "Automations",
+  "/account/flows": "Flows",
   "/account/connections": "Connections",
   "/account/runs": "Activity",
   "/account/approvals": "Approvals",
-  "/account/projects": "Projects",
   "/account/teams": "Teams",
   "/account/billing": "Billing",
   "/account/settings": "Settings",
@@ -132,18 +109,13 @@ const pathToTitle: Record<string, string> = {
 };
 
 function getPageTitle(pathname: string): string {
-  // Detail pages: /account/projects/[id], /account/runs/[runId],
-  // /account/teams/[teamId]
-  if (pathname.startsWith("/account/projects/")) return "Project";
+  // Detail pages: /account/runs/[runId], /account/teams/[id]
   if (pathname.startsWith("/account/runs/")) return "Run";
   if (pathname.startsWith("/account/teams/")) return "Team";
   return pathToTitle[pathname] ?? "Dashboard";
 }
 
-export function DashboardHeader({
-  showOrgSettings,
-  showTeams,
-}: OrganizationLinks) {
+export function DashboardHeader({ showOrgSettings }: OrganizationLinks) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -220,7 +192,6 @@ export function DashboardHeader({
             <NavLinks
               currentPath={pathname ?? ""}
               showOrgSettings={showOrgSettings}
-              showTeams={showTeams}
               onNavigate={() => setMenuOpen(false)}
             />
           </nav>

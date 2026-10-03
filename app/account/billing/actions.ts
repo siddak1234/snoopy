@@ -64,6 +64,17 @@ export async function beginBillingCheckout(
     const body: BillingCheckoutRequest = { planId };
     return hosted(await createBillingCheckout(workspaceId, body));
   } catch (error) {
+    // The workspace already has a plan (a page from before it was bought, or
+    // another tab's purchase): the platform refuses a second subscription
+    // (backend 24.12), and a plan is changed in Manage billing — so that is
+    // where the person goes (build 10).
+    if (
+      error instanceof PlatformServerError &&
+      error.status === 409 &&
+      error.details?.reason === "plan_exists"
+    ) {
+      return openBillingPortal(shownWorkspaceId);
+    }
     return failure(error);
   }
 }

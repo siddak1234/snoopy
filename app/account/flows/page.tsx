@@ -2,6 +2,8 @@ import Link from "next/link";
 import { getAppSession } from "@/lib/app-session";
 import {
   emptyWhenUnavailable,
+  formatDay,
+  listArchivedSubscriptions,
   listAutomations,
   listSubscriptions,
   type AutomationCatalogEntry,
@@ -30,32 +32,35 @@ import {
  * holds the status, the pinned version, and any unmet connections. Joining them
  * here is what lets one card show both "Added" and "Live".
  *
- * **One automation can hold a subscription per project** (backend 18.6.2): the
- * workspace-wide one and one for each project it was added to, each visible
- * only to the people who can see its project — the platform filters the list.
- * So a card lists every subscription it has, each under its own scope, rather
- * than one per template, which showed the oldest and hid the rest (register
- * F21).
+ * **One flow can be added once per team** (backend 18.6.2; a team is a project
+ * in the platform's contract): the workspace-wide one and one for each team it
+ * was added to, each visible only to the people who can see its team — the
+ * platform filters the list. So a card lists every subscription it has, each
+ * under its own scope, rather than one per template, which showed the oldest
+ * and hid the rest (register F21).
+ *
+ * Archived flows are read by name (`status=archived`, backend §12.1 #203) and
+ * listed last, each with the day it was archived (BUILD-PLAN 24.11.11).
  */
 
 export const dynamic = "force-dynamic";
 
-export default async function AutomationsPage() {
+export default async function FlowsPage() {
   const session = await getAppSession();
   const workspaceId = await resolveActiveWorkspaceId(session);
 
   if (!workspaceId) {
     return (
       <SectionCard
-        title="Automations"
-        subheader="Browse automations and add them to your workspace"
+        title="Flows"
+        subheader="Browse flows and add them to your workspace"
       >
         <EmptyRow text="No workspace is active yet." />
       </SectionCard>
     );
   }
 
-  const [catalog, subscriptions, projects, role] = await Promise.all([
+  const [catalog, subscriptions, archived, projects, role] = await Promise.all([
     emptyWhenUnavailable(() => listAutomations(workspaceId), {
       automations: [],
       categories: [],
@@ -63,6 +68,7 @@ export default async function AutomationsPage() {
     emptyWhenUnavailable(() => listSubscriptions(workspaceId), {
       subscriptions: [],
     }),
+    emptyWhenUnavailable(() => listArchivedSubscriptions(workspaceId), []),
     emptyWhenUnavailable(() => listWorkspaceProjects(workspaceId), []),
     roleInWorkspace(workspaceId),
   ]);
@@ -83,14 +89,22 @@ export default async function AutomationsPage() {
   const openProjects = projects.filter(
     (project) => project.status !== "archived",
   );
+  const catalogName = new Map(
+    catalog.automations.map((entry) => [entry.templateId, entry.name]),
+  );
+  // An archived flow keeps the team it was in, deleted or not. A team is its
+  // kind (the owner, build 9).
+  const teamName = new Map(
+    projects.map((project) => [project.id, project.type]),
+  );
 
   return (
     <SectionCard
-      title="Automations"
-      subheader="Browse automations and add them to your workspace"
+      title="Flows"
+      subheader="Browse flows and add them to your workspace"
     >
       {catalog.automations.length === 0 ? (
-        <EmptyRow text="No automations are available yet." />
+        <EmptyRow text="No flows are available yet." />
       ) : (
         <div className="grid gap-4 py-5 first:pt-0 sm:grid-cols-2">
           {catalog.automations.map((automation) => (
@@ -105,6 +119,41 @@ export default async function AutomationsPage() {
           ))}
         </div>
       )}
+
+      {archived.length > 0 ? (
+        <div className="border-t border-[var(--ring)] py-5">
+          <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
+            Archived flows
+          </h2>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            An archived flow keeps its history here. Add it again any time.
+          </p>
+          <ul className="mt-3 divide-y divide-[var(--ring)]">
+            {archived.map((subscription) => (
+              <li
+                key={subscription.id}
+                className="flex flex-wrap items-center justify-between gap-2 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-[var(--text)]">
+                    {subscription.name ??
+                      catalogName.get(subscription.templateId) ??
+                      subscription.templateId}
+                  </p>
+                  <p className="text-xs text-[var(--muted)]">
+                    {subscription.projectId
+                      ? `Team: ${teamName.get(subscription.projectId) ?? "a team"}`
+                      : "Whole workspace"}
+                  </p>
+                </div>
+                <span className="text-xs text-[var(--muted)]">
+                  Archived {formatDay(subscription.updatedAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </SectionCard>
   );
 }
@@ -123,8 +172,9 @@ function AutomationCard({
   /** The workspace this page shows; every action on the card is refused once it is not active. */
   workspaceId: string;
 }) {
+  // A team is its kind (the owner, build 9).
   const projectName = new Map(
-    projects.map((project) => [project.id, project.name]),
+    projects.map((project) => [project.id, project.type]),
   );
   // Only the scopes this automation is not in yet: the platform holds one live
   // subscription per template and project, the whole workspace included.
@@ -135,7 +185,7 @@ function AutomationCard({
       .filter((project) => !taken.has(project.id))
       .map((project) => ({
         projectId: project.id,
-        label: `Project: ${project.name}`,
+        label: `Team: ${project.type}`,
       })),
   ];
 
@@ -179,7 +229,7 @@ function AutomationCard({
           Add button that fails at the first run. */}
       {!automation.available ? (
         <p className="text-xs text-[var(--warning-text)]">
-          This automation is not responding, so it cannot run yet.
+          This flow is not responding, so it cannot run yet.
         </p>
       ) : null}
 
@@ -191,7 +241,7 @@ function AutomationCard({
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-[var(--muted)]">
               {subscription.projectId
-                ? `Project: ${projectName.get(subscription.projectId) ?? "a project"}`
+                ? `Team: ${projectName.get(subscription.projectId) ?? "a team"}`
                 : "Whole workspace"}
             </p>
             <StatusPill status={subscription.status} />

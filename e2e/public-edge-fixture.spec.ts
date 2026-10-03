@@ -1,5 +1,11 @@
 import { AxeBuilder } from "@axe-core/playwright";
-import { expect, test, type Page, type Request } from "@playwright/test";
+import {
+  expect,
+  test,
+  type BrowserContext,
+  type Page,
+  type Request,
+} from "@playwright/test";
 import {
   automationCard,
   expectNoAxeViolations,
@@ -105,6 +111,15 @@ test("Reconnect on a connection that already holds what it needs asks no consent
   expect(consent).toEqual([]);
 });
 
+test("a connection says how many live flows use it — flows, as every signed-in page says (BUILD-PLAN 24.11.11)", async ({
+  page,
+}) => {
+  await page.goto("/account/connections");
+  await expect(
+    page.getByText("fixture-oauth · Used by 1 live flow", { exact: true }),
+  ).toBeVisible();
+});
+
 test("a connection that needs reauthorization is repaired by Reconnect, not reused (backend §12.1 #175)", async ({
   page,
 }) => {
@@ -183,7 +198,7 @@ test("a replacement named after the connection changed is refused as stale, and 
 test("subscription refusals render only the two documented entitlement states", async ({
   page,
 }) => {
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   const planLimitCard = page
     .getByRole("heading", { name: "Plan-limit automation" })
     .locator("xpath=../../..");
@@ -208,7 +223,7 @@ test("a live automation whose pinned version declares run input is started from 
   // Backend §12.1 #162, ADR-0030. The fixture creates the run only when the
   // input is exactly the declaration, typed as it says — so landing on the run's
   // page proves the form sent a number for money and nothing undeclared.
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   const card = automationCard(page, "Manual input automation");
   await expect(card.getByRole("button", { name: "Pause" })).toBeVisible();
   await card.getByRole("button", { name: "Run", exact: true }).click();
@@ -239,7 +254,7 @@ test("a refused start keeps what was typed and the same idempotency key, so resu
 }) => {
   // React resets an action form's fields when the action settles; these forms
   // submit from onSubmit so a refusal keeps them (the change audit's P12b).
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   await automationCard(page, "Manual input automation")
     .getByRole("button", { name: "Run", exact: true })
     .click();
@@ -271,11 +286,11 @@ test("a refused set-up save stays in its dialog with the platform's answer and w
 }) => {
   // The change audit's P11: a failed save used to revalidate the page, and under
   // a refusal that re-render replaced the dialog with the "busy" panel.
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   await automationCard(page, "Manual input automation")
     .getByRole("button", { name: "Set up" })
     .click();
-  const dialog = page.getByRole("dialog", { name: "Automation setup" });
+  const dialog = page.getByRole("dialog", { name: "Flow setup" });
   await expect(dialog.getByLabel("Spending limit")).toHaveValue("500");
   await expectNoAxeViolations(page);
   // A notifications switch says what it switches, in words (register F22).
@@ -293,23 +308,28 @@ test("a refused set-up save stays in its dialog with the platform's answer and w
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
-test("a live automation that declares no run input offers no Run, and Archive is confirmed, one-way, and gives Add back", async ({
+test("a live flow that declares no run input offers no Run; Archive flow is confirmed, gives Add back, and lists it under Archived flows with the day (BUILD-PLAN 24.11.11, the owner's build 9)", async ({
   page,
 }) => {
-  // Backend §12.1 #169 and #92: archiving is how a workspace frees a plan slot.
-  await page.goto("/account/automations");
+  // Backend §12.1 #169 and #92: archiving is how a workspace frees a plan
+  // slot; #203: the archived ones are read by name.
+  await page.goto("/account/flows");
   const card = automationCard(page, "Archivable automation");
   await expect(card.getByRole("button", { name: "Pause" })).toBeVisible();
   await expect(
     card.getByRole("button", { name: "Run", exact: true }),
   ).toHaveCount(0);
-  const archive = card.getByRole("button", { name: "Archive" });
+  await expect(
+    page.getByRole("heading", { name: "Archived flows" }),
+  ).toHaveCount(0);
+  const archive = card.getByRole("button", { name: "Archive flow" });
   await archive.click();
   const dialog = page.getByRole("dialog", {
     name: "Archive Archivable automation?",
   });
-  await expect(dialog).toContainText("gives its plan slot back");
-  await expect(dialog).toContainText("This cannot be undone");
+  await expect(dialog).toContainText(
+    "It stops and moves to Archived flows. Its runs stay in Activity, and you can add it again later.",
+  );
   await expectNoAxeViolations(page);
   // Cancel changes nothing and hands focus back to the control that opened it.
   await dialog.getByRole("button", { name: "Cancel" }).click();
@@ -319,17 +339,32 @@ test("a live automation that declares no run input offers no Run, and Archive is
   await archive.click();
   await page
     .getByRole("dialog", { name: "Archive Archivable automation?" })
-    .getByRole("button", { name: "Archive" })
+    .getByRole("button", { name: "Archive", exact: true })
     .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(card.getByRole("button", { name: "Add" })).toBeVisible();
-  await expect(card.getByRole("button", { name: "Archive" })).toHaveCount(0);
+  await expect(card.getByRole("button", { name: "Archive flow" })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByRole("heading", { name: "Archived flows" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "An archived flow keeps its history here. Add it again any time.",
+    ),
+  ).toBeVisible();
+  const archived = page
+    .locator("main li")
+    .filter({ hasText: "Archivable automation" });
+  await expect(archived).toContainText("Whole workspace");
+  await expect(archived).toContainText("Archived Sep 30, 2026");
 });
 
 test("Pause and Go live move a live subscription and back, and the card follows (register F38)", async ({
   page,
 }) => {
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   const card = automationCard(page, "Manual input automation");
   await expect(card.getByText(/^live$/i)).toBeVisible();
   await card.getByRole("button", { name: "Pause" }).click();
@@ -346,7 +381,7 @@ test("Pause and Go live move a live subscription and back, and the card follows 
 test("a subscription pinned to an older version moves to the newest in place, confirmed first (backend §12.1 #126)", async ({
   page,
 }) => {
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   const card = automationCard(page, "Webhook automation");
   await expect(card).toContainText("This runs v1; v2 is available.");
   const move = card.getByRole("button", { name: "Move to v2" });
@@ -378,7 +413,7 @@ test("a move the platform holds for a pending approval is said in words, and the
   page,
 }) => {
   await fixtureControl("approval-pending-on-move");
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   const card = automationCard(page, "Webhook automation");
   await card.getByRole("button", { name: "Move to v2" }).click();
   const dialog = page.getByRole("dialog", {
@@ -386,7 +421,7 @@ test("a move the platform holds for a pending approval is said in words, and the
   });
   await dialog.getByRole("button", { name: "Move to v2" }).click();
   await expect(dialog.getByRole("alert")).toHaveText(
-    "An approval for this automation is still waiting. Decide it first, then move.",
+    "An approval for this flow is still waiting. Decide it first, then move.",
   );
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await page.reload();
@@ -397,7 +432,7 @@ test("a move refused while a run of the automation is still going is said in wor
   page,
 }) => {
   await fixtureControl("runs-in-flight-on-move");
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   const card = automationCard(page, "Webhook automation");
   await card.getByRole("button", { name: "Move to v2" }).click();
   const dialog = page.getByRole("dialog", {
@@ -405,7 +440,7 @@ test("a move refused while a run of the automation is still going is said in wor
   });
   await dialog.getByRole("button", { name: "Move to v2" }).click();
   await expect(dialog.getByRole("alert")).toHaveText(
-    "A run of this automation is still going. Wait for it to finish, then move.",
+    "A run of this flow is still going. Wait for it to finish, then move.",
   );
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await page.reload();
@@ -415,7 +450,7 @@ test("a move refused while a run of the automation is still going is said in wor
 test("each refusal of a move the platform names is said in its words, one it does not name by its title, and the subscription stays where it was (backend §12.1 #126)", async ({
   page,
 }) => {
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   const card = automationCard(page, "Webhook automation");
   await card.getByRole("button", { name: "Move to v2" }).click();
   const dialog = page.getByRole("dialog", {
@@ -424,7 +459,7 @@ test("each refusal of a move the platform names is said in its words, one it doe
   const move = dialog.getByRole("button", { name: "Move to v2" });
   for (const [status, reason, words] of [
     [409, "version_unavailable", "That version is no longer available."],
-    [409, "subscription_archived", "An archived automation cannot move."],
+    [409, "subscription_archived", "An archived flow cannot move."],
     [
       422,
       "invalid_config",
@@ -433,12 +468,12 @@ test("each refusal of a move the platform names is said in its words, one it doe
     [
       422,
       "unmet_connections",
-      "That version needs an account this workspace has not connected. Connect it first, or pause the automation and move.",
+      "That version needs an account this workspace has not connected. Connect it first, or pause the flow and move.",
     ],
     [
       422,
       "setup_incomplete",
-      "That version needs a setting this automation does not have yet. Pause it, move, then finish Set up.",
+      "That version needs a setting this flow does not have yet. Pause it, move, then finish Set up.",
     ],
     // A reason the website does not name reads as the platform's own title.
     [409, "a_reason_not_named_here", "Conflict"],
@@ -457,18 +492,14 @@ test("a move's dialog cannot be dismissed while the platform decides, so its ref
   page,
 }) => {
   await fixtureControl("approval-pending-on-move");
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   await automationCard(page, "Webhook automation")
     .getByRole("button", { name: "Move to v2" })
     .click();
   const dialog = page.getByRole("dialog", {
     name: "Move Webhook automation to v2?",
   });
-  const move = await holdRequest(
-    page,
-    "**/account/automations",
-    isServerAction,
-  );
+  const move = await holdRequest(page, "**/account/flows", isServerAction);
   await dialog.getByRole("button", { name: "Move to v2" }).click();
   await move.arrived;
   // Neither Escape nor the backdrop closes it while the answer is on its way.
@@ -477,7 +508,7 @@ test("a move's dialog cannot be dismissed while the platform decides, so its ref
   await expect(dialog).toBeVisible();
   move.release();
   await expect(dialog.getByRole("alert")).toHaveText(
-    "An approval for this automation is still waiting. Decide it first, then move.",
+    "An approval for this flow is still waiting. Decide it first, then move.",
   );
   // The refusal renders a moment before the transition ends (register F72): the
   // dialog is dismissible again once its buttons are.
@@ -493,15 +524,11 @@ test("a move's dialog closes on an Escape pressed the moment its answer enables 
   page,
 }) => {
   await fixtureControl("approval-pending-on-move");
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   await automationCard(page, "Webhook automation")
     .getByRole("button", { name: "Move to v2" })
     .click();
-  const move = await holdRequest(
-    page,
-    "**/account/automations",
-    isServerAction,
-  );
+  const move = await holdRequest(page, "**/account/flows", isServerAction);
   await page
     .getByRole("dialog", { name: "Move Webhook automation to v2?" })
     .getByRole("button", { name: "Move to v2" })
@@ -531,7 +558,7 @@ test("an owner makes a webhook automation's address, sees its secret once, and a
 }) => {
   const address =
     "https://hooks.example.test/v1/webhooks/efefefef-efef-4fef-8fef-efefefefefef";
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   const card = automationCard(page, "Webhook automation");
   // A manual automation has no address to give.
   await expect(
@@ -542,9 +569,11 @@ test("an owner makes a webhook automation's address, sees its secret once, and a
   const open = card.getByRole("button", { name: "Webhook address" });
   await open.click();
   const dialog = page.getByRole("dialog", { name: "Webhook address" });
-  await expect(
-    dialog.getByText("This automation has no address yet."),
-  ).toBeVisible();
+  // What the address is for, first (owner, build 7; BUILD-PLAN 24.11.11).
+  await expect(dialog).toContainText(
+    "Where a service sends the events that start this flow — give it this address and the secret, which it sends as the x-autom8x-webhook-secret header.",
+  );
+  await expect(dialog.getByText("This flow has no address yet.")).toBeVisible();
   await dialog.getByRole("button", { name: "Create address" }).click();
   await expect(dialog.getByText("fixture-secret-1")).toBeVisible();
   await expect(dialog).toContainText(address);
@@ -576,19 +605,13 @@ test("a webhook address's dialog cannot be dismissed while a secret is being mad
 }) => {
   // Making a secret stops the old one when the platform answers, and the new
   // one exists only in that answer: a dialog closed meanwhile lost it.
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   await automationCard(page, "Webhook automation")
     .getByRole("button", { name: "Webhook address" })
     .click();
   const dialog = page.getByRole("dialog", { name: "Webhook address" });
-  await expect(
-    dialog.getByText("This automation has no address yet."),
-  ).toBeVisible();
-  const issue = await holdRequest(
-    page,
-    "**/account/automations",
-    isServerAction,
-  );
+  await expect(dialog.getByText("This flow has no address yet.")).toBeVisible();
+  const issue = await holdRequest(page, "**/account/flows", isServerAction);
   await dialog.getByRole("button", { name: "Create address" }).click();
   await issue.arrived;
   await page.keyboard.press("Escape");
@@ -602,7 +625,7 @@ test("a webhook automation's address is offered to an admin and to no plain memb
   page,
 }) => {
   await presentSession(page, "admin");
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   await expect(
     automationCard(page, "Webhook automation").getByRole("button", {
       name: "Webhook address",
@@ -622,7 +645,7 @@ test("a webhook address the platform will not read says so in its dialog, and of
 }) => {
   // A plain member is offered no address at all, so the owner's own read is
   // the one refused — as it is once they are no longer an admin — or failed.
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   const open = automationCard(page, "Webhook automation").getByRole("button", {
     name: "Webhook address",
   });
@@ -646,7 +669,7 @@ test("a webhook address the platform will not read says so in its dialog, and of
 test("a webhook address read before is not shown again beside a read the platform now refuses (backend §12.1 #91)", async ({
   page,
 }) => {
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   const open = automationCard(page, "Webhook automation").getByRole("button", {
     name: "Webhook address",
   });
@@ -668,18 +691,16 @@ test("a webhook address read before is not shown again beside a read the platfor
 test("an address the platform will not make is said in words, and no secret is shown (backend §12.1 #91)", async ({
   page,
 }) => {
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   await automationCard(page, "Webhook automation")
     .getByRole("button", { name: "Webhook address" })
     .click();
   const dialog = page.getByRole("dialog", { name: "Webhook address" });
-  await expect(
-    dialog.getByText("This automation has no address yet."),
-  ).toBeVisible();
+  await expect(dialog.getByText("This flow has no address yet.")).toBeVisible();
   const create = dialog.getByRole("button", { name: "Create address" });
   for (const [reason, words] of [
-    ["trigger_kind_mismatch", "This automation is not started by a webhook."],
-    ["subscription_archived", "An archived automation has no address."],
+    ["trigger_kind_mismatch", "This flow is not started by a webhook."],
+    ["subscription_archived", "An archived flow has no address."],
     // A reason the website does not name reads as the platform's own title.
     ["a_reason_not_named_here", "Conflict"],
   ] as const) {
@@ -698,7 +719,7 @@ test("an address the platform has no public origin for is shown by its id, and i
   await fixtureControl("webhook-no-origin");
   await fixtureControl("webhook-last-outcome?outcome=trigger_kind_mismatch");
   const id = "Address id efefefef-efef-4fef-8fef-efefefefefef";
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   const open = automationCard(page, "Webhook automation").getByRole("button", {
     name: "Webhook address",
   });
@@ -731,7 +752,7 @@ function fixtureFiles() {
 
 // The Run dialog of the manual automation, with its three typed fields filled.
 async function openFilledRun(page: Page) {
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   await automationCard(page, "Manual input automation")
     .getByRole("button", { name: "Run", exact: true })
     .click();
@@ -979,7 +1000,7 @@ test.describe("a file for a run (backend FR-14)", () => {
       buffer: Buffer.from("not an invoice"),
     });
     await expect(dialog.getByRole("alert")).toHaveText(
-      "This automation does not accept that type of file.",
+      "This flow does not accept that type of file.",
     );
     expect(puts).toEqual([]);
     // Emptied, so the same file chosen again is a change the browser reports.
@@ -1091,15 +1112,15 @@ test.describe("a file for a run (backend FR-14)", () => {
         "open",
         400,
         "file_too_large",
-        "The file is larger than this automation accepts.",
+        "The file is larger than this flow accepts.",
       ],
       [
         "open",
         409,
         "subscription_not_live",
-        "Go live first; a paused automation takes no files.",
+        "Go live first; a paused flow takes no files.",
       ],
-      ["open", 409, "no_file_input", "This automation does not take a file."],
+      ["open", 409, "no_file_input", "This flow does not take a file."],
       // A reason the website does not name reads as the platform's own title.
       ["open", 400, "a_reason_not_named_here", "Bad Request"],
       [
@@ -1112,7 +1133,7 @@ test.describe("a file for a run (backend FR-14)", () => {
         "complete",
         400,
         "too_large",
-        "The file is larger than this automation accepts.",
+        "The file is larger than this flow accepts.",
       ],
       ["complete", 409, "a_reason_not_named_here", "Conflict"],
     ] as const) {
@@ -1171,10 +1192,10 @@ test.describe("a file for a run (backend FR-14)", () => {
 test("a ghost button keeps AA contrast when hovered and when pressed (register F64)", async ({
   page,
 }) => {
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   const archive = automationCard(page, "Archivable automation").getByRole(
     "button",
-    { name: "Archive" },
+    { name: "Archive flow" },
   );
   // Each state is measured once its transition has finished: the button from
   // pixels, the one measure the marketing test uses too (register F71), and the
@@ -1201,12 +1222,12 @@ test("a ghost button keeps AA contrast when hovered and when pressed (register F
 test("a card lists each subscription under its scope, and Add offers only the scopes it is not in yet (register F21)", async ({
   page,
 }) => {
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   // Already added to the project, as a draft: that row says where, and the only
   // place left to add it is the whole workspace — so there is nothing to choose.
   const planLimit = automationCard(page, "Plan-limit automation");
   await expect(
-    planLimit.locator("p", { hasText: "Project: Fixture Project" }),
+    planLimit.locator("p", { hasText: "Team: general" }),
   ).toBeVisible();
   await expect(planLimit.getByRole("combobox")).toHaveCount(0);
   await expect(planLimit.getByRole("button", { name: "Add" })).toBeVisible();
@@ -1218,13 +1239,11 @@ test("a card lists each subscription under its scope, and Add offers only the sc
   });
   await expect(where.locator("option")).toHaveText([
     "Whole workspace",
-    "Project: Fixture Project",
+    "Team: general",
   ]);
-  await where.selectOption({ label: "Project: Fixture Project" });
+  await where.selectOption({ label: "Team: general" });
   await card.getByRole("button", { name: "Add" }).click();
-  await expect(
-    card.locator("p", { hasText: "Project: Fixture Project" }),
-  ).toBeVisible();
+  await expect(card.locator("p", { hasText: "Team: general" })).toBeVisible();
   // What was chosen is gone from the offer; Add now means the workspace — the
   // fixture answers 409 if the project is sent again.
   await expect(card.getByRole("combobox")).toHaveCount(0);
@@ -1243,7 +1262,7 @@ test("the account area does not prefetch — a page view costs its own requests 
   // carries no RSC header, so with nothing navigating every RSC request is a
   // prefetch — hovering included.
   const rsc = observe(page, (request) => request.headers()["rsc"] === "1");
-  await page.goto("/account/automations");
+  await page.goto("/account/flows");
   await page.waitForLoadState("networkidle");
   for (const name of ["Connections", "Activity", "Billing", "Settings"]) {
     await page.getByRole("link", { name, exact: true }).first().hover();
@@ -1271,8 +1290,8 @@ for (const [who, heading] of [
       },
     ]);
     const logouts = observe(page, isLogout);
-    await page.goto("/account/automations");
-    await expect(page).toHaveURL(/\/account\/automations$/);
+    await page.goto("/account/flows");
+    await expect(page).toHaveURL(/\/account\/flows$/);
     await expect(page.getByRole("heading", { name: heading })).toBeVisible();
     await expect(page.getByText("You have not been signed out")).toBeVisible();
     await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
@@ -1350,7 +1369,7 @@ test("a figure the platform cannot answer reads Unavailable, and the rest of the
       .locator("dt", { hasText: term })
       .locator("xpath=following-sibling::dd[1]");
   await expect(figure("Runs this month")).toHaveText("Unavailable");
-  await expect(figure("Automations")).toHaveText("4");
+  await expect(figure("Flows")).toHaveText("4");
   await expect(figure("Integrations")).toHaveText("1");
   await expect(
     page.getByRole("link", { name: "Run of Manual input automation, running" }),
@@ -1396,7 +1415,7 @@ test("the dashboard shows the workspace's own numbers and names its recent runs 
       .locator("xpath=following-sibling::dd[1]");
   // Four subscriptions that are not archived; the platform's tally of this
   // month's runs; the one connected integration.
-  await expect(figure("Automations")).toHaveText("4");
+  await expect(figure("Flows")).toHaveText("4");
   await expect(figure("Runs this month")).toHaveText(
     "3 · 1 succeeded · 1 failed",
   );
@@ -1407,8 +1426,8 @@ test("the dashboard shows the workspace's own numbers and names its recent runs 
   await expect(page.locator("main")).not.toContainText("fixture-manual-input");
   // Its actions lead to the pages that do what they say (register F54).
   await expect(
-    page.getByRole("link", { name: "Browse automations" }).first(),
-  ).toHaveAttribute("href", "/account/automations");
+    page.getByRole("link", { name: "Browse flows" }).first(),
+  ).toHaveAttribute("href", "/account/flows");
   await expect(
     page.getByRole("link", { name: "Connect integration" }).first(),
   ).toHaveAttribute("href", "/account/connections");
@@ -1428,6 +1447,10 @@ test("domain discovery creates an approval request without an invite flow", asyn
   await page.goto(
     "/onboarding/join-org?w=11111111-1111-4111-8111-111111111111",
   );
+  // It names the organization — a team is now a part of one.
+  await expect(
+    page.getByRole("heading", { name: "Join Fixture Organization", level: 1 }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Join Fixture Organization" }).click();
   await expect(
     page.getByText("Your request was sent for approval."),
@@ -1441,9 +1464,94 @@ test("organization request controls use the public join-request operation withou
   page,
 }) => {
   await page.goto("/account/organization");
-  await expect(page.getByText(requesterUserId)).toBeVisible();
+  // The person asking, by name and address — not an id (backend 24.12.4).
+  await expect(page.getByText("Fixture Requester")).toBeVisible();
+  await expect(page.getByText("requester@example.test")).toBeVisible();
+  await expect(page.getByText(requesterUserId)).toHaveCount(0);
   await page.getByRole("button", { name: "Approve" }).click();
   await expect(page.getByText("No pending requests.")).toBeVisible();
+  await expect(
+    page.locator('a[href*="invite"], input[name*="invite" i]'),
+  ).toHaveCount(0);
+});
+
+// The organization's join page, as Copy join link puts it on the clipboard.
+const joinPageLink = `http://127.0.0.1:3001/onboarding/join-org?w=${organizationWorkspaceId}`;
+
+// The clipboard is stubbed in the page — each engine grants it differently —
+// to keep what was written, or to refuse as a browser may.
+async function stubClipboard(page: Page, refuse = false) {
+  await page.addInitScript((refusing) => {
+    const written: string[] = [];
+    Object.defineProperty(window, "__clipboard", { value: written });
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: (text: string) => {
+          if (refusing)
+            return Promise.reject(
+              new DOMException("Refused", "NotAllowedError"),
+            );
+          written.push(text);
+          return Promise.resolve();
+        },
+      },
+    });
+  }, refuse);
+}
+
+test("Copy join link puts the organization's join page on the clipboard, says Copied, and says who can ask (the owner's build 9)", async ({
+  page,
+}) => {
+  await stubClipboard(page);
+  await page.goto("/account/organization");
+  await expect(
+    page.getByText(
+      "People at example.test can ask to join. You approve them here.",
+    ),
+  ).toBeVisible();
+  const status = page
+    .getByRole("button", { name: "Copy join link" })
+    .locator("xpath=..")
+    .getByRole("status");
+  await expect(status).toHaveText("");
+  await page.getByRole("button", { name: "Copy join link" }).click();
+  await expect(status).toHaveText("Copied");
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { __clipboard: string[] }).__clipboard,
+    ),
+  ).toEqual([joinPageLink]);
+  await expectNoAxeViolations(page);
+  // No element names an invite: a join link asks; an owner or admin approves.
+  await expect(
+    page.locator('a[href*="invite"], input[name*="invite" i]'),
+  ).toHaveCount(0);
+});
+
+test("a refused clipboard leaves the join link selected in a field to copy by hand; an admin has it too, and a domain not verified yet is said (the owner's build 9)", async ({
+  page,
+}) => {
+  await stubClipboard(page, true);
+  await fixtureControl("domain-pending");
+  await presentSession(page, "admin");
+  await page.goto("/account/organization");
+  await expect(
+    page.getByText(
+      "Verify your email domain first — only people at it can ask to join.",
+    ),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Copy join link" }).click();
+  const field = page.getByRole("textbox", { name: "Join link" });
+  await expect(field).toHaveValue(joinPageLink);
+  await expect(field).toBeFocused();
+  expect(
+    await field.evaluate((input: HTMLInputElement) =>
+      input.value.slice(input.selectionStart ?? 0, input.selectionEnd ?? 0),
+    ),
+  ).toBe(joinPageLink);
+  await expect(page.getByText("Copied", { exact: true })).toHaveCount(0);
+  await expectNoAxeViolations(page);
   await expect(
     page.locator('a[href*="invite"], input[name*="invite" i]'),
   ).toHaveCount(0);
@@ -1745,6 +1853,105 @@ test("an export from a page whose workspace was switched away in another tab say
   ).toMatchObject({ exportCount: 0, exportJobStarted: false });
 });
 
+test("Unlink takes a linked sign-in account off, confirmed first; the one signed up with has none; a refusal is said in the app's words (backend 24.11.1, build 10)", async ({
+  page,
+}) => {
+  await page.goto("/account/settings");
+  const google = page.locator("main li").filter({ hasText: "Google" });
+  const microsoft = page.locator("main li").filter({ hasText: "Microsoft" });
+  await expect(google).toContainText("Primary");
+  await expect(google.getByRole("button", { name: "Unlink" })).toHaveCount(0);
+  await expect(microsoft).toContainText("Linked");
+  // Each account by the address its provider reports (backend 24.12.2), so
+  // two sign-ins can be told apart.
+  await expect(google).toContainText("owner@example.test");
+  await expect(microsoft).toContainText("fixture.owner@outlook.test");
+
+  // A refusal is the app's sentence for its reason — never the problem's
+  // title — and the account stays linked.
+  await fixtureControl("unlink-refused");
+  await microsoft.getByRole("button", { name: "Unlink" }).click();
+  let dialog = page.getByRole("dialog", { name: "Unlink Microsoft?" });
+  await expect(dialog).toContainText(
+    "You can still sign in with your other linked accounts, and link this one again later.",
+  );
+  await expectNoAxeViolations(page);
+  await dialog.getByRole("button", { name: "Unlink" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator("main").getByRole("alert")).toHaveText(
+    "This sign-in account cannot be unlinked.",
+  );
+  await expect(microsoft).toContainText("Linked");
+
+  await fixtureControl("reset");
+  await microsoft.getByRole("button", { name: "Unlink" }).click();
+  dialog = page.getByRole("dialog", { name: "Unlink Microsoft?" });
+  // Cancel changes nothing.
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(microsoft).toContainText("Linked");
+  await microsoft.getByRole("button", { name: "Unlink" }).click();
+  await dialog.getByRole("button", { name: "Unlink" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // Unlinked: offered to link again, and no longer named.
+  await expect(microsoft.getByRole("link", { name: "Link" })).toBeVisible();
+  await expect(microsoft).not.toContainText("fixture.owner@outlook.test");
+  await expect(google).toContainText("Primary");
+});
+
+test("each unlink refusal is said in the app's words: every reason, a platform with no unlink yet, and an account another tab already unlinked — never a problem's title (build 10)", async ({
+  page,
+}) => {
+  await page.goto("/account/settings");
+  const microsoft = page.locator("main li").filter({ hasText: "Microsoft" });
+  const alert = page.locator("main").getByRole("alert");
+  const unlink = async () => {
+    await microsoft.getByRole("button", { name: "Unlink" }).click();
+    await page
+      .getByRole("dialog", { name: "Unlink Microsoft?" })
+      .getByRole("button", { name: "Unlink" })
+      .click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  };
+  for (const [control, words] of [
+    [
+      "unlink-refused?reason=primary",
+      "The account you signed up with stays linked.",
+    ],
+    ["unlink-refused?reason=last", "The last sign-in account stays linked."],
+    [
+      "unlink-refused?reason=refused",
+      "This sign-in account cannot be unlinked.",
+    ],
+    // A reason the website does not name: the fallback, not "Bad Request".
+    [
+      "unlink-refused?reason=a_reason_not_named_here",
+      "The account could not be unlinked.",
+    ],
+    // The Edge's answer for a route it does not have yet (production before
+    // the SEVENTEENTH promotion) names the method and path.
+    ["unlink-route-missing", "Unlinking isn't available yet."],
+  ] as const) {
+    await fixtureControl("reset");
+    await fixtureControl(control);
+    await unlink();
+    await expect(alert).toHaveText(words);
+    await expect(microsoft).toContainText("Linked");
+  }
+  // Another tab unlinked it first: this page still offers Unlink, and the
+  // platform's 404 says the account is not linked.
+  await fixtureControl("reset");
+  const elsewhere = await page
+    .context()
+    .request.delete("/api/platform/v1/auth/identities/microsoft", {
+      headers: { origin: "http://127.0.0.1:3001" },
+    });
+  expect(elsewhere.status()).toBe(200);
+  await unlink();
+  await expect(alert).toHaveText("That sign-in account is not linked.");
+  await expect(microsoft.getByRole("link", { name: "Link" })).toBeVisible();
+});
+
 test("the workspace switcher drives the public active-workspace operation", async ({
   page,
 }) => {
@@ -1758,150 +1965,6 @@ test("the workspace switcher drives the public active-workspace operation", asyn
   await trigger.click();
   await page.getByRole("button", { name: /Fixture Organization/ }).click();
   await expect(trigger).toContainText("Fixture Organization");
-});
-
-const operationsTeam = "/account/teams/abababab-abab-4bab-8bab-abababababab";
-
-test("an owner sees every team and creates one; a team lists who is on it, and one control adds someone or changes a role (backend §12.1 #173)", async ({
-  page,
-}) => {
-  await page.goto("/account/teams");
-  await expect(
-    page.getByRole("link", { name: "Operations", exact: true }),
-  ).toBeVisible();
-  await page.getByLabel("Team name").fill("Finance");
-  await page.getByLabel("Description").fill("Pays the invoices.");
-  await page.getByRole("button", { name: "Create team" }).click();
-  await expect(
-    page.getByRole("link", { name: "Finance", exact: true }),
-  ).toBeVisible();
-  // The form clears once the platform has the team.
-  await expect(page.getByLabel("Team name")).toHaveValue("");
-
-  await page.getByRole("link", { name: "Operations", exact: true }).click();
-  await expect(page).toHaveURL(operationsTeam);
-  const members = page.locator("main li");
-  await expect(members).toHaveCount(1);
-  await expect(members.first()).toContainText("Fixture Member");
-  await expect(members.first()).toContainText(/manager/i);
-  await expectNoAxeViolations(page);
-  // Adding someone …
-  await page
-    .getByLabel("Person")
-    .selectOption({ label: "Fixture Admin (admin@example.test)" });
-  await page.getByRole("button", { name: "Add or change role" }).click();
-  await expect(members).toHaveCount(2);
-  // … and changing a role are the same operation.
-  await page
-    .getByLabel("Person")
-    .selectOption({ label: "Fixture Member (member@example.test)" });
-  await page.getByLabel("Team role").selectOption("member");
-  await page.getByRole("button", { name: "Add or change role" }).click();
-  await expect(
-    members.filter({ hasText: "Fixture Member" }).locator("span"),
-  ).toHaveText(/^member$/i);
-});
-
-test("taking someone off a team is confirmed first, a refusal keeps them on it, and the team's list follows (backend §12.1 #174)", async ({
-  page,
-}) => {
-  await page.goto(operationsTeam);
-  const members = page.locator("main li");
-  await expect(members).toHaveCount(1);
-  const remove = members
-    .filter({ hasText: "Fixture Member" })
-    .getByRole("button", { name: "Remove" });
-  await remove.click();
-  const dialog = page.getByRole("dialog", {
-    name: "Remove Fixture Member from Operations?",
-  });
-  await expect(dialog).toContainText(
-    "They lose any project access the team gave them.",
-  );
-  await expectNoAxeViolations(page);
-  // Cancel changes nothing and hands focus back.
-  await dialog.getByRole("button", { name: "Cancel" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(remove).toBeFocused();
-  await expect(members).toHaveCount(1);
-  // A refusal is said in the dialog, and the person is still on the team.
-  await remove.click();
-  await presentSession(page, "throttled");
-  await dialog.getByRole("button", { name: "Remove" }).click();
-  await expect(dialog.getByRole("alert")).toHaveText(busy);
-  await presentSession(page, "owner");
-  await dialog.getByRole("button", { name: "Remove" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.getByText("No one is on this team yet.")).toBeVisible();
-  // The row took its button with it; focus is on the list's heading, not
-  // dropped on the page.
-  await expect(page.getByRole("heading", { name: "Members" })).toBeFocused();
-});
-
-test("a removal's dialog cannot be dismissed while the platform decides, so its refusal is not lost (backend §12.1 #174)", async ({
-  page,
-}) => {
-  await page.goto(operationsTeam);
-  await page
-    .locator("main li")
-    .filter({ hasText: "Fixture Member" })
-    .getByRole("button", { name: "Remove" })
-    .click();
-  const dialog = page.getByRole("dialog", {
-    name: "Remove Fixture Member from Operations?",
-  });
-  const removal = await holdRequest(
-    page,
-    `**${operationsTeam}`,
-    isServerAction,
-  );
-  await presentSession(page, "throttled");
-  await dialog.getByRole("button", { name: "Remove" }).click();
-  await removal.arrived;
-  await page.keyboard.press("Escape");
-  await page.mouse.click(4, 4);
-  await expect(dialog).toBeVisible();
-  removal.release();
-  await expect(dialog.getByRole("alert")).toHaveText(busy);
-});
-
-test("a team's manager who takes themselves off it goes back to their teams, not to a page they can no longer see (backend §12.1 #174)", async ({
-  page,
-}) => {
-  // A plain member sees a team only while on it.
-  await presentSession(page, "member");
-  await page.goto(operationsTeam);
-  await page
-    .locator("main li")
-    .filter({ hasText: "Fixture Member" })
-    .getByRole("button", { name: "Remove" })
-    .click();
-  await page
-    .getByRole("dialog", { name: "Remove Fixture Member from Operations?" })
-    .getByRole("button", { name: "Remove" })
-    .click();
-  await expect(page).toHaveURL(/\/account\/teams$/);
-  await expect(page.getByText("You are not on a team yet.")).toBeVisible();
-});
-
-test("a team's manager who is a plain member manages their team — and sees neither the others nor the organization page (backend ADR-0010)", async ({
-  page,
-}) => {
-  await presentSession(page, "member");
-  await page.goto("/account/teams");
-  const nav = page.getByRole("complementary", { name: "Dashboard navigation" });
-  await expect(nav.getByRole("link", { name: "Teams" })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Organization" })).toHaveCount(0);
-  await expect(page.getByText("You are its manager.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Create team" })).toHaveCount(
-    0,
-  );
-  await page.getByRole("link", { name: "Operations", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Add or change role" }),
-  ).toBeVisible();
-  await page.goto("/account/organization");
-  await expect(page).toHaveURL(/\/account$/);
 });
 
 test("an admin reaches the organization page, where every operation admits them (register F55)", async ({
@@ -1924,184 +1987,300 @@ test("an admin reaches the organization page, where every operation admits them 
   ).toBeVisible();
 });
 
-test("a project's owner gives a team access, and the project lists the teams granted to it (backend §12.1 #173)", async ({
+const fixtureProject = "/account/teams/33333333-3333-4333-8333-333333333333";
+
+// Every team a test created, as the platform recorded it.
+async function createdTeams() {
+  return (
+    await fixtureRead<{
+      createdTeams: { workspaceId: string; name: string; type: string }[];
+    }>("counts")
+  ).createdTeams;
+}
+
+test("Create a team is the kind alone, made where the person is working: Other opens a field, words too short are refused, and the team made opens its page, titled by its kind (BUILD-PLAN 24.11.11, the owner's build 9)", async ({
   page,
 }) => {
-  await page.goto("/account/projects/33333333-3333-4333-8333-333333333333");
-  await expect(
-    page.getByText("No team has access to this project."),
-  ).toBeVisible();
+  await page.goto("/account/teams");
   await page
-    .getByLabel("Team", { exact: true })
-    .selectOption({ label: "Operations" });
-  await page.getByLabel("Role on this project").selectOption("admin");
-  await page.getByRole("button", { name: "Give access" }).click();
-  const granted = page.locator("main li").filter({ hasText: "Operations" });
-  await expect(granted).toContainText(/admin/i);
-  await expect(
-    page.getByText("No team has access to this project."),
-  ).toHaveCount(0);
-  await expectNoAxeViolations(page);
-});
-
-test("a project's owner removes a team's access, confirmed first, and a plain member on the project is offered no removal (backend §12.1 #174)", async ({
-  page,
-}) => {
-  const project = "/account/projects/33333333-3333-4333-8333-333333333333";
-  await page.goto(project);
-  await page
-    .getByLabel("Team", { exact: true })
-    .selectOption({ label: "Operations" });
-  await page.getByLabel("Role on this project").selectOption("member");
-  await page.getByRole("button", { name: "Give access" }).click();
-  const granted = page.locator("main li").filter({ hasText: "Operations" });
-  await expect(granted).toContainText(/member/i);
-
-  // A plain member reads the grant and is offered nothing to change it.
-  await presentSession(page, "member");
-  await page.reload();
-  await expect(granted).toContainText(/member/i);
-  await expect(granted.getByRole("button", { name: "Remove" })).toHaveCount(0);
-
-  await presentSession(page, "owner");
-  await page.reload();
-  await granted.getByRole("button", { name: "Remove" }).click();
-  const dialog = page.getByRole("dialog", {
-    name: "Remove Operations's access to Fixture Project?",
-  });
-  await expect(dialog).toContainText(
-    "Its members keep any access they hold on their own.",
-  );
-  await expectNoAxeViolations(page);
-  await dialog.getByRole("button", { name: "Remove access" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(
-    page.getByText("No team has access to this project."),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Teams with access" }),
-  ).toBeFocused();
-});
-
-test("a team's access the platform will not withdraw stays — a busy platform, and a project no longer found, are said in the dialog (backend §12.1 #174)", async ({
-  page,
-}) => {
-  await page.goto("/account/projects/33333333-3333-4333-8333-333333333333");
-  await page
-    .getByLabel("Team", { exact: true })
-    .selectOption({ label: "Operations" });
-  await page.getByLabel("Role on this project").selectOption("member");
-  await page.getByRole("button", { name: "Give access" }).click();
-  const granted = page.locator("main li").filter({ hasText: "Operations" });
-  await expect(granted).toContainText(/member/i);
-  await granted.getByRole("button", { name: "Remove" }).click();
-  const dialog = page.getByRole("dialog", {
-    name: "Remove Operations's access to Fixture Project?",
-  });
-  const remove = dialog.getByRole("button", { name: "Remove access" });
-  await presentSession(page, "throttled");
-  await remove.click();
-  await expect(dialog.getByRole("alert")).toHaveText(busy);
-  // The project gone from every list the person can read.
-  await presentSession(page, "owner");
-  await fixtureControl("org-without-projects");
-  await remove.click();
-  await expect(dialog.getByRole("alert")).toHaveText(
-    "The project is unavailable.",
-  );
-  await dialog.getByRole("button", { name: "Cancel" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  // Read at the platform: the grant was never withdrawn.
-  expect(
-    (await fixtureRead<{ projectTeamGrants: number }>("counts"))
-      .projectTeamGrants,
-  ).toBe(1);
-});
-
-test("anyone on a project reads the teams granted to it, and only its owner or admin is offered the grant (backend ADR-0010)", async ({
-  page,
-}) => {
-  await presentSession(page, "member");
-  await page.goto("/account/projects/33333333-3333-4333-8333-333333333333");
-  await expect(
-    page.getByRole("heading", { name: "Teams with access" }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("No team has access to this project."),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Give access" })).toHaveCount(
-    0,
-  );
-});
-
-test("an organization with no team yet tells its owner where teams are made, not which teams they can see", async ({
-  page,
-}) => {
-  await fixtureControl("org-without-teams");
-  await page.goto("/account/projects/33333333-3333-4333-8333-333333333333");
-  await expect(
-    page.getByText("This organization has no teams yet."),
-  ).toBeVisible();
-  await expect(page.getByRole("link", { name: "Teams page" })).toHaveAttribute(
-    "href",
-    "/account/teams",
-  );
-  await expect(page.getByText("the teams you are on")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Give access" })).toHaveCount(
-    0,
-  );
-});
-
-test("an organization with no project yet creates its first team project, in the organization being worked in (register F57)", async ({
-  page,
-}) => {
-  await fixtureControl("org-without-projects");
-  await page.goto("/account/projects");
-  await expect(page.getByText("No projects yet.")).toBeVisible();
-  await page.getByRole("button", { name: "Create project" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("radio", { name: /team/i })).toBeEnabled();
-  await dialog
-    .locator("label")
-    .filter({ hasText: /^\s*team\s*$/i })
+    .locator("main")
+    .getByRole("button", { name: "Create a team" })
     .click();
+  const dialog = page.getByRole("dialog", { name: "Create a team" });
+  // One line says where it goes; there is no picker, name or description.
+  await expect(dialog).toContainText("In Fixture Organization.");
+  await expect(dialog.getByRole("combobox")).toHaveCount(1);
+  await expect(dialog.getByRole("textbox")).toHaveCount(0);
+  const kind = dialog.getByLabel("Kind of team", { exact: true });
+  await expect(kind).toBeFocused();
+  await expect(kind.locator("option")).toContainText([
+    "HR",
+    "Accounting",
+    "Finance",
+    "Legal",
+    "Research",
+    "Other",
+  ]);
+  await expect(dialog.getByLabel("What kind of team")).toHaveCount(0);
+  await kind.selectOption("Other");
+  const other = dialog.getByLabel("What kind of team");
+  await expect(other).toBeVisible();
+  await expect(other).toHaveAttribute("placeholder", "Facilities");
+  await expect(other).toHaveAttribute("minlength", "2");
+  await expect(other).toHaveAttribute("maxlength", "60");
+  await expectNoAxeViolations(page);
+
+  // Words that trim to nothing pass the field, and the server refuses them.
+  await other.fill("   ");
+  await dialog.getByRole("button", { name: "Create team" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Say what kind of team it is, in 2 to 60 characters.",
+  );
+
+  await other.fill("Facilities");
+  await dialog.getByRole("button", { name: "Create team" }).click();
+  await expect(page.getByRole("dialog", { name: "Team created" })).toHaveText(
+    /Your team is ready\. Add people on its page\./u,
+  );
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(page).toHaveURL(/\/account\/teams\/55555550-/);
+  // Titled by its kind, which is not said a second time under it.
   await expect(
-    dialog.getByText("Created in Fixture Organization."),
+    page.getByRole("heading", { name: "Facilities", level: 1 }),
   ).toBeVisible();
-  await dialog.getByLabel(/Project name/).fill("First team project");
-  await dialog.getByLabel(/Project type/).fill("Invoices");
-  await dialog.getByRole("button", { name: "Create project" }).click();
-  await dialog.getByRole("button", { name: "Done" }).click();
   await expect(
-    page.getByRole("heading", { name: "Fixture Organization Team Projects" }),
+    page.getByText("Fixture Organization · You are its owner", {
+      exact: true,
+    }),
   ).toBeVisible();
-  await expect(page.getByText("First team project")).toBeVisible();
+  // The kind is sent as the team's name and its type.
+  expect(await createdTeams()).toEqual([
+    {
+      workspaceId: organizationWorkspaceId,
+      name: "Facilities",
+      type: "Facilities",
+    },
+  ]);
 });
 
-test("working in a personal workspace, a team project is not offered until the organization is (register F57)", async ({
+test("Create a team closes on Escape, asks for the list once as Done does, and sends the kind picked (register F77)", async ({
+  page,
+}) => {
+  const actions = observe(page, isServerAction);
+  await page.goto("/account/teams");
+  await page
+    .locator("main")
+    .getByRole("button", { name: "Create a team" })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Create a team" });
+  await dialog
+    .getByLabel("Kind of team", { exact: true })
+    .selectOption("Finance");
+  await dialog.getByRole("button", { name: "Create team" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Team created" }),
+  ).toBeVisible();
+  const before = actions.length;
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/account\/teams\/55555550-/);
+  await expect(
+    page.getByRole("heading", { name: "Finance", level: 1 }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Fixture Organization · You are its owner", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  expect(actions.length - before).toBe(1);
+});
+
+test("the dashboard titles a team by its kind, and offers Create a team only to an owner or admin (the owner's build 9)", async ({
   page,
 }) => {
   await page.goto("/account");
-  const trigger = page.getByRole("button", { name: "Switch workspace" });
-  await trigger.click();
-  await page.getByRole("button", { name: /Fixture Personal/ }).click();
-  await expect(trigger).toContainText("Fixture Personal");
-  await page.goto("/account/projects");
-  await page.getByRole("button", { name: "Create project" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("radio", { name: /team/i })).toBeDisabled();
-  await expect(
-    dialog.getByText(
-      "Switch to your organization to create a team project in it.",
-    ),
-  ).toBeVisible();
+  const main = page.locator("main");
+  // A team made before a team was its kind keeps a name at the platform; the
+  // dashboard titles it by its kind, as every team list does.
+  await expect(main.getByRole("link", { name: /general/ })).toBeVisible();
+  await expect(main).not.toContainText("Fixture Project");
+
+  // With no team, Create a team is the owner's and the admin's alone.
+  await fixtureControl("org-without-projects");
+  await page.goto("/account");
+  await expect(main.getByText("No teams yet.")).toBeVisible();
+  await expect(main.getByRole("link", { name: "Create a team" })).toBeVisible();
+  await presentSession(page, "member");
+  await page.goto("/account");
+  await expect(main.getByText("No teams yet.")).toBeVisible();
+  await expect(main.getByRole("link", { name: "Create a team" })).toHaveCount(
+    0,
+  );
 });
 
-test("Create team on a page whose workspace was switched away in another tab says so, and creates nothing", async ({
+test("an organization with no team yet shows the empty screen, whose one Create a team makes its first in the organization being worked in (register F57, the owner's build 9)", async ({
+  page,
+}) => {
+  await fixtureControl("org-without-projects");
+  await page.goto("/account/teams");
+  const main = page.locator("main");
+  await expect(
+    main.getByRole("heading", { name: "No teams yet" }),
+  ).toBeVisible();
+  await expect(
+    main.getByText("A team has its own flows and its own people."),
+  ).toBeVisible();
+  // The empty screen's Create is the only one: the top row's is not drawn.
+  await expect(main.getByRole("button", { name: "Create a team" })).toHaveCount(
+    1,
+  );
+  await expectNoAxeViolations(page);
+  await main.getByRole("button", { name: "Create a team" }).click();
+  const dialog = page.getByRole("dialog", { name: "Create a team" });
+  await expect(dialog).toContainText("In Fixture Organization.");
+  await dialog
+    .getByLabel("Kind of team", { exact: true })
+    .selectOption("Operations");
+  await dialog.getByRole("button", { name: "Create team" }).click();
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Operations", level: 1 }),
+  ).toBeVisible();
+  await page.goto("/account/teams");
+  await expect(
+    page.getByRole("heading", { name: "Fixture Organization" }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: /Operations/ })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "No teams yet" })).toHaveCount(
+    0,
+  );
+});
+
+test("working in the personal workspace, a team is made there — named by its one line, with no one to add (the owner's build 9)", async ({
+  page,
+}) => {
+  // Switched as the switcher does, through the platform's own operation — not
+  // by the switcher itself, whose refresh a navigation can cancel (F73).
+  const switched = await page
+    .context()
+    .request.patch("/api/platform/v1/session/active-workspace", {
+      data: { workspaceId: personalWorkspaceId },
+      headers: { origin: "http://127.0.0.1:3001" },
+    });
+  expect(switched.status()).toBe(200);
+  await page.goto("/account/teams");
+  await page
+    .locator("main")
+    .getByRole("button", { name: "Create a team" })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Create a team" });
+  await expect(dialog).toContainText("In your personal workspace.");
+  await dialog
+    .getByLabel("Kind of team", { exact: true })
+    .selectOption("Sales");
+  await dialog.getByRole("button", { name: "Create team" }).click();
+  const made = page.getByRole("dialog", { name: "Team created" });
+  await expect(made).toContainText("Your team is ready.");
+  await expect(made).not.toContainText("Add people");
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Sales", level: 1 }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Personal · You are its owner", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add members" })).toHaveCount(
+    0,
+  );
+  expect(await createdTeams()).toEqual([
+    { workspaceId: personalWorkspaceId, name: "Sales", type: "Sales" },
+  ]);
+});
+
+test("a kind the workspace already has a team for is refused in words — whatever its case, the older team's own kind too — and nothing is made (build 10)", async ({
+  page,
+}) => {
+  await page.goto("/account/teams");
+  const create = page
+    .locator("main")
+    .getByRole("button", { name: "Create a team" });
+  await create.click();
+  let dialog = page.getByRole("dialog", { name: "Create a team" });
+  await dialog
+    .getByLabel("Kind of team", { exact: true })
+    .selectOption("Finance");
+  await dialog.getByRole("button", { name: "Create team" }).click();
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Finance", level: 1 }),
+  ).toBeVisible();
+
+  await page.goto("/account/teams");
+  await create.click();
+  dialog = page.getByRole("dialog", { name: "Create a team" });
+  const kind = dialog.getByLabel("Kind of team", { exact: true });
+  await kind.selectOption("Finance");
+  await dialog.getByRole("button", { name: "Create team" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "This workspace already has a team for Finance.",
+  );
+  await kind.selectOption("Other");
+  const other = dialog.getByLabel("What kind of team");
+  for (const words of ["finance", "General"]) {
+    await other.fill(words);
+    await dialog.getByRole("button", { name: "Create team" }).click();
+    await expect(dialog.getByRole("alert")).toHaveText(
+      `This workspace already has a team for ${words}.`,
+    );
+  }
+  expect(await createdTeams()).toEqual([
+    {
+      workspaceId: organizationWorkspaceId,
+      name: "Finance",
+      type: "Finance",
+    },
+  ]);
+});
+
+test("a plain member of an organization is offered no Create a team; an admin is, and is refused in words once made a plain member with the dialog open (build 10)", async ({
+  page,
+}) => {
+  await presentSession(page, "member");
+  await page.goto("/account/teams");
+  await expect(page.getByRole("link", { name: /general/ })).toBeVisible();
+  await expect(
+    page.locator("main").getByRole("button", { name: "Create a team" }),
+  ).toHaveCount(0);
+
+  await presentSession(page, "admin");
+  await page.goto("/account/teams");
+  await page
+    .locator("main")
+    .getByRole("button", { name: "Create a team" })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Create a team" });
+  await dialog
+    .getByLabel("Kind of team", { exact: true })
+    .selectOption("Legal");
+  await presentSession(page, "member");
+  await dialog.getByRole("button", { name: "Create team" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Only an owner or admin can create a team here.",
+  );
+  expect(await createdTeams()).toEqual([]);
+});
+
+test("Create a team on a page whose workspace was switched away in another tab says so, and creates nothing (register F57, F28)", async ({
   page,
   context,
 }) => {
   await page.goto("/account/teams");
+  await page
+    .locator("main")
+    .getByRole("button", { name: "Create a team" })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Create a team" });
+  await dialog.getByLabel("Kind of team", { exact: true }).selectOption("HR");
   const other = await context.newPage();
   try {
     await other.goto("/account");
@@ -2112,53 +2291,182 @@ test("Create team on a page whose workspace was switched away in another tab say
   } finally {
     await other.close();
   }
-  await page.getByLabel("Team name").fill("Stale tab team");
-  await page.getByRole("button", { name: "Create team" }).click();
-  await expect(page.locator("main").getByRole("alert")).toHaveText(
+  await dialog.getByRole("button", { name: "Create team" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
     "The active workspace changed in another tab. Reload this page before continuing.",
   );
-  await page.goto("/account");
-  const trigger = page.getByRole("button", { name: "Switch workspace" });
-  await trigger.click();
-  await page.getByRole("button", { name: /Fixture Organization/ }).click();
-  await expect(trigger).toContainText("Fixture Organization");
-  await page.goto("/account/teams");
-  await expect(page.getByRole("link", { name: "Operations" })).toBeVisible();
-  await expect(page.getByText("Stale tab team")).toHaveCount(0);
+  // Neither the organization the page showed nor the workspace now active.
+  expect(await createdTeams()).toEqual([]);
 });
 
-test("a grant on a project from a workspace that is not the active one goes to the project's own workspace", async ({
+test("a team's owner adds someone from the organization, and the team lists who is on it (backend §12.1 #173)", async ({
   page,
 }) => {
-  await page.goto("/account");
-  const trigger = page.getByRole("button", { name: "Switch workspace" });
-  await trigger.click();
-  await page.getByRole("button", { name: /Fixture Personal/ }).click();
-  await expect(trigger).toContainText("Fixture Personal");
-  await page.goto("/account/projects/33333333-3333-4333-8333-333333333333");
-  await page
-    .getByLabel("Team", { exact: true })
-    .selectOption({ label: "Operations" });
-  await page.getByLabel("Role on this project").selectOption("member");
-  await page.getByRole("button", { name: "Give access" }).click();
+  await page.goto(fixtureProject);
+  const members = page.locator("main li");
+  await expect(members.filter({ hasText: "Fixture Owner" })).toBeVisible();
+  await expect(members.filter({ hasText: "Fixture Member" })).toBeVisible();
+  await expect(page.getByText("2 members")).toBeVisible();
+  await page.getByRole("button", { name: "Add members" }).click();
+  const picker = page.getByRole("dialog", { name: "Add members" });
+  const admin = picker.locator("li").filter({ hasText: "Fixture Admin" });
+  await admin.getByLabel("Role").selectOption("admin");
+  await admin.getByRole("button", { name: "Add" }).click();
   await expect(
-    page.locator("main li").filter({ hasText: "Operations" }),
-  ).toContainText(/member/i);
+    picker.getByText("Everyone in this organization is already on the team."),
+  ).toBeVisible();
+  await picker.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByText("3 members")).toBeVisible();
+  await expect(page.getByLabel("Role for Fixture Admin")).toHaveValue("admin");
 });
 
-const fixtureProject = "/account/projects/33333333-3333-4333-8333-333333333333";
-
-test("Leave project's dialog gives focus back to Leave project when it closes (register F75)", async ({
+test("a team's owner approves a request to join, and the person is on the team (backend 24.11.2)", async ({
   page,
 }) => {
+  await page.goto(fixtureProject);
+  await expect(
+    page.getByRole("heading", { name: "Asking to join" }),
+  ).toBeVisible();
+  const asking = page
+    .locator("main li")
+    .filter({ hasText: "Fixture Newcomer" });
+  await expect(asking).toContainText("newcomer@example.test");
+  await expectNoAxeViolations(page);
+  await asking.getByRole("button", { name: "Approve" }).click();
+  await expect(page.getByText("No one is asking to join.")).toBeVisible();
+  await expect(page.getByText("3 members")).toBeVisible();
+  await expect(page.getByLabel("Role for Fixture Newcomer")).toHaveValue(
+    "member",
+  );
+});
+
+test("a team's owner denies a request to join, and no one is added (backend 24.11.2)", async ({
+  page,
+}) => {
+  await page.goto(fixtureProject);
+  await page
+    .locator("main li")
+    .filter({ hasText: "Fixture Newcomer" })
+    .getByRole("button", { name: "Deny" })
+    .click();
+  await expect(page.getByText("No one is asking to join.")).toBeVisible();
+  await expect(page.getByText("2 members")).toBeVisible();
+  await expect(page.getByText("Fixture Newcomer")).toHaveCount(0);
+});
+
+test("a plain member on a team sees no requests and adds no one; an organization admin off the team sees it, decides, and has nothing to leave (backend 24.11.3)", async ({
+  page,
+}) => {
+  await presentSession(page, "member");
+  await page.goto(fixtureProject);
+  // A team made before a team was its kind keeps a name of its own at the
+  // platform; its title is still its kind, said once (the owner's build 9).
+  await expect(
+    page.getByRole("heading", { name: "general", level: 1 }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Fixture Organization · You are its member", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.locator("main")).not.toContainText("Fixture Project");
+  await expect(
+    page.getByRole("heading", { name: "Asking to join" }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add members" })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.locator("main").getByRole("button", { name: "Leave team" }),
+  ).toBeVisible();
+
   await presentSession(page, "admin");
+  await page.goto(fixtureProject);
+  await expect(
+    page.getByText(
+      "Fixture Organization · You see every team as an organization admin",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Asking to join" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add members" })).toBeVisible();
+  await expect(
+    page.locator("main").getByRole("button", { name: "Leave team" }),
+  ).toHaveCount(0);
+});
+
+test("a plain member asks to join a team the organization lists, sees Requested, and withdraws the request, confirmed first (backend 24.11.2, 24.11.4)", async ({
+  page,
+}) => {
+  await presentSession(page, "member");
+  await page.goto("/account/teams");
+  await expect(
+    page.getByRole("heading", { name: "Ask to join" }),
+  ).toBeVisible();
+  const operations = page.locator("main li").filter({ hasText: "Operations" });
+  // The team they are on is theirs, not one to ask for — titled by its kind,
+  // printed once.
+  const theirs = page.locator("main li").filter({ hasText: "general" });
+  await expect(theirs).toHaveCount(1);
+  await expect(theirs).not.toContainText("Fixture Project");
+  await operations.getByRole("button", { name: "Request to join" }).click();
+  await expect(operations).toContainText("Requested");
+  await expectNoAxeViolations(page);
+  await operations.getByRole("button", { name: "Withdraw" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Withdraw your request to join Operations?",
+  });
+  await expect(dialog).toContainText("You can ask again any time.");
+  await dialog.getByRole("button", { name: "Withdraw" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    operations.getByRole("button", { name: "Request to join" }),
+  ).toBeVisible();
+});
+
+test("before the platform has a directory and requests, Teams lists the teams a person is on and leaves the asking out, never the page", async ({
+  page,
+}) => {
+  await fixtureControl("team-access-missing");
+  await presentSession(page, "member");
+  await page.goto("/account/teams");
+  await expect(page.getByRole("link", { name: /general/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ask to join" })).toHaveCount(
+    0,
+  );
+  await presentSession(page, "owner");
+  await page.goto(fixtureProject);
+  await expect(page.getByText("No one is asking to join.")).toBeVisible();
+});
+
+test("the old addresses land on the new pages: Automations is Flows, Projects is Teams (BUILD-PLAN 24.11.11)", async ({
+  page,
+}) => {
+  await page.goto("/account/automations");
+  await expect(page).toHaveURL(/\/account\/flows$/);
+  await expect(page.getByRole("heading", { name: "Flows" })).toBeVisible();
+  await page.goto("/account/projects");
+  await expect(page).toHaveURL(/\/account\/teams$/);
+  await page.goto("/account/projects/33333333-3333-4333-8333-333333333333");
+  await expect(page).toHaveURL(fixtureProject);
+  await expect(
+    page.getByRole("heading", { name: "general", level: 1 }),
+  ).toBeVisible();
+});
+
+test("Leave team's dialog gives focus back to Leave team when it closes (register F75)", async ({
+  page,
+}) => {
+  await presentSession(page, "member");
   await page.goto(fixtureProject);
   const trigger = page
     .locator("main")
-    .getByRole("button", { name: "Leave project" });
+    .getByRole("button", { name: "Leave team" });
   await trigger.click();
   const dialog = page.getByRole("dialog", {
-    name: "Leave “Fixture Project”?",
+    name: "Leave “general”?",
   });
   await expect(dialog.getByLabel("Confirmation")).toBeFocused();
   await page.keyboard.press("Escape");
@@ -2166,22 +2474,22 @@ test("Leave project's dialog gives focus back to Leave project when it closes (r
   await expect(trigger).toBeFocused();
 });
 
-test("Leave project's dialog holds while the platform decides, and says its refusal (register F76)", async ({
+test("Leave team's dialog holds while the platform decides, and says its refusal (register F76)", async ({
   page,
 }) => {
-  await presentSession(page, "admin");
+  await presentSession(page, "member");
   await page.goto(fixtureProject);
   await page
     .locator("main")
-    .getByRole("button", { name: "Leave project" })
+    .getByRole("button", { name: "Leave team" })
     .click();
   const dialog = page.getByRole("dialog", {
-    name: "Leave “Fixture Project”?",
+    name: "Leave “general”?",
   });
   await dialog.getByLabel("Confirmation").fill("DELETE");
   const leave = await holdRequest(page, `**${fixtureProject}`, isServerAction);
   await presentSession(page, "throttled");
-  await dialog.getByRole("button", { name: "Leave project" }).click();
+  await dialog.getByRole("button", { name: "Leave team" }).click();
   await leave.arrived;
   // Neither Escape nor the backdrop closes it while the answer is on its way.
   await page.keyboard.press("Escape");
@@ -2189,31 +2497,6 @@ test("Leave project's dialog holds while the platform decides, and says its refu
   await expect(dialog).toBeVisible();
   leave.release();
   await expect(dialog.getByText(busy)).toBeVisible();
-});
-
-test("Create project closes on Escape and asks for the list once, as Done does (register F77)", async ({
-  page,
-}) => {
-  const actions = observe(page, isServerAction);
-  await page.goto("/account/projects");
-  await page
-    .locator("main")
-    .getByRole("button", { name: "Create project" })
-    .click();
-  const dialog = page.getByRole("dialog", { name: "Create project" });
-  await dialog
-    .locator("label")
-    .filter({ hasText: /^\s*team\s*$/i })
-    .click();
-  await dialog.getByLabel(/Project name/).fill("Escaped project");
-  await dialog.getByLabel(/Project type/).fill("Invoices");
-  await dialog.getByRole("button", { name: "Create project" }).click();
-  await expect(dialog).toContainText("Your project was created.");
-  const before = actions.length;
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.getByText("Escaped project")).toBeVisible();
-  expect(actions.length - before).toBe(1);
 });
 
 test("signing out flips the marketing nav without a manual reload", async ({
@@ -2323,11 +2606,29 @@ test("keyboard reaches dashboard navigation and preserves a visible focus target
   ).toBeFocused();
 });
 
-// A plan's card in the billing page's plan list.
+// A plan's card on the billing page, found by its name.
 function planCard(page: Page, name: string) {
   return page
     .locator("main li")
     .filter({ has: page.getByText(name, { exact: true }) });
+}
+
+// How many checkouts the platform was asked for, bought or refused.
+async function checkoutAttempts() {
+  return (await fixtureRead<{ checkoutAttempts: number }>("counts"))
+    .checkoutAttempts;
+}
+
+// The hosted pages are the provider's; here they are stubbed at the browser,
+// in every tab, so the navigation itself is what is observed.
+async function stubHostedPages(context: BrowserContext) {
+  await context.route("https://billing.invalid/**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: "<h1>hosted</h1>",
+    }),
+  );
 }
 
 test("a billing hand-off is refused when another tab changed the active workspace", async ({
@@ -2335,9 +2636,7 @@ test("a billing hand-off is refused when another tab changed the active workspac
   context,
 }) => {
   await page.goto("/account/billing");
-  await expect(
-    page.locator("main").getByText("Free", { exact: true }),
-  ).toBeVisible();
+  await expect(planCard(page, "Free")).toContainText("Enrolled");
   const other = await context.newPage();
   try {
     await other.goto("/account");
@@ -2347,7 +2646,7 @@ test("a billing hand-off is refused when another tab changed the active workspac
     await expect(trigger).toContainText("Fixture Personal");
     // This page still shows the organization, which is no longer active:
     // nothing is bought for a workspace the person was not looking at.
-    await planCard(page, "Team")
+    await planCard(page, "Plus")
       .getByRole("button", { name: "Choose plan" })
       .click();
     await expect(
@@ -2361,67 +2660,126 @@ test("a billing hand-off is refused when another tab changed the active workspac
   }
 });
 
-test("the billing page reads the plan through the published operations and hands off to the hosted pages", async ({
+test("three cards side by side — Free, then the platform's plans by price — each its name and its price, and the workspace's own says Enrolled (the owner's build 9)", async ({
   page,
 }) => {
-  // The hosted pages are the provider's; here they are stubbed at the browser
-  // so the navigation itself is what is observed.
-  await page.route("https://billing.invalid/**", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "text/html",
-      body: "<h1>hosted</h1>",
-    }),
-  );
   await page.goto("/account/billing");
+  const cards = page.locator("main li");
+  // By price, though the platform lists Pro before Plus.
+  await expect(cards).toHaveCount(3);
+  await expect(cards.nth(0)).toContainText("Free");
+  await expect(cards.nth(1)).toContainText("Plus");
+  await expect(cards.nth(2)).toContainText("Pro");
+  await expect(planCard(page, "Free")).toContainText("$0.00 per month");
+  await expect(planCard(page, "Plus")).toContainText("$5.00 per month");
+  await expect(planCard(page, "Pro")).toContainText("$10.00 per month");
+  // On the free floor Free is the workspace's own, and offers nothing.
+  await expect(planCard(page, "Free")).toContainText("Enrolled");
+  await expect(planCard(page, "Free").getByRole("button")).toHaveCount(0);
+  await expect(page.getByText("Enrolled", { exact: true })).toHaveCount(1);
+  // A name and a price: no capability is printed, in words or as a key.
   const main = page.locator("main");
-  await expect(main.getByText("Free", { exact: true })).toBeVisible();
-  // No billing account yet: the portal answers 409 and the page says what to do.
-  await page.getByRole("button", { name: "Manage billing" }).click();
+  for (const capability of [
+    "Flows",
+    "Requests per minute",
+    "automation.subscribe",
+    "workspace.rate",
+  ]) {
+    await expect(main).not.toContainText(capability);
+  }
+  // Side by side, across the page's width.
+  const tops = await cards.evaluateAll((items) =>
+    items.map((item) => Math.round(item.getBoundingClientRect().top)),
+  );
+  expect(new Set(tops).size).toBe(1);
+  await expectNoAxeViolations(page);
+});
+
+test("a plan picked opens the provider's checkout for that plan; once paying, its card says Enrolled with its status and renewal, and every other card opens Manage billing (ADR-0025, the owner's build 9)", async ({
+  page,
+  context,
+}) => {
+  await stubHostedPages(context);
+  await page.goto("/account/billing");
+  await planCard(page, "Pro")
+    .getByRole("button", { name: "Choose plan" })
+    .click();
+  await page.waitForURL(/billing\.invalid\/checkout\//);
+  // Back on the page, the plan the checkout was for is the workspace's.
+  await page.goto("/account/billing");
+  const pro = planCard(page, "Pro");
+  await expect(pro).toContainText("Enrolled");
+  await expect(pro.getByText(/^active$/i)).toBeVisible();
+  await expect(pro.locator("dt")).toHaveText("Renews");
+  await expect(pro.locator("dd")).toHaveText("Sep 12, 2026, 12:00 PM");
+  await expect(planCard(page, "Free")).not.toContainText("Enrolled");
+  await expectNoAxeViolations(page);
+  // Changing plans is the portal's: another card, Free included, opens
+  // Manage billing — never a second checkout, not even one refused.
+  for (const name of ["Plus", "Free"]) {
+    await page.goto("/account/billing");
+    await planCard(page, name)
+      .getByRole("button", { name: "Choose plan" })
+      .click();
+    await page.waitForURL(/billing\.invalid\/portal\//);
+  }
+  expect(await checkoutAttempts()).toBe(1);
+  await page.goto("/account/billing");
+  await pro.getByRole("button", { name: "Manage billing" }).click();
+  await page.waitForURL(/billing\.invalid\/portal\//);
+  // A subscription gone by the time Manage billing is pressed: the portal
+  // answers that there is no billing account, and the page says what to do.
+  await page.goto("/account/billing");
+  await fixtureControl("reset");
+  await pro.getByRole("button", { name: "Manage billing" }).click();
   await expect(
     page.getByText(
       "This workspace has no billing account yet. Choose a plan below to start one.",
     ),
   ).toBeVisible();
-  await planCard(page, "Team")
-    .getByRole("button", { name: "Choose plan" })
-    .click();
-  await page.waitForURL(/billing\.invalid\/checkout\//);
-  // Back on the page, the plan the checkout bought is the current one — and
-  // with a live subscription no other plan offers a second checkout: changing
-  // plans is the portal's (ADR-0025).
-  await page.goto("/account/billing");
-  await expect(
-    planCard(page, "Team").getByRole("button", { name: "Current plan" }),
-  ).toBeDisabled();
-  await expect(main.getByText(/^active$/i)).toBeVisible();
-  await expect(planCard(page, "Pro")).toBeVisible();
-  await expect(planCard(page, "Pro").getByRole("button")).toHaveCount(0);
-  await expect(
-    page.getByText(
-      "To change or cancel your plan, or to finish a payment, use Manage billing.",
-    ),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Manage billing" }).click();
-  await page.waitForURL(/billing\.invalid\/portal\//);
+  await expect(page).toHaveURL(/\/account\/billing$/);
 });
 
-test("a plan says what it costs when the provider states it, and labels every capability it shows", async ({
+test("a checkout for a workspace that already has a plan opens Manage billing instead — the platform refuses a second subscription (backend 24.12, build 10)", async ({
+  page,
+  context,
+}) => {
+  await stubHostedPages(context);
+  // This page renders on the free floor …
+  await page.goto("/account/billing");
+  await expect(planCard(page, "Free")).toContainText("Enrolled");
+  // … and another tab buys Plus meanwhile.
+  const other = await context.newPage();
+  try {
+    await other.goto("/account/billing");
+    await planCard(other, "Plus")
+      .getByRole("button", { name: "Choose plan" })
+      .click();
+    await other.waitForURL(/billing\.invalid\/checkout\//);
+  } finally {
+    await other.close();
+  }
+  await planCard(page, "Pro")
+    .getByRole("button", { name: "Choose plan" })
+    .click();
+  await page.waitForURL(/billing\.invalid\/portal\//);
+  // The platform was asked, and refused: two checkouts, one plan.
+  expect(await checkoutAttempts()).toBe(2);
+  // Nothing was bought twice: the plan is still the one the other tab bought.
+  await page.goto("/account/billing");
+  await expect(planCard(page, "Plus")).toContainText("Enrolled");
+  await expect(planCard(page, "Pro")).not.toContainText("Enrolled");
+});
+
+test("a plan whose price the provider cannot state says it is shown at checkout, and is the last card (backend ADR-0031)", async ({
   page,
 }) => {
-  // Backend §12.1 #163, ADR-0031: the price is the provider's figure in minor
-  // units; a plan without one says so rather than guessing, and a capability
-  // the website has no words for is not printed as a raw key.
+  await fixtureControl("plan-price-unstated");
   await page.goto("/account/billing");
-  const team = planCard(page, "Team");
-  await expect(team).toContainText("$5.00 per month");
-  await expect(team).toContainText("Automations");
-  await expect(team).toContainText("Requests per minute");
-  const pro = planCard(page, "Pro");
-  await expect(pro).toContainText("Price shown at checkout");
-  await expect(page.locator("main")).not.toContainText("fixture.unlabelled");
-  await expect(page.locator("main")).not.toContainText("workspace.rate");
-  await expectNoAxeViolations(page);
+  const cards = page.locator("main li");
+  await expect(cards.nth(1)).toContainText("Plus");
+  await expect(cards.nth(2)).toContainText("Pro");
+  await expect(planCard(page, "Pro")).toContainText("Price shown at checkout");
 });
 
 test("billing renders no identifier that is not this platform's own", async ({
@@ -2490,14 +2848,9 @@ test("a member is offered no control the platform would refuse them — connecti
 
 test("each workspace holds its own plan — buying for the personal workspace leaves the organization's alone (register F31)", async ({
   page,
+  context,
 }) => {
-  await page.route("https://billing.invalid/**", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "text/html",
-      body: "<h1>hosted</h1>",
-    }),
-  );
+  await stubHostedPages(context);
   const activate = async (workspaceId: string) => {
     const answer = await page
       .context()
@@ -2509,21 +2862,17 @@ test("each workspace holds its own plan — buying for the personal workspace le
   };
   await activate(personalWorkspaceId);
   await page.goto("/account/billing");
-  await planCard(page, "Team")
+  await planCard(page, "Plus")
     .getByRole("button", { name: "Choose plan" })
     .click();
   await page.waitForURL(/billing\.invalid\/checkout\//);
   await page.goto("/account/billing");
-  await expect(
-    planCard(page, "Team").getByRole("button", { name: "Current plan" }),
-  ).toBeDisabled();
+  await expect(planCard(page, "Plus")).toContainText("Enrolled");
   await activate(organizationWorkspaceId);
   await page.goto("/account/billing");
+  await expect(planCard(page, "Free")).toContainText("Enrolled");
   await expect(
-    page.locator("main").getByText("Free", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    planCard(page, "Team").getByRole("button", { name: "Choose plan" }),
+    planCard(page, "Plus").getByRole("button", { name: "Choose plan" }),
   ).toBeVisible();
 });
 

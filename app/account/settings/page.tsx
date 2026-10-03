@@ -44,8 +44,8 @@ export default async function AccountSettingsPage() {
     <SectionCard title="Settings">
       <div className="py-5 first:pt-0">
         <p className="text-sm text-[var(--muted)]">
-          Account and workspace settings. Connected accounts for automations are
-          on the Connections page.
+          Account and workspace settings. Connected accounts for flows are on
+          the Connections page.
         </p>
       </div>
       <LinkedAccountsSection />

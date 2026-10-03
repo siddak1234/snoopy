@@ -7,17 +7,15 @@ import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 
 /**
- * A small "Remove" that asks first, then runs one server action and refreshes
- * the page. For an undoable removal of one thing from a list — a person from a
- * team, a team's access to a project (backend §12.1 #174). Nothing here is
- * one-way: the same person or team can be added again, which is why a plain
- * confirmation suffices where deleting a project asks for a typed word.
+ * A small button that asks first, then runs one server action and refreshes
+ * the page. For an undoable change to one thing in a list — withdrawing a
+ * request to join a team (BUILD-PLAN 24.11.11). Nothing here is one-way: the
+ * person can ask again, which is why a plain confirmation suffices where
+ * deleting a team asks first and leaving one asks for a typed word.
  *
- * The removed row takes this button with it, so focus is handed to
- * `focusAfter` — the id of the list's heading, which stays. A removal that
- * takes the page away from the person (a manager leaving their own team, which
- * they then cannot see) goes to `redirectAfter` instead, as leaving a project
- * does.
+ * The changed row takes this button with it, so focus is handed to
+ * `focusAfter` — the id of the list's heading, which stays. A change that
+ * takes the page away from the person goes to `redirectAfter` instead.
  */
 export function ConfirmRemoveButton({
   label,

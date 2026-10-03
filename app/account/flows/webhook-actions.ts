@@ -27,8 +27,8 @@ export type WebhookIssueResult =
   { ok: true; issued: IssuedWebhookEndpoint } | { ok: false; error: string };
 
 const ISSUE_REFUSALS: Record<string, string> = {
-  trigger_kind_mismatch: "This automation is not started by a webhook.",
-  subscription_archived: "An archived automation has no address.",
+  trigger_kind_mismatch: "This flow is not started by a webhook.",
+  subscription_archived: "An archived flow has no address.",
 };
 
 export async function readWebhookAddress(

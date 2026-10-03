@@ -29,20 +29,17 @@ const GENERATED_PATH = resolve(
 );
 const ACTIONS_PATH = resolve(
   import.meta.dirname,
-  "../app/account/automations/actions.ts",
+  "../app/account/flows/actions.ts",
 );
 const ACTIONS_UI_PATH = resolve(
   import.meta.dirname,
-  "../app/account/automations/AutomationActions.tsx",
+  "../app/account/flows/AutomationActions.tsx",
 );
 const FIELDS_PATH = resolve(
   import.meta.dirname,
-  "../app/account/automations/ManifestFields.tsx",
+  "../app/account/flows/ManifestFields.tsx",
 );
-const PAGE_PATH = resolve(
-  import.meta.dirname,
-  "../app/account/automations/page.tsx",
-);
+const PAGE_PATH = resolve(import.meta.dirname, "../app/account/flows/page.tsx");
 const PLATFORM_SERVER_PATH = resolve(
   import.meta.dirname,
   "../lib/platform-server.ts",
@@ -438,8 +435,15 @@ test("archiving is its own confirmed action, and the generic status action canno
     "the unconfirmed status action must not accept archived",
   );
   assert.match(actionsUi, /archiveSubscription\(/);
-  assert.match(actionsUi, /This cannot be\s+undone/u);
-  assert.match(actionsUi, /gives its plan slot back/);
+  // Archive flow, in the app's words (the owner's build 9; build 10's
+  // wording): where it goes, and that its runs stay.
+  assert.match(actionsUi, />\s*Archive flow\s*</u);
+  assert.match(actionsUi, />\s*Archive \{name\}\?\s*</u);
+  assert.match(
+    actionsUi,
+    /It stops and moves to Archived flows\. Its runs stay in Activity, and\s+you can add it again later\./u,
+  );
+  assert.match(actionsUi, /pending \? "Archiving…" : "Archive"/u);
 });
 
 test("a card lists every subscription it has, each under its own scope (register F21)", () => {
@@ -456,7 +460,7 @@ test("a card lists every subscription it has, each under its own scope (register
     /const byTemplate = new Map<string, Subscription\[\]>\(\);/u,
   );
   assert.match(page, /subscriptions\.map\(\(subscription\) => \(/u);
-  assert.match(page, /subscription\.projectId\s*\?\s*`Project: /u);
+  assert.match(page, /subscription\.projectId\s*\?\s*`Team: /u);
   // Adding offers only the scopes not yet taken, and can name a project.
   assert.match(
     page,
@@ -561,8 +565,8 @@ const read = (path) =>
   readFileSync(resolve(import.meta.dirname, "..", path), "utf8");
 
 test("a run's file goes straight to the store, and the run carries only its id (backend FR-14)", () => {
-  const fileField = read("app/account/automations/RunFileField.tsx");
-  const uploads = read("app/account/automations/upload-actions.ts");
+  const fileField = read("app/account/flows/RunFileField.tsx");
+  const uploads = read("app/account/flows/upload-actions.ts");
   const browserApi = read("lib/platform-api.ts");
   // An artifact field is rendered as a file chooser; every other control as
   // before.
@@ -635,7 +639,7 @@ test("a run refused for its file says so and empties the file field to choose ag
 test("a subscription moves to the newest version in place, and each refusal the platform names is said in words (backend §12.1 #126)", () => {
   assert.match(
     actions,
-    /await updateSubscription\(\s*workspaceId,\s*subscriptionId,\s*\{ templateVersion \},\s*"version",\s*\);\s*revalidatePath\("\/account\/automations"\);/u,
+    /await updateSubscription\(\s*workspaceId,\s*subscriptionId,\s*\{ templateVersion \},\s*"version",\s*\);\s*revalidatePath\("\/account\/flows"\);/u,
   );
   assert.match(
     page,
@@ -651,8 +655,8 @@ test("a subscription moves to the newest version in place, and each refusal the 
 });
 
 test("a webhook address is offered for a webhook-started automation to an owner or admin only, and its secret is never kept (backend §12.1 #91, #109)", () => {
-  const button = read("app/account/automations/WebhookAddressButton.tsx");
-  const webhook = read("app/account/automations/webhook-actions.ts");
+  const button = read("app/account/flows/WebhookAddressButton.tsx");
+  const webhook = read("app/account/flows/webhook-actions.ts");
   assert.match(
     page,
     /subscription\.triggerKind === "webhook" && canAdminister \? \(\s*<div>\s*<WebhookAddressButton/u,
@@ -684,4 +688,16 @@ test("a webhook address is offered for a webhook-started automation to an owner 
       specReasons("issueWebhookEndpoint"),
     );
   }
+});
+
+test("archived flows are read by name, and only rows that are archived are kept (backend §12.1 #203, BUILD-PLAN 24.11.11)", () => {
+  // A platform from before the SEVENTEENTH promotion ignores the filter and
+  // answers the live list: a live flow must never be shown as archived.
+  assert.match(
+    client,
+    /`\$\{scope\(workspaceId\)\}\/subscriptions\?status=archived`,\s*\);\s*return response\.subscriptions\.filter\(\s*\(subscription\) => subscription\.status === "archived",\s*\);/u,
+  );
+  assert.match(page, /listArchivedSubscriptions\(workspaceId\)/u);
+  assert.match(page, />\s*Archived flows\s*</u);
+  assert.match(page, /Archived \{formatDay\(subscription\.updatedAt\)\}/u);
 });

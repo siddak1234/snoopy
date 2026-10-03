@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 // The drag-and-drop builder was removed from the account area (`415e57a`), so a
 // customer signing in from here lands on their automations — the page that
 // exists (register F53). What this page's copy promises is the owner's call.
-const SIGN_IN = loginHref("/account/automations");
+const SIGN_IN = loginHref("/account/flows");
 
 const features = [
   {

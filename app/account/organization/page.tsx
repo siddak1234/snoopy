@@ -12,6 +12,8 @@ import { OrgNameEditor } from "@/components/dashboard/OrgNameEditor";
 import { OrgDomainSection } from "@/components/dashboard/OrgDomainSection";
 import { OrgMemberList } from "@/components/dashboard/OrgMemberList";
 import { OrgJoinRequestList } from "@/components/dashboard/OrgJoinRequestList";
+import { OrgJoinLink } from "@/components/dashboard/OrgJoinLink";
+import { joinLinkLine } from "@/lib/join-link";
 import type { OrgMember } from "@/components/dashboard/OrgMemberList";
 
 export default async function OrganizationPage() {
@@ -68,6 +70,17 @@ export default async function OrganizationPage() {
             <dt className="w-20 shrink-0 pt-0.5 text-[var(--muted)]">Domain</dt>
             <dd>
               <OrgDomainSection workspaceId={workspace.id} domains={domains} />
+            </dd>
+          </div>
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-4">
+            <dt className="w-20 shrink-0 pt-1 text-[var(--muted)]">
+              Join link
+            </dt>
+            <dd className="min-w-0 flex-1">
+              <OrgJoinLink
+                workspaceId={workspace.id}
+                line={joinLinkLine(domains)}
+              />
             </dd>
           </div>
         </dl>

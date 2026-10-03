@@ -52,15 +52,14 @@ export default async function AccountLayout({
   if (!shell) redirect(SIGN_IN);
 
   const { workspaces, activeWorkspaceId } = shell;
-  // Each organization link shows where its page renders: the organization page
-  // for the active organization's owners and admins — who may do everything on
-  // it (register F55) — and teams in any organization workspace.
+  // The organization page shows where it renders: for the active
+  // organization's owners and admins, who may do everything on it (register
+  // F55). Teams is for everyone (BUILD-PLAN 24.11.11).
   const active = workspaces.find(
     (workspace) => workspace.id === activeWorkspaceId,
   );
-  const inOrganization = active?.type === "organization";
-  const showOrgSettings = inOrganization && administers(active?.role);
-  const showTeams = inOrganization;
+  const showOrgSettings =
+    active?.type === "organization" && administers(active?.role);
 
   return (
     // Self-contained dashboard shell: the route-group split means no marketing
@@ -72,16 +71,10 @@ export default async function AccountLayout({
         activeWorkspaceId={activeWorkspaceId}
       />
       <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
-        <DashboardSidebar
-          showOrgSettings={showOrgSettings}
-          showTeams={showTeams}
-        />
+        <DashboardSidebar showOrgSettings={showOrgSettings} />
         <div className="min-w-0 flex-1">
           <header className="mb-4 lg:mb-0">
-            <DashboardHeader
-              showOrgSettings={showOrgSettings}
-              showTeams={showTeams}
-            />
+            <DashboardHeader showOrgSettings={showOrgSettings} />
           </header>
           <main>{children}</main>
         </div>
