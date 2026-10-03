@@ -1323,6 +1323,30 @@ test("with no team yet, no flow can be added: an owner or admin is told to creat
   await expectNoAxeViolations(page);
 });
 
+test("a plain member on no team, in an organization that has one, is told to ask to join it — not that the first team is still to be made (the owner's build 10; the change audit)", async ({
+  page,
+}) => {
+  await fixtureControl("org-without-projects");
+  await createOperationsTeam(page);
+  await presentSession(page, "member");
+  await page.goto("/account/flows");
+  const card = automationCard(page, "Project automation");
+  await expect(card.getByText("Ask to join a team first.")).toBeVisible();
+  await expect(
+    card.getByText("An owner or admin creates the first team."),
+  ).toHaveCount(0);
+  await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
+  await expect(card.getByRole("combobox")).toHaveCount(0);
+  await expectNoAxeViolations(page);
+  const teams = card.getByRole("link", { name: "See teams" });
+  await expect(teams).toHaveAttribute("href", "/account/teams");
+  await teams.click();
+  await expect(page).toHaveURL(/\/account\/teams$/);
+  await expect(
+    page.locator("main li").filter({ hasText: "Operations" }),
+  ).toBeVisible();
+});
+
 test("a catalog with nothing to add is the app's empty screen — No flows to add yet — not a line in the section (the owner's build 10)", async ({
   page,
 }) => {

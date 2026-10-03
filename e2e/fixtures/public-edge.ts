@@ -1568,7 +1568,12 @@ const server = createServer(
       fixtureSession === "owner" || fixtureSession === "admin";
     // Backend 24.11.4: the organization's directory — every open team, and
     // where this person stands with each. Operations is listed to the plain
-    // member only (see operationsTeamId).
+    // member only (see operationsTeamId), and only while the organization has
+    // teams at all: under org-without-projects it has none, as the platform's
+    // directory would. A team a test created is listed like any open team —
+    // its creator and an owner or admin are on it, a plain member is not
+    // (the owner's build 10: a member on no team, in an organization that has
+    // one, is told to ask to join it).
     if (method === "GET" && isWorkspacePath(pathname, "/project-directory")) {
       if (state.teamAccessMissing)
         return respond(response, 404, problem(404, "Not Found"));
@@ -1587,7 +1592,24 @@ const server = createServer(
                 } satisfies Platform["ProjectDirectoryEntry"],
               ]
             : []),
-          ...(fixtureSession === "member"
+          ...createdIn(workspaceId)
+            .filter((team) => team.status !== "archived")
+            .map(
+              (team) =>
+                ({
+                  id: team.id,
+                  workspaceId: team.workspaceId,
+                  name: team.name,
+                  type: team.type,
+                  status: team.status,
+                  access:
+                    fixtureSession === "owner" || fixtureSession === "admin"
+                      ? "member"
+                      : "none",
+                  createdAt: team.createdAt,
+                }) satisfies Platform["ProjectDirectoryEntry"],
+            ),
+          ...(fixtureSession === "member" && state.fixtureProjectListed
             ? [
                 {
                   id: operationsTeamId,

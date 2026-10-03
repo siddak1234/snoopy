@@ -29,6 +29,7 @@ export function AddAutomation({
   scopes,
   hasTeam,
   canAdminister,
+  canAskToJoin,
   workspaceId,
 }: {
   templateId: string;
@@ -39,6 +40,8 @@ export function AddAutomation({
   hasTeam: boolean;
   /** Owner or admin, from the workspace list: who may create the first team. */
   canAdminister: boolean;
+  /** A plain member on no team, where the organization has one they could ask to join. */
+  canAskToJoin: boolean;
   /** The workspace this page shows; Add is refused once it is not active. */
   workspaceId: string;
 }) {
@@ -56,6 +59,17 @@ export function AddAutomation({
           className="btn-secondary btn-sm"
         >
           Create a team
+        </Link>
+      </div>
+    ) : canAskToJoin ? (
+      <div className="flex flex-col items-start gap-2">
+        <p className="text-xs text-[var(--muted)]">Ask to join a team first.</p>
+        <Link
+          prefetch={false}
+          href="/account/teams"
+          className="btn-secondary btn-sm"
+        >
+          See teams
         </Link>
       </div>
     ) : (

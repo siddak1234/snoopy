@@ -19,6 +19,7 @@ import { MoveVersionButton } from "./MoveVersionButton";
 import { WebhookAddressButton } from "./WebhookAddressButton";
 import {
   administers,
+  teamDirectoryIfThere,
   listWorkspaceProjects,
   resolveActiveWorkspaceId,
   roleInWorkspace,
@@ -94,6 +95,16 @@ export default async function FlowsPage() {
   const openProjects = projects.filter(
     (project) => project.status !== "archived",
   );
+  // A plain member on no team (the owner's build 10, found by the change
+  // audit): if the organization has teams they could ask to join, the card
+  // says so rather than that the first team is still to be made. Read only in
+  // that state; an owner or admin sees every team already.
+  const canAskToJoin =
+    !canAdminister && openProjects.length === 0
+      ? (await teamDirectoryIfThere(workspaceId)).some(
+          (entry) => entry.access !== "member",
+        )
+      : false;
   const catalogName = new Map(
     catalog.automations.map((entry) => [entry.templateId, entry.name]),
   );
@@ -125,6 +136,7 @@ export default async function FlowsPage() {
               subscriptions={byTemplate.get(automation.templateId) ?? []}
               projects={openProjects}
               canAdminister={canAdminister}
+              canAskToJoin={canAskToJoin}
               workspaceId={workspaceId}
             />
           ))}
@@ -174,12 +186,15 @@ function AutomationCard({
   subscriptions,
   projects,
   canAdminister,
+  canAskToJoin,
   workspaceId,
 }: {
   automation: AutomationCatalogEntry;
   subscriptions: Subscription[];
   projects: Project[];
   canAdminister: boolean;
+  /** A plain member on no team, in an organization with a team they could ask to join. */
+  canAskToJoin: boolean;
   /** The workspace this page shows; every action on the card is refused once it is not active. */
   workspaceId: string;
 }) {
@@ -329,6 +344,7 @@ function AutomationCard({
           scopes={scopes}
           hasTeam={projects.length > 0}
           canAdminister={canAdminister}
+          canAskToJoin={canAskToJoin}
         />
       </div>
     </div>

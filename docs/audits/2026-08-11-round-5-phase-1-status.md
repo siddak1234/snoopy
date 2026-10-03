@@ -1559,7 +1559,10 @@ This repository's half:
   nothing can be added, and the card says so in the app's words: an owner or admin reads
   "Create a team first." with a Create a team link to Teams, where Create a team is; a plain
   member, whom the platform would refuse, reads "An owner or admin creates the first team." —
-  the role is the workspace list's (F8). Neither is offered Add, and nothing is sent. A flow in
+  the role is the workspace list's (F8) — and, where the organization already has a team the
+  member could ask to join (the team directory, read only in that state), "Ask to join a team
+  first." with a See teams link instead: the change audit of this branch found the first line
+  false there (**F84**). Neither is offered Add, and nothing is sent. A flow in
   every team shows its rows and nothing to add, as before. A flow added to the whole workspace
   before stays listed, labelled "Whole workspace" — the platform still accepts the scope, and
   this website never sends it again.
@@ -1591,8 +1594,13 @@ Proved red by hand, each file restored by SHA-256:
 | No whole workspace to add to | the entry put back first in the offer | "a card lists each subscription under its team …" (a list to choose from where there was one team); the surfaces test "every automation control on a page whose workspace another tab switched away …" (Add read "Pick a team.", not the workspace line); the automation test "a flow is added to a team …" |
 | No team yet is said, not nothing | `return null` with no team | "with no team yet, no flow can be added …"; the automation test "a flow is added to a team …" |
 | A plain member reads who makes the first team | the owner's line for everyone | "with no team yet, no flow can be added …" (the member's half) |
+| A plain member where a team exists is told to ask to join it (F84) | the ask-to-join branch never taken | "a plain member on no team, in an organization that has one, is told to ask to join it …" |
 | The team is sent every time | the body sent without it when empty, and no refusal | the automation tests "a flow is added to a team …" and "a card lists every subscription it has …" |
 | An empty catalog is the whole-page empty screen | the one-line row put back | "a catalog with nothing to add is the app's empty screen …"; the structure test "a whole page with nothing on it …" |
 
-No new finding number: F83 stays the last. Build 10's proofs ran in Chromium, each guard's tests
-alone, against the fixture.
+**F84** (new): a plain member on no team, in an organization that has a team, read "An owner or
+admin creates the first team." on every flow card — false there; the Teams page offered "Ask to
+join Operations" at the same moment. Found by this branch's change audit (probe p04), fixed above.
+The fixture's directory now lists the teams a test creates, and lists its fixed Operations team
+only while the organization has teams at all, as the platform's directory would. F84 is the last
+number. Build 10's proofs ran in Chromium, each guard's tests alone, against the fixture.
