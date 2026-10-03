@@ -51,13 +51,15 @@ export function LeaveProjectButton({
     });
   }
 
+  // Leaving ends a person's place on the team, so the button and its confirm
+  // are red, as Delete is (the owner's build 12, #5).
   return (
     <>
       <button
         type="button"
         onClick={onOpen}
         disabled={pending}
-        className="shrink-0 rounded-lg px-2 py-1.5 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] dark:hover:bg-[var(--surface-hover)]"
+        className="shrink-0 rounded-lg px-2 py-1.5 text-sm font-medium text-[var(--error-text)] transition hover:bg-[var(--error-bg)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
       >
         {pending ? "Leaving…" : "Leave team"}
       </button>
@@ -116,7 +118,7 @@ export function LeaveProjectButton({
                 type="button"
                 onClick={onConfirm}
                 disabled={!canConfirm || pending}
-                className="btn-primary inline-flex px-5 disabled:pointer-events-none disabled:opacity-50"
+                className="btn-danger inline-flex px-5 disabled:pointer-events-none disabled:opacity-50"
               >
                 {pending ? "Leaving…" : "Leave team"}
               </button>

@@ -193,6 +193,29 @@ test("OAuth provider UI consumes the generated public provider policy", () => {
   assert.match(linkedAccounts, /state\.providers\.map/);
 });
 
+test("the Linked accounts lead says a linked account signs you in to this same account, in the app and on the website, and to link one before signing in with it (the owner's build 12, #8; register F86)", () => {
+  // The paragraph under the heading once the accounts are read, as a person
+  // reads it: JSX's wrapped lines joined by one space. Its first two sentences
+  // are the app's too; the credentials sentence is this page's own.
+  const prose = readFileSync(
+    "components/account/LinkedAccountsSection.tsx",
+    "utf8",
+  ).replace(/\s+/gu, " ");
+  const leads = [
+    ...prose.matchAll(/>\s*Linked accounts\s*<\/h2>\s*<p[^>]*>([^<]*)<\/p>/gu),
+  ]
+    .map(([, text]) => text.trim())
+    .filter((text) => text !== "Loading…");
+  assert.deepEqual(leads, [
+    "Any account linked here signs you in to this same account, in the app and on the website. Link an account before you first sign in with it. Provider credentials are handled by the Autom8x backend and never exposed to this page.",
+  ]);
+  assert.doesNotMatch(
+    prose,
+    /Link additional sign-in options to this account\./u,
+    "the old lead said nothing of what a linked account does",
+  );
+});
+
 test("a server-side call sends the Edge cookies, never cookie attributes (register F51)", async () => {
   const { requestCookieHeader } = await import("../lib/cookie-header.ts");
   const { ResponseCookies, RequestCookies } =

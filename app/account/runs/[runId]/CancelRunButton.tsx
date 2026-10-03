@@ -9,7 +9,8 @@ import { cancelRun } from "@/app/account/flows/actions";
 /**
  * Cancel a run that has not ended (`cancelRun`). Rendered only for a `pending`
  * or `running` run — the two states the platform cancels — and confirmed first,
- * because a cancelled run is not resumed: it ends where it stands.
+ * because a cancelled run is not resumed: it ends where it stands. For that, it
+ * is red on the page and in its confirm (the owner's build 12, #5).
  */
 export function CancelRunButton({
   runId,
@@ -46,7 +47,7 @@ export function CancelRunButton({
 
   return (
     <>
-      <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
+      <Button variant="danger" size="sm" onClick={() => setOpen(true)}>
         Cancel run
       </Button>
       {open ? (
@@ -80,7 +81,12 @@ export function CancelRunButton({
             >
               Keep it running
             </Button>
-            <Button type="button" onClick={confirm} disabled={pending}>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={confirm}
+              disabled={pending}
+            >
               {pending ? "Cancelling…" : "Cancel run"}
             </Button>
           </div>
