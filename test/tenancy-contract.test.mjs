@@ -307,17 +307,28 @@ test("asking to join a team is the published operations, keyed, and absent befor
     /method: "DELETE",\s*idempotencyKey: newIdempotencyKey\("project-access-cancel"\),/u,
   );
   // A platform from before the SEVENTEENTH promotion answers 404 for both: the
-  // asking parts are left out, never the page.
+  // asking parts are left out, never the page. The directory's tolerant read
+  // is one helper since build 11 (F84), used by Teams and by Flows' no-team line.
+  const tolerates404 =
+    /if \(error instanceof PlatformServerError && error\.status === 404\) return \[\];\s*throw error;/u;
+  assert.match(
+    tenancy,
+    new RegExp(
+      `export async function teamDirectoryIfThere\\([\\s\\S]*?${tolerates404.source}`,
+      "u",
+    ),
+  );
   for (const page of [
     "app/account/teams/page.tsx",
-    "app/account/teams/[id]/page.tsx",
+    "app/account/flows/page.tsx",
   ]) {
-    assert.match(
-      readFileSync(page, "utf8"),
-      /if \(error instanceof PlatformServerError && error\.status === 404\) return \[\];\s*throw error;/u,
-      page,
-    );
+    assert.match(readFileSync(page, "utf8"), /teamDirectoryIfThere\(/u, page);
   }
+  assert.match(
+    readFileSync("app/account/teams/[id]/page.tsx", "utf8"),
+    tolerates404,
+    "app/account/teams/[id]/page.tsx",
+  );
   // The requests are drawn for those who decide, never for a plain member.
   assert.match(
     readFileSync("app/account/teams/[id]/page.tsx", "utf8"),

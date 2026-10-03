@@ -99,14 +99,15 @@ export async function subscribeToAutomation(
 ): Promise<ActionResult> {
   const templateId = String(formData.get("templateId") ?? "");
   if (!templateId) return { ok: false, error: "A flow is required" };
-  // Empty is "the whole workspace"; anything else names a project the platform
-  // checks the person can see (18.6.2) — one they cannot is 404, not a hint.
+  // A flow is added to a team (the owner, build 10): the team is named every
+  // time, in the shared wording's words when it is not, and the platform
+  // checks the person can see it (18.6.2) — one they cannot is 404, not a
+  // hint. The whole workspace, which the platform would still accept, is
+  // never sent.
   const projectId = String(formData.get("projectId") ?? "");
+  if (!projectId) return { ok: false, error: "Pick a team." };
 
-  const body: CreateSubscriptionRequest = {
-    templateId,
-    ...(projectId ? { projectId } : {}),
-  };
+  const body: CreateSubscriptionRequest = { templateId, projectId };
   try {
     const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
     if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };

@@ -2,14 +2,12 @@ import { redirect } from "next/navigation";
 import { UsersThreeIcon } from "@phosphor-icons/react/dist/ssr/UsersThree";
 import { getAppSession } from "@/lib/app-session";
 import { loginHref } from "@/lib/platform-api";
-import { PlatformServerError } from "@/lib/platform-server";
 import {
   administers,
-  listTeamDirectory,
   listWorkspaceProjects,
   listWorkspaces,
   resolveActiveWorkspaceId,
-  type TeamDirectoryEntry,
+  teamDirectoryIfThere,
 } from "@/lib/tenancy";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
@@ -17,23 +15,6 @@ import { ProjectList } from "@/components/dashboard/ProjectList";
 import type { ProjectListItem } from "@/components/dashboard/ProjectList";
 import { CreateTeamButton } from "@/components/dashboard/CreateTeamButton";
 import { AskToJoinList } from "@/components/dashboard/AskToJoinList";
-
-/**
- * The directory, where the platform has one. A platform from before the
- * SEVENTEENTH promotion answers 404 for it: then the teams this person is on
- * are still listed and the asking section is simply not drawn, rather than the
- * whole page failing on the part that is not there yet.
- */
-async function directoryIfThere(
-  workspaceId: string,
-): Promise<TeamDirectoryEntry[]> {
-  try {
-    return await listTeamDirectory(workspaceId);
-  } catch (error) {
-    if (error instanceof PlatformServerError && error.status === 404) return [];
-    throw error;
-  }
-}
 
 /**
  * Teams (BUILD-PLAN 24.11.11). A team is a sub-organization with its own flows
@@ -70,7 +51,7 @@ export default async function AccountTeamsPage() {
       const [visible, directory] = await Promise.all([
         listWorkspaceProjects(workspace.id),
         workspace.type === "organization"
-          ? directoryIfThere(workspace.id)
+          ? teamDirectoryIfThere(workspace.id)
           : Promise.resolve([]),
       ]);
       const mine = visible

@@ -446,6 +446,23 @@ export async function listTeamDirectory(
   });
 }
 
+/**
+ * The directory, where the platform has one. A platform from before the
+ * SEVENTEENTH promotion answers 404 for it: then there is nothing to list, and
+ * the page that asked draws without it rather than failing on the part that is
+ * not there yet. Shared by Teams and by Flows' no-team line.
+ */
+export async function teamDirectoryIfThere(
+  workspaceId: string,
+): Promise<TeamDirectoryEntry[]> {
+  try {
+    return await listTeamDirectory(workspaceId);
+  } catch (error) {
+    if (error instanceof PlatformServerError && error.status === 404) return [];
+    throw error;
+  }
+}
+
 export async function listAccessRequests(
   workspaceId: string,
   projectId: string,

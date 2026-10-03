@@ -461,12 +461,58 @@ test("a card lists every subscription it has, each under its own scope (register
   );
   assert.match(page, /subscriptions\.map\(\(subscription\) => \(/u);
   assert.match(page, /subscription\.projectId\s*\?\s*`Team: /u);
-  // Adding offers only the scopes not yet taken, and can name a project.
+  // Adding offers only the teams not yet taken, and names one every time (the
+  // owner's build 10, below).
   assert.match(
     page,
     /const taken = new Set\(subscriptions\.map\(\(entry\) => entry\.projectId \?\? null\)\);/u,
   );
-  assert.match(actions, /projectId \? \{ projectId \} : \{\}/u);
+  assert.match(
+    actions,
+    /const body: CreateSubscriptionRequest = \{ templateId, projectId \};/u,
+  );
+});
+
+test("a flow is added to a team — never the whole workspace — and a workspace with no team yet is told to make one, in the app's words (the owner's build 10)", () => {
+  const addUi = read("app/account/flows/AddAutomation.tsx");
+  // The places offered are the teams the flow is not in yet, and no other; a
+  // flow added to the whole workspace before stays listed and labelled.
+  assert.doesNotMatch(
+    page,
+    /label: "Whole workspace"/u,
+    "the whole workspace is not a place to add to",
+  );
+  assert.match(
+    page,
+    /const scopes: AddScope\[\] = projects\s*\.filter\(\(project\) => !taken\.has\(project\.id\)\)/u,
+  );
+  assert.match(page, /: "Whole workspace"/u, "an older row keeps its label");
+  assert.match(
+    addUi,
+    /export type AddScope = \{ projectId: string; label: string \};/u,
+  );
+  // The team is sent every time; an Add that names none is refused in the
+  // shared wording's words before any call.
+  assert.match(addUi, /data\.append\("projectId", scope\);/u);
+  assert.doesNotMatch(addUi, /if \(scope\) data\.append/u);
+  assert.match(
+    actions,
+    /if \(!projectId\) return \{ ok: false, error: "Pick a team\." \};/u,
+  );
+  assert.doesNotMatch(
+    actions,
+    /projectId \? \{ projectId \} : \{\}/u,
+    "no body goes without a team",
+  );
+  // With no team yet: an owner or admin reads the line and the way to Teams; a
+  // plain member reads who makes it; neither is offered Add, and nothing is
+  // sent. The role is the workspace list's (register F8).
+  assert.match(page, /hasTeam=\{projects\.length > 0\}/u);
+  assert.match(page, /canAdminister=\{canAdminister\}/u);
+  assert.match(addUi, /if \(!hasTeam\) \{\s*return canAdminister \? \(/u);
+  assert.match(addUi, />\s*Create a team first\.\s*</u);
+  assert.match(addUi, /href="\/account\/teams"/u);
+  assert.match(addUi, />\s*An owner or admin creates the first team\.\s*</u);
 });
 
 test("a notifications toggle says what it switches, in words (register F22)", () => {

@@ -762,14 +762,12 @@ test("every automation control on a page whose workspace another tab switched aw
   await expect(page).toHaveURL(/\/account\/flows$/);
   await run.getByRole("button", { name: "Cancel" }).click();
 
-  // Back on the workspace the page showed, nothing moved.
+  // Back on the workspace the page showed, nothing moved: the one team is still
+  // open to it — so Add, with nothing to choose (the owner's build 10).
   await switchInAnotherTab(page, /Fixture Organization/);
   await page.reload();
-  await expect(
-    project
-      .getByRole("combobox", { name: "Where to add Project automation" })
-      .locator("option"),
-  ).toHaveCount(2);
+  await expect(project.getByRole("combobox")).toHaveCount(0);
+  await expect(project.getByRole("button", { name: "Add" })).toBeVisible();
   await expect(manual.getByText(/^live$/i)).toBeVisible();
   await expect(webhook).toContainText("This runs v1; v2 is available.");
   await expect(
