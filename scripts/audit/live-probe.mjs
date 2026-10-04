@@ -44,5 +44,3 @@ for (const route of routes) {
 }
 await browser.close();
 process.exit(failed ? 1 : 0);
-
-
