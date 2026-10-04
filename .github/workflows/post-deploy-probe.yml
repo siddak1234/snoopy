@@ -8,11 +8,11 @@ name: Post-deploy probe
 # serves answers (register F89). No checkout, no action, no token: the
 # repository is public and every read here is a public GET.
 #
-# Later, once the platform's /health/live carries the commit it was built from
-# and the sha256 of each published contract: a step here reads the deployed
-# sha's lib/generated/platform-contracts/*.d.ts headers and fails when a hash
-# differs from the live one. The website's merge is its release, so a platform
-# promotion between a PR's CI and its merge is caught here, where production is.
+# And, since the platform's /health/live carries the commit it was built from
+# and the sha256 of each published contract (register F94), that the deployed
+# sha's lib/generated/platform-contracts/*.d.ts headers name those hashes. The
+# website's merge is its release, so a platform promotion between a PR's CI
+# and its merge is caught here, where production is.
 on:
   deployment_status:
 
@@ -88,3 +88,60 @@ jobs:
           done
           echo "FAIL: production did not answer as it must."
           exit 1
+
+      # The platform production reads, through the /api/platform rewrite,
+      # reports its deployed marker: the commit it runs and the sha256 of each
+      # published contract. The deployed sha's generated types name, in their
+      # first line, the sha256 they were generated from — read with a public
+      # GET of that commit's files, still no checkout. Each pair must be equal:
+      # a difference, a marker that is absent or a header that cannot be read
+      # is red (register F94). A platform promotion between a PR's CI and its
+      # merge, or a merge declared ahead of the platform
+      # (platform-requirement.json), is seen here; there is no escape.
+      - name: The platform serves the contract the deployed site was built from
+        run: |
+          live=$(mktemp)
+          read_live() {
+            for round in 1 2 3 4; do
+              if curl -fsS --max-time 15 -o "$live" "${ORIGIN}/api/platform/health/live"; then
+                return 0
+              fi
+              if [ "$round" -lt 4 ]; then
+                echo "round ${round}: unread; again in 15 s."
+                sleep 15
+              fi
+            done
+            return 1
+          }
+          if ! read_live; then
+            echo "FAIL (closed): ${ORIGIN}/api/platform/health/live could not be read."
+            exit 1
+          fi
+          echo "deployed platform commit: $(jq -r '.commit // "<not reported>"' "$live")"
+          if [ "$(jq -r 'has("contracts")' "$live" 2>/dev/null)" != "true" ]; then
+            echo "FAIL (closed): /health/live reports no contract hashes (no deployed marker): $(head -c 300 "$live")"
+            exit 1
+          fi
+          failed=0
+          header=$(mktemp)
+          for pair in openapi.yaml:platform.d.ts automations.yaml:automations.d.ts connections.yaml:connections.d.ts; do
+            document=${pair%%:*}
+            file=lib/generated/platform-contracts/${pair#*:}
+            deployed=$(jq -r --arg d "$document" '.contracts[$d] // ""' "$live")
+            committed=""
+            if curl -fsS --max-time 15 -o "$header" \
+              "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${DEPLOYED_SHA}/${file}"; then
+              committed=$(head -n 1 "$header" | sed -nE 's#^// From snoopy-backend [^ ]+, sha256 ([0-9a-f]{64})\.$#\1#p')
+            fi
+            if [ -n "$committed" ] && [ "$committed" = "$deployed" ]; then
+              echo "OK   ${document} ${committed}"
+            else
+              echo "FAIL ${document}: ${file} at ${DEPLOYED_SHA} names ${committed:-<unread>}; the platform serves ${deployed:-<none>}"
+              failed=1
+            fi
+          done
+          if [ "$failed" = 1 ]; then
+            echo "FAIL: production's types are not the contract the platform serves."
+            exit 1
+          fi
+          echo "OK: production's types are the contract the platform serves."
