@@ -1,0 +1,90 @@
+name: Post-deploy probe
+
+# Vercel's Git integration builds main the moment it moves, before CI's run on
+# main has finished (e78d555 was live 63 s after its merge; CI ran 15 min), and
+# posts each deployment and its statuses to this repository. This runs on the
+# status Vercel posts when a Production deployment has completed, and asks the
+# live site what CI cannot: that production is main's tip, and that what it
+# serves answers (register F89). No checkout, no action, no token: the
+# repository is public and every read here is a public GET.
+#
+# Later, once the platform's /health/live carries the commit it was built from
+# and the sha256 of each published contract: a step here reads the deployed
+# sha's lib/generated/platform-contracts/*.d.ts headers and fails when a hash
+# differs from the live one. The website's merge is its release, so a platform
+# promotion between a PR's CI and its merge is caught here, where production is.
+on:
+  deployment_status:
+
+permissions: {}
+
+jobs:
+  probe:
+    name: Production is main's tip and answers
+    # Vercel posts "pending" first, and a Preview deployment for every PR push.
+    if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      ORIGIN: https://www.autom8x.ai
+      DEPLOYED_SHA: ${{ github.event.deployment.sha }}
+      DEPLOYMENT_URL: ${{ github.event.deployment_status.environment_url }}
+    steps:
+      - name: The deployment is main's tip
+        run: |
+          main_sha=$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/main | cut -f1)
+          echo "deployment ${DEPLOYED_SHA} (${DEPLOYMENT_URL})"
+          echo "main       ${main_sha:-<unread>}"
+          if [ -z "$main_sha" ]; then
+            echo "FAIL: main's tip could not be read."
+            exit 1
+          fi
+          if [ "$DEPLOYED_SHA" != "$main_sha" ]; then
+            echo "FAIL: production was built from ${DEPLOYED_SHA}, but main is at ${main_sha}:"
+            echo "a deployment of something other than main's tip, or main moved before this ran."
+            exit 1
+          fi
+          echo "OK: production is main's tip."
+
+      # The website's own liveness and readiness (app/api/health, app/api/ready;
+      # readiness reads the platform from the server), the platform through the
+      # /api/platform rewrite the build bakes in, and the root. Each must answer
+      # 200 and say its status. One re-read of the whole list after a pause, up
+      # to three times, rides out a connection that drops; an answer that is
+      # wrong stays wrong and fails.
+      - name: The live site answers
+        run: |
+          check() {
+            path=$1 want=$2 field=${3:-} value=${4:-}
+            body=$(mktemp)
+            status=$(curl -sS -o "$body" -w '%{http_code}' --max-time 15 "${ORIGIN}${path}") || status=000
+            got=""
+            if [ -n "$field" ]; then
+              got=$(jq -r "$field" "$body" 2>/dev/null) || got="<not json>"
+            fi
+            rm -f "$body"
+            if [ "$status" = "$want" ] && { [ -z "$field" ] || [ "$got" = "$value" ]; }; then
+              echo "OK   ${path} ${status}${field:+ ${field}=${got}}"
+              return 0
+            fi
+            echo "FAIL ${path} ${status}${field:+ ${field}=${got}} (wanted ${want}${field:+ and ${field}=${value}})"
+            return 1
+          }
+          for round in 1 2 3 4; do
+            failed=0
+            check /                          200                || failed=1
+            check /api/health                200 .status ok     || failed=1
+            check /api/ready                 200 .status ready  || failed=1
+            check /api/platform/health/live  200 .status ok     || failed=1
+            check /api/platform/health/ready 200 .status ready  || failed=1
+            if [ "$failed" = 0 ]; then
+              echo "all five answered."
+              exit 0
+            fi
+            if [ "$round" -lt 4 ]; then
+              echo "round ${round} failed; again in 15 s."
+              sleep 15
+            fi
+          done
+          echo "FAIL: production did not answer as it must."
+          exit 1

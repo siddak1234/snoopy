@@ -412,7 +412,7 @@ test("every launch configuration runs a script that exists (register F13)", () =
   }
 });
 
-test("one Node major everywhere — .nvmrc, CI and the image (register F17)", () => {
+test("one Node major everywhere — .nvmrc, CI, the image and package.json engines (register F17)", () => {
   const major = read(".nvmrc").trim();
   const ci = read(".github/workflows/ci.yml");
   const versions = [...ci.matchAll(/node-version: (\S+)/gu)].map((m) => m[1]);
@@ -421,6 +421,40 @@ test("one Node major everywhere — .nvmrc, CI and the image (register F17)", ()
   for (const from of read("Dockerfile").matchAll(/^FROM node:(\d+)/gmu)) {
     assert.equal(from[1], major, "Dockerfile");
   }
+  // Vercel builds production on `engines.node`, over its own project setting
+  // (24.x today): the range ">=22" let it build on 24 while CI, the image and
+  // .nvmrc were on 22. Exactly this major, as Vercel spells it.
+  assert.equal(
+    JSON.parse(read("package.json")).engines.node,
+    `${major}.x`,
+    "package.json engines",
+  );
+});
+
+test("all-green needs every other CI job, runs whatever they did, and passes only when each succeeded (register F88)", () => {
+  // The ruleset will require this one check in place of four job names, so a
+  // job left out of its needs, or a result it lets through, is a gate lost.
+  const ci = read(".github/workflows/ci.yml");
+  const jobs = ci
+    .slice(ci.indexOf("\njobs:\n"))
+    .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
+    .slice(1);
+  const ids = jobs.map((job) => job.slice(0, job.indexOf(":")));
+  const allGreen = jobs.find((job) => job.startsWith("all-green:"));
+  assert.ok(allGreen, "CI has no all-green job");
+  assert.match(
+    allGreen,
+    /^ {4}if: always\(\)$/mu,
+    "a failure upstream must not skip it",
+  );
+  const needs = /^ {4}needs:\n((?: {6}- [\w-]+\n)+)/mu.exec(allGreen);
+  assert.ok(needs, "all-green names no needs list");
+  assert.deepEqual(
+    [...needs[1].matchAll(/- ([\w-]+)/gu)].map((m) => m[1]).sort(),
+    ids.filter((id) => id !== "all-green").sort(),
+  );
+  // Only "success" passes: a skipped job is a gate that did not run.
+  assert.match(allGreen, /\.result != "success"/u);
 });
 
 test("every CI job in the Playwright image runs with a HOME that root owns (register F58)", () => {
@@ -449,7 +483,7 @@ test("CI's contract tests read the whole history, so a struck document path is c
   assert.match(job, /- run: npm run test:contracts$/mu);
   assert.match(
     job,
-    /- uses: actions\/checkout@v4\n(?: {8}#.*\n)*? {8}with:\n {10}fetch-depth: 0$/mu,
+    /- uses: actions\/checkout@v7\n(?: {8}#.*\n)*? {8}with:\n {10}fetch-depth: 0$/mu,
   );
 });
 

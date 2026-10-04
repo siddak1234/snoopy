@@ -8,10 +8,10 @@ on:
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -21,14 +21,14 @@ jobs:
 
   gates:
     name: Architecture gates
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         # The document check believes a struck path only when a commit once
         # added it; a one-commit clone has no history to show.
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -60,7 +60,7 @@ jobs:
 
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # Required at BUILD time, not runtime: Next bakes rewrites into
       # routes-manifest.json. Without this, next.config.ts emits no
@@ -68,8 +68,8 @@ jobs:
       # while the build still exits 0. Asserted below.
       BACKEND_API_ORIGIN: https://backend.invalid
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -100,10 +100,10 @@ jobs:
   # F62), and the build above, with the origin set, cannot see it.
   build-no-backend:
     name: Build with no backend
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -114,10 +114,10 @@ jobs:
 
   typecheck:
     name: Typecheck
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -126,7 +126,7 @@ jobs:
 
   browser:
     name: Browser regression and accessibility
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       image: mcr.microsoft.com/playwright@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
       options: --ipc=host
@@ -137,8 +137,8 @@ jobs:
     env:
       HOME: /root
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -153,7 +153,7 @@ jobs:
   # three engines (NFR-36). It had only ever run on a developer's machine.
   fixtures:
     name: Authenticated fixture suite
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       image: mcr.microsoft.com/playwright@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
       options: --ipc=host
@@ -161,8 +161,8 @@ jobs:
     env:
       HOME: /root
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -177,10 +177,10 @@ jobs:
   # gate that goes red for what nobody can act on is a gate somebody switches off.
   scan:
     name: Dependency and image scan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -235,9 +235,43 @@ jobs:
 
       - name: Retain the SBOM
         if: ${{ !cancelled() && steps.image.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sbom
           path: sbom-web.cdx.json
           if-no-files-found: error
           retention-days: 90
+
+  # Green only when every job above succeeded. The ruleset names four jobs; the
+  # other four — the no-backend build, the browser and fixture suites, the scan —
+  # gated nothing, and a merge could land while they ran or failed (register
+  # F88). Once the ruleset requires this one check, sourced from GitHub Actions,
+  # every job gates. It runs whatever the others did (`always()`), or a failure
+  # upstream would skip it and the check would never report. Nothing here may
+  # skip: a skipped job is a gate that did not run, so only "success" passes.
+  all-green:
+    name: all-green
+    if: always()
+    needs:
+      - lint
+      - gates
+      - build
+      - build-no-backend
+      - typecheck
+      - browser
+      - fixtures
+      - scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Every job succeeded
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          not_green=$(echo "$NEEDS" | jq -r 'to_entries[] | select(.value.result != "success") | .key')
+          if [ -n "$not_green" ]; then
+            echo "FAIL: not every job succeeded — $(echo "$not_green" | tr '\n' ' ')"
+            exit 1
+          fi
+          echo "all-green: every job succeeded"
