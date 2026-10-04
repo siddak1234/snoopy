@@ -1825,3 +1825,70 @@ were read red again on Unarchive's tree, and every earlier browser break (F85's,
 applied once and restored on it. The browser tests named are read red the same way in CI's
 Playwright image — in Chromium, each guard's test alone, against the fixture — before the push.
 F87 is the last number.
+
+### CI, Wave 1 — every job gates, one Node major, production probed — 2026-10-03
+
+The owner's CI plan (2026-10-03), Wave 1, for this repository: the safety gates, read from the
+newest runs before the change — main 37158057244 (e78d555, 15.4 min, the fixture suite 15.3 of
+them) and PR #30's 37157166431 (14.8 min). Nothing here changes what a gate tests; it changes
+what a merge and a deploy wait for. Vercel, the ruleset and the other repositories are not touched.
+
+- **F88** (new): the ruleset `protect-main` requires Lint, Typecheck, Build and Architecture gates
+  — four of the eight jobs. Build with no backend, Browser regression and accessibility, the
+  Authenticated fixture suite (the 15-minute critical path) and the Dependency and image scan gated
+  nothing: a merge could land while they ran or failed, and PR #30 waited for them by habit (merged
+  46 s after its run ended). `all-green` (`.github/workflows/ci.yml`) needs all eight, runs
+  whatever they did (`if: always()`, or a failure upstream would skip it and the check would never
+  report), and its one step reads `toJSON(needs)` and passes only when every result is "success" —
+  a skipped job is a gate that did not run, and no job here is push-only. Requiring that one check,
+  sourced from GitHub Actions, in place of the four names is the owner's ruleset edit, after
+  all-green has reported once on a PR and once on main. Held by the structure test "all-green needs
+  every other CI job …".
+- **F17**, reopened: Vercel builds production on `package.json`'s `engines.node`, over the project's
+  own Node setting (24.x), and the range ">=22" let it build on Node 24 — its build log warned it
+  would upgrade the major — while `.nvmrc`, CI and the Dockerfile are on 22 and F17's test never
+  read `engines`. It is "22.x" now, in `package.json` and the lockfile's root entry, and the F17
+  test holds it to `.nvmrc`'s major, as Vercel spells it. Setting the Vercel project itself to 22.x
+  is the owner's, and not done here.
+- **F89** (new): production deploys before CI finishes — e78d555 was live at 22:20:44Z, 63 s
+  after its merge, while main's CI ran to 22:35:06Z — and nothing read production afterwards
+  (`scripts/audit/live-probe.mjs` is run by hand, after a merge, from a session).
+  `.github/workflows/post-deploy-probe.yml` runs on the `deployment_status` Vercel's Git
+  integration posts to this repository, when a Production deployment has completed (state success,
+  environment Production): the deployment's sha must be main's tip at that moment (`git
+  ls-remote`), and the live site must answer 200 with its status field at the root, `/api/health`
+  (ok), `/api/ready` (ready: the server read the platform), `/api/platform/health/live` (ok) and
+  `/api/platform/health/ready` (ready) — the whole list read again after 15 s, up to four times,
+  for a connection that drops; a wrong answer stays wrong. ubuntu-24.04, five minutes, no checkout,
+  no action, no token (`permissions: {}`): every read is a public GET. Later, once the platform's
+  `/health/live` carries the commit and each published contract's sha256, a step there compares
+  them with the generated headers at the deployed sha; designed for, not written. Whether
+  production should also wait for all-green is the owner's decision; Vercel is unchanged.
+- **Runners and actions.** Every job runs on `ubuntu-24.04` by name: `ubuntu-latest` moves to
+  Ubuntu 26 on 2026-10-19 (the notice on job 111305515484), and today's image is 24.04, so only
+  the label's future changes. `actions/checkout`, `actions/setup-node` and `actions/upload-artifact`
+  move from v4, which runs on the deprecated Node 20 (the annotation on job 111305515429), to v7,
+  each repository's convention of a major tag kept. The structure test that holds the gates job to a
+  whole-history checkout names `checkout@v7` in the same change — on v4 it would have turned
+  Architecture gates, a required check, red.
+- **Not here.** The ruleset switch and the Vercel settings (the owner's); the other three
+  repositories' Wave 1; the contract job against the deployed contract, which waits on the
+  platform's marker; Wave 2.
+
+Proved red by hand, each file restored from the index:
+
+| Guard | Broken by | Red |
+| --- | --- | --- |
+| `engines.node` is `.nvmrc`'s major, as Vercel spells it | ">=22" put back | the F17 test |
+| The gates job checks out the whole history on the bumped checkout | `checkout@v4` put back on the gates job | "CI's contract tests read the whole history, so a struck document path is checked, not skipped" |
+| all-green needs every other job | `scan` taken out of its needs | the F88 test |
+| all-green runs whatever the others did | `if: always()` taken out | the F88 test |
+| Only "success" passes | `!= "success"` made `== "failure"` | the F88 test |
+
+Each break was run with the structure test alone, read red from the test runner's own events, and
+the working tree's diff against the index was empty after the last. The probe's two steps were run
+by hand, as the workflow holds them: against a loopback server answering as production does (exit
+0, all five), against one answering 503 from `/api/ready` (exit 1 after four rounds, 45 s), with
+main's sha (exit 0) and a wrong one (exit 1) — production itself was not read by them. Its first
+run on production is the merge of this change: a `deployment_status` workflow runs from the
+deployed commit, so no earlier deployment carries it. F89 is the last number.
