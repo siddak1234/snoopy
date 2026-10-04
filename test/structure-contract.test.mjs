@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { test } from "node:test";
 import ts from "typescript";
 
@@ -504,6 +505,124 @@ test("the fixture suite runs one engine per CI leg: every Playwright project, ea
   assert.match(
     job,
     /^ {6}- run: npm run test:browser:fixtures -- --project=\$\{\{ matrix\.project \}\}$/mu,
+  );
+});
+
+test("the fixture legs leave out exactly the accessibility tests the browser job already runs — the public routes but /login, and the ghost buttons — and the browser job runs them all (register F91)", () => {
+  // Twelve tests of e2e/accessibility.spec.ts ran in the browser job and again
+  // in each fixture leg, on pages that read the same against the fixture as
+  // against no backend. The runner's --grep-invert must take exactly those:
+  // one it lets through runs twice again; /login, an authenticated baseline or
+  // another spec's test taken is a scan only the fixture can make, gone. What
+  // the pattern takes is read from Playwright itself (`--list --grep`), not
+  // from a model of its titles: the pattern's first draft matched a title shape
+  // Playwright does not use, and took nothing.
+  const runner = read("scripts/run-browser-fixtures.mjs");
+  const declared = /^const browserJobOnly =\s*String\.raw`([^`]+)`;$/mu.exec(
+    runner,
+  );
+  assert.ok(declared, "the runner declares no browserJobOnly pattern");
+  assert.match(
+    runner,
+    /"--workers=1",\n(?: {6}\/\/.*\n)* {6}"--grep-invert",\n {6}browserJobOnly,\n/u,
+    "the runner does not hand the pattern to Playwright as --grep-invert",
+  );
+  const invocation = runner.slice(
+    runner.indexOf('"node_modules/@playwright/test/cli.js"'),
+    runner.indexOf('"--workers=1"'),
+  );
+  const specs = [...invocation.matchAll(/"(e2e\/[^"]+\.spec\.ts)"/gu)].map(
+    (match) => match[1],
+  );
+
+  // What the legs leave out, as Playwright lists it: `--grep` with the same
+  // pattern lists exactly what `--grep-invert` drops (one title string, one
+  // matcher). No browser and no build: a listing only.
+  let listing;
+  try {
+    listing = execFileSync(
+      process.execPath,
+      [
+        "node_modules/@playwright/test/cli.js",
+        "test",
+        ...specs,
+        "--list",
+        "--grep",
+        declared[1],
+      ],
+      { encoding: "utf8", env: { ...process.env, CI: "1" } },
+    );
+  } catch (error) {
+    // "No tests found" exits 1; what it printed is the listing.
+    listing = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+  }
+  const taken = [
+    ...listing.matchAll(/^\s+\[([^\]]+)\] › (\S+?):\d+:\d+ › (.+)$/gmu),
+  ]
+    .map((match) => `${match[1]} › ${basename(match[2])} › ${match[3]}`)
+    .sort();
+
+  // What they should leave out: the spec's own public routes but /login, and
+  // its ghost buttons in both themes, in every project — so a route or button
+  // added to the spec is held to the pattern too.
+  const spec = read("e2e/accessibility.spec.ts");
+  const quoted = (block) =>
+    [...block.matchAll(/"([^"]*)"/gu)].map((match) => match[1]);
+  const publicRoutes = quoted(
+    /const publicRoutes = \[([^\]]+)\]/u.exec(spec)[1],
+  );
+  const ghostButtons = [
+    .../const ghostButtons = \[([\s\S]+?)\] as const;/u
+      .exec(spec)[1]
+      .matchAll(/\["([^"]+)", "([^"]+)"\]/gu),
+  ].map((match) => [match[1], match[2]]);
+  const templates = [...spec.matchAll(/test\(\s*`([^`]+)`/gu)].map(
+    (match) => match[1],
+  );
+  const publicTitle = templates.find(
+    (template) =>
+      template.includes("${route}") && !template.includes("${name}"),
+  );
+  const ghostTitle = templates.find((template) => template.includes("${name}"));
+  assert.ok(
+    publicRoutes.includes("/login") &&
+      ghostButtons.length > 0 &&
+      publicTitle &&
+      ghostTitle,
+    "the spec's lists or titles moved",
+  );
+  const fill = (template, values) =>
+    template.replace(/\$\{(\w+)\}/gu, (_, name) => values[name]);
+  const projects = [
+    ...read("playwright.config.ts").matchAll(/^ +(?:\{ )?name: "([a-z]+)"/gmu),
+  ].map((match) => match[1]);
+  const expected = projects
+    .flatMap((project) => [
+      ...publicRoutes
+        .filter((route) => route !== "/login")
+        .map(
+          (route) =>
+            `${project} › accessibility.spec.ts › ${fill(publicTitle, { route })}`,
+        ),
+      ...["dark", "light"].flatMap((theme) =>
+        ghostButtons.map(
+          ([route, name]) =>
+            `${project} › accessibility.spec.ts › ${fill(ghostTitle, { route, name, theme })}`,
+        ),
+      ),
+    ])
+    .sort();
+  assert.deepEqual(taken, expected);
+
+  // And the browser job still runs every one of them: `playwright test`, no grep.
+  const browser = read(".github/workflows/ci.yml")
+    .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
+    .find((entry) => entry.startsWith("browser:"));
+  assert.ok(browser, "CI has no browser job");
+  assert.match(browser, /^ {6}- run: npm run test:browser$/mu);
+  assert.equal(
+    JSON.parse(read("package.json")).scripts["test:browser"],
+    "playwright test",
   );
 });
 

@@ -1925,3 +1925,63 @@ Nothing here changes what a gate tests; main as smoke-only is the next PR, on th
   three engines still run in series; the legs are CI's.
 
 F90 is the last number.
+
+### CI, Wave 3 — the twelve accessibility tests run once — 2026-10-04
+
+The owner's CI plan, Wave 3, for this repository: the accessibility tests that ran in both browser
+jobs, taken out of one after the measurement and the equivalence proof the plan asked for. Nothing
+here changes what any page is held to, or where `/login` and the signed-in pages are scanned; it
+changes how many times one job's tests run again in another.
+
+- **F91** (new): twelve of `e2e/accessibility.spec.ts`'s twenty-seven tests ran in the browser job
+  (`npm run test:browser`, three engines, no backend) and again in each of the three fixture legs
+  (`npm run test:browser:fixtures -- --project=<engine>`, against the fixture Edge): the axe
+  baselines of the six prerendered public routes — `/`, `/solutions`, `/contact`,
+  `/automation-builder`, `/privacy`, `/terms` — and the six ghost-button contrast tests (three
+  buttons, two themes). Measured with Playwright's JSON reporter in CI's image, since CI's github
+  reporter prints no per-test time: 19.2 s of Chromium's leg, 40.8 s of Firefox's and 88.0 s of
+  WebKit's on the machine the gates run on, where another container shared the CPU and the legs
+  took 1.6 to 3.2 times CI's — 5.7 %, 4.7 % and 13.6 % of each leg's tests, about 12, 13 and 41 s
+  of CI's 216, 270 and 300 s (main run 37182209022, jobs 111376875917, 111376875975,
+  111376875891). Proved the same test on the same page in both jobs before any was taken out: the
+  six routes are prerendered (`○` in the build) and outside the auth middleware's matcher
+  (`proxy.ts`), and their one platform read is the nav's session (`hooks/use-app-session.ts`),
+  which ends "unauthenticated" on the fixture's 401 as on no backend's 500; against both servers —
+  `next start` with `BACKEND_API_ORIGIN=https://backend.invalid`, and the standalone server with
+  the fixture on 3443, as `scripts/run-browser-fixtures.mjs` starts them — in all three engines
+  the settled ARIA tree, axe's whole result (violations, incomplete, passes and inapplicable, by
+  rule and node) and the ghost buttons' pixel contrast at rest, hovered and pressed in both themes
+  were identical, and the documents differed only in the build id, the placement of Next's async
+  script tags and, in one build, the CSS file's hash — the two origins' CSS is byte-identical.
+  `/login` is not a duplicate and stays in both: its provider list is read from the platform on
+  the server, so the fixture shows "Continue with Google / Microsoft" where no backend shows
+  "Sign-in providers could not be loaded" — a page only the fixture can scan. The fourteen
+  authenticated baselines were never in the browser job. The runner now hands Playwright
+  `--grep-invert` with a pattern on its grep title ("<project> <file> <describe…> <title>"),
+  anchored to the project, the spec's file and the title's end: `--list` per leg 196 → 184, 588 →
+  552 in all, the 36 taken listed by name with `--grep`; the browser job is unchanged (48 passed).
+  Every page is still scanned once per run in every engine: the six routes and the ghost buttons
+  in the browser job, `/login` in both, the account and onboarding pages in the fixture legs. Held
+  by the structure test "the fixture legs leave out exactly …", which reads what the pattern takes
+  from Playwright's own `--list --grep` — the pattern's first draft matched a title shape
+  Playwright does not use and took nothing, which a model of the titles would not have shown —
+  and compares it with the spec's own routes and buttons in every project. Seen on the way, not
+  changed: `html[data-theme]` is removed and set again for 15-30 ms after hydration on `/`, in
+  both jobs and every engine; the spec's `toHaveAttribute` retries past it.
+- **Not here.** The spec itself, the browser job, the Build jobs, main.yml. Locally
+  `npm run test:browser:fixtures` leaves the same twelve out, so `npm run verify` and the change
+  audit run them once too, in `test:browser`.
+
+Proved red by hand, the runner restored from a kept copy each time, the F91 test alone red:
+
+| Guard | Broken by |
+| --- | --- |
+| `/login` stays in the fixture run | `login` added to the routes taken |
+| Every proven duplicate is taken | `privacy` dropped from the routes taken |
+| The ghost buttons are taken | their alternative removed from the pattern |
+| The authenticated baselines stay | the pattern widened to every "accessibility baseline" title |
+| Nothing of another spec is taken | the file and the ghost title loosened to match `public-edge-fixture.spec.ts`'s own |
+| The pattern reaches Playwright | the `--grep-invert` argument removed |
+
+Expected: each fixture leg shorter by the measured share — to be read from this change's runs.
+F91 is the last number.
