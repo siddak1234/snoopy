@@ -7,6 +7,22 @@ import { join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 const playwrightSelectors = process.argv.slice(2);
+// Twelve of e2e/accessibility.spec.ts's tests read the same page here as in
+// CI's browser job (ci.yml `browser`, `npm run test:browser`, no backend): the
+// axe baselines of the six prerendered public routes and the six ghost-button
+// contrast tests. Those pages make one platform read, the nav's session, which
+// ends "signed out" on the fixture's 401 exactly as on no backend's failed
+// proxy — in three engines the settled ARIA tree, axe's whole result and the
+// buttons' pixel contrast were identical (register F91) — so they run once,
+// there, not again in each of the three legs. /login stays: its provider list
+// is the platform's, and only the fixture can show the page with one. The
+// fourteen authenticated baselines run only here. Matched on Playwright's grep
+// title — "<project> <file, relative to testDir> <describe…> <title>", e.g.
+// "chromium accessibility.spec.ts public accessibility baseline: /" — anchored
+// to the project, this spec's file and the title's end, so /login, the
+// authenticated baselines and the other specs' own button tests are untouched;
+// Playwright reads a plain --grep-invert string with the flags gi.
+const browserJobOnly = String.raw`^[a-z]+ accessibility\.spec\.ts (public accessibility baseline: /(solutions|contact|automation-builder|privacy|terms)?|a ghost button keeps AA contrast at rest, hovered and pressed: .*)$`;
 const fixtureDirectory = mkdtempSync(join(tmpdir(), "autom8x-public-edge-"));
 const certificate = join(fixtureDirectory, "cert.pem");
 const privateKey = join(fixtureDirectory, "key.pem");
@@ -137,6 +153,8 @@ try {
       // inside that window — the billing axe scan did, on the personal
       // workspace, and read Next's error page.
       "--workers=1",
+      "--grep-invert",
+      browserJobOnly,
       ...playwrightSelectors,
     ],
     { cwd: root, env: environment, stdio: "inherit" },
