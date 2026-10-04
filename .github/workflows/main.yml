@@ -3,7 +3,7 @@ name: Main
 # A push to main is, by the ruleset, a squash of a pull request that was up to
 # date with main, so the squashed commit's tree is the PR head's tree — and that
 # head's all-green already ran every job on exactly it (6 of 6 merges read;
-# register F91). Running ci.yml again on main was 14-16 minutes proving the
+# register F92). Running ci.yml again on main was 14-16 minutes proving the
 # proved, while production had been live since 63 s after the merge (F89).
 #
 # So main runs a smoke when the tree is the one its PR's all-green passed —

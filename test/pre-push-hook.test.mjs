@@ -170,7 +170,7 @@ test("native pre-push gate", (t) => {
   assert.deepEqual(ran(repo), [], "and runs no gate: nothing new ships");
 });
 
-test("the fast gates are verify's first six, run in its order and stopped at the first red, which is named with the bypass (register F92)", (t) => {
+test("the fast gates are verify's first six, run in its order and stopped at the first red, which is named with the bypass (register F93)", (t) => {
   assert.deepEqual(FAST_GATES, [
     "format:check",
     "lint",

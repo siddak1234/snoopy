@@ -2,7 +2,7 @@ name: CI
 
 # Every pull request, and main only through main.yml, which calls this whole
 # workflow when a push to main is not the tree its pull request's all-green
-# already proved (register F91). The jobs read nothing event-specific, so they
+# already proved (register F92). The jobs read nothing event-specific, so they
 # run the same under either trigger.
 on:
   pull_request:

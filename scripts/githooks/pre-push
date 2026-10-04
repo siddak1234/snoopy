@@ -1,7 +1,7 @@
 #!/bin/sh
 # Native pre-push gate: every push of this repository — from any tool or
 # terminal — runs the six fast gates `npm run verify` begins with (register
-# F92), so a push that would turn CI red is refused here, in about half a
+# F93), so a push that would turn CI red is refused here, in about half a
 # minute, instead of costing a run; and then requires a PASS marker from
 # /audit-change for the exact tree being pushed. Installed via
 # `npm run hooks:install` (bash scripts/install-git-hooks.sh: git config
