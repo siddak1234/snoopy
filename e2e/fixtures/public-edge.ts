@@ -117,6 +117,30 @@ const memberRequestId = "15151515-1515-4151-8151-151515151515";
  * calls it.
  */
 function initialState() {
+  // Who is on the fixture project: its owner and the plain member. The admin
+  // is not — an organization admin sees every team from outside (backend
+  // 24.11.3), and is the one an owner can add. Typed, not cast, so a field the
+  // published ProjectMembership drops or retypes fails typecheck.
+  const projectMembers: Platform["ProjectMembership"][] = [
+    {
+      projectId,
+      workspaceId,
+      userId,
+      role: "owner",
+      displayName: "Fixture Owner",
+      email: "owner@example.test",
+      createdAt: now,
+    },
+    {
+      projectId,
+      workspaceId,
+      userId: memberUserId,
+      role: "member",
+      displayName: "Fixture Member",
+      email: "member@example.test",
+      createdAt: now,
+    },
+  ];
   return {
     activeWorkspaceId: workspaceId as string,
     joinRequestStatus: "pending" as "pending" | "approved",
@@ -143,29 +167,7 @@ function initialState() {
     oauthStatus: "connected" as "connected" | "reauthorization-required",
     // The run tally the dashboard reads, when the platform cannot answer it.
     runStatsFailing: false,
-    // Who is on the fixture project: its owner and the plain member. The admin
-    // is not — an organization admin sees every team from outside (backend
-    // 24.11.3), and is the one an owner can add.
-    projectMembers: [
-      {
-        projectId,
-        workspaceId,
-        userId,
-        role: "owner",
-        displayName: "Fixture Owner",
-        email: "owner@example.test",
-        createdAt: now,
-      },
-      {
-        projectId,
-        workspaceId,
-        userId: memberUserId,
-        role: "member",
-        displayName: "Fixture Member",
-        email: "member@example.test",
-        createdAt: now,
-      },
-    ] as Platform["ProjectMembership"][],
+    projectMembers,
     // Backend 24.11.2: the newcomer's request onto the fixture project, and the
     // member's onto Operations — absent until they ask.
     newcomerRequest: "pending" as Platform["ProjectAccessRequest"]["status"],
@@ -743,7 +745,11 @@ function listedPlans(): Platform["PurchasablePlan"][] {
 }
 const hostedExpiry = "2026-08-12T12:30:00.000Z";
 
-function problem(status: number, title: string, details?: Json): Json {
+function problem(
+  status: number,
+  title: string,
+  details?: Json,
+): Platform["ApiProblem"] {
   return {
     type: "about:blank",
     title,
@@ -766,7 +772,7 @@ const statusTitles: Record<number, string> = {
   503: "Service Unavailable",
 };
 
-function refusal(status: number, reason?: string): Json {
+function refusal(status: number, reason?: string): Platform["ApiProblem"] {
   return problem(
     status,
     statusTitles[status] ?? "Refused",
@@ -1167,14 +1173,28 @@ const server = createServer(
         status: "ok",
         service: "fixture-edge",
         version: "1",
-      });
+      } satisfies Platform["LiveHealthResponse"]);
       return;
     }
     // The Edge's readiness, which the website's `/api/ready` reports.
     if (url.pathname === "/health/ready") {
       return state.notReady
-        ? respond(response, 503, { status: "not-ready" })
-        : respond(response, 200, { status: "ready" });
+        ? respond(response, 503, {
+            status: "not-ready",
+            service: "fixture-edge",
+            checks: [
+              {
+                name: "fixture",
+                ok: false,
+                detail: "Held not ready by a test",
+              },
+            ],
+          } satisfies Platform["ReadinessResponse"])
+        : respond(response, 200, {
+            status: "ready",
+            service: "fixture-edge",
+            checks: [{ name: "fixture", ok: true, detail: "Ready" }],
+          } satisfies Platform["ReadinessResponse"]);
     }
     // Public, as the Edge serves it: no session is needed to list the ways in,
     // and the website reads it on the server with no cookie (§12.1 #160).
@@ -1294,11 +1314,7 @@ const server = createServer(
         body.workspaceId !== workspaceId &&
         body.workspaceId !== personalWorkspaceId
       ) {
-        return respond(response, 404, {
-          type: "about:blank",
-          title: "Not Found",
-          status: 404,
-        });
+        return respond(response, 404, problem(404, "Not Found"));
       }
       state.activeWorkspaceId = body.workspaceId;
       return respond(response, 200, {
@@ -1338,7 +1354,7 @@ const server = createServer(
           ...problem(404, "Not Found", { method, path: pathname }),
           detail: "Route is not implemented",
           code: "NOT_FOUND",
-        });
+        } satisfies Platform["ApiProblem"]);
       const provider =
         unlink[1] as Platform["LoginIdentitySummary"]["provider"];
       const at = state.identities.indexOf(provider);
@@ -1346,7 +1362,7 @@ const server = createServer(
         return respond(response, 404, {
           ...problem(404, "Not Found"),
           detail: "That sign-in account is not linked",
-        });
+        } satisfies Platform["ApiProblem"]);
       const sentences: Record<string, string> = {
         primary: "The account you signed up with stays linked",
         last: "The last sign-in account stays linked",
@@ -1357,7 +1373,7 @@ const server = createServer(
         return respond(response, 400, {
           ...problem(400, "Bad Request", { reason }),
           detail: sentences[reason] ?? "Bad Request",
-        });
+        } satisfies Platform["ApiProblem"]);
       state.identities = state.identities.filter((entry) => entry !== provider);
       return respond(response, 200, identities());
     }
@@ -1440,7 +1456,7 @@ const server = createServer(
         return respond(response, 409, {
           ...problem(409, "Conflict", { reason: "team_kind_taken" }),
           detail: "This workspace already has a team of this kind",
-        });
+        } satisfies Platform["ApiProblem"]);
       const created = {
         // Eight hex digits in the first group, however many are created.
         id: `${String(state.createdProjects.length).padStart(8, "5")}-5555-4555-8555-555555555555`,
@@ -2023,7 +2039,7 @@ const server = createServer(
         return respond(response, 409, {
           ...problem(409, "Conflict"),
           details: { reason: "approvals_pending" },
-        });
+        } satisfies Platform["ApiProblem"]);
       }
       if (state.moveRefusal) {
         const { status, reason } = state.moveRefusal;
@@ -2035,7 +2051,7 @@ const server = createServer(
         return respond(response, 409, {
           ...problem(409, "Conflict"),
           details: { reason: "runs_in_flight" },
-        });
+        } satisfies Platform["ApiProblem"]);
       }
       state.webhookVersion = 2;
       return respond(response, 200, {
@@ -2054,7 +2070,7 @@ const server = createServer(
         return respond(response, 403, {
           ...problem(403, "Forbidden"),
           details: { requiredRole: "admin" },
-        });
+        } satisfies Platform["ApiProblem"]);
       // The contract's `url` is absent only where the platform has no public
       // origin to put in it.
       const address = state.webhookOrigin
@@ -2109,13 +2125,13 @@ const server = createServer(
         return respond(response, 409, {
           ...problem(409, "Conflict"),
           details: { reason: "no_file_input" },
-        });
+        } satisfies Platform["ApiProblem"]);
       }
       if (body.contentType !== "application/pdf") {
         return respond(response, 400, {
           ...problem(400, "Bad Request"),
           details: { reason: "content_type_not_accepted" },
-        });
+        } satisfies Platform["ApiProblem"]);
       }
       if (state.uploadRefusal?.stage === "open") {
         const { status, reason } = state.uploadRefusal;
@@ -2149,7 +2165,7 @@ const server = createServer(
         return respond(response, 400, {
           ...problem(400, "Bad Request"),
           details: { reason: "no_object" },
-        });
+        } satisfies Platform["ApiProblem"]);
       }
       state.uploads.delete(uploadComplete[1] ?? "");
       const artifactId = crypto.randomUUID();
@@ -2164,7 +2180,7 @@ const server = createServer(
           contentType: upload.contentType,
           sizeBytes: upload.received,
         },
-      });
+      } satisfies AutomationOperations["completeUpload"]["responses"][200]["content"]["application/json"]);
     }
     // Backend §12.1 #39: the complete export — running on its first read,
     // ready with a signed link after, and expired when the fixture says so.
@@ -2340,7 +2356,7 @@ const server = createServer(
         return respond(response, 422, {
           ...problem(422, "The request could not be processed"),
           details: { reason: "artifact_unavailable" },
-        });
+        } satisfies Platform["ApiProblem"]);
       }
       const exact =
         body.subscriptionId === manualSubscriptionId &&
@@ -2557,7 +2573,7 @@ const server = createServer(
             ...problem(409, "Conflict", { reason: "plan_exists" }),
             detail:
               "This workspace already has a plan. Change it in Manage billing.",
-          });
+          } satisfies Platform["ApiProblem"]);
         }
         state.subscribedPlan.set(billedWorkspace, plan);
         return respond(response, 201, {
