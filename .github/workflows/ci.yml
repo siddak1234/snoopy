@@ -151,9 +151,20 @@ jobs:
   # The authenticated suite against the loopback fixture Edge (backend BUILD-PLAN
   # 22.6.6): every account page, every refusal the website must survive, in all
   # three engines (NFR-36). It had only ever run on a developer's machine.
+  #
+  # One leg per engine (register F90): run in series in one job, the three
+  # engines were 13-14 of the run's 15-16 minutes. Each leg builds, starts its
+  # own fixture Edge and standalone server, and runs one Playwright project;
+  # nothing is shared between legs. `fail-fast: false`: one engine's failure
+  # still lets the other two report. The job id stays `fixtures` — all-green
+  # needs it, and its result is the three legs' together.
   fixtures:
-    name: Authenticated fixture suite
+    name: Authenticated fixture suite (${{ matrix.project }})
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium, firefox, webkit]
     container:
       image: mcr.microsoft.com/playwright@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
       options: --ipc=host
@@ -168,8 +179,9 @@ jobs:
           cache: npm
       - run: npm ci
       # Builds with the fixture's origin, serves the standalone bundle, and
-      # runs the accessibility and fixture specs against it.
-      - run: npm run test:browser:fixtures
+      # runs the accessibility and fixture specs against it — in this leg's
+      # engine only; the runner passes its arguments to Playwright.
+      - run: npm run test:browser:fixtures -- --project=${{ matrix.project }}
 
   # Backend SYSTEM-MANIFEST §12.2 #8, on NFR-24's model (the backend's own
   # `ci.yml`): what ships must be clean, so the runtime tree and the image block;
