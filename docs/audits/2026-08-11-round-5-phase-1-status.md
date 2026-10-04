@@ -2118,3 +2118,57 @@ marker: exit 1), c6b8650's hashes (exit 0), openapi.yaml's old hash (exit 1, nam
 answering 404 (exit 1), and an origin that refuses connections (exit 1 after four rounds, 45 s).
 Against today's `/health/live` the CI job fails closed, by design, until the marker is promoted.
 F94 is the last number.
+
+### Fixture conformance — the fixture Edge answers as the platform publishes — 2026-10-04
+
+The owner's decision: the fake platform answers the tests use must match the published API —
+measured first, built only where a real gap is. Nothing here changes a page or what a test
+asserts.
+
+- **F95** (new): measured, every answer the fixture Edge (`e2e/fixtures/public-edge.ts`) served
+  in one Chromium run of the fixture suite (183 passed) — 3,984 answers, 97 operation and status
+  pairs — validated against `snoopy-backend` fc9d131's three documents, the ones the generated
+  headers name (92e14453…, 0349e2cb…, ab70cb0f…), with a JSON-schema validator run from outside
+  this repository. The fixture already typed nearly every body with the generated types
+  (`satisfies`). Not typed: `getLiveHealth`'s and `getReadiness`'s bodies, `selectActiveWorkspace`'s
+  404, `completeUpload`'s 200, the fields twelve refusals spread over `problem()` (whose return
+  type was `Record<string, unknown>`), and the fixture project's members, cast with `as` — on
+  main a member with no `email`, a readiness body with a mistyped field, a completion with no
+  `sizeBytes` and a refusal whose `detail` is a number all pass typecheck. Two of them were off
+  the contract: `/health/ready` answered `{ status }` alone, 200 and 503, where `ReadinessResponse`
+  requires `service` and `checks`; `selectActiveWorkspace`'s 404 lacked `ApiProblem`'s `detail`,
+  `instance`, `code` and `requestId` (no test reaches it). Each is now typed with its published
+  type — `satisfies` as the rest of the file, `problem()` and `refusal()` returning `ApiProblem`,
+  each spread refusal `satisfies ApiProblem`, the members annotated rather than cast — and the two
+  answer as published: readiness with `service` and one check, the 404 through `problem()`.
+  `/api/ready` reads only the readiness answer's status (its test: `toMatchObject` on 200, its own
+  body on 503), so no assertion moves.
+- **Not here — measured, the owner's to decide.** (1) What the types cannot say: run ids
+  (`fixture-run-ok`…), `RunStep.id`/`runId` and `Approval.runId` are not UUIDs where the documents
+  say `format: uuid` — `listRuns`, `readRun`, `createRun`, `cancelRun`, `listApprovals`,
+  `decideApproval`. Only a runtime check of each answer against the documents holds a format, and
+  this repository has no validator or YAML parser of its own: that check is a new dependency. (2)
+  Statuses an operation does not list — 429 on `getSession` (the documents' `TooManyRequests`:
+  every route but `/health/live` can answer it), 503 on six reads, 500 on billing, 422 on
+  `createRun`, 409 on `completeUpload`, 401 on `logout`: the fixture's outage and refusal states,
+  each body an `ApiProblem`. (3) The specs' own `page.route` answers
+  (`e2e/public-edge-fixture.spec.ts`, `e2e/account-surfaces.spec.ts`), outside the fixture: of
+  eight problem bodies, seven lack fields `ApiProblem` requires and one is malformed on purpose (a
+  title that is not a string); one of the seven is a 409 for `deleteAccount`, whose 409 the
+  documents publish as `AccountDeletionResult`; a gateway's HTML 502 and 504 are off the contract
+  by design.
+
+Proved red by hand, the fixture restored from a kept copy each time (sha256 9e923858… before and
+after), `tsc --noEmit` alone red:
+
+| Guard | Broken by |
+| --- | --- |
+| A readiness check's fields are typed | `ok: "yes"` |
+| Readiness carries its checks | `checks` dropped from the 200 |
+| Liveness is the published constant | `status: "up"` |
+| A completed upload carries its size | `sizeBytes` dropped |
+| A project member carries an email | `email` dropped from the owner |
+| A spread refusal's fields are typed | `detail: 404` on the unlink route's 404 |
+| Every refusal carries a request id | `requestId` dropped from `problem()` |
+
+F95 is the last number.
