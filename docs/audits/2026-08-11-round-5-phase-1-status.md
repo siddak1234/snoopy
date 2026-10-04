@@ -1892,3 +1892,36 @@ by hand, as the workflow holds them: against a loopback server answering as prod
 main's sha (exit 0) and a wrong one (exit 1) — production itself was not read by them. Its first
 run on production is the merge of this change: a `deployment_status` workflow runs from the
 deployed commit, so no earlier deployment carries it. F89 is the last number.
+
+### CI, Wave 2 — the fixture suite in three legs — 2026-10-03
+
+The owner's CI plan, Wave 2, for this repository, its first item: the same coverage, faster.
+Nothing here changes what a gate tests; main as smoke-only is the next PR, on the owner's decision.
+
+- **F90** (new): the Authenticated fixture suite was the critical path of every run read — 13.9 to
+  16.3 of the run's 14 to 16.4 minutes, in 10 of 10 — because one job ran the three engines in
+  series, one worker: after 88-90 s of install, build and fixture start, Chromium 220-226 s,
+  Firefox 288-302 s, WebKit 284-297 s (jobs 111302814676, 111305515431). The `fixtures` job in
+  `.github/workflows/ci.yml` is now a matrix of three legs, one Playwright project each —
+  `npm run test:browser:fixtures -- --project=<engine>`; `scripts/run-browser-fixtures.mjs` passes
+  its arguments to Playwright, and `--list` per engine in CI's image gave 196 tests in each leg's
+  engine alone, 588 in all — with `fail-fast: false`, so one engine's red lets the other two
+  report, and `HOME: /root` at job level as F58 requires. What the engines shared in series was one
+  fixture Edge on 3443 whose state the tests move and put back, one standalone server on 3001, one
+  cookie, one certificate and one build with the fixture's origin; each leg is its own runner and
+  container and makes all of them itself, so each engine starts on a fresh fixture, as Chromium
+  alone did. The npm cache is restored in each leg as before; the build is not shared, since a
+  build job in front of the legs would put its own setup and an artifact hop on the critical path
+  for ~40 s of build that now runs three times in parallel. The job id stays `fixtures`: all-green's
+  needs and the F88 test are unchanged, and the ruleset never sees a leg's name (the plan's
+  compatibility rule 1). Expected: the run's critical path falls to the slowest leg (~5.2-6.6 min),
+  the PR from ~16-17 to ~7 min, to be read from the first runs. Held by the structure test "the
+  fixture suite runs one engine per CI leg …", proved red by hand with `fail-fast: false` removed,
+  `webkit` dropped from the matrix and the `--project` argument removed, each restored from the
+  index.
+- **Not here.** Main as smoke-only, the Build jobs, the twelve accessibility tests that run in both
+  browser jobs (Wave 3, after the equivalence proof), a `.next` cache (dropped: 0 s on the critical
+  path). The fixture gate that `npm run verify` and the change audit run is unchanged: locally the
+  three engines still run in series; the legs are CI's.
+
+F90 is the last number.
