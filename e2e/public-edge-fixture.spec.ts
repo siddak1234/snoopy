@@ -56,6 +56,12 @@ async function createOperationsTeam(page: Page) {
     .selectOption("Operations");
   await dialog.getByRole("button", { name: "Create team" }).click();
   await page.getByRole("button", { name: "Done" }).click();
+  // Done revalidates and pushes the new team's page
+  // (components/dashboard/CreateTeamButton.tsx). Wait for that navigation to
+  // land: a `page.goto` issued while it is still in flight is "interrupted by
+  // another navigation" — seen in WebKit once each engine ran on a fresh
+  // fixture (register F90).
+  await page.waitForURL(/\/account\/teams\/[^/]+$/);
 }
 
 test("the pasted-key 409 retry preserves the original connection intent", async ({

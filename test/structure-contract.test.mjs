@@ -473,6 +473,40 @@ test("every CI job in the Playwright image runs with a HOME that root owns (regi
   }
 });
 
+test("the fixture suite runs one engine per CI leg: every Playwright project, each leg its own, none stopped by another's failure (register F90)", () => {
+  // Run in series in one job, the three engines were 13-14 of the run's 15-16
+  // minutes. A project missing from the matrix is an engine CI no longer
+  // tests; a leg without `--project` is the series again, three times over.
+  const job = read(".github/workflows/ci.yml")
+    .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
+    .find((entry) => entry.startsWith("fixtures:"));
+  assert.ok(job, "CI has no fixtures job");
+  const matrix =
+    /^ {4}strategy:\n {6}fail-fast: false\n {6}matrix:\n {8}project: \[([^\]]+)\]$/mu.exec(
+      job,
+    );
+  assert.ok(
+    matrix,
+    "the fixtures job is not a fail-fast: false matrix over project",
+  );
+  const projects = [
+    ...read("playwright.config.ts").matchAll(/^ +(?:\{ )?name: "([a-z]+)"/gmu),
+  ].map((m) => m[1]);
+  assert.deepEqual(
+    matrix[1]
+      .split(",")
+      .map((name) => name.trim())
+      .sort(),
+    projects.sort(),
+  );
+  // Each leg is named by its engine, or the three read as one job.
+  assert.match(job, /^ {4}name: .*\$\{\{ matrix\.project \}\}/mu);
+  assert.match(
+    job,
+    /^ {6}- run: npm run test:browser:fixtures -- --project=\$\{\{ matrix\.project \}\}$/mu,
+  );
+});
+
 test("CI's contract tests read the whole history, so a struck document path is checked, not skipped", () => {
   // `scripts/audit-doc-references.mjs` believes a strike only for a file a
   // commit once added; in a one-commit clone every strike reads "not checked".
