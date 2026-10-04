@@ -1,0 +1,140 @@
+name: Main
+
+# A push to main is, by the ruleset, a squash of a pull request that was up to
+# date with main, so the squashed commit's tree is the PR head's tree — and that
+# head's all-green already ran every job on exactly it (6 of 6 merges read;
+# register F91). Running ci.yml again on main was 14-16 minutes proving the
+# proved, while production had been live since 63 s after the merge (F89).
+#
+# So main runs a smoke when the tree is the one its PR's all-green passed —
+# lint, format, typecheck and the contract tests, with setup-node's npm cache,
+# which keeps the cache a PR's first run restores seeded under main's scope —
+# and the whole suite (ci.yml as a reusable workflow) when it is not: a push
+# with no merged PR, a PR merged behind main through the admin bypass, a head
+# whose all-green did not pass. `main-green` is the one name a reader of main
+# needs. Vercel's Git deploy of main and the post-deploy probe are unchanged.
+on:
+  push:
+    branches: [main]
+
+jobs:
+  # Which suite this tree needs. Every answer the API cannot give is "full":
+  # this job decides and never fails, and main-green holds the suite it chose.
+  verdict:
+    name: Tested as a PR
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      suite: ${{ steps.decide.outputs.suite }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: The pull request that landed this commit proved this tree
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tree=$(git rev-parse 'HEAD^{tree}')
+          echo "main ${GITHUB_SHA} tree ${tree}"
+          decide() {
+            echo "suite=$1" >> "$GITHUB_OUTPUT"
+            echo "$2"
+            echo "suite: $1"
+            exit 0
+          }
+          # The merged pull request whose squash commit this is.
+          pr=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
+            --jq "[.[] | select(.merged_at != null and .base.ref == \"main\" and .merge_commit_sha == \"${GITHUB_SHA}\")] | first // empty") || pr=""
+          if [ -z "$pr" ]; then
+            decide full "no merged pull request has ${GITHUB_SHA} as its merge commit."
+          fi
+          number=$(printf '%s' "$pr" | jq -r .number)
+          head=$(printf '%s' "$pr" | jq -r .head.sha)
+          # Its head's tree must be this tree. The strict policy makes it so for
+          # a squash merge; a merge through the admin bypass need not be.
+          pr_tree=$(gh api "repos/${GITHUB_REPOSITORY}/git/commits/${head}" --jq .tree.sha) || pr_tree=""
+          echo "PR #${number} head ${head} tree ${pr_tree:-<unread>}"
+          if [ "$pr_tree" != "$tree" ]; then
+            decide full "the tree differs from PR #${number}'s head tree."
+          fi
+          # And all-green, from GitHub Actions (app 15368), must have passed on
+          # that head. The check-runs API answers with the latest run of the name.
+          conclusion=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${head}/check-runs?check_name=all-green&app_id=15368" \
+            --jq '[.check_runs[] | select(.status == "completed")] | first | .conclusion // empty') || conclusion=""
+          echo "all-green on ${head}: ${conclusion:-<none>}"
+          if [ "$conclusion" != "success" ]; then
+            decide full "PR #${number}'s all-green did not succeed on ${head}."
+          fi
+          decide smoke "PR #${number}'s all-green passed on this exact tree."
+
+  # The cheap gates, and the npm cache seeded under main's scope: a PR run
+  # restores from main when its own scope has nothing yet.
+  smoke:
+    name: Smoke
+    needs: verdict
+    if: needs.verdict.outputs.suite == 'smoke'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        # The contract tests read the whole history, as in ci.yml's gates job.
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm run test:contracts
+
+  # Every job ci.yml runs on a pull request, unchanged, on this push.
+  full:
+    name: Full suite
+    needs: verdict
+    if: needs.verdict.outputs.suite == 'full'
+    uses: ./.github/workflows/ci.yml
+
+  # all-green's shape, for main: runs whatever the others did, and passes only
+  # when the verdict was made and the suite it chose succeeded. The suite it did
+  # not choose is skipped by design; any other result is red.
+  main-green:
+    name: main-green
+    if: always()
+    needs:
+      - verdict
+      - smoke
+      - full
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: The chosen suite succeeded
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          SUITE: ${{ needs.verdict.outputs.suite }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "suite: ${SUITE:-<none>}"
+          verdict=$(echo "$NEEDS" | jq -r .verdict.result)
+          smoke=$(echo "$NEEDS" | jq -r .smoke.result)
+          full=$(echo "$NEEDS" | jq -r .full.result)
+          fail() {
+            echo "FAIL: $1"
+            exit 1
+          }
+          [ "$verdict" = "success" ] || fail "the verdict was not made ($verdict)"
+          case "$SUITE" in
+            smoke)
+              [ "$smoke" = "success" ] || fail "smoke: $smoke"
+              [ "$full" = "skipped" ] || fail "the full suite ran ($full) though the suite was smoke"
+              ;;
+            full)
+              [ "$full" = "success" ] || fail "full suite: $full"
+              [ "$smoke" = "skipped" ] || fail "smoke ran ($smoke) though the suite was full"
+              ;;
+            *)
+              fail "no suite was chosen"
+              ;;
+          esac
+          echo "main-green: the ${SUITE} suite succeeded"

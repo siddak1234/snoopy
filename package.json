@@ -20,7 +20,8 @@
     "test:browser:fixtures": "node scripts/run-browser-fixtures.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "hooks:install": "bash scripts/install-git-hooks.sh"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

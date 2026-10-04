@@ -1925,3 +1925,69 @@ Nothing here changes what a gate tests; main as smoke-only is the next PR, on th
   three engines still run in series; the legs are CI's.
 
 F90 is the last number.
+
+### CI, Wave 2 — main runs the smoke its pull request earned, and a push is gated before it leaves — 2026-10-04
+
+The owner's CI plan, Wave 2, for this repository, its second and third items, on the owner's Vercel
+decision: the Git deploy of main and the post-deploy probe stay and nothing deploys from Actions, so
+Vercel and the ruleset (all-green from GitHub Actions, strict, squash only) are untouched. Nothing
+here changes what a pull request's run tests.
+
+- **F91** (new): every push to main ran the whole suite again on a tree its pull request had already
+  proved. The ruleset allows squash merges only and requires the PR to be up to date with main, so
+  the squashed commit's tree is the PR head's — 6 of 6 merges read, 31126a6's tree `c87a5daa` being
+  dcb3441's — and the main runs read were the PR's run over again: 15.4 min (37158057244), 14.1
+  (37178107304), 7.3 after the matrix (37182209022), while production had been live since 63 s
+  after the merge (F89): the run gated nothing. `.github/workflows/ci.yml` now runs on
+  `pull_request` and `workflow_call` alone; `.github/workflows/main.yml` runs on a push to main. Its
+  `verdict` job finds the merged pull request whose squash commit this is (`commits/{sha}/pulls`:
+  merged, base main, that merge commit), reads the head's tree (`git/commits/{head}`) against
+  `HEAD^{tree}`, and reads the head's `all-green` check-run from GitHub Actions (app 15368; the
+  check-runs API answers with the latest of the name); every answer the API cannot give is "full",
+  and the job never fails. On one tree and a success, `smoke` runs lint, format:check, typecheck and
+  the contract tests on actions/setup-node's npm cache after `npm ci`, so the cache under main's
+  scope — the one a pull request's first run restores (PR #30 restored key `cba0c1…` from
+  `refs/heads/main`) — stays seeded; otherwise `full` calls ci.yml as a reusable workflow, every job
+  as on a pull request: a push with no merged PR, a PR merged behind main through the admin bypass,
+  a head whose all-green did not pass. `main-green` needs all three, runs whatever they did
+  (`if: always()`) and passes only when the verdict was made and the suite it chose succeeded while
+  the other was skipped — the one name a reader of main needs. The verdict's script was run by hand
+  against the live API — 31126a6 (smoke), dcb3441 (no merge commit: full), e78d555 against another
+  tree (full) — and with a stubbed `gh` (all-green failure, none, an API error: full; success:
+  smoke); main-green's against eight `needs` shapes (the two green ones pass, six fail). Expected: a
+  merge's main run ~1.5-2 min in place of 7-16; the first run after this change merges is the proof,
+  and the number is to be read from it. Held by the structure test "main runs a smoke on the tree
+  its pull request's all-green proved …".
+- **F92** (new): the native pre-push hook (`scripts/githooks/pre-push`) required the change-audit
+  marker and ran no gate, so a tree that would turn Lint red reached CI and cost a whole run. It
+  now runs the six fast gates `npm run verify` begins with, in verify's order — format:check, lint,
+  typecheck, audit:boundaries, test:contracts, verify:platform-contracts (skipped out loud when the
+  sibling checkout is absent, as verify skips it) — before the marker check, stops at the first red
+  and names it with the bypass (`git push --no-verify`); a deletion push and a tree identical to
+  origin/main run nothing. Nothing slow (no build, no browser suite: CI is the authority), no facts
+  file (only a whole green verify emits one) and no marker (only `scripts/audit/record-pass.mjs`
+  writes one). `npm run hooks:install` arms it (`bash scripts/install-git-hooks.sh`). Measured on
+  the owner's Mac, on this tree: 38 s (format:check 7, lint 9, typecheck 8, audit:boundaries 1,
+  test:contracts 10, verify:platform-contracts 3); a scratch commit with a prettier violation,
+  pushed to a throwaway bare remote, was refused in 3 s naming `format:check` and the bypass, and
+  the remote received no ref. Held by `test/pre-push-hook.test.mjs`, which drives the hook against
+  a throwaway repository whose gates are stubs: the list is verify's first six as
+  `scripts/audit/run-gates.mjs` declares them, a red `typecheck` refuses with its name and the
+  bypass and the gates after it do not run, an absent sibling skips the sixth out loud, and no
+  facts file appears.
+- **Not here.** Vercel and the ruleset (above); the Build jobs; the twelve accessibility tests
+  (Wave 3). CONTRIBUTING's step 4 and AGENTS.md rule 8 hold as written: the marker is still
+  required of every push.
+
+Proved red by hand, each file restored from a kept copy:
+
+| Guard | Broken by | Red |
+| --- | --- | --- |
+| ci.yml is callable from main | `workflow_call:` removed | the F91 test |
+| ci.yml no longer runs on a push to main | `push: branches: [main]` put back | the F91 test |
+| all-green is read from GitHub Actions | `&app_id=15368` dropped from the check-run read | the F91 test |
+| A tree that differs runs the full suite | its `decide full` made `decide smoke` | the F91 test |
+| The unchosen suite must be skipped | main-green's `[ "$full" = "skipped" ]` made `true` | the F91 test |
+| The full suite is ci.yml | `uses:` pointed at the probe workflow | the F91 test |
+
+F92 is the last number.

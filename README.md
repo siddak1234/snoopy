@@ -104,6 +104,12 @@ secret provisioning belongs to the deployment configuration round, not here.
 | `npm run test:browser` | Public accessibility in three engines, and Chromium's visual baselines |
 | `npm run test:browser:fixtures` | Credential-free authenticated suite, in three engines |
 
-CI (`.github/workflows/ci.yml`) runs these gates as jobs, plus what `npm run
-verify` cannot run offline: the dependency audit, a scan of the built image, and
-its SBOM.
+CI (`.github/workflows/ci.yml`) runs these gates as jobs on every pull request,
+plus what `npm run verify` cannot run offline: the dependency audit, a scan of
+the built image, and its SBOM. On `main`, `.github/workflows/main.yml` runs a
+smoke (lint, format, typecheck, the contract tests) when the merged commit's
+tree is the one its pull request's all-green passed, and the whole suite
+otherwise. `npm run hooks:install` arms the pre-push hook
+(`scripts/githooks/pre-push`), which requires the change-audit marker and runs
+the first six gates above (~30 s) before a push leaves; CI is the authority for
+the rest.
