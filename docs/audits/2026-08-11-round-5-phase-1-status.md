@@ -2051,3 +2051,70 @@ Proved red by hand, each file restored from a kept copy:
 | The full suite is ci.yml | `uses:` pointed at the probe workflow | the F92 test |
 
 F93 is the last number.
+
+### CI, Wave 1 — the generated types against the deployed platform's contract — 2026-10-04
+
+The owner's CI plan, Wave 1, the client contract job's second half, and the probe's hash step it
+designed for (F89): written once the platform's `/health/live` carries its deployed marker
+(`snoopy-backend` #153, c6b8650, `commit` and `contracts` beside `status`), and pushed only after
+that marker is promoted and read back. Nothing here changes a page.
+
+- **F94** (new): CI compared the generated platform types with nothing that runs. F7's headers
+  name the sha256 of the document each file was generated from, and `verify:platform-contracts`
+  compares them with whatever sibling checkout a developer has — CI has none, so the 8
+  sibling-dependent contract tests skip there — while production may run another contract
+  entirely. The types are regenerated from c6b8650's documents (openapi.yaml 7f9d1db7… →
+  92e14453…, the platform's `LiveHealthResponse.commit`/`contracts` and `PushNotificationData`,
+  types only, which no page reads; automations.yaml 0349e2cb… and connections.yaml ab70cb0f…
+  unchanged), each header equal to `shasum -a 256` of the document at c6b8650.
+  `scripts/verify-deployed-contracts.mjs` — the same file as `snoopy-mobile`'s, byte for byte —
+  reads the three headers, GETs `https://api.autom8x.ai/health/live` (four attempts, 2, 4 and 8 s
+  apart) and passes only when each header's hash equals the `contracts` entry for its document.
+  It fails closed: an unreachable host, and an answer with no `contracts` — today's, a platform
+  from before the marker — are red exactly as a mismatch is, never a skip. `platform-requirement.json`
+  at the root, committed `{ "aheadOfDeployed": false }`, is the one reviewed escape: `true`
+  passes a mismatch, loudly, for a change that must land before the platform's, and fails once
+  nothing is ahead, so it cannot outlive its change; an unread host or a missing marker still
+  fail. The CI job `contract-deployed` (Deployed contract: ubuntu-24.04, five minutes, Node 22,
+  no install, no secret) runs it, and all-green needs it — the F88 test reads the needs from the
+  job list, so it holds the new job unchanged. This repository's merge is its release, so a PR
+  generated against an unpromoted platform is red before it deploys. After every Production
+  deployment, `.github/workflows/post-deploy-probe.yml` now also reads the platform production
+  reads, `/api/platform/health/live` through the rewrite (four rounds, 15 s apart), requires its
+  `contracts`, reads the deployed sha's three generated files from raw.githubusercontent.com — a
+  public GET, still no checkout, no action, no token — and is red on any difference, an absent
+  marker or an unreadable header, with no escape: a promotion between a PR's CI and its merge, or
+  a merge declared ahead, is seen where production is. Held by `test/deployed-contracts.test.mjs`
+  (13 tests: match, mismatch, unreachable, no marker, a marker short of a document, ahead,
+  `--release`, a stale escape, the retries, the headers, the requirement file) and the structure
+  test "the committed platform types are checked against the deployed platform's contract …",
+  which keeps the probe's documents the script's.
+- **Not here.** The documents themselves (a regenerate-and-compare against served documents):
+  hashes were the plan's choice, so the 8 sibling-dependent tests still skip in CI. Main's smoke
+  (F92) does not run the check; production gets the probe. Whether production waits for
+  all-green stays the owner's decision.
+
+Proved red by hand, each file restored from a kept copy, the named test file alone red:
+
+| Guard | Broken by | Red |
+| --- | --- | --- |
+| all-green needs the contract job | `contract-deployed` taken out of its needs | the F88 test |
+| The job can fail | `continue-on-error: true` on the job | the F94 test |
+| The job's failure is not swallowed | `\|\| true` after its run line | the F94 test |
+| The probe is red with no marker | its `has("contracts")` made `true` | the F94 test |
+| The probe has no escape | `platform-requirement.json` read in its step | the F94 test |
+| The probe reads production's rewrite | the platform's own origin put in its place | the F94 test |
+| The probe compares every document | `connections.yaml` dropped from its list | the F94 test |
+| A release reads no escape | the escape honoured under `--release` | `test/deployed-contracts.test.mjs` |
+| No marker is red | the no-`contracts` branch made to pass | `test/deployed-contracts.test.mjs` |
+| An unread host is red | the unreachable branch made to pass | `test/deployed-contracts.test.mjs` |
+| An escape cannot outlive its change | ahead with nothing ahead made to pass | `test/deployed-contracts.test.mjs` |
+| Four attempts | three | `test/deployed-contracts.test.mjs` |
+
+The probe's new step was run by hand, as the workflow holds it, against a loopback server
+answering as production does and serving this tree's files in raw.githubusercontent.com's place —
+production itself was not read by it: today's body from `https://api.autom8x.ai/health/live` (no
+marker: exit 1), c6b8650's hashes (exit 0), openapi.yaml's old hash (exit 1, naming it), headers
+answering 404 (exit 1), and an origin that refuses connections (exit 1 after four rounds, 45 s).
+Against today's `/health/live` the CI job fails closed, by design, until the marker is promoted.
+F94 is the last number.
