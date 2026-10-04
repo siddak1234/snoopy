@@ -44,7 +44,7 @@ function git(cwd, ...args) {
 // A repository whose six gates are stubs — each writes `ran-<gate>` and exits
 // red or green as asked — with the sibling checkout the sixth reads planted
 // beside it, or not.
-function makeRepo({ red = [], sibling = true } = {}) {
+function makeRepo({ red = [], sibling = true, recordGitDir = false } = {}) {
   const base = mkdtempSync(join(tmpdir(), "pre-push-"));
   const repo = join(base, "snoopy");
   mkdirSync(repo);
@@ -52,7 +52,7 @@ function makeRepo({ red = [], sibling = true } = {}) {
   const scripts = Object.fromEntries(
     FAST_GATES.map((gate) => [
       gate,
-      `touch ran-${gate.replace(":", "-")} && exit ${red.includes(gate) ? 1 : 0}`,
+      `${recordGitDir ? `printf %s "\${GIT_DIR-unset}" > seen-git-dir-${gate.replace(":", "-")} && ` : ""}touch ran-${gate.replace(":", "-")} && exit ${red.includes(gate) ? 1 : 0}`,
     ]),
   );
   writeFileSync(
@@ -86,11 +86,12 @@ const ran = (repo) =>
     existsSync(join(repo, `ran-${gate.replace(":", "-")}`)),
   );
 
-function runHook(repo, url, lines) {
+function runHook(repo, url, lines, extraEnv = {}) {
   // The hook resolves the sibling as the generator does, from the environment
   // or beside the repository; the test's own environment must not reach it.
   const env = { ...process.env };
   delete env.SNOOPY_BACKEND_ROOT;
+  Object.assign(env, extraEnv);
   const run = spawnSync("sh", [hook, "origin", url], {
     cwd: repo,
     encoding: "utf8",
@@ -230,4 +231,26 @@ test("a sibling checkout that is absent skips verify:platform-contracts out loud
     /verify:platform-contracts skipped — sibling checkout not present/,
   );
   assert.deepEqual(ran(repo), FAST_GATES.slice(0, 5));
+});
+
+test("a push from a linked worktree runs the gates without git's repository variables, so the gates' own git calls cannot touch this repository", (t) => {
+  // git exports GIT_DIR (and, with --work-tree, GIT_WORK_TREE) to the hook for
+  // a push from a linked worktree or with --git-dir; the gates' tests run git
+  // in throwaway repositories, which those variables would redirect here.
+  const { base, repo } = makeRepo({ recordGitDir: true });
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const sha = git(repo, "rev-parse", "HEAD");
+  mark(repo, git(repo, "rev-parse", "HEAD^{tree}"), inAnHour());
+  const gitDir = git(repo, "rev-parse", "--absolute-git-dir");
+  const pushed = runHook(
+    repo,
+    SNOOPY_URL,
+    `refs/heads/main ${sha} refs/heads/main ${ZERO}\n`,
+    { GIT_DIR: gitDir, GIT_WORK_TREE: repo },
+  );
+  assert.equal(pushed.exit, 0, pushed.stderr);
+  for (const gate of FAST_GATES) {
+    const seen = join(repo, `seen-git-dir-${gate.replace(":", "-")}`);
+    assert.equal(readFileSync(seen, "utf8"), "unset", `${gate} saw GIT_DIR`);
+  }
 });

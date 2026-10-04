@@ -111,5 +111,5 @@ smoke (lint, format, typecheck, the contract tests) when the merged commit's
 tree is the one its pull request's all-green passed, and the whole suite
 otherwise. `npm run hooks:install` arms the pre-push hook
 (`scripts/githooks/pre-push`), which requires the change-audit marker and runs
-the first six gates above (~30 s) before a push leaves; CI is the authority for
+the six fast gates `npm run verify` begins with (see "Verification"; ~30 s) before a push leaves; CI is the authority for
 the rest.

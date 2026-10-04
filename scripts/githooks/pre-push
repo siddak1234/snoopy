@@ -44,6 +44,11 @@ done
 # facts file and no marker: only a whole green `npm run verify` emits facts,
 # and only scripts/audit/record-pass.mjs writes a marker.
 cd "$(git rev-parse --show-toplevel)" || exit 1
+# A push from a linked worktree (or with --git-dir) exports GIT_DIR and its
+# siblings to this hook. The gates' tests run git in throwaway repositories,
+# and with these set they would act on this one; the toplevel is resolved
+# above and the marker directory before it, so nothing below needs them.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   echo "pre-push: the working tree has uncommitted changes; the gates run on it, not on the pushed commit." >&2
 fi
