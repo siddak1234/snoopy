@@ -257,6 +257,27 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+  # The committed platform types against the contract the RUNNING platform
+  # serves (register F94): each generated file's sha256 header must equal the
+  # hash the public GET https://api.autom8x.ai/health/live reports for its
+  # document (the platform's deployed marker). This repository's merge is its
+  # release, so a PR generated against a platform that is not promoted is red
+  # here, before it deploys. Fails closed — an unreachable host or an answer
+  # with no marker is red, never a skip; platform-requirement.json is the one
+  # reviewed escape for a change that must land ahead of the platform
+  # (scripts/verify-deployed-contracts.mjs). Node's own fetch and no
+  # dependency, so no install; no secret.
+  contract-deployed:
+    name: Deployed contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: node scripts/verify-deployed-contracts.mjs
+
   # Green only when every job above succeeded. The ruleset names four jobs; the
   # other four — the no-backend build, the browser and fixture suites, the scan —
   # gated nothing, and a merge could land while they ran or failed (register
@@ -276,6 +297,7 @@ jobs:
       - browser
       - fixtures
       - scan
+      - contract-deployed
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

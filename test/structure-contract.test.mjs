@@ -5,6 +5,8 @@ import { basename, join } from "node:path";
 import { test } from "node:test";
 import ts from "typescript";
 
+import { DOCUMENTS } from "../scripts/verify-deployed-contracts.mjs";
+
 /**
  * The structure the register asked for (backend BUILD-PLAN 22.3, 22.4) — each
  * one a thing that was true once and drifted, so each is held here rather than
@@ -774,6 +776,48 @@ test("main runs a smoke on the tree its pull request's all-green proved, and the
     /full\)\n\s+\[ "\$full" = "success" \] \|\| fail[^\n]*\n\s+\[ "\$smoke" = "skipped" \] \|\| fail/u,
   );
   assert.match(green, /\*\)\n\s+fail/u, "no suite chosen is red");
+});
+
+test("the committed platform types are checked against the deployed platform's contract — in CI before a merge, and after every production deploy — and fail closed (register F94)", () => {
+  // CI: a job all-green needs (the F88 test) that runs the check and can fail.
+  const job = read(".github/workflows/ci.yml")
+    .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
+    .find((entry) => entry.startsWith("contract-deployed:"));
+  assert.ok(job, "CI has no contract-deployed job");
+  assert.match(
+    job,
+    /^ {6}- run: node scripts\/verify-deployed-contracts\.mjs$/mu,
+  );
+  assert.match(job, /^ {4}timeout-minutes: 5$/mu);
+  assert.doesNotMatch(
+    job,
+    /continue-on-error|^\s+if:|^\s+needs:/mu,
+    "the job, and every step in it, must run and be able to fail",
+  );
+  // After a deploy: the platform production reads, through the rewrite,
+  // against the deployed sha's own headers, for every document the check
+  // compares — and no marker is red. The probe has no escape.
+  const probe = read(".github/workflows/post-deploy-probe.yml");
+  const step = probe.slice(
+    probe.indexOf("- name: The platform serves the contract"),
+  );
+  assert.match(step, /"\$\{ORIGIN\}\/api\/platform\/health\/live"/u);
+  assert.match(
+    step,
+    /raw\.githubusercontent\.com\/\$\{GITHUB_REPOSITORY\}\/\$\{DEPLOYED_SHA\}\/\$\{file\}/u,
+  );
+  assert.match(step, /has\("contracts"\)/u, "no marker must be red");
+  assert.doesNotMatch(
+    step,
+    /platform-requirement|continue-on-error|^\s+if:/mu,
+    "the probe compares production with the platform, with no escape",
+  );
+  for (const [document, { file }] of Object.entries(DOCUMENTS)) {
+    assert.ok(
+      step.includes(`${document}:${basename(file)}`),
+      `the probe does not compare ${document}`,
+    );
+  }
 });
 
 test("signing in from a join link returns to the organization it named", () => {
