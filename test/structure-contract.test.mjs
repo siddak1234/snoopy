@@ -665,6 +665,117 @@ test("CI builds the site with no backend, as a Vercel preview does (register F62
   );
 });
 
+test("main runs a smoke on the tree its pull request's all-green proved, and the whole suite otherwise (register F92)", () => {
+  // Every push to main ran ci.yml again on a tree its pull request had proved:
+  // squash-only and strict, the squashed commit's tree is the PR head's. So
+  // ci.yml runs on pull requests, and on main only when main.yml calls it.
+  const ci = read(".github/workflows/ci.yml");
+  const triggers = ci.slice(ci.indexOf("\non:\n"), ci.indexOf("\njobs:\n"));
+  assert.match(triggers, /^ {2}pull_request:$/mu);
+  assert.match(
+    triggers,
+    /^ {2}workflow_call:$/mu,
+    "main's full suite calls ci.yml",
+  );
+  assert.doesNotMatch(
+    triggers,
+    /^ {2}push:/mu,
+    "a push to main runs main.yml, not ci.yml",
+  );
+
+  const main = read(".github/workflows/main.yml");
+  assert.match(main, /^on:\n {2}push:\n {4}branches: \[main\]$/mu);
+  const jobs = main
+    .slice(main.indexOf("\njobs:\n"))
+    .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
+    .slice(1);
+  const ids = jobs.map((job) => job.slice(0, job.indexOf(":")));
+  const job = (id) => jobs.find((entry) => entry.startsWith(`${id}:`));
+
+  // The verdict: the merged pull request whose squash commit this is, its
+  // head's tree against HEAD's, and all-green from GitHub Actions (app 15368)
+  // on that head. One way to the smoke, the last word; every other is full.
+  const verdict = job("verdict");
+  assert.ok(verdict, "main.yml has no verdict job");
+  assert.match(
+    verdict,
+    /^ {6}suite: \$\{\{ steps\.decide\.outputs\.suite \}\}$/mu,
+  );
+  assert.match(verdict, /tree=\$\(git rev-parse 'HEAD\^\{tree\}'\)/u);
+  assert.match(verdict, /commits\/\$\{GITHUB_SHA\}\/pulls/u);
+  assert.match(
+    verdict,
+    /\.merged_at != null and \.base\.ref == \\"main\\" and \.merge_commit_sha == \\"\$\{GITHUB_SHA\}\\"/u,
+  );
+  assert.match(verdict, /git\/commits\/\$\{head\}" --jq \.tree\.sha/u);
+  assert.match(
+    verdict,
+    /if \[ "\$pr_tree" != "\$tree" \]; then\n\s+decide full/u,
+  );
+  assert.match(
+    verdict,
+    /commits\/\$\{head\}\/check-runs\?check_name=all-green&app_id=15368/u,
+  );
+  assert.match(
+    verdict,
+    /if \[ "\$conclusion" != "success" \]; then\n\s+decide full/u,
+  );
+  assert.deepEqual(
+    [...verdict.matchAll(/^\s+decide (\w+) /gmu)].map((m) => m[1]),
+    ["full", "full", "full", "smoke"],
+  );
+
+  // The smoke: the cheap gates, on setup-node's npm cache after npm ci, so the
+  // cache under main's scope — the one a PR's first run restores — stays
+  // seeded. Nothing slow: the builds and the browser suites are the PR's.
+  const smoke = job("smoke");
+  assert.ok(smoke, "main.yml has no smoke job");
+  assert.match(smoke, /^ {4}if: needs\.verdict\.outputs\.suite == 'smoke'$/mu);
+  assert.match(smoke, /^ {4}timeout-minutes: 5$/mu);
+  assert.match(
+    smoke,
+    new RegExp(
+      `^ {6}- uses: actions/setup-node@v7\\n {8}with:\\n {10}node-version: ${read(".nvmrc").trim()}\\n {10}cache: npm$`,
+      "mu",
+    ),
+  );
+  assert.match(smoke, /^ {6}- run: npm ci$/mu);
+  for (const gate of ["lint", "format:check", "typecheck", "test:contracts"]) {
+    assert.match(smoke, new RegExp(`^ {6}- run: npm run ${gate}$`, "mu"), gate);
+  }
+  assert.doesNotMatch(smoke, /npm run build|test:browser|docker /u);
+
+  // Otherwise the whole of ci.yml, as a reusable workflow.
+  const full = job("full");
+  assert.ok(full, "main.yml has no full job");
+  assert.match(full, /^ {4}if: needs\.verdict\.outputs\.suite == 'full'$/mu);
+  assert.match(full, /^ {4}uses: \.\/\.github\/workflows\/ci\.yml$/mu);
+
+  // main-green, in all-green's shape: needs every other job, runs whatever
+  // they did, and passes only when the verdict was made, the suite it chose
+  // succeeded and the other was skipped.
+  const green = job("main-green");
+  assert.ok(green, "main.yml has no main-green job");
+  assert.match(green, /^ {4}if: always\(\)$/mu);
+  const needs = /^ {4}needs:\n((?: {6}- [\w-]+\n)+)/mu.exec(green);
+  assert.ok(needs, "main-green names no needs list");
+  assert.deepEqual(
+    [...needs[1].matchAll(/- ([\w-]+)/gu)].map((m) => m[1]).sort(),
+    ids.filter((id) => id !== "main-green").sort(),
+  );
+  assert.match(green, /^ {4}timeout-minutes: 5$/mu);
+  assert.match(green, /\[ "\$verdict" = "success" \] \|\| fail/u);
+  assert.match(
+    green,
+    /smoke\)\n\s+\[ "\$smoke" = "success" \] \|\| fail[^\n]*\n\s+\[ "\$full" = "skipped" \] \|\| fail/u,
+  );
+  assert.match(
+    green,
+    /full\)\n\s+\[ "\$full" = "success" \] \|\| fail[^\n]*\n\s+\[ "\$smoke" = "skipped" \] \|\| fail/u,
+  );
+  assert.match(green, /\*\)\n\s+fail/u, "no suite chosen is red");
+});
+
 test("signing in from a join link returns to the organization it named", () => {
   assert.match(
     read("app/onboarding/join-org/page.tsx"),
