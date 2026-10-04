@@ -1,8 +1,11 @@
 #!/bin/sh
 # Native pre-push gate: every push of this repository — from any tool or
-# terminal — requires a PASS marker from /audit-change for the exact tree
-# being pushed. Installed via `bash scripts/install-git-hooks.sh`
-# (git config core.hooksPath scripts/githooks). Deliberate bypass: --no-verify.
+# terminal — runs the six fast gates `npm run verify` begins with (register
+# F93), so a push that would turn CI red is refused here, in about half a
+# minute, instead of costing a run; and then requires a PASS marker from
+# /audit-change for the exact tree being pushed. Installed via
+# `npm run hooks:install` (bash scripts/install-git-hooks.sh: git config
+# core.hooksPath scripts/githooks). Deliberate bypass: --no-verify.
 #
 # git calls this with: $1=remote name, $2=remote url, and stdin lines of
 # "<local_ref> <local_sha> <remote_ref> <remote_sha>".
@@ -17,6 +20,7 @@ git_dir="$(git rev-parse --absolute-git-dir)" || exit 1
 marker_dir="$git_dir/autom8x-audit"
 zero="0000000000000000000000000000000000000000"
 now_epoch="$(date +%s)"
+gated=""
 
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ "$local_sha" = "$zero" ] && continue # deletion push
@@ -28,6 +32,56 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     [ "$tree" = "$base_tree" ] && continue
   fi
 
+  gated="$gated $tree:$local_ref"
+done
+
+[ -n "$gated" ] || exit 0
+
+# The six fast gates, in verify's order (README "Verification"), on the working
+# tree, stopped at the first red — what is wrong in the tree, before what is
+# missing from the process. CI is the authority: the slow gates — the builds,
+# the browser suites — are its, and this hook never runs them. It writes no
+# facts file and no marker: only a whole green `npm run verify` emits facts,
+# and only scripts/audit/record-pass.mjs writes a marker.
+cd "$(git rev-parse --show-toplevel)" || exit 1
+# A push from a linked worktree (or with --git-dir) exports GIT_DIR and its
+# siblings to this hook. The gates' tests run git in throwaway repositories,
+# and with these set they would act on this one; the toplevel is resolved
+# above and the marker directory before it, so nothing below needs them.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+  echo "pre-push: the working tree has uncommitted changes; the gates run on it, not on the pushed commit." >&2
+fi
+# verify:platform-contracts reads the sibling checkout and throws when it is
+# absent; as `npm run verify` does, the skip is said out loud, never silently.
+backend_root="${SNOOPY_BACKEND_ROOT:-../snoopy-backend}"
+sibling_present=1
+for contract in docs/openapi.yaml docs/openapi/automations.yaml docs/openapi/connections.yaml; do
+  [ -f "$backend_root/$contract" ] || sibling_present=0
+done
+output="$(mktemp)" || exit 1
+trap 'rm -f "$output"' EXIT
+started="$(date +%s)"
+for gate in format:check lint typecheck audit:boundaries test:contracts verify:platform-contracts; do
+  if [ "$gate" = "verify:platform-contracts" ] && [ "$sibling_present" = 0 ]; then
+    echo "pre-push: $gate skipped — sibling checkout not present at $backend_root; accepted dependency (§12.2 #78)." >&2
+    continue
+  fi
+  begun="$(date +%s)"
+  if npm run --silent "$gate" >"$output" 2>&1 </dev/null; then
+    echo "pre-push: $gate ok ($(( $(date +%s) - begun ))s)" >&2
+  else
+    tail -n 30 "$output" >&2
+    echo "pre-push: $gate is red — refused before CI. Fix it, or bypass deliberately with git push --no-verify." >&2
+    exit 1
+  fi
+done
+echo "pre-push: the six fast gates are green ($(( $(date +%s) - started ))s); CI runs the rest." >&2
+
+# The change-audit marker, for each tree pushed (AGENTS.md rule 8).
+for entry in $gated; do
+  tree="${entry%%:*}"
+  local_ref="${entry#*:}"
   marker="$marker_dir/$tree.json"
   if [ ! -f "$marker" ]; then
     echo "pre-push: no change-audit PASS marker for tree $tree ($local_ref)." >&2
