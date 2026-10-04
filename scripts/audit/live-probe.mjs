@@ -1,4 +1,4 @@
-// Post-deploy production prober for /audit-change --live: verifies that the
+// Post-deploy production prober for /audit-change --live: verifies that the   
 // routes a merged change affects actually serve and render on the live site.
 // Route-level only — interaction-level probes are composed by the session
 // using the same chromium pattern. Never part of the push gate.
