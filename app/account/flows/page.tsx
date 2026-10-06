@@ -11,6 +11,7 @@ import {
   type Subscription,
 } from "@/lib/automations";
 import { heldCopy } from "@/lib/held-flow";
+import { flowsOverPlan, overPlanSentence } from "@/lib/plan-limit";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { StatusPill } from "@/components/dashboard/StatusPill";
@@ -90,6 +91,8 @@ export default async function FlowsPage() {
     roleInWorkspace(workspaceId),
   ]);
   const canAdminister = administers(role);
+  // Over the plan's flow allowance, the whole workspace's (decision 7a3).
+  const overPlan = flowsOverPlan(subscriptions.flowAllowance);
 
   // Archiving is one-way and is how a workspace gives a plan slot back; using
   // that automation again means subscribing afresh, which the archived list
@@ -143,6 +146,17 @@ export default async function FlowsPage() {
       title="Flows"
       subheader="Browse flows and add them to your workspace"
     >
+      {overPlan ? (
+        // Every flow is held from starting a run, so this is said above them
+        // all, in the app's words (the owner's build 13 decision 7a3).
+        <p
+          role="status"
+          data-testid="flows-over-plan"
+          className="mb-4 rounded-[var(--radius-md)] border border-[var(--warning-border)] bg-[var(--warning-bg)] px-4 py-3 text-sm text-[var(--warning-text)]"
+        >
+          {overPlanSentence(overPlan.allowed, overPlan.live)}
+        </p>
+      ) : null}
       {catalog.automations.length === 0 ? (
         // The whole page is empty: the app's empty screen, in its words (the
         // owner, build 10). There is nowhere to go until the catalog has one.

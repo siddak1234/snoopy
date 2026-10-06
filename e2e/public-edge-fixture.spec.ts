@@ -244,6 +244,39 @@ test("subscription refusals render only the two documented entitlement states", 
   ).toBeVisible();
 });
 
+test("over the plan's flow allowance, Flows says so and a run's start is refused in the same words (the owner's build 13 decision 7a3)", async ({
+  page,
+}) => {
+  const sentence =
+    "Your plan allows 2 flows; this workspace has 4. No flow can start a run until you archive 2. Paused and draft flows count.";
+  await fixtureControl("over-plan");
+  await page.goto("/account/flows");
+  await expect(page.getByTestId("flows-over-plan")).toHaveText(sentence);
+  await automationCard(page, "Manual input automation")
+    .getByRole("button", { name: "Run", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "Run Manual input automation",
+  });
+  await dialog.getByLabel("Vendor").fill("Acme Supplies");
+  await dialog.getByLabel("Amount").fill("10");
+  await dialog.getByLabel("Invoice reference").fill("R-1");
+  await dialog.getByRole("button", { name: "Start run" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(sentence);
+  await expect(page).toHaveURL(/\/account\/flows$/);
+});
+
+test("within the plan, Flows says nothing of it", async ({ page }) => {
+  await page.goto("/account/flows");
+  await expect(
+    automationCard(page, "Manual input automation").getByRole("button", {
+      name: "Run",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.getByTestId("flows-over-plan")).toHaveCount(0);
+});
+
 test("a live automation whose pinned version declares run input is started from its form, and the run's page follows", async ({
   page,
 }) => {
@@ -1788,6 +1821,51 @@ test("organization request controls use the public join-request operation withou
   await expect(
     page.locator('a[href*="invite"], input[name*="invite" i]'),
   ).toHaveCount(0);
+});
+
+test("Verified domains only turns on and stays on, and turns off again (the owner's build 13 decision 8B)", async ({
+  page,
+}) => {
+  await page.goto("/account/organization");
+  const toggle = () =>
+    page.getByRole("switch", { name: /^Verified domains only/ });
+  await expect(toggle()).not.toBeChecked();
+  await expect(
+    page.getByText(
+      "Only people who sign in with addresses at your verified domains can join, and members can't link an account outside them.",
+    ),
+  ).toBeVisible();
+  await toggle().click();
+  await expect(toggle()).toBeChecked();
+  // Saved on the platform: read again, it is still on.
+  await page.reload();
+  await expect(toggle()).toBeChecked();
+  await toggle().click();
+  await expect(toggle()).not.toBeChecked();
+  await page.reload();
+  await expect(toggle()).not.toBeChecked();
+});
+
+test("Verified domains only refused says why, in words, and stays off (8B)", async ({
+  page,
+}) => {
+  for (const [control, sentence] of [
+    [
+      "domain-only-refused?reason=members_outside_domain&count=2",
+      "2 members sign in with an address outside your verified domains, so this can't be turned on yet. Nobody is removed. A member who hasn't signed in since this setting arrived counts until they sign in again.",
+    ],
+    [
+      "domain-only-refused?reason=no_verified_domain",
+      "Verify a domain before limiting the organization to it.",
+    ],
+  ] as const) {
+    await fixtureControl(control);
+    await page.goto("/account/organization");
+    const toggle = page.getByRole("switch", { name: /^Verified domains only/ });
+    await toggle.click();
+    await expect(page.getByText(sentence)).toBeVisible();
+    await expect(toggle).not.toBeChecked();
+  }
 });
 
 // The organization's join page, as Copy join link puts it on the clipboard.
@@ -3657,6 +3735,49 @@ test("signed out, the login page arrives with its providers — read on the serv
   await page.goto("/login");
   await expect(page.getByRole("link", { name: /Google/ })).toBeVisible();
   expect(browserReads).toEqual([]);
+});
+
+test("a link the platform refused lands a signed-in person on Linked accounts, which says why once (the owner's build 13 decision 10A, TestFlight #19)", async ({
+  page,
+}) => {
+  // The platform sends a link's refusal to the login page, as a sign-in's;
+  // signed in already, the person was linking.
+  await page.goto("/login?error=auth_callback&reason=identity_already_linked");
+  await expect(page).toHaveURL(
+    /^http:\/\/127\.0\.0\.1:3001\/account\/settings$/,
+  );
+  const said = page.getByText(
+    "That account is already linked, to this account or another. To link it here, unlink it from the other account first.",
+  );
+  await expect(said).toBeVisible();
+  // Said once: the address no longer carries it, so a reload does not.
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Linked accounts" }),
+  ).toBeVisible();
+  await expect(said).toHaveCount(0);
+  // A reason the page does not know is said as the link failing, never raw.
+  await page.goto("/login?error=auth_callback&reason=%3Cb%3Ex%3C%2Fb%3E");
+  await expect(
+    page.getByText("The account could not be linked. Try again."),
+  ).toBeVisible();
+});
+
+test("signed out, a refused sign-in says why on the login page (10A)", async ({
+  page,
+}) => {
+  await page.context().clearCookies();
+  for (const [reason, sentence] of [
+    ["signup_disabled", "New sign-ups are closed."],
+    ["access_denied", "Sign-in was declined."],
+    [
+      "provider_refused",
+      "Sign-in did not complete. Please try your provider again.",
+    ],
+  ] as const) {
+    await page.goto(`/login?error=auth_callback&reason=${reason}`);
+    await expect(page.getByRole("alert")).toHaveText(sentence);
+  }
 });
 
 test("a crafted return target cannot leave the site — signed in, the login page lands on the account", async ({

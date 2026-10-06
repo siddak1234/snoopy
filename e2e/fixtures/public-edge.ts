@@ -143,6 +143,12 @@ function initialState() {
   ];
   return {
     activeWorkspaceId: workspaceId as string,
+    // Build 14 (the owner's build 13 decisions 7a3 and 8B): the workspace over
+    // its plan's flow allowance; the organization's domain-only setting, and a
+    // refusal to turn it on.
+    overPlan: false,
+    domainOnly: false,
+    domainOnlyRefusal: null as { reason: string; count?: number } | null,
     joinRequestStatus: "pending" as "pending" | "approved",
     archivableArchived: false,
     // The fresh copy unarchiving the archivable automation made (the owner's
@@ -1004,6 +1010,26 @@ const server = createServer(
         }
         state.uploadRefusal = { stage, status, reason };
       },
+      // Over the plan's flow allowance (decision 7a3): the list says so, and a
+      // run's start is refused with the numbers.
+      "/__fixture/over-plan": () => {
+        state.overPlan = true;
+      },
+      // Turning domain-only on refused (decision 8B), with its reason.
+      "/__fixture/domain-only-refused": () => {
+        const reason = url.searchParams.get("reason");
+        if (
+          reason !== "no_verified_domain" &&
+          reason !== "members_outside_domain"
+        ) {
+          return false;
+        }
+        const count = Number(url.searchParams.get("count") ?? "");
+        state.domainOnlyRefusal =
+          Number.isSafeInteger(count) && count > 0
+            ? { reason, count }
+            : { reason };
+      },
       // The store refuses the PUT, as it refuses one whose signature fails.
       "/__fixture/store-refusing": () => {
         state.storeRefusing = true;
@@ -1377,11 +1403,40 @@ const server = createServer(
       state.identities = state.identities.filter((entry) => entry !== provider);
       return respond(response, 200, identities());
     }
+    // The organization's settings (decision 8B): turning domain-only on is
+    // refused while a refusal is set; off always succeeds.
+    if (method === "PATCH" && pathname === `/v1/workspaces/${workspaceId}`) {
+      const body = (await requestJson(request)) as { domainOnly?: unknown };
+      if (
+        typeof body.domainOnly !== "boolean" ||
+        !request.headers["idempotency-key"]
+      ) {
+        return respond(response, 400, problem(400, "Bad Request"));
+      }
+      if (body.domainOnly && state.domainOnlyRefusal) {
+        const { reason, count } = state.domainOnlyRefusal;
+        return respond(response, 409, {
+          ...problem(409, "Conflict"),
+          details: { reason, ...(count === undefined ? {} : { count }) },
+        });
+      }
+      state.domainOnly = body.domainOnly;
+      return respond(response, 200, {
+        workspace: state.domainOnly
+          ? { ...workspace, domainOnly: true as const }
+          : workspace,
+      } satisfies Platform["WorkspaceUpdateResponse"]);
+    }
     if (method === "GET" && pathname === "/v1/workspaces") {
       state.workspaceListReads += 1;
       const workspaces =
         fixtureSession === "owner"
-          ? [workspace, personalWorkspace]
+          ? [
+              state.domainOnly
+                ? { ...workspace, domainOnly: true as const }
+                : workspace,
+              personalWorkspace,
+            ]
           : fixtureSession === "member"
             ? [memberWorkspace]
             : fixtureSession === "admin"
@@ -1964,6 +2019,7 @@ const server = createServer(
               : [],
           },
         ],
+        ...(state.overPlan ? { flowAllowance: { allowed: 2, live: 4 } } : {}),
       } satisfies AutomationOperations["listSubscriptions"]["responses"][200]["content"]["application/json"]);
     }
     if (
@@ -2335,6 +2391,17 @@ const server = createServer(
         403,
         problem(403, "Subscription cannot be created", { reason }),
       );
+    }
+    if (
+      method === "POST" &&
+      isWorkspacePath(pathname, "/runs") &&
+      state.overPlan
+    ) {
+      // Decision 7a3: no flow starts a run while the workspace is over its plan.
+      return respond(response, 403, {
+        ...problem(403, "Access is forbidden"),
+        details: { reason: "over_plan_limit", limit: 2, live: 4 },
+      });
     }
     if (method === "POST" && isWorkspacePath(pathname, "/runs")) {
       // createRun as ADR-0030 holds it: the input must be exactly the pinned

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { APPROVAL_OUTSIDE_DOMAIN, domainOnlyRefusal } from "@/lib/domain-only";
 import { PlatformServerError } from "@/lib/platform-server";
 import {
   claimOrganizationDomain,
@@ -44,6 +45,36 @@ export async function updateWorkspaceNameAction(
         error,
         "The organization name could not be updated.",
       ),
+    };
+  }
+}
+
+export type SetDomainOnlyResult = OrganizationActionResult;
+
+/**
+ * Turns the organization's domain-only setting on or off (the owner's build 13
+ * decision 8B). The platform refuses turning it on without a verified domain or
+ * with a member signing in from outside one, each said in words; turning it off
+ * always succeeds.
+ */
+export async function setDomainOnlyAction(
+  workspaceId: string,
+  domainOnly: boolean,
+): Promise<SetDomainOnlyResult> {
+  try {
+    await updateWorkspace(workspaceId, { domainOnly });
+    revalidateOrganization();
+    return { ok: true };
+  } catch (error) {
+    const refused =
+      error instanceof PlatformServerError
+        ? domainOnlyRefusal(error.status, error.details)
+        : null;
+    return {
+      ok: false,
+      error:
+        refused ??
+        organizationActionError(error, "The setting could not be saved."),
     };
   }
 }
@@ -164,6 +195,13 @@ export async function decideOrganizationJoinRequestAction(
     revalidateOrganization();
     return { ok: true };
   } catch (error) {
+    // Someone outside the verified domains, while the setting is on (8B).
+    if (
+      error instanceof PlatformServerError &&
+      error.details?.reason === "outside_org_domain"
+    ) {
+      return { ok: false, error: APPROVAL_OUTSIDE_DOMAIN };
+    }
     return {
       ok: false,
       error: organizationActionError(

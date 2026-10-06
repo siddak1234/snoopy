@@ -7,6 +7,7 @@ import {
   type LoginProvider,
 } from "@/components/auth/OAuthButtons";
 import { useAppSession } from "@/hooks/use-app-session";
+import { linkFailureHref, signInFailure } from "@/lib/auth-callback-errors";
 import { safePlatformReturnTo } from "@/lib/platform-api";
 
 export function LoginForm({
@@ -18,15 +19,21 @@ export function LoginForm({
   const searchParams = useSearchParams();
   const callbackUrl = safePlatformReturnTo(searchParams.get("callbackUrl"));
   const authCallbackError = searchParams.get("error") === "auth_callback";
+  // Why, as the platform names it (build 14, decision 10A): said in words, never raw.
+  const reason = searchParams.get("reason");
   const { data: session, status } = useAppSession({
     retryIfEmpty: authCallbackError,
   });
 
   useEffect(() => {
     if (status === "authenticated" && session?.user) {
-      window.location.replace(callbackUrl);
+      // Signed in already, a refused callback was a link: back to the linked
+      // accounts, where its reason is said, rather than on past it unsaid.
+      window.location.replace(
+        authCallbackError ? linkFailureHref(reason) : callbackUrl,
+      );
     }
-  }, [status, session?.user, callbackUrl]);
+  }, [status, session?.user, callbackUrl, authCallbackError, reason]);
 
   if (status === "loading") {
     return <div className="bubble p-6 sm:p-8">Checking authentication…</div>;
@@ -45,7 +52,7 @@ export function LoginForm({
           className="mt-5 rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--muted)]"
           role="alert"
         >
-          Sign-in did not complete. Please try your provider again.
+          {signInFailure(reason)}
         </p>
       ) : null}
 
