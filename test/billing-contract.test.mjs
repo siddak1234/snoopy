@@ -241,6 +241,11 @@ test("only the control that was pressed reports that it is opening, nothing re-e
   );
   assert.match(panel, /opening\("portal"\) \? "Opening…" : "Manage billing"/u);
   assert.match(panel, /opening\(plan\.planId\) \? "Opening…" : "Choose plan"/u);
+  // Paying, the Free card says how to reach it: cancel in the portal (build 13 decision 7c).
+  assert.match(
+    panel,
+    /To move to Free, cancel \{billing\.displayName\} in Manage billing\./u,
+  );
   // `window.location.assign` returns before the hosted page loads; the lock
   // is taken before it and never released by this page.
   assert.match(panel, /const busy = pending \|\| departing;/u);

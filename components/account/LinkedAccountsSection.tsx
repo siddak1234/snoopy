@@ -199,8 +199,10 @@ export default function LinkedAccountsSection() {
       </h2>
       <p className="mt-2 text-sm text-[var(--muted)]">
         Any account linked here signs you in to this same account, in the app
-        and on the website. Link an account before you first sign in with it.
-        Provider credentials are handled by the Autom8x backend and never
+        and on the website. Signing in with Google, Microsoft or Apple at the
+        same email address as this account joins this account too. To use one
+        with a different email address, link it before you first sign in with
+        it. Provider credentials are handled by the Autom8x backend and never
         exposed to this page.
       </p>
       {state.error ? (

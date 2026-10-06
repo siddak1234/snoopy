@@ -207,7 +207,7 @@ test("the Linked accounts lead says a linked account signs you in to this same a
     .map(([, text]) => text.trim())
     .filter((text) => text !== "Loading…");
   assert.deepEqual(leads, [
-    "Any account linked here signs you in to this same account, in the app and on the website. Link an account before you first sign in with it. Provider credentials are handled by the Autom8x backend and never exposed to this page.",
+    "Any account linked here signs you in to this same account, in the app and on the website. Signing in with Google, Microsoft or Apple at the same email address as this account joins this account too. To use one with a different email address, link it before you first sign in with it. Provider credentials are handled by the Autom8x backend and never exposed to this page.",
   ]);
   assert.doesNotMatch(
     prose,

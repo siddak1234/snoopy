@@ -2179,7 +2179,7 @@ test("Settings shows the Linked accounts lead: a linked account signs you in to 
     .getByRole("heading", { name: "Linked accounts" })
     .locator("xpath=following-sibling::p[1]");
   await expect(lead).toHaveText(
-    "Any account linked here signs you in to this same account, in the app and on the website. Link an account before you first sign in with it. Provider credentials are handled by the Autom8x backend and never exposed to this page.",
+    "Any account linked here signs you in to this same account, in the app and on the website. Signing in with Google, Microsoft or Apple at the same email address as this account joins this account too. To use one with a different email address, link it before you first sign in with it. Provider credentials are handled by the Autom8x backend and never exposed to this page.",
   );
   await expect(
     page.getByText("Link additional sign-in options to this account."),
@@ -3050,6 +3050,10 @@ test("a plan picked opens the provider's checkout for that plan; once paying, it
   await expect(pro.locator("dt")).toHaveText("Renews");
   await expect(pro.locator("dd")).toHaveText("Sep 12, 2026, 12:00 PM");
   await expect(planCard(page, "Free")).not.toContainText("Enrolled");
+  // Free is cancelling the paid plan in the portal (the owner's build 13 decision 7c).
+  await expect(planCard(page, "Free")).toContainText(
+    "To move to Free, cancel Pro in Manage billing.",
+  );
   await expectNoAxeViolations(page);
   // Changing plans is the portal's: another card, Free included, opens
   // Manage billing — never a second checkout, not even one refused.
