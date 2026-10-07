@@ -178,7 +178,13 @@ export function BillingPanel({
           {periodEnd && !accessEnded ? (
             <dl className="flex gap-1">
               <dt>{billing.cancelAtPeriodEnd ? "Ends" : "Renews"}</dt>
-              <dd className="text-[var(--text)]">{periodEnd}</dd>
+              {/* A cancelled plan says where the workspace goes after it (the
+                  owner's build 14 feedback #11, on the app: "it should be your
+                  membership will go to free"). */}
+              <dd className="text-[var(--text)]">
+                {periodEnd}
+                {billing.cancelAtPeriodEnd ? ", then Free" : null}
+              </dd>
             </dl>
           ) : null}
         </div>
@@ -228,9 +234,13 @@ export function BillingPanel({
               >
                 {opening(FREE_CARD) ? "Opening…" : "Choose plan"}
               </Button>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                To move to Free, cancel {billing.displayName} in Manage billing.
-              </p>
+              {/* Not once the plan is cancelled: the move to Free is under way. */}
+              {billing.cancelAtPeriodEnd ? null : (
+                <p className="mt-2 text-sm text-[var(--muted)]">
+                  To move to Free, cancel {billing.displayName} in Manage
+                  billing.
+                </p>
+              )}
             </>
           )}
         </PlanCard>
