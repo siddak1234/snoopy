@@ -20,7 +20,7 @@ export default function PrivacyPage() {
           Privacy Policy
         </h1>
         <p className="mt-6 max-w-[56ch] text-base leading-7 text-[color-mix(in_srgb,var(--color-text)_78%,transparent)]">
-          Effective and last updated: August 28, 2026. This policy explains what
+          Effective and last updated: October 5, 2026. This policy explains what
           information Autom8x collects, why, and what we do with it. It is
           written to be read; if anything is unclear, contact us at{" "}
           <LegalLink href={`mailto:${LEGAL_EMAIL}`}>{LEGAL_EMAIL}</LegalLink>.
@@ -73,6 +73,15 @@ export default function PrivacyPage() {
             and records what was done.
           </p>
           <p>
+            <strong>The Autom8x iPhone app.</strong> The app signs in to the
+            same account and keeps its session in your iPhone&apos;s Keychain
+            rather than in cookies. If you turn on notifications, we store your
+            device&apos;s push token so we can tell you when a run needs your
+            approval or has failed; signing out removes it. A file you give a
+            run is uploaded and stored for that run. If you turn on Face ID,
+            your iPhone checks it; we never receive it.
+          </p>
+          <p>
             <strong>Usage and log data.</strong> Standard operational logs
             (request metadata, IP addresses, timestamps, errors) used to run,
             secure, and debug the service.
@@ -97,10 +106,10 @@ export default function PrivacyPage() {
           <p>
             For sign-in, Autom8x requests only basic profile information from
             Google (name, email address, profile picture) and uses it solely to
-            create and operate your account. If, in the future, an automation
-            you enable requests access to additional Google data, that access
-            will be requested separately on Google&apos;s consent screen and
-            used only to provide the feature you enabled.
+            create and operate your account. When an automation you enable needs
+            access to additional Google data, such as sending mail from your
+            account, that access is requested separately on Google&apos;s
+            consent screen and used only to provide the feature you enabled.
           </p>
           <p>
             Autom8x&apos;s use and transfer to any other app of information
@@ -134,10 +143,12 @@ export default function PrivacyPage() {
             Only service providers that host and operate the platform for us,
             each processing data in the United States under an agreement with
             us: Supabase (authentication and database), DigitalOcean
-            (application hosting), Vercel (website hosting), Backblaze
-            (encrypted off-site backups), and Datadog (operational logs and
-            monitoring). We will update this policy before adding or replacing a
-            subprocessor category.
+            (application hosting), Vercel (website hosting), Backblaze (file
+            storage and encrypted off-site backups), Datadog (operational logs
+            and monitoring), Stripe (billing and payments), Resend (email
+            delivery), and Expo (delivering notifications to your iPhone through
+            Apple&apos;s push service). We will update this policy before adding
+            or replacing a subprocessor category.
           </p>
           <p>
             Your sign-in provider (Google, Microsoft, or Apple) and the
@@ -194,7 +205,8 @@ export default function PrivacyPage() {
           <p>
             In the preceding 12 months we collected these categories of personal
             information: identifiers (name, email address, account IDs, IP
-            address); commercial information (subscriptions and billing
+            address, and the app&apos;s push token if you turn on
+            notifications); commercial information (subscriptions and billing
             records); internet or network activity (log and usage data);
             professional information (your workspace and role); audio/visual
             information (your profile picture); and sensitive personal
