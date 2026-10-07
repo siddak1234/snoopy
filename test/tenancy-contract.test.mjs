@@ -4,6 +4,12 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import { joinLinkLine } from "../lib/join-link.ts";
+import {
+  APPROVAL_OUTSIDE_DOMAIN,
+  DOMAIN_ONLY_TITLE,
+  JOIN_OUTSIDE_DOMAIN,
+  domainOnlyRefusal,
+} from "../lib/domain-only.ts";
 
 const tenancy = readFileSync("lib/tenancy.ts", "utf8");
 const generated = readFileSync(
@@ -473,4 +479,50 @@ test("the join link's line follows the verified domain's joining policy", () => 
       "Verify your email domain first — only people at it can ask to join.",
     );
   }
+});
+
+test("Verified domains only: its refusals in words, on the published operation, and joining or approving outside it said (the owner's build 13 decision 8B)", () => {
+  assert.equal(DOMAIN_ONLY_TITLE, "Verified domains only");
+  assert.equal(
+    domainOnlyRefusal(409, { reason: "no_verified_domain" }),
+    "Verify a domain before limiting the organization to it.",
+  );
+  const outside = (who) =>
+    `${who} in with an address outside your verified domains, so this can't be turned on yet. Nobody is removed. A member who hasn't signed in since this setting arrived counts until they sign in again.`;
+  assert.equal(
+    domainOnlyRefusal(409, { reason: "members_outside_domain", count: 2 }),
+    outside("2 members sign"),
+  );
+  assert.equal(
+    domainOnlyRefusal(409, { reason: "members_outside_domain", count: 1 }),
+    outside("1 member signs"),
+  );
+  assert.equal(
+    domainOnlyRefusal(409, { reason: "members_outside_domain" }),
+    outside("Some members sign"),
+  );
+  // Only the 409's two reasons; anything else is the caller's to word.
+  assert.equal(domainOnlyRefusal(403, { reason: "no_verified_domain" }), null);
+  assert.equal(domainOnlyRefusal(409, { reason: "other" }), null);
+
+  const actions = readFileSync("app/account/organization/actions.ts", "utf8");
+  assert.match(
+    actions,
+    /export async function setDomainOnlyAction\([\s\S]*?updateWorkspace\(workspaceId, \{ domainOnly \}\)/u,
+  );
+  assert.match(actions, /domainOnlyRefusal\(error\.status, error\.details\)/u);
+  assert.match(
+    actions,
+    /error\.details\?\.reason === "outside_org_domain"[\s\S]*?APPROVAL_OUTSIDE_DOMAIN/u,
+  );
+  const onboarding = readFileSync("app/onboarding/actions.ts", "utf8");
+  assert.match(
+    onboarding,
+    /error\.details\?\.reason === "outside_org_domain"[\s\S]*?JOIN_OUTSIDE_DOMAIN/u,
+  );
+  assert.ok(
+    JOIN_OUTSIDE_DOMAIN.length > 0 && APPROVAL_OUTSIDE_DOMAIN.length > 0,
+  );
+  const page = readFileSync("app/account/organization/page.tsx", "utf8");
+  assert.match(page, /initialOn=\{workspace\.domainOnly === true\}/u);
 });

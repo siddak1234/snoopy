@@ -3,6 +3,11 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
 import { heldCopy } from "../lib/held-flow.ts";
+import {
+  flowsOverPlan,
+  overPlanRefusal,
+  overPlanSentence,
+} from "../lib/plan-limit.ts";
 
 /**
  * The website's automation types match the backend's specification.
@@ -945,4 +950,55 @@ test("archived flows are read by name, and only rows that are archived are kept 
   assert.match(page, /listArchivedSubscriptions\(workspaceId\)/u);
   assert.match(page, />\s*Archived flows\s*</u);
   assert.match(page, /Archived \{formatDay\(subscription\.updatedAt\)\}/u);
+});
+
+test("over the plan's flow allowance, a run's start and the Flows page say so in the app's words (the owner's build 13 decision 7a3)", () => {
+  assert.equal(
+    overPlanSentence(2, 4),
+    "Your plan allows 2 flows; this workspace has 4. No flow can start a run until you archive 2. Paused and draft flows count.",
+  );
+  assert.equal(
+    overPlanSentence(1, 2),
+    "Your plan allows 1 flow; this workspace has 2. No flow can start a run until you archive 1. Paused and draft flows count.",
+  );
+  // Over only when a ceiling is known and passed: within it, unlimited and unknown are not.
+  assert.deepEqual(flowsOverPlan({ allowed: 2, live: 4 }), {
+    allowed: 2,
+    live: 4,
+  });
+  assert.equal(flowsOverPlan({ allowed: 2, live: 2 }), null);
+  assert.equal(flowsOverPlan({ allowed: null, live: 40 }), null);
+  assert.equal(flowsOverPlan(undefined), null);
+  // The refusal's numbers when usable, never a made-up count.
+  assert.equal(
+    overPlanRefusal({ reason: "over_plan_limit", limit: 2, live: 4 }),
+    overPlanSentence(2, 4),
+  );
+  for (const details of [
+    { reason: "over_plan_limit" },
+    { reason: "over_plan_limit", limit: "2", live: 4 },
+    { reason: "over_plan_limit", limit: 4, live: 4 },
+  ]) {
+    assert.equal(
+      overPlanRefusal(details),
+      "This workspace has reached its current plan limit.",
+    );
+  }
+  // Wired: a run's 403 through the subscribe path's two reasons, and the list's allowance.
+  const actions = readFileSync("app/account/flows/actions.ts", "utf8");
+  const start = actions.slice(
+    actions.indexOf("export async function startRun"),
+  );
+  assert.match(
+    start,
+    /subscriptionEntitlementState\(\s*error\.status,\s*error\.details,?\s*\)/u,
+  );
+  assert.match(start, /error: overPlanRefusal\(error\.details\)/u);
+  assert.match(
+    start,
+    /"Runs are unavailable while billing entitlements are not configured\."/u,
+  );
+  const page = readFileSync("app/account/flows/page.tsx", "utf8");
+  assert.match(page, /flowsOverPlan\(subscriptions\.flowAllowance\)/u);
+  assert.match(page, /overPlanSentence\(overPlan\.allowed, overPlan\.live\)/u);
 });

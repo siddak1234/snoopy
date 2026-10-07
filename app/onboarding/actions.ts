@@ -9,6 +9,7 @@ import {
   createWorkspace,
   requestOrganizationJoin,
 } from "@/lib/tenancy";
+import { JOIN_OUTSIDE_DOMAIN } from "@/lib/domain-only";
 
 function platformMessage(error: unknown, fallback: string): string {
   return error instanceof PlatformServerError ? error.message : fallback;
@@ -102,6 +103,13 @@ export async function joinOrgWorkspaceAction(
       ...(result.request ? { requestId: result.request.id } : {}),
     };
   } catch (error) {
+    // An organization that admits only its verified domains (decision 8B).
+    if (
+      error instanceof PlatformServerError &&
+      error.details?.reason === "outside_org_domain"
+    ) {
+      return { ok: false, error: JOIN_OUTSIDE_DOMAIN };
+    }
     return {
       ok: false,
       error: platformMessage(error, "The organization could not be joined."),

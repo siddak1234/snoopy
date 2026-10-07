@@ -4,6 +4,11 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import { toAppSession } from "../lib/session-contract.ts";
+import {
+  linkFailure,
+  linkFailureHref,
+  signInFailure,
+} from "../lib/auth-callback-errors.ts";
 
 const userId = "8e126f3c-b18a-4b12-a581-4836757c1709";
 const workspaceId = "1b338fcf-1d89-4b56-8bac-7e0983fddfd0";
@@ -207,7 +212,7 @@ test("the Linked accounts lead says a linked account signs you in to this same a
     .map(([, text]) => text.trim())
     .filter((text) => text !== "Loading…");
   assert.deepEqual(leads, [
-    "Any account linked here signs you in to this same account, in the app and on the website. Link an account before you first sign in with it. Provider credentials are handled by the Autom8x backend and never exposed to this page.",
+    "Any account linked here signs you in to this same account, in the app and on the website. Signing in with Google, Microsoft or Apple at the same email address as this account joins this account too. To use one with a different email address, link it before you first sign in with it. Provider credentials are handled by the Autom8x backend and never exposed to this page.",
   ]);
   assert.doesNotMatch(
     prose,
@@ -298,4 +303,54 @@ test("a server read takes the request's cookies before the origin, so no page is
     cookiesAt < originAt,
     "with no backend, a platform read before the cookies fails the build",
   );
+});
+
+test("a refused sign-in or link says why, one sentence per reason and nothing raw; signed in, a refused callback goes back to the linked accounts (the owner's build 13 decision 10A, TestFlight #19)", () => {
+  assert.equal(signInFailure("signup_disabled"), "New sign-ups are closed.");
+  assert.equal(signInFailure("access_denied"), "Sign-in was declined.");
+  for (const unknown of [null, "provider_refused", "constructor", "<b>x</b>"]) {
+    assert.equal(
+      signInFailure(unknown),
+      "Sign-in did not complete. Please try your provider again.",
+    );
+  }
+  assert.equal(
+    linkFailure("identity_already_linked"),
+    "That account is already linked, to this account or another. To link it here, unlink it from the other account first.",
+  );
+  assert.equal(
+    linkFailure("outside_org_domain"),
+    "That account wasn't linked: its address is outside your organization's verified domains.",
+  );
+  assert.equal(linkFailure("access_denied"), "Linking was declined.");
+  for (const unknown of [null, "exchange_failed", "__proto__", "constructor"]) {
+    assert.equal(
+      linkFailure(unknown),
+      "The account could not be linked. Try again.",
+    );
+  }
+  assert.equal(
+    linkFailureHref("identity_already_linked"),
+    "/account/settings?link_error=identity_already_linked",
+  );
+  // Only a well-formed token travels.
+  for (const crafted of [null, "<b>x</b>", "a".repeat(65), "Upper"]) {
+    assert.equal(
+      linkFailureHref(crafted),
+      "/account/settings?link_error=exchange_failed",
+    );
+  }
+  const login = readFileSync("app/(auth)/login/LoginForm.tsx", "utf8");
+  assert.match(
+    login,
+    /authCallbackError \? linkFailureHref\(reason\) : callbackUrl/u,
+  );
+  assert.match(login, /\{signInFailure\(reason\)\}/u);
+  const linked = readFileSync(
+    "components/account/LinkedAccountsSection.tsx",
+    "utf8",
+  );
+  assert.match(linked, /searchParams\.get\("link_error"\)/u);
+  assert.match(linked, /searchParams\.delete\("link_error"\)/u);
+  assert.match(linked, /linkFailure\(reason\)/u);
 });
