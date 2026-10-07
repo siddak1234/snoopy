@@ -1808,6 +1808,65 @@ test("domain discovery creates an approval request without an invite flow", asyn
   ).toHaveCount(0);
 });
 
+test("a domain claim refused after its organization was made keeps the organization: pressed again, setup claims again on it, with the same claim key, and makes no second organization (backend §12.1 #186)", async ({
+  page,
+}) => {
+  await presentSession(page, "requester");
+  await fixtureControl("domain-claim-refused-once");
+  await page.goto("/onboarding/setup-org");
+  const form = page.locator("form");
+  await form.getByLabel("Organization name").fill("Requester Co");
+  await form.getByRole("button", { name: "Create organization" }).click();
+  await expect(form.getByRole("alert")).toHaveText(busy);
+  // The organization is made, and named: only its claim is left to ask.
+  await expect(form.getByLabel("Organization name")).toBeDisabled();
+  await form.getByRole("button", { name: "Claim example.test again" }).click();
+  // In the organization made, active and theirs: its page is offered.
+  await expect(page).toHaveURL(/\/account$/);
+  await expect(
+    page
+      .getByRole("complementary", { name: "Dashboard navigation" })
+      .getByRole("link", { name: "Organization" }),
+  ).toBeVisible();
+  const { createdOrganizations, organizationsAskedFor, domainClaims } =
+    await fixtureRead<{
+      createdOrganizations: {
+        id: string;
+        name: string;
+        idempotencyKey: string;
+      }[];
+      organizationsAskedFor: number;
+      domainClaims: {
+        workspaceId: string;
+        domain: string;
+        joinPolicy: string;
+        idempotencyKey: string;
+        status: number;
+      }[];
+    }>("counts");
+  // One organization, asked for once: the press after the refusal asked only
+  // for the claim — not even a replay of the create.
+  expect(createdOrganizations).toEqual([
+    {
+      id: expect.any(String),
+      name: "Requester Co",
+      idempotencyKey: expect.stringMatching(/^workspace-create-/u),
+    },
+  ]);
+  expect(organizationsAskedFor).toBe(1);
+  const claim = {
+    workspaceId: createdOrganizations[0]!.id,
+    domain: "example.test",
+    joinPolicy: "approval",
+    idempotencyKey: domainClaims[0]?.idempotencyKey,
+  };
+  expect(claim.idempotencyKey).toMatch(/^domain-claim-/u);
+  expect(domainClaims).toEqual([
+    { ...claim, status: 429 },
+    { ...claim, status: 200 },
+  ]);
+});
+
 test("organization request controls use the public join-request operation without invite links", async ({
   page,
 }) => {
