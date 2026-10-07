@@ -375,6 +375,9 @@ function AutomationCard({
                 name={automation.name}
                 from={subscription.templateVersion}
                 to={automation.version}
+                config={subscription.config}
+                // Move goes only to the catalog's newest, so its fields are the target's.
+                targetSetup={automation.setup}
                 focusAfter={`automation-${automation.templateId}-name`}
               />
             </div>
@@ -396,7 +399,9 @@ function AutomationCard({
             workspaceId={workspaceId}
             name={automation.name}
             available={automation.available}
-            setup={automation.setup}
+            // The settings of the version it RUNS, which the platform checks a
+            // save against — not the catalog's newest (backend §12.1 #185).
+            setup={subscription.setup ?? []}
             subscription={{
               id: subscription.id,
               status: subscription.status,
