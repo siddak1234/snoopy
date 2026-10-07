@@ -214,17 +214,24 @@ export function BillingPanel({
           {onFree ? (
             enrolled(false)
           ) : (
-            // Back to Free is a cancellation: the portal's.
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={busy}
-              onClick={() =>
-                navigate(FREE_CARD, () => openBillingPortal(workspaceId))
-              }
-            >
-              {opening(FREE_CARD) ? "Opening…" : "Choose plan"}
-            </Button>
+            // Back to Free is a cancellation: the portal's. Free is not a
+            // provider price, so the portal cannot list it — said here (the
+            // owner's build 13 decision 7c).
+            <>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={busy}
+                onClick={() =>
+                  navigate(FREE_CARD, () => openBillingPortal(workspaceId))
+                }
+              >
+                {opening(FREE_CARD) ? "Opening…" : "Choose plan"}
+              </Button>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                To move to Free, cancel {billing.displayName} in Manage billing.
+              </p>
+            </>
           )}
         </PlanCard>
         {[...plans]

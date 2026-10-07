@@ -15,6 +15,7 @@ import {
   type UpdateSubscriptionRequest,
 } from "@/lib/automations";
 import { heldCopy } from "@/lib/held-flow";
+import { overPlanRefusal } from "@/lib/plan-limit";
 import { subscriptionEntitlementState } from "@/lib/subscription-entitlements";
 import { activeWorkspaceIfShown, WORKSPACE_CHANGED } from "@/lib/tenancy";
 
@@ -252,6 +253,28 @@ export async function startRun(formData: FormData): Promise<ActionResult> {
       return {
         ok: false,
         error: "This flow is not live, so it cannot run.",
+      };
+    }
+    // Over the plan (the owner's build 13 decision 7a3): no flow starts a run
+    // until the workspace archives down. The same two reasons as the subscribe
+    // path's, and only on a 403; every other 403 is authorization.
+    const entitlement = subscriptionEntitlementState(
+      error.status,
+      error.details,
+    );
+    if (entitlement === "plan-limit") {
+      return {
+        ok: false,
+        error: overPlanRefusal(error.details),
+        state: "plan-limit",
+      };
+    }
+    if (entitlement === "entitlements-unavailable") {
+      return {
+        ok: false,
+        error:
+          "Runs are unavailable while billing entitlements are not configured.",
+        state: "entitlements-unavailable",
       };
     }
     return { ok: false, error: error.message };

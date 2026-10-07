@@ -14,6 +14,7 @@ import {
   sessionEnded,
 } from "@/lib/platform-api";
 import type { operations } from "@/lib/generated/platform-contracts/platform";
+import { linkFailure } from "@/lib/auth-callback-errors";
 
 type IdentityResponse =
   operations["listLoginIdentities"]["responses"][200]["content"]["application/json"];
@@ -133,6 +134,20 @@ export default function LinkedAccountsSection() {
     return () => clearTimeout(loadTimer);
   }, [loadIdentities]);
 
+  // A link the platform refused comes back here from the login page with its
+  // reason (build 14, decision 10A): said once, in words, and taken off the
+  // address so a reload does not say it again.
+  const [linkError, setLinkError] = useState<string | null>(null);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const reason = url.searchParams.get("link_error");
+    if (reason === null) return;
+    url.searchParams.delete("link_error");
+    window.history.replaceState(null, "", url.toString());
+    const shown = setTimeout(() => setLinkError(linkFailure(reason)), 0);
+    return () => clearTimeout(shown);
+  }, []);
+
   function handleLink(provider: ProviderId) {
     setState((current) => ({
       ...current,
@@ -199,10 +214,13 @@ export default function LinkedAccountsSection() {
       </h2>
       <p className="mt-2 text-sm text-[var(--muted)]">
         Any account linked here signs you in to this same account, in the app
-        and on the website. Link an account before you first sign in with it.
-        Provider credentials are handled by the Autom8x backend and never
+        and on the website. Signing in with Google, Microsoft or Apple at the
+        same email address as this account joins this account too. To use one
+        with a different email address, link it before you first sign in with
+        it. Provider credentials are handled by the Autom8x backend and never
         exposed to this page.
       </p>
+      <FormError message={linkError} className="mt-2" />
       {state.error ? (
         <FormError message={state.error} className="mt-2" />
       ) : null}
