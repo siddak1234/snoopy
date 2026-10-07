@@ -83,6 +83,22 @@ const nextConfig: NextConfig = {
         destination: "/account/teams/:id",
         permanent: true,
       },
+      // 2026-10 the owner's build 14 feedback #6: the platform's notification
+      // emails link to `/runs/<id>` and `/approvals/<id>` on this origin
+      // (`PRODUCT_ORIGIN`, backend `apps/runs/src/notifications.ts`), which no
+      // page here served — every mailed link answered 404. A run's page and the
+      // decisions waiting are in the account area; an email already sent lands
+      // there too.
+      {
+        source: "/runs/:runId",
+        destination: "/account/runs/:runId",
+        permanent: false,
+      },
+      {
+        source: "/approvals/:approvalId",
+        destination: "/account/approvals",
+        permanent: false,
+      },
     ];
   },
 };

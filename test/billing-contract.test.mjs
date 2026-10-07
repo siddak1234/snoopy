@@ -242,9 +242,20 @@ test("only the control that was pressed reports that it is opening, nothing re-e
   assert.match(panel, /opening\("portal"\) \? "Opening…" : "Manage billing"/u);
   assert.match(panel, /opening\(plan\.planId\) \? "Opening…" : "Choose plan"/u);
   // Paying, the Free card says how to reach it: cancel in the portal (build 13 decision 7c).
+  // Wrapped where Prettier wraps it; read as one sentence.
   assert.match(
     panel,
-    /To move to Free, cancel \{billing\.displayName\} in Manage billing\./u,
+    /To move to Free, cancel \{billing\.displayName\} in Manage\s+billing\./u,
+  );
+  // Not once the plan is cancelled, and the cancelled plan says Free comes next
+  // (the owner's build 14 feedback #11).
+  assert.match(
+    panel,
+    /\{billing\.cancelAtPeriodEnd \? null : \(\s*<p[^>]*>\s*To move to Free/u,
+  );
+  assert.match(
+    panel,
+    /\{billing\.cancelAtPeriodEnd \? ", then Free" : null\}/u,
   );
   // `window.location.assign` returns before the hosted page loads; the lock
   // is taken before it and never released by this page.

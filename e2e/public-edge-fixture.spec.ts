@@ -3159,6 +3159,32 @@ test("a plan picked opens the provider's checkout for that plan; once paying, it
   await expect(page).toHaveURL(/\/account\/billing$/);
 });
 
+test("a cancelled plan says it ends, then Free, and the Free card no longer says to cancel it (the owner's build 14 feedback #11)", async ({
+  page,
+  context,
+}) => {
+  await stubHostedPages(context);
+  await page.goto("/account/billing");
+  await planCard(page, "Pro")
+    .getByRole("button", { name: "Choose plan" })
+    .click();
+  await page.waitForURL(/billing\.invalid\/checkout\//);
+  await fixtureControl("billing-cancelled");
+  await page.goto("/account/billing");
+  const pro = planCard(page, "Pro");
+  await expect(pro).toContainText("Enrolled");
+  await expect(pro.locator("dt")).toHaveText("Ends");
+  await expect(pro.locator("dd")).toHaveText(
+    "Sep 12, 2026, 12:00 PM, then Free",
+  );
+  await expect(planCard(page, "Free")).not.toContainText("To move to Free");
+  // Manage billing stays: a cancellation is undone in the portal.
+  await expect(
+    pro.getByRole("button", { name: "Manage billing" }),
+  ).toBeVisible();
+  await expectNoAxeViolations(page);
+});
+
 test("a checkout for a workspace that already has a plan opens Manage billing instead — the platform refuses a second subscription (backend 24.12, build 10)", async ({
   page,
   context,
