@@ -198,6 +198,91 @@ test("Replace account is confirmed first, names the connection it replaces, and 
   await page.waitForURL(/^https:\/\/oauth\.invalid\/authorize/);
 });
 
+// The page a connect returns to carries only `status`; whether "your existing
+// connection is still active" is true depends on the provider the connect left
+// for, which this tab remembers (register F100). The fixture starts with its
+// OAuth provider connected and its key provider not.
+const stillActive =
+  "The new authorization didn't complete, so nothing changed — your existing connection is still active. Try again or contact an owner.";
+const notCompleted =
+  "The connection could not be completed. Try again or contact an owner.";
+const pendingConnectKey = "autom8x.connections.pending";
+
+test("an unfinished connect says the connection is still active only when the provider it left for has one (register F100)", async ({
+  page,
+}) => {
+  const banner = page
+    .getByRole("alert")
+    .filter({ hasText: "Try again or contact an owner." });
+  const returnFor = async (providerId: string | null) => {
+    await page.evaluate(
+      ({ key, value }) =>
+        value === null
+          ? sessionStorage.removeItem(key)
+          : sessionStorage.setItem(key, value),
+      { key: pendingConnectKey, value: providerId },
+    );
+    await page.goto("/account/connections?status=error");
+  };
+  await page.goto("/account/connections");
+  // Left for the provider that is connected: it still is.
+  await returnFor("fixture-oauth");
+  await expect(banner).toHaveText(stillActive);
+  // Left for one with no connection, while another provider is connected —
+  // the case the page used to answer "still active".
+  await returnFor("fixture-key");
+  await expect(banner).toHaveText(notCompleted);
+  // Nothing remembered (another tab, storage refused): only what is certain.
+  await returnFor(null);
+  await expect(banner).toHaveText(notCompleted);
+});
+
+test("Replace and Reconnect remember the provider before they leave for its consent (register F100)", async ({
+  page,
+}) => {
+  await page.route("https://oauth.invalid/**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: "<h1>consent</h1>",
+    }),
+  );
+  const banner = page
+    .getByRole("alert")
+    .filter({ hasText: "Try again or contact an owner." });
+  // Replace keeps the account it replaces until the new sign-in completes, so
+  // an unfinished replace leaves that connection active.
+  await page.goto("/account/connections");
+  await page.getByRole("button", { name: "Replace account" }).click();
+  await page
+    .getByRole("dialog", { name: "Replace Fixture OAuth account?" })
+    .getByRole("button", { name: "Replace account" })
+    .click();
+  await page.waitForURL(/^https:\/\/oauth\.invalid\/authorize/);
+  await page.goto("/account/connections?status=error");
+  await expect(banner).toHaveText(stillActive);
+  // Reconnect on a connection that needs reauthorization: remembered too, and
+  // that connection is not active, so the page does not say it is.
+  await page.evaluate(
+    (key) => sessionStorage.removeItem(key),
+    pendingConnectKey,
+  );
+  await fixtureControl("oauth-connection-broken");
+  await page.goto("/account/connections");
+  await providerCard(page, "Fixture OAuth provider")
+    .getByRole("button", { name: "Reconnect" })
+    .click();
+  await page.waitForURL(/^https:\/\/oauth\.invalid\/authorize/);
+  await page.goto("/account/connections?status=error");
+  await expect(banner).toHaveText(notCompleted);
+  expect(
+    await page.evaluate(
+      (key) => sessionStorage.getItem(key),
+      pendingConnectKey,
+    ),
+  ).toBe("fixture-oauth");
+});
+
 test("a replacement named after the connection changed is refused as stale, and nothing is replaced", async ({
   page,
 }) => {

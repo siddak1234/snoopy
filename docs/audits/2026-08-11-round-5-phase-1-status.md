@@ -2258,4 +2258,32 @@ and all 15 went red.
   (`snoopy-backend/apps/access/src/postgres-tenancy.ts`). The button can only fail; the person
   has a personal workspace already.
 
-F99 is the last number.
+F99 was the last number.
+
+### The page a connect returns to speaks for that connect's provider — 2026-10-07
+
+Found by the app's Gate 24 parity work (`snoopy-mobile` #49), which says it for the provider it
+asked for, and read here at `309717b`.
+
+- **F100** (new): a connect that came back without the connection told a person "your existing
+  connection is still active" whenever ANY provider in the workspace was connected
+  (`ConnectionsPanel.tsx`, `hasConnected`), because the callback carries only `status`
+  (`app/connections/page.tsx`). A first connect of one provider that did not finish, with another
+  provider connected, said the person's existing connection still worked — a connection they
+  never had. Now Connect, Reconnect and Replace remember the provider they leave for in this
+  tab's `sessionStorage` (a provider id, never a credential), and the page says "still active"
+  only when that provider has a live connection; with nothing remembered — another tab, storage
+  refused — it says only that the connection could not be completed, which is always true. The
+  banner is read in the browser only (`useSyncExternalStore`, as `ThemeToggle` reads its
+  storage), so it is drawn once in its final words rather than changed on hydration. Two
+  browser tests in `e2e/public-edge-fixture.spec.ts`.
+
+Proved red by hand, the file restored from a kept copy each time:
+
+| Guard | Broken by |
+| --- | --- |
+| Still active only for the provider the connect left for | `stillActive` back to "some provider is connected" |
+| Replace remembers its provider | `rememberPendingConnect` removed from `confirmReplace` |
+| Connect and Reconnect remember theirs | `rememberPendingConnect` removed from `connect` |
+
+F100 is the last number.
