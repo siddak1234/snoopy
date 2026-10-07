@@ -110,10 +110,15 @@ test("generated automation contract is present and used by the facade", () => {
   }
 });
 
-test("the setup UI is generated from the catalog metadata", () => {
+test("the setup UI is generated from the pinned version's metadata (backend §12.1 #185)", () => {
   // One renderer for both manifest declarations — setup and run input (backend
-  // ADR-0030) — in ManifestFields.tsx; the card only chooses which to show.
-  assert.match(page, /setup=\{automation\.setup\}/);
+  // ADR-0030) — in ManifestFields.tsx; the card only chooses which to show. The
+  // fields are the version the subscription PINS, which the platform checks a
+  // save against, not the catalog's newest (§12.1 #185) — and the move dialog
+  // draws the newest's, which is where a move goes.
+  assert.match(page, /setup=\{subscription\.setup \?\? \[\]\}/);
+  assert.doesNotMatch(page, /setup=\{automation\.setup\}/);
+  assert.match(page, /targetSetup=\{automation\.setup\}/);
   assert.doesNotMatch(actionsUi, /SETUP_SECTIONS/);
   assert.match(actionsUi, /<SetupFields setup=\{setup\}/);
   assert.match(fields, /for \(const field of setup\)/);

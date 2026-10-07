@@ -510,6 +510,19 @@ const webhookAutomation = {
   ...automation("fixture-webhook", "Webhook automation"),
   version: 2,
   subscribed: true,
+  // v2 adds a setting v1 does not declare (backend §12.1 #185): the card draws
+  // the pinned version's, so it offers no Set up until the flow is on v2.
+  setup: [
+    {
+      section: "rules",
+      key: "toleranceSeconds",
+      title: "Signature tolerance",
+      description: "How old a signed event may be, in seconds.",
+      control: "money",
+      defaultValue: 300,
+      required: true,
+    },
+  ],
 } satisfies Automations["AutomationCatalogEntry"];
 
 const webhookSubscriptionId = "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd";
@@ -524,6 +537,8 @@ function webhookSubscription(): Automations["Subscription"] {
     templateVersion: state.webhookVersion,
     triggerKind: "webhook",
     runInput: undefined,
+    // The pinned version's settings (backend §12.1 #185): v1 declares none.
+    setup: state.webhookVersion === 2 ? webhookAutomation.setup : undefined,
   };
 }
 
@@ -560,6 +575,8 @@ const manualSubscription = {
   config: {},
   unmetConnections: [],
   triggerKind: "manual",
+  // Pinned at the catalog's v1, so its settings are that entry's (backend §12.1 #185).
+  setup: manualAutomation.setup,
   // The shipped invoice-check v4's declaration (backend ADR-0030): three typed
   // fields its container requires, and a file it reads when given one — which
   // the website uploads when a person chooses one (backend FR-14).
@@ -2266,13 +2283,33 @@ const server = createServer(
       method === "PATCH" &&
       isWorkspacePath(pathname, `/subscriptions/${webhookSubscriptionId}`)
     ) {
-      const body = (await requestJson(request)) as { templateVersion?: number };
+      const body = (await requestJson(request)) as {
+        templateVersion?: number;
+        config?: Json;
+      };
       if (body.templateVersion !== 2 || !request.headers["idempotency-key"]) {
         return respond(
           response,
           422,
           problem(422, "Undeclared fixture subscription update"),
         );
+      }
+      // The move with v2's settings, in one change (backend §12.1 #185): held to
+      // v2's one field, as the platform holds the pair to the version it moves to.
+      if (body.config !== undefined) {
+        const config = body.config as Record<string, unknown> | null;
+        if (
+          !config ||
+          Object.keys(config).join() !== "toleranceSeconds" ||
+          typeof config.toleranceSeconds !== "number"
+        ) {
+          return respond(response, 422, refusal(422, "invalid_config"));
+        }
+        state.webhookVersion = 2;
+        state.moveRefusal = null;
+        return respond(response, 200, {
+          subscription: { ...webhookSubscription(), config: config as Json },
+        } satisfies AutomationOperations["updateSubscription"]["responses"][200]["content"]["application/json"]);
       }
       if (state.approvalPendingOnMove) {
         return respond(response, 409, {

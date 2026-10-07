@@ -614,11 +614,6 @@ test("each refusal of a move the platform names is said in its words, one it doe
     [409, "subscription_archived", "An archived flow cannot move."],
     [
       422,
-      "invalid_config",
-      "Its settings do not fit that version. Open Set up, fix them, then move.",
-    ],
-    [
-      422,
       "unmet_connections",
       "That version needs an account this workspace has not connected. Connect it first, or pause the flow and move.",
     ],
@@ -638,6 +633,37 @@ test("each refusal of a move the platform names is said in its words, one it doe
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await page.reload();
   await expect(card).toContainText("This runs v1; v2 is available.");
+});
+
+test("a move whose settings do not fit is answered with the new version's settings, saved with the move in one change (backend §12.1 #185)", async ({
+  page,
+}) => {
+  await page.goto("/account/flows");
+  const card = automationCard(page, "Webhook automation");
+  // Set up draws the version the flow runs: v1 declares no setting, though the
+  // catalog's v2 does, so there is nothing to set up yet.
+  await expect(card.getByRole("button", { name: "Set up" })).toHaveCount(0);
+
+  await fixtureControl("move-refused?status=422&reason=invalid_config");
+  await card.getByRole("button", { name: "Move to v2" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Move Webhook automation to v2?",
+  });
+  await dialog.getByRole("button", { name: "Move to v2" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Its settings do not fit that version. Set them for it to move.",
+  );
+  await dialog.getByRole("button", { name: "Set them for v2" }).click();
+
+  const settings = page.getByRole("dialog", { name: "Settings for v2" });
+  const tolerance = settings.getByLabel("Signature tolerance");
+  await expect(tolerance).toBeVisible();
+  await tolerance.fill("120");
+  await settings.getByRole("button", { name: "Save and move to v2" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // Moved: no newer version to offer, and v2's setting is the flow's to set up.
+  await expect(card).not.toContainText("v2 is available");
+  await expect(card.getByRole("button", { name: "Set up" })).toBeVisible();
 });
 
 test("a move's dialog cannot be dismissed while the platform decides, so its refusal is not lost (backend §12.1 #126)", async ({
