@@ -220,15 +220,21 @@ export async function listJoinRequests(
   });
 }
 
+/**
+ * The key is the caller's where a retry must reuse it — the setup form's, so a
+ * press after a lost answer makes no second organization (backend §12.1 #186)
+ * — and one per call otherwise.
+ */
 export async function createWorkspace(
   input: Schema["CreateWorkspaceRequest"],
+  idempotencyKey = newIdempotencyKey("workspace-create"),
 ): Promise<Schema["WorkspaceMutationResponse"]> {
   return platformServerJson<Schema["WorkspaceMutationResponse"]>(
     "/v1/workspaces",
     {
       method: "POST",
       body: JSON.stringify(input),
-      idempotencyKey: newIdempotencyKey("workspace-create"),
+      idempotencyKey,
     },
   );
 }
@@ -345,16 +351,18 @@ export async function requestOrganizationJoin(
   );
 }
 
+/** The key is the caller's where a retry must reuse it, as `createWorkspace`'s. */
 export async function claimOrganizationDomain(
   workspaceId: string,
   input: Schema["ClaimOrganizationDomainRequest"],
+  idempotencyKey = newIdempotencyKey("domain-claim"),
 ): Promise<Schema["OrganizationDomainClaimResponse"]> {
   return platformServerJson<Schema["OrganizationDomainClaimResponse"]>(
     `${workspacePath(workspaceId)}/domains`,
     {
       method: "POST",
       body: JSON.stringify(input),
-      idempotencyKey: newIdempotencyKey("domain-claim"),
+      idempotencyKey,
     },
   );
 }

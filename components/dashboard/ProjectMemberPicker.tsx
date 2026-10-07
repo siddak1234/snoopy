@@ -80,6 +80,9 @@ export function ProjectMemberPicker({
           ariaLabelledBy="member-picker-title"
           bubble
           zIndex={100}
+          // Held open while someone is being added, and Done waits too:
+          // closed meanwhile, a refusal was said nowhere (register F97).
+          dismissible={!addingUserId}
         >
           <h3
             id="member-picker-title"
@@ -152,6 +155,7 @@ export function ProjectMemberPicker({
             <button
               type="button"
               onClick={() => setOpen(false)}
+              disabled={!!addingUserId}
               className="btn-secondary inline-flex px-5"
             >
               Done

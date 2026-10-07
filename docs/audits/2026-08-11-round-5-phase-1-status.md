@@ -1259,8 +1259,11 @@ F69 to F77 are new, and no number is reused.
 - 51 dialog behaviours no test holds: Escape, the backdrop and focus return across the 15
   dialogs; the hold on Cancel run, Delete account, the organization's Remove member, Replace
   account and a team's access; the Escape-at-re-enable case on every dialog that holds but
-  Move. The organization's Remove member, Leave project and Add team members were never
-  opened by a test. The audit's sketch of each is its verdict's `required_tests`.
+  Move. The organization's Remove member, ~~Leave project~~ and Add team members were never
+  opened by a test. The audit's sketch of each is its verdict's `required_tests`. _Corrected
+  2026-10-07: F75's and F76's tests, added in this same close, open Leave project. Every one
+  of these behaviours is held since, by `e2e/dialogs.spec.ts` (§ "The backlog before Round
+  17", below)._
 - Create project and Add team members do not hold while their request is on its way, as F76
   did not (read in the code, not probed).
 - The audit also measured that `a06d43e` closes the Escape-at-re-enable gap on all 8 dialogs
@@ -2172,3 +2175,87 @@ after), `tsc --noEmit` alone red:
 | Every refusal carries a request id | `requestId` dropped from `problem()` |
 
 F95 is the last number.
+
+### The backlog before Round 17 — a setup retry keeps its organization, and every dialog is held — 2026-10-07
+
+Two items of the owner's backlog before Round 17: backend §12.1 #186's website half, and the
+dialog tests Round 15's close filed (above).
+
+- **Backend §12.1 #186**: a retry after a refused domain claim made a second organization.
+  `createOrgWorkspaceAction` (`app/onboarding/actions.ts`) makes the organization, active, then
+  claims the email's domain on it. `createWorkspace` (`lib/tenancy.ts`) minted a new idempotency
+  key on every call, and the form (`app/onboarding/setup-org/SetupOrgForm.tsx`, on Settings too)
+  kept nothing between presses — so Create, pressed again after the claim was refused, made
+  another organization and made it active, the first left behind. The form now keeps the
+  organization it made, as the app's does: its name is set, the button reads "Claim
+  example.test again", and the retry names that organization, so only the claim is asked again.
+  Both idempotency keys come from the form, one per intent, made at the first press and kept for
+  every press after it — a new name makes a new create — and the action checks them as the Run
+  form's key is checked, so a press after a lost answer is answered with what was already made.
+  `createWorkspace` and `claimOrganizationDomain` take the caller's key, and still mint one for
+  every other caller. The organization the retry names is checked by the platform, which claims
+  only on an organization the person owns or administers. The fixture Edge answers both
+  operations for the requester as the platform publishes them — the organization theirs, active
+  and listed from then on; a key used again replayed, and with other input 409; the claim
+  pending, its challenge only in the answer that made it — and `domain-claim-refused-once`
+  refuses the next claim, busy (429). Held by "a domain claim refused after its organization was
+  made keeps the organization …" — one organization, asked for once, and two claims on it with
+  one key, 429 then 200 — and the tenancy test "setup's keys are the form's …". The join-link
+  half of #186 is `components/dashboard/OrgJoinLink.tsx` (#27).
+- **F96** (new): Create a team closed on Escape or a click outside while its team was being
+  made, and its answer — the team made, or a refusal — was said nowhere (filed at Round 15's
+  close, read in the code). It holds now, as Move does.
+- **F97** (new): Add members closed the same way while someone was being added, and Done closed
+  it too. It holds, Done disabled meanwhile.
+- **Every dialog, held.** `e2e/dialogs.spec.ts` holds each dialog `components/ui/Modal.tsx`
+  serves — the 15 `<Modal`s in `app/` and `components/` — one row each: its name, its page and
+  person, its opener and, for one that sends, the request held in flight, what its button says
+  meanwhile, its own way out and its answer.
+  - Escape closes it while it sends nothing, and focus goes back to its opener: 15. Focus is put
+    inside the dialog first (Tab), so focus on the opener afterwards is the dialog giving it
+    back.
+  - A click outside closes it: 15.
+  - It holds while its request is in flight — against Escape, a click outside and its own way
+    out — and says the answer once it arrives: 11. The five that hold by `dismissible` (Move,
+    Webhook address, Unlink, Withdraw, Leave team), the four by a guard in their close (Cancel
+    run, Delete account, Replace account, the organization's Remove member), F96 and F97.
+  - An Escape pressed the moment its buttons come back closes it (F72): 10. Unlink has no such
+    moment — its answer closes it — so it has the hold test alone.
+
+  51 tests in each engine; some repeat what an older test holds, so the table is whole. Four
+  dialogs send and hold nothing, by design: Connect, Set up, Run and Archive. A refusal that
+  arrives after one has closed is said on its page, by the panel's alert or the card's.
+- **Corrected**: Round 15's close said Leave project was never opened by a test. F75's and F76's
+  tests, in that same close, open it; struck there.
+
+Proved red by hand in Chromium — all 51 dialog tests run for each dialog break, the setup test
+for each #186 break — every patched file restored from a copy after each and checked by sha256;
+only the named tests went red:
+
+| Guard | Broken by | Red |
+| --- | --- | --- |
+| Focus goes back to the opener | `trigger.focus()` taken out of `Modal` | the 15 Escape tests |
+| A click outside closes an idle dialog | the backdrop's handler made `undefined` | the 15 click-outside tests |
+| The holds: F96, F97 and a guard | Create a team's and Add members' `dismissible`, and Cancel run's guard, taken out | those three hold tests |
+| Dismissible in the commit that brings the buttons back | `useLayoutEffect` made `useEffect` in `Modal` | the 10 buttons-back tests |
+| #186, whole | the three files as `main` has them | the setup test: the name stays open |
+| The retry names the organization made | the form's `workspaceId` not sent, the name left open | the setup test; with its name check taken out, the create asked for twice |
+| …with a new create key every press, as before #186 | as above, and the create key made anew | the setup test; with its name check taken out, a second organization |
+| One claim key across the retry | the claim key made anew every press | the setup test: two claim keys |
+
+The focus test's first version passed five dialogs with no `trigger.focus()`: Escape came before
+focus had moved into them, so it had never left the opener. It now tabs into the dialog first,
+and all 15 went red.
+
+**Filed for this repository's next round** — found doing the above, not fixed here:
+
+- **F98**: Webhook address takes no focus when it opens. Its controls are disabled while its
+  address is read, and `Modal` focuses only an enabled control, so focus stays on the opener
+  behind the backdrop until Tab brings it in.
+- **F99**: "Skip — create a personal account instead", on setup, asks the platform for a
+  personal workspace (`createPersonalWorkspaceAction`), and the platform never makes one on
+  request: Access refuses it, 400 "Personal workspaces are provisioned automatically"
+  (`snoopy-backend/apps/access/src/postgres-tenancy.ts`). The button can only fail; the person
+  has a personal workspace already.
+
+F99 is the last number.
