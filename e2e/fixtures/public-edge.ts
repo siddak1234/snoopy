@@ -244,6 +244,9 @@ function initialState() {
     oauthDisconnected: false,
     approvals: [] as Automations["Approval"][],
     billingNotConfigured: false,
+    // The paid plan cancelled in the portal, ending at its period's end (the
+    // owner's build 14 feedback #11).
+    billingCancelled: false,
     discoveryFailing: false,
     notReady: false,
     draftNeedsConnection: false,
@@ -907,6 +910,9 @@ const server = createServer(
       },
       "/__fixture/billing-not-configured": () => {
         state.billingNotConfigured = true;
+      },
+      "/__fixture/billing-cancelled": () => {
+        state.billingCancelled = true;
       },
       "/__fixture/discovery-failing": () => {
         state.discoveryFailing = true;
@@ -2609,7 +2615,7 @@ const server = createServer(
               displayName: subscribed.displayName,
               status: "active",
               currentPeriodEnd: "2026-09-12T12:00:00.000Z",
-              cancelAtPeriodEnd: false,
+              cancelAtPeriodEnd: state.billingCancelled,
             } satisfies Platform["WorkspaceBillingResponse"])
           : ({
               workspaceId: billedWorkspace,

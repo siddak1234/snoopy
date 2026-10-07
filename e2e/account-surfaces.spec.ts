@@ -856,6 +856,24 @@ test("15 — an unmet connection links to Connections, and Go live waits for it"
   await expect(page).toHaveURL(/\/account\/connections$/);
 });
 
+test("the platform's email links open their pages: a run's, and the decisions waiting (the owner's build 14 feedback #6)", async ({
+  page,
+}) => {
+  // `PRODUCT_ORIGIN/runs/<id>` and `/approvals/<id>`, as the backend's notifier
+  // builds them (`apps/runs/src/notifications.ts`); both answered 404.
+  await page.goto("/runs/fixture-run-ok");
+  await expect(page).toHaveURL(/\/account\/runs\/fixture-run-ok$/);
+  await expect(page.locator("main")).toContainText(
+    "Recorded the invoice and emailed the summary.",
+  );
+  await fixtureControl("approval-waiting");
+  await page.goto("/approvals/a0a0a0a0-a0a0-4a0a-8a0a-a0a0a0a0a0a0");
+  await expect(page).toHaveURL(/\/account\/approvals$/);
+  await expect(page.locator("main")).toContainText(
+    "A payment over the spending limit needs a person to approve it.",
+  );
+});
+
 test("16 — Cancel on a run another tab already stopped says so", async ({
   page,
   context,
