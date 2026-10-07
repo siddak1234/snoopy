@@ -46,7 +46,13 @@ export type ActionResult =
   | {
       ok: false;
       error: string;
-      state?: "plan-limit" | "entitlements-unavailable" | "file-unavailable";
+      state?:
+        | "plan-limit"
+        | "entitlements-unavailable"
+        | "file-unavailable"
+        // A move refused because the settings do not fit the version it goes
+        // to: answered with that version's fields (backend §12.1 #185).
+        | "settings-misfit";
     };
 
 /** The workspace the page showed, which the form sends (register F28). */
@@ -317,8 +323,10 @@ const MOVE_REFUSALS: Record<string, string> = {
     "A run of this flow is still going. Wait for it to finish, then move.",
   version_unavailable: "That version is no longer available.",
   subscription_archived: "An archived flow cannot move.",
+  // Answered with that version's fields in the move dialog (backend §12.1
+  // #185): Set up draws the version the flow runs, so it could not fix this.
   invalid_config:
-    "Its settings do not fit that version. Open Set up, fix them, then move.",
+    "Its settings do not fit that version. Set them for it to move.",
   unmet_connections:
     "That version needs an account this workspace has not connected. Connect it first, or pause the flow and move.",
   setup_incomplete:
@@ -345,6 +353,51 @@ export async function moveSubscriptionVersion(
       workspaceId,
       subscriptionId,
       { templateVersion },
+      "version",
+    );
+    revalidatePath("/account/flows");
+    return { ok: true };
+  } catch (error) {
+    if (!(error instanceof PlatformServerError)) throw error;
+    const reason = error.details?.reason;
+    const known =
+      typeof reason === "string" ? MOVE_REFUSALS[reason] : undefined;
+    return {
+      ok: false,
+      error: known ?? error.message,
+      ...(reason === "invalid_config"
+        ? { state: "settings-misfit" as const }
+        : {}),
+    };
+  }
+}
+
+/**
+ * Moves a subscription with the settings of the version it moves to, in one
+ * change (backend §12.1 #185): a plain move refused `invalid_config` is
+ * answered with that version's fields, and the platform checks the pair against
+ * it. Set up cannot do it — it draws the version the flow runs.
+ */
+export async function moveWithConfiguration(
+  formData: FormData,
+): Promise<ActionResult> {
+  const subscriptionId = String(formData.get("subscriptionId") ?? "");
+  const templateVersion = Number(formData.get("templateVersion"));
+  if (
+    !subscriptionId ||
+    !Number.isInteger(templateVersion) ||
+    templateVersion < 1
+  ) {
+    return { ok: false, error: "Choose a version to move to." };
+  }
+  const config = declaredValues(formData, "config");
+  try {
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+    await updateSubscription(
+      workspaceId,
+      subscriptionId,
+      { config, templateVersion },
       "version",
     );
     revalidatePath("/account/flows");
