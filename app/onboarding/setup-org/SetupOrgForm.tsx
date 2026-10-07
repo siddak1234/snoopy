@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createOrgWorkspaceAction,
@@ -12,21 +12,38 @@ import { FormError } from "@/components/ui/FormError";
 export function SetupOrgForm({ domain }: { domain: string }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<"create" | "skip" | null>(null);
+  // The organization made when its domain claim was refused: pressed again,
+  // the form claims on it and never makes a second one (backend §12.1 #186),
+  // as the app's does.
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  // One idempotency key per intent, made at its first press and kept for every
+  // press after it — a new name makes a new create — so a press after a lost
+  // answer is answered with what was already made.
+  const keys = useRef<{ create?: string; claim?: string }>({});
   const router = useRouter();
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setPending("create");
-    const result = await createOrgWorkspaceAction(
-      new FormData(e.currentTarget),
+    const data = new FormData(e.currentTarget);
+    data.set(
+      "createKey",
+      (keys.current.create ??= `workspace-create-${crypto.randomUUID()}`),
     );
+    data.set(
+      "claimKey",
+      (keys.current.claim ??= `domain-claim-${crypto.randomUUID()}`),
+    );
+    if (createdId) data.set("workspaceId", createdId);
+    const result = await createOrgWorkspaceAction(data);
     setPending(null);
     if (result.ok) {
       router.push("/account");
-    } else {
-      setError(result.error);
+      return;
     }
+    if (result.workspaceId) setCreatedId(result.workspaceId);
+    setError(result.error);
   }
 
   async function handleSkip() {
@@ -44,7 +61,14 @@ export function SetupOrgForm({ domain }: { domain: string }) {
   const busy = pending !== null;
 
   return (
-    <form onSubmit={handleCreate} className="mt-6 space-y-5">
+    <form
+      onSubmit={handleCreate}
+      // A new name is a new organization, so a new key.
+      onChange={() => {
+        keys.current.create = undefined;
+      }}
+      className="mt-6 space-y-5"
+    >
       {/* Read-only domain pill */}
       <div>
         <label className="block text-sm font-medium text-[var(--text)]">
@@ -68,7 +92,8 @@ export function SetupOrgForm({ domain }: { domain: string }) {
         required
         autoComplete="organization"
         placeholder="Acme Corp"
-        disabled={busy}
+        // Once the organization is made its name is set: only the claim is left.
+        disabled={busy || createdId !== null}
       />
 
       <FormError message={error} />
@@ -78,7 +103,11 @@ export function SetupOrgForm({ domain }: { domain: string }) {
         disabled={busy}
         className="btn-primary inline-flex w-full justify-center px-5 disabled:opacity-60"
       >
-        {pending === "create" ? "Creating…" : "Create organization"}
+        {pending === "create"
+          ? "Creating…"
+          : createdId
+            ? `Claim ${domain} again`
+            : "Create organization"}
       </button>
 
       <div className="relative flex items-center py-1">

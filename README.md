@@ -62,15 +62,19 @@ run's file (PUT straight to the fixture's object store, across origins), moving
 a subscription to a newer version, a webhook flow's address, connections, teams
 (a team is a project in the platform's contract: creating one in the
 organization or the personal workspace — one per kind, by its owners and admins
-— its members, asking to join and the answers), the organization's join link,
+— its members, asking to join and the answers), setting up an organization
+(a refused domain claim retried on the organization made), the organization's
+join link,
 unlinking a sign-in account (each refusal, and a platform with no unlink yet),
 billing (Free, Plus and Pro — the platform's, or the one the website draws
 while the platform lists none — and a second plan refused), the quick and the
 complete export, account deletion, and the platform's refusals —
 without real accounts or credentials, and each test starts from the fixture's
-first state. Three specs: `e2e/accessibility.spec.ts`,
-`e2e/public-edge-fixture.spec.ts` and `e2e/account-surfaces.spec.ts` (every
-surface a change audit probed and no test asserted), sharing `e2e/helpers.ts`. The playbook's human keyboard
+first state. Four specs: `e2e/accessibility.spec.ts`,
+`e2e/public-edge-fixture.spec.ts`, `e2e/account-surfaces.spec.ts` (every
+surface a change audit probed and no test asserted) and `e2e/dialogs.spec.ts`
+(every dialog's Escape, click outside, focus return and hold, one row each),
+sharing `e2e/helpers.ts`. The playbook's human keyboard
 traversal (NFR-35) has a hand-over test in the same suite:
 `KEYBOARD_JOURNEY=1 node scripts/run-browser-fixtures.mjs --headed --grep "keyboard journey"`
 opens the built site against the fixture, signed in, and pauses for the person

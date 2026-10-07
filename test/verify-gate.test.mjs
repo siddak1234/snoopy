@@ -358,6 +358,7 @@ test("the browser fixture run passes every spec that needs the fixture Edge, and
     "e2e/accessibility.spec.ts",
     "e2e/public-edge-fixture.spec.ts",
     "e2e/account-surfaces.spec.ts",
+    "e2e/dialogs.spec.ts",
   ]);
   // And derived: every spec that reads the fixture's switch is one of them.
   const e2e = resolve(import.meta.dirname, "../e2e");

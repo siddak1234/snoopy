@@ -147,6 +147,7 @@ try {
       "e2e/accessibility.spec.ts",
       "e2e/public-edge-fixture.spec.ts",
       "e2e/account-surfaces.spec.ts",
+      "e2e/dialogs.spec.ts",
       // One worker: every test here talks to ONE fixture process whose state is
       // global (the active workspace, billing, exports), and some tests move it
       // and put it back. With two workers the other file's scans could land

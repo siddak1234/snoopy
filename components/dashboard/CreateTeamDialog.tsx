@@ -91,6 +91,9 @@ export function CreateTeamDialog({
       }
       bubble
       zIndex={100}
+      // Held open while the team is being made: closed meanwhile, its answer —
+      // the team made, or a refusal — was said nowhere (register F96).
+      dismissible={!pending}
     >
       <h2
         id="create-team-title"
