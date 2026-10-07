@@ -273,6 +273,26 @@ function initialState() {
     // or ready but partial.
     exportFailure: null as string | null,
     exportPartial: false,
+    // Backend §12.1 #186: the organizations the requester — the person with
+    // none — made at /onboarding/setup-org, each with the key and the input it
+    // was made with, and how many times one was asked for, a replay included;
+    // the one made active; every claim of a domain on one, as asked and as
+    // answered; and how many of the next claims are refused.
+    createdOrganizations: [] as {
+      workspace: Platform["WorkspaceSummary"];
+      idempotencyKey: string;
+      input: string;
+    }[],
+    organizationsAskedFor: 0,
+    requesterActiveWorkspaceId: null as string | null,
+    domainClaims: [] as {
+      workspaceId: string;
+      domain: string;
+      joinPolicy: Platform["ClaimOrganizationDomainRequest"]["joinPolicy"];
+      idempotencyKey: string;
+      status: number;
+    }[],
+    domainClaimsRefused: 0,
   };
 }
 let state = initialState();
@@ -1047,6 +1067,11 @@ const server = createServer(
       "/__fixture/export-partial": () => {
         state.exportPartial = true;
       },
+      // Backend §12.1 #186: the next domain claim refused, once — busy (429),
+      // as any route may answer — after its organization was made.
+      "/__fixture/domain-claim-refused-once": () => {
+        state.domainClaimsRefused = 1;
+      },
     };
     const control =
       request.method === "POST" ? controls[url.pathname] : undefined;
@@ -1078,6 +1103,18 @@ const server = createServer(
           name: team.name,
           type: team.type,
         })),
+        // Every organization made at setup, with the key it was made with;
+        // how many times one was asked for, a replay included; and every
+        // claim on one — refused or made — with its key.
+        createdOrganizations: state.createdOrganizations.map(
+          ({ workspace, idempotencyKey }) => ({
+            id: workspace.id,
+            name: workspace.name,
+            idempotencyKey,
+          }),
+        ),
+        organizationsAskedFor: state.organizationsAskedFor,
+        domainClaims: state.domainClaims,
       });
     }
     if (
@@ -1328,6 +1365,20 @@ const server = createServer(
         },
         workspaces: [adminWorkspace],
       } satisfies Platform["SessionResponse"];
+      // The requester has no workspace until it makes an organization at
+      // setup (backend §12.1 #186), which is theirs, and active, from then on.
+      const requesterNow = {
+        ...requesterSession,
+        user: {
+          ...requesterSession.user,
+          ...(state.requesterActiveWorkspaceId
+            ? { activeWorkspaceId: state.requesterActiveWorkspaceId }
+            : {}),
+        },
+        workspaces: state.createdOrganizations.map(
+          ({ workspace }) => workspace,
+        ),
+      } satisfies Platform["SessionResponse"];
       return respond(
         response,
         200,
@@ -1337,7 +1388,7 @@ const server = createServer(
             ? memberSession
             : fixtureSession === "admin"
               ? adminSession
-              : requesterSession,
+              : requesterNow,
       );
     }
     if (method === "PATCH" && pathname === "/v1/session/active-workspace") {
@@ -1447,13 +1498,139 @@ const server = createServer(
             ? [memberWorkspace]
             : fixtureSession === "admin"
               ? [adminWorkspace]
-              : [];
+              : state.createdOrganizations.map(({ workspace }) => workspace);
+      const activeWorkspaceId =
+        fixtureSession === "requester"
+          ? state.requesterActiveWorkspaceId
+          : state.activeWorkspaceId;
       return respond(response, 200, {
         workspaces,
-        ...(fixtureSession === "requester"
-          ? {}
-          : { activeWorkspaceId: state.activeWorkspaceId }),
+        ...(activeWorkspaceId ? { activeWorkspaceId } : {}),
       } satisfies Platform["WorkspaceListResponse"]);
+    }
+    // Backend §12.1 #186: an organization the requester makes at setup — theirs
+    // as owner, active when asked, and listed to them from then on. A key used
+    // again with the same input is answered with the organization it made, as
+    // the platform replays it; with other input it is refused (409). Only an
+    // organization: the platform makes a personal workspace itself (400).
+    if (
+      method === "POST" &&
+      pathname === "/v1/workspaces" &&
+      fixtureSession === "requester"
+    ) {
+      const key = request.headers["idempotency-key"];
+      const body = (await requestJson(request)) as Partial<
+        Platform["CreateWorkspaceRequest"]
+      >;
+      if (
+        typeof key !== "string" ||
+        body.type !== "organization" ||
+        typeof body.name !== "string" ||
+        body.name.length < 2 ||
+        body.name.length > 120 ||
+        typeof body.activate !== "boolean"
+      ) {
+        return respond(response, 400, problem(400, "Bad Request"));
+      }
+      state.organizationsAskedFor += 1;
+      const input = JSON.stringify([body.name, body.activate]);
+      let made = state.createdOrganizations.find(
+        (entry) => entry.idempotencyKey === key,
+      );
+      if (made && made.input !== input) {
+        return respond(response, 409, {
+          ...problem(409, "Conflict"),
+          detail: "The idempotency key was already used with different input",
+        } satisfies Platform["ApiProblem"]);
+      }
+      if (!made) {
+        made = {
+          workspace: {
+            id: `${String(state.createdOrganizations.length).padStart(8, "9")}-9999-4999-8999-999999999999`,
+            name: body.name,
+            type: "organization",
+            role: "owner",
+          },
+          idempotencyKey: key,
+          input,
+        };
+        state.createdOrganizations.push(made);
+        if (body.activate) state.requesterActiveWorkspaceId = made.workspace.id;
+      }
+      return respond(response, 200, {
+        workspace: made.workspace,
+        ...(body.activate ? { activeWorkspaceId: made.workspace.id } : {}),
+      } satisfies Platform["WorkspaceMutationResponse"]);
+    }
+    // Backend §12.1 #186: setup's second step — the requester's email domain
+    // claimed on the organization it made, pending until its DNS record is
+    // checked, the challenge only in the answer that made the claim. A key used
+    // again with the same input is answered with that claim, without the
+    // challenge; with other input it is refused (409). Every claim asked is
+    // kept here with its answer, a refused one too, so a test reads the retry.
+    const claiming = /^\/v1\/workspaces\/([^/]+)\/domains$/u.exec(pathname);
+    const claimedOn =
+      claiming && fixtureSession === "requester"
+        ? state.createdOrganizations.find(
+            ({ workspace }) => workspace.id === claiming[1],
+          )
+        : undefined;
+    if (method === "POST" && claimedOn) {
+      const key = request.headers["idempotency-key"];
+      const body = (await requestJson(request)) as Partial<
+        Platform["ClaimOrganizationDomainRequest"]
+      >;
+      if (
+        typeof key !== "string" ||
+        typeof body.domain !== "string" ||
+        body.domain.length < 3 ||
+        body.domain.length > 253
+      ) {
+        return respond(response, 400, problem(400, "Bad Request"));
+      }
+      const claim = {
+        workspaceId: claimedOn.workspace.id,
+        domain: body.domain.toLowerCase(),
+        joinPolicy: body.joinPolicy ?? "approval",
+        idempotencyKey: key,
+      };
+      if (state.domainClaimsRefused > 0) {
+        state.domainClaimsRefused -= 1;
+        state.domainClaims.push({ ...claim, status: 429 });
+        response.setHeader("retry-after", "30");
+        return respond(response, 429, problem(429, "Too Many Requests"));
+      }
+      const made = state.domainClaims.find(
+        (entry) => entry.status === 200 && entry.idempotencyKey === key,
+      );
+      if (
+        made &&
+        (made.workspaceId !== claim.workspaceId ||
+          made.domain !== claim.domain ||
+          made.joinPolicy !== claim.joinPolicy)
+      ) {
+        return respond(response, 409, {
+          ...problem(409, "Conflict"),
+          detail: "The idempotency key was already used with different input",
+        } satisfies Platform["ApiProblem"]);
+      }
+      state.domainClaims.push({ ...claim, status: 200 });
+      return respond(response, 200, {
+        domain: {
+          id: "56565656-5656-4565-8565-565656565656",
+          workspaceId: claim.workspaceId,
+          domain: claim.domain,
+          registrableDomain: claim.domain,
+          status: "pending",
+          joinPolicy: claim.joinPolicy,
+          discoveryEnabled: true,
+          verificationRecordName: `_autom8x-challenge.${claim.domain}`,
+          createdAt: now,
+        },
+        ...(made
+          ? {}
+          : { verificationRecordValue: "autom8x-domain-verification=fixture" }),
+      } satisfies Platform["OrganizationDomainClaimResponse"]);
     }
     // The teams a test created in one workspace. An organization's are listed
     // to its owner and its admin — the creator and someone who sees every team
@@ -1608,14 +1785,14 @@ const server = createServer(
     // and the teams a test creates in it: every other list the account pages
     // read for it is empty, as the Edge answers a workspace with nothing in it,
     // and the catalog is the same catalog with nothing subscribed. A test that
-    // switches to it reads real pages, not 501s.
-    if (
-      method === "GET" &&
-      pathname.startsWith(`/v1/workspaces/${personalWorkspaceId}/`)
-    ) {
-      const read = pathname.slice(
-        `/v1/workspaces/${personalWorkspaceId}`.length,
-      );
+    // switches to it reads real pages, not 501s — and so does the requester
+    // landing in an organization it has just made (backend §12.1 #186).
+    const emptyWorkspaceId = [
+      personalWorkspaceId,
+      ...state.createdOrganizations.map(({ workspace }) => workspace.id),
+    ].find((id) => pathname.startsWith(`/v1/workspaces/${id}/`));
+    if (method === "GET" && emptyWorkspaceId) {
+      const read = pathname.slice(`/v1/workspaces/${emptyWorkspaceId}`.length);
       const noRuns = {
         total: 0,
         pending: 0,
@@ -1627,7 +1804,7 @@ const server = createServer(
       };
       const empty: Record<string, Json> = {
         "/projects": {
-          projects: createdIn(personalWorkspaceId),
+          projects: createdIn(emptyWorkspaceId),
         } satisfies Platform["ProjectListResponse"],
         "/subscriptions": {
           subscriptions: [],

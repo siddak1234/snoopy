@@ -1,6 +1,11 @@
 "use client";
 
-import { useState, useTransition, type FormEvent } from "react";
+import {
+  useState,
+  useSyncExternalStore,
+  useTransition,
+  type FormEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { Button } from "@/components/ui/Button";
@@ -13,6 +18,37 @@ import {
   connectProviderWithKey,
   disconnectConnection,
 } from "./actions";
+
+/**
+ * Which provider this tab's last Connect, Reconnect or Replace left for, so the
+ * page a connect returns to can say whether THAT provider's connection is still
+ * active. The callback carries only `status` (`app/connections/page.tsx`), and
+ * the page used to read "some provider is connected" as "yours is still
+ * active": a first connect of one provider that did not finish told a person
+ * with another provider connected that their existing connection still worked
+ * (register F100). This tab's storage, and a provider id only — never a
+ * credential.
+ */
+const PENDING_CONNECT = "autom8x.connections.pending";
+
+function rememberPendingConnect(providerId: string) {
+  try {
+    sessionStorage.setItem(PENDING_CONNECT, providerId);
+  } catch {
+    // Storage refused (a private window, a policy): the page then says only
+    // that the connection could not be completed, which is always true.
+  }
+}
+
+function pendingConnect(): string | null {
+  try {
+    return sessionStorage.getItem(PENDING_CONNECT);
+  } catch {
+    return null;
+  }
+}
+
+const noSubscription = () => () => {};
 
 /**
  * `canManage` is the page's reading of the platform's rule: connecting or
@@ -55,6 +91,14 @@ export function ConnectionsPanel({
   const [notice, setNotice] = useState<string | null>(null);
   const [replacing, setReplacing] = useState<Connection | null>(null);
   const [replaceError, setReplaceError] = useState<string | null>(null);
+  // Read in the browser only: the server cannot know, so the unfinished-connect
+  // banner is drawn once, in its final words, rather than announced as one
+  // sentence and changed to another on hydration.
+  const returnedFor = useSyncExternalStore(
+    noSubscription,
+    pendingConnect,
+    () => undefined,
+  );
 
   const close = () => {
     setSelectedProvider(null);
@@ -90,6 +134,7 @@ export function ConnectionsPanel({
         setError(result.ok ? "Could not start the connection" : result.error);
         return;
       }
+      rememberPendingConnect(provider.providerId);
       window.location.assign(result.authorizationUrl);
     });
   };
@@ -124,6 +169,7 @@ export function ConnectionsPanel({
         );
         return;
       }
+      rememberPendingConnect(connection.providerId);
       window.location.assign(result.authorizationUrl);
     });
   };
@@ -169,7 +215,10 @@ export function ConnectionsPanel({
       .filter((connection) => connection.status === "connected")
       .map((connection) => connection.providerId),
   );
-  const hasConnected = connectedProviderIds.size > 0;
+  // Still active only when the provider the connect left for has a live
+  // connection — never because some other provider does (register F100).
+  const stillActive =
+    typeof returnedFor === "string" && connectedProviderIds.has(returnedFor);
   // A connection that needs reauthorization is still this workspace's
   // connection: Reconnect is what repairs it (backend §12.1 #175).
   const reconnectableProviderIds = new Set(
@@ -203,9 +252,9 @@ export function ConnectionsPanel({
           {notice}
         </p>
       ) : null}
-      {callbackStatus === "error" ? (
+      {callbackStatus === "error" && returnedFor !== undefined ? (
         <p role="alert" className="mb-4 text-sm text-[var(--error-text)]">
-          {hasConnected
+          {stillActive
             ? "The new authorization didn't complete, so nothing changed — your existing connection is still active. Try again or contact an owner."
             : "The connection could not be completed. Try again or contact an owner."}
         </p>

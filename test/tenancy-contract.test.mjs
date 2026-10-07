@@ -66,6 +66,56 @@ test("tenancy mutations use unique idempotency keys", () => {
   }
 });
 
+test("setup's keys are the form's, one per intent, and a retry after a refused claim claims on the organization already made (backend §12.1 #186)", () => {
+  const onboarding = readFileSync("app/onboarding/actions.ts", "utf8");
+  const action =
+    /export async function createOrgWorkspaceAction\([\s\S]*?\n\}/u.exec(
+      onboarding,
+    );
+  assert.ok(action, "createOrgWorkspaceAction not found; this test is blind");
+  // Both from the form and checked as the Run form's key is — never minted
+  // here, where each press would mint new ones.
+  for (const key of ["createKey", "claimKey"])
+    assert.match(action[0], new RegExp(`formData\\.get\\("${key}"\\)`, "u"));
+  assert.match(
+    action[0],
+    /\/\^\[A-Za-z0-9\._~:-\]\{16,128\}\$\/u\.test\(key\)/u,
+  );
+  assert.doesNotMatch(action[0], /newIdempotencyKey\(/u);
+  // An organization the form names is claimed on, never made again; one made
+  // here before a refused claim is handed back for the retry to name.
+  assert.match(
+    action[0],
+    /if \(!workspaceId\) \{[\s\S]*?createKey,\s*\);\s*workspaceId = created\.workspace\.id;\s*\}\s*await claimOrganizationDomain\(\s*workspaceId,\s*\{ domain, joinPolicy: "approval" \},\s*claimKey,\s*\);/u,
+  );
+  assert.match(action[0], /\.\.\.\(workspaceId \? \{ workspaceId \} : \{\}\)/u);
+  for (const [operation, prefix] of [
+    ["createWorkspace", "workspace-create"],
+    ["claimOrganizationDomain", "domain-claim"],
+  ])
+    assert.match(
+      tenancy,
+      new RegExp(
+        `export async function ${operation}\\([^)]*?idempotencyKey = newIdempotencyKey\\("${prefix}"\\),\\s*\\)(?:(?!export async function)[\\s\\S])*?\\{\\s*method: "POST",\\s*body: JSON\\.stringify\\(input\\),\\s*idempotencyKey,\\s*\\}`,
+        "u",
+      ),
+      operation,
+    );
+  // The form keeps what it made, and its keys, from press to press.
+  const form = readFileSync(
+    "app/onboarding/setup-org/SetupOrgForm.tsx",
+    "utf8",
+  );
+  for (const kept of [
+    /keys\.current\.create \?\?= `workspace-create-\$\{crypto\.randomUUID\(\)\}`/u,
+    /keys\.current\.claim \?\?= `domain-claim-\$\{crypto\.randomUUID\(\)\}`/u,
+    /if \(createdId\) data\.set\("workspaceId", createdId\);/u,
+    /if \(result\.workspaceId\) setCreatedId\(result\.workspaceId\);/u,
+    /`Claim \$\{domain\} again`/u,
+  ])
+    assert.match(form, kept);
+});
+
 test("cursor handling remains opaque and project actions do not revive local policy", () => {
   assert.match(tenancy, /encodeURIComponent\(cursor\)/);
   assert.match(tenancy, /nextCursor: response\.nextCursor/);

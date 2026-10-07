@@ -26,38 +26,69 @@ async function currentSession() {
   return session;
 }
 
-export type CreateOrgResult = { ok: true } | { ok: false; error: string };
+export type CreateOrgResult =
+  | { ok: true }
+  | {
+      ok: false;
+      error: string;
+      /** The organization made before its claim was refused; the retry claims on it. */
+      workspaceId?: string;
+    };
 
+/**
+ * The organization, made active, then its claim on the email's domain, joined
+ * by approval — the app's two steps (`snoopy-mobile`'s org-join).
+ *
+ * **Both idempotency keys come from the form**, one per intent, kept from press
+ * to press: a press after a lost answer is answered with the organization or
+ * the claim already made. A refused claim returns the organization made, and
+ * the form's retry names it: only the claim is asked again, and no second
+ * organization is made (backend §12.1 #186). The platform claims only on an
+ * organization this person owns or administers.
+ */
 export async function createOrgWorkspaceAction(
   formData: FormData,
 ): Promise<CreateOrgResult> {
+  const createKey = String(formData.get("createKey") ?? "");
+  const claimKey = String(formData.get("claimKey") ?? "");
+  if (
+    ![createKey, claimKey].every((key) =>
+      /^[A-Za-z0-9._~:-]{16,128}$/u.test(key),
+    )
+  ) {
+    return { ok: false, error: "Reload the page and try again." };
+  }
+  let workspaceId = String(formData.get("workspaceId") ?? "") || null;
   try {
     const session = await currentSession();
     if (!session) return { ok: false, error: "Please sign in again." };
 
-    const name = formData.get("name");
-    if (typeof name !== "string" || !name.trim()) {
-      return { ok: false, error: "Organization name is required." };
-    }
     const domain = extractDomain(session.user.email);
     if (!domain) {
       return { ok: false, error: "Your email domain is unavailable." };
     }
-
-    const created = await createWorkspace({
-      name: name.trim(),
-      type: "organization",
-      activate: true,
-    });
-    await claimOrganizationDomain(created.workspace.id, {
-      domain,
-      joinPolicy: "approval",
-    });
+    if (!workspaceId) {
+      const name = formData.get("name");
+      if (typeof name !== "string" || !name.trim()) {
+        return { ok: false, error: "Organization name is required." };
+      }
+      const created = await createWorkspace(
+        { name: name.trim(), type: "organization", activate: true },
+        createKey,
+      );
+      workspaceId = created.workspace.id;
+    }
+    await claimOrganizationDomain(
+      workspaceId,
+      { domain, joinPolicy: "approval" },
+      claimKey,
+    );
     return { ok: true };
   } catch (error) {
     return {
       ok: false,
       error: platformMessage(error, "The organization could not be created."),
+      ...(workspaceId ? { workspaceId } : {}),
     };
   }
 }

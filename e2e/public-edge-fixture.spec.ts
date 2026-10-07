@@ -198,6 +198,91 @@ test("Replace account is confirmed first, names the connection it replaces, and 
   await page.waitForURL(/^https:\/\/oauth\.invalid\/authorize/);
 });
 
+// The page a connect returns to carries only `status`; whether "your existing
+// connection is still active" is true depends on the provider the connect left
+// for, which this tab remembers (register F100). The fixture starts with its
+// OAuth provider connected and its key provider not.
+const stillActive =
+  "The new authorization didn't complete, so nothing changed — your existing connection is still active. Try again or contact an owner.";
+const notCompleted =
+  "The connection could not be completed. Try again or contact an owner.";
+const pendingConnectKey = "autom8x.connections.pending";
+
+test("an unfinished connect says the connection is still active only when the provider it left for has one (register F100)", async ({
+  page,
+}) => {
+  const banner = page
+    .getByRole("alert")
+    .filter({ hasText: "Try again or contact an owner." });
+  const returnFor = async (providerId: string | null) => {
+    await page.evaluate(
+      ({ key, value }) =>
+        value === null
+          ? sessionStorage.removeItem(key)
+          : sessionStorage.setItem(key, value),
+      { key: pendingConnectKey, value: providerId },
+    );
+    await page.goto("/account/connections?status=error");
+  };
+  await page.goto("/account/connections");
+  // Left for the provider that is connected: it still is.
+  await returnFor("fixture-oauth");
+  await expect(banner).toHaveText(stillActive);
+  // Left for one with no connection, while another provider is connected —
+  // the case the page used to answer "still active".
+  await returnFor("fixture-key");
+  await expect(banner).toHaveText(notCompleted);
+  // Nothing remembered (another tab, storage refused): only what is certain.
+  await returnFor(null);
+  await expect(banner).toHaveText(notCompleted);
+});
+
+test("Replace and Reconnect remember the provider before they leave for its consent (register F100)", async ({
+  page,
+}) => {
+  await page.route("https://oauth.invalid/**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: "<h1>consent</h1>",
+    }),
+  );
+  const banner = page
+    .getByRole("alert")
+    .filter({ hasText: "Try again or contact an owner." });
+  // Replace keeps the account it replaces until the new sign-in completes, so
+  // an unfinished replace leaves that connection active.
+  await page.goto("/account/connections");
+  await page.getByRole("button", { name: "Replace account" }).click();
+  await page
+    .getByRole("dialog", { name: "Replace Fixture OAuth account?" })
+    .getByRole("button", { name: "Replace account" })
+    .click();
+  await page.waitForURL(/^https:\/\/oauth\.invalid\/authorize/);
+  await page.goto("/account/connections?status=error");
+  await expect(banner).toHaveText(stillActive);
+  // Reconnect on a connection that needs reauthorization: remembered too, and
+  // that connection is not active, so the page does not say it is.
+  await page.evaluate(
+    (key) => sessionStorage.removeItem(key),
+    pendingConnectKey,
+  );
+  await fixtureControl("oauth-connection-broken");
+  await page.goto("/account/connections");
+  await providerCard(page, "Fixture OAuth provider")
+    .getByRole("button", { name: "Reconnect" })
+    .click();
+  await page.waitForURL(/^https:\/\/oauth\.invalid\/authorize/);
+  await page.goto("/account/connections?status=error");
+  await expect(banner).toHaveText(notCompleted);
+  expect(
+    await page.evaluate(
+      (key) => sessionStorage.getItem(key),
+      pendingConnectKey,
+    ),
+  ).toBe("fixture-oauth");
+});
+
 test("a replacement named after the connection changed is refused as stale, and nothing is replaced", async ({
   page,
 }) => {
@@ -1806,6 +1891,65 @@ test("domain discovery creates an approval request without an invite flow", asyn
   await expect(
     page.locator('a[href*="invite"], input[name*="invite" i]'),
   ).toHaveCount(0);
+});
+
+test("a domain claim refused after its organization was made keeps the organization: pressed again, setup claims again on it, with the same claim key, and makes no second organization (backend §12.1 #186)", async ({
+  page,
+}) => {
+  await presentSession(page, "requester");
+  await fixtureControl("domain-claim-refused-once");
+  await page.goto("/onboarding/setup-org");
+  const form = page.locator("form");
+  await form.getByLabel("Organization name").fill("Requester Co");
+  await form.getByRole("button", { name: "Create organization" }).click();
+  await expect(form.getByRole("alert")).toHaveText(busy);
+  // The organization is made, and named: only its claim is left to ask.
+  await expect(form.getByLabel("Organization name")).toBeDisabled();
+  await form.getByRole("button", { name: "Claim example.test again" }).click();
+  // In the organization made, active and theirs: its page is offered.
+  await expect(page).toHaveURL(/\/account$/);
+  await expect(
+    page
+      .getByRole("complementary", { name: "Dashboard navigation" })
+      .getByRole("link", { name: "Organization" }),
+  ).toBeVisible();
+  const { createdOrganizations, organizationsAskedFor, domainClaims } =
+    await fixtureRead<{
+      createdOrganizations: {
+        id: string;
+        name: string;
+        idempotencyKey: string;
+      }[];
+      organizationsAskedFor: number;
+      domainClaims: {
+        workspaceId: string;
+        domain: string;
+        joinPolicy: string;
+        idempotencyKey: string;
+        status: number;
+      }[];
+    }>("counts");
+  // One organization, asked for once: the press after the refusal asked only
+  // for the claim — not even a replay of the create.
+  expect(createdOrganizations).toEqual([
+    {
+      id: expect.any(String),
+      name: "Requester Co",
+      idempotencyKey: expect.stringMatching(/^workspace-create-/u),
+    },
+  ]);
+  expect(organizationsAskedFor).toBe(1);
+  const claim = {
+    workspaceId: createdOrganizations[0]!.id,
+    domain: "example.test",
+    joinPolicy: "approval",
+    idempotencyKey: domainClaims[0]?.idempotencyKey,
+  };
+  expect(claim.idempotencyKey).toMatch(/^domain-claim-/u);
+  expect(domainClaims).toEqual([
+    { ...claim, status: 429 },
+    { ...claim, status: 200 },
+  ]);
 });
 
 test("organization request controls use the public join-request operation without invite links", async ({
