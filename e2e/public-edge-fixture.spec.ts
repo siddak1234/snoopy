@@ -3776,7 +3776,10 @@ test("signed out, a refused sign-in says why on the login page (10A)", async ({
     ],
   ] as const) {
     await page.goto(`/login?error=auth_callback&reason=${reason}`);
-    await expect(page.getByRole("alert")).toHaveText(sentence);
+    // By its words: Next's route announcer is an empty alert of its own.
+    const said = page.getByText(sentence, { exact: true });
+    await expect(said).toBeVisible();
+    await expect(said).toHaveAttribute("role", "alert");
   }
 });
 
