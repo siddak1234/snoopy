@@ -212,16 +212,24 @@ export async function readWebhookEndpoint(
 
 /**
  * Issues the address, or gives it a new secret — shown in this answer and
- * never again. Not replayable, so it carries no idempotency key: a retry
- * rotates again, and the secret last shown is the one that works.
+ * never again.
+ *
+ * **Replayable by key** (backend §12.1 #240, BUILD-PLAN 25.2.12). The key is
+ * the caller's: a fresh one per press, the same one on every retry of that
+ * press. The platform derives the secret from it, so a retry after a lost
+ * answer is answered with the secret that answer carried and rotates nothing;
+ * without a key every call rotates again. The contract makes the header
+ * optional on this one operation, and a platform from before the TWENTY-THIRD
+ * promotion never reads it here, so it rotates as it always did.
  */
 export function issueWebhookEndpoint(
   workspaceId: string,
   subscriptionId: string,
+  idempotencyKey: string,
 ): Promise<IssuedWebhookEndpoint> {
   return platformServerJson<IssuedWebhookEndpoint>(
     `${scope(workspaceId)}/subscriptions/${encodeURIComponent(subscriptionId)}/webhook`,
-    { method: "POST" },
+    { method: "POST", idempotencyKey },
   );
 }
 

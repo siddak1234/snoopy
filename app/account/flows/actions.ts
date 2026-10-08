@@ -206,6 +206,18 @@ const RUN_REFUSALS: Record<string, string> = {
 };
 
 /**
+ * A run refused because its flow is at capacity AND its queue is full (backend
+ * BUILD-PLAN 25.2.10): a flow at capacity holds a new run back, `pending`, until
+ * a run of it ends, and only once as many wait as it runs at once is a start
+ * refused — 429, `details.reason` `max_concurrent_runs`. Nothing was created,
+ * and only a run of this flow ending makes room, so it is said as the flow's
+ * and not as the platform's "busy right now". Every other 429 keeps the
+ * platform's words and the wait it stated.
+ */
+const FLOW_QUEUE_FULL =
+  "This flow is busy and its queue is full, so the run was not started. Try again once one of its runs has ended.";
+
+/**
  * Start a run of a manual automation — backend §12.1 #162, ADR-0030.
  *
  * The input is exactly what the subscription's pinned version declares; the
@@ -260,6 +272,9 @@ export async function startRun(formData: FormData): Promise<ActionResult> {
         ok: false,
         error: "This flow is not live, so it cannot run.",
       };
+    }
+    if (error.status === 429 && reason === "max_concurrent_runs") {
+      return { ok: false, error: FLOW_QUEUE_FULL };
     }
     // Over the plan (the owner's build 13 decision 7a3): no flow starts a run
     // until the workspace archives down. The same two reasons as the subscribe

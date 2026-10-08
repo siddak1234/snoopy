@@ -316,8 +316,9 @@ export function AutomationActions({
             id={`automation-run-${subscription.id}-description`}
             className="mt-1 text-sm text-[var(--muted)]"
           >
-            Enter what this run needs. It starts as soon as you submit, and its
-            page shows each step as it happens.
+            Enter what this run needs. It starts when you submit, or waits its
+            turn if this flow is busy, and its page shows each step as it
+            happens.
           </p>
           <form
             onSubmit={fromForm(submitRun)}

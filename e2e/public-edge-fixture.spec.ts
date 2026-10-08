@@ -426,6 +426,41 @@ test("a refused start keeps what was typed and the same idempotency key, so resu
   await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
 });
 
+test("a start refused because its flow and the flow's queue are full says so in the flow's words, keeps what was typed and its key, and goes through once there is room (backend BUILD-PLAN 25.2.10)", async ({
+  page,
+}) => {
+  // At capacity the platform holds a new run back, pending, until its turn;
+  // only with as many waiting as the flow runs at once is a start refused —
+  // 429 `max_concurrent_runs` — and nothing is created. Any other 429 keeps
+  // the platform's words (the test above).
+  await page.goto("/account/flows");
+  await automationCard(page, "Manual input automation")
+    .getByRole("button", { name: "Run", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "Run Manual input automation",
+  });
+  await expect(dialog).toContainText(
+    "Enter what this run needs. It starts when you submit, or waits its turn if this flow is busy, and its page shows each step as it happens.",
+  );
+  await dialog.getByLabel("Vendor").fill("Acme Supplies");
+  await dialog.getByLabel("Amount").fill("10");
+  await dialog.getByLabel("Invoice reference").fill("R-1");
+  const key = dialog.locator('input[name="idempotencyKey"]');
+  const sent = await key.inputValue();
+  await fixtureControl("run-at-capacity-once");
+  await dialog.getByRole("button", { name: "Start run" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "This flow is busy and its queue is full, so the run was not started. Try again once one of its runs has ended.",
+  );
+  await expect(page).toHaveURL(/\/account\/flows$/);
+  await expect(dialog.getByLabel("Vendor")).toHaveValue("Acme Supplies");
+  await expect(key).toHaveValue(sent);
+  // Room again: the same start, with the same key, goes through.
+  await dialog.getByRole("button", { name: "Start run" }).click();
+  await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
+});
+
 test("a refused set-up save stays in its dialog with the platform's answer and what was typed", async ({
   page,
 }) => {
@@ -918,6 +953,65 @@ test("an address the platform has no public origin for is shown by its id, and i
   await expect(
     dialog.getByRole("button", { name: "Make a new secret" }),
   ).toBeVisible();
+});
+
+test("a secret whose answer was lost is asked for again with the same key, and is answered with that secret rather than a second rotation (backend §12.1 #240)", async ({
+  page,
+}) => {
+  // The platform derives the secret from the press's key: a retry carrying it
+  // is answered with the secret the lost answer carried, and nothing rotates.
+  await page.goto("/account/flows");
+  const open = automationCard(page, "Webhook automation").getByRole("button", {
+    name: "Webhook address",
+  });
+  const dialog = page.getByRole("dialog", { name: "Webhook address" });
+  const renew = dialog.getByRole("button", { name: "Make a new secret" });
+  await open.click();
+  await dialog.getByRole("button", { name: "Create address" }).click();
+  await expect(dialog.getByText("fixture-secret-1")).toBeVisible();
+  // Made, and its answer lost on the way back; pressed again, in the dialog.
+  await fixtureControl("webhook-answer-lost");
+  await renew.click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "The platform is unreachable",
+  );
+  await renew.click();
+  await expect(dialog.getByText("fixture-secret-2")).toBeVisible();
+  await expect(dialog.getByRole("alert")).toHaveCount(0);
+  // Lost again, and pressed again after the dialog was closed and reopened.
+  await fixtureControl("webhook-answer-lost");
+  await renew.click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "The platform is unreachable",
+  );
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await open.click();
+  await renew.click();
+  await expect(dialog.getByText("fixture-secret-3")).toBeVisible();
+  // A secret shown spends its key: the next press is a new secret.
+  await renew.click();
+  await expect(dialog.getByText("fixture-secret-4")).toBeVisible();
+
+  const { webhookIssues } = await fixtureRead<{
+    webhookIssues: { idempotencyKey: string | null; replayed: boolean }[];
+  }>("counts");
+  expect(webhookIssues.map(({ replayed }) => replayed)).toEqual([
+    false,
+    false,
+    true,
+    false,
+    true,
+    false,
+  ]);
+  const keys = webhookIssues.map(({ idempotencyKey }) => idempotencyKey);
+  // Every press carries one, in the contract's IdempotencyKey shape.
+  for (const key of keys) expect(key).toMatch(/^[A-Za-z0-9._~:-]{16,128}$/u);
+  // Each retry carries the key of the press it retries, and every press a
+  // new one.
+  expect(keys[2]).toBe(keys[1]);
+  expect(keys[4]).toBe(keys[3]);
+  expect(new Set([keys[0], keys[1], keys[3], keys[5]]).size).toBe(4);
 });
 
 // What the fixture's object store holds, read at the fixture: the run's page

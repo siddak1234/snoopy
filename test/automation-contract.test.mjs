@@ -187,7 +187,11 @@ function generatedFields(schemaName) {
 function specEnum(schemaName) {
   const start = spec.indexOf(`    ${schemaName}:`);
   assert.ok(start > 0, `${schemaName} is missing from the specification`);
-  const block = spec.slice(start, start + 400);
+  // The schema's own block, to the next key at its indentation: a fixed window
+  // of 400 characters stopped short of `RunStatus`'s enum once its description
+  // grew (backend BUILD-PLAN 25.2.10).
+  const end = spec.slice(start + 1).search(/\n {4}\S/u);
+  const block = spec.slice(start, end < 0 ? undefined : start + 1 + end);
   const members = /enum:\s*\[([^\]]*)\]/.exec(block);
   assert.ok(members, `${schemaName} declares no enum`);
   return members[1]
@@ -927,10 +931,24 @@ test("a webhook address is offered for a webhook-started automation to an owner 
     /const close = \(\) => \{\s*setOpen\(false\);[\s\S]*?setIssued\(null\);/u,
   );
   assert.doesNotMatch(webhook, /console\.|revalidatePath/u);
-  // Issuing takes no idempotency key: a replay would mean storing the secret.
+  // Issuing carries the dialog's key (backend §12.1 #240): the platform derives
+  // the secret from it, so a retry is answered with the lost answer's secret.
+  // One key per press still unanswered, spent once a secret is shown.
   assert.match(
     client,
-    /platformServerJson<IssuedWebhookEndpoint>\(\s*`\$\{scope\(workspaceId\)\}\/subscriptions\/\$\{encodeURIComponent\(subscriptionId\)\}\/webhook`,\s*\{ method: "POST" \},\s*\);/u,
+    /platformServerJson<IssuedWebhookEndpoint>\(\s*`\$\{scope\(workspaceId\)\}\/subscriptions\/\$\{encodeURIComponent\(subscriptionId\)\}\/webhook`,\s*\{ method: "POST", idempotencyKey \},\s*\);/u,
+  );
+  assert.match(
+    button,
+    /const key = \(issueKey\.current \?\?= `webhook-secret-\$\{crypto\.randomUUID\(\)\}`\);/u,
+  );
+  assert.match(
+    button,
+    /if \(!result\.ok\) \{\s*setError\(result\.error\);\s*return;\s*\}\s*\/\/[^\n]*\n\s*issueKey\.current = null;\s*setIssued\(result\.issued\);/u,
+  );
+  assert.match(
+    webhook,
+    /if \(!\/\^\[A-Za-z0-9\._~:-\]\{16,128\}\$\/u\.test\(idempotencyKey\)\) \{/u,
   );
   // None issued yet is not an error.
   assert.match(
