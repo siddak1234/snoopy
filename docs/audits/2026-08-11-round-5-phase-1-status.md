@@ -2384,4 +2384,17 @@ a kept copy after its break, its sha256 checked equal, and the tree's diff check
   running run every 2 s), so a new step appears only on a reload. Whether to change the words or
   the page is the owner's call.
 
-F102 is the last number.
+**Fixed here, in its own commit:**
+
+- **F103** (new): the runtime dependency audit fails on `main`
+  (`npm audit --omit=dev --audit-level=high`, the blocking step of CI's scan job). Six advisories
+  published 2026-10-07 from 20:30Z cover `next` 16.0.0–16.3.7: one high, GHSA-cjq9-62q9-8jv4
+  (server-side request forgery in Image Optimization through an allow-listed remote URL), four
+  medium and one low. This site configures no `images.remotePatterns` (`next.config.ts`), which
+  the advisory names unaffected, but the scan blocks on the version. `next` is now 16.3.8, the
+  first release with all six fixes. Only `next` and its `@next/*` packages move: the lockfile was
+  written by npm 10.9.8 (Node 22's), whose diff is those entries alone; npm 11.21 also added `libc`
+  fields and dropped `fsevents`'s `dev` flag. `npm audit --omit=dev --audit-level=high` finds 0.
+  The precedent is F83.
+
+F103 is the last number.
