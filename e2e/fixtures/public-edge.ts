@@ -226,6 +226,17 @@ function initialState() {
     runsInFlightOnMove: false,
     // Backend §12.1 #91: the address once issued, and how many secrets so far.
     webhookSecrets: 0,
+    // Backend §12.1 #240: every issue asked for, with the key it carried and
+    // whether it was answered as a replay; the key the current secret was made
+    // with, and whether making it was a rotation; and how many of the next
+    // issues have their answer lost once the secret is made.
+    webhookIssues: [] as { idempotencyKey: string | null; replayed: boolean }[],
+    webhookSecretKey: null as string | null,
+    webhookSecretRotated: false,
+    webhookAnswersLost: 0,
+    // Backend BUILD-PLAN 25.2.10: how many of the next run starts are refused
+    // because the flow is at capacity and its queue is full.
+    runsAtCapacity: 0,
     // Backend §12.1 #39: the complete export, read as running once then ready.
     exportJobReads: 0,
     exportJobStarted: false,
@@ -1039,6 +1050,16 @@ const server = createServer(
         if (!outcome) return false;
         state.webhookLastOutcome = outcome;
       },
+      // Backend §12.1 #240: the next issue makes its secret, and its answer
+      // is lost on the way back.
+      "/__fixture/webhook-answer-lost": () => {
+        state.webhookAnswersLost = 1;
+      },
+      // Backend BUILD-PLAN 25.2.10: the next run start finds the flow at
+      // capacity with its queue full, once.
+      "/__fixture/run-at-capacity-once": () => {
+        state.runsAtCapacity = 1;
+      },
       // FR-14: opening an upload, or completing one, refused with a reason.
       "/__fixture/upload-refused": () => {
         const stage = url.searchParams.get("stage");
@@ -1132,6 +1153,8 @@ const server = createServer(
         ),
         organizationsAskedFor: state.organizationsAskedFor,
         domainClaims: state.domainClaims,
+        // Every webhook secret asked for, with its key (backend §12.1 #240).
+        webhookIssues: state.webhookIssues,
       });
     }
     if (
@@ -2372,6 +2395,16 @@ const server = createServer(
         } satisfies Automations["WebhookEndpoint"]);
       }
       if (method === "POST") {
+        // §12.1 #240: an optional Idempotency-Key, refused when it is not the
+        // contract's shape, as the Edge refuses it before Runs is asked.
+        const presented = request.headers["idempotency-key"];
+        const key = typeof presented === "string" ? presented : null;
+        if (
+          presented !== undefined &&
+          (key === null || !/^[A-Za-z0-9._~:-]{16,128}$/u.test(key))
+        ) {
+          return respond(response, 400, problem(400, "Bad Request"));
+        }
         if (state.webhookIssueRefusal) {
           return respond(
             response,
@@ -2379,13 +2412,30 @@ const server = createServer(
             refusal(409, state.webhookIssueRefusal),
           );
         }
-        state.webhookSecrets += 1;
+        // The platform derives the secret from the key, so the key the current
+        // secret was made with is answered with that secret again, rotated as
+        // its first answer said, and nothing rotates. Any other key, or none,
+        // makes a new secret.
+        const replayed = key !== null && key === state.webhookSecretKey;
+        if (!replayed) {
+          state.webhookSecrets += 1;
+          state.webhookSecretKey = key;
+          state.webhookSecretRotated = state.webhookSecrets > 1;
+        }
+        state.webhookIssues.push({ idempotencyKey: key, replayed });
+        if (state.webhookAnswersLost > 0) {
+          // Made, and its answer lost on the way back: the connection drops
+          // before a status line is written, as the departing session's does.
+          state.webhookAnswersLost -= 1;
+          response.socket?.destroy();
+          return;
+        }
         return respond(response, 200, {
           endpointId: webhookEndpointId,
           ...address,
           createdAt: now,
           secret: `fixture-secret-${state.webhookSecrets}`,
-          rotated: state.webhookSecrets > 1,
+          rotated: state.webhookSecretRotated,
         } satisfies Automations["IssuedWebhookEndpoint"]);
       }
     }
@@ -2657,6 +2707,20 @@ const server = createServer(
           422,
           problem(422, "The request could not be processed"),
         );
+      }
+      // Backend BUILD-PLAN 25.2.10: at capacity a run is held back `pending`;
+      // only with its queue full as well is the start refused, and nothing is
+      // created.
+      if (state.runsAtCapacity > 0) {
+        state.runsAtCapacity -= 1;
+        return respond(response, 429, {
+          ...problem(429, "The automation is at capacity"),
+          details: {
+            reason: "max_concurrent_runs",
+            templateId: "fixture-manual-input",
+            limit: "1",
+          },
+        } satisfies Platform["ApiProblem"]);
       }
       if (file) file.runId = startedRunId;
       return respond(response, 201, {

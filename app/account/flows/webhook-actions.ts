@@ -16,6 +16,11 @@ import { activeWorkspaceIfShown, WORKSPACE_CHANGED } from "@/lib/tenancy";
  * The secret comes back from `issue` only, is handed to the page that asked,
  * and is never stored here: the dialog shows it once and forgets it.
  *
+ * `issue` carries the dialog's idempotency key (backend §12.1 #240): a fresh
+ * one per press, the same one on every retry of it, so a press after a lost
+ * answer is answered with the secret that answer carried rather than a second
+ * rotation. The key is checked here the way the Run form's is.
+ *
  * Both act on the workspace the page showed (`activeWorkspaceIfShown`, register
  * F28). After a switch in another tab the read would otherwise ask the other
  * workspace, whose 404 reads as "no address yet" for an automation that has one.
@@ -51,13 +56,21 @@ export async function readWebhookAddress(
 export async function issueWebhookAddress(
   shownWorkspaceId: string,
   subscriptionId: string,
+  idempotencyKey: string,
 ): Promise<WebhookIssueResult> {
+  if (!/^[A-Za-z0-9._~:-]{16,128}$/u.test(idempotencyKey)) {
+    return { ok: false, error: "Reload the page and try again." };
+  }
   try {
     const workspaceId = await activeWorkspaceIfShown(shownWorkspaceId);
     if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
     return {
       ok: true,
-      issued: await issueWebhookEndpoint(workspaceId, subscriptionId),
+      issued: await issueWebhookEndpoint(
+        workspaceId,
+        subscriptionId,
+        idempotencyKey,
+      ),
     };
   } catch (error) {
     if (!(error instanceof PlatformServerError)) throw error;

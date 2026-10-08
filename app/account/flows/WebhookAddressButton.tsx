@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import Modal from "@/components/ui/Modal";
@@ -16,6 +16,15 @@ import { issueWebhookAddress, readWebhookAddress } from "./webhook-actions";
  * keeps only its hash — and is forgotten when the dialog closes. Making a new
  * one keeps the address and stops the old secret at once, so the vendor's
  * settings must be updated before its next delivery.
+ *
+ * **A press carries an idempotency key, and every retry of it the same one**
+ * (backend §12.1 #240). The platform derives the secret from the key, so a
+ * press whose answer was lost — the platform unreachable, the wait run out —
+ * is answered, when pressed again, with the secret that answer carried rather
+ * than a second rotation on top of the first. The key is made at the press and
+ * kept through a refusal, a lost answer and the dialog closing; it is spent
+ * once a secret is shown, so the next press is a new secret with a new key. It
+ * is not a secret and names nothing: a prefix and a UUID.
  */
 export function WebhookAddressButton({
   workspaceId,
@@ -32,6 +41,8 @@ export function WebhookAddressButton({
     undefined,
   );
   const [issued, setIssued] = useState<IssuedWebhookEndpoint | null>(null);
+  // The key of the press still waiting for its secret (backend §12.1 #240).
+  const issueKey = useRef<string | null>(null);
   const titleId = `webhook-${subscriptionId}-title`;
 
   const show = () => {
@@ -53,12 +64,21 @@ export function WebhookAddressButton({
 
   const issue = () => {
     setError(null);
+    // Made at this press unless a press before it is still unanswered: then
+    // this is its retry, and carries its key.
+    const key = (issueKey.current ??= `webhook-secret-${crypto.randomUUID()}`);
     startTransition(async () => {
-      const result = await issueWebhookAddress(workspaceId, subscriptionId);
+      const result = await issueWebhookAddress(
+        workspaceId,
+        subscriptionId,
+        key,
+      );
       if (!result.ok) {
         setError(result.error);
         return;
       }
+      // Answered: the next press is a new secret, so a new key.
+      issueKey.current = null;
       setIssued(result.issued);
       setEndpoint({
         endpointId: result.issued.endpointId,
