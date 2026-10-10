@@ -280,6 +280,15 @@ function initialState() {
     storeRefusing: false,
     storePuts: 0,
     storePutsWithCookie: 0,
+    // BUILD-PLAN 25.8.5: each object the store took — the type the upload was
+    // opened with, the type its PUT came as, and its bytes — since no page
+    // shows what the website sent.
+    storedObjects: [] as {
+      filename: string;
+      declaredType: string;
+      contentType: string | null;
+      bytes: string;
+    }[],
     // The complete export ends failed — with this reason, or none when empty —
     // or ready but partial.
     exportFailure: null as string | null,
@@ -1201,7 +1210,8 @@ const server = createServer(
       const upload = state.uploads.get(storeObject[1] ?? "");
       const chunks: Buffer[] = [];
       for await (const chunk of request) chunks.push(Buffer.from(chunk));
-      const size = Buffer.concat(chunks).byteLength;
+      const body = Buffer.concat(chunks);
+      const size = body.byteLength;
       if (request.method === "PUT") {
         state.storePuts += 1;
         if (request.headers.cookie) state.storePutsWithCookie += 1;
@@ -1216,8 +1226,23 @@ const server = createServer(
         return response.end();
       }
       upload.received = size;
+      state.storedObjects.push({
+        filename: upload.filename,
+        declaredType: upload.contentType,
+        contentType: request.headers["content-type"] ?? null,
+        bytes: body.toString("base64"),
+      });
       response.writeHead(200, { ...cors, "content-type": "application/json" });
       return response.end("{}");
+    }
+    // BUILD-PLAN 25.8.5: what the store took, read by a test at the fixture —
+    // the type each file was sent as and its bytes, which no page shows.
+    if (request.method === "GET" && url.pathname === "/__fixture/stored") {
+      response.writeHead(200, {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+      });
+      return response.end(JSON.stringify(state.storedObjects));
     }
     // FR-14: every completed file and the run it was given to, read by a test
     // at the fixture, because the run's page does not show its input.
@@ -2453,7 +2478,14 @@ const server = createServer(
           details: { reason: "no_file_input" },
         } satisfies Platform["ApiProblem"]);
       }
-      if (body.contentType !== "application/pdf") {
+      // Invoice Processing's types — a PDF, a JPEG or a PNG (the owner's
+      // approval of 2026-10-10) — the three the website's file field sends
+      // (BUILD-PLAN 25.8.5). Any other is refused as the platform refuses a
+      // type a manifest does not accept.
+      const contentType = body.contentType ?? "";
+      if (
+        !["application/pdf", "image/jpeg", "image/png"].includes(contentType)
+      ) {
         return respond(response, 400, {
           ...problem(400, "Bad Request"),
           details: { reason: "content_type_not_accepted" },
@@ -2466,7 +2498,7 @@ const server = createServer(
       const uploadSessionId = crypto.randomUUID();
       state.uploads.set(uploadSessionId, {
         filename: body.filename ?? "file",
-        contentType: body.contentType,
+        contentType,
         sizeBytes: body.sizeBytes ?? 0,
       });
       return respond(response, 200, {

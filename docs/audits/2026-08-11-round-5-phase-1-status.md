@@ -2411,4 +2411,106 @@ The platform's AI path (BUILD-PLAN 25.2.14–25.2.16) landed on `snoopy-backend`
   `connections.d.ts` are unchanged (`93fd335c…`, `ab70cb0f…`). Production serves `69a65b05…`
   since the promotion, which is what CI's Deployed contract job compares this file with.
 
+## Round 17 — the Run window's file field: Take photo on a phone or a tablet, and every image drawn upright as a JPEG (BUILD-PLAN 25.8.5) — 2026-10-10
+
+BUILD-PLAN 25.8.5, approved by the owner on 2026-10-10: "The website's Run window offers Take
+photo for a file field on a phone or tablet, as the app does (`snoopy`); nothing else on the
+website changes." Grown the same day by the owner's decision 8: "the website processes images as
+the app does — the file input limited to PDF, JPEG and PNG, offering the camera on a phone, and
+every image drawn upright with `createImageBitmap` onto a canvas and saved as a JPEG with its long
+side at most 2,576 px. It still changes the Run window's file field and nothing else." Both are
+written in `snoopy-backend/docs/platform/BUILD-PLAN.md` at its `main` `4875579` (#195, which
+carried #194's `974d66f`). The app's
+half is 25.8.3 (decision 1: `expo-image-picker`'s camera, `expo-image-manipulator`, the pickers
+limited to the same three types).
+
+- **The file chooser takes a PDF, a JPEG or a PNG.** `app/account/flows/RunFileField.tsx`'s file
+  input has `accept="application/pdf,image/jpeg,image/png"`, named in code
+  (`RUN_FILE_ACCEPT`, `app/account/flows/run-file-image.ts`) because a run-input field carries no
+  list of types.
+- **Take photo, on a phone or a tablet only.** It is offered where `(pointer: coarse)` matches:
+  the primary pointer is "a pointing device of limited accuracy, such as a finger on a
+  touchscreen" (MDN, `pointer`). Not `any-pointer`, which a laptop with a touchscreen matches while
+  its primary pointer is a trackpad; a computer's browser ignores `capture` and would open the same
+  file picker as the chooser. Not the user agent: Safari on an iPad presents itself as a Mac. The
+  query is read with `useSyncExternalStore`, so a change of pointer is followed. Take photo is
+  `components/ui/Button.tsx` (secondary, small) under the chooser; its accessible name is "Take
+  photo for" the field's title. It opens a second file input, `accept="image/*"` and
+  `capture="environment"` (MDN: "Values include `user` and `environment`"), styled `display:none`
+  and opened by its `click()`, as MDN's "Using hidden file input elements" describes. That input
+  has no name, so the form still carries only the file's id. A photo takes the place of a file
+  chosen before, and the chooser is emptied so it does not name a file the field no longer holds;
+  closing the camera without a photo keeps what the field held.
+- **What is sent.** A PDF, as it is. A JPEG or a PNG from the chooser, and any image the camera
+  gives, is drawn once before the platform is asked for a URL, so the size it signs is the size
+  sent: `createImageBitmap(file)` with no options, whose `imageOrientation` is "from-image" by
+  default ("Image oriented according to EXIF orientation metadata, if present (default)", MDN),
+  onto a canvas whose long side is at most 2,576 px and never enlarged, on white — a JPEG keeps no
+  transparency and an empty canvas saves it black — and saved by `toBlob` as `image/jpeg` at
+  quality 0.9, named as chosen with `.jpg`. That file is what `openRunUpload` names and
+  `putFileToSignedUrl` sends. Any other type is refused before anything is sent, in the words
+  "Choose a PDF, JPEG or PNG file.", and like any new choice it ends the upload it replaces; an
+  image the browser cannot decode reads "The image could not be read. Try another." (the browser's
+  own was "The source image could not be decoded."). The rest is as it was: an upload stops when
+  its field goes, busy is reported per field, the hidden inputs carry the control and the file's
+  id, the platform's refusals keep their words, and a failed file empties the chooser to choose it
+  again.
+- **The fixture Edge.** An upload opens for `application/pdf`, `image/jpeg` and `image/png`,
+  Invoice Processing's three, and any other type is refused `content_type_not_accepted` as before.
+  The store keeps what each PUT carried — the type the upload was opened with, the PUT's
+  `content-type` and the bytes — read by a test as `stored`.
+- **The tests.** `test/run-file-image.test.mjs` (six): the three types; which are sent, drawn
+  again or refused, from the chooser and from the camera; 2,576 px on the long side, proportions
+  kept, a sweep of sizes never past it; nothing enlarged; the `.jpg` name and quality 0.9; the
+  camera's input and its media query. `e2e/public-edge-fixture.spec.ts`, "a photo or an image for
+  a run (backend BUILD-PLAN 25.8.5)" (seven): the chooser's `accept` and no Take photo on a
+  computer; a PDF reaching the store byte for byte as `application/pdf`; a 3,200 by 1,800 PNG
+  reaching it as `image/jpeg` named `scan.jpg`, 2,576 by 1,449, transparency white, and the run
+  started with it; a JPEG saved sideways (EXIF orientation 6) reaching it upright, 859 by 2,576;
+  a refusal ending the upload it replaced; an image the browser cannot read; and, with
+  `hasTouch`, Take photo opening a chooser with `image/*` and `environment`, its photo sent
+  upright in place of the PDF chosen before, axe clean with the button shown. The type refusal
+  test now holds the website's words, with no server action and no PUT sent, and
+  `content_type_not_accepted` joined "each refusal of a file the platform names …", so the
+  platform's words keep a browser test.
+
+Proved red by hand: the unit test with `node --test`, the browser tests in Chromium alone (this
+Mac's WebKit fails the fixture suite on unchanged `main`). Each file was restored from a kept copy
+after its break, its sha256 checked equal, and the tree's diff checked unchanged:
+
+| Guard | Broken by | Red |
+| --- | --- | --- |
+| The chooser takes the three types | `accept` taken out | the chooser's test and the Take photo test |
+| The three named in code | `RUN_FILE_ACCEPT` set to `application/pdf,image/*` | the unit test's first |
+| No Take photo on a computer | the media query read as always true | "… a computer is offered no Take photo" |
+| Take photo on a phone or a tablet | the media query read as always false | the Take photo test |
+| The query is the primary pointer's | `(any-pointer: coarse)` | the unit test's last |
+| The camera's input opens the camera | `capture="environment"` taken out | the Take photo test; the unit test's last |
+| The camera's input is never sent | a `name` given to it | the unit test's last |
+| A PNG is drawn again | a PNG sent as it is | the PNG test, and the unreadable image's (sent, no refusal); the unit test's second |
+| Any photo is drawn again | the camera's own rule taken out | the unit test's second |
+| Anything else is refused first | anything else sent | the type refusal test and the replaced upload's; the unit test's second |
+| A PDF is sent as it is | a PDF drawn again | the PDF test, the refusals' and the replaced upload's, the Take photo test |
+| 2,576 px | the bound set to 4,096; the canvas left the image's size | the unit test's third; the PNG, sideways and Take photo tests |
+| Nothing enlarged | the early return for an image within the bound taken out | the unit test's fourth |
+| Upright | `imageOrientation: "flipY"` | the sideways test and the Take photo test |
+| On white | the white fill taken out | the PNG test (black where it was transparent) |
+| A JPEG's bytes and name | `toBlob` as `image/png`; the name kept; quality 0.5 | the PNG test (no JPEG marker); the unit test's fifth (twice) |
+| The image's own orientation, by default | `imageOrientation: "none"` | the unit test's fifth — the browser tests stay green: see below |
+| An unreadable image in words | the decode's failure passed through | the unreadable image's test |
+| A refusal ends the upload it replaces | the refusal leaving it running | the replaced upload's test (Start run read "Uploading…") |
+| A photo empties the chooser | the emptying taken out | the Take photo test |
+| Closing the camera keeps the file | a closed camera treated as a choice of nothing | the Take photo test |
+| The platform's type refusal in words | `content_type_not_accepted` taken out of `UPLOAD_REFUSALS` | the refusals' test ("Bad Request") |
+
+**Read, not changed.** Chromium 151 and Firefox 153 (Playwright 1.62.1's builds) apply a JPEG's
+EXIF orientation in `createImageBitmap` by default, and also when told `imageOrientation: "none"`,
+which MDN describes as ignoring it; `"flipY"` flips. So the code passes no option, and the upright
+tests are proved by `"flipY"`. The same two browsers' `hasTouch` makes `(pointer: coarse)` match.
+
+**Not verified here**: a real phone's camera (iOS Safari, Android Chrome) and Safari's
+`createImageBitmap` orientation. The sideways test runs in every engine with no touch emulation,
+so CI's WebKit leg reads WebKit's orientation; the Take photo test is skipped in WebKit only if its
+touch emulation leaves the primary pointer fine, and says so.
+
 F103 is the last number.
