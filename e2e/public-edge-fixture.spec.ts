@@ -1,3 +1,4 @@
+import { crc32, deflateSync } from "node:zlib";
 import { AxeBuilder } from "@axe-core/playwright";
 import {
   expect,
@@ -1022,6 +1023,140 @@ function fixtureFiles() {
   );
 }
 
+// What the fixture's object store took (BUILD-PLAN 25.8.5): each file's name,
+// the type its upload was opened with, the type its PUT came as, and its bytes.
+function storedObjects() {
+  return fixtureRead<
+    {
+      filename: string;
+      declaredType: string;
+      contentType: string | null;
+      bytes: string;
+    }[]
+  >("stored");
+}
+
+// A PNG built here, so no image is checked in: `paint` gives each pixel's red,
+// green, blue and alpha. The signature, its header, one IDAT and the end.
+function png(
+  width: number,
+  height: number,
+  paint: (x: number, y: number) => readonly [number, number, number, number],
+): Buffer {
+  const stride = width * 4 + 1;
+  // Each row begins with its filter, 0: none.
+  const rows = Buffer.alloc(stride * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      rows.set(paint(x, y), y * stride + 1 + x * 4);
+    }
+  }
+  const chunk = (type: string, data: Buffer) => {
+    const typed = Buffer.concat([Buffer.from(type, "latin1"), data]);
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(data.byteLength);
+    const check = Buffer.alloc(4);
+    check.writeUInt32BE(crc32(typed));
+    return Buffer.concat([length, typed, check]);
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  // Eight bits a channel, RGBA, no interlace.
+  header.set([8, 6, 0, 0, 0], 8);
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk("IHDR", header),
+    chunk("IDAT", deflateSync(rows)),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
+// A photo as a phone held sideways saves it: its pixels stored 3,000 wide and
+// 1,000 tall, the left half red and the right half blue, and EXIF orientation
+// 6 — "turn me a quarter clockwise". Upright it is 1,000 wide and 3,000 tall,
+// red at the top. The browser encodes the JPEG; the orientation is written in
+// here, after the start-of-image marker, where a camera writes it.
+async function sidewaysPhoto(page: Page): Promise<Buffer> {
+  const encoded = await page.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 3000;
+    canvas.height = 1000;
+    const context = canvas.getContext("2d")!;
+    context.fillStyle = "red";
+    context.fillRect(0, 0, 1500, 1000);
+    context.fillStyle = "blue";
+    context.fillRect(1500, 0, 1500, 1000);
+    const jpeg = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.95),
+    );
+    let binary = "";
+    for (const byte of new Uint8Array(await jpeg!.arrayBuffer())) {
+      binary += String.fromCharCode(byte);
+    }
+    return btoa(binary);
+  });
+  const jpeg = Buffer.from(encoded, "base64");
+  // APP1, 34 bytes: "Exif", a big-endian TIFF header, and one IFD holding one
+  // entry — tag 0x0112 (Orientation), one SHORT, 6.
+  const exif = Buffer.from([
+    0xff, 0xe1, 0x00, 0x22, 0x45, 0x78, 0x69, 0x66, 0x00, 0x00, 0x4d, 0x4d,
+    0x00, 0x2a, 0x00, 0x00, 0x00, 0x08, 0x00, 0x01, 0x01, 0x12, 0x00, 0x03,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  ]);
+  return Buffer.concat([jpeg.subarray(0, 2), exif, jpeg.subarray(2)]);
+}
+
+// An image as a browser decodes it: its size, and the colour at points given
+// as fractions of its width and height, each named as the tests paint them.
+async function decodedImage(
+  page: Page,
+  base64: string,
+  points: (readonly [number, number])[],
+) {
+  const image = await page.evaluate(
+    async ([data, at]) => {
+      const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+      const bitmap = await createImageBitmap(new Blob([bytes]));
+      const canvas = document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const context = canvas.getContext("2d")!;
+      context.drawImage(bitmap, 0, 0);
+      return {
+        width: bitmap.width,
+        height: bitmap.height,
+        colours: at.map(([across, down]) => [
+          ...context
+            .getImageData(
+              Math.floor(across * bitmap.width),
+              Math.floor(down * bitmap.height),
+              1,
+              1,
+            )
+            .data.slice(0, 3),
+        ]),
+      };
+    },
+    [base64, points] as const,
+  );
+  const named = ([red = 0, green = 0, blue = 0]: number[]) =>
+    red > 200 && green < 80 && blue < 80
+      ? "red"
+      : blue > 200 && red < 80 && green < 80
+        ? "blue"
+        : red > 235 && green > 235 && blue > 235
+          ? "white"
+          : red < 60 && green < 60 && blue < 60
+            ? "black"
+            : `rgb(${red}, ${green}, ${blue})`;
+  return {
+    width: image.width,
+    height: image.height,
+    colours: image.colours.map(named),
+  };
+}
+
 // The Run dialog of the manual automation, with its three typed fields filled.
 async function openFilledRun(page: Page) {
   await page.goto("/account/flows");
@@ -1257,24 +1392,25 @@ test.describe("a file for a run (backend FR-14)", () => {
     ]);
   });
 
-  test("a file of a type the automation does not take is refused in words, and nothing is sent", async ({
+  test("a file that is not a PDF, a JPEG or a PNG is refused in words before anything is sent — its upload is never opened (BUILD-PLAN 25.8.5)", async ({
     page,
   }) => {
-    const puts = observe(
+    const dialog = await openFilledRun(page);
+    const sent = observe(
       page,
       (request) =>
-        request.method() === "PUT" && request.url().includes("/__fixture/"),
+        isServerAction(request) ||
+        (request.method() === "PUT" && request.url().includes("/__fixture/")),
     );
-    const dialog = await openFilledRun(page);
     await dialog.getByLabel("Invoice file").setInputFiles({
       name: "invoice.txt",
       mimeType: "text/plain",
       buffer: Buffer.from("not an invoice"),
     });
     await expect(dialog.getByRole("alert")).toHaveText(
-      "This flow does not accept that type of file.",
+      "Choose a PDF, JPEG or PNG file.",
     );
-    expect(puts).toEqual([]);
+    expect(sent).toEqual([]);
     // Emptied, so the same file chosen again is a change the browser reports.
     await expect(dialog.getByLabel("Invoice file")).toHaveValue("");
     // The file is optional: the run still starts, with no file.
@@ -1380,6 +1516,13 @@ test.describe("a file for a run (backend FR-14)", () => {
     const dialog = await openFilledRun(page);
     const file = dialog.getByLabel("Invoice file");
     for (const [stage, status, reason, words] of [
+      // A flow whose manifest takes fewer types than the three.
+      [
+        "open",
+        400,
+        "content_type_not_accepted",
+        "This flow does not accept that type of file.",
+      ],
       [
         "open",
         400,
@@ -1458,6 +1601,268 @@ test.describe("a file for a run (backend FR-14)", () => {
     expect((await fixtureRead<{ storePuts: number }>("counts")).storePuts).toBe(
       0,
     );
+  });
+});
+
+test.describe("a photo or an image for a run (backend BUILD-PLAN 25.8.5)", () => {
+  // The browser PUTs the file straight to the fixture's object store, whose
+  // certificate is the fixture's own.
+  test.use({ ignoreHTTPSErrors: true });
+
+  test("the file chooser takes a PDF, a JPEG or a PNG, and a computer is offered no Take photo", async ({
+    page,
+  }) => {
+    const dialog = await openFilledRun(page);
+    await expect(dialog.getByLabel("Invoice file")).toHaveAttribute(
+      "accept",
+      "application/pdf,image/jpeg,image/png",
+    );
+    // A mouse is this browser's primary pointer, as a computer's is.
+    expect(
+      await page.evaluate(() => matchMedia("(pointer: coarse)").matches),
+    ).toBe(false);
+    await expect(
+      dialog.getByRole("button", { name: /Take photo/u }),
+    ).toHaveCount(0);
+    await expect(dialog.locator('input[type="file"]')).toHaveCount(1);
+  });
+
+  test("a PDF is sent as it is: its own bytes, name and type", async ({
+    page,
+  }) => {
+    const dialog = await openFilledRun(page);
+    await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
+    await expect(
+      dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+    ).toBeVisible();
+    expect(await storedObjects()).toEqual([
+      {
+        filename: "invoice.pdf",
+        declaredType: "application/pdf",
+        contentType: "application/pdf",
+        bytes: invoicePdf.buffer.toString("base64"),
+      },
+    ]);
+  });
+
+  test("a PNG is drawn again and sent as a JPEG named .jpg, its long side 2,576 px and its transparency on white, and the run is started with it", async ({
+    page,
+  }) => {
+    // 3,200 by 1,800: ink on the left two thirds, transparent on the right.
+    const scan = png(3200, 1800, (x) =>
+      x < 2133 ? [20, 20, 20, 255] : [0, 0, 0, 0],
+    );
+    const dialog = await openFilledRun(page);
+    await dialog.getByLabel("Invoice file").setInputFiles({
+      name: "scan.png",
+      mimeType: "image/png",
+      buffer: scan,
+    });
+    await expect(
+      dialog.getByText(/^Ready: scan\.jpg \(\d+ KB\)$/u),
+    ).toBeVisible();
+    const [sent, ...others] = await storedObjects();
+    expect(others).toEqual([]);
+    expect(sent).toMatchObject({
+      filename: "scan.jpg",
+      declaredType: "image/jpeg",
+      contentType: "image/jpeg",
+    });
+    const bytes = Buffer.from(sent!.bytes, "base64");
+    // A JPEG's start-of-image marker, and not the PNG chosen.
+    expect([...bytes.subarray(0, 3)]).toEqual([0xff, 0xd8, 0xff]);
+    expect(
+      await decodedImage(page, sent!.bytes, [
+        [0.25, 0.5],
+        [0.9, 0.5],
+      ]),
+    ).toEqual({ width: 2576, height: 1449, colours: ["black", "white"] });
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
+    expect(await fixtureFiles()).toEqual([
+      {
+        filename: "scan.jpg",
+        sizeBytes: bytes.byteLength,
+        runId: "fixture-run-started",
+      },
+    ]);
+  });
+
+  test("a JPEG saved sideways is sent upright — drawn the way the phone was held — its long side 2,576 px", async ({
+    page,
+  }) => {
+    const dialog = await openFilledRun(page);
+    await dialog.getByLabel("Invoice file").setInputFiles({
+      name: "receipt.jpeg",
+      mimeType: "image/jpeg",
+      buffer: await sidewaysPhoto(page),
+    });
+    await expect(
+      dialog.getByText(/^Ready: receipt\.jpg \(\d+ KB\)$/u),
+    ).toBeVisible();
+    const [sent, ...others] = await storedObjects();
+    expect(others).toEqual([]);
+    expect(sent).toMatchObject({
+      filename: "receipt.jpg",
+      declaredType: "image/jpeg",
+      contentType: "image/jpeg",
+    });
+    // Red at the top: 1,000 by 3,000 upright, so 859 by 2,576.
+    expect(
+      await decodedImage(page, sent!.bytes, [
+        [0.5, 0.1],
+        [0.5, 0.9],
+      ]),
+    ).toEqual({ width: 859, height: 2576, colours: ["red", "blue"] });
+  });
+
+  test("a file refused before it is sent ends the upload it replaced: Start run is not held, and that file never lands", async ({
+    page,
+  }) => {
+    const put = await holdRequest(
+      page,
+      "https://127.0.0.1:3443/__fixture/objects/**",
+      (request) => request.method() === "PUT",
+    );
+    const dialog = await openFilledRun(page);
+    const file = dialog.getByLabel("Invoice file");
+    await file.setInputFiles(invoicePdf);
+    await put.arrived;
+    await file.setInputFiles({
+      name: "invoice.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("not an invoice"),
+    });
+    await expect(dialog.getByRole("alert")).toHaveText(
+      "Choose a PDF, JPEG or PNG file.",
+    );
+    const start = dialog.getByRole("button", { name: /Start run|Uploading…/u });
+    await expect(start).toHaveText("Start run");
+    await expect(start).toBeEnabled();
+    // The upload it replaced was stopped: let through, it lands nothing.
+    put.release();
+    await page.waitForTimeout(1_000);
+    await expect(dialog.getByText(/^Ready:/u)).toHaveCount(0);
+    expect(await fixtureFiles()).toEqual([]);
+  });
+
+  test("an image the browser cannot read is said so, its field emptied, and nothing is sent", async ({
+    page,
+  }) => {
+    const dialog = await openFilledRun(page);
+    const sent = observe(
+      page,
+      (request) =>
+        isServerAction(request) ||
+        (request.method() === "PUT" && request.url().includes("/__fixture/")),
+    );
+    const file = dialog.getByLabel("Invoice file");
+    await file.setInputFiles({
+      name: "torn.png",
+      mimeType: "image/png",
+      buffer: Buffer.from("not a picture at all"),
+    });
+    await expect(dialog.getByRole("alert")).toHaveText(
+      "The image could not be read. Try another.",
+    );
+    await expect(file).toHaveValue("");
+    expect(sent).toEqual([]);
+    await expect(
+      dialog.getByRole("button", { name: "Start run" }),
+    ).toBeEnabled();
+  });
+
+  test.describe("on a phone or a tablet", () => {
+    // A touchscreen as the primary pointer. Chromium's and Firefox's touch
+    // emulation make `(pointer: coarse)` match (read 2026-10-10).
+    test.use({ hasTouch: true });
+
+    test("Take photo opens the camera, and the photo — held sideways — is sent upright as a JPEG whose long side is 2,576 px, in place of the file chosen before", async ({
+      page,
+      browserName,
+    }) => {
+      const dialog = await openFilledRun(page);
+      const coarse = await page.evaluate(
+        () => matchMedia("(pointer: coarse)").matches,
+      );
+      test.skip(
+        !coarse && browserName === "webkit",
+        "this WebKit's touch emulation leaves the primary pointer fine",
+      );
+      expect(coarse).toBe(true);
+      const file = dialog.getByLabel("Invoice file");
+      await expect(file).toHaveAttribute(
+        "accept",
+        "application/pdf,image/jpeg,image/png",
+      );
+      await file.setInputFiles(invoicePdf);
+      await expect(
+        dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+      ).toBeVisible();
+      const takePhoto = dialog.getByRole("button", {
+        name: "Take photo for Invoice file",
+      });
+      await expect(takePhoto).toBeVisible();
+      await expectNoAxeViolations(page);
+
+      // Closing the camera without a photo keeps the file the field holds.
+      const [closed] = await Promise.all([
+        page.waitForEvent("filechooser"),
+        takePhoto.click(),
+      ]);
+      await closed.setFiles([]);
+      await page.waitForTimeout(500);
+      await expect(
+        dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+      ).toBeVisible();
+
+      const photo = await sidewaysPhoto(page);
+      const [camera] = await Promise.all([
+        page.waitForEvent("filechooser"),
+        takePhoto.click(),
+      ]);
+      expect(await camera.element().getAttribute("accept")).toBe("image/*");
+      expect(await camera.element().getAttribute("capture")).toBe(
+        "environment",
+      );
+      expect(camera.isMultiple()).toBe(false);
+      await camera.setFiles({
+        name: "image.jpg",
+        mimeType: "image/jpeg",
+        buffer: photo,
+      });
+      await expect(
+        dialog.getByText(/^Ready: image\.jpg \(\d+ KB\)$/u),
+      ).toBeVisible();
+      // The chooser no longer names the PDF the photo replaced.
+      await expect(file).toHaveValue("");
+
+      const [, taken, ...others] = await storedObjects();
+      expect(others).toEqual([]);
+      expect(taken).toMatchObject({
+        filename: "image.jpg",
+        declaredType: "image/jpeg",
+        contentType: "image/jpeg",
+      });
+      // Upright — red at the top — and bounded: 1,000 by 3,000 becomes 859
+      // by 2,576.
+      expect(
+        await decodedImage(page, taken!.bytes, [
+          [0.5, 0.1],
+          [0.5, 0.9],
+        ]),
+      ).toEqual({ width: 859, height: 2576, colours: ["red", "blue"] });
+      await dialog.getByRole("button", { name: "Start run" }).click();
+      await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
+      expect(await fixtureFiles()).toEqual([
+        { filename: "invoice.pdf", sizeBytes: 24 },
+        {
+          filename: "image.jpg",
+          sizeBytes: Buffer.from(taken!.bytes, "base64").byteLength,
+          runId: "fixture-run-started",
+        },
+      ]);
+    });
   });
 });
 
