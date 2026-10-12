@@ -155,24 +155,32 @@ export default function PrivacyPage() {
             refused, never sent elsewhere. Under these rules a request can reach
             Amazon Bedrock, Microsoft Azure, DeepInfra, Fireworks, Google Vertex
             AI, Mistral, Sail Research, Wafer or xAI; which one serves it
-            depends on the model and on OpenRouter&apos;s routing. A PDF goes
-            directly to the model, not through OpenRouter&apos;s optional
-            PDF-conversion services. OpenRouter handles each request before the
-            provider does, and its privacy policy says it may process data in
-            the United States or in other countries.
+            depends on the model and on OpenRouter&apos;s routing. A PDF is sent
+            with OpenRouter&apos;s &quot;native&quot; PDF engine selected;
+            OpenRouter&apos;s PDF guide says a PDF sent this way is passed
+            directly to the model, not through its optional PDF-conversion
+            services. OpenRouter handles each request before the provider does,
+            and its privacy policy says it may process data in the United States
+            or in other countries.
           </p>
           <p>
-            Under these rules your documents are not used to train AI models.
-            Autom8x trains no models; OpenRouter&apos;s privacy policy says it
-            does not use inputs or outputs for model training; and OpenRouter
-            lists none of the providers above as training on prompts, which a
-            provider that keeps no data cannot do. OpenRouter says it stores no
-            prompts or answers unless an account opts in to logging or to
-            OpenRouter&apos;s own use of them, both off by default. It keeps
-            metadata such as token counts and timing, may tag a request with an
-            anonymous topic category for its reports and rankings, and under its
-            privacy policy may keep an image longer than routing it takes where
-            abuse detection, security, billing or legal compliance requires. See{" "}
+            Autom8x trains no models. Under these rules, the policies OpenRouter
+            publishes, for itself and for each provider above, say your
+            documents are not used to train AI models: OpenRouter&apos;s privacy
+            policy says it does not use inputs or outputs for model training,
+            and OpenRouter lists none of the providers above as training on
+            prompts, which a provider that keeps no data cannot do. OpenRouter
+            says it stores no prompts or answers unless an account opts in to
+            logging or to OpenRouter&apos;s own use of them, both off by
+            default; Autom8x keeps both off for its OpenRouter account, and that
+            account&apos;s settings turn on no OpenRouter plugin and no
+            broadcast of requests to other services. OpenRouter keeps metadata
+            such as token counts and timing, may tag a request with an anonymous
+            topic category for its reports and rankings, under its terms may
+            store a request temporarily where it is too large to process in
+            memory, and under its privacy policy may keep an image longer than
+            routing it takes where abuse detection, security, billing or legal
+            compliance requires. See{" "}
             <LegalLink href="https://openrouter.ai/privacy">
               OpenRouter&apos;s privacy policy
             </LegalLink>
@@ -194,8 +202,10 @@ export default function PrivacyPage() {
             settings, looks up its accounts, vendors, customers, employees,
             bills, expenses, vendor credits and journal entries, and creates
             vendors, bills, expenses, vendor credits and journal entries: a bill
-            is recorded as a bill, a receipt as an expense and a credit note as
-            a vendor credit, while a statement is compared, not recorded.
+            is recorded as a bill and a receipt as an expense, or as a journal
+            entry or a bill when someone paid with their own money; a credit
+            note as a vendor credit, or as a card refund when it was refunded to
+            a card; and a statement is compared, not recorded.
           </p>
           <p>
             Intuit&apos;s tokens for the connection are stored encrypted
@@ -208,10 +218,11 @@ export default function PrivacyPage() {
             your workspace, as described in Retention and deletion. QuickBooks
             data is used only to run your workspace&apos;s own automations and
             show you what they did; none of it is sent to an AI model, and it is
-            never sold or used for advertising. If you give Bills &amp; Receipts
-            an address in its &quot;Also email&quot; setting, such as your
-            bookkeeper&apos;s, a short summary of each document it records or
-            compares, built from QuickBooks&apos; answer, is emailed there.
+            never sold or used for advertising. Autom8x does not process
+            QuickBooks data on Intuit&apos;s behalf. If you give Bills &amp;
+            Receipts an address in its &quot;Also email&quot; setting, such as
+            your bookkeeper&apos;s, a short summary of each document it records
+            or compares, built from QuickBooks&apos; answer, is emailed there.
           </p>
           <p>
             An owner or admin can disconnect QuickBooks at any time on the
@@ -219,7 +230,9 @@ export default function PrivacyPage() {
             deletes the stored tokens at once and asks Intuit to revoke the
             access, and no automation can reach the company until it is
             connected again. What earlier runs recorded stays, in QuickBooks and
-            in your workspace.
+            in your workspace. An owner or admin can ask us at {LEGAL_EMAIL} to
+            delete what runs kept from QuickBooks, and we will delete it, apart
+            from records the law requires us to keep.
           </p>
         </LegalSection>
 
@@ -271,7 +284,8 @@ export default function PrivacyPage() {
             backups age out. Operational logs are kept for a limited period for
             security and debugging. Billing records are kept as long as tax and
             accounting law requires. Disconnecting a connected provider account
-            revokes and deletes its stored tokens immediately.
+            deletes its stored tokens immediately and asks the provider to
+            revoke the access.
           </p>
         </LegalSection>
 
