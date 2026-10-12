@@ -2662,6 +2662,8 @@ Intuit's developer documents. `app/(marketing)/privacy/page.tsx`:
   deleting, but whether either droplet runs them on a schedule is unknown (backend
   SYSTEM-MANIFEST §12.1 #229). The general rule, "retained while your account is active", is not
   false either way; if the jobs run, it overstates how long files and timelines are kept.
+  _Corrected by the re-check of 2026-10-12 (below): the records settle it — both jobs run at every
+  promotion — and the page states both windows since._
 - Whether OpenRouter's `native` PDF engine parses anything on its side (25.7.4's question). The
   page says what OpenRouter's PDF guide says, as the guide's words.
 
@@ -2681,7 +2683,8 @@ Intuit's developer documents. `app/(marketing)/privacy/page.tsx`:
    processing, and a wider licence in the terms. OpenRouter's processing starts only with the
    key. The owner decides; if it is material and there are account holders, it is announced
    before the key; and the decision is recorded either way, with "no outside account holders
-   yet" if that is so.
+   yet" if that is so. _Since the re-check of 2026-10-12 (below): due before the merge, not
+   before the key — both pages take effect when posted, and the terms' licence with them._
 3. **Financial documents under OpenRouter's data processing agreement**: its "Sensitive Data"
    includes "(b) credit or debit card number (other than the truncated (last four digits)…)" and
    "(c) employment, financial, credit … information" (1.15); "Unless the parties agree that
@@ -2702,7 +2705,9 @@ Intuit's developer documents. `app/(marketing)/privacy/page.tsx`:
    results stay while your account is active", with the timeline's "about three months" if it is
    to match `partitions.ts`. If they do not run: schedule them, or keep the general rule as a
    deliberate choice. Apple's guideline 5.1.1(i) asks the same of the policy: "Explain its data
-   retention/deletion policies".
+   retention/deletion policies". _Since the re-check of 2026-10-12 (below): the jobs run at every
+   promotion and the page states both windows; what stays here is a timer, so they hold between
+   promotions._
 5. **The realm id** (a finding for `snoopy-backend`): Intuit's security requirements say "Encrypt
    and store the refresh token and realmID in persistent memory" and "Intuit OAuth tokens or
    customer-identifying information is not exposed within your app or shared with other parties"
@@ -2735,7 +2740,9 @@ Intuit's developer documents. `app/(marketing)/privacy/page.tsx`:
    providers and linking this policy. Guideline 5.1.1(i)'s
    statement that a third party gives "the same or equal protection of user data as stated in the
    app's privacy policy" goes into the policy only after its basis is confirmed (OpenRouter's data
-   processing agreement, §5.1).
+   processing agreement, §5.1). _Since the re-check of 2026-10-12 (below): due with the key
+   (25.7.1), not with an app release — `snoopy-mobile` `d5fbb40` already starts a run with a file
+   for any flow in the catalog, so Bills & Receipts reaches the app with the catalog._
 
 **The audit of 2026-10-12** — twelve findings (the audit's list as received ends partway through
 the twelfth, the terms' disconnect sentence), each answered above:
@@ -2767,3 +2774,157 @@ their axe baselines (4), and all six marketing pages (6). CI's pinned image
 the two pages and their axe baselines in Chromium, Firefox and WebKit (8). The draft's control
 — both renderers reproducing `main`'s baselines for these two pages — stands; GitHub's x86_64
 runner is the authority.
+
+**The re-check of 2026-10-12, answered.** An independent re-check of `ee40349` found nothing
+blocking: three should-fix items and nine minor ones. Every page change below is read from
+`snoopy-backend` at `62284de`, its `main` at this update (records only since `3e235ca`; its
+`apps/`, `packages/`, `providers/` and `deploy/` are the same), `snoopy-automations` at `a00d7fa`,
+OpenRouter's terms (last updated August 31, 2026), data processing agreement (August 26, 2026)
+and guides as served 2026-10-12 20:44Z, Backblaze's documentation read the same day, or Intuit's
+authorization FAQ as copied 2026-10-12. `app/(marketing)/privacy/page.tsx`:
+
+- **Files and timelines** (re-check 1). Retention and deletion: "A file given to a run is kept
+  for 90 days after the run ends and then deleted, and a run's step-by-step timeline for about
+  three months; a run's results stay while your account is active", under "Your data is retained
+  while your account is active, except where this policy says otherwise". The 90 days:
+  `snoopy-backend/apps/artifacts/src/main.ts:47` (NFR-16, ADR-0012 §2; no
+  `ARTIFACTS_RETENTION_DAYS` in `snoopy-backend/deploy/compose.prod.yml`), stamped from the run's
+  end by the runs service's minute sweep (`snoopy-backend/apps/runs/src/background.ts:69`,
+  `snoopy-backend/apps/artifacts/src/routes.ts:264`) and deleted by `maintain-artifacts`
+  (`snoopy-backend/apps/artifacts/src/maintain.ts:65`). The timeline: three monthly partitions,
+  a row dropped no younger than 89 days and kept no older than 122
+  (`snoopy-backend/apps/runs/src/partitions.ts:64`), by `maintain-runs`. Neither job has a
+  profile (`snoopy-backend/compose.yml:556`, `:942`; `snoopy-backend/deploy/compose.prod.yml:714`,
+  `:767`), so both hosts run them at every `up -d` (backend SYSTEM-MANIFEST §12.1 #229);
+  production deploys with `doppler run -- docker compose up -d` (backend BUILD-PLAN line 2788),
+  and the read-backs record 15 one-shot jobs `Exited (0)` on each host (lines 7575 and 7720). No
+  timer is recorded, so a window closes at the next promotion's pass, not on its day. A run's own
+  row has no window (backend BUILD-PLAN 7.3).
+- **Deletion's two limits** (re-check 3, and one this update found). (a) Backups:
+  `snoopy-backend/deploy/backup/pg-backup.sh` dumps the platform's schemas each night
+  (`snoopy-backend/deploy/backup/autom8x-backup.timer`, 03:30 UTC), deletes only the server's own
+  dumps after 14 days (line 17, `KEEP_DAYS`; line 77), and uploads each dump to `autom8x-backups`
+  (lines 57–65) with no deletion there and no encryption of its own; nothing in `snoopy-backend`
+  records a lifecycle rule or default encryption on that bucket — the ADR-0022 amendment says only
+  "Backups age out on the backup script's schedule" — and Supabase's Free tier keeps no backups
+  (backend SYSTEM-MANIFEST §12.2 #28). So the page says what a backup is and may hold: "the copy
+  kept on our server is deleted after 14 days, and a copy stored off-site with Backblaze is not
+  deleted on that schedule. A backup can still hold data deleted after it was made, such as the
+  tokens of a provider account since disconnected, which stay encrypted in it" (sealed under
+  keys outside the database, `snoopy-backend/packages/crypto/src/envelope.ts`). It promises no
+  expiry. "nightly encrypted backups rotate on a fixed schedule, so deleted data leaves the
+  backup set as those backups age out" is gone, and Who we share it with's "encrypted off-site
+  backups" is "off-site backups". (b) Files: the store deletes a file with an S3 `DELETE` that
+  names no version (`snoopy-backend/apps/artifacts/src/s3-store.ts:338`,
+  `snoopy-backend/apps/artifacts/src/s3-signing.ts:237`), and Backblaze answers that with a
+  marker: "If no versionId is included in the request, a delete marker will be inserted"
+  (https://www.backblaze.com/apidocs/s3-delete-object); a bucket left at its default keeps the
+  earlier version "forever, unless you delete them"
+  (https://www.backblaze.com/docs/cloud-storage-lifecycle-rules). No record shows
+  `autom8x-artifacts`' lifecycle either, so the page says Backblaze "can keep an earlier version
+  of a file after it is deleted". Account deletion now "removes your account data from the
+  service promptly, within the limits below" (was "from live systems promptly"), and the
+  QuickBooks deletion sentence names the backup limit.
+- **A PDF goes as uploaded** (re-check 5): "The document itself goes as uploaded, including
+  anything stored inside the file, such as a PDF's title or author" — the stored bytes, unchanged
+  (`snoopy-backend/apps/runs/src/model-file.ts:89`), with only the name replaced
+  (`snoopy-backend/packages/model-gateway/src/openrouter.ts:246`); the Run window re-draws an
+  image and sends a PDF as it is (`app/account/flows/RunFileField.tsx:54`).
+- **OpenRouter's screening, and its exception for the law and malicious use** (re-check 6), in
+  its own documents' words — its terms §6.7: "OpenRouter may, however, at any time and without
+  prior notice, screen, remove, edit, or block any Inputs that in our sole judgment violates
+  these Terms or is otherwise objectionable or illegal. This includes screening Inputs for known
+  child sexual abuse material (CSAM) and malware using automated detection tools"
+  (https://openrouter.ai/terms); its data processing agreement §2.4(a): "Except where required by
+  law or as necessary to address malicious use of the Service, … OpenRouter will delete Inputs and
+  Outputs promptly following generation of the relevant Output. OpenRouter may apply automated
+  risk classification to Inputs and Outputs prior to deletion solely to detect violations of this
+  Agreement" (https://openrouter.ai/data-processing-agreement). Both apply to every request, not
+  only an image. Linked where the page names them, with the zero data retention, PDF and data
+  collection guides.
+- **The PDF plugin** (re-check 7): "A PDF is sent through OpenRouter's PDF plugin, set on each
+  request to its "native" engine" (`snoopy-backend/packages/model-gateway/src/openrouter.ts:201`),
+  and the zero data retention guide's "does not apply to plugins and tools you choose to enable"
+  (https://openrouter.ai/docs/guides/features/zdr). The PDF guide's words on the native engine
+  stay as they were, because 25.7.4's question to OpenRouter is unanswered. The account's
+  commitment is now "turn on no OpenRouter plugin by default" — the plugins guide's "Default
+  Plugin Settings" (https://openrouter.ai/docs/guides/features/plugins).
+- **Disconnecting from inside QuickBooks** (re-check 10): "If you disconnect Autom8x from within
+  QuickBooks instead, Intuit says this invalidates the tokens it gave Autom8x, so no automation
+  can reach the company from then on; disconnecting on the Connections page as well deletes the
+  stored tokens." Intuit's authorization FAQ: "If a user disconnects their QuickBooks Online
+  company from your app, it invalidates the access token and refresh token"
+  (https://developer.intuit.com/app/developer/qbo/docs/develop/authentication-and-authorization/faq).
+  The platform learns at its next call or renewal and marks the connection to be reconnected
+  (`snoopy-backend/apps/connections/src/routes-operations.ts:227`,
+  `snoopy-backend/apps/connections/src/refresh.ts:179`), keeping the dead tokens; the schema's
+  trigger deletes them only when the status becomes `disconnected`
+  (`snoopy-backend/apps/connections/migrations/0001_connections_baseline.sql:202`), which
+  Disconnect sets from any other status
+  (`snoopy-backend/apps/connections/src/postgres-connections.ts:175`), and both the website and
+  the app offer Disconnect on a connection that needs reconnecting
+  (`app/account/connections/ConnectionsPanel.tsx:315`;
+  `snoopy-mobile/components/settings/connections-card.tsx:46`).
+- **What earlier runs recorded, after a disconnect** (re-check 10): "in your workspace, Autom8x
+  uses it only for those runs, to show them to you or to end one still waiting for approval, until
+  you ask us to delete it". The re-check's "used only to show your workspace its earlier runs" is
+  not the whole of it: an approval given after a disconnect hands the held run's saved state back
+  to Bills & Receipts (`snoopy-backend/apps/runs/src/routes-approvals.ts:113`), whose first step
+  after an approval checks the company again "before anything is written"
+  (`snoopy-automations/automations/invoice-processing/src/steps/confirm-company.ts`), and the
+  call is refused, so the run ends. A workspace export carries the runs' one-line results
+  (`snoopy-backend/apps/runs/src/postgres-export.ts:40`) — the runs, shown to you. Deletion on
+  request is the page's own promise, carried out by hand until a tool exists (owner item 6).
+
+`app/(marketing)/terms/page.tsx` (re-check 11): "and the service providers the Privacy Policy
+names, including OpenRouter and the model providers it routes requests to, the licenses they need
+to process it as that policy describes — nothing more" — was "our service providers the licenses
+they need to process it as the Privacy Policy describes". The policy names the eight hosts as
+under an agreement with us, and OpenRouter and the model providers apart from them.
+
+**Not page changes** — for the owner and for `snoopy-backend`:
+
+- Owner item 2 is due before the merge (re-check 2).
+- 25.7.1 closes only on the OpenRouter account's settings read back — Privacy, Observability
+  (logging and Broadcast), and Plugins with "Prevent overrides" (re-check 4); not yet filed in
+  the backend's BUILD-PLAN.
+- Revocation should send the refresh token (re-check 9; Intuit's OAuth 2.0 guide, Step 16:
+  "include the refresh_token value for the token parameter"):
+  `snoopy-backend/apps/connections/src/postgres-disconnect.ts:34` reads the access token and
+  `snoopy-backend/apps/connections/src/oauth-revoke.ts:29` posts it.
+- The stored tokens should be deleted when Intuit reports the grant gone — a renewal refused, or
+  a call answered 401 — not only on Disconnect (re-check 10; Intuit's developer terms §12.2:
+  "Immediately cease to access and discontinue processing User Data … if a User revokes their
+  consent").
+- A timer for `maintain-artifacts` and `maintain-runs` (§12.1 #229), so the 90 days and about
+  three months hold between promotions (re-check 1).
+- The Backblaze console: `autom8x-backups`' and `autom8x-artifacts`' Lifecycle Settings and
+  Default Encryption read and recorded; with a rule there — or a store that deletes by version —
+  the page's two limits can be tightened (re-check 3, and this update's own).
+- Owner items 3, 5 and 6 stand; item 7 is due with the key (re-check 12).
+- If the merge slips past October 12, both dates and the four PNGs change together (re-check 8).
+
+| Re-check finding | Severity | Answer |
+| ---------------- | -------- | ------ |
+| Files and timelines said "retained while your account is active" | should-fix | both windows on the page; the timer, for `snoopy-backend` |
+| The owner's materiality decision is due before the merge | should-fix | owner item 2, its deadline moved |
+| Off-site backups: no record they expire or are encrypted | should-fix | the page says what backups hold and promises no expiry; "encrypted" dropped; the console read, for the owner |
+| The account settings check not filed in 25.7.1 | minor | for `snoopy-backend` |
+| A PDF's own title and author reach the model | minor | said on the page |
+| OpenRouter's screening and its law and abuse exception | minor | said on the page, with its terms and data processing agreement linked |
+| "No OpenRouter plugin" beside the PDF plugin | minor | "by default", and the PDF plugin named |
+| The dates and snapshots if the merge slips | minor | October 12 kept; the four re-recorded today |
+| Revocation with the access token | minor | for `snoopy-backend` |
+| Disconnecting inside QuickBooks; run data kept after | minor | both on the page; deleting the tokens on Intuit's report, for `snoopy-backend` |
+| The terms' "our service providers" | minor | the policy's named providers, OpenRouter and the model providers among them |
+| Apple 5.1.2(i) applies at the key | minor | item 7, its deadline moved |
+
+**The screenshots, again.** `e2e/marketing.visual.spec.ts-snapshots/privacy-darwin.png`,
+`privacy-linux.png`, `terms-darwin.png` and `terms-linux.png` re-recorded: privacy 1440 by 6,467
+px on the Mac and 6,490 in CI's image (were 5,960 and 5,983), terms 3,979 and 3,955 (were 3,955
+and 3,932). Each renderer first failed both pages on the previous baselines, then re-recorded
+them and passed again: the Mac's Chromium through the same temporary, uncommitted config on
+127.0.0.1:3111 — the two pages and their axe baselines (4) and all six marketing pages (6); CI's
+pinned image (`mcr.microsoft.com/playwright@sha256:dcc5531e…`, Node 22.23.2, `CI=1`, on this
+Mac's arm64), in a copy of the tracked tree — the two pages and their axe baselines in Chromium,
+Firefox and WebKit (8). GitHub's x86_64 runner is the authority.

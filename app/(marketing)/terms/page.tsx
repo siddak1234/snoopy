@@ -115,16 +115,17 @@ export default function TermsPage() {
         <LegalSection heading="Intellectual property">
           <p>
             You own your workspace content, and you grant us the license needed
-            to operate the service on it, and our service providers the licenses
-            they need to process it as the Privacy Policy describes — nothing
-            more. We own the platform. Subject to these terms, we grant you a
-            limited, non-exclusive, non-transferable, revocable right to access
-            and use the service for your internal business purposes. Except as
-            law permits notwithstanding this limit, you may not copy, modify, or
-            create derivative works of the platform, reverse engineer it, resell
-            or sublicense it, scrape it, or access it to build a competing
-            product. If you send us feedback, we may use it without restriction
-            or obligation.
+            to operate the service on it, and the service providers the Privacy
+            Policy names, including OpenRouter and the model providers it routes
+            requests to, the licenses they need to process it as that policy
+            describes — nothing more. We own the platform. Subject to these
+            terms, we grant you a limited, non-exclusive, non-transferable,
+            revocable right to access and use the service for your internal
+            business purposes. Except as law permits notwithstanding this limit,
+            you may not copy, modify, or create derivative works of the
+            platform, reverse engineer it, resell or sublicense it, scrape it,
+            or access it to build a competing product. If you send us feedback,
+            we may use it without restriction or obligation.
           </p>
         </LegalSection>
 

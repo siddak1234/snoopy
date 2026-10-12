@@ -138,30 +138,40 @@ export default function PrivacyPage() {
             workspace goes with it: not your name, email address or other
             account details, not the flow&apos;s settings or what was typed to
             start the run (such as who paid), and nothing read from QuickBooks;
-            even the file&apos;s own name is left out. A second model, from a
-            different maker, then reads the document again to check the first
-            reading, and a model that gives no usable answer is replaced by the
-            next one on its list, each request under the rules below. The answer
-            goes back to the automation, and what the run makes of it is kept
-            with the run&apos;s results.
+            even the file&apos;s own name is left out. The document itself goes
+            as uploaded, including anything stored inside the file, such as a
+            PDF&apos;s title or author. A second model, from a different maker,
+            then reads the document again to check the first reading, and a
+            model that gives no usable answer is replaced by the next one on its
+            list, each request under the rules below. The answer goes back to
+            the automation, and what the run makes of it is kept with the
+            run&apos;s results.
           </p>
           <p>
             Every request tells OpenRouter to use only endpoints in the United
             States that it lists as zero data retention and that collect no
-            data. Zero data retention means, in OpenRouter&apos;s words, that
-            the provider &quot;will not store your data for any period of
+            data. Zero data retention means, in the words of OpenRouter&apos;s{" "}
+            <LegalLink href="https://openrouter.ai/docs/guides/features/zdr">
+              zero data retention guide
+            </LegalLink>
+            , that the provider &quot;will not store your data for any period of
             time&quot;; OpenRouter does not count an in-memory cache of repeated
             prompts as storing it. A request that no such endpoint can serve is
             refused, never sent elsewhere. Under these rules a request can reach
             Amazon Bedrock, Microsoft Azure, DeepInfra, Fireworks, Google Vertex
             AI, Mistral, Sail Research, Wafer or xAI; which one serves it
             depends on the model and on OpenRouter&apos;s routing. A PDF is sent
-            with OpenRouter&apos;s &quot;native&quot; PDF engine selected;
-            OpenRouter&apos;s PDF guide says a PDF sent this way is passed
-            directly to the model, not through its optional PDF-conversion
-            services. OpenRouter handles each request before the provider does,
-            and its privacy policy says it may process data in the United States
-            or in other countries.
+            through OpenRouter&apos;s PDF plugin, set on each request to its
+            &quot;native&quot; engine. The zero data retention guide says its
+            enforcement &quot;does not apply to plugins and tools you choose to
+            enable&quot;, and OpenRouter&apos;s{" "}
+            <LegalLink href="https://openrouter.ai/docs/guides/overview/multimodal/pdfs">
+              PDF guide
+            </LegalLink>{" "}
+            says a PDF sent this way is passed directly to the model, not
+            through its optional PDF-conversion services. OpenRouter handles
+            each request before the provider does, and its privacy policy says
+            it may process data in the United States or in other countries.
           </p>
           <p>
             Autom8x trains no models. Under these rules, the policies OpenRouter
@@ -169,18 +179,33 @@ export default function PrivacyPage() {
             documents are not used to train AI models: OpenRouter&apos;s privacy
             policy says it does not use inputs or outputs for model training,
             and OpenRouter lists none of the providers above as training on
-            prompts, which a provider that keeps no data cannot do. OpenRouter
+            prompts, which a provider that keeps no data cannot do.
+            OpenRouter&apos;s{" "}
+            <LegalLink href="https://openrouter.ai/docs/guides/privacy/data-collection">
+              data collection guide
+            </LegalLink>{" "}
             says it stores no prompts or answers unless an account opts in to
             logging or to OpenRouter&apos;s own use of them, both off by
             default; Autom8x keeps both off for its OpenRouter account, and that
-            account&apos;s settings turn on no OpenRouter plugin and no
-            broadcast of requests to other services. OpenRouter keeps metadata
-            such as token counts and timing, may tag a request with an anonymous
-            topic category for its reports and rankings, under its terms may
-            store a request temporarily where it is too large to process in
-            memory, and under its privacy policy may keep an image longer than
-            routing it takes where abuse detection, security, billing or legal
-            compliance requires. See{" "}
+            account&apos;s settings turn on no OpenRouter plugin by default and
+            no broadcast of requests to other services. OpenRouter keeps
+            metadata such as token counts and timing, and may tag a request with
+            an anonymous topic category for its reports and rankings. Its{" "}
+            <LegalLink href="https://openrouter.ai/terms">terms</LegalLink> say
+            it may store a request temporarily where it is too large to process
+            in memory, and may screen, remove, edit or block any request it
+            judges to break them or to be objectionable or illegal, including by
+            screening with automated tools for known child sexual abuse material
+            and malware. Its{" "}
+            <LegalLink href="https://openrouter.ai/data-processing-agreement">
+              data processing agreement
+            </LegalLink>{" "}
+            says it deletes a request and its answer promptly once the answer is
+            made, except where the law requires otherwise or where needed to
+            address malicious use of its service, and that it may first classify
+            them automatically to detect violations. Its privacy policy says it
+            may keep an image longer than routing it takes where abuse
+            detection, security, billing or legal compliance requires. See{" "}
             <LegalLink href="https://openrouter.ai/privacy">
               OpenRouter&apos;s privacy policy
             </LegalLink>
@@ -229,10 +254,17 @@ export default function PrivacyPage() {
             Connections page, on the website or in the app. The platform then
             deletes the stored tokens at once and asks Intuit to revoke the
             access, and no automation can reach the company until it is
-            connected again. What earlier runs recorded stays, in QuickBooks and
-            in your workspace. An owner or admin can ask us at {LEGAL_EMAIL} to
-            delete what runs kept from QuickBooks, and we will delete it, apart
-            from records the law requires us to keep.
+            connected again. If you disconnect Autom8x from within QuickBooks
+            instead, Intuit says this invalidates the tokens it gave Autom8x, so
+            no automation can reach the company from then on; disconnecting on
+            the Connections page as well deletes the stored tokens. What earlier
+            runs recorded stays, in QuickBooks and in your workspace; in your
+            workspace, Autom8x uses it only for those runs, to show them to you
+            or to end one still waiting for approval, until you ask us to delete
+            it. An owner or admin can ask us at {LEGAL_EMAIL} to delete what
+            runs kept from QuickBooks, and we will delete it, apart from records
+            the law requires us to keep; a database backup made before then can
+            still hold it, as described in Retention and deletion.
           </p>
         </LegalSection>
 
@@ -254,9 +286,9 @@ export default function PrivacyPage() {
             Each of these processes data in the United States under an agreement
             with us: Supabase (authentication and database), DigitalOcean
             (application hosting), Vercel (website hosting), Backblaze (file
-            storage and encrypted off-site backups), Datadog (operational logs
-            and monitoring), Stripe (billing and payments), Resend (email
-            delivery), and Expo (delivering notifications to your iPhone through
+            storage and off-site backups), Datadog (operational logs and
+            monitoring), Stripe (billing and payments), Resend (email delivery),
+            and Expo (delivering notifications to your iPhone through
             Apple&apos;s push service). When an automation has an AI model read
             a document, OpenRouter processes it too, and so does the model
             provider OpenRouter routes the request to, as described in Documents
@@ -277,15 +309,27 @@ export default function PrivacyPage() {
 
         <LegalSection heading="Retention and deletion">
           <p>
-            Your data is retained while your account is active. You can delete
-            your account from Settings; deletion removes your account data from
-            live systems promptly, and nightly encrypted backups rotate on a
-            fixed schedule, so deleted data leaves the backup set as those
-            backups age out. Operational logs are kept for a limited period for
-            security and debugging. Billing records are kept as long as tax and
-            accounting law requires. Disconnecting a connected provider account
-            deletes its stored tokens immediately and asks the provider to
-            revoke the access.
+            Your data is retained while your account is active, except where
+            this policy says otherwise. A file given to a run is kept for 90
+            days after the run ends and then deleted, and a run&apos;s
+            step-by-step timeline for about three months; a run&apos;s results
+            stay while your account is active. You can delete your account from
+            Settings; deletion removes your account data from the service
+            promptly, within the limits below. Operational logs are kept for a
+            limited period for security and debugging. Billing records are kept
+            as long as tax and accounting law requires. Disconnecting a
+            connected provider account deletes its stored tokens immediately and
+            asks the provider to revoke the access.
+          </p>
+          <p>
+            Deletion, wherever this policy describes it, has two limits. Each
+            night a backup of our database is made: the copy kept on our server
+            is deleted after 14 days, and a copy stored off-site with Backblaze
+            is not deleted on that schedule. A backup can still hold data
+            deleted after it was made, such as the tokens of a provider account
+            since disconnected, which stay encrypted in it. And the files given
+            to runs, which are not in these backups, are stored with Backblaze,
+            which can keep an earlier version of a file after it is deleted.
           </p>
         </LegalSection>
 
