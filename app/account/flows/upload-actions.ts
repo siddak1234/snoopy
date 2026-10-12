@@ -8,6 +8,7 @@ import {
   type UploadTicket,
 } from "@/lib/automations";
 import { activeWorkspaceIfShown, WORKSPACE_CHANGED } from "@/lib/tenancy";
+import { uploadRefusalMessage } from "./upload-refusals";
 
 /**
  * A file for a run (FR-14). The bytes never pass through here: `open` answers
@@ -24,21 +25,9 @@ export type OpenUploadResult =
 export type CompleteUploadResult =
   { ok: true; file: UploadedFile } | { ok: false; error: string };
 
-const UPLOAD_REFUSALS: Record<string, string> = {
-  content_type_not_accepted: "This flow does not accept that type of file.",
-  file_too_large: "The file is larger than this flow accepts.",
-  subscription_not_live: "Go live first; a paused flow takes no files.",
-  no_file_input: "This flow does not take a file.",
-  session_expired: "The upload took too long. Choose the file again.",
-  no_object: "The file did not arrive. Choose it again.",
-  too_large: "The file is larger than this flow accepts.",
-};
-
 function refused(error: unknown): { ok: false; error: string } {
   if (!(error instanceof PlatformServerError)) throw error;
-  const reason = error.details?.reason;
-  const known =
-    typeof reason === "string" ? UPLOAD_REFUSALS[reason] : undefined;
+  const known = uploadRefusalMessage(error.details?.reason, error.details);
   return { ok: false, error: known ?? error.message };
 }
 

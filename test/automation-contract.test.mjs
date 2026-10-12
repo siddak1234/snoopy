@@ -826,6 +826,7 @@ const read = (path) =>
 test("a run's file goes straight to the store, and the run carries only its id (backend FR-14)", () => {
   const fileField = read("app/account/flows/RunFileField.tsx");
   const uploads = read("app/account/flows/upload-actions.ts");
+  const uploadRefusals = read("app/account/flows/upload-refusals.ts");
   const browserApi = read("lib/platform-api.ts");
   // An artifact field is rendered as a file chooser; every other control as
   // before.
@@ -865,9 +866,15 @@ test("a run's file goes straight to the store, and the run carries only its id (
   // Both act on the workspace the page showed (register F70), never the active one.
   assert.match(uploads, /activeWorkspaceIfShown\(input\.workspaceId\)/u);
   assert.match(uploads, /activeWorkspaceIfShown\(shownWorkspaceId\)/u);
+  // Every refusal of either upload step is said through the one function, which
+  // names a measured file's numbers when the platform sends them (backend 25.2.28).
+  assert.match(
+    uploads,
+    /const known = uploadRefusalMessage\(error\.details\?\.reason, error\.details\);/u,
+  );
   if (available) {
     assert.deepEqual(
-      refusalKeys(uploads, "UPLOAD_REFUSALS"),
+      refusalKeys(uploadRefusals, "UPLOAD_REFUSALS"),
       [...specReasons("openUpload"), ...specReasons("completeUpload")].sort(),
       "every refusal the two upload operations name is said in words, and no other",
     );
