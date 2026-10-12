@@ -2543,3 +2543,100 @@ Bills & Receipts' platform half (backend BUILD-PLAN 25.2.17–25.2.33) landed on
   and that rule, `test/automation-contract.test.mjs` the words against every reason the two
   upload operations name, and `e2e/public-edge-fixture.spec.ts` each one shown in the Run
   window. The app says the same sentences (`snoopy-mobile`, the same day).
+
+## Round 17 — the privacy policy names OpenRouter, the model providers it may route to, and QuickBooks Online (backend BUILD-PLAN 25.7.4) — 2026-10-12
+
+Backend BUILD-PLAN 25.7.4: "The privacy policy names OpenRouter and the model providers it routes
+to, written with counsel before the key". Bills & Receipts sends a run's document to OpenRouter
+and reads and writes a workspace's QuickBooks Online company, and the policy of October 5, 2026
+named neither, while saying "We will update this policy before adding or replacing a
+subprocessor category". Intuit's App Details for production ask for the policy's URL
+(https://developer.intuit.com/app/developer/qbo/docs/go-live/publish-app, step 1), and its data
+stewardship principles require that "The privacy policy must specify the data retention and
+deletion policies and practices that pertain to the application"
+(https://developer.intuit.com/app/developer/qbo/docs/legal-agreements/intuit-terms-of-service-for-intuit-developer-services/intuit-data-stewardship-principles).
+The owner's direction of 2026-10-12, "Audit with another agent and confirm then merge": the draft
+is checked by an independent agent in place of counsel.
+
+Every sentence added is read from `snoopy-backend` at `4e54169`, `snoopy-automations` at
+`a00d7fa` (Bills & Receipts, `templateId` `invoice-processing`), OpenRouter's documents and
+endpoint lists read 2026-10-12, or Intuit's developer documents; the pull request lists each with
+its source. `app/(marketing)/privacy/page.tsx`:
+
+- **The date**: "Effective and last updated: October 12, 2026."
+- **What we collect**: workspace content names the files given to runs (the Run window's file
+  field, `app/account/flows/RunFileField.tsx`, and the app's).
+- **Documents read by AI** (new). What is sent: the run's own file and no other
+  (`snoopy-backend/apps/runs/src/model-file.ts`), with the automation's fixed instructions — for
+  Bills & Receipts a fixed task and prompt files with no placeholders, so nothing typed to start
+  the run, no setting and nothing from QuickBooks
+  (`snoopy-automations/automations/invoice-processing/src/steps/extract.ts`, `verify-read.ts`) —
+  and never the file's own name (`snoopy-backend/packages/model-gateway/src/openrouter.ts`). The
+  second read by another maker's model and the platform's next-model fallback. What every request
+  asks of OpenRouter (the same file): `provider.zdr`, `data_collection: deny`, `provider.only` set
+  to the fifteen United States zero-retention endpoints of
+  `snoopy-backend/packages/config/src/index.ts` (Amazon Bedrock, Azure, DeepInfra, Fireworks,
+  Google Vertex, Mistral, Sail Research, Wafer and xAI, as OpenRouter's endpoint list names their
+  tags — the same fifteen on 2026-10-12 as on 2026-10-10), and a PDF read `native`. Training and
+  retention as OpenRouter publishes them: its privacy policy (no training on inputs or outputs;
+  data may be processed in the United States or other countries; an image kept past routing only
+  for abuse detection, security, billing or legal compliance), its data-collection guide (no
+  prompts or answers stored unless an account opts in, metadata kept, an anonymous topic category
+  sampled), its zero-retention guide (in-memory caching not counted as retention) and its provider
+  list (none of the nine marked as training).
+- **QuickBooks Online data** (new). Owners and admins connect
+  (`snoopy-backend/apps/api/src/modules/connections/routes.ts`); the one scope and the platform's
+  operations, reads and creates only, a create refused a body naming `Id`, `SyncToken` or
+  `sparse` (`snoopy-backend/providers/quickbooks.json`,
+  `snoopy-backend/apps/connections/src/operations.ts`); what Bills & Receipts reads and creates
+  (its manifest's purpose and description, `snoopy-automations/manifests/invoice-processing.v1.json`);
+  the tokens encrypted (`snoopy-backend/packages/crypto/src/envelope.ts`) and renewed
+  (`snoopy-backend/apps/connections/src/refresh.ts`); QuickBooks' answers kept 30 days for a
+  retried step and pruned by the connections service's own sweep; the "Also email" summary; and
+  disconnecting — the tokens deleted by the schema's trigger, Intuit asked to revoke, every later
+  call refused (`snoopy-backend/apps/connections/src/routes.ts`,
+  `snoopy-backend/apps/connections/migrations/0001_connections_baseline.sql`).
+- **Who we share it with**: the eight providers keep their sentence. OpenRouter and the model
+  provider it routes to have their own, because OpenRouter's privacy policy does not hold its own
+  processing to the United States and the model providers are reached through OpenRouter, not
+  under an agreement with us. Intuit is named as a provider a workspace connects.
+- **The terms** (`app/(marketing)/terms/page.tsx`): read, unchanged — nothing in them is made
+  false by this.
+
+**Not stated, because the records do not settle it:**
+
+- How long uploaded files are kept. `snoopy-backend/apps/artifacts/src/main.ts` defaults to 90
+  days and `maintain-artifacts` deletes after it, but whether either droplet runs that job on a
+  schedule is unknown (backend SYSTEM-MANIFEST §12.1 #229).
+- Whether OpenRouter's `native` PDF engine parses anything on its side, asked of OpenRouter in
+  writing by 25.7.4. The page says what OpenRouter's PDF guide says: a PDF goes directly to a
+  model that reads files natively.
+- Autom8x's own OpenRouter account settings: the account and its key come last (25.7.1). The
+  page states OpenRouter's defaults, logging and its own use of prompts both off, not the
+  account's.
+
+**Read for the owner, not changed here:**
+
+- Intuit's security requirements say "Encrypt and store the refresh token and realmID"
+  (https://developer.intuit.com/app/developer/qbo/docs/go-live/publish-app/security-requirements).
+  The tokens are encrypted; the company's id is stored as `external_account_id` in plain text
+  (`snoopy-backend/apps/connections/migrations/0001_connections_baseline.sql`). A finding for
+  `snoopy-backend` before Intuit's review (25.7.3). The page claims encryption for the tokens
+  only.
+- The policy's Changes section: "Material changes are announced by email or in the product
+  before they take effect."
+- Retention and deletion, unchanged: disconnecting "revokes and deletes its stored tokens
+  immediately". The platform deletes at once and asks the provider to revoke, best effort
+  (`snoopy-backend/apps/connections/src/routes.ts`); the new QuickBooks section says it that way.
+
+**The screenshots.** `e2e/marketing.visual.spec.ts-snapshots/privacy-darwin.png` and
+`e2e/marketing.visual.spec.ts-snapshots/privacy-linux.png` re-recorded, 1440 by 5,771 px (were
+4,255); the terms baselines are unchanged. First, on unchanged `main` (`2c9ee3b`), both renderers
+matched the committed baselines. The Mac's Chromium passed `/privacy` and `/terms` (2), served on
+127.0.0.1:3111 through a temporary, uncommitted config that imports `playwright.config.ts` and
+changes only its port, because an orphaned next-server holds 127.0.0.1:3001. CI's pinned image
+(`mcr.microsoft.com/playwright@sha256:dcc5531e…`, Node 22.23.2, `CI=1`) passed the same two and
+their axe baselines in Chromium, Firefox and WebKit (8). Then each renderer re-recorded `/privacy`
+alone, and passed both pages again: on the Mac with their axe baselines in Chromium (4), in the
+image as before (8). The image ran on this Mac's arm64; GitHub's x86_64 runner is the authority,
+and the control shows the arm64 image reproducing its baselines for these two pages.
