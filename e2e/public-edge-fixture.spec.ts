@@ -1550,6 +1550,39 @@ test.describe("a file for a run (backend FR-14)", () => {
         "too_large",
         "The file is larger than this flow accepts.",
       ],
+      // The platform's five reasons since it measures a file at seal (backend
+      // BUILD-PLAN 25.2.28); the numbers' sentences are held by
+      // test/upload-refusals.test.mjs, and with none sent the plain one is said.
+      [
+        "complete",
+        400,
+        "file_too_many_pages",
+        "This PDF has more pages than this flow reads.",
+      ],
+      [
+        "complete",
+        400,
+        "file_image_too_large",
+        "This image is larger than this flow takes.",
+      ],
+      [
+        "complete",
+        400,
+        "file_content_mismatch",
+        "This file's contents don't match its type. Choose the original file again.",
+      ],
+      [
+        "complete",
+        400,
+        "file_encrypted",
+        "This PDF is password-protected. Remove the password and upload it again.",
+      ],
+      [
+        "complete",
+        400,
+        "file_unreadable",
+        "This file could not be read. Choose it again, or try another copy.",
+      ],
       ["complete", 409, "a_reason_not_named_here", "Conflict"],
     ] as const) {
       await fixtureControl(
