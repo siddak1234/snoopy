@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
+import ts from "typescript";
 import {
   AI_CONSENT,
   AI_CONSENT_VERSION,
@@ -19,7 +20,9 @@ import {
  * words (snoopy-mobile, round-17/deletion-and-consent). The words, the key the
  * agreement is kept under, and what counts as agreement are held here; what the
  * browser does with them is held by e2e/public-edge-fixture.spec.ts ("asking
- * before a run's file goes to an AI").
+ * before a run's file goes to an AI"). Neither `startRun` nor the platform
+ * asks, so the last test here holds the Run window as the only code that starts
+ * a run.
  */
 
 const read = (path) =>
@@ -225,4 +228,131 @@ test("the Run window asks before a run with a file, and the dialog draws the wor
   ]) {
     assert.ok(dialog.includes(`{${word}}`), word);
   }
+});
+
+/**
+ * The website's own modules — app/, components/, hooks/ and lib/, less the
+ * contracts generated into lib/generated/, which name every operation — and the
+ * root's proxy.ts and instrumentation.ts, each parsed by TypeScript, so a
+ * comment or a sentence is never taken for code.
+ */
+function websiteModules() {
+  const found = [];
+  const walk = (directory) => {
+    const at = resolve(import.meta.dirname, "..", directory);
+    for (const entry of readdirSync(at, { withFileTypes: true })) {
+      const path = `${directory}/${entry.name}`;
+      if (entry.isDirectory()) {
+        if (path !== "lib/generated") walk(path);
+      } else if (/\.tsx?$/u.test(entry.name)) found.push(path);
+    }
+  };
+  for (const directory of ["app", "components", "hooks", "lib"])
+    walk(directory);
+  found.push("proxy.ts", "instrumentation.ts");
+  return found.map((path) => ({
+    path,
+    source: ts.createSourceFile(
+      path,
+      read(path),
+      ts.ScriptTarget.Latest,
+      true,
+      path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+    ),
+  }));
+}
+
+/** The function a node is in: the nearest one with a name, or held by a const. */
+function enclosingName(node) {
+  for (let at = node.parent; at; at = at.parent) {
+    if (ts.isFunctionDeclaration(at) && at.name) return at.name.text;
+    if (
+      (ts.isArrowFunction(at) || ts.isFunctionExpression(at)) &&
+      ts.isVariableDeclaration(at.parent) &&
+      ts.isIdentifier(at.parent.name)
+    )
+      return at.parent.name.text;
+  }
+  return "the module";
+}
+
+/** Every node `found` answers for, as "<file>: <what it says>", sorted. */
+function across(modules, found) {
+  const said = [];
+  for (const { path, source } of modules) {
+    const visit = (node) => {
+      const what = found(node);
+      if (what) said.push(`${path}: ${what}`);
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  return said.sort();
+}
+
+/** How a name is used where it appears in code. */
+function use(names) {
+  return (node) => {
+    if (!ts.isIdentifier(node) || !names.includes(node.text)) return null;
+    const { parent } = node;
+    if (
+      (ts.isFunctionDeclaration(parent) || ts.isVariableDeclaration(parent)) &&
+      parent.name === node
+    )
+      return `${node.text} declared`;
+    if (ts.isImportSpecifier(parent)) return `${node.text} imported`;
+    if (ts.isCallExpression(parent) && parent.expression === node)
+      return `${node.text} called in ${enclosingName(node)}`;
+    if (ts.isJsxExpression(parent) && ts.isJsxAttribute(parent.parent))
+      return `${node.text} passed as ${parent.parent.name.getText()}`;
+    return `${node.text} used in ${enclosingName(node)}`;
+  };
+}
+
+test("the Run window is the only code here that starts a run: neither startRun nor the platform asks before a run's file goes to an AI", () => {
+  const modules = websiteModules();
+  assert.ok(
+    modules.length > 100 &&
+      modules.some(({ path }) => path === "lib/automations.ts"),
+    "the walk found too little; it is now blind",
+  );
+  // The platform's start is called by startRun alone, and startRun by the Run
+  // window's sendRun alone: no other code imports, calls or passes either.
+  assert.deepEqual(across(modules, use(["createRun", "startRun"])), [
+    "app/account/flows/AutomationActions.tsx: startRun called in sendRun",
+    "app/account/flows/AutomationActions.tsx: startRun imported",
+    "app/account/flows/actions.ts: createRun called in startRun",
+    "app/account/flows/actions.ts: createRun imported",
+    "app/account/flows/actions.ts: startRun declared",
+    "lib/automations.ts: createRun declared",
+  ]);
+  // sendRun is reached only after the question: from submitRun past its gate
+  // (held above, with the form's onSubmit) and from Agree and start.
+  const runWindow = modules.filter(
+    ({ path }) => path === "app/account/flows/AutomationActions.tsx",
+  );
+  assert.deepEqual(across(runWindow, use(["sendRun", "agreeAndStart"])), [
+    "app/account/flows/AutomationActions.tsx: agreeAndStart declared",
+    "app/account/flows/AutomationActions.tsx: agreeAndStart passed as onAgree",
+    "app/account/flows/AutomationActions.tsx: sendRun called in agreeAndStart",
+    "app/account/flows/AutomationActions.tsx: sendRun called in submitRun",
+    "app/account/flows/AutomationActions.tsx: sendRun declared",
+  ]);
+  // Nothing else names the platform's runs, so no other code — in the browser,
+  // through /api/platform, or on the server — can start one: lib/automations.ts
+  // alone, in its four functions.
+  const runsPath = (node) =>
+    (ts.isStringLiteralLike(node) ||
+      ts.isTemplateHead(node) ||
+      ts.isTemplateMiddle(node) ||
+      ts.isTemplateTail(node)) &&
+    /(?<!\/account)\/runs\b/u.test(node.text)
+      ? `the platform's runs in ${enclosingName(node)}`
+      : null;
+  assert.deepEqual(across(modules, runsPath), [
+    "lib/automations.ts: the platform's runs in cancelRun",
+    "lib/automations.ts: the platform's runs in createRun",
+    "lib/automations.ts: the platform's runs in listRuns",
+    "lib/automations.ts: the platform's runs in readRun",
+  ]);
 });

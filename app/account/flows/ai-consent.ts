@@ -14,6 +14,15 @@
  * reached at all, asks again — it is never taken for agreement. A write that
  * fails after Agree still starts that run, and the next one asks again.
  *
+ * Only the Run window asks. Neither `startRun` (actions.ts) nor the platform
+ * checks, and the platform keeps no record of the agreement, so a direct POST
+ * of that action, or of the platform's own start (which this site forwards
+ * under /api/platform), starts a run with a file unasked. Another site cannot
+ * send either; the person can, and so can code already running on this site.
+ * The app, too, asks on the phone alone. A check that holds needs that record
+ * in snoopy-backend; test/ai-consent.test.mjs holds the Run window as the only
+ * code here that starts a run.
+ *
  * No React and no `@/` import here: the unit test loads this file as it is.
  */
 

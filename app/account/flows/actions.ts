@@ -228,6 +228,10 @@ const FLOW_QUEUE_FULL =
  * again whenever a value changes. A resubmission of the same values after an
  * answer was lost therefore carries the same key, and the platform returns the
  * run it already started instead of starting a second one.
+ *
+ * **It does not ask before a run's file goes to an AI** — the Run window does
+ * (`ai-consent.ts`), and the platform does not check, so the Run window stays
+ * its only caller (test/ai-consent.test.mjs).
  */
 export async function startRun(formData: FormData): Promise<ActionResult> {
   const subscriptionId = String(formData.get("subscriptionId") ?? "");

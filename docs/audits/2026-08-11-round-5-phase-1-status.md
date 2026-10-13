@@ -2988,4 +2988,15 @@ before any run whose input carries a file — the website cannot tell which auto
 and never before one without. Agreed once per person per browser (localStorage,
 `autom8x.ai-consent.v1.<the person's id>`); a failed read asks again, a failed write still starts
 the run, and Cancel starts and keeps nothing. `components/ui/Modal.tsx` now lets only the dialog
-on top answer the keyboard.
+on top answer the keyboard. Only the Run window asks: neither `startRun`
+(`app/account/flows/actions.ts:236`) nor the platform checks, and the platform keeps no record of
+the agreement, so a direct POST of the action, or of the platform's start through `/api/platform`
+(`next.config.ts:9-18`), starts a run with a file unasked. Another site cannot send either —
+Next.js aborts an action whose Origin is not its Host
+(`node_modules/next/dist/docs/01-app/02-guides/data-security.md:550`), and the Edge refuses a
+request with a cookie from any Origin but the website's
+(`snoopy-backend/apps/api/src/modules/automations/routes.ts:94`,
+`snoopy-backend/apps/api/src/app.ts:1354-1359`) — but the person can, and so can code already
+running on the site. The app, too, asks on the phone alone.
+`test/ai-consent.test.mjs` holds the Run window as the only code here that starts a run. Open for
+`snoopy-backend`: a record of the agreement that the start checks.
