@@ -2973,3 +2973,10 @@ pages.
 at deletion; deleting the Supabase user, which would also end every device's session; and the
 daily timer, without which a lapse of about three months sends timeline rows to the DEFAULT
 partition, which no pass drops (`snoopy-backend/apps/runs/src/partitions.ts:14-17`).
+
+**2026-10-13 — Account → Support names the support email.** `app/account/support/page.tsx` said
+"This page is a placeholder" on the page Intuit's app review is pointed to. It now says "For help,
+email support@autom8x.ai." — a `mailto:` link to `lib/site.ts`'s `supportEmail` — beside Contact
+us, and promises no reply time. It does not send people to the contact form for help: a contact
+request is stored and nobody is told (backend SYSTEM-MANIFEST §12.1 #36). Test 5 of
+`e2e/account-surfaces.spec.ts` reads the link; the authenticated axe baseline scans the page.
