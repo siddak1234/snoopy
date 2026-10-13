@@ -1023,6 +1023,14 @@ function fixtureFiles() {
   );
 }
 
+// How many completions of an upload the platform was asked for: a file waiting
+// to be measured is completed again by itself (Round 17's B5), and no page
+// shows how often.
+async function uploadCompletions() {
+  return (await fixtureRead<{ uploadCompletions: number }>("counts"))
+    .uploadCompletions;
+}
+
 // What the fixture's object store took (BUILD-PLAN 25.8.5): each file's name,
 // the type its upload was opened with, the type its PUT came as, and its bytes.
 function storedObjects() {
@@ -1549,6 +1557,9 @@ test.describe("a file for a run (backend FR-14)", () => {
   test("each refusal of a file the platform names is said in its words, one it does not name by its title, and the field is emptied each time", async ({
     page,
   }) => {
+    // A file still waiting to be measured is said only after four more
+    // completions, 1.5 s apart (Round 17's B5), beside thirteen refusals.
+    test.slow();
     const dialog = await openFilledRun(page);
     const file = dialog.getByLabel("Invoice file");
     for (const [stage, status, reason, words] of [
@@ -1620,7 +1631,9 @@ test.describe("a file for a run (backend FR-14)", () => {
         "This file could not be read. Choose it again, or try another copy.",
       ],
       // No place yet to measure the file (backend BUILD-PLAN 25.2.39): a 429,
-      // not a refusal — said as its own, never as the platform being busy.
+      // not a refusal. Answered so to every completion here, the Run window's
+      // four more (Round 17's B5) find no place either, and only then is it
+      // said — as its own, never as the platform being busy.
       [
         "complete",
         429,
@@ -1629,17 +1642,76 @@ test.describe("a file for a run (backend FR-14)", () => {
       ],
       ["complete", 409, "a_reason_not_named_here", "Conflict"],
     ] as const) {
+      const asked = await uploadCompletions();
       await fixtureControl(
         `upload-refused?stage=${stage}&status=${status}&reason=${reason}`,
       );
       await file.setInputFiles(invoicePdf);
-      await expect(dialog.getByRole("alert")).toHaveText(words);
+      const waits = reason === "measurement_busy";
+      // Its words come after four waits of 1.5 s: past expect's own 5 s.
+      await expect(dialog.getByRole("alert")).toHaveText(
+        words,
+        waits ? { timeout: 15_000 } : {},
+      );
       await expect(file).toHaveValue("");
       await expect(
         dialog.getByRole("button", { name: "Start run" }),
       ).toBeEnabled();
+      // An upload refused as it opens is never completed; a refused completion
+      // is asked once, and one whose file waits to be measured five times.
+      expect((await uploadCompletions()) - asked).toBe(
+        stage === "open" ? 0 : waits ? 5 : 1,
+      );
     }
     expect(await fixtureFiles()).toEqual([]);
+  });
+
+  test("a file waiting to be measured is completed again by itself: still uploading meanwhile, then ready with nothing said, and the run starts with it (backend BUILD-PLAN 25.2.39, Round 17's B5)", async ({
+    page,
+  }) => {
+    const dialog = await openFilledRun(page);
+    // The next completion finds no place yet to measure the file; the one
+    // after measures it.
+    await fixtureControl("measurement-busy-once");
+    await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
+    // Answered busy: for the 1.5 s before it is asked again, the field says
+    // only that it is uploading, and the run waits for it.
+    await expect.poll(uploadCompletions, { intervals: [50] }).toBe(1);
+    await expect(dialog.getByText("Uploading invoice.pdf…")).toBeVisible();
+    await expect(dialog.getByRole("alert")).toHaveCount(0);
+    await expect(
+      dialog.getByRole("button", { name: "Uploading…" }),
+    ).toBeDisabled();
+    // Asked again, it is measured: ready, nothing said, two completions in all.
+    await expect(
+      dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+    ).toBeVisible();
+    await expect(dialog.getByRole("alert")).toHaveCount(0);
+    expect(await uploadCompletions()).toBe(2);
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await agreeToAiConsent(page);
+    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
+    expect(await fixtureFiles()).toEqual([
+      { filename: "invoice.pdf", sizeBytes: 24, runId: "fixture-run-started" },
+    ]);
+  });
+
+  test("any other 429 at a completion is the platform being busy, said at once and never asked again (Round 17's B5)", async ({
+    page,
+  }) => {
+    const dialog = await openFilledRun(page);
+    // The plan's request limit, which the Edge may answer on any route.
+    await fixtureControl(
+      "upload-refused?stage=complete&status=429&reason=over_workspace_quota",
+    );
+    const file = dialog.getByLabel("Invoice file");
+    await file.setInputFiles(invoicePdf);
+    await expect(dialog.getByRole("alert")).toHaveText(
+      "The platform is busy right now. Try again in a moment.",
+    );
+    await expect(file).toHaveValue("");
+    // Said once its one completion was answered: a retry would come first.
+    expect(await uploadCompletions()).toBe(1);
   });
 
   test("the Run dialog dismissed by Escape or by a click outside it mid-upload closes, stops the upload, and opened again is not held Uploading…", async ({

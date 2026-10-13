@@ -3037,7 +3037,9 @@ name `measurement_busy`.
   each upload operation's reasons from its responses as well as its description, since this one is
   named on the 429 alone; `e2e/public-edge-fixture.spec.ts` shows it in the Run window, the fixture
   Edge answering a completion — and only a completion — 429, as the contract documents
-  (`e2e/fixtures/public-edge.ts`).
+  (`e2e/fixtures/public-edge.ts`). _Since Round 17's B5 (below): the Run window completes the
+  upload again by itself, four more times at most, and says these words only when the file still
+  waits after the last._
 
 ## Round 17 — the sign-in screen says continuing agrees to the Terms of Service and the Privacy Policy — 2026-10-13
 
@@ -3060,3 +3062,83 @@ Service and Privacy Policy." — "Terms of Service" a link to `/terms` and "Priv
   `e2e/public-edge-fixture.spec.ts` checks the same in the browser: the line under the last
   button, each link underlined, and its font size, colour and opacity the lead's.
   `e2e/accessibility.spec.ts` already scans `/login` with axe in three engines.
+
+## Round 17 — the Run window completes an upload again by itself while its file waits to be measured (B5, backend BUILD-PLAN 25.2.39) — 2026-10-13
+
+Round 17's B5, under the owner's rule of 2026-10-13: "we want it to be easy for users to sign up
+and access flows not make it complicated for no absolute reason … dont start adding blockers, see
+how we can work around them". The words added for `measurement_busy` the same day (above) asked the
+person to choose the file again, though the contract says of that 429 "nothing was refused and
+nothing was lost — the upload stays open, and completing it again shortly measures it"
+(`completeUpload`, `snoopy-backend/docs/openapi/automations.yaml` at #207's `41917a3`), and the
+platform's sealing of an upload is idempotent (`snoopy-backend/apps/artifacts/src/routes-upload.ts`).
+The owner's test F3 starts two runs at once in one workspace, which has one place to measure in.
+
+- **What changed.** When completing an upload answers 429 with `details.reason`
+  `measurement_busy` — and nothing else — the Run window completes the same upload again, four
+  more times at most, each after the answer's `retry-after` when it names one and otherwise
+  1.5 s (`app/account/flows/upload-completion.ts`, new). Nothing new is shown meanwhile: the field
+  still says it is uploading the file, and Start run is still held. Only a file still waiting
+  after the fourth retry is said, in the words already added and unchanged — "Files are checked
+  one at a time. Nothing was lost. Choose the file again in a moment." — with the field emptied,
+  as after every refusal. Every other answer is the field's at once, from one completion, as
+  before: another 429 (the Edge's flood limit, a plan's request limit), any refusal, a workspace
+  changed in another tab. `completeRunUpload` (`app/account/flows/upload-actions.ts`) flags that
+  one answer (`measurementBusy`, through `waitsToBeMeasured`), with its `retry-after` in seconds
+  when it named one; `app/account/flows/RunFileField.tsx` completes through `completeWhenMeasured`
+  with the upload's own abort signal.
+- **This change's own choices, not B5's.** The wait is in the browser, between completions, never
+  inside the server action: Next dispatches a client's server actions one at a time
+  (`node_modules/next/dist/docs/01-app/02-guides/server-actions.md`, "Sequential dispatch on the
+  client"), so a wait inside one would hold every other action of the page behind it, and the form
+  closing could not stop it. A new choice, or the form closing, stops the waiting at once and
+  nothing is completed after it. A `retry-after` over 5 s is not waited out — that answer is said
+  at once — so the waits come to 20 s at most; with none named, as the platform names none today
+  ("No retry interval is invented", `snoopy-backend/apps/api/src/modules/upstream.ts`), they come
+  to 6 s.
+- **The budgets read for it.** Each completion keeps its own 10 s (`DEFAULT_TIMEOUT_MS`,
+  `lib/platform-server.ts`): every retry is its own request. The platform gives a completion 5 s,
+  stops a measurement at 3 s and holds two completions a process, one measuring and one waiting
+  (`snoopy-backend/apps/artifacts/src/measure-upload.ts`), so 6 s of waits outlasts one
+  measurement ahead of the file twice over, and the two a process holds about once. An upload's
+  session lasts 15 minutes from its opening (the store's upload lifetime, and the PUT's own
+  `UPLOAD_TIMEOUT_MS` in `lib/platform-api.ts`); one that ends anyway is refused
+  `session_expired` and said as before.
+  No route here sets `maxDuration`, and no completion's function runs longer than before.
+  Playwright waits 5 s for an assertion by default (`playwright.config.ts` sets no other), so the
+  browser test's busy row waits up to 15 s for its words and its test is marked slow.
+- **The tests.** `test/upload-completion.test.mjs` (eight, on node:test's fake clock): busy once,
+  then the file at 1.5 s with nothing said — two completions; busy every time, the words after
+  five completions, at 0, 1.5, 3, 4.5 and 6 s; any other answer at once from one completion; only
+  a 429 naming `measurement_busy` waits, and the server action flags that answer alone;
+  `retry-after` honoured to the millisecond; 5 s waited out, 20 s in all, and 6 s, a minute and
+  an hour not; a field gone, while it waits or while a completion is on its way, asks nothing
+  more; and the Run window completing through it with the upload's signal.
+  `e2e/public-edge-fixture.spec.ts`: "each refusal of a file the platform names …" now counts each
+  row's completions — none for a refused opening, one for a refused completion, five for a file
+  that waits every time — and two tests are new: "a file waiting to be measured is completed again
+  by itself …" (busy once: still uploading meanwhile, then ready with nothing said, two
+  completions, and the run started with the file) and "any other 429 at a completion is the
+  platform being busy …" (said at once, from one completion). The fixture Edge counts completions,
+  read as `counts`, and answers the next one busy, once, on `measurement-busy-once`
+  (`e2e/fixtures/public-edge.ts`).
+
+Proved red with `node --test` on `test/upload-completion.test.mjs` alone. Each file was restored
+from a kept copy, its sha256 checked equal, and the test file then passed, 20 of 20 with its
+subtests:
+
+| Guard | Broken by | Red |
+| --- | --- | --- |
+| A waiting file is completed again | the loop never asking again | the busy-once, busy-every-time, `retry-after` and bound tests |
+| By the Run window | the field calling `completeRunUpload` itself | the Run window's test |
+| Four more at most | the loop asking while busy, for ever | the busy-every-time and bound tests |
+| `measurement_busy` and nothing else | the check taking any 429 | the check's test |
+| | the loop retrying any failure | the other answers' test, five of its six |
+| | the server action flagging any 429 | the check's test, on the action's source |
+| `retry-after` honoured | 1.5 s always | the `retry-after` and bound tests |
+| 5 s at most | that bound taken out | the bound test: 6 s, a minute, an hour |
+| A field gone asks nothing more | the check after the wait taken out | the field-gone test, both cases |
+
+**Not run here**: the browser suites, the new and changed tests among them, the whole
+`test:contracts`, the builds and the whole typecheck. Open for `snoopy-mobile`: the app's own
+completion, should B5 hold there too.

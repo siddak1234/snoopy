@@ -10,9 +10,11 @@
  *
  * Since BUILD-PLAN 25.2.39 a completion can also find no place yet to measure
  * the file — files are measured in turn, a workspace's one at a time — and is
- * answered 429 `measurement_busy`: not a refusal, and nothing was lost. The
- * field is emptied as after any refusal (`RunFileField.tsx`) and the upload is
- * not completed again here, so its sentence asks for the file again in a moment.
+ * answered 429 `measurement_busy`: not a refusal, and nothing was lost. The Run
+ * window completes the same upload again by itself, at most four more times
+ * (`upload-completion.ts`); only a file still waiting after the last is said
+ * here, and the field is then emptied as after any refusal (`RunFileField.tsx`),
+ * so its sentence asks for the file again in a moment.
  */
 
 const UPLOAD_REFUSALS: Record<string, string> = {
