@@ -2937,11 +2937,39 @@ touch the identity provider", `snoopy-backend/apps/api/src/app.ts:504`; the Edge
 Supabase's publishable key, `snoopy-backend/deploy/compose.prod.yml:1442-1443`). A file and a
 timeline "become eligible for deletion" and go "at the next maintenance pass" (a file at a later
 pass if many are due, `snoopy-backend/apps/artifacts/src/maintain.ts:27`), because the jobs run
-only at `up -d` (`snoopy-backend/deploy/compose.prod.yml:708-713`, backend SYSTEM-MANIFEST §12.1
+at every `up -d` and no timer is recorded: whether either droplet runs them from a timer or cron
+is UNKNOWN (`snoopy-backend/deploy/compose.prod.yml:708-713`, backend SYSTEM-MANIFEST §12.1
 #229). A disconnect inside QuickBooks holds "until it is connected again", and the terms'
 Disconnect sentence ends "as the Privacy Policy describes". Both pages are dated October 13, 2026,
 the day they publish, and the four PNGs are re-recorded as before: privacy 6,596 px on the Mac and
 6,620 in CI's image, terms 3,979 and 3,955. Owner item 2, the owner's answer of 2026-10-12: "No,
-only me" — no account holder besides the owner, so the Terms' licence change needs no prior notice.
-Open: deleting the Supabase user and a daily timer for the maintenance jobs (`snoopy-backend`);
-Intuit's §12.2 and the DigitalOcean droplets' Backups and Snapshots (the owner).
+only me" — no account holder besides the owner, so neither page's change needs prior notice: not
+under the Privacy Policy's "Material changes are announced by email or in the product before they
+take effect", and not under the Terms' "If these terms change materially, we will notify account
+holders by email or in the product before the change takes effect", the licence included. Open:
+deleting the Supabase user and a daily timer for the maintenance jobs (`snoopy-backend`); Intuit's
+§12.2 and the DigitalOcean droplets' Backups and Snapshots (the owner).
+
+**2026-10-13 — the re-check of `41b43d5`, answered.** Deleting a file removes its bytes but only
+stamps its row (`snoopy-backend/apps/artifacts/src/postgres-retention.ts:121-131`, where the 90-day
+sweep and the workspace purge both end, `snoopy-backend/apps/artifacts/src/sweeps.ts:44-73`), and
+nothing deletes the row: it keeps the file's name, type, size and SHA-256, and since migration 0006
+its page count or pixel sizes; `artifacts.upload_sessions` keeps the name and the uploader's id. So
+deletion has a fourth limit on the page: "Deleting a file does not delete our record of it, which
+keeps the file's name, type and size, its page count or image dimensions, and a fingerprint of its
+contents (its SHA-256 hash), but not the file itself." No fix is promised. The confirmation a
+person reads, `app/(auth)/account-deleted/page.tsx`, said "Your account and data have been
+permanently removed" and "your first sign-in creates a new account". It now names what was deleted
+as Settings does, says the Privacy Policy "says what deletion does not remove", and "You can come
+back anytime with a new account": deletion signs out only the device that asked
+(`snoopy-backend/apps/api/src/modules/auth/identity.ts:898-900`), so another device still signed in
+starts a new account at its next request, with no sign-in
+(`snoopy-backend/apps/api/src/app.ts:504-507`). axe finds nothing on it in three engines and both
+themes (a temporary spec, not committed), and the two fixture tests that end on it pass. The two
+corrections above: whether a timer runs the jobs is unknown, and the owner's answer covers both
+pages.
+`privacy-darwin.png` and `privacy-linux.png` re-recorded, 6,644 and 6,667 px (were 6,596 and
+6,620); terms holds on its baselines. Open for `snoopy-backend`: the file rows deleted or blanked
+at deletion; deleting the Supabase user, which would also end every device's session; and the
+daily timer, without which a lapse of about three months sends timeline rows to the DEFAULT
+partition, which no pass drops (`snoopy-backend/apps/runs/src/partitions.ts:14-17`).

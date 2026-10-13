@@ -331,18 +331,21 @@ export default function PrivacyPage() {
             access.
           </p>
           <p>
-            Deletion, wherever this policy describes it, has three limits. Each
+            Deletion, wherever this policy describes it, has four limits. Each
             night a backup of our database is made: the copy kept on our server
             is deleted after 14 days, and a copy stored off-site with Backblaze
             is not deleted on that schedule. A backup can still hold data
             deleted after it was made, such as the tokens of a provider account
             since disconnected, which stay encrypted in it. The files given to
             runs, which are not in these backups, are stored with Backblaze,
-            which can keep an earlier version of a file after it is deleted. And
-            deleting an account does not delete its sign-in record with
-            Supabase, which handles our sign-in: your email address and the
-            sign-in accounts linked to it, with the profile details their
-            providers sent.
+            which can keep an earlier version of a file after it is deleted.
+            Deleting a file does not delete our record of it, which keeps the
+            file&apos;s name, type and size, its page count or image dimensions,
+            and a fingerprint of its contents (its SHA-256 hash), but not the
+            file itself. And deleting an account does not delete its sign-in
+            record with Supabase, which handles our sign-in: your email address
+            and the sign-in accounts linked to it, with the profile details
+            their providers sent.
           </p>
         </LegalSection>
 
