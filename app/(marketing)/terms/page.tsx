@@ -19,7 +19,7 @@ export default function TermsPage() {
           Terms of Service
         </h1>
         <p className="mt-6 max-w-[56ch] text-base leading-7 text-[color-mix(in_srgb,var(--color-text)_78%,transparent)]">
-          Effective and last updated: October 12, 2026. These terms are an
+          Effective and last updated: October 13, 2026. These terms are an
           agreement between you and Snoopy LLC, 14355 Francis Lane, Frisco,
           Texas 75035 (&quot;Autom8x&quot;, &quot;we&quot;, &quot;us&quot;), the
           operator of Autom8x. Questions:{" "}
@@ -77,10 +77,11 @@ export default function TermsPage() {
             you approve on the provider&apos;s own consent page, used solely to
             run your automations. You can disconnect at any time on the
             Connections page, which deletes the stored tokens at once and asks
-            the provider to revoke the access. Third-party providers are
-            independent services: we are not responsible for their availability,
-            their content, or changes they make, and your use of each provider
-            remains governed by that provider&apos;s own terms.
+            the provider to revoke the access, as the Privacy Policy describes.
+            Third-party providers are independent services: we are not
+            responsible for their availability, their content, or changes they
+            make, and your use of each provider remains governed by that
+            provider&apos;s own terms.
           </p>
         </LegalSection>
 

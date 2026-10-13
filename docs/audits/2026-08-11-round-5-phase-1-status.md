@@ -2928,3 +2928,20 @@ them and passed again: the Mac's Chromium through the same temporary, uncommitte
 pinned image (`mcr.microsoft.com/playwright@sha256:dcc5531e…`, Node 22.23.2, `CI=1`, on this
 Mac's arm64), in a copy of the tracked tree — the two pages and their axe baselines in Chromium,
 Firefox and WebKit (8). GitHub's x86_64 runner is the authority.
+
+**2026-10-12 — the re-check of `4935e6c`, answered.** Account deletion now says what it removes,
+"your account, your personal workspace and every organization you alone own, with their workspace
+content" (as Settings says, `app/account/settings/page.tsx:99`), and names a third limit: the
+sign-in record Supabase keeps, which nothing deletes ("Access purges the workspaces but does not
+touch the identity provider", `snoopy-backend/apps/api/src/app.ts:504`; the Edge holds only
+Supabase's publishable key, `snoopy-backend/deploy/compose.prod.yml:1442-1443`). A file and a
+timeline "become eligible for deletion" and go "at the next maintenance pass" (a file at a later
+pass if many are due, `snoopy-backend/apps/artifacts/src/maintain.ts:27`), because the jobs run
+only at `up -d` (`snoopy-backend/deploy/compose.prod.yml:708-713`, backend SYSTEM-MANIFEST §12.1
+#229). A disconnect inside QuickBooks holds "until it is connected again", and the terms'
+Disconnect sentence ends "as the Privacy Policy describes". Both pages are dated October 13, 2026,
+the day they publish, and the four PNGs are re-recorded as before: privacy 6,596 px on the Mac and
+6,620 in CI's image, terms 3,979 and 3,955. Owner item 2, the owner's answer of 2026-10-12: "No,
+only me" — no account holder besides the owner, so the Terms' licence change needs no prior notice.
+Open: deleting the Supabase user and a daily timer for the maintenance jobs (`snoopy-backend`);
+Intuit's §12.2 and the DigitalOcean droplets' Backups and Snapshots (the owner).

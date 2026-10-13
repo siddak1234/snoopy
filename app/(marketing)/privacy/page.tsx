@@ -20,7 +20,7 @@ export default function PrivacyPage() {
           Privacy Policy
         </h1>
         <p className="mt-6 max-w-[56ch] text-base leading-7 text-[color-mix(in_srgb,var(--color-text)_78%,transparent)]">
-          Effective and last updated: October 12, 2026. This policy explains
+          Effective and last updated: October 13, 2026. This policy explains
           what information Autom8x collects, why, and what we do with it. It is
           written to be read; if anything is unclear, contact us at{" "}
           <LegalLink href={`mailto:${LEGAL_EMAIL}`}>{LEGAL_EMAIL}</LegalLink>.
@@ -256,15 +256,16 @@ export default function PrivacyPage() {
             access, and no automation can reach the company until it is
             connected again. If you disconnect Autom8x from within QuickBooks
             instead, Intuit says this invalidates the tokens it gave Autom8x, so
-            no automation can reach the company from then on; disconnecting on
-            the Connections page as well deletes the stored tokens. What earlier
-            runs recorded stays, in QuickBooks and in your workspace; in your
-            workspace, Autom8x uses it only for those runs, to show them to you
-            or to end one still waiting for approval, until you ask us to delete
-            it. An owner or admin can ask us at {LEGAL_EMAIL} to delete what
-            runs kept from QuickBooks, and we will delete it, apart from records
-            the law requires us to keep; a database backup made before then can
-            still hold it, as described in Retention and deletion.
+            no automation can reach the company until it is connected again;
+            disconnecting on the Connections page as well deletes the stored
+            tokens. What earlier runs recorded stays, in QuickBooks and in your
+            workspace; in your workspace, Autom8x uses it only for those runs,
+            to show them to you or to end one still waiting for approval, until
+            you ask us to delete it. An owner or admin can ask us at{" "}
+            {LEGAL_EMAIL} to delete what runs kept from QuickBooks, and we will
+            delete it, apart from records the law requires us to keep; a
+            database backup made before then can still hold it, as described in
+            Retention and deletion.
           </p>
         </LegalSection>
 
@@ -310,26 +311,38 @@ export default function PrivacyPage() {
         <LegalSection heading="Retention and deletion">
           <p>
             Your data is retained while your account is active, except where
-            this policy says otherwise. A file given to a run is kept for 90
-            days after the run ends and then deleted, and a run&apos;s
-            step-by-step timeline for about three months; a run&apos;s results
-            stay while your account is active. You can delete your account from
-            Settings; deletion removes your account data from the service
-            promptly, within the limits below. Operational logs are kept for a
-            limited period for security and debugging. Billing records are kept
-            as long as tax and accounting law requires. Disconnecting a
-            connected provider account deletes its stored tokens immediately and
-            asks the provider to revoke the access.
+            this policy says otherwise. A file given to a run becomes eligible
+            for deletion 90 days after the run ends, and is deleted at the next
+            maintenance pass, or at a later one if many files are due at once. A
+            run&apos;s step-by-step timeline becomes eligible for deletion about
+            three months after it is recorded, and is deleted at the next
+            maintenance pass. A run&apos;s results stay while your account is
+            active.
           </p>
           <p>
-            Deletion, wherever this policy describes it, has two limits. Each
+            You can delete your account from Settings. Deletion promptly removes
+            your account, your personal workspace and every organization you
+            alone own, with their workspace content, within the limits below; an
+            organization that has another owner is kept, and you leave it.
+            Operational logs are kept for a limited period for security and
+            debugging. Billing records are kept as long as tax and accounting
+            law requires. Disconnecting a connected provider account deletes its
+            stored tokens immediately and asks the provider to revoke the
+            access.
+          </p>
+          <p>
+            Deletion, wherever this policy describes it, has three limits. Each
             night a backup of our database is made: the copy kept on our server
             is deleted after 14 days, and a copy stored off-site with Backblaze
             is not deleted on that schedule. A backup can still hold data
             deleted after it was made, such as the tokens of a provider account
-            since disconnected, which stay encrypted in it. And the files given
-            to runs, which are not in these backups, are stored with Backblaze,
-            which can keep an earlier version of a file after it is deleted.
+            since disconnected, which stay encrypted in it. The files given to
+            runs, which are not in these backups, are stored with Backblaze,
+            which can keep an earlier version of a file after it is deleted. And
+            deleting an account does not delete its sign-in record with
+            Supabase, which handles our sign-in: your email address and the
+            sign-in accounts linked to it, with the profile details their
+            providers sent.
           </p>
         </LegalSection>
 
