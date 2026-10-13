@@ -176,6 +176,7 @@ export default async function FlowsPage() {
               canAdminister={canAdminister}
               canAskToJoin={canAskToJoin}
               workspaceId={workspaceId}
+              userId={session?.user.id ?? ""}
             />
           ))}
         </div>
@@ -261,6 +262,7 @@ function AutomationCard({
   canAdminister,
   canAskToJoin,
   workspaceId,
+  userId,
 }: {
   automation: AutomationCatalogEntry;
   subscriptions: Subscription[];
@@ -270,6 +272,8 @@ function AutomationCard({
   canAskToJoin: boolean;
   /** The workspace this page shows; every action on the card is refused once it is not active. */
   workspaceId: string;
+  /** The signed-in person: the Run window keeps their AI consent under their id. */
+  userId: string;
 }) {
   // A team is its kind (the owner, build 9).
   const projectName = new Map(
@@ -397,6 +401,7 @@ function AutomationCard({
 
           <AutomationActions
             workspaceId={workspaceId}
+            userId={userId}
             name={automation.name}
             available={automation.available}
             // The settings of the version it RUNS, which the platform checks a

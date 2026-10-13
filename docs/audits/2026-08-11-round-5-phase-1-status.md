@@ -2980,3 +2980,12 @@ email support@autom8x.ai." — a `mailto:` link to `lib/site.ts`'s `supportEmail
 us, and promises no reply time. It does not send people to the contact form for help: a contact
 request is stored and nobody is told (backend SYSTEM-MANIFEST §12.1 #36). Test 5 of
 `e2e/account-surfaces.spec.ts` reads the link; the authenticated axe baseline scans the page.
+
+**2026-10-13 — the Run window asks before a run's file goes to an AI,** as the iPhone app does
+(Apple's App Review Guideline 5.1.2(i)): "AI reads this file", over the Run window, in the app's
+words byte for byte (`app/account/flows/ai-consent.ts`, pinned by `test/ai-consent.test.mjs`),
+before any run whose input carries a file — the website cannot tell which automation uses a model —
+and never before one without. Agreed once per person per browser (localStorage,
+`autom8x.ai-consent.v1.<the person's id>`); a failed read asks again, a failed write still starts
+the run, and Cancel starts and keeps nothing. `components/ui/Modal.tsx` now lets only the dialog
+on top answer the keyboard.

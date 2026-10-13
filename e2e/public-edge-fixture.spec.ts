@@ -1157,6 +1157,37 @@ async function decodedImage(
   };
 }
 
+// The question asked before a run whose input carries a file starts, over the
+// Run window, in the app's words (app/account/flows/ai-consent.ts).
+function aiConsent(page: Page) {
+  return page.getByRole("dialog", { name: "AI reads this file", exact: true });
+}
+
+// Agreed to: the run it held starts.
+async function agreeToAiConsent(page: Page) {
+  await aiConsent(page)
+    .getByRole("button", { name: "Agree and start", exact: true })
+    .click();
+}
+
+// The owner's agreement as this browser keeps it: the key names the consent's
+// version and the person's id.
+const ownersConsent =
+  "autom8x.ai-consent.v1.22222222-2222-4222-8222-222222222222";
+
+// Every agreement this browser keeps, read in the page by name — not through
+// getItem, which a test below makes refuse.
+function keptConsents(page: Page) {
+  return page.evaluate(() => {
+    const kept: Record<string, string> = {};
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith("autom8x.ai-consent.")) kept[key] = localStorage[key];
+    }
+    return kept;
+  });
+}
+
 // The Run dialog of the manual automation, with its three typed fields filled.
 async function openFilledRun(page: Page) {
   await page.goto("/account/flows");
@@ -1202,6 +1233,9 @@ test.describe("a file for a run (backend FR-14)", () => {
     expect(puts).toHaveLength(1);
     await expectNoAxeViolations(page);
     await dialog.getByRole("button", { name: "Start run" }).click();
+    // A run with a file asks first ("asking before a run's file goes to an
+    // AI", below); agreed, it starts.
+    await agreeToAiConsent(page);
     await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
     // The platform received the file's id, and gave the file to that run.
     expect(await fixtureFiles()).toEqual([
@@ -1374,6 +1408,7 @@ test.describe("a file for a run (backend FR-14)", () => {
     ).toBeVisible();
     await fixtureControl("files-collected");
     await dialog.getByRole("button", { name: "Start run" }).click();
+    await agreeToAiConsent(page);
     await expect(dialog.getByRole("alert")).toHaveText(
       "That file can no longer be used. Choose it again.",
     );
@@ -1385,6 +1420,7 @@ test.describe("a file for a run (backend FR-14)", () => {
     await expect(
       dialog.getByText("Ready: invoice.pdf (24 bytes)"),
     ).toBeVisible();
+    // Agreed once already: not asked again.
     await dialog.getByRole("button", { name: "Start run" }).click();
     await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
     expect(await fixtureFiles()).toEqual([
@@ -1711,6 +1747,7 @@ test.describe("a photo or an image for a run (backend BUILD-PLAN 25.8.5)", () =>
       ]),
     ).toEqual({ width: 2576, height: 1449, colours: ["black", "white"] });
     await dialog.getByRole("button", { name: "Start run" }).click();
+    await agreeToAiConsent(page);
     await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
     expect(await fixtureFiles()).toEqual([
       {
@@ -1886,6 +1923,7 @@ test.describe("a photo or an image for a run (backend BUILD-PLAN 25.8.5)", () =>
         ]),
       ).toEqual({ width: 859, height: 2576, colours: ["red", "blue"] });
       await dialog.getByRole("button", { name: "Start run" }).click();
+      await agreeToAiConsent(page);
       await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
       expect(await fixtureFiles()).toEqual([
         { filename: "invoice.pdf", sizeBytes: 24 },
@@ -1896,6 +1934,279 @@ test.describe("a photo or an image for a run (backend BUILD-PLAN 25.8.5)", () =>
         },
       ]);
     });
+  });
+});
+
+test.describe("asking before a run's file goes to an AI (Apple App Review 5.1.2(i), as the app asks)", () => {
+  // The browser PUTs the file straight to the fixture's object store, whose
+  // certificate is the fixture's own.
+  test.use({ ignoreHTTPSErrors: true });
+
+  // The Run window, filled, with a file chosen and uploaded.
+  async function withFile(page: Page, name = "invoice.pdf") {
+    const dialog = await openFilledRun(page);
+    await dialog
+      .getByLabel("Invoice file")
+      .setInputFiles({ ...invoicePdf, name });
+    await expect(dialog.getByText(`Ready: ${name} (24 bytes)`)).toBeVisible();
+    return dialog;
+  }
+
+  test("a run with a file asks first, in the app's words, and only the question answers the keyboard", async ({
+    page,
+  }) => {
+    const dialog = await withFile(page);
+    const starts = observe(page, isServerAction);
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    const consent = aiConsent(page);
+    await expect(consent).toBeVisible();
+    await expect(consent.getByRole("heading")).toHaveText("AI reads this file");
+    await expect(consent.locator("p")).toHaveText([
+      "To read the file you give this run, Autom8x sends it to OpenRouter, which passes it to an AI model provider in the United States, using only endpoints that OpenRouter lists as zero data retention.",
+      "Our Privacy Policy names the providers and explains what may be kept.",
+    ]);
+    // Both said when it opens, as a screen reader reads it.
+    await expect(consent).toHaveAccessibleDescription(
+      "To read the file you give this run, Autom8x sends it to OpenRouter, which passes it to an AI model provider in the United States, using only endpoints that OpenRouter lists as zero data retention. Our Privacy Policy names the providers and explains what may be kept.",
+    );
+    const policy = consent.getByRole("link", {
+      name: "Privacy Policy",
+      exact: true,
+    });
+    await expect(policy).toHaveAttribute("href", "/privacy");
+    // A new tab, as the app opens it in the browser: the run waits here.
+    await expect(policy).toHaveAttribute("target", "_blank");
+    await expect(consent.getByRole("button")).toHaveText([
+      "Cancel",
+      "Agree and start",
+    ]);
+    const cancel = consent.getByRole("button", { name: "Cancel", exact: true });
+    const agree = consent.getByRole("button", {
+      name: "Agree and start",
+      exact: true,
+    });
+    await expect(agree).toHaveClass(/btn-primary/);
+    await expectNoAxeViolations(page);
+    // Only the question answers the keyboard: Tab goes round its three
+    // controls and never into the Run window beneath it.
+    await expect(policy).toBeFocused();
+    for (const next of [cancel, agree, policy]) {
+      await page.keyboard.press("Tab");
+      await expect(next).toBeFocused();
+    }
+    await page.keyboard.press("Shift+Tab");
+    await expect(agree).toBeFocused();
+    expect(starts).toEqual([]);
+  });
+
+  test("Cancel — or Escape, or a click outside it — starts nothing, keeps nothing, and leaves the Run window as it was", async ({
+    page,
+  }) => {
+    const dialog = await withFile(page);
+    const key = dialog.locator('input[name="idempotencyKey"]');
+    const sent = await key.inputValue();
+    const starts = observe(page, isServerAction);
+    const consent = aiConsent(page);
+    for (const dismiss of [
+      () =>
+        consent.getByRole("button", { name: "Cancel", exact: true }).click(),
+      () => page.keyboard.press("Escape"),
+      () => page.mouse.click(4, 4),
+    ]) {
+      await dialog.getByRole("button", { name: "Start run" }).click();
+      await expect(consent).toBeVisible();
+      await dismiss();
+      await expect(consent).toHaveCount(0);
+      await expect(dialog).toBeVisible();
+      await expect(dialog.getByLabel("Vendor")).toHaveValue("Acme Supplies");
+      await expect(dialog.getByLabel("Amount")).toHaveValue("120.50");
+      await expect(dialog.getByLabel("Invoice reference")).toHaveValue(
+        "INV-1001",
+      );
+      await expect(
+        dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+      ).toBeVisible();
+      await expect(key).toHaveValue(sent);
+    }
+    expect(starts).toEqual([]);
+    expect(await keptConsents(page)).toEqual({});
+    // The file is chosen and given to no run.
+    expect(await fixtureFiles()).toEqual([
+      { filename: "invoice.pdf", sizeBytes: 24 },
+    ]);
+  });
+
+  test("Agree and start starts the run it held, with its file, and keeps the agreement for this person: their next run with a file is not asked", async ({
+    page,
+  }) => {
+    const dialog = await withFile(page);
+    const starts = observe(page, isServerAction);
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await agreeToAiConsent(page);
+    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
+    expect(starts).toHaveLength(1);
+    expect(await fixtureFiles()).toEqual([
+      { filename: "invoice.pdf", sizeBytes: 24, runId: "fixture-run-started" },
+    ]);
+    expect(await keptConsents(page)).toEqual({ [ownersConsent]: "agreed" });
+    // The next is sent at once: no question opens, and the start is on its
+    // way, held in flight.
+    const again = await withFile(page, "second.pdf");
+    const held = await holdRequest(page, "**/account/flows", isServerAction);
+    await again.getByRole("button", { name: "Start run" }).click();
+    await expect(aiConsent(page)).toHaveCount(0);
+    await held.arrived;
+    held.release();
+    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
+  });
+
+  test("a run with no file is never asked", async ({ page }) => {
+    const dialog = await openFilledRun(page);
+    const held = await holdRequest(page, "**/account/flows", isServerAction);
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await expect(aiConsent(page)).toHaveCount(0);
+    await held.arrived;
+    held.release();
+    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
+    expect(await keptConsents(page)).toEqual({});
+  });
+
+  test("the agreement is the person's: another person signed in to this browser is asked, and the one who agreed is not", async ({
+    page,
+  }) => {
+    await page.goto("/account/flows");
+    await page.evaluate(
+      (key) => localStorage.setItem(key, "agreed"),
+      ownersConsent,
+    );
+    await presentSession(page, "admin");
+    const admins = await withFile(page);
+    await admins.getByRole("button", { name: "Start run" }).click();
+    await expect(aiConsent(page)).toBeVisible();
+    await aiConsent(page)
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
+    await presentSession(page, "owner");
+    const owners = await withFile(page, "second.pdf");
+    const held = await holdRequest(page, "**/account/flows", isServerAction);
+    await owners.getByRole("button", { name: "Start run" }).click();
+    await expect(aiConsent(page)).toHaveCount(0);
+    await held.arrived;
+    held.release();
+    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
+  });
+
+  test("a storage read that fails asks again: it is never taken for agreement", async ({
+    page,
+  }) => {
+    // This browser keeps the owner's agreement and refuses to read it back.
+    await page.addInitScript(() => {
+      const read = Storage.prototype.getItem;
+      Storage.prototype.getItem = function (this: Storage, key: string) {
+        if (String(key).startsWith("autom8x.ai-consent."))
+          throw new DOMException("refused", "SecurityError");
+        return read.call(this, key);
+      };
+    });
+    await page.goto("/account/flows");
+    await page.evaluate(
+      (key) => localStorage.setItem(key, "agreed"),
+      ownersConsent,
+    );
+    const dialog = await withFile(page);
+    const starts = observe(page, isServerAction);
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await expect(aiConsent(page)).toBeVisible();
+    expect(starts).toEqual([]);
+    await agreeToAiConsent(page);
+    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
+  });
+
+  test("a write that fails after Agree still starts that run, and the next run with a file asks again", async ({
+    page,
+  }) => {
+    // This browser cannot keep the agreement.
+    await page.addInitScript(() => {
+      const write = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (
+        this: Storage,
+        key: string,
+        value: string,
+      ) {
+        if (String(key).startsWith("autom8x.ai-consent."))
+          throw new DOMException("full", "QuotaExceededError");
+        return write.call(this, key, value);
+      };
+    });
+    const dialog = await withFile(page);
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await agreeToAiConsent(page);
+    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
+    expect(await fixtureFiles()).toEqual([
+      { filename: "invoice.pdf", sizeBytes: 24, runId: "fixture-run-started" },
+    ]);
+    expect(await keptConsents(page)).toEqual({});
+    const again = await withFile(page, "second.pdf");
+    await again.getByRole("button", { name: "Start run" }).click();
+    await expect(aiConsent(page)).toBeVisible();
+  });
+
+  test("while the question is open no second start goes out — not the form sent again, not an agreement kept meanwhile from another tab", async ({
+    page,
+  }) => {
+    const dialog = await withFile(page);
+    const starts = observe(page, isServerAction);
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await expect(aiConsent(page)).toBeVisible();
+    // Another tab agrees meanwhile, and the form beneath is sent again:
+    // Enter in one of its fields.
+    await page.evaluate(
+      (key) => localStorage.setItem(key, "agreed"),
+      ownersConsent,
+    );
+    await dialog.getByLabel("Invoice reference").press("Enter");
+    await page.waitForTimeout(1_000);
+    expect(starts).toEqual([]);
+    await expect(aiConsent(page)).toHaveCount(1);
+    // Agreed here: one start, the run the question held.
+    await agreeToAiConsent(page);
+    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
+    expect(starts).toHaveLength(1);
+  });
+
+  test("a page left while the question is open over the Run window scrolls again: the two close together", async ({
+    page,
+  }) => {
+    // Reached in the page, so going back is the app's own navigation and
+    // both dialogs close in one render.
+    await page.goto("/account");
+    await page
+      .getByRole("complementary", { name: "Dashboard navigation" })
+      .getByRole("link", { name: "Flows", exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/account\/flows$/);
+    await automationCard(page, "Manual input automation")
+      .getByRole("button", { name: "Run", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog", {
+      name: "Run Manual input automation",
+    });
+    await expect(dialog.getByLabel("Vendor")).toBeFocused();
+    await dialog.getByLabel("Vendor").fill("Acme Supplies");
+    await dialog.getByLabel("Amount").fill("120.50");
+    await dialog.getByLabel("Invoice reference").fill("INV-1001");
+    await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
+    await expect(
+      dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+    ).toBeVisible();
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await expect(aiConsent(page)).toBeVisible();
+    const overflow = () => page.evaluate(() => document.body.style.overflow);
+    expect(await overflow()).toBe("hidden");
+    await page.goBack();
+    await expect(page).toHaveURL(/\/account$/);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect.poll(overflow).toBe("");
   });
 });
 
