@@ -1962,12 +1962,12 @@ test.describe("asking before a run's file goes to an AI (Apple App Review 5.1.2(
     await expect(consent).toBeVisible();
     await expect(consent.getByRole("heading")).toHaveText("AI reads this file");
     await expect(consent.locator("p")).toHaveText([
-      "To read the file you give this run, Autom8x sends it to OpenRouter, which passes it to an AI model provider in the United States, using only endpoints that OpenRouter lists as zero data retention.",
+      "To read the file you give this run, Autom8x sends it to OpenRouter, which passes it to AI model providers in the United States, using only endpoints that OpenRouter lists as zero data retention.",
       "Our Privacy Policy names the providers and explains what may be kept.",
     ]);
     // Both said when it opens, as a screen reader reads it.
     await expect(consent).toHaveAccessibleDescription(
-      "To read the file you give this run, Autom8x sends it to OpenRouter, which passes it to an AI model provider in the United States, using only endpoints that OpenRouter lists as zero data retention. Our Privacy Policy names the providers and explains what may be kept.",
+      "To read the file you give this run, Autom8x sends it to OpenRouter, which passes it to AI model providers in the United States, using only endpoints that OpenRouter lists as zero data retention. Our Privacy Policy names the providers and explains what may be kept.",
     );
     const policy = consent.getByRole("link", {
       name: "Privacy Policy",

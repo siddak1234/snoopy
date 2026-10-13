@@ -32,7 +32,7 @@ test("the words are the app's, byte for byte", () => {
   assert.equal(AI_CONSENT.title, "AI reads this file");
   assert.equal(
     AI_CONSENT.body,
-    "To read the file you give this run, Autom8x sends it to OpenRouter, which passes it to an AI model provider in the United States, using only endpoints that OpenRouter lists as zero data retention.",
+    "To read the file you give this run, Autom8x sends it to OpenRouter, which passes it to AI model providers in the United States, using only endpoints that OpenRouter lists as zero data retention.",
   );
   assert.equal(
     AI_CONSENT.policy,

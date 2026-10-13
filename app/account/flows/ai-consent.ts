@@ -31,7 +31,7 @@ export const AI_CONSENT_VERSION = 1;
 
 export const AI_CONSENT = {
   title: "AI reads this file",
-  body: "To read the file you give this run, Autom8x sends it to OpenRouter, which passes it to an AI model provider in the United States, using only endpoints that OpenRouter lists as zero data retention.",
+  body: "To read the file you give this run, Autom8x sends it to OpenRouter, which passes it to AI model providers in the United States, using only endpoints that OpenRouter lists as zero data retention.",
   /** The second line; its words `policyLink` link to `policyHref`. */
   policy:
     "Our Privacy Policy names the providers and explains what may be kept.",
