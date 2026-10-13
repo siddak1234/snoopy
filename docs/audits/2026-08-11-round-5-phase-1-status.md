@@ -3038,3 +3038,25 @@ name `measurement_busy`.
   named on the 429 alone; `e2e/public-edge-fixture.spec.ts` shows it in the Run window, the fixture
   Edge answering a completion — and only a completion — 429, as the contract documents
   (`e2e/fixtures/public-edge.ts`).
+
+## Round 17 — the sign-in screen says continuing agrees to the Terms of Service and the Privacy Policy — 2026-10-13
+
+The owner's decision of 2026-10-13 (Round 17's B6): one line directly under the sign-in buttons,
+in the same words on the website and in the app — "By continuing, you agree to our Terms of
+Service and Privacy Policy." — "Terms of Service" a link to `/terms` and "Privacy Policy" to
+`/privacy`; no checkbox, no extra screen or tap, and nothing else on the screen changes.
+
+- `app/(auth)/login/LoginForm.tsx`: the line, a paragraph after the buttons', in the lead's size and
+  colour (the lead's classes, its margin aside). Its two links are drawn as the Support page's and the
+  Run window's AI question's are, in the accent colour and underlined — 4.71:1 on the dark card and
+  5.33:1 on the light, against WCAG's 4.5:1. This change's own choices, not the decision's: both open
+  in the same tab, since the address keeps where the person was going and Back returns to it, and
+  neither prefetches (`prefetch={false}`), so a visitor who signs in without opening either page
+  fetches neither.
+- `test/session-contract.test.mjs` holds the words as they render, both links and their pages, the
+  place under the buttons, the lead's look and that nothing is there to tick. Each of seven bites
+  failed it — other words, another page, smaller text, fainter text, no underline, no full stop,
+  the line above the buttons — and the file restored sha256-equal passed.
+  `e2e/public-edge-fixture.spec.ts` checks the same in the browser: the line under the last
+  button, each link underlined, and its font size, colour and opacity the lead's.
+  `e2e/accessibility.spec.ts` already scans `/login` with axe in three engines.

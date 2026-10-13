@@ -4784,6 +4784,43 @@ test("signed out, the login page arrives with its providers — read on the serv
   expect(browserReads).toEqual([]);
 });
 
+test("signed out, the login page says under its buttons that continuing agrees to the Terms of Service and the Privacy Policy, each a link, in the lead's size and colour, with nothing to tick (the owner, 2026-10-13)", async ({
+  page,
+}) => {
+  await page.context().clearCookies();
+  await page.goto("/login");
+  const line = page.getByText(
+    "By continuing, you agree to our Terms of Service and Privacy Policy.",
+    { exact: true },
+  );
+  await expect(line).toBeVisible();
+  for (const [name, href] of [
+    ["Terms of Service", "/terms"],
+    ["Privacy Policy", "/privacy"],
+  ] as const) {
+    const link = line.getByRole("link", { name, exact: true });
+    await expect(link).toHaveAttribute("href", href);
+    await expect(link).toHaveCSS("text-decoration-line", "underline");
+  }
+  // Under the last button.
+  const lastButton = page.getByRole("link", { name: /^Continue with / }).last();
+  await expect(lastButton).toBeVisible();
+  const buttonBox = await lastButton.boundingBox();
+  const lineBox = await line.boundingBox();
+  expect(lineBox!.y).toBeGreaterThanOrEqual(buttonBox!.y + buttonBox!.height);
+  // Never smaller or fainter than the screen's own lead.
+  const look = (element: Element) => {
+    const style = getComputedStyle(element);
+    return [style.fontSize, style.color, style.opacity];
+  };
+  expect(await line.evaluate(look)).toEqual(
+    await page
+      .getByText(/^Sign in with an approved provider\./u)
+      .evaluate(look),
+  );
+  await expect(page.getByRole("checkbox")).toHaveCount(0);
+});
+
 test("a link the platform refused lands a signed-in person on Linked accounts, which says why once (the owner's build 13 decision 10A, TestFlight #19)", async ({
   page,
 }) => {
