@@ -2543,3 +2543,460 @@ Bills & Receipts' platform half (backend BUILD-PLAN 25.2.17–25.2.33) landed on
   and that rule, `test/automation-contract.test.mjs` the words against every reason the two
   upload operations name, and `e2e/public-edge-fixture.spec.ts` each one shown in the Run
   window. The app says the same sentences (`snoopy-mobile`, the same day).
+
+## Round 17 — the privacy policy names OpenRouter, the model providers it may route to, and QuickBooks Online (backend BUILD-PLAN 25.7.4) — 2026-10-12
+
+Backend BUILD-PLAN 25.7.4: "The privacy policy names OpenRouter and the model providers it routes
+to, written with counsel before the key". Bills & Receipts sends a run's document to OpenRouter
+and reads and writes a workspace's QuickBooks Online company, and the policy of October 5, 2026
+named neither, while saying "We will update this policy before adding or replacing a
+subprocessor category". Intuit's App Details for production ask for the policy's URL
+(https://developer.intuit.com/app/developer/qbo/docs/go-live/publish-app, step 1), and its data
+stewardship principles require that "The privacy policy must specify the data retention and
+deletion policies and practices that pertain to the application"
+(https://developer.intuit.com/app/developer/qbo/docs/legal-agreements/intuit-terms-of-service-for-intuit-developer-services/intuit-data-stewardship-principles).
+The owner's direction of 2026-10-12, "Audit with another agent and confirm then merge": the draft
+is checked by an independent agent in place of counsel. An agent's audit checks facts and
+coverage; it is not legal advice.
+
+Every sentence added is read from `snoopy-backend` at `4e54169` (its `apps/`, `packages/` and
+`providers/` are the same at `3e235ca`, its `main` when the audit's changes were made),
+`snoopy-automations` at `a00d7fa` (Bills & Receipts, `templateId` `invoice-processing`),
+OpenRouter's documents, terms, data processing agreement and endpoint lists read 2026-10-12, or
+Intuit's developer documents. `app/(marketing)/privacy/page.tsx`:
+
+- **The date**: "Effective and last updated: October 12, 2026."
+- **What we collect**: workspace content names the files given to runs (the Run window's file
+  field, `app/account/flows/RunFileField.tsx`, and the app's).
+- **Documents read by AI** (new). What is sent: the run's own file and no other
+  (`snoopy-backend/apps/runs/src/model-file.ts`), with the automation's fixed instructions — for
+  Bills & Receipts a fixed task and prompt files with no placeholders, so nothing typed to start
+  the run, no setting and nothing from QuickBooks
+  (`snoopy-automations/automations/invoice-processing/src/steps/extract.ts`, `verify-read.ts`) —
+  and never the file's own name (`snoopy-backend/packages/model-gateway/src/openrouter.ts:245`).
+  The second read by another maker's model and the platform's next-model fallback. What every
+  request asks of OpenRouter (the same file, lines 201–210): `provider.zdr`,
+  `data_collection: deny`, `provider.only` set to the fifteen United States zero-retention
+  endpoints of `snoopy-backend/packages/config/src/index.ts` (Amazon Bedrock, Azure, DeepInfra,
+  Fireworks, Google Vertex, Mistral, Sail Research, Wafer and xAI, as OpenRouter's endpoint list
+  names their tags — the same fifteen on 2026-10-12 as on 2026-10-10), and a PDF with the
+  `file-parser` plugin's `native` engine — said in OpenRouter's words, "passed directly to the
+  model" (https://openrouter.ai/docs/guides/overview/multimodal/pdfs), because whether that
+  engine parses anything on OpenRouter's side is 25.7.4's question to OpenRouter, unanswered.
+  Training: Autom8x trains no models, and the rest is said as the policies OpenRouter publishes,
+  not as Autom8x's guarantee — OpenRouter's privacy policy (no training on inputs or outputs) and
+  its provider list (none of the nine marked as training); its data processing agreement,
+  §2.4(b), says the list "does not constitute OpenRouter's guarantee of AI Model Provider
+  compliance" (https://openrouter.ai/data-processing-agreement). Retention as OpenRouter
+  publishes it: its privacy policy (data may be processed in the United States or other
+  countries; an image kept past routing only for abuse detection, security, billing or legal
+  compliance), its data-collection guide (no prompts or answers stored unless an account opts in,
+  metadata kept, an anonymous topic category sampled), its terms §6.3(b) (a request stored
+  temporarily where it cannot be processed in memory) and its zero-retention guide (in-memory
+  caching not counted as retention). **Autom8x's own account, a commitment**: the data-collection
+  guide's two switches, logging and OpenRouter's use of inputs and outputs, off, and no plugin or
+  broadcast turned on in the account's settings — settings the platform's requests do not
+  override, while zero retention "does not apply to plugins"
+  (https://openrouter.ai/docs/guides/features/zdr). The account and its key come last (25.7.1);
+  the read-back that keeps this sentence true is below.
+- **QuickBooks Online data** (new). Owners and admins connect
+  (`snoopy-backend/apps/api/src/modules/connections/routes.ts`); the one scope and the platform's
+  operations, reads and creates only, a create refused a body naming `Id`, `SyncToken` or
+  `sparse` (`snoopy-backend/providers/quickbooks.json`); what Bills & Receipts reads and creates
+  (its manifest, `snoopy-automations/manifests/invoice-processing.v1.json`) and what each document
+  becomes — a bill a bill and a receipt an expense, or, with "I paid for this with my own money"
+  on, a journal entry (an owner or an employee) or a bill (a contractor); a credit note a vendor
+  credit, or a card refund (`purchase.create`) when refunded to a card; a statement compared
+  (`snoopy-automations/automations/invoice-processing/src/checks/route.ts:19`,
+  `snoopy-automations/automations/invoice-processing/src/writes/saved-state.ts:68`); the tokens
+  encrypted (`snoopy-backend/packages/crypto/src/envelope.ts`) and renewed
+  (`snoopy-backend/apps/connections/src/refresh.ts`); QuickBooks' answers kept 30 days for a
+  retried step and pruned by the connections service's own sweep (the same file); the "Also
+  email" summary (`snoopy-automations/automations/invoice-processing/src/steps/notify.ts`);
+  disconnecting — the tokens deleted by the schema's trigger, Intuit asked to revoke, every later
+  call refused (`snoopy-backend/apps/connections/src/routes.ts`,
+  `snoopy-backend/apps/connections/migrations/0001_connections_baseline.sql`). Two sentences
+  Intuit's developer terms, §12.2, ask for: Autom8x does not process QuickBooks data on Intuit's
+  behalf ("(iii) clarify that you do not process User Data or Personal Information on Intuit's
+  behalf"), and an owner or admin can ask at singh@autom8x.ai for what runs kept from QuickBooks
+  to be deleted, apart from records the law requires ("Securely Delete User Data or Personal
+  Information at the request of User",
+  https://developer.intuit.com/app/developer/qbo/docs/legal-agreements/intuit-terms-of-service-for-intuit-developer-services).
+- **Who we share it with**: the eight providers keep their sentence. OpenRouter and the model
+  provider it routes to have their own, because OpenRouter's privacy policy does not hold its own
+  processing to the United States and the model providers are reached through OpenRouter, not
+  under an agreement with us. Intuit is named as a provider a workspace connects.
+- **Retention and deletion**: disconnecting "deletes its stored tokens immediately and asks the
+  provider to revoke the access", as the QuickBooks section says it — was "revokes and deletes".
+  Revocation is attempted after the local delete and never fatal
+  (`snoopy-backend/apps/connections/src/routes.ts:278`), and every provider the platform has is
+  OAuth 2 with a revocation URL (`snoopy-backend/providers/`).
+
+`app/(marketing)/terms/page.tsx`, changed by the audit:
+
+- **The date**: "Effective and last updated: October 12, 2026." (was August 28).
+- **Connected provider accounts**: "You can disconnect at any time on the Connections page, which
+  deletes the stored tokens at once and asks the provider to revoke the access" — was "in
+  Settings, which revokes and deletes stored tokens". On this website Connections is its own
+  page, not a part of Settings (`components/dashboard/DashboardNav.tsx:10`, `:15`), and its
+  Disconnect button is there (`app/account/connections/ConnectionsPanel.tsx:314`); in the app it
+  is a screen inside the Settings tab (`snoopy-mobile/app/(tabs)/settings/connections.tsx`), so
+  "the Connections page" names it on both.
+- **Intellectual property**: "you grant us the license needed to operate the service on it, and
+  our service providers the licenses they need to process it as the Privacy Policy describes —
+  nothing more" — was "the license needed to operate the service on it — nothing more".
+  OpenRouter's terms take a licence to a user's inputs to run its service (§6.1) and a
+  "perpetual, irrevocable" one to use them "in anonymized form, solely for tracking and sharing
+  user metrics" (§6.5, https://openrouter.ai/terms), and a customer's document is such an input.
+  Of the audit's two ways out, amending the terms or OpenRouter opting Autom8x out of
+  categorization in writing, this draft takes the first; the second stays open to the owner, and
+  either one is the owner's to accept at the merge.
+
+**Not stated, because the records do not settle it:**
+
+- How long uploaded files and run timelines are kept.
+  `snoopy-backend/apps/artifacts/src/main.ts` defaults a file to 90 days past its run's
+  completion, and `snoopy-backend/apps/runs/src/partitions.ts` keeps the timeline three monthly
+  partitions (a row is dropped no younger than 89 days and kept no older than 122, the file's own
+  measure); `maintain-artifacts` and `maintain-runs` do the
+  deleting, but whether either droplet runs them on a schedule is unknown (backend
+  SYSTEM-MANIFEST §12.1 #229). The general rule, "retained while your account is active", is not
+  false either way; if the jobs run, it overstates how long files and timelines are kept.
+  _Corrected by the re-check of 2026-10-12 (below): the records settle it — both jobs run at every
+  promotion — and the page states both windows since._
+- Whether OpenRouter's `native` PDF engine parses anything on its side (25.7.4's question). The
+  page says what OpenRouter's PDF guide says, as the guide's words.
+
+**For the owner before the key (25.7.1)** — none of these is a change in this repository:
+
+1. **OpenRouter's account settings, read back and recorded**: Privacy (OpenRouter's use of inputs
+   and outputs off, the 1% discount declined; zero data retention enforced), Observability
+   (input and output logging off, Broadcast off with no destination), and Plugins (none on by
+   default, none forced with "Prevent overrides"). The page now says both switches are off and no
+   plugin or broadcast is on. The owner's settings of 2026-10-09 already say "zero data retention
+   enforced for every request" and "prompt logging off" (backend BUILD-PLAN 25.7.1); the rest is
+   this audit's. A finding for `snoopy-backend`: 25.7.1 closes only on that read-back.
+2. **Whether this update is material** (the policy: "Material changes are announced by email or in
+   the product before they take effect"; the terms: "If these terms change materially, we will
+   notify account holders by email or in the product before the change takes effect"). It adds
+   OpenRouter and nine model providers as recipients of customer documents, QuickBooks
+   processing, and a wider licence in the terms. OpenRouter's processing starts only with the
+   key. The owner decides; if it is material and there are account holders, it is announced
+   before the key; and the decision is recorded either way, with "no outside account holders
+   yet" if that is so. _Since the re-check of 2026-10-12 (below): due before the merge, not
+   before the key — both pages take effect when posted, and the terms' licence with them._
+3. **Financial documents under OpenRouter's data processing agreement**: its "Sensitive Data"
+   includes "(b) credit or debit card number (other than the truncated (last four digits)…)" and
+   "(c) employment, financial, credit … information" (1.15); "Unless the parties agree that
+   OpenRouter will process Sensitive Data …, Customer will restrict OpenRouter's access to any
+   Sensitive Data" (§2.6); and Schedule 1(B): "No processing of Sensitive Data … is intended; …
+   the parties will update this Schedule 1 by amendment"
+   (https://openrouter.ai/data-processing-agreement, last updated August 26, 2026). Bills &
+   Receipts sends bills, receipts and statements, among them receipts a person paid personally,
+   and a bank statement for its first read before refusing it. A Schedule 1 amendment in writing
+   that covers financial documents, or the risk accepted knowingly and recorded.
+
+**For the owner before Intuit's review (25.7.3):**
+
+4. **Backend §12.1 #229**: `systemctl list-timers --all` and `crontab -l` (as root and as
+   `autom8x`) on both droplets. If `maintain-artifacts` and `maintain-runs` run, the retention
+   section gains a sentence for files and timelines — the audit's: "A file given to a run is
+   deleted 90 days after the run finishes, and a run's step-by-step timeline after 90 days; its
+   results stay while your account is active", with the timeline's "about three months" if it is
+   to match `partitions.ts`. If they do not run: schedule them, or keep the general rule as a
+   deliberate choice. Apple's guideline 5.1.1(i) asks the same of the policy: "Explain its data
+   retention/deletion policies". _Since the re-check of 2026-10-12 (below): the jobs run at every
+   promotion and the page states both windows; what stays here is a timer, so they hold between
+   promotions._
+5. **The realm id** (a finding for `snoopy-backend`): Intuit's security requirements say "Encrypt
+   and store the refresh token and realmID in persistent memory" and "Intuit OAuth tokens or
+   customer-identifying information is not exposed within your app or shared with other parties"
+   (https://developer.intuit.com/app/developer/qbo/docs/go-live/publish-app/security-requirements).
+   The company's id is stored as `external_account_id` in plain text
+   (`snoopy-backend/apps/connections/migrations/0001_connections_baseline.sql:87`) and returned as
+   `externalAccount.id` in every connection summary
+   (`snoopy-backend/apps/connections/src/postgres-connections.ts:50`); this website shows only
+   `externalAccount.displayName` (`app/account/connections/ConnectionsPanel.tsx:277`). Encrypt it
+   at rest with the connections keyring and stop sending it. The page claims encryption for the
+   tokens only.
+6. **A deletion request has no tool yet** (the page's new QuickBooks sentence). The platform
+   deletes runs only a whole workspace at a time, through each service's
+   `DELETE /internal/v1/workspaces/{id}` (`snoopy-backend/apps/runs/src/routes-purge.ts:12`),
+   called only by Access when an account is deleted, and then only for its personal workspaces
+   and those it is the last owner of (`snoopy-backend/apps/access/src/postgres-purge.ts:88`,
+   `snoopy-backend/apps/access/src/app.ts:267`). Nothing deletes one automation's runs, so until
+   a tool or a written procedure exists, such a request is a hand-run production deletion.
+
+**For the iPhone app, before it ships with Bills & Receipts:**
+
+7. Apple's guideline 5.1.2(i): "You must clearly disclose where personal data will be shared with
+   third parties, including with third-party AI, and obtain explicit permission before doing so"
+   (https://developer.apple.com/app-store/review/guidelines/, read 2026-10-12). Neither
+   `snoopy-mobile` (`d5fbb40`, `app/` and `components/`) nor this website's Run window names
+   OpenRouter or asks permission; at most the flow's steps, from its manifest, say "The AI reads
+   the document" and "A second AI, by another maker, reads" it
+   (`snoopy-automations/manifests/invoice-processing.v1.json:245`, `:257`), naming no third party.
+   A one-time consent before a document first goes to AI, naming OpenRouter and its model
+   providers and linking this policy. Guideline 5.1.1(i)'s
+   statement that a third party gives "the same or equal protection of user data as stated in the
+   app's privacy policy" goes into the policy only after its basis is confirmed (OpenRouter's data
+   processing agreement, §5.1). _Since the re-check of 2026-10-12 (below): due with the key
+   (25.7.1), not with an app release — `snoopy-mobile` `d5fbb40` already starts a run with a file
+   for any flow in the catalog, so Bills & Receipts reaches the app with the catalog._
+
+**The audit of 2026-10-12** — twelve findings (the audit's list as received ends partway through
+the twelfth, the terms' disconnect sentence), each answered above:
+
+| Finding | Severity | Answer |
+| ------- | -------- | ------ |
+| OpenRouter's own storage depends on account settings the page never committed to | should-fix | the commitment and its temporary-storage clause on the page; the read-back, owner item 1 |
+| "Not used to train" stated as Autom8x's guarantee | should-fix | said as the policies OpenRouter publishes |
+| The PDF sentence stated an open question as fact | should-fix | in OpenRouter's PDF guide's words |
+| Intuit §12.2's two disclosures missing | should-fix | both sentences on the page; the tool, owner item 6 |
+| File and timeline retention not stated | should-fix | owner item 4 (no page change: nothing on it is false) |
+| The page's own promise to announce material changes | should-fix | owner item 2 |
+| The terms' licence clause against OpenRouter's §6.5 | should-fix | the terms amended |
+| The realm id stored in plain text and sent to clients | should-fix | owner item 5 (not a page change) |
+| Financial documents under OpenRouter's DPA | should-fix | owner item 3 (not a page change) |
+| Apple's rules for third-party AI | should-fix | item 7 (not a page change) |
+| The record mapping was the default case only | minor | the exceptions on the page |
+| Two older sentences said disconnecting "revokes" | minor | both reworded, and the terms' "in Settings" made "on the Connections page" |
+
+**The screenshots.** `e2e/marketing.visual.spec.ts-snapshots/privacy-darwin.png`,
+`privacy-linux.png`, `terms-darwin.png` and `terms-linux.png` re-recorded: privacy 1440 by 5,960
+px on the Mac and 5,983 in CI's image (both were 5,771 in the draft; 4,255 on `main`), terms
+3,955 and 3,932 (were 3,908 and 3,884). Each renderer first failed both pages on the old
+baselines, as it must, then re-recorded them and passed again. The Mac's Chromium, served on
+127.0.0.1:3111 through a temporary, uncommitted config that imports `playwright.config.ts` and
+changes only its port, because an orphaned next-server holds 127.0.0.1:3001: the two pages and
+their axe baselines (4), and all six marketing pages (6). CI's pinned image
+(`mcr.microsoft.com/playwright@sha256:dcc5531e…`, Node 22.23.2, `CI=1`, on this Mac's arm64):
+the two pages and their axe baselines in Chromium, Firefox and WebKit (8). The draft's control
+— both renderers reproducing `main`'s baselines for these two pages — stands; GitHub's x86_64
+runner is the authority.
+
+**The re-check of 2026-10-12, answered.** An independent re-check of `ee40349` found nothing
+blocking: three should-fix items and nine minor ones. Every page change below is read from
+`snoopy-backend` at `62284de`, its `main` at this update (records only since `3e235ca`; its
+`apps/`, `packages/`, `providers/` and `deploy/` are the same), `snoopy-automations` at `a00d7fa`,
+OpenRouter's terms (last updated August 31, 2026), data processing agreement (August 26, 2026)
+and guides as served 2026-10-12 20:44Z, Backblaze's documentation read the same day, or Intuit's
+authorization FAQ as copied 2026-10-12. `app/(marketing)/privacy/page.tsx`:
+
+- **Files and timelines** (re-check 1). Retention and deletion: "A file given to a run is kept
+  for 90 days after the run ends and then deleted, and a run's step-by-step timeline for about
+  three months; a run's results stay while your account is active", under "Your data is retained
+  while your account is active, except where this policy says otherwise". The 90 days:
+  `snoopy-backend/apps/artifacts/src/main.ts:47` (NFR-16, ADR-0012 §2; no
+  `ARTIFACTS_RETENTION_DAYS` in `snoopy-backend/deploy/compose.prod.yml`), stamped from the run's
+  end by the runs service's minute sweep (`snoopy-backend/apps/runs/src/background.ts:69`,
+  `snoopy-backend/apps/artifacts/src/routes.ts:264`) and deleted by `maintain-artifacts`
+  (`snoopy-backend/apps/artifacts/src/maintain.ts:65`). The timeline: three monthly partitions,
+  a row dropped no younger than 89 days and kept no older than 122
+  (`snoopy-backend/apps/runs/src/partitions.ts:64`), by `maintain-runs`. Neither job has a
+  profile (`snoopy-backend/compose.yml:556`, `:942`; `snoopy-backend/deploy/compose.prod.yml:714`,
+  `:767`), so both hosts run them at every `up -d` (backend SYSTEM-MANIFEST §12.1 #229);
+  production deploys with `doppler run -- docker compose up -d` (backend BUILD-PLAN line 2788),
+  and the read-backs record 15 one-shot jobs `Exited (0)` on each host (lines 7575 and 7720). No
+  timer is recorded, so a window closes at the next promotion's pass, not on its day. A run's own
+  row has no window (backend BUILD-PLAN 7.3).
+- **Deletion's two limits** (re-check 3, and one this update found). (a) Backups:
+  `snoopy-backend/deploy/backup/pg-backup.sh` dumps the platform's schemas each night
+  (`snoopy-backend/deploy/backup/autom8x-backup.timer`, 03:30 UTC), deletes only the server's own
+  dumps after 14 days (line 17, `KEEP_DAYS`; line 77), and uploads each dump to `autom8x-backups`
+  (lines 57–65) with no deletion there and no encryption of its own; nothing in `snoopy-backend`
+  records a lifecycle rule or default encryption on that bucket — the ADR-0022 amendment says only
+  "Backups age out on the backup script's schedule" — and Supabase's Free tier keeps no backups
+  (backend SYSTEM-MANIFEST §12.2 #28). So the page says what a backup is and may hold: "the copy
+  kept on our server is deleted after 14 days, and a copy stored off-site with Backblaze is not
+  deleted on that schedule. A backup can still hold data deleted after it was made, such as the
+  tokens of a provider account since disconnected, which stay encrypted in it" (sealed under
+  keys outside the database, `snoopy-backend/packages/crypto/src/envelope.ts`). It promises no
+  expiry. "nightly encrypted backups rotate on a fixed schedule, so deleted data leaves the
+  backup set as those backups age out" is gone, and Who we share it with's "encrypted off-site
+  backups" is "off-site backups". (b) Files: the store deletes a file with an S3 `DELETE` that
+  names no version (`snoopy-backend/apps/artifacts/src/s3-store.ts:338`,
+  `snoopy-backend/apps/artifacts/src/s3-signing.ts:237`), and Backblaze answers that with a
+  marker: "If no versionId is included in the request, a delete marker will be inserted"
+  (https://www.backblaze.com/apidocs/s3-delete-object); a bucket left at its default keeps the
+  earlier version "forever, unless you delete them"
+  (https://www.backblaze.com/docs/cloud-storage-lifecycle-rules). No record shows
+  `autom8x-artifacts`' lifecycle either, so the page says Backblaze "can keep an earlier version
+  of a file after it is deleted". Account deletion now "removes your account data from the
+  service promptly, within the limits below" (was "from live systems promptly"), and the
+  QuickBooks deletion sentence names the backup limit.
+- **A PDF goes as uploaded** (re-check 5): "The document itself goes as uploaded, including
+  anything stored inside the file, such as a PDF's title or author" — the stored bytes, unchanged
+  (`snoopy-backend/apps/runs/src/model-file.ts:89`), with only the name replaced
+  (`snoopy-backend/packages/model-gateway/src/openrouter.ts:246`); the Run window re-draws an
+  image and sends a PDF as it is (`app/account/flows/RunFileField.tsx:54`).
+- **OpenRouter's screening, and its exception for the law and malicious use** (re-check 6), in
+  its own documents' words — its terms §6.7: "OpenRouter may, however, at any time and without
+  prior notice, screen, remove, edit, or block any Inputs that in our sole judgment violates
+  these Terms or is otherwise objectionable or illegal. This includes screening Inputs for known
+  child sexual abuse material (CSAM) and malware using automated detection tools"
+  (https://openrouter.ai/terms); its data processing agreement §2.4(a): "Except where required by
+  law or as necessary to address malicious use of the Service, … OpenRouter will delete Inputs and
+  Outputs promptly following generation of the relevant Output. OpenRouter may apply automated
+  risk classification to Inputs and Outputs prior to deletion solely to detect violations of this
+  Agreement" (https://openrouter.ai/data-processing-agreement). Both apply to every request, not
+  only an image. Linked where the page names them, with the zero data retention, PDF and data
+  collection guides.
+- **The PDF plugin** (re-check 7): "A PDF is sent through OpenRouter's PDF plugin, set on each
+  request to its "native" engine" (`snoopy-backend/packages/model-gateway/src/openrouter.ts:201`),
+  and the zero data retention guide's "does not apply to plugins and tools you choose to enable"
+  (https://openrouter.ai/docs/guides/features/zdr). The PDF guide's words on the native engine
+  stay as they were, because 25.7.4's question to OpenRouter is unanswered. The account's
+  commitment is now "turn on no OpenRouter plugin by default" — the plugins guide's "Default
+  Plugin Settings" (https://openrouter.ai/docs/guides/features/plugins).
+- **Disconnecting from inside QuickBooks** (re-check 10): "If you disconnect Autom8x from within
+  QuickBooks instead, Intuit says this invalidates the tokens it gave Autom8x, so no automation
+  can reach the company from then on; disconnecting on the Connections page as well deletes the
+  stored tokens." Intuit's authorization FAQ: "If a user disconnects their QuickBooks Online
+  company from your app, it invalidates the access token and refresh token"
+  (https://developer.intuit.com/app/developer/qbo/docs/develop/authentication-and-authorization/faq).
+  The platform learns at its next call or renewal and marks the connection to be reconnected
+  (`snoopy-backend/apps/connections/src/routes-operations.ts:227`,
+  `snoopy-backend/apps/connections/src/refresh.ts:179`), keeping the dead tokens; the schema's
+  trigger deletes them only when the status becomes `disconnected`
+  (`snoopy-backend/apps/connections/migrations/0001_connections_baseline.sql:202`), which
+  Disconnect sets from any other status
+  (`snoopy-backend/apps/connections/src/postgres-connections.ts:175`), and both the website and
+  the app offer Disconnect on a connection that needs reconnecting
+  (`app/account/connections/ConnectionsPanel.tsx:315`;
+  `snoopy-mobile/components/settings/connections-card.tsx:46`).
+- **What earlier runs recorded, after a disconnect** (re-check 10): "in your workspace, Autom8x
+  uses it only for those runs, to show them to you or to end one still waiting for approval, until
+  you ask us to delete it". The re-check's "used only to show your workspace its earlier runs" is
+  not the whole of it: an approval given after a disconnect hands the held run's saved state back
+  to Bills & Receipts (`snoopy-backend/apps/runs/src/routes-approvals.ts:113`), whose first step
+  after an approval checks the company again "before anything is written"
+  (`snoopy-automations/automations/invoice-processing/src/steps/confirm-company.ts`), and the
+  call is refused, so the run ends. A workspace export carries the runs' one-line results
+  (`snoopy-backend/apps/runs/src/postgres-export.ts:40`) — the runs, shown to you. Deletion on
+  request is the page's own promise, carried out by hand until a tool exists (owner item 6).
+
+`app/(marketing)/terms/page.tsx` (re-check 11): "and the service providers the Privacy Policy
+names, including OpenRouter and the model providers it routes requests to, the licenses they need
+to process it as that policy describes — nothing more" — was "our service providers the licenses
+they need to process it as the Privacy Policy describes". The policy names the eight hosts as
+under an agreement with us, and OpenRouter and the model providers apart from them.
+
+**Not page changes** — for the owner and for `snoopy-backend`:
+
+- Owner item 2 is due before the merge (re-check 2).
+- 25.7.1 closes only on the OpenRouter account's settings read back — Privacy, Observability
+  (logging and Broadcast), and Plugins with "Prevent overrides" (re-check 4); not yet filed in
+  the backend's BUILD-PLAN.
+- Revocation should send the refresh token (re-check 9; Intuit's OAuth 2.0 guide, Step 16:
+  "include the refresh_token value for the token parameter"):
+  `snoopy-backend/apps/connections/src/postgres-disconnect.ts:34` reads the access token and
+  `snoopy-backend/apps/connections/src/oauth-revoke.ts:29` posts it.
+- The stored tokens should be deleted when Intuit reports the grant gone — a renewal refused, or
+  a call answered 401 — not only on Disconnect (re-check 10; Intuit's developer terms §12.2:
+  "Immediately cease to access and discontinue processing User Data … if a User revokes their
+  consent").
+- A timer for `maintain-artifacts` and `maintain-runs` (§12.1 #229), so the 90 days and about
+  three months hold between promotions (re-check 1).
+- The Backblaze console: `autom8x-backups`' and `autom8x-artifacts`' Lifecycle Settings and
+  Default Encryption read and recorded; with a rule there — or a store that deletes by version —
+  the page's two limits can be tightened (re-check 3, and this update's own).
+- Owner items 3, 5 and 6 stand; item 7 is due with the key (re-check 12).
+- If the merge slips past October 12, both dates and the four PNGs change together (re-check 8).
+
+| Re-check finding | Severity | Answer |
+| ---------------- | -------- | ------ |
+| Files and timelines said "retained while your account is active" | should-fix | both windows on the page; the timer, for `snoopy-backend` |
+| The owner's materiality decision is due before the merge | should-fix | owner item 2, its deadline moved |
+| Off-site backups: no record they expire or are encrypted | should-fix | the page says what backups hold and promises no expiry; "encrypted" dropped; the console read, for the owner |
+| The account settings check not filed in 25.7.1 | minor | for `snoopy-backend` |
+| A PDF's own title and author reach the model | minor | said on the page |
+| OpenRouter's screening and its law and abuse exception | minor | said on the page, with its terms and data processing agreement linked |
+| "No OpenRouter plugin" beside the PDF plugin | minor | "by default", and the PDF plugin named |
+| The dates and snapshots if the merge slips | minor | October 12 kept; the four re-recorded today |
+| Revocation with the access token | minor | for `snoopy-backend` |
+| Disconnecting inside QuickBooks; run data kept after | minor | both on the page; deleting the tokens on Intuit's report, for `snoopy-backend` |
+| The terms' "our service providers" | minor | the policy's named providers, OpenRouter and the model providers among them |
+| Apple 5.1.2(i) applies at the key | minor | item 7, its deadline moved |
+
+**The screenshots, again.** `e2e/marketing.visual.spec.ts-snapshots/privacy-darwin.png`,
+`privacy-linux.png`, `terms-darwin.png` and `terms-linux.png` re-recorded: privacy 1440 by 6,467
+px on the Mac and 6,490 in CI's image (were 5,960 and 5,983), terms 3,979 and 3,955 (were 3,955
+and 3,932). Each renderer first failed both pages on the previous baselines, then re-recorded
+them and passed again: the Mac's Chromium through the same temporary, uncommitted config on
+127.0.0.1:3111 — the two pages and their axe baselines (4) and all six marketing pages (6); CI's
+pinned image (`mcr.microsoft.com/playwright@sha256:dcc5531e…`, Node 22.23.2, `CI=1`, on this
+Mac's arm64), in a copy of the tracked tree — the two pages and their axe baselines in Chromium,
+Firefox and WebKit (8). GitHub's x86_64 runner is the authority.
+
+**2026-10-12 — the re-check of `4935e6c`, answered.** Account deletion now says what it removes,
+"your account, your personal workspace and every organization you alone own, with their workspace
+content" (as Settings says, `app/account/settings/page.tsx:99`), and names a third limit: the
+sign-in record Supabase keeps, which nothing deletes ("Access purges the workspaces but does not
+touch the identity provider", `snoopy-backend/apps/api/src/app.ts:504`; the Edge holds only
+Supabase's publishable key, `snoopy-backend/deploy/compose.prod.yml:1442-1443`). A file and a
+timeline "become eligible for deletion" and go "at the next maintenance pass" (a file at a later
+pass if many are due, `snoopy-backend/apps/artifacts/src/maintain.ts:27`), because the jobs run
+at every `up -d` and no timer is recorded: whether either droplet runs them from a timer or cron
+is UNKNOWN (`snoopy-backend/deploy/compose.prod.yml:708-713`, backend SYSTEM-MANIFEST §12.1
+#229). A disconnect inside QuickBooks holds "until it is connected again", and the terms'
+Disconnect sentence ends "as the Privacy Policy describes". Both pages are dated October 13, 2026,
+the day they publish, and the four PNGs are re-recorded as before: privacy 6,596 px on the Mac and
+6,620 in CI's image, terms 3,979 and 3,955. Owner item 2, the owner's answer of 2026-10-12: "No,
+only me" — no account holder besides the owner, so neither page's change needs prior notice: not
+under the Privacy Policy's "Material changes are announced by email or in the product before they
+take effect", and not under the Terms' "If these terms change materially, we will notify account
+holders by email or in the product before the change takes effect", the licence included. Open:
+deleting the Supabase user and a daily timer for the maintenance jobs (`snoopy-backend`); Intuit's
+§12.2 and the DigitalOcean droplets' Backups and Snapshots (the owner).
+
+**2026-10-13 — the re-check of `41b43d5`, answered.** Deleting a file removes its bytes but only
+stamps its row (`snoopy-backend/apps/artifacts/src/postgres-retention.ts:121-131`, where the 90-day
+sweep and the workspace purge both end, `snoopy-backend/apps/artifacts/src/sweeps.ts:44-73`), and
+nothing deletes the row: it keeps the file's name, type, size and SHA-256, and since migration 0006
+its page count or pixel sizes; `artifacts.upload_sessions` keeps the name and the uploader's id. So
+deletion has a fourth limit on the page: "Deleting a file does not delete our record of it, which
+keeps the file's name, type and size, its page count or image dimensions, and a fingerprint of its
+contents (its SHA-256 hash), but not the file itself." No fix is promised. The confirmation a
+person reads, `app/(auth)/account-deleted/page.tsx`, said "Your account and data have been
+permanently removed" and "your first sign-in creates a new account". It now names what was deleted
+as Settings does, says the Privacy Policy "says what deletion does not remove", and "You can come
+back anytime with a new account": deletion signs out only the device that asked
+(`snoopy-backend/apps/api/src/modules/auth/identity.ts:898-900`), so another device still signed in
+starts a new account at its next request, with no sign-in
+(`snoopy-backend/apps/api/src/app.ts:504-507`). axe finds nothing on it in three engines and both
+themes (a temporary spec, not committed), and the two fixture tests that end on it pass. The two
+corrections above: whether a timer runs the jobs is unknown, and the owner's answer covers both
+pages.
+`privacy-darwin.png` and `privacy-linux.png` re-recorded, 6,644 and 6,667 px (were 6,596 and
+6,620); terms holds on its baselines. Open for `snoopy-backend`: the file rows deleted or blanked
+at deletion; deleting the Supabase user, which would also end every device's session; and the
+daily timer, without which a lapse of about three months sends timeline rows to the DEFAULT
+partition, which no pass drops (`snoopy-backend/apps/runs/src/partitions.ts:14-17`).
+
+**2026-10-13 — Account → Support names the support email.** `app/account/support/page.tsx` said
+"This page is a placeholder" on the page Intuit's app review is pointed to. It now says "For help,
+email support@autom8x.ai." — a `mailto:` link to `lib/site.ts`'s `supportEmail` — beside Contact
+us, and promises no reply time. It does not send people to the contact form for help: a contact
+request is stored and nobody is told (backend SYSTEM-MANIFEST §12.1 #36). Test 5 of
+`e2e/account-surfaces.spec.ts` reads the link; the authenticated axe baseline scans the page.
+
+**2026-10-13 — the Run window asks before a run's file goes to an AI,** as the iPhone app does
+(Apple's App Review Guideline 5.1.2(i)): "AI reads this file", over the Run window, in the app's
+words byte for byte (`app/account/flows/ai-consent.ts`, pinned by `test/ai-consent.test.mjs`),
+before any run whose input carries a file — the website cannot tell which automation uses a model —
+and never before one without. Agreed once per person per browser (localStorage,
+`autom8x.ai-consent.v1.<the person's id>`); a failed read asks again, a failed write still starts
+the run, and Cancel starts and keeps nothing. `components/ui/Modal.tsx` now lets only the dialog
+on top answer the keyboard. Only the Run window asks: neither `startRun`
+(`app/account/flows/actions.ts:236`) nor the platform checks, and the platform keeps no record of
+the agreement, so a direct POST of the action, or of the platform's start through `/api/platform`
+(`next.config.ts:9-18`), starts a run with a file unasked. Another site cannot send either —
+Next.js aborts an action whose Origin is not its Host
+(`node_modules/next/dist/docs/01-app/02-guides/data-security.md:550`), and the Edge refuses a
+request with a cookie from any Origin but the website's
+(`snoopy-backend/apps/api/src/modules/automations/routes.ts:94`,
+`snoopy-backend/apps/api/src/app.ts:1354-1359`) — but the person can, and so can code already
+running on the site. The app, too, asks on the phone alone.
+`test/ai-consent.test.mjs` holds the Run window as the only code here that starts a run. Open for
+`snoopy-backend`: a record of the agreement that the start checks.

@@ -19,6 +19,17 @@ function focusableChildren(container: HTMLElement): HTMLElement[] {
 }
 
 /**
+ * The dialogs open now, the first opened first. One can open over another —
+ * the Run window's AI consent opens over the Run window
+ * (`app/account/flows/AiConsentDialog.tsx`) — and then only the one on top
+ * answers the keyboard: Escape closes it alone, and Tab stays inside it. The
+ * page scrolls again once the last of them has closed, whatever the order they
+ * close in.
+ */
+const openDialogs: symbol[] = [];
+let overflowBeforeDialogs = "";
+
+/**
  * Full-screen modal with a viewport-anchored content card so the card never
  * shifts when the cursor moves (e.g. to screen edges). Use for all button-triggered
  * popups (confirmations, dialogs, etc.).
@@ -74,12 +85,16 @@ export default function Modal({
     : `${baseContent} ${contentClassName}`.trim();
 
   useEffect(() => {
+    const self = Symbol("dialog");
     const trigger =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (openDialogs.length === 0) {
+      overflowBeforeDialogs = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    }
+    openDialogs.push(self);
 
     const focusInitialControl = () => {
       const dialog = dialogRef.current;
@@ -89,6 +104,8 @@ export default function Modal({
     const focusFrame = requestAnimationFrame(focusInitialControl);
 
     const onKeyDown = (event: KeyboardEvent) => {
+      // A dialog opened over this one answers instead.
+      if (openDialogs.at(-1) !== self) return;
       if (event.key === "Escape") {
         event.preventDefault();
         if (dismissibleRef.current) onCloseRef.current();
@@ -125,7 +142,10 @@ export default function Modal({
     document.addEventListener("keydown", onKeyDown);
     return () => {
       cancelAnimationFrame(focusFrame);
-      document.body.style.overflow = prev;
+      openDialogs.splice(openDialogs.indexOf(self), 1);
+      if (openDialogs.length === 0) {
+        document.body.style.overflow = overflowBeforeDialogs;
+      }
       document.removeEventListener("keydown", onKeyDown);
       if (trigger?.isConnected) trigger.focus();
     };

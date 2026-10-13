@@ -247,7 +247,7 @@ test("4, 20 — the sidebar's Teams link opens Teams in any workspace; Organizat
 test.describe("on a small screen", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("5 — every account page names itself in the header, and the menu reaches Teams (register F56)", async ({
+  test("5 — every account page names itself in the header, Support names its email, and the menu reaches Teams (register F56)", async ({
     page,
   }) => {
     const header = page
@@ -269,6 +269,19 @@ test.describe("on a small screen", () => {
     ] as const) {
       await page.goto(path);
       await expect(header.getByText(title, { exact: true })).toBeVisible();
+      if (path === "/account/support") {
+        // The support email is the way named, as a link to write to, beside
+        // Contact us: the contact form is stored and tells nobody (backend
+        // SYSTEM-MANIFEST §12.1 #36). Intuit's app review is pointed here.
+        const main = page.locator("main");
+        await expect(
+          main.getByRole("link", { name: "support@autom8x.ai", exact: true }),
+        ).toHaveAttribute("href", "mailto:support@autom8x.ai");
+        await expect(
+          main.getByRole("link", { name: "Contact us", exact: true }),
+        ).toHaveAttribute("href", "/contact");
+        await expect(main).not.toContainText("placeholder");
+      }
     }
     await page.getByRole("button", { name: "Open menu" }).click();
     await page
