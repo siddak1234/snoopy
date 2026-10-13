@@ -5,7 +5,8 @@ import { uploadRefusalMessage } from "../app/account/flows/upload-refusals.ts";
 /**
  * A run's file refused by the platform, said in words (FR-14), including the
  * five reasons the platform gives since it measures a file when its upload is
- * sealed (backend BUILD-PLAN 25.2.28). The browser's half — each reason shown
+ * sealed (backend BUILD-PLAN 25.2.28), and its 429 `measurement_busy` since it
+ * measures them one at a time (25.2.39). The browser's half — each reason shown
  * in the Run window and the field emptied — is held by
  * e2e/public-edge-fixture.spec.ts ("each refusal of a file the platform names").
  */
@@ -73,6 +74,8 @@ test("every reason the website names has its sentence; one it does not name is l
       "This PDF is password-protected. Remove the password and upload it again.",
     file_unreadable:
       "This file could not be read. Choose it again, or try another copy.",
+    measurement_busy:
+      "Files are checked one at a time. Nothing was lost. Choose the file again in a moment.",
   };
   for (const [reason, words] of Object.entries(named)) {
     assert.equal(uploadRefusalMessage(reason, { reason }), words, reason);

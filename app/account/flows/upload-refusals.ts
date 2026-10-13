@@ -7,6 +7,12 @@
  * breaks them before any run exists: five reasons, two carrying their numbers in
  * `details` as strings of digits. A number that is not one is never shown; the
  * sentence without numbers is said instead.
+ *
+ * Since BUILD-PLAN 25.2.39 a completion can also find no place yet to measure
+ * the file — files are measured in turn, a workspace's one at a time — and is
+ * answered 429 `measurement_busy`: not a refusal, and nothing was lost. The
+ * field is emptied as after any refusal (`RunFileField.tsx`) and the upload is
+ * not completed again here, so its sentence asks for the file again in a moment.
  */
 
 const UPLOAD_REFUSALS: Record<string, string> = {
@@ -25,6 +31,8 @@ const UPLOAD_REFUSALS: Record<string, string> = {
     "This PDF is password-protected. Remove the password and upload it again.",
   file_unreadable:
     "This file could not be read. Choose it again, or try another copy.",
+  measurement_busy:
+    "Files are checked one at a time. Nothing was lost. Choose the file again in a moment.",
 };
 
 /** A whole number from the platform's details, or nothing. */

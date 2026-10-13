@@ -1619,6 +1619,14 @@ test.describe("a file for a run (backend FR-14)", () => {
         "file_unreadable",
         "This file could not be read. Choose it again, or try another copy.",
       ],
+      // No place yet to measure the file (backend BUILD-PLAN 25.2.39): a 429,
+      // not a refusal — said as its own, never as the platform being busy.
+      [
+        "complete",
+        429,
+        "measurement_busy",
+        "Files are checked one at a time. Nothing was lost. Choose the file again in a moment.",
+      ],
       ["complete", 409, "a_reason_not_named_here", "Conflict"],
     ] as const) {
       await fixtureControl(

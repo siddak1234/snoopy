@@ -835,6 +835,7 @@ const statusTitles: Record<number, string> = {
   403: "Forbidden",
   409: "Conflict",
   422: "Unprocessable Content",
+  429: "Too Many Requests",
   503: "Service Unavailable",
 };
 
@@ -1069,14 +1070,18 @@ const server = createServer(
       "/__fixture/run-at-capacity-once": () => {
         state.runsAtCapacity = 1;
       },
-      // FR-14: opening an upload, or completing one, refused with a reason.
+      // FR-14: opening an upload, or completing one, refused with a reason —
+      // and a completion answered 429, which the contract documents for it
+      // alone (backend BUILD-PLAN 25.2.39, `measurement_busy`).
       "/__fixture/upload-refused": () => {
         const stage = url.searchParams.get("stage");
         const status = Number(url.searchParams.get("status") ?? "400");
         const reason = url.searchParams.get("reason");
         if (
           (stage !== "open" && stage !== "complete") ||
-          (status !== 400 && status !== 409) ||
+          (status !== 400 &&
+            status !== 409 &&
+            !(status === 429 && stage === "complete")) ||
           !reason
         ) {
           return false;
