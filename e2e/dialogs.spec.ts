@@ -15,7 +15,7 @@ import {
 } from "./helpers";
 
 /**
- * Every dialog `components/ui/Modal.tsx` serves — fifteen, one row each — held
+ * Every dialog `components/ui/Modal.tsx` serves — sixteen, one row each — held
  * to the same behaviours (filed at Round 15's close; the register's § "The
  * backlog before Round 17"):
  *
@@ -85,6 +85,11 @@ type Dialog = {
   before?: (page: Page) => Promise<void>;
   /** The control that opens it. */
   opener: (page: Page) => Locator;
+  /**
+   * Opened only once a file is uploaded, which the browser PUTs to the
+   * fixture's object store, whose certificate is the fixture's own.
+   */
+  files?: true;
   /** Until this, it is still sending: Webhook address reads on opening. */
   settled?: (dialog: Locator) => Promise<void>;
   /** How it holds while its request is in flight, if it sends one. */
@@ -135,6 +140,38 @@ const dialogs: Dialog[] = [
         name: "Run",
         exact: true,
       }),
+  },
+  {
+    // Asked over the Run window, by its Start run, once a file is chosen
+    // (app/account/flows/AiConsentDialog.tsx): it closes alone, and focus
+    // goes back to Start run.
+    name: "AI reads this file",
+    path: "/account/flows",
+    files: true,
+    before: async (page) => {
+      await automationCard(page, "Manual input automation")
+        .getByRole("button", { name: "Run", exact: true })
+        .click();
+      const run = page.getByRole("dialog", {
+        name: "Run Manual input automation",
+      });
+      await expect(run.getByLabel("Vendor")).toBeFocused();
+      await run.getByLabel("Vendor").fill("Acme Supplies");
+      await run.getByLabel("Amount").fill("120.50");
+      await run.getByLabel("Invoice reference").fill("INV-1001");
+      await run.getByLabel("Invoice file").setInputFiles({
+        name: "invoice.pdf",
+        mimeType: "application/pdf",
+        buffer: Buffer.from("%PDF-1.4 fixture invoice"),
+      });
+      await expect(
+        run.getByText("Ready: invoice.pdf (24 bytes)"),
+      ).toBeVisible();
+    },
+    opener: (page) =>
+      page
+        .getByRole("dialog", { name: "Run Manual input automation" })
+        .getByRole("button", { name: "Start run" }),
   },
   {
     name: "Archive Archivable automation?",
@@ -396,6 +433,7 @@ function escapeOnceEnabled(waiting: string) {
 
 for (const dialog of dialogs) {
   test.describe(dialog.name, () => {
+    if (dialog.files) test.use({ ignoreHTTPSErrors: true });
     test("Escape closes it while it sends nothing, and focus goes back to the control that opened it", async ({
       page,
     }) => {

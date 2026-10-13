@@ -17,7 +17,13 @@ import {
   startRun,
   type ActionResult,
 } from "./actions";
+import { AiConsentDialog } from "./AiConsentDialog";
+import { hasAiConsent, recordAiConsent, runCarriesFile } from "./ai-consent";
 import { RunInputFields, SetupFields } from "./ManifestFields";
+
+// This browser's storage, reached only inside ai-consent.ts's guards: in a
+// browser that refuses it, reading `window.localStorage` itself throws.
+const browserStorage = () => window.localStorage;
 
 /**
  * The buttons for one subscription on a flow's card — adding is
@@ -34,6 +40,10 @@ import { RunInputFields, SetupFields } from "./ManifestFields";
  *
  * A refusal is shown rather than swallowed: "Go live" can fail because a
  * connection is unmet, which is an answer a person needs, not console noise.
+ *
+ * A run whose input carries a file is asked about first, once per person in
+ * this browser — the file goes to an AI model (`ai-consent.ts`, as the app
+ * asks).
  */
 export function AutomationActions({
   name,
@@ -41,6 +51,7 @@ export function AutomationActions({
   setup,
   subscription,
   workspaceId,
+  userId,
 }: {
   name: string;
   available: boolean;
@@ -55,6 +66,8 @@ export function AutomationActions({
   };
   /** The workspace this page shows; every action is refused once it is not active. */
   workspaceId: string;
+  /** The signed-in person, whose agreement to the AI consent this browser keeps. */
+  userId: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -84,6 +97,9 @@ export function AutomationActions({
   // Bumped to empty the file fields when the platform will not take a file.
   const [fileRound, setFileRound] = useState(0);
   const newRunKey = () => setRunKey(`run-${crypto.randomUUID()}`);
+  // A run held for the AI consent: its form's values as Start run sent them,
+  // started as they are once the person agrees.
+  const [awaitingConsent, setAwaitingConsent] = useState<FormData | null>(null);
 
   const submit = (
     action: (data: FormData) => Promise<ActionResult>,
@@ -113,6 +129,7 @@ export function AutomationActions({
     setDialog(null);
     setError(null);
     setUploadingFields(new Set());
+    setAwaitingConsent(null);
   };
 
   // Submitted from `onSubmit`, not a form `action`: React resets an action form's
@@ -141,7 +158,7 @@ export function AutomationActions({
   };
 
   // A started run is somewhere to go: its own page, where its steps arrive.
-  const submitRun = (data: FormData) => {
+  const sendRun = (data: FormData) => {
     setError(null);
     startTransition(async () => {
       const result = await startRun(data);
@@ -159,6 +176,31 @@ export function AutomationActions({
       if (result.runId) router.push(`/account/runs/${result.runId}`);
     });
   };
+
+  // A run whose input carries a file waits for the AI consent, unless this
+  // person agreed in this browser before; a run with no file never asks. While
+  // the consent is open nothing else starts a run — not the form sent again,
+  // not an agreement kept meanwhile from another tab.
+  const submitRun = (data: FormData) => {
+    if (awaitingConsent) return;
+    if (runCarriesFile(data) && !hasAiConsent(browserStorage, userId)) {
+      setAwaitingConsent(data);
+      return;
+    }
+    sendRun(data);
+  };
+
+  // Agreed: kept for next time if this browser can keep it, and the run starts
+  // either way, with the values it was held with.
+  const agreeAndStart = () => {
+    if (!awaitingConsent) return;
+    recordAiConsent(browserStorage, userId);
+    setAwaitingConsent(null);
+    sendRun(awaitingConsent);
+  };
+
+  // Cancelled: nothing is kept and nothing starts; the Run window is as it was.
+  const cancelConsent = () => setAwaitingConsent(null);
 
   const confirmArchive = () => {
     setError(null);
@@ -354,6 +396,14 @@ export function AutomationActions({
             </div>
           </form>
         </Modal>
+      ) : null}
+
+      {dialog === "run" && awaitingConsent ? (
+        <AiConsentDialog
+          subscriptionId={subscription.id}
+          onAgree={agreeAndStart}
+          onCancel={cancelConsent}
+        />
       ) : null}
 
       {dialog === "archive" ? (

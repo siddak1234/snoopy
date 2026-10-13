@@ -20,8 +20,8 @@ export default function PrivacyPage() {
           Privacy Policy
         </h1>
         <p className="mt-6 max-w-[56ch] text-base leading-7 text-[color-mix(in_srgb,var(--color-text)_78%,transparent)]">
-          Effective and last updated: October 5, 2026. This policy explains what
-          information Autom8x collects, why, and what we do with it. It is
+          Effective and last updated: October 13, 2026. This policy explains
+          what information Autom8x collects, why, and what we do with it. It is
           written to be read; if anything is unclear, contact us at{" "}
           <LegalLink href={`mailto:${LEGAL_EMAIL}`}>{LEGAL_EMAIL}</LegalLink>.
         </p>
@@ -59,8 +59,8 @@ export default function PrivacyPage() {
           <p>
             <strong>Workspace content.</strong> What you and your team put into
             the platform: workspaces, team membership, automation subscriptions
-            and their configuration, runs and their results, and approval
-            decisions.
+            and their configuration, runs with their results and the files you
+            give them, and approval decisions.
           </p>
           <p>
             <strong>Connected accounts for automations.</strong> If you connect
@@ -126,6 +126,149 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
+        <LegalSection heading="Documents read by AI">
+          <p>
+            An automation can have an AI model read the file given to its run,
+            and no other file. Bills &amp; Receipts does, to read a bill,
+            receipt, credit note or statement before recording it in QuickBooks
+            Online or comparing it with what QuickBooks holds. The platform
+            sends the document, with Autom8x&apos;s fixed instructions for
+            reading it, to OpenRouter, which passes the request to the provider
+            of an AI model. For Bills &amp; Receipts, nothing else from your
+            workspace goes with it: not your name, email address or other
+            account details, not the flow&apos;s settings or what was typed to
+            start the run (such as who paid), and nothing read from QuickBooks;
+            even the file&apos;s own name is left out. The document itself goes
+            as uploaded, including anything stored inside the file, such as a
+            PDF&apos;s title or author. A second model, from a different maker,
+            then reads the document again to check the first reading, and a
+            model that gives no usable answer is replaced by the next one on its
+            list, each request under the rules below. The answer goes back to
+            the automation, and what the run makes of it is kept with the
+            run&apos;s results.
+          </p>
+          <p>
+            Every request tells OpenRouter to use only endpoints in the United
+            States that it lists as zero data retention and that collect no
+            data. Zero data retention means, in the words of OpenRouter&apos;s{" "}
+            <LegalLink href="https://openrouter.ai/docs/guides/features/zdr">
+              zero data retention guide
+            </LegalLink>
+            , that the provider &quot;will not store your data for any period of
+            time&quot;; OpenRouter does not count an in-memory cache of repeated
+            prompts as storing it. A request that no such endpoint can serve is
+            refused, never sent elsewhere. Under these rules a request can reach
+            Amazon Bedrock, Microsoft Azure, DeepInfra, Fireworks, Google Vertex
+            AI, Mistral, Sail Research, Wafer or xAI; which one serves it
+            depends on the model and on OpenRouter&apos;s routing. A PDF is sent
+            through OpenRouter&apos;s PDF plugin, set on each request to its
+            &quot;native&quot; engine. The zero data retention guide says its
+            enforcement &quot;does not apply to plugins and tools you choose to
+            enable&quot;, and OpenRouter&apos;s{" "}
+            <LegalLink href="https://openrouter.ai/docs/guides/overview/multimodal/pdfs">
+              PDF guide
+            </LegalLink>{" "}
+            says a PDF sent this way is passed directly to the model, not
+            through its optional PDF-conversion services. OpenRouter handles
+            each request before the provider does, and its privacy policy says
+            it may process data in the United States or in other countries.
+          </p>
+          <p>
+            Autom8x trains no models. Under these rules, the policies OpenRouter
+            publishes, for itself and for each provider above, say your
+            documents are not used to train AI models: OpenRouter&apos;s privacy
+            policy says it does not use inputs or outputs for model training,
+            and OpenRouter lists none of the providers above as training on
+            prompts, which a provider that keeps no data cannot do.
+            OpenRouter&apos;s{" "}
+            <LegalLink href="https://openrouter.ai/docs/guides/privacy/data-collection">
+              data collection guide
+            </LegalLink>{" "}
+            says it stores no prompts or answers unless an account opts in to
+            logging or to OpenRouter&apos;s own use of them, both off by
+            default; Autom8x keeps both off for its OpenRouter account, and that
+            account&apos;s settings turn on no OpenRouter plugin by default and
+            no broadcast of requests to other services. OpenRouter keeps
+            metadata such as token counts and timing, and may tag a request with
+            an anonymous topic category for its reports and rankings. Its{" "}
+            <LegalLink href="https://openrouter.ai/terms">terms</LegalLink> say
+            it may store a request temporarily where it is too large to process
+            in memory, and may screen, remove, edit or block any request it
+            judges to break them or to be objectionable or illegal, including by
+            screening with automated tools for known child sexual abuse material
+            and malware. Its{" "}
+            <LegalLink href="https://openrouter.ai/data-processing-agreement">
+              data processing agreement
+            </LegalLink>{" "}
+            says it deletes a request and its answer promptly once the answer is
+            made, except where the law requires otherwise or where needed to
+            address malicious use of its service, and that it may first classify
+            them automatically to detect violations. Its privacy policy says it
+            may keep an image longer than routing it takes where abuse
+            detection, security, billing or legal compliance requires. See{" "}
+            <LegalLink href="https://openrouter.ai/privacy">
+              OpenRouter&apos;s privacy policy
+            </LegalLink>
+            .
+          </p>
+        </LegalSection>
+
+        <LegalSection heading="QuickBooks Online data">
+          <p>
+            A workspace&apos;s owners and admins can connect its QuickBooks
+            Online company so that an automation, such as Bills &amp; Receipts,
+            can work in it. The connection is approved on Intuit&apos;s own
+            consent page, and Autom8x asks only for access to QuickBooks Online
+            accounting (the com.intuit.quickbooks.accounting scope). Through it
+            the platform can read the company&apos;s records and settings and
+            create vendors, bills, expenses, vendor credits, journal entries and
+            invoices; it cannot change or delete a record that already exists.
+            Bills &amp; Receipts reads the company&apos;s information and
+            settings, looks up its accounts, vendors, customers, employees,
+            bills, expenses, vendor credits and journal entries, and creates
+            vendors, bills, expenses, vendor credits and journal entries: a bill
+            is recorded as a bill and a receipt as an expense, or as a journal
+            entry or a bill when someone paid with their own money; a credit
+            note as a vendor credit, or as a card refund when it was refunded to
+            a card; and a statement is compared, not recorded.
+          </p>
+          <p>
+            Intuit&apos;s tokens for the connection are stored encrypted
+            (AES-256-GCM envelope encryption) and renewed automatically before
+            they expire, and they are never given to an automation: the platform
+            makes each call to QuickBooks for it. QuickBooks&apos; answers are
+            kept for 30 days, so that a step that is retried gets the same
+            answer instead of creating a record twice, and are then deleted.
+            What a run records and finds is kept with the run&apos;s results in
+            your workspace, as described in Retention and deletion. QuickBooks
+            data is used only to run your workspace&apos;s own automations and
+            show you what they did; none of it is sent to an AI model, and it is
+            never sold or used for advertising. Autom8x does not process
+            QuickBooks data on Intuit&apos;s behalf. If you give Bills &amp;
+            Receipts an address in its &quot;Also email&quot; setting, such as
+            your bookkeeper&apos;s, a short summary of each document it records
+            or compares, built from QuickBooks&apos; answer, is emailed there.
+          </p>
+          <p>
+            An owner or admin can disconnect QuickBooks at any time on the
+            Connections page, on the website or in the app. The platform then
+            deletes the stored tokens at once and asks Intuit to revoke the
+            access, and no automation can reach the company until it is
+            connected again. If you disconnect Autom8x from within QuickBooks
+            instead, Intuit says this invalidates the tokens it gave Autom8x, so
+            no automation can reach the company until it is connected again;
+            disconnecting on the Connections page as well deletes the stored
+            tokens. What earlier runs recorded stays, in QuickBooks and in your
+            workspace; in your workspace, Autom8x uses it only for those runs,
+            to show them to you or to end one still waiting for approval, until
+            you ask us to delete it. An owner or admin can ask us at{" "}
+            {LEGAL_EMAIL} to delete what runs kept from QuickBooks, and we will
+            delete it, apart from records the law requires us to keep; a
+            database backup made before then can still hold it, as described in
+            Retention and deletion.
+          </p>
+        </LegalSection>
+
         <LegalSection heading="How we use information">
           <p>
             To provide the service: run the automations you subscribe to,
@@ -140,21 +283,24 @@ export default function PrivacyPage() {
 
         <LegalSection heading="Who we share it with">
           <p>
-            Only service providers that host and operate the platform for us,
-            each processing data in the United States under an agreement with
-            us: Supabase (authentication and database), DigitalOcean
+            Only service providers that host and operate the platform for us.
+            Each of these processes data in the United States under an agreement
+            with us: Supabase (authentication and database), DigitalOcean
             (application hosting), Vercel (website hosting), Backblaze (file
-            storage and encrypted off-site backups), Datadog (operational logs
-            and monitoring), Stripe (billing and payments), Resend (email
-            delivery), and Expo (delivering notifications to your iPhone through
-            Apple&apos;s push service). We will update this policy before adding
-            or replacing a subprocessor category.
+            storage and off-site backups), Datadog (operational logs and
+            monitoring), Stripe (billing and payments), Resend (email delivery),
+            and Expo (delivering notifications to your iPhone through
+            Apple&apos;s push service). When an automation has an AI model read
+            a document, OpenRouter processes it too, and so does the model
+            provider OpenRouter routes the request to, as described in Documents
+            read by AI. We will update this policy before adding or replacing a
+            subprocessor category.
           </p>
           <p>
             Your sign-in provider (Google, Microsoft, or Apple) and the
-            providers you choose to connect for automations are independent
-            services governed by their own privacy policies — they are not our
-            service providers.
+            providers you choose to connect for automations, such as Intuit for
+            QuickBooks Online, are independent services governed by their own
+            privacy policies — they are not our service providers.
           </p>
           <p>
             We disclose information if required by law, and in a merger or
@@ -164,14 +310,42 @@ export default function PrivacyPage() {
 
         <LegalSection heading="Retention and deletion">
           <p>
-            Your data is retained while your account is active. You can delete
-            your account from Settings; deletion removes your account data from
-            live systems promptly, and nightly encrypted backups rotate on a
-            fixed schedule, so deleted data leaves the backup set as those
-            backups age out. Operational logs are kept for a limited period for
-            security and debugging. Billing records are kept as long as tax and
-            accounting law requires. Disconnecting a connected provider account
-            revokes and deletes its stored tokens immediately.
+            Your data is retained while your account is active, except where
+            this policy says otherwise. A file given to a run becomes eligible
+            for deletion 90 days after the run ends, and is deleted at the next
+            maintenance pass, or at a later one if many files are due at once. A
+            run&apos;s step-by-step timeline becomes eligible for deletion about
+            three months after it is recorded, and is deleted at the next
+            maintenance pass. A run&apos;s results stay while your account is
+            active.
+          </p>
+          <p>
+            You can delete your account from Settings. Deletion promptly removes
+            your account, your personal workspace and every organization you
+            alone own, with their workspace content, within the limits below; an
+            organization that has another owner is kept, and you leave it.
+            Operational logs are kept for a limited period for security and
+            debugging. Billing records are kept as long as tax and accounting
+            law requires. Disconnecting a connected provider account deletes its
+            stored tokens immediately and asks the provider to revoke the
+            access.
+          </p>
+          <p>
+            Deletion, wherever this policy describes it, has four limits. Each
+            night a backup of our database is made: the copy kept on our server
+            is deleted after 14 days, and a copy stored off-site with Backblaze
+            is not deleted on that schedule. A backup can still hold data
+            deleted after it was made, such as the tokens of a provider account
+            since disconnected, which stay encrypted in it. The files given to
+            runs, which are not in these backups, are stored with Backblaze,
+            which can keep an earlier version of a file after it is deleted.
+            Deleting a file does not delete our record of it, which keeps the
+            file&apos;s name, type and size, its page count or image dimensions,
+            and a fingerprint of its contents (its SHA-256 hash), but not the
+            file itself. And deleting an account does not delete its sign-in
+            record with Supabase, which handles our sign-in: your email address
+            and the sign-in accounts linked to it, with the profile details
+            their providers sent.
           </p>
         </LegalSection>
 

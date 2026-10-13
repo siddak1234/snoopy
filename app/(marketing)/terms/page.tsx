@@ -19,7 +19,7 @@ export default function TermsPage() {
           Terms of Service
         </h1>
         <p className="mt-6 max-w-[56ch] text-base leading-7 text-[color-mix(in_srgb,var(--color-text)_78%,transparent)]">
-          Effective and last updated: August 28, 2026. These terms are an
+          Effective and last updated: October 13, 2026. These terms are an
           agreement between you and Snoopy LLC, 14355 Francis Lane, Frisco,
           Texas 75035 (&quot;Autom8x&quot;, &quot;we&quot;, &quot;us&quot;), the
           operator of Autom8x. Questions:{" "}
@@ -75,11 +75,13 @@ export default function TermsPage() {
           <p>
             Connecting a provider account grants the platform the scoped access
             you approve on the provider&apos;s own consent page, used solely to
-            run your automations. You can disconnect at any time in Settings,
-            which revokes and deletes stored tokens. Third-party providers are
-            independent services: we are not responsible for their availability,
-            their content, or changes they make, and your use of each provider
-            remains governed by that provider&apos;s own terms.
+            run your automations. You can disconnect at any time on the
+            Connections page, which deletes the stored tokens at once and asks
+            the provider to revoke the access, as the Privacy Policy describes.
+            Third-party providers are independent services: we are not
+            responsible for their availability, their content, or changes they
+            make, and your use of each provider remains governed by that
+            provider&apos;s own terms.
           </p>
         </LegalSection>
 
@@ -114,15 +116,17 @@ export default function TermsPage() {
         <LegalSection heading="Intellectual property">
           <p>
             You own your workspace content, and you grant us the license needed
-            to operate the service on it — nothing more. We own the platform.
-            Subject to these terms, we grant you a limited, non-exclusive,
-            non-transferable, revocable right to access and use the service for
-            your internal business purposes. Except as law permits
-            notwithstanding this limit, you may not copy, modify, or create
-            derivative works of the platform, reverse engineer it, resell or
-            sublicense it, scrape it, or access it to build a competing product.
-            If you send us feedback, we may use it without restriction or
-            obligation.
+            to operate the service on it, and the service providers the Privacy
+            Policy names, including OpenRouter and the model providers it routes
+            requests to, the licenses they need to process it as that policy
+            describes — nothing more. We own the platform. Subject to these
+            terms, we grant you a limited, non-exclusive, non-transferable,
+            revocable right to access and use the service for your internal
+            business purposes. Except as law permits notwithstanding this limit,
+            you may not copy, modify, or create derivative works of the
+            platform, reverse engineer it, resell or sublicense it, scrape it,
+            or access it to build a competing product. If you send us feedback,
+            we may use it without restriction or obligation.
           </p>
         </LegalSection>
 
