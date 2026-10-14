@@ -4500,6 +4500,15 @@ test("a clean account deletion signs out and leaves", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Account deleted" }),
   ).toBeVisible();
+  // Its words (the register, 2026-10-13): the Privacy Policy says what
+  // deletion leaves, and the old "permanently removed", which was not true,
+  // is gone.
+  const main = page.getByRole("main");
+  await expect(main).toContainText("says what deletion does not remove");
+  await expect(main).not.toContainText("permanently removed");
+  await expect(
+    main.getByRole("link", { name: "Privacy Policy" }),
+  ).toHaveAttribute("href", "/privacy");
 });
 
 test("the deletion itself signs the browser out — the sign-out after it is only a courtesy (register F34)", async ({

@@ -3001,6 +3001,13 @@ running on the site. The app, too, asks on the phone alone.
 `test/ai-consent.test.mjs` holds the Run window as the only code here that starts a run. Open for
 `snoopy-backend`: a record of the agreement that the start checks.
 
+**2026-10-13 — Gate 25's review of #48: the deletion page's words held in the browser.** No test
+read the words of `app/(auth)/account-deleted/page.tsx`, so a return to the old, untrue "Your
+account and data have been permanently removed" would have passed. "a clean account deletion signs
+out and leaves" (`e2e/public-edge-fixture.spec.ts`) now reads the page's main landmark after the
+deletion: it says the Privacy Policy "says what deletion does not remove", it does not say
+"permanently removed", and its "Privacy Policy" link goes to `/privacy`.
+
 ## Round 17 — the contract from `snoopy-backend` #207, and a file that waits to be measured said in words (backend BUILD-PLAN 25.8.8) — 2026-10-13
 
 Gate 25's fixes on `snoopy-backend` #207 move `snoopy-backend/docs/openapi/automations.yaml`
