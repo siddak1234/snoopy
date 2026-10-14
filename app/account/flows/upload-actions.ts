@@ -8,6 +8,7 @@ import {
   type UploadTicket,
 } from "@/lib/automations";
 import { activeWorkspaceIfShown, WORKSPACE_CHANGED } from "@/lib/tenancy";
+import { waitsToBeMeasured } from "./upload-completion";
 import { uploadRefusalMessage } from "./upload-refusals";
 
 /**
@@ -23,7 +24,20 @@ import { uploadRefusalMessage } from "./upload-refusals";
 export type OpenUploadResult =
   { ok: true; ticket: UploadTicket } | { ok: false; error: string };
 export type CompleteUploadResult =
-  { ok: true; file: UploadedFile } | { ok: false; error: string };
+  | { ok: true; file: UploadedFile }
+  | {
+      ok: false;
+      error: string;
+      /**
+       * The file has no place yet to be measured (backend BUILD-PLAN 25.2.39):
+       * nothing was refused, its upload is still open, and the browser
+       * completes it again (`upload-completion.ts`). Set for a 429
+       * `measurement_busy` and for nothing else.
+       */
+      measurementBusy?: true;
+      /** That answer's `retry-after`, in seconds, when it named one. */
+      retryAfterSeconds?: number;
+    };
 
 function refused(error: unknown): { ok: false; error: string } {
   if (!(error instanceof PlatformServerError)) throw error;
@@ -73,6 +87,19 @@ export async function completeRunUpload(
       file: await completeUpload(workspaceId, uploadSessionId),
     };
   } catch (error) {
-    return refused(error);
+    const answer = refused(error);
+    if (
+      error instanceof PlatformServerError &&
+      waitsToBeMeasured(error.status, error.details)
+    ) {
+      return {
+        ...answer,
+        measurementBusy: true,
+        ...(error.retryAfterSeconds === undefined
+          ? {}
+          : { retryAfterSeconds: error.retryAfterSeconds }),
+      };
+    }
+    return answer;
   }
 }

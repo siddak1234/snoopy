@@ -796,13 +796,29 @@ function specReasons(operationId) {
   const start = spec.indexOf(`operationId: ${operationId}\n`);
   assert.ok(start > 0, `${operationId} is missing from the specification`);
   const end = spec.slice(start).search(/\n\s+(?:parameters|requestBody):/u);
+  return reasonsIn(spec.slice(start, start + end));
+}
+
+/**
+ * The `details.reason` tokens one operation names anywhere — its description
+ * and its responses' — for words keyed by reason whatever the status: since
+ * backend 25.2.39, `completeUpload` names `measurement_busy` on its 429 alone.
+ */
+function operationReasons(operationId) {
+  const start = spec.indexOf(`operationId: ${operationId}\n`);
+  assert.ok(start > 0, `${operationId} is missing from the specification`);
+  const rest = spec.slice(start);
+  // The operation ends at the next method, the next path or the next top-level key.
+  const end = rest.search(/\n(?: {0,2}\S| {4}(?:get|put|post|patch|delete):)/u);
+  return reasonsIn(end < 0 ? rest : rest.slice(0, end));
+}
+
+function reasonsIn(text) {
   return [
     ...new Set(
       [
         // A reason is named on its own, or as `details.reason: <reason>`.
-        ...spec
-          .slice(start, start + end)
-          .matchAll(/`(?:details\.reason: )?([a-z]+(?:_[a-z]+)+)`/gu),
+        ...text.matchAll(/`(?:details\.reason: )?([a-z]+(?:_[a-z]+)+)`/gu),
       ].map((match) => match[1]),
     ),
   ].sort();
@@ -875,7 +891,10 @@ test("a run's file goes straight to the store, and the run carries only its id (
   if (available) {
     assert.deepEqual(
       refusalKeys(uploadRefusals, "UPLOAD_REFUSALS"),
-      [...specReasons("openUpload"), ...specReasons("completeUpload")].sort(),
+      [
+        ...operationReasons("openUpload"),
+        ...operationReasons("completeUpload"),
+      ].sort(),
       "every refusal the two upload operations name is said in words, and no other",
     );
   }
