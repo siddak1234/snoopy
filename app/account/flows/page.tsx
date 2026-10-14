@@ -20,11 +20,11 @@ import { flowsOverPlan, overPlanSentence } from "@/lib/plan-limit";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { StatusPill } from "@/components/dashboard/StatusPill";
-import { AutomationActions, type VendorChoiceRow } from "./AutomationActions";
+import { AutomationActions } from "./AutomationActions";
 import { AddAutomation } from "./AddAutomation";
 import { MoveVersionButton } from "./MoveVersionButton";
 import { WebhookAddressButton } from "./WebhookAddressButton";
-import { vendorPath } from "./vendor-path";
+import { unmetLines, vendorChoice } from "./vendor-path";
 import {
   administers,
   listWorkspaceProjects,
@@ -246,77 +246,6 @@ function placeOf(
   };
 }
 
-/**
- * The flow's vendor choice, as Set up's Connect row shows it (spec §3.B): the
- * flow's `connection` setting — `none` or an optional connection's provider —
- * with that vendor's name and mark, and whether it still needs connecting,
- * which the platform says by listing it in `unmetConnections` (backend
- * ADR-0037). Null for a flow with no vendor to choose.
- */
-function vendorChoice(
-  subscription: Subscription,
-  automation: AutomationCatalogEntry,
-  providers: ConnectionProvider[],
-): VendorChoiceRow | null {
-  const field = (subscription.setup ?? []).find(
-    (candidate) => candidate.control === "connection",
-  );
-  if (!field) return null;
-  const value = subscription.config[field.key] ?? field.defaultValue ?? "none";
-  const providerId = typeof value === "string" ? value : "none";
-  if (providerId === "none") {
-    return { key: field.key, providerId, href: vendorPath(subscription.id) };
-  }
-  const provider = providers.find(
-    (candidate) => candidate.providerId === providerId,
-  );
-  const declared = automation.requiredConnections.find(
-    (connection) => connection.providerId === providerId,
-  );
-  return {
-    key: field.key,
-    providerId,
-    href: vendorPath(subscription.id),
-    displayName: declared?.displayName ?? provider?.displayName ?? field.title,
-    icon: provider?.icon ?? null,
-    connected: !subscription.unmetConnections.includes(providerId),
-  };
-}
-
-/**
- * What an unmet connection asks for, in words and with the way to it (spec
- * §3.D): the vendor the flow chose is connected, or None chosen instead, on the
- * flow's vendor page; a connection the flow cannot run without is connected on
- * Connections. Never the provider's raw id.
- */
-function unmetLines(
-  subscription: Subscription,
-  automation: AutomationCatalogEntry,
-  providers: ConnectionProvider[],
-) {
-  return subscription.unmetConnections.map((providerId) => {
-    const declared = automation.requiredConnections.find(
-      (connection) => connection.providerId === providerId,
-    );
-    const displayName =
-      declared?.displayName ??
-      providers.find((provider) => provider.providerId === providerId)
-        ?.displayName ??
-      "its account";
-    return declared?.optional
-      ? {
-          providerId,
-          text: `Connect ${displayName} first, or choose None.`,
-          href: vendorPath(subscription.id),
-        }
-      : {
-          providerId,
-          text: `Connect ${displayName} first.`,
-          href: "/account/connections",
-        };
-  });
-}
-
 function AutomationCard({
   automation,
   subscriptions,
@@ -389,7 +318,11 @@ function AutomationCard({
             <StatusPill status={subscription.status} />
           </div>
 
-          {unmetLines(subscription, automation, providers).map((line) => (
+          {unmetLines(
+            subscription,
+            automation.requiredConnections,
+            providers,
+          ).map((line) => (
             <p
               key={line.providerId}
               className="text-xs text-[var(--warning-text)]"
@@ -453,7 +386,11 @@ function AutomationCard({
             // The settings of the version it RUNS, which the platform checks a
             // save against — not the catalog's newest (backend §12.1 #185).
             setup={subscription.setup ?? []}
-            vendor={vendorChoice(subscription, automation, providers)}
+            vendor={vendorChoice(
+              subscription,
+              automation.requiredConnections,
+              providers,
+            )}
             subscription={{
               id: subscription.id,
               status: subscription.status,

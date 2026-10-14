@@ -27,14 +27,9 @@ import {
   startRun,
   type ActionResult,
 } from "./actions";
-import {
-  RunInputFields,
-  SetupFields,
-  type VendorChoiceRow,
-} from "./ManifestFields";
+import { RunInputFields, SetupFields } from "./ManifestFields";
 import { setupProblem } from "./setup-check";
-
-export type { VendorChoiceRow } from "./ManifestFields";
+import type { VendorChoiceRow } from "./vendor-path";
 
 /**
  * The buttons for one subscription on a flow's card — adding is

@@ -335,6 +335,10 @@ function initialState() {
     invoiceConfig: { vendor: "none", holdAboveAmount: 500 } as Json,
     invoiceSaves: [] as Json[],
     quickbooksConnected: false,
+    // The flow still on v1 (Bills & Receipts, which the catalog now names
+    // Invoice Processing): its pinned version declares no vendor setting and
+    // cannot run without QuickBooks, though the catalog's v2 makes it optional.
+    invoiceV1: false,
   };
 }
 let state = initialState();
@@ -715,6 +719,31 @@ const invoiceSubscriptionId = "f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1";
 const accountingTeamId = "acacacac-acac-4cac-8cac-acacacacacac";
 
 function invoiceSubscription(): Automations["Subscription"] {
+  if (state.invoiceV1) {
+    return {
+      ...invoiceV2Subscription(),
+      templateVersion: 1,
+      config: { defaultCategory: "Office supplies" },
+      // v1 required QuickBooks; it declared no vendor setting.
+      unmetConnections: state.quickbooksConnected
+        ? []
+        : [quickbooksProvider.providerId],
+      setup: [
+        {
+          section: "rules",
+          key: "defaultCategory",
+          title: "Default category",
+          description: "The account a purchase goes to.",
+          control: "text",
+          required: true,
+        },
+      ],
+    };
+  }
+  return invoiceV2Subscription();
+}
+
+function invoiceV2Subscription(): Automations["Subscription"] {
   const vendor = state.invoiceConfig.vendor;
   return {
     id: invoiceSubscriptionId,
@@ -1259,6 +1288,9 @@ const server = createServer(
       },
       "/__fixture/invoice-paused": () => {
         state.invoiceStatus = "paused";
+      },
+      "/__fixture/invoice-v1": () => {
+        state.invoiceV1 = true;
       },
       // The project automation held twice, as production's one duplicate from
       // before one flow per workspace is (the owner's build 12, #9): in the

@@ -15,7 +15,7 @@ import {
 } from "./helpers";
 
 /**
- * Every dialog `components/ui/Modal.tsx` serves — fifteen, one row each — held
+ * Every dialog `components/ui/Modal.tsx` serves — seventeen, one row each — held
  * to the same behaviours (filed at Round 15's close; the register's § "The
  * backlog before Round 17"):
  *
@@ -45,6 +45,7 @@ test.beforeEach(async () => {
 
 const busy = "The platform is busy right now. Try again in 30 seconds.";
 const team = "/account/teams/33333333-3333-4333-8333-333333333333";
+const vendorPage = "/account/flows/f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1/vendor";
 
 /** A server action, as its page sends it: a POST to the page's own URL. */
 const actionOn = (path: string) => ({
@@ -123,6 +124,46 @@ const dialogs: Dialog[] = [
         expect(dialog.getByRole("alert")).toHaveText(
           "This connection changed since the page loaded, so nothing was replaced. Reload the page to see it, then choose again.",
         ),
+      staysOpen: true,
+    },
+  },
+  {
+    // Disconnect is confirmed first, as in the app (spec §3.I).
+    name: "Disconnect Fixture OAuth provider?",
+    path: "/account/connections",
+    opener: (page) =>
+      page
+        .locator("main")
+        .getByRole("button", { name: "Disconnect", exact: true }),
+    holds: {
+      ...actionOn("/account/connections"),
+      prepare: refusedAsBusy,
+      send: "Disconnect",
+      busy: "Disconnecting…",
+      cancel: "Cancel",
+      answered: (_, dialog) =>
+        expect(dialog.getByRole("alert")).toHaveText(busy),
+      staysOpen: true,
+    },
+  },
+  {
+    // A flow's Connect vendor page: QuickBooks's disconnect, in Intuit's words
+    // (spec §3.C).
+    name: "Disconnect from QuickBooks?",
+    path: vendorPage,
+    state: "quickbooks-connected",
+    opener: (page) =>
+      page
+        .locator("main")
+        .getByRole("button", { name: "Disconnect from QuickBooks" }),
+    holds: {
+      ...actionOn(vendorPage),
+      prepare: refusedAsBusy,
+      send: "Disconnect",
+      busy: "Disconnecting…",
+      cancel: "Cancel",
+      answered: (_, dialog) =>
+        expect(dialog.getByRole("alert")).toHaveText(busy),
       staysOpen: true,
     },
   },

@@ -20,7 +20,7 @@ export default function PrivacyPage() {
           Privacy Policy
         </h1>
         <p className="mt-6 max-w-[56ch] text-base leading-7 text-[color-mix(in_srgb,var(--color-text)_78%,transparent)]">
-          Effective and last updated: October 13, 2026. This policy explains
+          Effective and last updated: October 14, 2026. This policy explains
           what information Autom8x collects, why, and what we do with it. It is
           written to be read; if anything is unclear, contact us at{" "}
           <LegalLink href={`mailto:${LEGAL_EMAIL}`}>{LEGAL_EMAIL}</LegalLink>.
@@ -130,21 +130,21 @@ export default function PrivacyPage() {
           <p>
             An automation can have an AI model read the file given to its run,
             and no other file. Invoice Processing does, to read a bill, receipt,
-            credit note or statement before recording it in QuickBooks Online or
-            comparing it with what QuickBooks holds. The platform sends the
-            document, with Autom8x&apos;s fixed instructions for reading it, to
-            OpenRouter, which passes the request to the provider of an AI model.
-            For Invoice Processing, nothing else from your workspace goes with
-            it: not your name, email address or other account details, not the
-            flow&apos;s settings, and nothing read from QuickBooks; even the
-            file&apos;s own name is left out. The document itself goes as
-            uploaded, including anything stored inside the file, such as a
-            PDF&apos;s title or author. Only when the first reading looks wrong
-            (totals that don&apos;t add up, unclear details, or an amount over
-            the flow&apos;s approval limit) does a second model, from a
-            different maker, read it again. A model that gives no usable answer
-            is replaced by the next one on its list, each request under the
-            rules below. What the run makes of the document is kept with the
+            credit note or statement before saving its details, recording it in
+            QuickBooks Online, or comparing it with what QuickBooks holds. The
+            platform sends the document, with Autom8x&apos;s fixed instructions
+            for reading it, to OpenRouter, which passes the request to the
+            provider of an AI model. For Invoice Processing, nothing else from
+            your workspace goes with it: not your name, email address or other
+            account details, not the flow&apos;s settings, and nothing read from
+            QuickBooks; even the file&apos;s own name is left out. The document
+            itself goes as uploaded, including anything stored inside the file,
+            such as a PDF&apos;s title or author. Only when the first reading
+            looks wrong (totals that don&apos;t add up, unclear details, or an
+            amount over the flow&apos;s approval limit) does a second model,
+            from a different maker, read it again. A model that gives no usable
+            answer is replaced by the next one on its list, each request under
+            the rules below. What the run makes of the document is kept with the
             run&apos;s results, and the details it saved are shown to the
             members of your workspace.
           </p>
@@ -248,8 +248,11 @@ export default function PrivacyPage() {
             never sold or used for advertising. Autom8x does not process
             QuickBooks data on Intuit&apos;s behalf. If you give Invoice
             Processing an address in its &quot;Also email&quot; setting, such as
-            your bookkeeper&apos;s, a short summary of each document it records
-            or compares, built from QuickBooks&apos; answer, is emailed there.
+            your bookkeeper&apos;s, a short summary of each document it saves,
+            records or compares is emailed there, built from the details read
+            from the document and, when it records the document in QuickBooks or
+            compares it with what QuickBooks holds, from QuickBooks&apos;
+            answer.
           </p>
           <p>
             An owner or admin can disconnect QuickBooks at any time on the

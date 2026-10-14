@@ -17,7 +17,7 @@ import {
   VendorConnectButton,
   VendorLogo,
 } from "@/components/dashboard/VendorLogo";
-import { brandLogo } from "@/lib/brand-logos";
+import { DISCONNECT_BODY, brandLogo, disconnectTitle } from "@/lib/brand-logos";
 import type { Connection, ConnectionProvider } from "@/lib/connections";
 import {
   beginConnectionAuthorization,
@@ -53,6 +53,10 @@ const noSubscription = () => () => {};
  * account for every automation that uses this connection — so it is its own
  * control, confirmed first, and it names the exact connection it replaces
  * (backend 22.5.3, ADR-0026).
+ *
+ * **Disconnect** ends the connection every flow in the workspace acts through
+ * (the contract's own words), so it is confirmed first, as in the app — in the
+ * vendor's words where it has them: "Disconnect from QuickBooks?" (spec §3.I).
  */
 export function ConnectionsPanel({
   connections,
@@ -77,7 +81,9 @@ export function ConnectionsPanel({
     null,
   );
   const [pending, startTransition] = useTransition();
-  const [disconnecting, setDisconnecting] = useState<string | null>(null);
+  // The connection whose disconnect is being confirmed, and its refusal.
+  const [disconnecting, setDisconnecting] = useState<Connection | null>(null);
+  const [disconnectError, setDisconnectError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [replacing, setReplacing] = useState<Connection | null>(null);
   const [replaceError, setReplaceError] = useState<string | null>(null);
@@ -194,16 +200,23 @@ export function ConnectionsPanel({
     submitKey(data);
   };
 
-  const disconnect = async (connectionId: string) => {
-    setError(null);
-    setDisconnecting(connectionId);
-    try {
-      const result = await disconnectConnection(workspaceId, connectionId);
-      if (!result.ok) setError(result.error);
-      else router.refresh();
-    } finally {
+  const closeDisconnect = () => {
+    if (pending) return;
+    setDisconnecting(null);
+    setDisconnectError(null);
+  };
+
+  const confirmDisconnect = (connection: Connection) => {
+    setDisconnectError(null);
+    startTransition(async () => {
+      const result = await disconnectConnection(workspaceId, connection.id);
+      if (!result.ok) {
+        setDisconnectError(result.error);
+        return;
+      }
       setDisconnecting(null);
-    }
+      router.refresh();
+    });
   };
 
   // A live connection for a provider is one already `connected`. It changes both
@@ -274,12 +287,10 @@ export function ConnectionsPanel({
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    {/* The vendor's own logo, where it has one (spec §3.I). */}
-                    {logo ? (
-                      <span className="mr-3">
-                        <VendorLogo logo={logo} />
-                      </span>
-                    ) : null}
+                    {/* The vendor's own logo, where it has one (spec §3.I),
+                      in its own clear space; its left padding sits in the
+                      card's, so the logo lines up with the words below. */}
+                    {logo ? <VendorLogo logo={logo} className="-ml-3" /> : null}
                     <p className="font-medium text-[var(--text)]">
                       {connection.externalAccount.displayName}
                     </p>
@@ -320,14 +331,14 @@ export function ConnectionsPanel({
                     <Button
                       variant="danger"
                       size="sm"
-                      disabled={pending || disconnecting === connection.id}
-                      onClick={() => disconnect(connection.id)}
+                      disabled={pending}
+                      onClick={() => {
+                        setError(null);
+                        setNotice(null);
+                        setDisconnecting(connection);
+                      }}
                     >
-                      {disconnecting === connection.id
-                        ? "Disconnecting…"
-                        : logo
-                          ? logo.disconnectLabel
-                          : "Disconnect"}
+                      {logo ? logo.disconnectLabel : "Disconnect"}
                     </Button>
                   </div>
                 ) : null}
@@ -356,9 +367,11 @@ export function ConnectionsPanel({
                 className="bubble flex flex-col gap-3 p-4"
               >
                 <div>
-                  {/* A vendor's own logo carries its name (spec §3.I). */}
+                  {/* A vendor's own logo carries its name (spec §3.I). Its
+                    clear space reaches into the card's padding above and to
+                    the left, so it lines up with a name in the next card. */}
                   {logo ? (
-                    <VendorLogo logo={logo} />
+                    <VendorLogo logo={logo} className="-mt-3 -ml-3" />
                   ) : (
                     <p className="font-medium text-[var(--text)]">
                       {provider.displayName}
@@ -408,9 +421,56 @@ export function ConnectionsPanel({
 
       {/* One refusal, one alert (register F52): while a dialog is open its own
           alert carries the answer, so the panel's does not repeat it. */}
-      {selectedProvider || replacing ? null : (
+      {selectedProvider || replacing || disconnecting ? null : (
         <FormError message={error} className="mt-4" />
       )}
+
+      {disconnecting ? (
+        <Modal
+          onClose={closeDisconnect}
+          bubble
+          ariaLabelledBy="disconnect-connection-title"
+          ariaDescribedBy="disconnect-connection-description"
+          zIndex={100}
+          dismissible={!pending}
+        >
+          <h2
+            id="disconnect-connection-title"
+            className="text-xl font-semibold text-[var(--text)]"
+          >
+            {disconnectTitle(
+              providerNamed.get(disconnecting.providerId)?.icon,
+              providerNamed.get(disconnecting.providerId)?.displayName ??
+                disconnecting.externalAccount.displayName,
+            )}
+          </h2>
+          <p
+            id="disconnect-connection-description"
+            className="mt-1 text-sm text-[var(--muted)]"
+          >
+            {DISCONNECT_BODY}
+          </p>
+          <FormError message={disconnectError} className="mt-3" />
+          <div className="mt-6 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={closeDisconnect}
+              disabled={pending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => confirmDisconnect(disconnecting)}
+              disabled={pending}
+            >
+              {pending ? "Disconnecting…" : "Disconnect"}
+            </Button>
+          </div>
+        </Modal>
+      ) : null}
 
       {replacing ? (
         <Modal

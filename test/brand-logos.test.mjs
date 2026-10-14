@@ -7,7 +7,9 @@ import ts from "typescript";
 import {
   BRAND_FILE_SHA256,
   BRAND_LOGOS,
+  DISCONNECT_BODY,
   brandLogo,
+  disconnectTitle,
 } from "../lib/brand-logos.ts";
 
 /**
@@ -114,6 +116,19 @@ test("a brand is resolved by the provider's icon name alone, and any other name 
   ]) {
     assert.equal(brandLogo(name), null, String(name));
   }
+});
+
+test("a disconnect is confirmed in the vendor's own words where it has them, and the app's words otherwise (spec §3.C, §3.I)", () => {
+  assert.equal(
+    disconnectTitle("QuickBooksLogo", "QuickBooks Online"),
+    "Disconnect from QuickBooks?",
+  );
+  assert.equal(
+    disconnectTitle("link", "Fixture OAuth provider"),
+    "Disconnect Fixture OAuth provider?",
+  );
+  assert.equal(disconnectTitle(undefined, "Acme"), "Disconnect Acme?");
+  assert.equal(DISCONNECT_BODY, "You can connect it again any time.");
 });
 
 test("the logo is drawn 24 tall from the vendor's files as they are — never re-encoded — and the connect button at its own size", () => {

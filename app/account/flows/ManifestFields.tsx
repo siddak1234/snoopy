@@ -1,9 +1,10 @@
-import Link from "next/link";
 import { ProhibitIcon } from "@phosphor-icons/react/dist/ssr/Prohibit";
+import { Button } from "@/components/ui/Button";
 import { FormInput } from "@/components/ui/FormInput";
 import { NumberedStep } from "@/components/ui/NumberedStep";
 import { VendorMark } from "@/components/dashboard/VendorLogo";
 import { RunFileField } from "./RunFileField";
+import type { VendorChoiceRow } from "./vendor-path";
 import type {
   AutomationRunInputField,
   AutomationSetupField,
@@ -35,24 +36,6 @@ export const SECTION_NAME: Record<AutomationSetupField["section"], string> = {
   source: "Source",
   rules: "Settings",
   notifications: "Email",
-};
-
-/**
- * The flow's vendor choice — its `connection` setting (backend ADR-0037) — as
- * Set up's Connect row shows it (spec §3.B), with the way to the vendor page.
- */
-export type VendorChoiceRow = {
-  /** The setting's key. */
-  key: string;
-  /** `none`, or the chosen provider. */
-  providerId: string;
-  /** The flow's vendor page. */
-  href: string;
-  displayName?: string;
-  /** The provider's published icon name, which may name its logo. */
-  icon?: string | null;
-  /** False while the chosen vendor is not connected. */
-  connected?: boolean;
 };
 
 /** Setup fields, grouped under their manifest section without reordering. */
@@ -163,6 +146,9 @@ function VendorField({
             <VendorMark
               icon={vendor?.icon}
               displayName={vendor?.displayName ?? field.title}
+              // Its clear space reaches into the dialog's padding, so the logo
+              // lines up with the section's other fields.
+              logoClassName="-ml-3"
             />
           )}
           {vendor && chosen !== "none" && vendor.connected === false ? (
@@ -172,13 +158,14 @@ function VendorField({
           ) : null}
         </div>
         {vendor ? (
-          <Link
-            prefetch={false}
+          <Button
             href={vendor.href}
-            className="btn-secondary btn-sm"
+            variant="secondary"
+            size="sm"
+            prefetch={false}
           >
             Connect vendor
-          </Link>
+          </Button>
         ) : null}
       </div>
     </div>

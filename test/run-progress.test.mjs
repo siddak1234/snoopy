@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
-import { WORKING, progressRows } from "../lib/run-progress.ts";
+import { OUTCOME_WORDS, WORKING, progressRows } from "../lib/run-progress.ts";
 
 /**
  * A run's progress (spec §3.E; backend ADR-0037, BUILD-PLAN 25.4.22): one row
@@ -176,5 +176,18 @@ test("the run page draws Progress from these rows and Details from the run's own
   assert.match(
     page,
     /const common = \{ size: 24, "aria-hidden": true \} as const;/u,
+  );
+});
+
+test("a finished row says its outcome in words to a screen reader — its icon is hidden from one — and the working row says Working… alone", () => {
+  assert.deepEqual(OUTCOME_WORDS, {
+    ok: "Succeeded",
+    held: "Held",
+    failed: "Failed",
+  });
+  const page = read("app/account/runs/[runId]/page.tsx");
+  assert.match(
+    page,
+    /\{row\.outcome === "working" \? null : \(\s*<span className="sr-only">\{OUTCOME_WORDS\[row\.outcome\]\}<\/span>\s*\)\}/u,
   );
 });

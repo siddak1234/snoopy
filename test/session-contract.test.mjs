@@ -146,9 +146,12 @@ test("no link in the account area prefetches", () => {
   walk("components/dashboard");
   let links = 0;
   for (const path of files) {
+    // A <Link>, and a <Button> drawn as one (`href`), which renders a <Link>.
     for (const match of readFileSync(path, "utf8").matchAll(
-      /<Link\b[^>]*>/gu,
+      /<(?:Link|Button)\b[^>]*>/gu,
     )) {
+      if (match[0].startsWith("<Button") && !/\shref=/u.test(match[0]))
+        continue;
       links += 1;
       assert.match(
         match[0],

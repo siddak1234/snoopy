@@ -3173,11 +3173,13 @@ then, by design. What changed, by the spec's items:
 - **U4/U5 — the Connect vendor page and the logos.** `app/account/flows/[subscriptionId]/vendor/`:
   each optional vendor by its own logo, and None; Intuit's Connect to QuickBooks button for an
   owner or admin, "Ask an owner or admin to connect it." for a member, "Disconnect from QuickBooks"
-  once connected; the choice saved as the flow's `connection` setting, the rest of its settings
+  once connected, confirmed first ("Disconnect from QuickBooks?", as in the app — and every
+  Disconnect on Connections the same way); the choice saved as the flow's `connection` setting, the rest of its settings
   read on the server and sent whole. A connect started there comes back to it from Connections
   (`app/account/connections/pending-connect.ts`, a UUID-shaped path only). Intuit's four files in
   `public/vendors/`, byte for byte (`lib/brand-logos.ts`, `components/dashboard/VendorLogo.tsx`,
-  served `unoptimized`, 24 px tall, the theme picking the file); Connections shows the logo and
+  served `unoptimized`, 24 px tall, the theme picking the file, 12 px of clear space its own;
+  Intuit's button never faded while the page waits); Connections shows the logo and
   Intuit's words, and no longer the provider's id or "Only providers configured for this
   deployment are shown."
 - **U8 — the AI consent on the account.** "AI reads your documents" once while
@@ -3195,9 +3197,10 @@ then, by design. What changed, by the spec's items:
   Settings, Email) with `components/ui/NumberedStep.tsx`, "Optional", "$" on an amount, "Save",
   "Enter an amount for {title}." and "Fill in: {titles}." before sending, "Could not save. Try
   again." after; the Run window's "Fill this in, then start the run.", Upload and Take photo (icons
-  20), no "(optional)"; "Go live" is "Turn on". The privacy page (§3.K): "Invoice Processing", the
-  second read only on a problem, the details shown to the workspace, and None; its baselines
-  re-recorded on both renderers.
+  20), no "(optional)"; "Go live" is "Turn on", and a file refused because the flow is paused says
+  "Turn it on first; a paused flow takes no files." (the app's words). The privacy page (§3.K):
+  "Invoice Processing", the second read only on a problem, the details shown to the workspace, and
+  None; dated October 14, 2026; its baselines re-recorded on both renderers.
 
 Guards, each bitten by hand — the guarded code broken, the guard RED, the file restored from a kept
 copy (sha256 checked equal), the guard GREEN: W1 the four Intuit files' sha256, the button's too,
@@ -3213,3 +3216,63 @@ save changing the flow's own setting; U11 the section names, an empty amount, no
 contract: each person's AI answer (allowed, so no other test meets the card), the save route,
 Invoice Processing's flow, vendor page, QuickBooks and grouped run, and the category team made on
 an add.
+
+**2026-10-14 — the review of the Invoice Processing screens, answered.** A single-pass review of
+`b1697e1` found no blocker and five should-fix findings; each was re-checked against the code and
+all five held. Fixed in one commit on top:
+
+- **The privacy page said less than v2 does.** With None a document's details are saved and the
+  "Also email" summary is still sent, and the summary is built from what was read, not only from
+  QuickBooks' answer (at `1defad9`:
+  `snoopy-automations/automations/invoice-processing/src/writes/mail.ts`,
+  `snoopy-automations/automations/invoice-processing/src/details.ts`,
+  `snoopy-automations/automations/invoice-processing/src/steps/notify.ts`). The session's words, for the two sentences the spec's §3.K does not give:
+  "…to read a bill, receipt, credit note or statement before saving its details, recording it in
+  QuickBooks Online, or comparing it with what QuickBooks holds." and "…a short summary of each
+  document it saves, records or compares is emailed there, built from the details read from the
+  document and, when it records the document in QuickBooks or compares it with what QuickBooks
+  holds, from QuickBooks' answer." §3.K's own sentences are unchanged. The date is October 14,
+  2026, the day the page goes live with the release (Terms is unchanged and keeps October 13).
+  Both baselines re-recorded, each first failing on the old one.
+- **Disconnect had no confirm** on the vendor page, and none on Connections, while the app confirms
+  both. Now `Modal` asks "Disconnect from QuickBooks?" (else "Disconnect {name}?") — "You can
+  connect it again any time." — with Cancel and a red Disconnect, held while it sends, its refusal
+  in the dialog (register F52, F76). A vendor disconnected on its page is no longer the choice:
+  None, until it is connected again, as in the app.
+- **A v1 flow's unmet QuickBooks went to a vendor page that is not there.** Whether a flow has a
+  vendor to choose is now read from its own pinned `setup`, never from the catalog's newest version
+  (`app/account/flows/vendor-path.ts`: `unmetLines`, `vendorChoice`, pure and unit-tested): a v1
+  flow says "Connect QuickBooks Online first." and goes to Connections.
+- **The logo's clear space** was 4 px under it on Connections and in Set up. `VendorLogo` now keeps
+  12 px of its own on every side (Intuit asks half the symbol's height, about 11 px at 24 tall);
+  a caller pulls it only into padding it owns.
+
+The nits taken: Intuit's button is no longer faded while the page waits (Intuit: "Do not modify the
+appearance of any button graphics"); Set up's Connect vendor is a `Button`, and a `Button` that
+links passes `prefetch={false}` (the no-prefetch test now reads those too); a progress row says its
+outcome in words to a screen reader ("Succeeded", "Held", "Failed" — the run's own status words);
+the paused-flow upload refusal says "Turn it on first"; `Modal`'s comment names the consent card.
+"Connect {displayName} first." for a connection a flow cannot run without is the session's words,
+as the app says it. Left for a spec amendment, not changed here: the run page's "Trigger" fact and
+Activity's "· v2", and "Optional" on Approval limit, which may not be left blank. Left for the
+backend: the vendor page lists the catalog's newest optional connections, since a subscription does
+not publish its pinned version's (a backend §12.1 row to file). Not a defect: the vendor page's
+reads fall back only when no backend is configured; a platform that cannot answer throws to the
+account area's boundary, as every page's read does.
+
+Guards, each bitten by hand (RED, restored sha256-equal, GREEN): the v1 line, `unmetLines` and
+`vendorChoice` (`test/vendor-page.test.mjs`, and the e2e on a v1 fixture flow); the confirm's words
+and red button, one alert (`test/brand-logos.test.mjs`, `test/structure-contract.test.mjs`); a
+`Button` link's prefetch (`test/session-contract.test.mjs`); the outcome words
+(`test/run-progress.test.mjs`); the refusal words (`test/upload-refusals.test.mjs`); and in the
+browser, each disconnect confirmed (`e2e/account-surfaces.spec.ts` 13, two new rows in
+`e2e/dialogs.spec.ts`), the clear space measured on the vendor page, Connections and Set up, the
+button's opacity while Save waits, the light theme's preferred logo, and the vendor page's owner and
+member checks as two tests.
+
+The full local gate (`npm run verify`, the contract read from backend `57eac70`'s docs): every step
+green but the fixture suite's WebKit leg — Chromium and Firefox no failure; WebKit 65, of which 57
+fail on unchanged `main` (`c0bd411`) by the same title, 3 are `b1697e1`'s renames of titles failing
+there, and 5 are new tests of the classes `main` fails on this Mac (the two Disconnect rows' Escape
+and hold, and the vendor page's member test). The vendor page's owner test, failing in WebKit while
+it shared its test with the member's session, now passes there.

@@ -639,6 +639,17 @@ test("11 — every action that removes or ends something wears the error tokens,
     tokens,
     "Disconnect",
   );
+  await page.getByRole("button", { name: "Disconnect" }).click();
+  dialog = page.getByRole("dialog", {
+    name: "Disconnect Fixture OAuth provider?",
+  });
+  await expectDanger(
+    dialog.getByRole("button", { name: "Disconnect" }),
+    tokens,
+    "Disconnect, confirming",
+  );
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
   // Red at rest, not only hovered. Its confirm is the browser's own, which
   // takes no colour.
@@ -819,11 +830,21 @@ test("11 — what can be undone is not red: Pause, Deny, Reject, Cancel request 
   );
 });
 
-test("13 — a disconnected account leaves its provider offering Connect", async ({
+test("13 — a disconnected account leaves its provider offering Connect; Disconnect is confirmed first, as in the app", async ({
   page,
 }) => {
   await page.goto("/account/connections");
   await page.getByRole("button", { name: "Disconnect" }).click();
+  const confirm = page.getByRole("dialog", {
+    name: "Disconnect Fixture OAuth provider?",
+  });
+  await expect(confirm).toHaveAccessibleDescription(
+    "You can connect it again any time.",
+  );
+  // Nothing is disconnected until it is confirmed.
+  await expect(page.getByText("Fixture OAuth account")).toBeVisible();
+  await confirm.getByRole("button", { name: "Disconnect" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Disconnect" })).toHaveCount(0);
   const connect = providerCard(page, "Fixture OAuth provider").getByRole(
     "button",
@@ -1198,9 +1219,13 @@ test("a connection started, replaced or removed on a page whose workspace anothe
   );
 
   await disconnect.click();
-  await expect(page.locator("main").getByRole("alert")).toHaveText(
-    workspaceChanged,
-  );
+  const confirm = page.getByRole("dialog", {
+    name: "Disconnect Fixture OAuth provider?",
+  });
+  await confirm.getByRole("button", { name: "Disconnect" }).click();
+  await expect(confirm.getByRole("alert")).toHaveText(workspaceChanged);
+  await confirm.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
   await key.getByRole("button", { name: "Connect" }).click();
   const connect = page.getByRole("dialog", {
@@ -1231,6 +1256,10 @@ test("a provider connected on a page whose workspace another tab switched away i
   );
   await page.goto("/account/connections");
   await page.getByRole("button", { name: "Disconnect" }).click();
+  await page
+    .getByRole("dialog", { name: "Disconnect Fixture OAuth provider?" })
+    .getByRole("button", { name: "Disconnect" })
+    .click();
   const connect = providerCard(page, "Fixture OAuth provider").getByRole(
     "button",
     { name: "Connect", exact: true },

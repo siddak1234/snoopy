@@ -225,7 +225,11 @@ test("every action that removes or ends something is red, on its page and in its
       "Unlink",
       ["danger", "danger"],
     ],
-    ["app/account/connections/ConnectionsPanel.tsx", "Disconnect", ["danger"]],
+    [
+      "app/account/connections/ConnectionsPanel.tsx",
+      "Disconnect",
+      ["danger", "danger"],
+    ],
     ["components/dashboard/ProjectMemberList.tsx", "Leave", ["text"]],
     ["components/dashboard/ProjectMemberList.tsx", "Remove", ["text"]],
     ["components/dashboard/OrgMemberList.tsx", "Remove", ["text"]],
@@ -336,16 +340,32 @@ test("no dead focus utility — the global :focus-visible rule decides (register
 
 test("one refusal, one alert, in the connections dialogs (register F52)", () => {
   const panel = read("app/account/connections/ConnectionsPanel.tsx");
-  // The panel's alert stands down while either dialog is open …
+  // The panel's alert stands down while any of its dialogs is open …
   assert.match(
     panel,
-    /\{selectedProvider \|\| replacing \? null : \(\s*<FormError message=\{error\} className="mt-4" \/>\s*\)\}/u,
+    /\{selectedProvider \|\| replacing \|\| disconnecting \? null : \(\s*<FormError message=\{error\} className="mt-4" \/>\s*\)\}/u,
   );
   // … because each dialog carries its own.
   assert.match(panel, /<FormError message=\{error\} \/>/u);
   assert.match(
     panel,
     /<FormError message=\{replaceError\} className="mt-3" \/>/u,
+  );
+  assert.match(
+    panel,
+    /<FormError message=\{disconnectError\} className="mt-3" \/>/u,
+  );
+  // The vendor page's disconnect confirm too.
+  const vendor = read(
+    "app/account/flows/[subscriptionId]/vendor/VendorChoice.tsx",
+  );
+  assert.match(
+    vendor,
+    /\{disconnecting \? null : <FormError message=\{error\} className="mt-4" \/>\}/u,
+  );
+  assert.match(
+    vendor,
+    /<FormError message=\{disconnectError\} className="mt-3" \/>/u,
   );
 });
 

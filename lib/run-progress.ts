@@ -37,6 +37,19 @@ export type ProgressRow = {
 export const WORKING = "Working…";
 
 /**
+ * A finished row's outcome in words, for a screen reader: its icon says it to
+ * the eye alone. The words a run's own status pill uses, as each step's pill
+ * did before the rows were grouped.
+ */
+export const OUTCOME_WORDS: Readonly<
+  Record<Exclude<ProgressRow["outcome"], "working">, string>
+> = {
+  ok: "Succeeded",
+  held: "Held",
+  failed: "Failed",
+};
+
+/**
  * The rows for a run's reported steps. The manifest is the catalog's entry
  * for the run's flow, which lists one version: its groups are used only for a
  * run of that version — a step's group is that version's — while a step's

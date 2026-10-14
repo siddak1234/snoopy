@@ -13,7 +13,11 @@ import {
   type RunOrigin,
 } from "@/lib/automations";
 import { PlatformServerError } from "@/lib/platform-server";
-import { progressRows, type ProgressRow } from "@/lib/run-progress";
+import {
+  OUTCOME_WORDS,
+  progressRows,
+  type ProgressRow,
+} from "@/lib/run-progress";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
@@ -190,7 +194,7 @@ export default async function RunDetailPage(
   );
 }
 
-/** A row's icon (24): its outcome, said by the row's words as well. */
+/** A row's icon (24): its outcome to the eye; `OUTCOME_WORDS` says it to a screen reader. */
 function ProgressIcon({ outcome }: { outcome: ProgressRow["outcome"] }) {
   const common = { size: 24, "aria-hidden": true } as const;
   if (outcome === "ok")
@@ -214,6 +218,9 @@ function ProgressItem({ row }: { row: ProgressRow }) {
       </span>
       <div className="flex min-w-0 flex-col gap-1">
         <p className="text-sm font-medium text-[var(--text)]">{row.title}</p>
+        {row.outcome === "working" ? null : (
+          <span className="sr-only">{OUTCOME_WORDS[row.outcome]}</span>
+        )}
         {row.sub ? (
           <p className="text-sm text-[var(--muted)]">{row.sub}</p>
         ) : null}

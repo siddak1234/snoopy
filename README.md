@@ -58,12 +58,15 @@ a temporary certificate and scans every authenticated page with axe. Its tests
 drive the published operations the website calls — flows and runs, archiving
 a flow and the archived ones, adding a flow (it goes to the team of its
 category, which the platform makes when there is none; a catalog with nothing
-to add), a flow's Connect vendor page and its vendor choice, a run's progress
-by group and its saved details, the account's AI consent (the card once, the
-Settings switch, and Start run's gate), a run's file (PUT straight to the
-fixture's object store, across origins), moving a subscription to a newer
-version, a webhook flow's address, connections, teams (a team is a project in
-the platform's contract: its members, asking to join and the answers), setting up an organization
+to add), a flow's Connect vendor page and its vendor choice (a flow still on
+an older version with no vendor to choose is sent to Connections instead), the
+vendor's logo in its own clear space, a run's progress by group and its saved
+details, the account's AI consent (the card once, the Settings switch, and
+Start run's gate), a run's file (PUT straight to the fixture's object store,
+across origins), moving a subscription to a newer version, a webhook flow's
+address, connections (each disconnect confirmed first), teams (a team is a
+project in the platform's contract: its members, asking to join and the
+answers), setting up an organization
 (a refused domain claim retried on the organization made), the organization's
 join link,
 unlinking a sign-in account (each refusal, and a platform with no unlink yet),

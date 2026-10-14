@@ -4,6 +4,7 @@ import {
   expect,
   test,
   type BrowserContext,
+  type Locator,
   type Page,
   type Request,
 } from "@playwright/test";
@@ -1558,7 +1559,7 @@ test.describe("a file for a run (backend FR-14)", () => {
         "open",
         409,
         "subscription_not_live",
-        "Go live first; a paused flow takes no files.",
+        "Turn it on first; a paused flow takes no files.",
       ],
       ["open", 409, "no_file_input", "This flow does not take a file."],
       // A reason the website does not name reads as the platform's own title.
@@ -2536,6 +2537,32 @@ async function invoiceSettings() {
   ).invoiceConfig;
 }
 
+/**
+ * The logo's clear space (spec §4.2: at least 12; Intuit's half the symbol's
+ * height, about 11 at 24 tall): nothing beside it comes within 12 px of the
+ * image on any side.
+ */
+async function expectClearSpace(logo: Locator, neighbours: Locator[]) {
+  const image = await logo.boundingBox();
+  expect(image, "the logo is drawn").not.toBeNull();
+  if (!image) return;
+  for (const neighbour of neighbours) {
+    const box = await neighbour.boundingBox();
+    expect(box, `${neighbour} is drawn`).not.toBeNull();
+    if (!box) continue;
+    const apart = Math.max(
+      image.x - (box.x + box.width),
+      box.x - (image.x + image.width),
+      image.y - (box.y + box.height),
+      box.y - (image.y + image.height),
+    );
+    expect(
+      apart,
+      `${neighbour} is within the logo's clear space`,
+    ).toBeGreaterThanOrEqual(12);
+  }
+}
+
 test("Invoice Processing's card and Set up say the spec's words: its category, Included, its team, and numbered sections — Connect, Settings, Email — the vendor first (spec §3.A–§3.B)", async ({
   page,
 }) => {
@@ -2585,7 +2612,7 @@ test("Invoice Processing's card and Set up say the spec's words: its category, I
   });
 });
 
-test("the Connect vendor page shows each vendor by its own logo, and None; Intuit's own button connects QuickBooks; a member is told who connects it (spec §3.C, §4)", async ({
+test("the Connect vendor page shows each vendor by its own logo, and None; Intuit's own button connects QuickBooks, as Intuit draws it even while the page waits; the light theme shows the preferred logo (spec §3.C, §4)", async ({
   page,
 }) => {
   await page.goto(vendorPage);
@@ -2616,14 +2643,56 @@ test("the Connect vendor page shows each vendor by its own logo, and None; Intui
     "src",
     "/vendors/connect-to-quickbooks.svg",
   );
+  await expectClearSpace(logo, [
+    connect,
+    main.getByText("None", { exact: true }),
+  ]);
   await expectNoAxeViolations(page);
 
+  // While Save is answered the button waits, disabled — and still looks as
+  // Intuit draws it: never faded.
+  const saved = await holdRequest(page, `**${vendorPage}`, isServerAction);
+  await main.getByRole("button", { name: "Save", exact: true }).click();
+  await saved.arrived;
+  await expect(connect).toBeDisabled();
+  expect(
+    await connect.evaluate((button) => getComputedStyle(button).opacity),
+  ).toBe("1");
+  saved.release();
+  await expect(page).toHaveURL(
+    new RegExp(`/account/flows#flow-${invoiceFlow}$`, "u"),
+  );
+
+  // On the light ground, Intuit's preferred logo — the dark wordmark.
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem("theme", "light");
+    } catch {
+      /* the page falls back to its default */
+    }
+  });
+  await page.goto(vendorPage);
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  const preferred = main.locator('img[src="/vendors/quickbooks-logo.png"]');
+  await expect(preferred).toBeVisible();
+  expect((await preferred.boundingBox())?.height).toBe(24);
+  await expect(logo).toBeHidden();
+});
+
+test("a member on the Connect vendor page is told who connects a vendor, and offered no Connect to QuickBooks (spec §3.C)", async ({
+  page,
+}) => {
   await presentSession(page, "member");
-  await page.reload();
+  await page.goto(vendorPage);
+  const main = page.locator("main");
+  await expect(
+    main.getByRole("heading", { name: "Connect vendor", level: 1 }),
+  ).toBeVisible();
   await expect(main).toContainText("Ask an owner or admin to connect it.");
   await expect(
     main.getByRole("button", { name: "Connect to QuickBooks" }),
   ).toHaveCount(0);
+  await expect(main.getByRole("radio", { name: /None/u })).toBeChecked();
 });
 
 test("Connect to QuickBooks goes to Intuit and back to the vendor page, where QuickBooks is the choice; Save keeps it as the flow's setting, and Connections shows its logo and Disconnect from QuickBooks (spec §3.C, §3.I)", async ({
@@ -2660,10 +2729,16 @@ test("Connect to QuickBooks goes to Intuit and back to the vendor page, where Qu
   const card = automationCard(page, "Invoice Processing");
   await card.getByRole("button", { name: "Set up" }).click();
   const setup = page.getByRole("dialog", { name: "Set up Invoice Processing" });
-  await expect(
-    setup.locator('img[src="/vendors/quickbooks-logo-reversed.png"]'),
-  ).toBeVisible();
+  const setupLogo = setup.locator(
+    'img[src="/vendors/quickbooks-logo-reversed.png"]',
+  );
+  await expect(setupLogo).toBeVisible();
   await expect(setup).not.toContainText("Not connected");
+  await expectClearSpace(setupLogo, [
+    setup.getByRole("heading", { name: "Connect", exact: true }),
+    setup.getByRole("link", { name: "Connect vendor" }),
+    setup.getByLabel("Approval limit"),
+  ]);
   await setup.getByRole("button", { name: "Cancel" }).click();
 
   await page.goto("/account/connections");
@@ -2671,14 +2746,55 @@ test("Connect to QuickBooks goes to Intuit and back to the vendor page, where Qu
     "Only providers configured for this deployment are shown.",
   );
   await expect(main).not.toContainText("quickbooks ·");
-  await expect(
-    main.getByRole("button", { name: "Disconnect from QuickBooks" }),
-  ).toBeVisible();
+  // The account's row: QuickBooks's logo, in its own clear space.
+  const account = main.getByText("Fixture Company", { exact: true });
+  const row = account.locator("xpath=../..");
+  const rowLogo = row.locator(
+    'img[src="/vendors/quickbooks-logo-reversed.png"]',
+  );
+  await expect(rowLogo).toBeVisible();
+  await expectClearSpace(rowLogo, [account, row.getByText(/^Used by /u)]);
+  const disconnect = main.getByRole("button", {
+    name: "Disconnect from QuickBooks",
+  });
+  await expect(disconnect).toBeVisible();
   // Connected, Intuit's button is hidden (its technical requirement 1.1).
   await expect(
     main.getByRole("button", { name: "Connect to QuickBooks" }),
   ).toHaveCount(0);
   await expectNoAxeViolations(page);
+  // Disconnect is confirmed first, in Intuit's words — and Cancel keeps it.
+  await disconnect.click();
+  const confirm = page.getByRole("dialog", {
+    name: "Disconnect from QuickBooks?",
+  });
+  await expect(confirm).toHaveAccessibleDescription(
+    "You can connect it again any time.",
+  );
+  await expectNoAxeViolations(page);
+  await confirm.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(disconnect).toBeVisible();
+  expect(await invoiceSettings()).toEqual({
+    vendor: "quickbooks",
+    holdAboveAmount: 500,
+  });
+});
+
+test("Available connections shows QuickBooks by its logo, in its own clear space, with Intuit's Connect to QuickBooks (spec §3.I, §4.2)", async ({
+  page,
+}) => {
+  await page.goto("/account/connections");
+  const main = page.locator("main");
+  const logo = main.locator('img[src="/vendors/quickbooks-logo-reversed.png"]');
+  await expect(logo).toBeVisible();
+  expect((await logo.boundingBox())?.height).toBe(24);
+  const connect = main.getByRole("button", { name: "Connect to QuickBooks" });
+  await expect(connect).toBeVisible();
+  await expectClearSpace(logo, [
+    main.getByText("Records bills and receipts.", { exact: true }),
+    connect,
+  ]);
 });
 
 test("a vendor chosen and not connected is said: the card's line goes to the vendor page, Turn on waits, and Set up says Not connected (spec §3.B, §3.D)", async ({
@@ -2697,14 +2813,31 @@ test("a vendor chosen and not connected is said: the card's line goes to the ven
   await expect(page).toHaveURL(
     new RegExp(`/account/flows#flow-${invoiceFlow}$`, "u"),
   );
-  // Disconnected again on the vendor page, in Intuit's words.
+  // Disconnected again on the vendor page, in Intuit's words, confirmed
+  // first — as in the app.
   await page.goto(vendorPage);
   await main
     .getByRole("button", { name: "Disconnect from QuickBooks" })
     .click();
+  const confirm = page.getByRole("dialog", {
+    name: "Disconnect from QuickBooks?",
+  });
+  await expect(confirm).toHaveAccessibleDescription(
+    "You can connect it again any time.",
+  );
+  await expect(
+    confirm.getByRole("button", { name: "Disconnect", exact: true }),
+  ).toHaveClass(/btn-danger/u);
+  await expectNoAxeViolations(page);
+  await confirm
+    .getByRole("button", { name: "Disconnect", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(
     main.getByRole("button", { name: "Connect to QuickBooks" }),
   ).toBeVisible();
+  // A vendor no longer connected is no choice: None, until it is again.
+  await expect(main.getByRole("radio", { name: /None/u })).toBeChecked();
   await page.goto("/account/flows");
   const card = automationCard(page, "Invoice Processing");
   const line = card.getByRole("link", {
@@ -2713,9 +2846,29 @@ test("a vendor chosen and not connected is said: the card's line goes to the ven
   await expect(line).toHaveAttribute("href", vendorPage);
   await expect(card.getByRole("button", { name: "Turn on" })).toBeDisabled();
   await card.getByRole("button", { name: "Set up" }).click();
+  const setup = page.getByRole("dialog", { name: "Set up Invoice Processing" });
+  const notConnected = setup.getByText("Not connected", { exact: true });
+  await expect(notConnected).toBeVisible();
+  await expectClearSpace(
+    setup.locator('img[src="/vendors/quickbooks-logo-reversed.png"]'),
+    [notConnected, setup.getByRole("link", { name: "Connect vendor" })],
+  );
+});
+
+test("a flow still on v1, whose QuickBooks the catalog's newer version makes optional, is sent to Connections: its own version has no vendor to choose, so no vendor page (spec §3.D)", async ({
+  page,
+}) => {
+  await fixtureControl("invoice-v1");
+  await page.goto("/account/flows");
+  const card = automationCard(page, "Invoice Processing");
   await expect(
-    page.getByRole("dialog", { name: "Set up Invoice Processing" }),
-  ).toContainText("Not connected");
+    card.getByRole("link", { name: "Connect QuickBooks Online first." }),
+  ).toHaveAttribute("href", "/account/connections");
+  await expect(card.getByText(/or choose None/u)).toHaveCount(0);
+  await expect(card.locator(`a[href="${vendorPage}"]`)).toHaveCount(0);
+  // Its vendor page is the same "not found" any other id is.
+  const response = await page.goto(vendorPage);
+  expect(response?.status()).toBe(404);
 });
 
 test("a finished run of a grouped flow shows its progress by group — never a step's id, never Not run — and the details it saved (spec §3.E; backend ADR-0037)", async ({
@@ -2737,6 +2890,11 @@ test("a finished run of a grouped flow shows its progress by group — never a s
     "Checked",
     "Done",
   ]);
+  // Each row's outcome in words too, not by its icon alone — which a screen
+  // reader does not see.
+  for (let row = 0; row < 4; row += 1) {
+    await expect(rows.nth(row).locator(".sr-only")).toHaveText("Succeeded");
+  }
   await expect(rows.nth(1)).toContainText("Second read matches");
   for (const gone of ["Not run", "check-document", "verify-read", "Emailed"]) {
     await expect(main).not.toContainText(gone);

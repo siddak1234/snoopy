@@ -9,7 +9,11 @@ import {
   rememberConnect,
   takeConnectReturn,
 } from "../app/account/connections/pending-connect.ts";
-import { vendorPath } from "../app/account/flows/vendor-path.ts";
+import {
+  unmetLines,
+  vendorChoice,
+  vendorPath,
+} from "../app/account/flows/vendor-path.ts";
 import { setupProblem } from "../app/account/flows/setup-check.ts";
 
 /**
@@ -259,5 +263,144 @@ test("Set up says an empty amount and an empty required field before anything is
       form({}),
     ),
     null,
+  );
+});
+
+// Invoice Processing in the catalog (its newest version, v2): QuickBooks is
+// optional. A v2 flow declares the vendor setting; a v1 flow — Bills &
+// Receipts, which the catalog now names Invoice Processing — declares none,
+// and cannot run without QuickBooks.
+const quickbooks = {
+  providerId: "quickbooks",
+  displayName: "QuickBooks Online",
+  optional: true,
+};
+const providers = [
+  {
+    providerId: "quickbooks",
+    displayName: "QuickBooks",
+    icon: "QuickBooksLogo",
+  },
+  { providerId: "fixture-oauth", displayName: "Fixture OAuth", icon: "Plug" },
+];
+const vendorSetting = {
+  key: "vendor",
+  title: "Vendor",
+  control: "connection",
+  defaultValue: "none",
+};
+const v2Flow = (config, unmetConnections = []) => ({
+  id: flow,
+  config,
+  setup: [
+    vendorSetting,
+    { key: "notifyEmail", title: "Also email", control: "email" },
+  ],
+  unmetConnections,
+});
+const v1Flow = (unmetConnections) => ({
+  id: flow,
+  config: { defaultCategory: "Expenses" },
+  setup: [
+    { key: "defaultCategory", title: "Default category", control: "text" },
+  ],
+  unmetConnections,
+});
+
+test("a flow's unmet vendor goes to its vendor page only when its own version has a vendor to choose; a v1 flow is sent to Connections, never to a page that is not there", () => {
+  assert.deepEqual(
+    unmetLines(
+      v2Flow({ vendor: "quickbooks" }, ["quickbooks"]),
+      [quickbooks],
+      providers,
+    ),
+    [
+      {
+        providerId: "quickbooks",
+        text: "Connect QuickBooks Online first, or choose None.",
+        href: vendorPath(flow),
+      },
+    ],
+  );
+  // v1 pins no vendor setting: the catalog's "optional" is v2's, not its own.
+  for (const v1 of [
+    v1Flow(["quickbooks"]),
+    { ...v1Flow(["quickbooks"]), setup: undefined },
+  ]) {
+    assert.deepEqual(unmetLines(v1, [quickbooks], providers), [
+      {
+        providerId: "quickbooks",
+        text: "Connect QuickBooks Online first.",
+        href: "/account/connections",
+      },
+    ]);
+  }
+  // A connection a flow cannot run without is connected on Connections, by
+  // its name — the catalog's, else the provider's, never the raw id.
+  assert.deepEqual(
+    unmetLines(
+      v2Flow({ vendor: "none" }, ["fixture-oauth", "unknown-provider"]),
+      [
+        {
+          providerId: "fixture-oauth",
+          displayName: "Fixture OAuth provider",
+          optional: false,
+        },
+      ],
+      providers,
+    ),
+    [
+      {
+        providerId: "fixture-oauth",
+        text: "Connect Fixture OAuth provider first.",
+        href: "/account/connections",
+      },
+      {
+        providerId: "unknown-provider",
+        text: "Connect its account first.",
+        href: "/account/connections",
+      },
+    ],
+  );
+  assert.deepEqual(
+    unmetLines(v2Flow({ vendor: "none" }), [quickbooks], providers),
+    [],
+  );
+});
+
+test("Set up's vendor row is the flow's own setting — None, or the chosen vendor with its logo and whether it is connected — and a flow whose version has no vendor setting has none", () => {
+  assert.equal(
+    vendorChoice(v1Flow(["quickbooks"]), [quickbooks], providers),
+    null,
+  );
+  assert.deepEqual(vendorChoice(v2Flow({}), [quickbooks], providers), {
+    key: "vendor",
+    providerId: "none",
+    href: vendorPath(flow),
+  });
+  assert.deepEqual(
+    vendorChoice(
+      v2Flow({ vendor: "quickbooks" }, ["quickbooks"]),
+      [quickbooks],
+      providers,
+    ),
+    {
+      key: "vendor",
+      providerId: "quickbooks",
+      href: vendorPath(flow),
+      displayName: "QuickBooks Online",
+      icon: "QuickBooksLogo",
+      connected: false,
+    },
+  );
+  assert.equal(
+    vendorChoice(v2Flow({ vendor: "quickbooks" }), [quickbooks], providers)
+      ?.connected,
+    true,
+  );
+  // A value that is not a provider's id reads as None.
+  assert.equal(
+    vendorChoice(v2Flow({ vendor: 42 }), [quickbooks], providers)?.providerId,
+    "none",
   );
 });

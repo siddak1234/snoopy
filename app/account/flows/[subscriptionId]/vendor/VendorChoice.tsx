@@ -6,11 +6,12 @@ import { CheckIcon } from "@phosphor-icons/react/dist/ssr/Check";
 import { ProhibitIcon } from "@phosphor-icons/react/dist/ssr/Prohibit";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
+import Modal from "@/components/ui/Modal";
 import {
   VendorConnectButton,
   VendorMark,
 } from "@/components/dashboard/VendorLogo";
-import { brandLogo } from "@/lib/brand-logos";
+import { DISCONNECT_BODY, brandLogo, disconnectTitle } from "@/lib/brand-logos";
 import {
   beginConnectionAuthorization,
   disconnectConnection,
@@ -53,8 +54,9 @@ const noSubscription = () => () => {};
  * own Connect to QuickBooks button — and, back from the vendor's sign-in, it is
  * the choice; a member is told who connects it. A connected vendor's row says
  * so and, for an owner or admin, offers its disconnect — "Disconnect from
- * QuickBooks", Intuit's words. None is always last: the details are saved, and
- * no vendor is called.
+ * QuickBooks", Intuit's words — confirmed first, as in the app, since it ends
+ * the connection every flow in the workspace acts through. None is always
+ * last: the details are saved, and no vendor is called.
  */
 export function VendorChoice({
   workspaceId,
@@ -79,6 +81,9 @@ export function VendorChoice({
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // The vendor whose disconnect is being confirmed, and its refusal.
+  const [disconnecting, setDisconnecting] = useState<VendorOption | null>(null);
+  const [disconnectError, setDisconnectError] = useState<string | null>(null);
   // Read in the browser only: which vendor this tab's last connect left for.
   const returnedFor = useSyncExternalStore(
     noSubscription,
@@ -122,14 +127,26 @@ export function VendorChoice({
     });
   };
 
-  const disconnect = (connectionId: string) => {
-    setError(null);
+  const closeDisconnect = () => {
+    if (pending) return;
+    setDisconnecting(null);
+    setDisconnectError(null);
+  };
+
+  const confirmDisconnect = (option: VendorOption) => {
+    if (!option.connectionId) return;
+    const connectionId = option.connectionId;
+    setDisconnectError(null);
     startTransition(async () => {
       const result = await disconnectConnection(workspaceId, connectionId);
       if (!result.ok) {
-        setError(result.error);
+        setDisconnectError(result.error);
         return;
       }
+      // A vendor no longer connected is no choice: None until it is
+      // connected again (as the app does).
+      if (choice === option.providerId) setPicked(NONE);
+      setDisconnecting(null);
       router.refresh();
     });
   };
@@ -187,12 +204,11 @@ export function VendorChoice({
                     onChange={() => setPicked(option.providerId)}
                     className="sr-only"
                   />
-                  <span className="m-3">
-                    <VendorMark
-                      icon={option.icon}
-                      displayName={option.displayName}
-                    />
-                  </span>
+                  {/* A logo keeps its own clear space (VendorLogo's). */}
+                  <VendorMark
+                    icon={option.icon}
+                    displayName={option.displayName}
+                  />
                   {isConnected ? (
                     <span className="text-sm text-[var(--success-text)]">
                       Connected
@@ -210,7 +226,11 @@ export function VendorChoice({
                     <button
                       type="button"
                       disabled={pending}
-                      onClick={() => disconnect(option.connectionId as string)}
+                      onClick={() => {
+                        setError(null);
+                        setDisconnectError(null);
+                        setDisconnecting(option);
+                      }}
                       className="text-sm text-[var(--link)] underline underline-offset-2 disabled:opacity-60"
                     >
                       {logo ? logo.disconnectLabel : "Disconnect"}
@@ -220,6 +240,7 @@ export function VendorChoice({
                       href="/account/connections"
                       variant="secondary"
                       size="sm"
+                      prefetch={false}
                     >
                       Connect
                     </Button>
@@ -273,12 +294,56 @@ export function VendorChoice({
           </div>
         </div>
       </fieldset>
-      <FormError message={error} className="mt-4" />
+      {/* One refusal, one alert (register F52): the dialog's own says it. */}
+      {disconnecting ? null : <FormError message={error} className="mt-4" />}
       <div className="mt-6 flex flex-wrap gap-2">
         <Button type="button" disabled={pending} onClick={save}>
           {saving ? "Saving…" : "Save"}
         </Button>
       </div>
+
+      {disconnecting ? (
+        <Modal
+          onClose={closeDisconnect}
+          bubble
+          ariaLabelledBy="disconnect-vendor-title"
+          ariaDescribedBy="disconnect-vendor-description"
+          zIndex={100}
+          dismissible={!pending}
+        >
+          <h2
+            id="disconnect-vendor-title"
+            className="text-xl font-semibold text-[var(--text)]"
+          >
+            {disconnectTitle(disconnecting.icon, disconnecting.displayName)}
+          </h2>
+          <p
+            id="disconnect-vendor-description"
+            className="mt-1 text-sm text-[var(--muted)]"
+          >
+            {DISCONNECT_BODY}
+          </p>
+          <FormError message={disconnectError} className="mt-3" />
+          <div className="mt-6 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={closeDisconnect}
+              disabled={pending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => confirmDisconnect(disconnecting)}
+              disabled={pending}
+            >
+              {pending ? "Disconnecting…" : "Disconnect"}
+            </Button>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   );
 }

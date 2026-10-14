@@ -79,3 +79,18 @@ export function brandLogo(icon: string | null | undefined): BrandLogo | null {
   if (!icon || !Object.hasOwn(BRAND_LOGOS, icon)) return null;
   return BRAND_LOGOS[icon as BrandName];
 }
+
+/**
+ * A disconnect's confirm (spec §3.C, §3.I), in the app's words: the vendor's
+ * own words where it has them — "Disconnect from QuickBooks?" — else
+ * "Disconnect {name}?"; and one line under it.
+ */
+export function disconnectTitle(
+  icon: string | null | undefined,
+  displayName: string,
+): string {
+  const logo = brandLogo(icon);
+  return `${logo ? logo.disconnectLabel : `Disconnect ${displayName}`}?`;
+}
+
+export const DISCONNECT_BODY = "You can connect it again any time.";
