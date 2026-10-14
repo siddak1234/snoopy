@@ -55,6 +55,24 @@ const ENTITLEMENTS_PATH = resolve(
   "../lib/subscription-entitlements.ts",
 );
 
+/** The website's source files: app/, components/ and lib/. */
+function sourceFiles() {
+  const files = [];
+  const walk = (directory) => {
+    for (const entry of readdirSync(
+      resolve(import.meta.dirname, "..", directory),
+      { withFileTypes: true },
+    )) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        if (path !== join("lib", "generated")) walk(path);
+      } else if (/\.tsx?$/u.test(entry.name)) files.push(path);
+    }
+  };
+  for (const directory of ["app", "components", "lib"]) walk(directory);
+  return files;
+}
+
 const available = existsSync(SPEC_PATH);
 const spec = available ? readFileSync(SPEC_PATH, "utf8") : "";
 const client = readFileSync(CLIENT_PATH, "utf8");
@@ -120,17 +138,22 @@ test("the setup UI is generated from the pinned version's metadata (backend §12
   assert.doesNotMatch(page, /setup=\{automation\.setup\}/);
   assert.match(page, /targetSetup=\{automation\.setup\}/);
   assert.doesNotMatch(actionsUi, /SETUP_SECTIONS/);
-  assert.match(actionsUi, /<SetupFields setup=\{setup\}/);
+  assert.match(actionsUi, /<SetupFields\s+setup=\{setup\}/);
   assert.match(fields, /for \(const field of setup\)/);
   assert.match(fields, /currentGroup\?\.section === field\.section/);
   assert.match(
     fields,
     /groups\.push\(\{ section: field\.section, fields: \[field\] \}\)/,
   );
-  // toggle is a checkbox, money a number; text and resource-picker are text,
-  // because no contract lists resources to pick from.
+  // toggle is a checkbox, money a number, email an email; text and
+  // resource-picker are text, because no contract lists resources to pick
+  // from. The vendor choice (`connection`, backend ADR-0037) is its own row.
   assert.match(fields, /field\.control === "toggle"/);
-  assert.match(fields, /field\.control === "money" \? "number" : "text"/);
+  assert.match(
+    fields,
+    /field\.control === "money"\s*\?\s*"number"\s*:\s*field\.control === "email"\s*\?\s*"email"\s*:\s*"text"/,
+  );
+  assert.match(fields, /field\.control === "connection" \? \(\s*<VendorField/);
   assert.match(fields, /name=\{`\$\{prefix\}:\$\{field\.key\}`\}/);
   assert.match(fields, /prefix="config"/);
   assert.match(fields, /field\.defaultValue/);
@@ -304,7 +327,7 @@ test("an archived subscription is treated as absent by the automations page", ()
   // subscriptions — a card for an archived row offers Add, not Pause or Go live.
   assert.match(
     page,
-    /status !== "archived"/,
+    /if \(entry\.status === "archived"\) continue;/,
     "page.tsx must drop archived subscriptions before pairing them with cards",
   );
 });
@@ -462,9 +485,8 @@ test("archiving is its own confirmed action, and the generic status action canno
   assert.match(actionsUi, /pending \? "Archiving…" : "Archive"/u);
 });
 
-test("a card lists every subscription it has, each under its own scope (register F21)", () => {
-  // The platform still takes a subscription per project (backend 18.6.2), so a
-  // workspace may hold a duplicate from before one flow per workspace (the
+test("a card lists every subscription it has, each under its own team (register F21)", () => {
+  // A workspace may hold a duplicate from before one flow per workspace (the
   // owner's build 12, #9) — listed, never hidden. Keyed by template alone, the
   // last-written — the OLDEST, in a newest-first list — hid the rest.
   assert.doesNotMatch(
@@ -477,55 +499,46 @@ test("a card lists every subscription it has, each under its own scope (register
     /const byTemplate = new Map<string, Subscription\[\]>\(\);/u,
   );
   assert.match(page, /subscriptions\.map\(\(subscription\) => \(/u);
-  assert.match(page, /subscription\.projectId\s*\?\s*`Team: /u);
-  // Adding names a team every time (the owner's build 10, below).
-  assert.match(
-    actions,
-    /const body: CreateSubscriptionRequest = \{ templateId, projectId \};/u,
-  );
+  assert.match(page, /\{place\(subscription\)\}/u);
 });
 
-test("a flow is added to a team — never the whole workspace — and a workspace with no team yet is told to make one, in the app's words (the owner's build 10)", () => {
+test("a flow is added with no team: the platform puts it in the team of its category — no picker, no team sent, no Create a team (backend ADR-0036; the owner, 2026-10-14)", () => {
   const addUi = read("app/account/flows/AddAutomation.tsx");
-  // The places offered are the open teams, and no other — for a flow held
-  // nowhere, as Add is drawn only then (the owner's build 12, #9, below); a
-  // flow added to the whole workspace before stays listed and labelled.
-  assert.doesNotMatch(
-    page,
-    /label: "Whole workspace"/u,
-    "the whole workspace is not a place to add to",
-  );
-  assert.match(
-    page,
-    /const scopes: AddScope\[\] = projects\.map\(\(project\) => \(\{\s*projectId: project\.id,\s*label: `Team: \$\{project\.type\}`,\s*\}\)\);/u,
-  );
-  assert.match(page, /: "Whole workspace"/u, "an older row keeps its label");
-  assert.match(
-    addUi,
-    /export type AddScope = \{ projectId: string; label: string \};/u,
-  );
-  // The team is sent every time; an Add that names none is refused in the
-  // shared wording's words before any call.
-  assert.match(addUi, /data\.append\("projectId", scope\);/u);
-  assert.doesNotMatch(addUi, /if \(scope\) data\.append/u);
+  // The body is the flow alone: the platform ignores a team now, so none is
+  // ever sent, and nothing asks for one first.
   assert.match(
     actions,
-    /if \(!projectId\) return \{ ok: false, error: "Pick a team\." \};/u,
+    /const body: CreateSubscriptionRequest = \{ templateId \};/u,
   );
-  assert.doesNotMatch(
+  const subscribe =
+    /export async function subscribeToAutomation[\s\S]*?\n\}/u.exec(actions);
+  assert.ok(subscribe, "subscribeToAutomation not found");
+  assert.doesNotMatch(subscribe[0], /projectId/u);
+  assert.doesNotMatch(addUi, /projectId|<select|scopes|hasTeam/u);
+  // An add the platform could not make — a workspace or team it could not
+  // find or make (404), its team service unanswered (502) — in the spec's
+  // words (§3.A).
+  assert.match(
     actions,
-    /projectId \? \{ projectId \} : \{\}/u,
-    "no body goes without a team",
+    /const ADD_REFUSED = "Could not add this flow\. Try again\.";/u,
   );
-  // With no team yet: an owner or admin reads the line and the way to Teams; a
-  // plain member reads who makes it; neither is offered Add, and nothing is
-  // sent. The role is the workspace list's (register F8).
-  assert.match(page, /hasTeam=\{projects\.length > 0\}/u);
-  assert.match(page, /canAdminister=\{canAdminister\}/u);
-  assert.match(addUi, /if \(!hasTeam\) \{\s*return canAdminister \? \(/u);
-  assert.match(addUi, />\s*Create a team first\.\s*</u);
-  assert.match(addUi, /href="\/account\/teams"/u);
-  assert.match(addUi, />\s*An owner or admin creates the first team\.\s*</u);
+  assert.match(
+    subscribe[0],
+    /error instanceof PlatformServerError &&\s*\(error\.status === 404 \|\| error\.status === 502\)\s*\) \{\s*return \{ ok: false, error: ADD_REFUSED \};/u,
+  );
+  // Where a flow is: its team, by kind — the category's, when the team is
+  // one this person cannot list — or, added before teams, the whole
+  // workspace.
+  assert.match(
+    page,
+    /if \(!subscription\.projectId\) return "Whole workspace";\s*const kind =\s*teamKind\.get\(subscription\.projectId\) \?\?\s*catalog\.get\(subscription\.templateId\)\?\.category;\s*return kind \? `Team: \$\{kind\}` : "Team";/u,
+  );
+  // The removed words (spec §3.A): no source file says them.
+  const removed =
+    /Add to\b|Choose a team|Pick a team\.|Create a team first\.|Create a team|Ask to join a team first\.|See teams|An owner or admin creates the first team\./u;
+  for (const path of sourceFiles()) {
+    assert.doesNotMatch(read(path), removed, path);
+  }
 });
 
 test("an archived flow is unarchived in every word a person reads — the archive's confirm and the Archived flows note — and no source file says the old words (the owner's build 12, #4; register F87)", () => {
@@ -615,24 +628,19 @@ test("a flow is held once per workspace: by a copy that is not archived, in any 
   assert.equal(heldCopy([newer, older], "invoice-check"), newer);
 });
 
-test("a held flow's card offers no team and says where it is, with the way to it, and Add refuses a second copy in words before anything is sent (the owner's build 12, #9; register F87)", () => {
+test("a held flow's card says Added ✓, going to it, offers no Add, and Add refuses a second copy in words before anything is sent (the owner's build 12, #9; register F87)", () => {
   // One rule, said once, for the page and the action.
   assert.match(page, /import \{ heldCopy \} from "@\/lib\/held-flow";/u);
   assert.match(actions, /import \{ heldCopy \} from "@\/lib\/held-flow";/u);
-  // The card: held, "Added · Team: {kind}" or "Added · Whole workspace" — the
-  // app's Added with its team — going to the flow's own row, and no Add,
-  // whatever teams there are, or none.
+  // The card: held, "Added ✓" (spec §3.A) going to the flow's own row, which
+  // says its team, and no Add.
   assert.match(
     page,
     /const held = heldCopy\(subscriptions, automation\.templateId\);/u,
   );
   assert.match(
     page,
-    /const where = \(subscription: Subscription\) =>\s*subscription\.projectId\s*\?\s*`Team: \$\{projectName\.get\(subscription\.projectId\) \?\? "a team"\}`\s*:\s*"Whole workspace";/u,
-  );
-  assert.match(
-    page,
-    /\{held \? \(\s*<a\s+href=\{`#flow-\$\{held\.id\}`\}[^>]*>\s*Added · \{where\(held\)\}\s*<\/a>\s*\) : \(\s*<AddAutomation\b/u,
+    /\{held \? \(\s*<a\s+href=\{`#flow-\$\{held\.id\}`\}[^>]*>\s*Added ✓\s*<\/a>\s*\) : \(\s*<AddAutomation\b/u,
   );
   assert.match(page, /id=\{`flow-\$\{subscription\.id\}`\}\s*tabIndex=\{-1\}/u);
   // The action: after the workspace check, and before the call that adds.
@@ -649,17 +657,17 @@ test("a held flow's card offers no team and says where it is, with the way to it
   );
 });
 
-test("an archived flow's row offers Unarchive — its card's own Add, named for the flow, to the team it had or the teams the card offers, never the whole workspace — and, the flow held again, says where it is instead, going to it (the owner's build 12, #4 and #9; register F87)", () => {
+test("an archived flow's row offers Unarchive — its card's own Add, named for the flow, which goes to the team of its category — and, the flow held again, says Added ✓ instead, going to it (the owner's build 12, #4 and #9; register F87)", () => {
   const addUi = read("app/account/flows/AddAutomation.tsx");
   // One add path: unarchiving is adding afresh — the platform's archive stays
   // one-way (backend §12.1 #92) — so the row draws the card's own Add, whose
-  // action, teams and refusals are the card's, and no action of its own.
+  // action and refusals are the card's, and no action of its own.
   assert.match(
     addUi,
     /^import \{ subscribeToAutomation \} from "\.\/actions";$/mu,
   );
   assert.doesNotMatch(actions, /export async function \w*unarchive/iu);
-  // In its word: Unarchive, named for its flow, and its teams' list as well.
+  // In its word: Unarchive, named for its flow.
   assert.match(
     addUi,
     /aria-label=\{unarchive \? `Unarchive \$\{name\}` : undefined\}/u,
@@ -668,18 +676,10 @@ test("an archived flow's row offers Unarchive — its card's own Add, named for 
     addUi,
     /\{unarchive\s*\?\s*pending\s*\?\s*"Unarchiving…"\s*:\s*"Unarchive"\s*:\s*pending\s*\?\s*"Adding…"\s*:\s*"Add"\}/u,
   );
-  assert.match(
-    addUi,
-    /aria-label=\{`Where to \$\{unarchive \? "unarchive" : "add"\} \$\{name\}`\}/u,
-  );
   const rows =
     /\{archived\.map\(\(subscription\) => \{[\s\S]*?\n {12}\}\)\}/u.exec(page);
   assert.ok(rows, "the archived rows are not found");
   const [row] = rows;
-  // Held again — in any team or the whole workspace, as `heldCopy` says (#9)
-  // — a row says where, as its card does, going to that copy's own row (D3's
-  // live twin); held nowhere, it offers Unarchive. A flow the catalog no
-  // longer lists has no card, so neither.
   assert.match(
     row,
     /const entry = catalogEntry\.get\(subscription\.templateId\);/u,
@@ -689,42 +689,21 @@ test("an archived flow's row offers Unarchive — its card's own Add, named for 
     /const twin = heldCopy\(\s*subscriptions\.subscriptions,\s*subscription\.templateId,\s*\);/u,
   );
   const drawn =
-    /\{!entry \? null : twin \? \(\s*<a\s+href=\{`#flow-\$\{twin\.id\}`\}[^>]*>\s*Added · \{place\(twin\)\}\s*<\/a>\s*\) : \(\s*<AddAutomation\b([\s\S]*?)\/>\s*\)\}/u.exec(
+    /\{!entry \? null : twin \? \(\s*<a\s+href=\{`#flow-\$\{twin\.id\}`\}[^>]*>\s*Added ✓\s*<\/a>\s*\) : \(\s*<AddAutomation\b([\s\S]*?)\/>\s*\)\}/u.exec(
       row,
     );
   assert.ok(drawn, "the row's Added or Unarchive is not drawn as decided");
-  // The card's Add for that flow: its template, its name, whether the catalog
-  // says it answers, the workspace shown (F28) — and Unarchive its word.
   for (const prop of [
     /\bworkspaceId=\{workspaceId\}/u,
     /\btemplateId=\{subscription\.templateId\}/u,
     /\bname=\{name\}/u,
     /\bavailable=\{entry\.available\}/u,
-    /\bscopes=\{had \? \[had\] : teamsOffered\}/u,
-    /\bhasTeam=\{teamsOffered\.length > 0\}/u,
-    /\bcanAdminister=\{canAdminister\}/u,
-    /\bcanAskToJoin=\{canAskToJoin\}/u,
     /\bunarchive\s*$/u,
   ]) {
     assert.match(drawn[1], prop);
   }
-  // To the team it had while that team is open; otherwise — the whole
-  // workspace, or a team deleted since — the teams the card offers, never the
-  // whole workspace (D4), and with none, the card's words.
-  assert.match(
-    row,
-    /const had = teamsOffered\.find\(\s*\(scope\) => scope\.projectId === subscription\.projectId,\s*\);/u,
-  );
-  assert.match(
-    page,
-    /const teamsOffered: AddScope\[\] = openProjects\.map\(\(project\) => \(\{\s*projectId: project\.id,\s*label: `Team: \$\{project\.type\}`,\s*\}\)\);/u,
-  );
-  // Where a copy is — the archived one, and the one held — by its team's
-  // kind, deleted or not, or the whole workspace.
-  assert.match(
-    page,
-    /const place = \(copy: Subscription\) =>\s*copy\.projectId\s*\?\s*`Team: \$\{teamName\.get\(copy\.projectId\) \?\? "a team"\}`\s*:\s*"Whole workspace";/u,
-  );
+  assert.doesNotMatch(drawn[1], /scopes|hasTeam|canAdminister|canAskToJoin/u);
+  // Where the archived copy was, by its team's kind, or the whole workspace.
   assert.match(row, /\{place\(subscription\)\}/u);
 });
 

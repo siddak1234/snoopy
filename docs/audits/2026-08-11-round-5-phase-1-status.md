@@ -2983,7 +2983,7 @@ request is stored and nobody is told (backend SYSTEM-MANIFEST §12.1 #36). Test 
 
 **2026-10-13 — the Run window asks before a run's file goes to an AI,** as the iPhone app does
 (Apple's App Review Guideline 5.1.2(i)): "AI reads this file", over the Run window, in the app's
-words byte for byte (`app/account/flows/ai-consent.ts`, pinned by `test/ai-consent.test.mjs`),
+words byte for byte (~~`app/account/flows/ai-consent.ts`~~, pinned by `test/ai-consent.test.mjs`),
 before any run whose input carries a file — the website cannot tell which automation uses a model —
 and never before one without. Agreed once per person per browser (localStorage,
 `autom8x.ai-consent.v1.<the person's id>`); a failed read asks again, a failed write still starts
@@ -3154,3 +3154,62 @@ _Since then, 2026-10-14_: production serves `cceee630…` (backend `ecc4d2f`, re
 Deployed contract job passes on this branch. The full local gate ran before the push — the browser suites included: Chromium and
 Firefox green, WebKit failing the same 69 fixture tests it fails on unchanged `main` — and the app completes again the same way
 since `snoopy-mobile` #63 (`fcc2f79`).
+
+**2026-10-14 — the Invoice Processing update's shared screens (backend BUILD-PLAN 25.4.15–25.4.25,
+ADR-0036–0038; the spec's §3–§4).** The owner's build-19 feedback (9 items, 2026-10-14) and
+"ensure web is also updated accordingly" (25.4.25). The contract is regenerated from backend `main`
+`57eac70` (#210): `platform.d.ts` `ab30738d…`, `automations.d.ts` `ca1fd0eb…`, `connections.d.ts`
+`bf50b980…` — live only with the release that serves it, so CI's Deployed contract job is red until
+then, by design. What changed, by the spec's items:
+
+- **U2 — a flow's team follows its category.** Add sends the flow alone (`subscribeToAutomation`,
+  `app/account/flows/actions.ts`): the platform puts it in the team of its category, made when the
+  workspace has none. The team picker, "Create a team first.", "Ask to join a team first." and
+  their links are gone from the card, and Create a team from Teams, its empty screen and the
+  dashboard (~~`components/dashboard/CreateTeamButton.tsx`~~, ~~`components/dashboard/CreateTeamDialog.tsx`~~,
+  `createProjectAction` and `lib/tenancy.ts`'s `createProject` removed). A flow's row says
+  "Team: {kind}"; a held card says "Added ✓". A refused add (404, 502) is "Could not add this flow.
+  Try again." `lib/team-types.ts` is held both ways to the published categories at typecheck.
+- **U4/U5 — the Connect vendor page and the logos.** `app/account/flows/[subscriptionId]/vendor/`:
+  each optional vendor by its own logo, and None; Intuit's Connect to QuickBooks button for an
+  owner or admin, "Ask an owner or admin to connect it." for a member, "Disconnect from QuickBooks"
+  once connected; the choice saved as the flow's `connection` setting, the rest of its settings
+  read on the server and sent whole. A connect started there comes back to it from Connections
+  (`app/account/connections/pending-connect.ts`, a UUID-shaped path only). Intuit's four files in
+  `public/vendors/`, byte for byte (`lib/brand-logos.ts`, `components/dashboard/VendorLogo.tsx`,
+  served `unoptimized`, 24 px tall, the theme picking the file); Connections shows the logo and
+  Intuit's words, and no longer the provider's id or "Only providers configured for this
+  deployment are shown."
+- **U8 — the AI consent on the account.** "AI reads your documents" once while
+  `aiDocumentReading` is null (`app/account/layout.tsx`, `components/account/AiConsentCard.tsx`),
+  Settings › AI's switch (`components/account/AiReadingSetting.tsx`), and Start run's gate for a run
+  with a file on a flow that `usesAi` (`lib/ai-consent.ts`), all through
+  `PUT /v1/session/ai-document-reading`. The per-run dialog and its localStorage agreement are
+  removed in the same change (~~`app/account/flows/AiConsentDialog.tsx`~~,
+  ~~`app/account/flows/ai-consent.ts`~~).
+- **U9/U3 — a run's progress and details.** One row per visible group with a reported step
+  (`lib/run-progress.ts`), titled by the group, never by a step's id, never "Not run"; "Working…"
+  last while it runs; "Waiting for approval." for a held run; the flow's name, not its template id
+  and version; a succeeded run's `details` under Details.
+- **U11 — the words.** Set up: "Set up {name}", "Team: {kind}", numbered sections (Connect,
+  Settings, Email) with `components/ui/NumberedStep.tsx`, "Optional", "$" on an amount, "Save",
+  "Enter an amount for {title}." and "Fill in: {titles}." before sending, "Could not save. Try
+  again." after; the Run window's "Fill this in, then start the run.", Upload and Take photo (icons
+  20), no "(optional)"; "Go live" is "Turn on". The privacy page (§3.K): "Invoice Processing", the
+  second read only on a problem, the details shown to the workspace, and None; its baselines
+  re-recorded on both renderers.
+
+Guards, each bitten by hand — the guarded code broken, the guard RED, the file restored from a kept
+copy (sha256 checked equal), the guard GREEN: W1 the four Intuit files' sha256, the button's too,
+the light theme's dark wordmark, `unoptimized` (`test/brand-logos.test.mjs`); W2 the card only while
+never asked, Start run's gate, the Run window asking before it starts, the per-run words gone, the
+layout's once, the card's words (`test/ai-consent.test.mjs`); W3 never a step id, one row per
+group, groups for the run's own version only, the run page drawing no step id
+(`test/run-progress.test.mjs`); U2 no team sent, the removed words, the 404/502 words, no Create on
+Teams (`test/automation-contract.test.mjs`, `test/tenancy-contract.test.mjs`), a kind added or
+removed failing typecheck (`lib/team-types.ts`); U4 only a vendor path gone back to, taken once, the
+save changing the flow's own setting; U11 the section names, an empty amount, no "(optional)"
+(`test/vendor-page.test.mjs`). The fixture Edge (`e2e/fixtures/public-edge.ts`) answers the new
+contract: each person's AI answer (allowed, so no other test meets the card), the save route,
+Invoice Processing's flow, vendor page, QuickBooks and grouped run, and the category team made on
+an add.

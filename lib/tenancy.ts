@@ -276,21 +276,6 @@ export async function removeWorkspaceMember(
   );
 }
 
-export async function createProject(
-  workspaceId: string,
-  input: Schema["CreateProjectRequest"],
-): Promise<Project> {
-  const response = await platformServerJson<Schema["ProjectMutationResponse"]>(
-    `${workspacePath(workspaceId)}/projects`,
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-      idempotencyKey: newIdempotencyKey("project-create"),
-    },
-  );
-  return response.project;
-}
-
 export async function updateProject(
   workspaceId: string,
   projectId: string,

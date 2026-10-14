@@ -15,7 +15,7 @@ import {
 } from "./helpers";
 
 /**
- * Every dialog `components/ui/Modal.tsx` serves — sixteen, one row each — held
+ * Every dialog `components/ui/Modal.tsx` serves — fifteen, one row each — held
  * to the same behaviours (filed at Round 15's close; the register's § "The
  * backlog before Round 17"):
  *
@@ -78,6 +78,8 @@ type Holding = {
 type Dialog = {
   /** Its accessible name. */
   name: string;
+  /** A fixture state the page needs before it is opened. */
+  state?: string;
   /** Where it is opened — by the owner, unless a session is named. */
   path: string;
   session?: "member";
@@ -125,7 +127,7 @@ const dialogs: Dialog[] = [
     },
   },
   {
-    name: "Flow setup",
+    name: "Set up Manual input automation",
     path: "/account/flows",
     opener: (page) =>
       automationCard(page, "Manual input automation").getByRole("button", {
@@ -142,13 +144,22 @@ const dialogs: Dialog[] = [
       }),
   },
   {
-    // Asked over the Run window, by its Start run, once a file is chosen
-    // (app/account/flows/AiConsentDialog.tsx): it closes alone, and focus
-    // goes back to Start run.
-    name: "AI reads this file",
+    // "AI reads your documents" (backend ADR-0038), asked over the Run window
+    // by its Start run, once a file is chosen, while the account has never
+    // answered — the account area's own card, shown first on the page,
+    // closed (components/account/AiConsentCard.tsx). It closes alone, and
+    // focus goes back to Start run.
+    name: "AI reads your documents",
     path: "/account/flows",
+    state: "ai-reading-unasked",
     files: true,
     before: async (page) => {
+      const card = page.getByRole("dialog", {
+        name: "AI reads your documents",
+      });
+      await expect(card).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(card).toHaveCount(0);
       await automationCard(page, "Manual input automation")
         .getByRole("button", { name: "Run", exact: true })
         .click();
@@ -335,27 +346,6 @@ const dialogs: Dialog[] = [
     },
   },
   {
-    name: "Create a team",
-    path: "/account/teams",
-    opener: (page) =>
-      page.locator("main").getByRole("button", { name: "Create a team" }),
-    holds: {
-      ...actionOn("/account/teams"),
-      prepare: async (page, dialog) => {
-        await dialog
-          .getByLabel("Kind of team", { exact: true })
-          .selectOption("Finance");
-        await refusedAsBusy(page);
-      },
-      send: "Create team",
-      busy: "Creating…",
-      cancel: "Cancel",
-      answered: (_, dialog) =>
-        expect(dialog.getByRole("alert")).toHaveText(busy),
-      staysOpen: true,
-    },
-  },
-  {
     name: "Remove Fixture Member?",
     path: "/account/organization",
     opener: (page) =>
@@ -393,6 +383,7 @@ const dialogs: Dialog[] = [
 ];
 
 async function open(page: Page, dialog: Dialog): Promise<Locator> {
+  if (dialog.state) await fixtureControl(dialog.state);
   if (dialog.session) await presentSession(page, dialog.session);
   await page.goto(dialog.path);
   await dialog.before?.(page);

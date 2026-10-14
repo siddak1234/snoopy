@@ -41,30 +41,6 @@ test.beforeEach(async () => {
   await fixtureControl("reset");
 });
 
-// A second team in the organization, made as a person makes one: a flow is
-// added to a team and nowhere else (the owner's build 10), so with two there is
-// a choice for a flow held nowhere — and a team left that a held flow is still
-// not offered (the owner's build 12, #9).
-async function createOperationsTeam(page: Page) {
-  await page.goto("/account/teams");
-  await page
-    .locator("main")
-    .getByRole("button", { name: "Create a team" })
-    .click();
-  const dialog = page.getByRole("dialog", { name: "Create a team" });
-  await dialog
-    .getByLabel("Kind of team", { exact: true })
-    .selectOption("Operations");
-  await dialog.getByRole("button", { name: "Create team" }).click();
-  await page.getByRole("button", { name: "Done" }).click();
-  // Done revalidates and pushes the new team's page
-  // (components/dashboard/CreateTeamButton.tsx). Wait for that navigation to
-  // land: a `page.goto` issued while it is still in flight is "interrupted by
-  // another navigation" — seen in WebKit once each engine ran on a fresh
-  // fixture (register F90).
-  await page.waitForURL(/\/account\/teams\/[^/]+$/);
-}
-
 test("the pasted-key 409 retry preserves the original connection intent", async ({
   page,
 }) => {
@@ -141,7 +117,10 @@ test("a connection says how many live flows use it — flows, as every signed-in
 }) => {
   await page.goto("/account/connections");
   await expect(
-    page.getByText("fixture-oauth · Used by 1 live flow", { exact: true }),
+    // The provider by its name, never its id (spec §3.0 rule 4).
+    page.getByText("Fixture OAuth provider · Used by 1 live flow", {
+      exact: true,
+    }),
   ).toBeVisible();
 });
 
@@ -441,9 +420,7 @@ test("a start refused because its flow and the flow's queue are full says so in 
   const dialog = page.getByRole("dialog", {
     name: "Run Manual input automation",
   });
-  await expect(dialog).toContainText(
-    "Enter what this run needs. It starts when you submit, or waits its turn if this flow is busy, and its page shows each step as it happens.",
-  );
+  await expect(dialog).toContainText("Fill this in, then start the run.");
   await dialog.getByLabel("Vendor").fill("Acme Supplies");
   await dialog.getByLabel("Amount").fill("10");
   await dialog.getByLabel("Invoice reference").fill("R-1");
@@ -462,7 +439,7 @@ test("a start refused because its flow and the flow's queue are full says so in 
   await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
 });
 
-test("a refused set-up save stays in its dialog with the platform's answer and what was typed", async ({
+test("a refused set-up save stays in its dialog, says so in the spec's words, and keeps what was typed", async ({
   page,
 }) => {
   // The change audit's P11: a failed save used to revalidate the page, and under
@@ -471,7 +448,9 @@ test("a refused set-up save stays in its dialog with the platform's answer and w
   await automationCard(page, "Manual input automation")
     .getByRole("button", { name: "Set up" })
     .click();
-  const dialog = page.getByRole("dialog", { name: "Flow setup" });
+  const dialog = page.getByRole("dialog", {
+    name: "Set up Manual input automation",
+  });
   await expect(dialog.getByLabel("Spending limit")).toHaveValue("500");
   await expectNoAxeViolations(page);
   // A notifications switch says what it switches, in words (register F22).
@@ -481,11 +460,21 @@ test("a refused set-up save stays in its dialog with the platform's answer and w
   );
   await dialog.getByLabel("Spending limit").fill("99");
   await presentSession(page, "throttled");
-  await dialog.getByRole("button", { name: "Save setup" }).click();
-  await expect(dialog.getByRole("alert")).toHaveText(busy);
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  // Spec §3.B: the save's refusal in its own words, not the platform's.
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Could not save. Try again.",
+  );
   await expect(dialog.getByLabel("Spending limit")).toHaveValue("99");
+  // An amount emptied is said before anything is sent.
   await presentSession(page, "owner");
-  await dialog.getByRole("button", { name: "Save setup" }).click();
+  await dialog.getByLabel("Spending limit").fill("");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Enter an amount for Spending limit.",
+  );
+  await dialog.getByLabel("Spending limit").fill("99");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
@@ -500,8 +489,9 @@ test("a live flow that declares no run input offers no Run; Archive flow is conf
   await expect(
     card.getByRole("button", { name: "Run", exact: true }),
   ).toHaveCount(0);
-  // Held, so its card says where, and offers no Add (the owner's build 12, #9).
-  const held = card.getByRole("link", { name: "Added · Whole workspace" });
+  // Held, so its card says Added ✓, and offers no Add (the owner's build 12,
+  // #9; spec §3.A).
+  const held = card.getByRole("link", { name: "Added ✓" });
   await expect(held).toBeVisible();
   await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
   await expect(
@@ -549,7 +539,7 @@ test("a live flow that declares no run input offers no Run; Archive flow is conf
   await expect(archived).toContainText("Archived Sep 30, 2026");
 });
 
-test("Pause and Go live move a live subscription and back, and the card follows (register F38)", async ({
+test("Pause and Turn on move a live subscription and back, and the card follows (register F38)", async ({
   page,
 }) => {
   await page.goto("/account/flows");
@@ -561,7 +551,7 @@ test("Pause and Go live move a live subscription and back, and the card follows 
   await expect(
     card.getByRole("button", { name: "Run", exact: true }),
   ).toHaveCount(0);
-  await card.getByRole("button", { name: "Go live" }).click();
+  await card.getByRole("button", { name: "Turn on" }).click();
   await expect(card.getByText(/^live$/i)).toBeVisible();
   await expect(card.getByRole("button", { name: "Pause" })).toBeVisible();
 });
@@ -1165,36 +1155,24 @@ async function decodedImage(
   };
 }
 
-// The question asked before a run whose input carries a file starts, over the
-// Run window, in the app's words (app/account/flows/ai-consent.ts).
+// "AI reads your documents", the account's AI consent (backend ADR-0038;
+// spec §3.G): shown once while the account has never answered, and over the
+// Run window before a run with a file on a flow that reads it with AI. The
+// fixture's people have allowed it, so no other test meets it.
 function aiConsent(page: Page) {
-  return page.getByRole("dialog", { name: "AI reads this file", exact: true });
-}
-
-// Agreed to: the run it held starts.
-async function agreeToAiConsent(page: Page) {
-  await aiConsent(page)
-    .getByRole("button", { name: "Agree and start", exact: true })
-    .click();
-}
-
-// The owner's agreement as this browser keeps it: the key names the consent's
-// version and the person's id.
-const ownersConsent =
-  "autom8x.ai-consent.v1.22222222-2222-4222-8222-222222222222";
-
-// Every agreement this browser keeps, read in the page by name — not through
-// getItem, which a test below makes refuse.
-function keptConsents(page: Page) {
-  return page.evaluate(() => {
-    const kept: Record<string, string> = {};
-    for (let index = 0; index < localStorage.length; index += 1) {
-      const key = localStorage.key(index);
-      if (key?.startsWith("autom8x.ai-consent.")) kept[key] = localStorage[key];
-    }
-    return kept;
+  return page.getByRole("dialog", {
+    name: "AI reads your documents",
+    exact: true,
   });
 }
+
+// What the platform keeps of each person's answer.
+async function aiReading() {
+  return (
+    await fixtureRead<{ aiReading: Record<string, string | null> }>("counts")
+  ).aiReading;
+}
+const ownerId = "22222222-2222-4222-8222-222222222222";
 
 // The Run dialog of the manual automation, with its three typed fields filled.
 async function openFilledRun(page: Page) {
@@ -1241,9 +1219,9 @@ test.describe("a file for a run (backend FR-14)", () => {
     expect(puts).toHaveLength(1);
     await expectNoAxeViolations(page);
     await dialog.getByRole("button", { name: "Start run" }).click();
-    // A run with a file asks first ("asking before a run's file goes to an
-    // AI", below); agreed, it starts.
-    await agreeToAiConsent(page);
+    // The account allowed AI reading ("the account's AI consent", below), so
+    // a run with a file starts at once.
+    await expect(aiConsent(page)).toHaveCount(0);
     await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
     // The platform received the file's id, and gave the file to that run.
     expect(await fixtureFiles()).toEqual([
@@ -1416,7 +1394,6 @@ test.describe("a file for a run (backend FR-14)", () => {
     ).toBeVisible();
     await fixtureControl("files-collected");
     await dialog.getByRole("button", { name: "Start run" }).click();
-    await agreeToAiConsent(page);
     await expect(dialog.getByRole("alert")).toHaveText(
       "That file can no longer be used. Choose it again.",
     );
@@ -1527,7 +1504,7 @@ test.describe("a file for a run (backend FR-14)", () => {
     expect(await fixtureFiles()).toEqual([]);
   });
 
-  test("an empty file is refused in words before anything is sent, and the optional field says it is optional", async ({
+  test("an empty file is refused in words before anything is sent, and the field says nothing of being optional (spec §3.D)", async ({
     page,
   }) => {
     const sent = observe(page, (request) =>
@@ -1536,7 +1513,8 @@ test.describe("a file for a run (backend FR-14)", () => {
     const dialog = await openFilledRun(page);
     await expect(
       dialog.locator("label", { hasText: "Invoice file" }),
-    ).toContainText("(optional)");
+    ).toHaveText("Invoice file");
+    await expect(dialog).not.toContainText("(optional)");
     const file = dialog.getByLabel("Invoice file");
     await file.setInputFiles({
       name: "empty.pdf",
@@ -1689,7 +1667,6 @@ test.describe("a file for a run (backend FR-14)", () => {
     await expect(dialog.getByRole("alert")).toHaveCount(0);
     expect(await uploadCompletions()).toBe(2);
     await dialog.getByRole("button", { name: "Start run" }).click();
-    await agreeToAiConsent(page);
     await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
     expect(await fixtureFiles()).toEqual([
       { filename: "invoice.pdf", sizeBytes: 24, runId: "fixture-run-started" },
@@ -1827,7 +1804,6 @@ test.describe("a photo or an image for a run (backend BUILD-PLAN 25.8.5)", () =>
       ]),
     ).toEqual({ width: 2576, height: 1449, colours: ["black", "white"] });
     await dialog.getByRole("button", { name: "Start run" }).click();
-    await agreeToAiConsent(page);
     await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
     expect(await fixtureFiles()).toEqual([
       {
@@ -2003,7 +1979,6 @@ test.describe("a photo or an image for a run (backend BUILD-PLAN 25.8.5)", () =>
         ]),
       ).toEqual({ width: 859, height: 2576, colours: ["red", "blue"] });
       await dialog.getByRole("button", { name: "Start run" }).click();
-      await agreeToAiConsent(page);
       await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
       expect(await fixtureFiles()).toEqual([
         { filename: "invoice.pdf", sizeBytes: 24 },
@@ -2017,249 +1992,254 @@ test.describe("a photo or an image for a run (backend BUILD-PLAN 25.8.5)", () =>
   });
 });
 
-test.describe("asking before a run's file goes to an AI (Apple App Review 5.1.2(i), as the app asks)", () => {
+test.describe("the account's AI consent (backend ADR-0038; spec §3.G–§3.H; Apple App Review 5.1.2(i))", () => {
   // The browser PUTs the file straight to the fixture's object store, whose
   // certificate is the fixture's own.
   test.use({ ignoreHTTPSErrors: true });
 
-  // The Run window, filled, with a file chosen and uploaded.
-  async function withFile(page: Page, name = "invoice.pdf") {
-    const dialog = await openFilledRun(page);
-    await dialog
-      .getByLabel("Invoice file")
-      .setInputFiles({ ...invoicePdf, name });
-    await expect(dialog.getByText(`Ready: ${name} (24 bytes)`)).toBeVisible();
+  const body =
+    "Some flows send a document you add to AI models, through OpenRouter, to read it. They don't keep it.";
+
+  // The Run window, filled, with a file chosen and uploaded — the account
+  // area's own card closed first when the account was never asked.
+  async function withFile(page: Page, { asked = false } = {}) {
+    await page.goto("/account/flows");
+    if (asked) {
+      await expect(aiConsent(page)).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(aiConsent(page)).toHaveCount(0);
+    }
+    await automationCard(page, "Manual input automation")
+      .getByRole("button", { name: "Run", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog", {
+      name: "Run Manual input automation",
+    });
+    await expect(dialog.getByLabel("Vendor")).toBeFocused();
+    await dialog.getByLabel("Vendor").fill("Acme Supplies");
+    await dialog.getByLabel("Amount").fill("120.50");
+    await dialog.getByLabel("Invoice reference").fill("INV-1001");
+    await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
+    await expect(
+      dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+    ).toBeVisible();
     return dialog;
   }
 
-  test("a run with a file asks first, in the app's words, and only the question answers the keyboard", async ({
+  test("an account never asked sees the card once, in the spec's words; Allow keeps the answer on the account, and the card is gone for good", async ({
     page,
   }) => {
-    const dialog = await withFile(page);
-    const starts = observe(page, isServerAction);
-    await dialog.getByRole("button", { name: "Start run" }).click();
-    const consent = aiConsent(page);
-    await expect(consent).toBeVisible();
-    await expect(consent.getByRole("heading")).toHaveText("AI reads this file");
-    await expect(consent.locator("p")).toHaveText([
-      "To read the file you give this run, Autom8x sends it to OpenRouter, which passes it to AI model providers in the United States, using only endpoints that OpenRouter lists as zero data retention.",
-      "Our Privacy Policy names the providers and explains what may be kept.",
-    ]);
-    // Both said when it opens, as a screen reader reads it.
-    await expect(consent).toHaveAccessibleDescription(
-      "To read the file you give this run, Autom8x sends it to OpenRouter, which passes it to AI model providers in the United States, using only endpoints that OpenRouter lists as zero data retention. Our Privacy Policy names the providers and explains what may be kept.",
+    await fixtureControl("ai-reading-unasked");
+    await page.goto("/account");
+    const card = aiConsent(page);
+    await expect(card).toBeVisible();
+    await expect(card.getByRole("heading")).toHaveText(
+      "AI reads your documents",
     );
-    const policy = consent.getByRole("link", {
+    await expect(card.locator("p")).toHaveText([
+      body,
+      "See our Privacy Policy.",
+    ]);
+    await expect(card).toHaveAccessibleDescription(
+      `${body} See our Privacy Policy.`,
+    );
+    const policy = card.getByRole("link", {
       name: "Privacy Policy",
       exact: true,
     });
     await expect(policy).toHaveAttribute("href", "/privacy");
-    // A new tab, as the app opens it in the browser: the run waits here.
+    // A new tab: the card waits here.
     await expect(policy).toHaveAttribute("target", "_blank");
-    await expect(consent.getByRole("button")).toHaveText([
-      "Cancel",
-      "Agree and start",
-    ]);
-    const cancel = consent.getByRole("button", { name: "Cancel", exact: true });
-    const agree = consent.getByRole("button", {
-      name: "Agree and start",
-      exact: true,
-    });
-    await expect(agree).toHaveClass(/btn-primary/);
+    await expect(card.getByRole("button")).toHaveText(["Not now", "Allow"]);
+    await expect(
+      card.getByRole("button", { name: "Allow", exact: true }),
+    ).toHaveClass(/btn-primary/);
     await expectNoAxeViolations(page);
-    // Only the question answers the keyboard: Tab goes round its three
-    // controls and never into the Run window beneath it.
-    await expect(policy).toBeFocused();
-    for (const next of [cancel, agree, policy]) {
-      await page.keyboard.press("Tab");
-      await expect(next).toBeFocused();
-    }
-    await page.keyboard.press("Shift+Tab");
-    await expect(agree).toBeFocused();
-    expect(starts).toEqual([]);
+    await card.getByRole("button", { name: "Allow", exact: true }).click();
+    await expect(card).toHaveCount(0);
+    expect((await aiReading())[ownerId]).toBe("allowed");
+    // Kept by the platform, so a new visit — any page — asks nothing.
+    await page.goto("/account/flows");
+    await expect(
+      automationCard(page, "Manual input automation").getByRole("button", {
+        name: "Run",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await page.waitForTimeout(500);
+    await expect(aiConsent(page)).toHaveCount(0);
   });
 
-  test("Cancel — or Escape, or a click outside it — starts nothing, keeps nothing, and leaves the Run window as it was", async ({
+  test("Not now keeps the answer as no; closed unanswered — Escape or a click outside — it saves nothing and asks again on the next visit", async ({
+    page,
+  }) => {
+    await fixtureControl("ai-reading-unasked");
+    for (const dismiss of [
+      () => page.keyboard.press("Escape"),
+      () => page.mouse.click(4, 4),
+    ]) {
+      await page.goto("/account/flows");
+      await expect(aiConsent(page)).toBeVisible();
+      await dismiss();
+      await expect(aiConsent(page)).toHaveCount(0);
+      expect((await aiReading())[ownerId]).toBeNull();
+    }
+    await page.goto("/account/flows");
+    await aiConsent(page)
+      .getByRole("button", { name: "Not now", exact: true })
+      .click();
+    await expect(aiConsent(page)).toHaveCount(0);
+    expect((await aiReading())[ownerId]).toBe("declined");
+    await page.reload();
+    await page.waitForTimeout(500);
+    await expect(aiConsent(page)).toHaveCount(0);
+  });
+
+  test("a save the platform refuses is said in the card, which stays to be answered again", async ({
+    page,
+  }) => {
+    await fixtureControl("ai-reading-unasked");
+    await fixtureControl("ai-reading-refusing");
+    await page.goto("/account");
+    const card = aiConsent(page);
+    await card.getByRole("button", { name: "Allow", exact: true }).click();
+    await expect(card.getByRole("alert")).toHaveText(
+      "Could not save your choice. Try again.",
+    );
+    await expect(card).toBeVisible();
+    expect((await aiReading())[ownerId]).toBeNull();
+    await card.getByRole("button", { name: "Allow", exact: true }).click();
+    await expect(card).toHaveCount(0);
+    expect((await aiReading())[ownerId]).toBe("allowed");
+  });
+
+  test("Settings › AI: the switch says the account's answer and changes it; a refused save moves it back, said in words", async ({
+    page,
+  }) => {
+    await page.goto("/account/settings");
+    await expect(
+      page.getByRole("heading", { name: "AI", exact: true }),
+    ).toBeVisible();
+    const toggle = page.getByRole("switch", { name: "AI reads documents" });
+    await expect(toggle).toBeChecked();
+    await expectNoAxeViolations(page);
+    await toggle.click();
+    await expect(toggle).not.toBeChecked();
+    await expect
+      .poll(async () => (await aiReading())[ownerId])
+      .toBe("declined");
+    await fixtureControl("ai-reading-refusing");
+    await toggle.click();
+    await expect(page.locator("main").getByRole("alert")).toHaveText(
+      "Could not save. Try again.",
+    );
+    await expect(toggle).not.toBeChecked();
+    expect((await aiReading())[ownerId]).toBe("declined");
+  });
+
+  test("allowed, a run with a file starts at once: the per-run question is gone", async ({
     page,
   }) => {
     const dialog = await withFile(page);
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(await fixtureFiles()).toEqual([
+      { filename: "invoice.pdf", sizeBytes: 24, runId: "fixture-run-started" },
+    ]);
+  });
+
+  test("never asked, a run with a file asks the card over the Run window: closed, nothing starts and the Run window is as it was; Allow starts the run it held, with its file", async ({
+    page,
+  }) => {
+    await fixtureControl("ai-reading-unasked");
+    const dialog = await withFile(page, { asked: true });
     const key = dialog.locator('input[name="idempotencyKey"]');
     const sent = await key.inputValue();
-    const starts = observe(page, isServerAction);
-    const consent = aiConsent(page);
     for (const dismiss of [
-      () =>
-        consent.getByRole("button", { name: "Cancel", exact: true }).click(),
       () => page.keyboard.press("Escape"),
       () => page.mouse.click(4, 4),
     ]) {
       await dialog.getByRole("button", { name: "Start run" }).click();
-      await expect(consent).toBeVisible();
+      await expect(aiConsent(page)).toBeVisible();
       await dismiss();
-      await expect(consent).toHaveCount(0);
+      await expect(aiConsent(page)).toHaveCount(0);
       await expect(dialog).toBeVisible();
       await expect(dialog.getByLabel("Vendor")).toHaveValue("Acme Supplies");
-      await expect(dialog.getByLabel("Amount")).toHaveValue("120.50");
-      await expect(dialog.getByLabel("Invoice reference")).toHaveValue(
-        "INV-1001",
-      );
       await expect(
         dialog.getByText("Ready: invoice.pdf (24 bytes)"),
       ).toBeVisible();
       await expect(key).toHaveValue(sent);
     }
-    expect(starts).toEqual([]);
-    expect(await keptConsents(page)).toEqual({});
-    // The file is chosen and given to no run.
+    // Nothing started, and nothing saved.
     expect(await fixtureFiles()).toEqual([
       { filename: "invoice.pdf", sizeBytes: 24 },
     ]);
-  });
-
-  test("Agree and start starts the run it held, with its file, and keeps the agreement for this person: their next run with a file is not asked", async ({
-    page,
-  }) => {
-    const dialog = await withFile(page);
-    const starts = observe(page, isServerAction);
+    expect((await aiReading())[ownerId]).toBeNull();
     await dialog.getByRole("button", { name: "Start run" }).click();
-    await agreeToAiConsent(page);
-    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
-    expect(starts).toHaveLength(1);
-    expect(await fixtureFiles()).toEqual([
-      { filename: "invoice.pdf", sizeBytes: 24, runId: "fixture-run-started" },
-    ]);
-    expect(await keptConsents(page)).toEqual({ [ownersConsent]: "agreed" });
-    // The next is sent at once: no question opens, and the start is on its
-    // way, held in flight.
-    const again = await withFile(page, "second.pdf");
-    const held = await holdRequest(page, "**/account/flows", isServerAction);
-    await again.getByRole("button", { name: "Start run" }).click();
-    await expect(aiConsent(page)).toHaveCount(0);
-    await held.arrived;
-    held.release();
-    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
-  });
-
-  test("a run with no file is never asked", async ({ page }) => {
-    const dialog = await openFilledRun(page);
-    const held = await holdRequest(page, "**/account/flows", isServerAction);
-    await dialog.getByRole("button", { name: "Start run" }).click();
-    await expect(aiConsent(page)).toHaveCount(0);
-    await held.arrived;
-    held.release();
-    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
-    expect(await keptConsents(page)).toEqual({});
-  });
-
-  test("the agreement is the person's: another person signed in to this browser is asked, and the one who agreed is not", async ({
-    page,
-  }) => {
-    await page.goto("/account/flows");
-    await page.evaluate(
-      (key) => localStorage.setItem(key, "agreed"),
-      ownersConsent,
-    );
-    await presentSession(page, "admin");
-    const admins = await withFile(page);
-    await admins.getByRole("button", { name: "Start run" }).click();
-    await expect(aiConsent(page)).toBeVisible();
     await aiConsent(page)
-      .getByRole("button", { name: "Cancel", exact: true })
+      .getByRole("button", { name: "Allow", exact: true })
       .click();
-    await presentSession(page, "owner");
-    const owners = await withFile(page, "second.pdf");
-    const held = await holdRequest(page, "**/account/flows", isServerAction);
-    await owners.getByRole("button", { name: "Start run" }).click();
-    await expect(aiConsent(page)).toHaveCount(0);
-    await held.arrived;
-    held.release();
     await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
-  });
-
-  test("a storage read that fails asks again: it is never taken for agreement", async ({
-    page,
-  }) => {
-    // This browser keeps the owner's agreement and refuses to read it back.
-    await page.addInitScript(() => {
-      const read = Storage.prototype.getItem;
-      Storage.prototype.getItem = function (this: Storage, key: string) {
-        if (String(key).startsWith("autom8x.ai-consent."))
-          throw new DOMException("refused", "SecurityError");
-        return read.call(this, key);
-      };
-    });
-    await page.goto("/account/flows");
-    await page.evaluate(
-      (key) => localStorage.setItem(key, "agreed"),
-      ownersConsent,
-    );
-    const dialog = await withFile(page);
-    const starts = observe(page, isServerAction);
-    await dialog.getByRole("button", { name: "Start run" }).click();
-    await expect(aiConsent(page)).toBeVisible();
-    expect(starts).toEqual([]);
-    await agreeToAiConsent(page);
-    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
-  });
-
-  test("a write that fails after Agree still starts that run, and the next run with a file asks again", async ({
-    page,
-  }) => {
-    // This browser cannot keep the agreement.
-    await page.addInitScript(() => {
-      const write = Storage.prototype.setItem;
-      Storage.prototype.setItem = function (
-        this: Storage,
-        key: string,
-        value: string,
-      ) {
-        if (String(key).startsWith("autom8x.ai-consent."))
-          throw new DOMException("full", "QuotaExceededError");
-        return write.call(this, key, value);
-      };
-    });
-    const dialog = await withFile(page);
-    await dialog.getByRole("button", { name: "Start run" }).click();
-    await agreeToAiConsent(page);
-    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
+    expect((await aiReading())[ownerId]).toBe("allowed");
     expect(await fixtureFiles()).toEqual([
       { filename: "invoice.pdf", sizeBytes: 24, runId: "fixture-run-started" },
     ]);
-    expect(await keptConsents(page)).toEqual({});
-    const again = await withFile(page, "second.pdf");
-    await again.getByRole("button", { name: "Start run" }).click();
-    await expect(aiConsent(page)).toBeVisible();
   });
 
-  test("while the question is open no second start goes out — not the form sent again, not an agreement kept meanwhile from another tab", async ({
+  test("Not now over the Run window starts nothing; Start run then says AI reading is off, and its Turn on allows it and starts the run with its file", async ({
     page,
   }) => {
-    const dialog = await withFile(page);
-    const starts = observe(page, isServerAction);
+    await fixtureControl("ai-reading-unasked");
+    const dialog = await withFile(page, { asked: true });
+    await expect(dialog.getByText("AI reading is off.")).toHaveCount(0);
     await dialog.getByRole("button", { name: "Start run" }).click();
-    await expect(aiConsent(page)).toBeVisible();
-    // Another tab agrees meanwhile, and the form beneath is sent again:
-    // Enter in one of its fields.
-    await page.evaluate(
-      (key) => localStorage.setItem(key, "agreed"),
-      ownersConsent,
-    );
-    await dialog.getByLabel("Invoice reference").press("Enter");
-    await page.waitForTimeout(1_000);
-    expect(starts).toEqual([]);
-    await expect(aiConsent(page)).toHaveCount(1);
-    // Agreed here: one start, the run the question held.
-    await agreeToAiConsent(page);
+    await aiConsent(page)
+      .getByRole("button", { name: "Not now", exact: true })
+      .click();
+    await expect(aiConsent(page)).toHaveCount(0);
+    expect((await aiReading())[ownerId]).toBe("declined");
+    await expect(dialog.getByText("AI reading is off.")).toBeVisible();
+    const turnOn = dialog.getByRole("button", { name: "Turn on" });
+    // Start run again starts nothing and asks nothing: Turn on is the way.
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await expect(turnOn).toBeFocused();
+    await expect(aiConsent(page)).toHaveCount(0);
+    await expect(page).toHaveURL(/\/account\/flows$/);
+    expect(await fixtureFiles()).toEqual([
+      { filename: "invoice.pdf", sizeBytes: 24 },
+    ]);
+    await expectNoAxeViolations(page);
+    await turnOn.click();
     await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
-    expect(starts).toHaveLength(1);
+    expect((await aiReading())[ownerId]).toBe("allowed");
+    expect(await fixtureFiles()).toEqual([
+      { filename: "invoice.pdf", sizeBytes: 24, runId: "fixture-run-started" },
+    ]);
   });
 
-  test("a page left while the question is open over the Run window scrolls again: the two close together", async ({
+  test("with AI reading off, a run with no file starts as it is", async ({
+    page,
+  }) => {
+    await fixtureControl("ai-reading-declined");
+    await openFilledRun(page);
+    const dialog = page.getByRole("dialog", {
+      name: "Run Manual input automation",
+    });
+    await expect(dialog.getByText("AI reading is off.")).toBeVisible();
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
+  });
+
+  test("a page left while the card is open over the Run window scrolls again: the two close together", async ({
     page,
   }) => {
     // Reached in the page, so going back is the app's own navigation and
     // both dialogs close in one render.
+    await fixtureControl("ai-reading-unasked");
     await page.goto("/account");
+    await expect(aiConsent(page)).toBeVisible();
+    await page.keyboard.press("Escape");
     await page
       .getByRole("complementary", { name: "Dashboard navigation" })
       .getByRole("link", { name: "Flows", exact: true })
@@ -2360,21 +2340,17 @@ test("a danger button keeps AA contrast at rest, hovered and pressed: Archive fl
   await page.mouse.up();
 });
 
-test("a flow is held once per workspace: its card, whatever teams are left, offers no team and no Add and says where the flow is, going to it; a flow held nowhere is offered every team, never the whole workspace (the owner's build 12, #9; register F87, superseding F21's offer)", async ({
+test("a flow is held once per workspace: its row says its team, and its card says Added ✓, going to it, with no Add (the owner's build 12, #9; spec §3.A)", async ({
   page,
 }) => {
-  // A second team, so a team is left that a held flow is not in: the
-  // fixture's general, and Operations.
-  await createOperationsTeam(page);
-
   await page.goto("/account/flows");
   // In the general team, as a draft: its row says where, and the card offers
-  // nothing — not Operations — but says where the flow is, going to its row.
+  // no Add but says it is added, going to its row.
   const draft = automationCard(page, "Team draft automation");
   await expect(draft.locator("p", { hasText: "Team: general" })).toBeVisible();
   await expect(draft.getByRole("combobox")).toHaveCount(0);
   await expect(draft.getByRole("button", { name: "Add" })).toHaveCount(0);
-  const held = draft.getByRole("link", { name: "Added · Team: general" });
+  const held = draft.getByRole("link", { name: "Added ✓" });
   await expect(held).toHaveAttribute(
     "href",
     "#flow-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
@@ -2384,113 +2360,90 @@ test("a flow is held once per workspace: its card, whatever teams are left, offe
   await expect(page).toHaveURL(/#flow-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb$/u);
   const row = page.locator("#flow-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
   await expect(row).toContainText("Team: general");
-  await expect(row.getByRole("button", { name: "Go live" })).toBeVisible();
+  await expect(row.getByRole("button", { name: "Turn on" })).toBeVisible();
+});
 
-  // Held nowhere: both teams are offered, and the whole workspace is not.
+test("Add sends no team: the flow goes to the team of its category, which the platform makes when the workspace has none, and Teams then lists it (backend ADR-0036; the owner, 2026-10-14)", async ({
+  page,
+}) => {
+  await page.goto("/account/flows");
+  await expect(
+    page.locator("main").getByText("Ready-made flows for your teams.", {
+      exact: true,
+    }),
+  ).toBeVisible();
   const card = automationCard(page, "Project automation");
-  const where = card.getByRole("combobox", {
-    name: "Where to add Project automation",
-  });
-  await expect(where.locator("option")).toHaveText([
-    "Team: general",
-    "Team: Operations",
-  ]);
-  await expect(card.getByRole("link", { name: /^Added · /u })).toHaveCount(0);
-  await where.selectOption({ label: "Team: Operations" });
+  // Its category, its price, and no version (spec §3.A, S9).
+  await expect(card).toContainText("Operations");
+  await expect(card).toContainText("Included");
+  await expect(card).not.toContainText("Version");
+  await expect(card.getByRole("combobox")).toHaveCount(0);
+  await expect(card.getByRole("link", { name: "Added ✓" })).toHaveCount(0);
   await card.getByRole("button", { name: "Add" }).click();
-  // Added: its row says where, and the card now offers nothing — not the
-  // general team either — and says where the flow is.
   await expect(
     card.locator("p", { hasText: "Team: Operations" }),
   ).toBeVisible();
-  await expect(
-    card.getByRole("link", { name: "Added · Team: Operations" }),
-  ).toBeVisible();
-  await expect(card.getByRole("combobox")).toHaveCount(0);
+  await expect(card.getByRole("link", { name: "Added ✓" })).toBeVisible();
   await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
-  await expect(card.locator("p", { hasText: "Whole workspace" })).toHaveCount(
-    0,
-  );
   await expect(card.getByRole("alert")).toHaveCount(0);
+  // The platform made the team, named by its kind.
+  expect(await createdTeams()).toEqual([
+    {
+      workspaceId: organizationWorkspaceId,
+      name: "Operations",
+      type: "Operations",
+    },
+  ]);
+  await page.goto("/account/teams");
+  await expect(page.getByRole("link", { name: /Operations/ })).toBeVisible();
 });
 
-test("Add on a page drawn before another tab added that flow is refused in words, and no second copy is made — though the platform would still take another team (the owner's build 12, #9; register F87)", async ({
+test("Add on a page drawn before another tab added that flow is refused in words, and no second copy is made (the owner's build 12, #9; register F87)", async ({
   page,
   context,
 }) => {
-  await createOperationsTeam(page);
   await page.goto("/account/flows");
   const card = automationCard(page, "Project automation");
-  const where = card.getByRole("combobox", {
-    name: "Where to add Project automation",
-  });
-  await expect(where.locator("option")).toHaveText([
-    "Team: general",
-    "Team: Operations",
-  ]);
+  await expect(card.getByRole("button", { name: "Add" })).toBeVisible();
 
-  // Another tab adds it to the general team.
   const other = await context.newPage();
   try {
     await other.goto("/account/flows");
     const there = automationCard(other, "Project automation");
-    await there
-      .getByRole("combobox", { name: "Where to add Project automation" })
-      .selectOption({ label: "Team: general" });
     await there.getByRole("button", { name: "Add" }).click();
-    await expect(
-      there.getByRole("link", { name: "Added · Team: general" }),
-    ).toBeVisible();
+    await expect(there.getByRole("link", { name: "Added ✓" })).toBeVisible();
   } finally {
     await other.close();
   }
 
-  // This page still offers both teams, and the platform — one per team until
-  // its own guard lands — would take Operations.
-  await where.selectOption({ label: "Team: Operations" });
   await card.getByRole("button", { name: "Add" }).click();
   await expect(card.getByRole("alert")).toHaveText(
     "This flow is already in this workspace.",
   );
-
-  // Nothing was sent: read again, the flow is in the general team alone.
+  // Nothing was sent: read again, the flow is in its team once.
   await page.reload();
-  await expect(card.locator("p", { hasText: "Team: general" })).toBeVisible();
   await expect(card.locator("p", { hasText: "Team: Operations" })).toHaveCount(
-    0,
+    1,
   );
-  await expect(
-    card.getByRole("link", { name: "Added · Team: general" }),
-  ).toBeVisible();
+  await expect(card.getByRole("link", { name: "Added ✓" })).toBeVisible();
   await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
 });
 
-test("a flow held twice from before one flow per workspace keeps both copies listed, each under its place, and its card offers nothing more (the owner's build 12, #9; register F87)", async ({
+test("a flow held twice from before one flow per workspace keeps both copies listed, each under its place, and its card says Added ✓ once (the owner's build 12, #9; register F87)", async ({
   page,
 }) => {
-  // As production's one duplicate: a team's copy and the whole workspace's.
-  // Nothing deletes or hides either; Operations, a team neither is in, is
-  // not offered.
   await fixtureControl("flow-held-twice");
-  await createOperationsTeam(page);
   await page.goto("/account/flows");
   const card = automationCard(page, "Project automation");
   await expect(card.locator("p", { hasText: "Team: general" })).toBeVisible();
   await expect(card.locator("p", { hasText: "Whole workspace" })).toBeVisible();
-  await expect(card.getByRole("combobox")).toHaveCount(0);
+  await expect(card.getByRole("link", { name: "Added ✓" })).toHaveCount(1);
   await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
-  // The newer copy, listed first, is the one named.
-  await expect(card.getByRole("link", { name: /^Added · /u })).toHaveText(
-    "Added · Team: general",
-  );
 });
 
-test("Unarchive on an archived flow adds it afresh by its card's own Add — a team required, the card's teams offered — and the row then says where the flow is, going to it, with no Unarchive (the owner's build 12, #4 and #9; register F87)", async ({
+test("Unarchive adds an archived flow afresh by its card's own Add, to the team of its category, and the row then says Added ✓, going to it (the owner's build 12, #4 and #9; backend ADR-0036)", async ({
   page,
 }) => {
-  // Two teams, so a flow archived from the whole workspace has a team to
-  // choose: a team is required (the owner's build 10).
-  await createOperationsTeam(page);
   await page.goto("/account/flows");
   const card = automationCard(page, "Archivable automation");
   await card.getByRole("button", { name: "Archive flow" }).click();
@@ -2500,8 +2453,6 @@ test("Unarchive on an archived flow adds it afresh by its card's own Add — a t
     .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // Held nowhere: the row offers Unarchive, named for its flow, with the teams
-  // its card's Add offers — never the whole workspace it was in.
   const row = page
     .locator("main li")
     .filter({ hasText: "Archivable automation" });
@@ -2510,114 +2461,342 @@ test("Unarchive on an archived flow adds it afresh by its card's own Add — a t
     name: "Unarchive Archivable automation",
   });
   await expect(unarchive).toHaveText("Unarchive");
-  const where = row.getByRole("combobox", {
-    name: "Where to unarchive Archivable automation",
-  });
-  await expect(where.locator("option")).toHaveText([
-    "Team: general",
-    "Team: Operations",
-  ]);
-  await expect(row.getByRole("link", { name: /^Added · /u })).toHaveCount(0);
+  await expect(row.getByRole("combobox")).toHaveCount(0);
+  await expect(row.getByRole("link", { name: "Added ✓" })).toHaveCount(0);
   await expectNoAxeViolations(page);
-  await where.selectOption({ label: "Team: Operations" });
   await unarchive.click();
 
-  // A fresh copy, in Operations. The row, held now, says where it is and goes
-  // to it, and offers Unarchive no more; the card lists the copy and says the
-  // same. The archived row stays: the archive is one-way.
-  const added = row.getByRole("link", { name: "Added · Team: Operations" });
+  const added = row.getByRole("link", { name: "Added ✓" });
   await expect(added).toHaveAttribute(
     "href",
     "#flow-a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2",
   );
   await expect(row.getByRole("button")).toHaveCount(0);
-  await expect(row.getByRole("combobox")).toHaveCount(0);
   await expect(
     card.locator("p", { hasText: "Team: Operations" }),
-  ).toBeVisible();
-  await expect(
-    card.getByRole("link", { name: "Added · Team: Operations" }),
   ).toBeVisible();
   await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
   await added.click();
   await expect(page).toHaveURL(/#flow-a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2$/u);
-  await expect(
-    page.locator("#flow-a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2"),
-  ).toContainText("Team: Operations");
-
-  // Read again: the platform's list says the same.
   await page.reload();
   await expect(row).toContainText("Archived Sep 30, 2026");
-  await expect(
-    row.getByRole("link", { name: "Added · Team: Operations" }),
-  ).toBeVisible();
-  await expect(row.getByRole("button")).toHaveCount(0);
+  await expect(row.getByRole("link", { name: "Added ✓" })).toBeVisible();
 });
 
-test("with no team yet, no flow can be added: an owner or admin is told to create a team first, with the way to Teams, and a plain member who does (the owner's build 10)", async ({
+test("an Add the platform refuses — a team it could not find or make, or its team service not answering — is said in the spec's words (backend ADR-0036; spec §3.A)", async ({
+  page,
+}) => {
+  for (const refusal of ["add-not-found", "add-team-service-down"]) {
+    await fixtureControl(refusal);
+    await page.goto("/account/flows");
+    const card = automationCard(page, "Project automation");
+    await card.getByRole("button", { name: "Add" }).click();
+    await expect(card.getByRole("alert")).toHaveText(
+      "Could not add this flow. Try again.",
+    );
+    await expect(card.getByRole("button", { name: "Add" })).toBeVisible();
+  }
+  expect(await createdTeams()).toEqual([]);
+});
+
+test("with no team yet, anyone in the workspace adds a flow and its team is made — no Create a team, no Ask to join (backend ADR-0036; the owner, 2026-10-14)", async ({
   page,
 }) => {
   await fixtureControl("org-without-projects");
-  await page.goto("/account/flows");
-  const card = automationCard(page, "Project automation");
-  await expect(card.getByText("Create a team first.")).toBeVisible();
-  const create = card.getByRole("link", { name: "Create a team" });
-  await expect(create).toHaveAttribute("href", "/account/teams");
-  await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
-  await expect(card.getByRole("combobox")).toHaveCount(0);
-  // A flow the workspace holds already says where it is instead: held, there
-  // is nothing to add, team or none (the owner's build 12, #9).
-  const manual = automationCard(page, "Manual input automation");
-  await expect(
-    manual.locator("p", { hasText: "Whole workspace" }),
-  ).toBeVisible();
-  await expect(
-    manual.getByRole("link", { name: "Added · Whole workspace" }),
-  ).toBeVisible();
-  await expect(manual.getByText("Create a team first.")).toHaveCount(0);
-  await expectNoAxeViolations(page);
-  await create.click();
-  await expect(page).toHaveURL(/\/account\/teams$/);
-  await expect(
-    page.locator("main").getByRole("heading", { name: "No teams yet" }),
-  ).toBeVisible();
-
-  // A plain member cannot make one, and is told who does — and offered nothing.
   await presentSession(page, "member");
   await page.goto("/account/flows");
+  const main = page.locator("main");
+  for (const gone of [
+    "Create a team first.",
+    "Create a team",
+    "An owner or admin creates the first team.",
+    "Ask to join a team first.",
+    "See teams",
+    "Add to",
+    "Pick a team.",
+  ]) {
+    await expect(main).not.toContainText(gone);
+  }
+  await expectNoAxeViolations(page);
+  const card = automationCard(page, "Project automation");
+  await card.getByRole("button", { name: "Add" }).click();
   await expect(
-    card.getByText("An owner or admin creates the first team."),
+    card.locator("p", { hasText: "Team: Operations" }),
   ).toBeVisible();
-  await expect(card.getByText("Create a team first.")).toHaveCount(0);
-  await expect(card.getByRole("link", { name: "Create a team" })).toHaveCount(
-    0,
+});
+
+// Invoice Processing (backend ADR-0036–0038; the spec's §2.1): a flow whose
+// QuickBooks is optional, chosen on its vendor page.
+const invoiceFlow = "f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1";
+const vendorPage = `/account/flows/${invoiceFlow}/vendor`;
+
+async function invoiceSettings() {
+  return (
+    await fixtureRead<{ invoiceConfig: Record<string, unknown> }>("counts")
+  ).invoiceConfig;
+}
+
+test("Invoice Processing's card and Set up say the spec's words: its category, Included, its team, and numbered sections — Connect, Settings, Email — the vendor first (spec §3.A–§3.B)", async ({
+  page,
+}) => {
+  await page.goto("/account/flows");
+  const card = automationCard(page, "Invoice Processing");
+  await expect(card).toContainText("Accounting");
+  await expect(card).toContainText("Included");
+  await expect(card).not.toContainText(/Version|v2/u);
+  await expect(
+    card.locator("p", { hasText: "Team: Accounting" }),
+  ).toBeVisible();
+  await card.getByRole("button", { name: "Set up" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Set up Invoice Processing",
+  });
+  await expect(dialog).toHaveAccessibleDescription("Team: Accounting");
+  await expect(dialog.getByRole("heading", { level: 3 })).toHaveText([
+    "Connect",
+    "Settings",
+    "Email",
+  ]);
+  for (const number of ["01", "02", "03"]) {
+    await expect(dialog.getByText(number, { exact: true })).toBeVisible();
+  }
+  const connect = dialog.getByRole("group", { name: "Connect" });
+  await expect(connect).toContainText("None");
+  await expect(
+    connect.getByRole("link", { name: "Connect vendor" }),
+  ).toHaveAttribute("href", vendorPage);
+  await expect(dialog.getByLabel("Approval limit")).toHaveValue("500");
+  await expect(dialog.getByRole("group", { name: "Settings" })).toContainText(
+    "Amounts over this wait for approval.",
   );
-  await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
+  await expect(dialog.getByRole("group", { name: "Email" })).toContainText(
+    "Gets a short summary of each one.",
+  );
+  await expect(dialog.getByText("Optional", { exact: true })).toHaveCount(2);
+  await expectNoAxeViolations(page);
+  await dialog.getByLabel("Also email").fill("books@example.test");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // Saved whole, the vendor choice kept as it was.
+  expect(await invoiceSettings()).toEqual({
+    vendor: "none",
+    holdAboveAmount: 500,
+    notifyEmail: "books@example.test",
+  });
+});
+
+test("the Connect vendor page shows each vendor by its own logo, and None; Intuit's own button connects QuickBooks; a member is told who connects it (spec §3.C, §4)", async ({
+  page,
+}) => {
+  await page.goto(vendorPage);
+  const main = page.locator("main");
+  await expect(
+    main.getByRole("heading", { name: "Connect vendor", level: 1 }),
+  ).toBeVisible();
+  await expect(main).toContainText("For Invoice Processing");
+  const radios = main.getByRole("radio");
+  await expect(radios).toHaveCount(2);
+  // QuickBooks by its logo alone — the reversed one on the dark ground, 24
+  // tall — and no name beside it.
+  const quickbooks = main.getByRole("radio", { name: /QuickBooks/u });
+  await expect(quickbooks).toBeDisabled();
+  const logo = main.locator('img[src="/vendors/quickbooks-logo-reversed.png"]');
+  await expect(logo).toBeVisible();
+  expect((await logo.boundingBox())?.height).toBe(24);
+  await expect(
+    main.locator('img[src="/vendors/quickbooks-logo.png"]'),
+  ).toBeHidden();
+  await expect(main).not.toContainText("QuickBooks Online");
+  const none = main.getByRole("radio", { name: /None/u });
+  await expect(none).toBeChecked();
+  await expect(main).toContainText("Save the details only.");
+  const connect = main.getByRole("button", { name: "Connect to QuickBooks" });
+  await expect(connect).toBeVisible();
+  await expect(connect.locator("img").first()).toHaveAttribute(
+    "src",
+    "/vendors/connect-to-quickbooks.svg",
+  );
+  await expectNoAxeViolations(page);
+
+  await presentSession(page, "member");
+  await page.reload();
+  await expect(main).toContainText("Ask an owner or admin to connect it.");
+  await expect(
+    main.getByRole("button", { name: "Connect to QuickBooks" }),
+  ).toHaveCount(0);
+});
+
+test("Connect to QuickBooks goes to Intuit and back to the vendor page, where QuickBooks is the choice; Save keeps it as the flow's setting, and Connections shows its logo and Disconnect from QuickBooks (spec §3.C, §3.I)", async ({
+  page,
+}) => {
+  await page.goto(vendorPage);
+  await page
+    .locator("main")
+    .getByRole("button", { name: "Connect to QuickBooks" })
+    .click();
+  // Through the platform's callback landing and Connections, back here.
+  await expect(page).toHaveURL(
+    new RegExp(`${vendorPage}\\?status=connected$`, "u"),
+  );
+  const main = page.locator("main");
+  const quickbooks = main.getByRole("radio", { name: /QuickBooks/u });
+  await expect(quickbooks).toBeChecked();
+  await expect(main).toContainText("Connected");
+  await expect(
+    main.getByRole("button", { name: "Disconnect from QuickBooks" }),
+  ).toBeVisible();
+  await expect(
+    main.getByRole("button", { name: "Connect to QuickBooks" }),
+  ).toHaveCount(0);
+  await main.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page).toHaveURL(
+    new RegExp(`/account/flows#flow-${invoiceFlow}$`, "u"),
+  );
+  // Every other setting kept: the platform replaces them whole.
+  expect(await invoiceSettings()).toEqual({
+    vendor: "quickbooks",
+    holdAboveAmount: 500,
+  });
+  const card = automationCard(page, "Invoice Processing");
+  await card.getByRole("button", { name: "Set up" }).click();
+  const setup = page.getByRole("dialog", { name: "Set up Invoice Processing" });
+  await expect(
+    setup.locator('img[src="/vendors/quickbooks-logo-reversed.png"]'),
+  ).toBeVisible();
+  await expect(setup).not.toContainText("Not connected");
+  await setup.getByRole("button", { name: "Cancel" }).click();
+
+  await page.goto("/account/connections");
+  await expect(main).not.toContainText(
+    "Only providers configured for this deployment are shown.",
+  );
+  await expect(main).not.toContainText("quickbooks ·");
+  await expect(
+    main.getByRole("button", { name: "Disconnect from QuickBooks" }),
+  ).toBeVisible();
+  // Connected, Intuit's button is hidden (its technical requirement 1.1).
+  await expect(
+    main.getByRole("button", { name: "Connect to QuickBooks" }),
+  ).toHaveCount(0);
   await expectNoAxeViolations(page);
 });
 
-test("a plain member on no team, in an organization that has one, is told to ask to join it — not that the first team is still to be made (the owner's build 10; the change audit)", async ({
+test("a vendor chosen and not connected is said: the card's line goes to the vendor page, Turn on waits, and Set up says Not connected (spec §3.B, §3.D)", async ({
   page,
 }) => {
-  await fixtureControl("org-without-projects");
-  await createOperationsTeam(page);
-  await presentSession(page, "member");
-  await page.goto("/account/flows");
-  const card = automationCard(page, "Project automation");
-  await expect(card.getByText("Ask to join a team first.")).toBeVisible();
+  await fixtureControl("quickbooks-connected");
+  await fixtureControl("invoice-paused");
+  await page.goto(vendorPage);
+  const main = page.locator("main");
+  // A tap on the row chooses it.
+  await main
+    .locator('img[src="/vendors/quickbooks-logo-reversed.png"]')
+    .click();
+  await expect(main.getByRole("radio", { name: /QuickBooks/u })).toBeChecked();
+  await main.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page).toHaveURL(
+    new RegExp(`/account/flows#flow-${invoiceFlow}$`, "u"),
+  );
+  // Disconnected again on the vendor page, in Intuit's words.
+  await page.goto(vendorPage);
+  await main
+    .getByRole("button", { name: "Disconnect from QuickBooks" })
+    .click();
   await expect(
-    card.getByText("An owner or admin creates the first team."),
-  ).toHaveCount(0);
-  await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
-  await expect(card.getByRole("combobox")).toHaveCount(0);
-  await expectNoAxeViolations(page);
-  const teams = card.getByRole("link", { name: "See teams" });
-  await expect(teams).toHaveAttribute("href", "/account/teams");
-  await teams.click();
-  await expect(page).toHaveURL(/\/account\/teams$/);
-  await expect(
-    page.locator("main li").filter({ hasText: "Operations" }),
+    main.getByRole("button", { name: "Connect to QuickBooks" }),
   ).toBeVisible();
+  await page.goto("/account/flows");
+  const card = automationCard(page, "Invoice Processing");
+  const line = card.getByRole("link", {
+    name: "Connect QuickBooks Online first, or choose None.",
+  });
+  await expect(line).toHaveAttribute("href", vendorPage);
+  await expect(card.getByRole("button", { name: "Turn on" })).toBeDisabled();
+  await card.getByRole("button", { name: "Set up" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Set up Invoice Processing" }),
+  ).toContainText("Not connected");
+});
+
+test("a finished run of a grouped flow shows its progress by group — never a step's id, never Not run — and the details it saved (spec §3.E; backend ADR-0037)", async ({
+  page,
+}) => {
+  await page.goto("/account/runs/fixture-run-invoice");
+  const main = page.locator("main");
+  await expect(main).toContainText("Invoice Processing");
+  await expect(main).not.toContainText("fixture-invoice");
+  await expect(main).toContainText("Saved: Acme Supplies, $120.00.");
+  await expect(
+    main.getByRole("heading", { name: "Progress", exact: true }),
+  ).toBeVisible();
+  const rows = main.locator("ol > li");
+  await expect(rows).toHaveCount(4);
+  await expect(rows.locator("p.font-medium")).toHaveText([
+    "Received",
+    "Read",
+    "Checked",
+    "Done",
+  ]);
+  await expect(rows.nth(1)).toContainText("Second read matches");
+  for (const gone of ["Not run", "check-document", "verify-read", "Emailed"]) {
+    await expect(main).not.toContainText(gone);
+  }
+  await expect(
+    main.getByRole("heading", { name: "Details", exact: true }),
+  ).toBeVisible();
+  await expect(main.locator("dt")).toHaveText([
+    "Started",
+    "Ended",
+    "Trigger",
+    "Type",
+    "Seller",
+    "Total",
+    "Category",
+  ]);
+  await expect(main.locator("dd").nth(5)).toHaveText("$120.00");
+  await expectNoAxeViolations(page);
+
+  // A run still going: its steps as they came, titled by their line — the
+  // flow declares no groups — and a last row saying it is working.
+  await page.goto("/account/runs/fixture-run-running");
+  await expect(main.locator("ol > li").last()).toHaveText("Working…");
+  await expect(main).not.toContainText("validate-input");
+  await expect(
+    main.getByRole("heading", { name: "Details", exact: true }),
+  ).toHaveCount(0);
+});
+
+test.describe("Invoice Processing's Run window", () => {
+  // The browser PUTs the file straight to the fixture's object store.
+  test.use({ ignoreHTTPSErrors: true });
+
+  test("the file field in the manifest's words, Upload, no (optional), and the run started with its file (spec §3.D)", async ({
+    page,
+  }) => {
+    await page.goto("/account/flows");
+    await automationCard(page, "Invoice Processing")
+      .getByRole("button", { name: "Run", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog", { name: "Run Invoice Processing" });
+    await expect(dialog).toHaveAccessibleDescription(
+      "Fill this in, then start the run.",
+    );
+    await expect(dialog).toContainText("Document");
+    await expect(dialog).toContainText("A PDF or photo of a bill or receipt.");
+    await expect(dialog).not.toContainText("(optional)");
+    await expect(
+      dialog.getByRole("button", { name: "Upload for Document" }),
+    ).toBeVisible();
+    await expectNoAxeViolations(page);
+    await dialog.getByLabel("Document").setInputFiles(invoicePdf);
+    await expect(
+      dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+    ).toBeVisible();
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await expect(page).toHaveURL(
+      /\/account\/runs\/fixture-run-invoice-started$/,
+    );
+  });
 });
 
 test("a catalog with nothing to add is the app's empty screen — No flows to add yet — not a line in the section (the owner's build 10)", async ({
@@ -2751,7 +2930,7 @@ test("a figure the platform cannot answer reads Unavailable, and the rest of the
       .locator("dt", { hasText: term })
       .locator("xpath=following-sibling::dd[1]");
   await expect(figure("Runs this month")).toHaveText("Unavailable");
-  await expect(figure("Flows")).toHaveText("4");
+  await expect(figure("Flows")).toHaveText("5");
   await expect(figure("Integrations")).toHaveText("1");
   await expect(
     page.getByRole("link", { name: "Run of Manual input automation, running" }),
@@ -2795,9 +2974,10 @@ test("the dashboard shows the workspace's own numbers and names its recent runs 
     page
       .locator("dt", { hasText: term })
       .locator("xpath=following-sibling::dd[1]");
-  // Four subscriptions that are not archived; the platform's tally of this
-  // month's runs; the one connected integration.
-  await expect(figure("Flows")).toHaveText("4");
+  // Five subscriptions that are not archived — Invoice Processing's among
+  // them; the platform's tally of this month's runs; the one connected
+  // integration.
+  await expect(figure("Flows")).toHaveText("5");
   await expect(figure("Runs this month")).toHaveText(
     "3 · 1 succeeded · 1 failed",
   );
@@ -3502,104 +3682,34 @@ async function createdTeams() {
   ).createdTeams;
 }
 
-test("Create a team is the kind alone, made where the person is working: Other opens a field, words too short are refused, and the team made opens its page, titled by its kind (BUILD-PLAN 24.11.11, the owner's build 9)", async ({
+test("no one creates a team: Teams, its empty screen and the dashboard offer no Create a team — to an owner, an admin or a member (backend ADR-0036; the owner, 2026-10-14)", async ({
   page,
 }) => {
+  const main = page.locator("main");
+  for (const session of ["admin", "member", "owner"] as const) {
+    await presentSession(page, session);
+    await page.goto("/account/teams");
+    await expect(page.getByRole("link", { name: /general/ })).toBeVisible();
+    await expect(main).not.toContainText("Create a team");
+  }
+  // With no team at all: the empty screen, and nothing to create.
+  await fixtureControl("org-without-projects");
   await page.goto("/account/teams");
-  await page
-    .locator("main")
-    .getByRole("button", { name: "Create a team" })
-    .click();
-  const dialog = page.getByRole("dialog", { name: "Create a team" });
-  // One line says where it goes; there is no picker, name or description.
-  await expect(dialog).toContainText("In Fixture Organization.");
-  await expect(dialog.getByRole("combobox")).toHaveCount(1);
-  await expect(dialog.getByRole("textbox")).toHaveCount(0);
-  const kind = dialog.getByLabel("Kind of team", { exact: true });
-  await expect(kind).toBeFocused();
-  await expect(kind.locator("option")).toContainText([
-    "HR",
-    "Accounting",
-    "Finance",
-    "Legal",
-    "Research",
-    "Other",
-  ]);
-  await expect(dialog.getByLabel("What kind of team")).toHaveCount(0);
-  await kind.selectOption("Other");
-  const other = dialog.getByLabel("What kind of team");
-  await expect(other).toBeVisible();
-  await expect(other).toHaveAttribute("placeholder", "Facilities");
-  await expect(other).toHaveAttribute("minlength", "2");
-  await expect(other).toHaveAttribute("maxlength", "60");
+  await expect(
+    main.getByRole("heading", { name: "No teams yet" }),
+  ).toBeVisible();
+  await expect(
+    main.getByText("A team has its own flows and its own people."),
+  ).toBeVisible();
+  await expect(main.getByRole("button")).toHaveCount(0);
   await expectNoAxeViolations(page);
-
-  // Words that trim to nothing pass the field, and the server refuses them.
-  await other.fill("   ");
-  await dialog.getByRole("button", { name: "Create team" }).click();
-  await expect(dialog.getByRole("alert")).toHaveText(
-    "Say what kind of team it is, in 2 to 60 characters.",
-  );
-
-  await other.fill("Facilities");
-  await dialog.getByRole("button", { name: "Create team" }).click();
-  await expect(page.getByRole("dialog", { name: "Team created" })).toHaveText(
-    /Your team is ready\. Add people on its page\./u,
-  );
-  await page.getByRole("button", { name: "Done" }).click();
-  await expect(page).toHaveURL(/\/account\/teams\/55555550-/);
-  // Titled by its kind, which is not said a second time under it.
-  await expect(
-    page.getByRole("heading", { name: "Facilities", level: 1 }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Fixture Organization · You are its owner", {
-      exact: true,
-    }),
-  ).toBeVisible();
-  // The kind is sent as the team's name and its type.
-  expect(await createdTeams()).toEqual([
-    {
-      workspaceId: organizationWorkspaceId,
-      name: "Facilities",
-      type: "Facilities",
-    },
-  ]);
+  await page.goto("/account");
+  await expect(main.getByText("No teams yet.")).toBeVisible();
+  await expect(main).not.toContainText("Create a team");
+  expect(await createdTeams()).toEqual([]);
 });
 
-test("Create a team closes on Escape, asks for the list once as Done does, and sends the kind picked (register F77)", async ({
-  page,
-}) => {
-  const actions = observe(page, isServerAction);
-  await page.goto("/account/teams");
-  await page
-    .locator("main")
-    .getByRole("button", { name: "Create a team" })
-    .click();
-  const dialog = page.getByRole("dialog", { name: "Create a team" });
-  await dialog
-    .getByLabel("Kind of team", { exact: true })
-    .selectOption("Finance");
-  await dialog.getByRole("button", { name: "Create team" }).click();
-  await expect(
-    page.getByRole("dialog", { name: "Team created" }),
-  ).toBeVisible();
-  const before = actions.length;
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page).toHaveURL(/\/account\/teams\/55555550-/);
-  await expect(
-    page.getByRole("heading", { name: "Finance", level: 1 }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Fixture Organization · You are its owner", {
-      exact: true,
-    }),
-  ).toBeVisible();
-  expect(actions.length - before).toBe(1);
-});
-
-test("the dashboard titles a team by its kind, and offers Create a team only to an owner or admin (the owner's build 9)", async ({
+test("the dashboard titles a team by its kind (the owner's build 9)", async ({
   page,
 }) => {
   await page.goto("/account");
@@ -3608,199 +3718,6 @@ test("the dashboard titles a team by its kind, and offers Create a team only to 
   // dashboard titles it by its kind, as every team list does.
   await expect(main.getByRole("link", { name: /general/ })).toBeVisible();
   await expect(main).not.toContainText("Fixture Project");
-
-  // With no team, Create a team is the owner's and the admin's alone.
-  await fixtureControl("org-without-projects");
-  await page.goto("/account");
-  await expect(main.getByText("No teams yet.")).toBeVisible();
-  await expect(main.getByRole("link", { name: "Create a team" })).toBeVisible();
-  await presentSession(page, "member");
-  await page.goto("/account");
-  await expect(main.getByText("No teams yet.")).toBeVisible();
-  await expect(main.getByRole("link", { name: "Create a team" })).toHaveCount(
-    0,
-  );
-});
-
-test("an organization with no team yet shows the empty screen, whose one Create a team makes its first in the organization being worked in (register F57, the owner's build 9)", async ({
-  page,
-}) => {
-  await fixtureControl("org-without-projects");
-  await page.goto("/account/teams");
-  const main = page.locator("main");
-  await expect(
-    main.getByRole("heading", { name: "No teams yet" }),
-  ).toBeVisible();
-  await expect(
-    main.getByText("A team has its own flows and its own people."),
-  ).toBeVisible();
-  // The empty screen's Create is the only one: the top row's is not drawn.
-  await expect(main.getByRole("button", { name: "Create a team" })).toHaveCount(
-    1,
-  );
-  await expectNoAxeViolations(page);
-  await main.getByRole("button", { name: "Create a team" }).click();
-  const dialog = page.getByRole("dialog", { name: "Create a team" });
-  await expect(dialog).toContainText("In Fixture Organization.");
-  await dialog
-    .getByLabel("Kind of team", { exact: true })
-    .selectOption("Operations");
-  await dialog.getByRole("button", { name: "Create team" }).click();
-  await page.getByRole("button", { name: "Done" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Operations", level: 1 }),
-  ).toBeVisible();
-  await page.goto("/account/teams");
-  await expect(
-    page.getByRole("heading", { name: "Fixture Organization" }),
-  ).toBeVisible();
-  await expect(page.getByRole("link", { name: /Operations/ })).toBeVisible();
-  await expect(main.getByRole("heading", { name: "No teams yet" })).toHaveCount(
-    0,
-  );
-});
-
-test("working in the personal workspace, a team is made there — named by its one line, with no one to add (the owner's build 9)", async ({
-  page,
-}) => {
-  // Switched as the switcher does, through the platform's own operation — not
-  // by the switcher itself, whose refresh a navigation can cancel (F73).
-  const switched = await page
-    .context()
-    .request.patch("/api/platform/v1/session/active-workspace", {
-      data: { workspaceId: personalWorkspaceId },
-      headers: { origin: "http://127.0.0.1:3001" },
-    });
-  expect(switched.status()).toBe(200);
-  await page.goto("/account/teams");
-  await page
-    .locator("main")
-    .getByRole("button", { name: "Create a team" })
-    .click();
-  const dialog = page.getByRole("dialog", { name: "Create a team" });
-  await expect(dialog).toContainText("In your personal workspace.");
-  await dialog
-    .getByLabel("Kind of team", { exact: true })
-    .selectOption("Sales");
-  await dialog.getByRole("button", { name: "Create team" }).click();
-  const made = page.getByRole("dialog", { name: "Team created" });
-  await expect(made).toContainText("Your team is ready.");
-  await expect(made).not.toContainText("Add people");
-  await page.getByRole("button", { name: "Done" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Sales", level: 1 }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Personal · You are its owner", { exact: true }),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add members" })).toHaveCount(
-    0,
-  );
-  expect(await createdTeams()).toEqual([
-    { workspaceId: personalWorkspaceId, name: "Sales", type: "Sales" },
-  ]);
-});
-
-test("a kind the workspace already has a team for is refused in words — whatever its case, the older team's own kind too — and nothing is made (build 10)", async ({
-  page,
-}) => {
-  await page.goto("/account/teams");
-  const create = page
-    .locator("main")
-    .getByRole("button", { name: "Create a team" });
-  await create.click();
-  let dialog = page.getByRole("dialog", { name: "Create a team" });
-  await dialog
-    .getByLabel("Kind of team", { exact: true })
-    .selectOption("Finance");
-  await dialog.getByRole("button", { name: "Create team" }).click();
-  await page.getByRole("button", { name: "Done" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Finance", level: 1 }),
-  ).toBeVisible();
-
-  await page.goto("/account/teams");
-  await create.click();
-  dialog = page.getByRole("dialog", { name: "Create a team" });
-  const kind = dialog.getByLabel("Kind of team", { exact: true });
-  await kind.selectOption("Finance");
-  await dialog.getByRole("button", { name: "Create team" }).click();
-  await expect(dialog.getByRole("alert")).toHaveText(
-    "This workspace already has a team for Finance.",
-  );
-  await kind.selectOption("Other");
-  const other = dialog.getByLabel("What kind of team");
-  for (const words of ["finance", "General"]) {
-    await other.fill(words);
-    await dialog.getByRole("button", { name: "Create team" }).click();
-    await expect(dialog.getByRole("alert")).toHaveText(
-      `This workspace already has a team for ${words}.`,
-    );
-  }
-  expect(await createdTeams()).toEqual([
-    {
-      workspaceId: organizationWorkspaceId,
-      name: "Finance",
-      type: "Finance",
-    },
-  ]);
-});
-
-test("a plain member of an organization is offered no Create a team; an admin is, and is refused in words once made a plain member with the dialog open (build 10)", async ({
-  page,
-}) => {
-  await presentSession(page, "member");
-  await page.goto("/account/teams");
-  await expect(page.getByRole("link", { name: /general/ })).toBeVisible();
-  await expect(
-    page.locator("main").getByRole("button", { name: "Create a team" }),
-  ).toHaveCount(0);
-
-  await presentSession(page, "admin");
-  await page.goto("/account/teams");
-  await page
-    .locator("main")
-    .getByRole("button", { name: "Create a team" })
-    .click();
-  const dialog = page.getByRole("dialog", { name: "Create a team" });
-  await dialog
-    .getByLabel("Kind of team", { exact: true })
-    .selectOption("Legal");
-  await presentSession(page, "member");
-  await dialog.getByRole("button", { name: "Create team" }).click();
-  await expect(dialog.getByRole("alert")).toHaveText(
-    "Only an owner or admin can create a team here.",
-  );
-  expect(await createdTeams()).toEqual([]);
-});
-
-test("Create a team on a page whose workspace was switched away in another tab says so, and creates nothing (register F57, F28)", async ({
-  page,
-  context,
-}) => {
-  await page.goto("/account/teams");
-  await page
-    .locator("main")
-    .getByRole("button", { name: "Create a team" })
-    .click();
-  const dialog = page.getByRole("dialog", { name: "Create a team" });
-  await dialog.getByLabel("Kind of team", { exact: true }).selectOption("HR");
-  const other = await context.newPage();
-  try {
-    await other.goto("/account");
-    const trigger = other.getByRole("button", { name: "Switch workspace" });
-    await trigger.click();
-    await other.getByRole("button", { name: /Fixture Personal/ }).click();
-    await expect(trigger).toContainText("Fixture Personal");
-  } finally {
-    await other.close();
-  }
-  await dialog.getByRole("button", { name: "Create team" }).click();
-  await expect(dialog.getByRole("alert")).toHaveText(
-    "The active workspace changed in another tab. Reload this page before continuing.",
-  );
-  // Neither the organization the page showed nor the workspace now active.
-  expect(await createdTeams()).toEqual([]);
 });
 
 test("a team's owner adds someone from the organization, and the team lists who is on it (backend §12.1 #173)", async ({

@@ -52,7 +52,10 @@ export type ActionResult =
         | "file-unavailable"
         // A move refused because the settings do not fit the version it goes
         // to: answered with that version's fields (backend §12.1 #185).
-        | "settings-misfit";
+        | "settings-misfit"
+        // A save that chose a vendor the workspace has not connected, on a
+        // live flow (backend ADR-0037): said with the vendor's name.
+        | "vendor-not-connected";
     };
 
 /** The workspace the page showed, which the form sends (register F28). */
@@ -106,36 +109,43 @@ function subscriptionFailure(error: unknown): ActionResult {
 /** A second copy of a flow the workspace holds (the owner, build 12's #9). */
 const ALREADY_IN_WORKSPACE = "This flow is already in this workspace.";
 
+/**
+ * An add the platform could not make (spec §3.A): a workspace or a team it
+ * could not find or make answers 404, and a team service that did not answer
+ * 502 — neither is something the person can change but by trying again.
+ */
+const ADD_REFUSED = "Could not add this flow. Try again.";
+
 export async function subscribeToAutomation(
   formData: FormData,
 ): Promise<ActionResult> {
   const templateId = String(formData.get("templateId") ?? "");
   if (!templateId) return { ok: false, error: "A flow is required" };
-  // A flow is added to a team (the owner, build 10): the team is named every
-  // time, in the shared wording's words when it is not, and the platform
-  // checks the person can see it (18.6.2) — one they cannot is 404, not a
-  // hint. The whole workspace, which the platform would still accept, is
-  // never sent.
-  const projectId = String(formData.get("projectId") ?? "");
-  if (!projectId) return { ok: false, error: "Pick a team." };
-
-  const body: CreateSubscriptionRequest = { templateId, projectId };
+  // No team is sent (backend ADR-0036): the platform puts the flow in the team
+  // of its category, made when the workspace has none, and puts the person
+  // adding it on that team. A team sent would be ignored, so none is.
+  const body: CreateSubscriptionRequest = { templateId };
   try {
     const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
     if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
-    // A workspace holds each flow once (the owner, build 12's #9). The
-    // platform still takes one per team (backend 18.6.2) until its own guard
-    // lands, so a page drawn before another tab or person added the flow is
-    // refused here, in words, and nothing is sent. Only what this person may
-    // see is listed: a copy in a team hidden from them is the platform's to
-    // refuse.
+    // A workspace holds each flow once (the owner, build 12's #9): a page
+    // drawn before another tab or person added the flow is refused here, in
+    // words, and nothing is sent. Only what this person may see is listed: a
+    // copy in a team hidden from them is the platform's to refuse.
     const { subscriptions } = await listSubscriptions(workspaceId);
     if (heldCopy(subscriptions, templateId))
       return { ok: false, error: ALREADY_IN_WORKSPACE };
     const response = await createSubscription(workspaceId, body);
     revalidatePath("/account/flows");
+    revalidatePath("/account/teams");
     return { ok: true, subscriptionId: response.subscription.id };
   } catch (error) {
+    if (
+      error instanceof PlatformServerError &&
+      (error.status === 404 || error.status === 502)
+    ) {
+      return { ok: false, error: ADD_REFUSED };
+    }
     return subscriptionFailure(error);
   }
 }
@@ -174,6 +184,12 @@ function declaredValues(
   return values;
 }
 
+/**
+ * Set up's save (spec §3.B). The vendor the flow chose not connected is said
+ * by the dialog, which knows the vendor's name; anything else the platform
+ * refuses is "Could not save. Try again." — its words name a status, not what
+ * to do. A workspace switched away in another tab is said as it is everywhere.
+ */
 export async function saveSubscriptionConfiguration(
   formData: FormData,
 ): Promise<ActionResult> {
@@ -184,16 +200,69 @@ export async function saveSubscriptionConfiguration(
   const config = declaredValues(formData, "config");
 
   const body: UpdateSubscriptionRequest = { config };
-  const result = await attempt(formData, (workspaceId) =>
-    updateSubscription(
+  return saveConfig(formData, subscriptionId, body);
+}
+
+/**
+ * The vendor page's save (spec §3.C): the flow's settings as the platform
+ * holds them, with its `connection` setting — the vendor it chose, or `none`
+ * — changed. The platform replaces a flow's settings whole, so every other
+ * value is sent as it was read here, never as the page sent it; and the
+ * setting changed is the one the flow's pinned version declares, never a key
+ * the page names.
+ */
+export async function saveVendorChoice(
+  formData: FormData,
+): Promise<ActionResult> {
+  const subscriptionId = String(formData.get("subscriptionId") ?? "");
+  const choice = String(formData.get("choice") ?? "");
+  if (!subscriptionId || !choice) return { ok: false, error: SAVE_REFUSED };
+  try {
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+    const { subscriptions } = await listSubscriptions(workspaceId);
+    const subscription = subscriptions.find(
+      (candidate) => candidate.id === subscriptionId,
+    );
+    const field = subscription?.setup?.find(
+      (candidate) => candidate.control === "connection",
+    );
+    if (!subscription || !field) return { ok: false, error: SAVE_REFUSED };
+    const body: UpdateSubscriptionRequest = {
+      config: { ...subscription.config, [field.key]: choice },
+    };
+    return await saveConfig(formData, subscriptionId, body);
+  } catch (error) {
+    if (error instanceof PlatformServerError)
+      return { ok: false, error: SAVE_REFUSED };
+    throw error;
+  }
+}
+
+const SAVE_REFUSED = "Could not save. Try again.";
+
+async function saveConfig(
+  formData: FormData,
+  subscriptionId: string,
+  body: UpdateSubscriptionRequest,
+): Promise<ActionResult> {
+  try {
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+    await updateSubscription(
       workspaceId,
       subscriptionId,
       body,
       "subscription-config",
-    ),
-  );
-  if (result.ok) revalidatePath("/account/flows");
-  return result;
+    );
+    revalidatePath("/account/flows");
+    return { ok: true };
+  } catch (error) {
+    if (!(error instanceof PlatformServerError)) throw error;
+    if (error.status === 422 && error.details?.reason === "unmet_connections")
+      return { ok: false, error: SAVE_REFUSED, state: "vendor-not-connected" };
+    return { ok: false, error: SAVE_REFUSED };
+  }
 }
 
 /**
@@ -229,9 +298,11 @@ const FLOW_QUEUE_FULL =
  * answer was lost therefore carries the same key, and the platform returns the
  * run it already started instead of starting a second one.
  *
- * **It does not ask before a run's file goes to an AI** — the Run window does
- * (`ai-consent.ts`), and the platform does not check, so the Run window stays
- * its only caller (test/ai-consent.test.mjs).
+ * **It does not ask before a run's file goes to an AI** — the account's answer
+ * is asked once and kept by the platform (backend ADR-0038), and the Run window
+ * holds a run with a file on a flow that `usesAi` until it is "allowed"
+ * (`lib/ai-consent.ts`); the platform does not check, so the Run window stays
+ * this action's only caller (test/ai-consent.test.mjs).
  */
 export async function startRun(formData: FormData): Promise<ActionResult> {
   const subscriptionId = String(formData.get("subscriptionId") ?? "");
