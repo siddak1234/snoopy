@@ -179,6 +179,68 @@ test("the login page reads the provider list on the server, cached and cookieles
   );
 });
 
+test("under the sign-in buttons, one line says continuing agrees to the Terms of Service and the Privacy Policy, each a link, with nothing to tick (the owner, 2026-10-13)", () => {
+  const login = readFileSync("app/(auth)/login/LoginForm.tsx", "utf8");
+  // Directly under the buttons: nothing but a comment between them.
+  const line =
+    /<OAuthButtons [^>]*\/>\s*<\/div>\s*(?:\{\/\*[\s\S]*?\*\/\}\s*)?<p className="([^"]*)">([\s\S]*?)<\/p>/u.exec(
+      login,
+    );
+  assert.ok(line, "no line directly under the sign-in buttons");
+  const [, className, body] = line;
+  // The screen's own secondary text: the lead's size and colour, never smaller
+  // or fainter — only the margin differs.
+  const lead =
+    /<h1[^>]*>Continue to Autom8x<\/h1>\s*<p className="([^"]*)">/u.exec(login);
+  assert.ok(lead, "the sign-in screen's lead was not found");
+  const look = (classes) =>
+    classes
+      .split(" ")
+      .filter((name) => !/^m[tb]-/u.test(name))
+      .join(" ");
+  assert.equal(look(className), look(lead[1]));
+  assert.equal(look(className), "text-sm leading-6 text-[var(--muted)]");
+  // The words as they render. JSX's rule for text: a line is trimmed where it
+  // meets a line break, a blank line is dropped, the rest are joined by a
+  // space; `{" "}` is a space, and a tag or a comment adds nothing.
+  const words = body
+    .split(/(\{" "\}|\{\/\*[\s\S]*?\*\/\}|<[^>]*>)/u)
+    .map((part) => {
+      if (part === '{" "}') return " ";
+      if (part.startsWith("{/*") || part.startsWith("<")) return "";
+      const lines = part.split("\n");
+      return lines
+        .map((text, index) => {
+          const start = index > 0 ? text.trimStart() : text;
+          return index < lines.length - 1 ? start.trimEnd() : start;
+        })
+        .filter((text) => text !== "")
+        .join(" ");
+    })
+    .join("");
+  assert.equal(
+    words,
+    "By continuing, you agree to our Terms of Service and Privacy Policy.",
+  );
+  // Each document its page, drawn as a link.
+  const links = [
+    ...body.matchAll(/<Link\s([^>]*)>\s*([^<]*?)\s*<\/Link>/gu),
+  ].map(([, attributes, text]) => {
+    assert.match(
+      attributes,
+      /className="text-\[var\(--accent\)\] underline underline-offset-2"/u,
+      text,
+    );
+    return [text, /href="([^"]+)"/u.exec(attributes)?.[1]];
+  });
+  assert.deepEqual(links, [
+    ["Terms of Service", "/terms"],
+    ["Privacy Policy", "/privacy"],
+  ]);
+  // Continuing is agreeing: no box to tick, and no second step.
+  assert.doesNotMatch(login, /checkbox|type="submit"|<form\b/u);
+});
+
 test("OAuth provider UI consumes the generated public provider policy", () => {
   const oauthButtons = readFileSync("components/auth/OAuthButtons.tsx", "utf8");
   const linkedAccounts = readFileSync(

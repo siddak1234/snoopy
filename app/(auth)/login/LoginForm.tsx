@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import {
@@ -59,6 +60,27 @@ export function LoginForm({
       <div className="mt-6">
         <OAuthButtons callbackUrl={callbackUrl} initialProviders={providers} />
       </div>
+      {/* The owner's decision of 2026-10-13: one line under the buttons, in the
+          app's words too, and nothing to tick or tap — continuing is agreeing. */}
+      <p className="mt-4 text-sm leading-6 text-[var(--muted)]">
+        By continuing, you agree to our{" "}
+        <Link
+          prefetch={false}
+          href="/terms"
+          className="text-[var(--accent)] underline underline-offset-2"
+        >
+          Terms of Service
+        </Link>{" "}
+        and{" "}
+        <Link
+          prefetch={false}
+          href="/privacy"
+          className="text-[var(--accent)] underline underline-offset-2"
+        >
+          Privacy Policy
+        </Link>
+        .
+      </p>
     </section>
   );
 }

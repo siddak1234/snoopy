@@ -277,6 +277,13 @@ function initialState() {
       status: number;
       reason: string;
     } | null,
+    // Backend BUILD-PLAN 25.2.39: how many of the next completions find no
+    // place yet to measure their file, each answered 429 `measurement_busy`
+    // with its upload kept open, as the platform keeps it; and how many
+    // completions were asked for in all, since the Run window asks again by
+    // itself (Round 17's B5) and no page shows how often.
+    measurementBusy: 0,
+    uploadCompletions: 0,
     storeRefusing: false,
     storePuts: 0,
     storePutsWithCookie: 0,
@@ -835,6 +842,7 @@ const statusTitles: Record<number, string> = {
   403: "Forbidden",
   409: "Conflict",
   422: "Unprocessable Content",
+  429: "Too Many Requests",
   503: "Service Unavailable",
 };
 
@@ -1069,19 +1077,28 @@ const server = createServer(
       "/__fixture/run-at-capacity-once": () => {
         state.runsAtCapacity = 1;
       },
-      // FR-14: opening an upload, or completing one, refused with a reason.
+      // FR-14: opening an upload, or completing one, refused with a reason —
+      // and a completion answered 429, which the contract documents for it
+      // alone (backend BUILD-PLAN 25.2.39, `measurement_busy`).
       "/__fixture/upload-refused": () => {
         const stage = url.searchParams.get("stage");
         const status = Number(url.searchParams.get("status") ?? "400");
         const reason = url.searchParams.get("reason");
         if (
           (stage !== "open" && stage !== "complete") ||
-          (status !== 400 && status !== 409) ||
+          (status !== 400 &&
+            status !== 409 &&
+            !(status === 429 && stage === "complete")) ||
           !reason
         ) {
           return false;
         }
         state.uploadRefusal = { stage, status, reason };
+      },
+      // Backend BUILD-PLAN 25.2.39: the next completion finds no place yet to
+      // measure its file, once; the one after measures it.
+      "/__fixture/measurement-busy-once": () => {
+        state.measurementBusy = 1;
       },
       // Over the plan's flow allowance (decision 7a3): the list says so, and a
       // run's start is refused with the numbers.
@@ -1138,6 +1155,9 @@ const server = createServer(
         // What reached the object store, and how much of it carried a cookie.
         storePuts: state.storePuts,
         storePutsWithCookie: state.storePutsWithCookie,
+        // Every completion of an upload asked for, each one asked again
+        // included (Round 17's B5).
+        uploadCompletions: state.uploadCompletions,
         // Each approval's status: a decision leaves the page, and which it was
         // is read here.
         approvalStatuses: state.approvals.map((entry) => entry.status),
@@ -2513,6 +2533,7 @@ const server = createServer(
       "u",
     ).exec(pathname);
     if (method === "POST" && uploadComplete) {
+      state.uploadCompletions += 1;
       const upload = state.uploads.get(uploadComplete[1] ?? "");
       if (!upload) return respond(response, 404, problem(404, "Not Found"));
       if (state.uploadRefusal?.stage === "complete") {
@@ -2524,6 +2545,12 @@ const server = createServer(
           ...problem(400, "Bad Request"),
           details: { reason: "no_object" },
         } satisfies Platform["ApiProblem"]);
+      }
+      // Sealed, with no place yet to measure it: the upload stays open, and
+      // completing it again measures it (backend BUILD-PLAN 25.2.39).
+      if (state.measurementBusy > 0) {
+        state.measurementBusy -= 1;
+        return respond(response, 429, refusal(429, "measurement_busy"));
       }
       state.uploads.delete(uploadComplete[1] ?? "");
       const artifactId = crypto.randomUUID();

@@ -20,6 +20,7 @@ import {
   type RunFileSource,
 } from "./run-file-image";
 import { completeRunUpload, openRunUpload } from "./upload-actions";
+import { completeWhenMeasured } from "./upload-completion";
 
 /**
  * A phone or a tablet: its primary pointer is a finger, "a pointing device of
@@ -147,9 +148,12 @@ export function RunFileField({
       if (upload.signal.aborted) return;
       if (!opened.ok) throw new Error(opened.error);
       await putFileToSignedUrl(opened.ticket.uploadUrl, file, upload.signal);
-      const completed = await completeRunUpload(
-        workspaceId,
-        opened.ticket.uploadSessionId,
+      // A file with no place yet to be measured is completed again by itself
+      // (`upload-completion.ts`), the field still uploading meanwhile.
+      const { uploadSessionId } = opened.ticket;
+      const completed = await completeWhenMeasured(
+        () => completeRunUpload(workspaceId, uploadSessionId),
+        upload.signal,
       );
       if (upload.signal.aborted) return;
       if (!completed.ok) throw new Error(completed.error);
