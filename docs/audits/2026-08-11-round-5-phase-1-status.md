@@ -3098,7 +3098,7 @@ The owner's test F3 starts two runs at once in one workspace, which has one plac
   inside the server action: Next dispatches a client's server actions one at a time
   (`node_modules/next/dist/docs/01-app/02-guides/server-actions.md`, "Sequential dispatch on the
   client"), so a wait inside one would hold every other action of the page behind it, and the form
-  closing could not stop it. A new choice, or the form closing, stops the waiting at once and
+  closing could not stop it. The form closing stops the waiting at once (a new choice cannot come while it waits: the inputs are disabled while the field uploads) and
   nothing is completed after it. A `retry-after` over 5 s is not waited out — that answer is said
   at once — so the waits come to 20 s at most; with none named, as the platform names none today
   ("No retry interval is invented", `snoopy-backend/apps/api/src/modules/upstream.ts`), they come
@@ -3149,3 +3149,8 @@ subtests:
 **Not run here**: the browser suites, the new and changed tests among them, the whole
 `test:contracts`, the builds and the whole typecheck. Open for `snoopy-mobile`: the app's own
 completion, should B5 hold there too.
+
+_Since then, 2026-10-14_: production serves `cceee630…` (backend `ecc4d2f`, release 1, read back 04:48:17Z), and CI's
+Deployed contract job passes on this branch. The full local gate ran before the push — the browser suites included: Chromium and
+Firefox green, WebKit failing the same 69 fixture tests it fails on unchanged `main` — and the app completes again the same way
+since `snoopy-mobile` #63 (`fcc2f79`).

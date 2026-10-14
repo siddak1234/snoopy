@@ -229,7 +229,7 @@ test("the waits are bounded: a named wait of 5 s at most is waited out, 20 s in 
   }
 });
 
-test("a field that goes, or a new choice, stops the waiting at once, and nothing more is asked", async (t) => {
+test("a field that goes stops the waiting at once, and nothing more is asked", async (t) => {
   await t.test("while it waits", async (t) => {
     const field = new AbortController();
     const { asked, given } = completing(t, [busy(), measured], field.signal);

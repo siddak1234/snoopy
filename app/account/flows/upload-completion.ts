@@ -24,8 +24,9 @@ import type { CompleteUploadResult } from "./upload-actions";
  * would hold every other action of the page behind it. The upload's session
  * lasts 15 minutes from its opening (the PUT's own bound, `lib/platform-api.ts`);
  * one that ends anyway is refused `session_expired` and said as it always was.
- * A new choice, or the field going, stops the waiting at once, and nothing is
- * completed after it.
+ * The field going (the Run window closed) stops the waiting at once, and nothing
+ * is completed after it; a new choice cannot come while it waits, because the
+ * file inputs and Take photo are disabled while the field uploads.
  */
 
 /** The completions asked after the first while the file waits to be measured. */
