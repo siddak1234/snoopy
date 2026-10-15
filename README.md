@@ -42,8 +42,14 @@ builds it), `probe:no-backend` (that build served as a preview serves it: the
 public pages load, the account area sends a visitor to sign in, and readiness
 says "not configured"), `build` with `BACKEND_API_ORIGIN=https://backend.invalid` plus the
 `/api/platform` rewrite assertion CI makes, `test:browser`, and
-`test:browser:fixtures`. The browser suites run in Chromium, Firefox and WebKit
-(NFR-36); the marketing screenshots are Chromium's baselines alone. A run in
+`test:browser:fixtures`. Locally, the browser suites run in Chromium and
+Firefox. WebKit runs in GitHub CI on Linux, where it passes. CI runs all three
+engines (NFR-36), and all-green needs every one. On the owner's Mac,
+Playwright's WebKit fails dozens of the fixture suite's tests that pass in CI,
+even on unchanged `main`, so it was left to CI (the owner's decision of
+2026-10-14, register F104). Every local browser run says so as it starts.
+`AUTOM8X_WEBKIT=1` runs WebKit locally on purpose. The marketing screenshots
+are Chromium's baselines alone. A run in
 which every gate ran green ends by emitting
 this repository's facts file to `.autom8x/repo-facts/snoopy.json` (gitignored;
 `snoopy-backend` commits it as `snoopy-backend/docs/repo-facts/snoopy.json`); a run that had to
@@ -109,8 +115,8 @@ secret provisioning belongs to the deployment configuration round, not here.
 | `npm run generate:platform-contracts` | Regenerate the typed client from `../snoopy-backend`'s published contracts |
 | `npm run verify:platform-contracts` | Report a generated type that differs from its contract; changes nothing |
 | `npm run audit:boundaries` | Reject browser secrets, direct DB access, manual fetches, and raw hex colours |
-| `npm run test:browser` | Public accessibility in three engines, and Chromium's visual baselines |
-| `npm run test:browser:fixtures` | Credential-free authenticated suite, in three engines |
+| `npm run test:browser` | Public accessibility in Chromium and Firefox (and WebKit in CI), and Chromium's visual baselines |
+| `npm run test:browser:fixtures` | Credential-free authenticated suite, in Chromium and Firefox (and WebKit in CI) |
 
 CI (`.github/workflows/ci.yml`) runs these gates as jobs on every pull request,
 plus what `npm run verify` cannot run offline: the dependency audit, a scan of

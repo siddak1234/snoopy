@@ -559,7 +559,9 @@ test("the fixture legs leave out exactly the accessibility tests the browser job
 
   // What the legs leave out, as Playwright lists it: `--grep` with the same
   // pattern lists exactly what `--grep-invert` drops (one title string, one
-  // matcher). No browser and no build: a listing only.
+  // matcher). No browser and no build: a listing only. AUTOM8X_WEBKIT=1: the
+  // legs are CI's, where WebKit runs too (register F104), so the pattern is
+  // read in all three engines on any machine.
   let listing;
   try {
     listing = execFileSync(
@@ -572,7 +574,10 @@ test("the fixture legs leave out exactly the accessibility tests the browser job
         "--grep",
         declared[1],
       ],
-      { encoding: "utf8", env: { ...process.env, CI: "1" } },
+      {
+        encoding: "utf8",
+        env: { ...process.env, CI: "1", AUTOM8X_WEBKIT: "1" },
+      },
     );
   } catch (error) {
     // "No tests found" exits 1; what it printed is the listing.

@@ -3276,3 +3276,84 @@ fail on unchanged `main` (`c0bd411`) by the same title, 3 are `b1697e1`'s rename
 there, and 5 are new tests of the classes `main` fails on this Mac (the two Disconnect rows' Escape
 and hold, and the vendor page's member test). The vendor page's owner test, failing in WebKit while
 it shared its test with the member's session, now passes there.
+
+## Round 17 — the local push gate runs Chromium and Firefox; WebKit runs in GitHub CI on Linux, where it passes (the owner's decision of 2026-10-14)
+
+Every push of this repository needs a change-audit PASS for its tree (AGENTS.md rule 8), and the
+audit's gates run the browser suites. On the owner's Mac (macOS 26.6.2, Playwright 1.62.1's
+WebKit), WebKit fails dozens of the fixture suite's tests even on unchanged `main` — about 57 on
+`c0bd411`, and the 69 the note above records — mostly in two ways: after a session cookie is
+swapped in the middle of a test (`presentSession`, `e2e/helpers.ts`) the page goes on as the session
+it had, and focus does not come back to the control that opened a dialog once it closes. In GitHub
+CI, on Linux, the same tests pass: PR #49's "Authenticated fixture suite (webkit)" passed 269 and
+skipped 1 (run 38520239746, job 115708036990). So no push could earn the marker on this machine,
+and pushes went out with `--no-verify`.
+
+The owner was offered three ways out: A, paste the push command once; B, a permission rule; C, fix
+the cause — "the local guard runs Chromium + Firefox; WebKit runs only in GitHub CI on Linux, where
+it passes". The owner's answer, 2026-10-14: "okay then do c right, what helps us in the long term".
+
+- **F104** (new): `playwright.config.ts` gives Playwright the WebKit project only when
+  `GITHUB_ACTIONS` is `"true"` or `AUTOM8X_WEBKIT` is `1`. GitHub sets `GITHUB_ACTIONS=true` on every
+  runner, inside a job's container too (PR #49's WebKit leg: `GITHUB_ACTIONS=true` and `CI=true`
+  in the Playwright container's environment). `CI` is not the switch: `npm run verify` and the
+  change audit set `CI=1` for `test:browser`, and `scripts/run-browser-fixtures.mjs` sets it for
+  itself, to keep Playwright from reusing a stale server. So a run on this machine —
+  `npm run test:browser`, `npm run test:browser:fixtures`, `npm run verify`, the change audit — runs
+  Chromium and Firefox, and its first line says so: "Browser engines here: Chromium and Firefox.
+  WebKit runs in GitHub CI on Linux, where it passes; AUTOM8X_WEBKIT=1 runs it here too." Each
+  Playwright worker loads the config again, with `TEST_WORKER_INDEX` set, and says nothing, so a run
+  says it once. Asked for by name without the opt-in (`--project=webkit`), WebKit is refused out
+  loud by Playwright — `Project(s) "webkit" not found` — under that line.
+- **What did not change.** `.github/workflows/ci.yml` is untouched: the browser job runs every
+  project, the fixture suite keeps a leg per engine — WebKit's with `--project=webkit` — and
+  all-green needs both jobs, so a WebKit failure still blocks a merge. `scripts/audit/record-pass.mjs`
+  keeps its gate list and its floors: 3 s for `test:browser` and 15 s for `test:browser:fixtures`
+  are there to refuse a faked instant pass, and a two-engine run still takes minutes (below). The
+  pre-push hook, the marker, `scripts/verify.mjs`, `scripts/audit/run-gates.mjs` and
+  `scripts/run-browser-fixtures.mjs` are unchanged.
+- **The cost, plainly.** A failure that only WebKit shows is now first seen in the pull request's
+  CI, not before the push. CI still blocks the merge on it.
+  `AUTOM8X_WEBKIT=1 npm run test:browser:fixtures -- --project=webkit` runs it here on purpose, this
+  Mac's failures included.
+- **The tests.** `test/browser-engines.test.mjs` (new, four tests) reads what Playwright would run
+  from Playwright itself (`--list`) under each environment, not from the config's text, which names
+  all three engines whichever a run gets: CI keeps a fixture leg per engine on Linux, the browser
+  job on every project, all-green needing both, and nothing in CI setting either switch; on a
+  GitHub runner Playwright has all three engines and finds `--project=webkit`; a run here — with
+  `CI=1`, `CI=true` or none, and with an opt-in that is not exactly `1` or a `GITHUB_ACTIONS` that
+  is not exactly `true` — has Chromium and Firefox, says the line once (a worker never), and refuses
+  `--project=webkit`, and no local gate sets either switch for itself; `AUTOM8X_WEBKIT=1` brings
+  WebKit back. The F91 test's listing now sets `AUTOM8X_WEBKIT=1`, so its pattern is still checked
+  in all three engines on any machine.
+
+Proved red with `node --test` on `test/browser-engines.test.mjs` and
+`test/structure-contract.test.mjs`, each file restored from a kept copy and its sha256 checked
+equal, then 31 of 31 passing:
+
+| Guard | Broken by | Red |
+| --- | --- | --- |
+| CI keeps WebKit | `webkit` dropped from the fixtures matrix | the CI test, the GitHub-runner test, F90 |
+| all-green needs the fixture legs | `fixtures` taken out of its needs | the CI test, F88 |
+| all-green needs the browser job | `browser` taken out of its needs | the CI test, F88 |
+| The browser job runs every project | `-- --project=chromium --project=firefox` added | the CI test, F91 |
+| The legs run on Linux | the fixtures job on `macos-15` | the CI test |
+| CI never turns the switch off | `GITHUB_ACTIONS: "false"` in the fixtures job's env | the CI test |
+| A GitHub runner gets WebKit | the `GITHUB_ACTIONS` clause taken out | the GitHub-runner test |
+| `CI` is not the switch | `Boolean(process.env.CI)` in its place | the local test |
+| A local run leaves WebKit out | the filter taken out | the local test |
+| The line is said | `console.log` made `String` | the local test |
+| Once, not once per worker | the `TEST_WORKER_INDEX` check taken out | the local test |
+| No local gate opts in by itself | `AUTOM8X_WEBKIT: "1"` in the change audit's `test:browser` env | the local test |
+| The opt-in brings WebKit back | the `AUTOM8X_WEBKIT` clause taken out | the opt-in test, F91 |
+
+**The gate.** `npm run verify` on this change, on the owner's Mac, Node 22.23.2, with
+`SNOOPY_BACKEND_ROOT` at a read-only copy of the three contracts of `snoopy-backend` `82bd743`, the
+ones the generated files name by sha256: every gate exited 0 — `format:check`, `lint`, `typecheck`,
+`audit:boundaries`, `test:contracts` (213 of 213), `verify:platform-contracts`, `build:no-backend`,
+`probe:no-backend`, `build`, `test:browser` (21 s: 34 passed — Chromium 20, Firefox 14 — 538 skipped
+for want of the fixture, none failed) and `test:browser:fixtures` (530 s: 538 passed, 269 in each
+engine, and 2 skipped, the keyboard journey in each; none failed) — and the facts file was written.
+Each browser gate said the engine line once. CI's WebKit leg lists the same 270 fixture tests.
+
+F104 is the last number.
