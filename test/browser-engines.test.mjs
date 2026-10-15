@@ -37,28 +37,28 @@ delete bare.GITHUB_ACTIONS;
 delete bare.AUTOM8X_WEBKIT;
 delete bare.TEST_WORKER_INDEX;
 
-/** Playwright's own listing of one spec under `extra`, and the engines in it. */
-function listing(extra, ...args) {
+/**
+ * Playwright's own listing of `spec` under `extra`: the engines in it, and how
+ * many tests it lists in all.
+ */
+function listSpec(spec, extra, ...args) {
   const run = spawnSync(
     process.execPath,
-    [
-      "node_modules/@playwright/test/cli.js",
-      "test",
-      "e2e/accessibility.spec.ts",
-      "--list",
-      ...args,
-    ],
+    ["node_modules/@playwright/test/cli.js", "test", spec, "--list", ...args],
     { cwd: root, encoding: "utf8", env: { ...bare, ...extra } },
   );
   const output = `${run.stdout ?? ""}${run.stderr ?? ""}`;
-  const engines = [
-    ...new Set(
-      [...output.matchAll(/^\s+\[([a-z]+)\] › /gmu)].map((match) => match[1]),
-    ),
-  ].sort();
+  const listed = [...output.matchAll(/^\s+\[([a-z]+)\] › /gmu)].map(
+    (match) => match[1],
+  );
+  const engines = [...new Set(listed)].sort();
   const notices = output.split("\n").filter((line) => line === NOTICE).length;
-  return { status: run.status, output, engines, notices };
+  return { status: run.status, output, engines, count: listed.length, notices };
 }
+
+/** The accessibility spec's listing: a spec every engine runs. */
+const listing = (extra, ...args) =>
+  listSpec("e2e/accessibility.spec.ts", extra, ...args);
 
 /** ci.yml's jobs, split as the structure tests split them. */
 function ciJob(id) {
@@ -197,3 +197,59 @@ test("AUTOM8X_WEBKIT=1 brings WebKit back on this machine, on purpose (register 
   assert.equal(leg.status, 0, leg.output);
   assert.deepEqual(leg.engines, ["webkit"]);
 });
+
+test("the marketing visual baselines stay Chromium's alone — on this machine, on a GitHub runner, and with WebKit asked for (NFR-36, register F104)", () => {
+  // The baselines are one engine's pixels: Firefox and WebKit leave the spec
+  // out (testIgnore), wherever each of them runs.
+  for (const extra of [
+    { CI: "1" },
+    { GITHUB_ACTIONS: "true", CI: "true" },
+    { CI: "1", AUTOM8X_WEBKIT: "1" },
+  ]) {
+    const visual = listSpec("e2e/marketing.visual.spec.ts", extra);
+    const label = JSON.stringify(extra);
+    assert.equal(visual.status, 0, `${label}\n${visual.output}`);
+    assert.deepEqual(visual.engines, ["chromium"], label);
+    assert.ok(visual.count > 0, `${label}: no marketing visual test listed`);
+  }
+});
+
+// The nested run below, so it does not start itself again.
+const NESTED = "AUTOM8X_ENGINES_NESTED";
+
+test(
+  "the engine tests hold under GitHub's own environment — CI's gates job runs them with GITHUB_ACTIONS=true — and under a shell that opted in: each listing starts from neither switch (register F104)",
+  { skip: process.env[NESTED] === "1" && "the nested run itself" },
+  () => {
+    // This file run again with the switches set for the whole run, as CI's
+    // gates job sets GITHUB_ACTIONS for test:contracts (and a worker's index
+    // or the opt-in a shell may hold): the local and opt-in tests must still
+    // see what a run here sees.
+    const env = {
+      ...process.env,
+      GITHUB_ACTIONS: "true",
+      CI: "true",
+      AUTOM8X_WEBKIT: "1",
+      TEST_WORKER_INDEX: "0",
+      [NESTED]: "1",
+    };
+    // A test file's own process is told to report to its runner; the nested
+    // run reports in plain text instead.
+    delete env.NODE_TEST_CONTEXT;
+    const run = spawnSync(
+      process.execPath,
+      [
+        "--test-reporter=tap",
+        "--test-name-pattern",
+        "a run on this machine|AUTOM8X_WEBKIT=1 brings",
+        "test/browser-engines.test.mjs",
+      ],
+      { cwd: root, encoding: "utf8", env },
+    );
+    const output = `${run.stdout ?? ""}${run.stderr ?? ""}`;
+    assert.equal(run.status, 0, output);
+    // Both tests ran there, and passed: not a green run of nothing.
+    assert.match(output, /^# pass 2$/mu, output);
+    assert.match(output, /^# fail 0$/mu, output);
+  },
+);

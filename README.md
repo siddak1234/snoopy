@@ -60,8 +60,9 @@ share one lock, and a port anything already listens on is refused before either
 starts (the preflight binds each one; `lsof` cannot see a renamed `next-server`).
 
 `npm run test:browser:fixtures` starts a loopback-only HTTPS Edge fixture with
-a temporary certificate and scans every authenticated page with axe. Its tests
-drive the published operations the website calls — flows and runs, archiving
+a temporary certificate and scans every authenticated page with axe. Here it
+runs in Chromium and Firefox; CI runs it once per engine, WebKit's leg
+included (register F104). Its tests drive the published operations the website calls — flows and runs, archiving
 a flow and the archived ones, adding a flow (it goes to the team of its
 category, which the platform makes when there is none; a catalog with nothing
 to add), a flow's Connect vendor page and its vendor choice (a flow still on

@@ -3277,12 +3277,22 @@ there, and 5 are new tests of the classes `main` fails on this Mac (the two Disc
 and hold, and the vendor page's member test). The vendor page's owner test, failing in WebKit while
 it shared its test with the member's session, now passes there.
 
+_Since then, 2026-10-14_: production serves this contract — `ab30738d…`, `ca1fd0eb…`, `bf50b980…`,
+byte for byte — since the thirty-first promotion (backend `8e16301`, read back 21:51:37Z). So it is
+`main`'s generated types (`c0bd411`, backend `82bd743`'s `93fd335c…`) that are now stale against
+production: a website change without this one fails the local gate's contract-hash tests (F6, F7 in
+`test:contracts`, read against backend `main`'s contracts, the ones production serves) and CI's
+Deployed contract job, which reads production itself. The local push gate's change below
+(register F104) failed its own change audit there and nowhere else, so it cannot ship alone, and
+these screens ship with it, in one pull request. Its gate ran Chromium and Firefox only; the WebKit
+failures this entry counts are no longer a local gate's (below).
+
 ## Round 17 — the local push gate runs Chromium and Firefox; WebKit runs in GitHub CI on Linux, where it passes (the owner's decision of 2026-10-14)
 
 Every push of this repository needs a change-audit PASS for its tree (AGENTS.md rule 8), and the
 audit's gates run the browser suites. On the owner's Mac (macOS 26.6.2, Playwright 1.62.1's
 WebKit), WebKit fails dozens of the fixture suite's tests even on unchanged `main` — about 57 on
-`c0bd411`, and the 69 the note above records — mostly in two ways: after a session cookie is
+`c0bd411`, and the 69 the B5 entry's note of 2026-10-14 records — mostly in two ways: after a session cookie is
 swapped in the middle of a test (`presentSession`, `e2e/helpers.ts`) the page goes on as the session
 it had, and focus does not come back to the control that opened a dialog once it closes. In GitHub
 CI, on Linux, the same tests pass: PR #49's "Authenticated fixture suite (webkit)" passed 269 and
@@ -3355,5 +3365,51 @@ ones the generated files name by sha256: every gate exited 0 — `format:check`,
 for want of the fixture, none failed) and `test:browser:fixtures` (530 s: 538 passed, 269 in each
 engine, and 2 skipped, the keyboard journey in each; none failed) — and the facts file was written.
 Each browser gate said the engine line once. CI's WebKit leg lists the same 270 fixture tests.
+
+**Ships with the Invoice Processing screens.** This change's own change audit, on `c0bd411`, failed
+at one gate only: `test:contracts`, 211 of 213 — the contract-hash tests F6 and F7, because the
+generated types `main` holds (backend `82bd743`'s `93fd335c…`, `cceee630…`, `ab70cb0f…`) are stale
+against the contracts production serves since the thirty-first promotion (backend `8e16301`:
+`ab30738d…`, `ca1fd0eb…`, `bf50b980…`); the same tree passed 213 of 213 against `82bd743`'s. Every
+website change fails there, and CI's Deployed contract job, until the types are regenerated, and the
+Invoice Processing screens above regenerate them from exactly those contracts. So the two ship as
+one pull request: this change on top of those screens (the note of 2026-10-14 above).
+
+**The audit's two uncovered surfaces, now tested.** The audit found two surfaces no test held, and
+`test/browser-engines.test.mjs` has two more tests, six in all:
+
+- **The marketing baselines stay Chromium's.** `e2e/marketing.visual.spec.ts`, listed by
+  Playwright under `CI=1`, a GitHub runner's environment and `AUTOM8X_WEBKIT=1`: status 0, only
+  Chromium, and at least one test. Firefox's and WebKit's `testIgnore` now sit in the typed
+  `projects` list this change made, and a project that dropped one would draw pixels no baseline
+  holds.
+- **The engine tests hold under GitHub's own environment.** CI's gates job runs `test:contracts`
+  with `GITHUB_ACTIONS=true` for the whole run; each listing here starts from an environment with
+  neither switch. The file now runs its local and opt-in tests again in a child whose environment
+  has `GITHUB_ACTIONS=true` and `CI=true` — and `AUTOM8X_WEBKIT=1` and `TEST_WORKER_INDEX`, as a
+  shell or a worker may hold them — and both must run and pass there.
+
+Proved red with `node --test` on `test/browser-engines.test.mjs`, only the guarding test red each
+time, each file restored from a kept copy and its sha256 checked equal, then 6 of 6 passing:
+
+| Guard | Broken by | Red |
+| --- | --- | --- |
+| Firefox leaves the baselines out | Firefox's `testIgnore` taken out | the marketing test, at `CI=1` |
+| WebKit leaves the baselines out | WebKit's `testIgnore` taken out | the marketing test, on a GitHub runner |
+| Chromium keeps them | Chromium given the same `testIgnore` | the marketing test: no tests found, not status 0 |
+| A listing drops GitHub's switch | `delete bare.GITHUB_ACTIONS` taken out | the nested test (its local test red inside) |
+| A listing drops the opt-in | `delete bare.AUTOM8X_WEBKIT` taken out | the nested test (its local test red inside) |
+| A listing drops a worker's index | `delete bare.TEST_WORKER_INDEX` taken out | the nested test (its local test red inside) |
+
+**The gate, the two together.** `npm run verify` on the Invoice Processing screens with this change
+on top, on the owner's Mac, Node 22.23.2, default `TMPDIR`, `GITHUB_ACTIONS` and `AUTOM8X_WEBKIT`
+unset, `SNOOPY_BACKEND_ROOT` at a read-only extract of backend `57eac70`'s docs (its three
+contracts byte for byte the ones production serves): every gate exited 0 — `format:check`, `lint`,
+`typecheck`, `audit:boundaries`, `test:contracts` (233 of 233), `verify:platform-contracts`,
+`build:no-backend`, `probe:no-backend`, `build`, `test:browser` (19 s: 34 passed — Chromium 20,
+Firefox 14 — 554 skipped for want of the fixture, none failed) and `test:browser:fixtures` (532 s:
+554 passed, 277 in each engine, and 2 skipped, the keyboard journey in each; none failed) — and the
+facts file was written. WebKit did not run: each browser gate said the engine line once, and
+Playwright listed Chromium and Firefox alone. CI's WebKit leg lists the same 278 fixture tests.
 
 F104 is the last number.
