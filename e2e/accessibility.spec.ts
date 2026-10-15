@@ -18,9 +18,9 @@ const publicRoutes = [
   "/terms",
 ] as const;
 
-// Every page behind sign-in (register F37) — sixteen, found by
+// Every page behind sign-in (register F37) — fifteen, found by
 // `find app/account app/onboarding -name page.tsx`. The three with an id read
-// the fixture's project, run and team, and the onboarding pages are read as the
+// the fixture's team, run and flow, and the onboarding pages are read as the
 // fixture's requester (a person with no organization): those five exist only
 // against the fixture, so they are scanned only there.
 const authenticatedRoutes: ReadonlyArray<{
@@ -39,6 +39,11 @@ const authenticatedRoutes: ReadonlyArray<{
   },
   { path: "/account/runs" },
   { path: "/account/runs/fixture-run-ok", fixture: {} },
+  // A flow's Connect vendor page (spec §3.C): Invoice Processing's.
+  {
+    path: "/account/flows/f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1/vendor",
+    fixture: {},
+  },
   { path: "/account/settings" },
   { path: "/account/support" },
   { path: "/account/teams" },

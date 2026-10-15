@@ -1,5 +1,10 @@
+import { ProhibitIcon } from "@phosphor-icons/react/dist/ssr/Prohibit";
+import { Button } from "@/components/ui/Button";
 import { FormInput } from "@/components/ui/FormInput";
+import { NumberedStep } from "@/components/ui/NumberedStep";
+import { VendorMark } from "@/components/dashboard/VendorLogo";
 import { RunFileField } from "./RunFileField";
+import type { VendorChoiceRow } from "./vendor-path";
 import type {
   AutomationRunInputField,
   AutomationSetupField,
@@ -14,17 +19,35 @@ import type {
  * the form posts each value under
  * `<prefix>:<key>` with its control under `<prefix>-control:<key>`, which is how
  * the server action converts it back to the type the platform checks.
+ *
+ * A field's title and help line are the manifest's own; nothing here adds one
+ * (spec §3.0 rule 5).
  */
 
 type ManifestField = AutomationSetupField | AutomationRunInputField;
+
+/**
+ * A setup section's name (spec §3.B): numbered, in plain words — never the
+ * manifest's own token. Keyed by the generated enum, so a section the contract
+ * adds cannot render as its wire token.
+ */
+export const SECTION_NAME: Record<AutomationSetupField["section"], string> = {
+  connections: "Connect",
+  source: "Source",
+  rules: "Settings",
+  notifications: "Email",
+};
 
 /** Setup fields, grouped under their manifest section without reordering. */
 export function SetupFields({
   setup,
   config,
+  vendor = null,
 }: {
   setup: AutomationSetupField[];
   config: Record<string, unknown>;
+  /** The vendor row; absent where the vendor is not chosen (a move). */
+  vendor?: VendorChoiceRow | null;
 }) {
   const groups: Array<{
     section: AutomationSetupField["section"];
@@ -44,22 +67,109 @@ export function SetupFields({
   }
 
   return groups.map(({ section, fields }, groupIndex) => {
+    const name = SECTION_NAME[section];
     return (
-      <fieldset key={`${section}-${groupIndex}`} className="space-y-4">
-        <legend className="text-sm font-medium text-[var(--text)] capitalize">
-          {section}
-        </legend>
-        {fields.map((field) => (
-          <ManifestFieldInput
-            key={field.key}
-            field={field}
-            value={config[field.key]}
-            prefix="config"
-          />
-        ))}
-      </fieldset>
+      <div
+        key={`${section}-${groupIndex}`}
+        role="group"
+        aria-label={name}
+        className="space-y-4"
+      >
+        <NumberedStep index={groupIndex + 1} title={name} />
+        {fields.map((field) =>
+          field.control === "connection" ? (
+            <VendorField
+              key={field.key}
+              field={field}
+              value={config[field.key]}
+              vendor={vendor?.key === field.key ? vendor : null}
+            />
+          ) : (
+            <ManifestFieldInput
+              key={field.key}
+              field={field}
+              value={config[field.key]}
+              prefix="config"
+            />
+          ),
+        )}
+      </div>
     );
   });
+}
+
+/**
+ * The vendor choice (spec §3.B): the chosen vendor's logo — or its icon and
+ * name — or None, with "Not connected" while the chosen vendor still needs
+ * connecting, and Connect vendor, which goes to the flow's vendor page, where
+ * it is chosen. The value is carried as it is, since a save replaces every
+ * setting.
+ */
+function VendorField({
+  field,
+  value,
+  vendor,
+}: {
+  field: AutomationSetupField;
+  value: unknown;
+  vendor: VendorChoiceRow | null;
+}) {
+  const chosen =
+    vendor?.providerId ??
+    (typeof value === "string"
+      ? value
+      : typeof field.defaultValue === "string"
+        ? field.defaultValue
+        : "none");
+  return (
+    <div>
+      <input
+        type="hidden"
+        name={`config-control:${field.key}`}
+        value="connection"
+      />
+      <input type="hidden" name={`config:${field.key}`} value={chosen} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          {chosen === "none" ? (
+            <span className="inline-flex items-center gap-3">
+              <ProhibitIcon
+                size={24}
+                aria-hidden
+                className="shrink-0 text-[var(--muted)]"
+              />
+              <span className="text-sm font-medium text-[var(--text)]">
+                None
+              </span>
+            </span>
+          ) : (
+            <VendorMark
+              icon={vendor?.icon}
+              displayName={vendor?.displayName ?? field.title}
+              // Its clear space reaches into the dialog's padding, so the logo
+              // lines up with the section's other fields.
+              logoClassName="-ml-3"
+            />
+          )}
+          {vendor && chosen !== "none" && vendor.connected === false ? (
+            <p className="mt-1 text-xs text-[var(--warning-text)]">
+              Not connected
+            </p>
+          ) : null}
+        </div>
+        {vendor ? (
+          <Button
+            href={vendor.href}
+            variant="secondary"
+            size="sm"
+            prefetch={false}
+          >
+            Connect vendor
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -102,6 +212,16 @@ export function RunInputFields({
         ),
       )}
     </div>
+  );
+}
+
+/** "Optional", beside the title of a field that may be left empty (spec §3.B). */
+function OptionalMark({ field }: { field: ManifestField }) {
+  if (field.required) return null;
+  return (
+    <span className="ml-2 text-xs font-normal text-[var(--muted)]">
+      Optional
+    </span>
   );
 }
 
@@ -161,10 +281,22 @@ function ManifestFieldInput({
       <FormInput
         id={fieldId}
         name={`${prefix}:${field.key}`}
-        type={field.control === "money" ? "number" : "text"}
+        type={
+          field.control === "money"
+            ? "number"
+            : field.control === "email"
+              ? "email"
+              : "text"
+        }
         step={field.control === "money" ? "any" : undefined}
         min={field.control === "money" ? 0 : undefined}
-        label={field.title}
+        prefix={field.control === "money" ? "$" : undefined}
+        label={
+          <>
+            {field.title}
+            <OptionalMark field={field} />
+          </>
+        }
         hint={field.description}
         required={required}
         defaultValue={

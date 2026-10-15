@@ -63,7 +63,7 @@ test("every reason the website names has its sentence; one it does not name is l
   const named = {
     content_type_not_accepted: "This flow does not accept that type of file.",
     file_too_large: "The file is larger than this flow accepts.",
-    subscription_not_live: "Go live first; a paused flow takes no files.",
+    subscription_not_live: "Turn it on first; a paused flow takes no files.",
     no_file_input: "This flow does not take a file.",
     session_expired: "The upload took too long. Choose the file again.",
     no_object: "The file did not arrive. Choose it again.",

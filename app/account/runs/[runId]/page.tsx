@@ -1,26 +1,39 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle";
+import { CircleNotchIcon } from "@phosphor-icons/react/dist/ssr/CircleNotch";
+import { HandPalmIcon } from "@phosphor-icons/react/dist/ssr/HandPalm";
+import { WarningCircleIcon } from "@phosphor-icons/react/dist/ssr/WarningCircle";
 import { getAppSession } from "@/lib/app-session";
 import {
+  emptyWhenUnavailable,
   formatWhen,
+  listAutomations,
   readRun,
   type RunOrigin,
-  type RunStep,
 } from "@/lib/automations";
 import { PlatformServerError } from "@/lib/platform-server";
+import {
+  OUTCOME_WORDS,
+  progressRows,
+  type ProgressRow,
+} from "@/lib/run-progress";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { StatusPill } from "@/components/dashboard/StatusPill";
-import { Kicker } from "@/components/ui/Kicker";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 import { CancelRunButton } from "./CancelRunButton";
 
 /**
- * One run, step by step.
+ * One run: what it came to, its progress, and what it saved.
  *
  * The screen renders `steps` — what the automation reported against the steps
  * its manifest declares — and not `events`, which is the platform's own record
  * of state transitions. Both come back from the same read; only one is written
- * for a person.
+ * for a person. The progress is drawn from the flow's visible groups of steps
+ * (spec §3.E; backend ADR-0037): one row per group that has a reported step,
+ * each titled by its group and never by a step's id, and no row for a step
+ * that did not run. A succeeded run's saved details follow, as the automation
+ * wrote them for people (`RunDetail.details`).
  */
 
 export const dynamic = "force-dynamic";
@@ -57,12 +70,27 @@ export default async function RunDetailPage(
     throw error;
   }
 
-  const { run, steps } = detail;
+  const { run, steps, details } = detail;
+  // The run names no flow (`Run.templateId`'s own words: a screen joins the
+  // catalog), so its name, steps' titles and groups come from there.
+  const catalog = await emptyWhenUnavailable(
+    () => listAutomations(workspaceId),
+    { automations: [], categories: [] },
+  );
+  const entry = catalog.automations.find(
+    (candidate) => candidate.templateId === run.templateId,
+  );
+  const rows = progressRows({
+    steps,
+    manifest: entry,
+    runVersion: run.templateVersion,
+    running: run.status === "pending" || run.status === "running",
+  });
 
   return (
     <SectionCard
       title="Run"
-      subheader={`${run.templateId} · v${run.templateVersion}`}
+      subheader={entry?.name}
       primaryAction={<StatusPill status={run.status} />}
     >
       <div className="py-5 first:pt-0">
@@ -117,11 +145,18 @@ export default async function RunDetailPage(
             {run.resultSummary}
           </p>
         ) : null}
+        {/* Held for a person's decision (spec §3.E): said in words, the
+            decision itself on Approvals. */}
+        {run.status === "held" ? (
+          <p className="mt-4 text-sm text-[var(--warning-text)]">
+            Waiting for approval.
+          </p>
+        ) : null}
       </div>
 
       <div className="py-5">
         <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-          Steps
+          Progress
         </h2>
         {steps.length === 0 ? (
           <p className="mt-3 text-sm text-[var(--muted)]">
@@ -129,44 +164,77 @@ export default async function RunDetailPage(
           </p>
         ) : (
           <ol className="mt-4 flex flex-col gap-4">
-            {steps.map((step) => (
-              <StepRow key={step.id} step={step} />
+            {rows.map((row) => (
+              <ProgressItem key={row.key} row={row} />
             ))}
           </ol>
         )}
       </div>
+
+      {/* What a succeeded run saved, as its automation wrote it for people
+          (backend ADR-0037); a run that saved none has no section. */}
+      {details && details.length > 0 ? (
+        <div className="py-5">
+          <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
+            Details
+          </h2>
+          <dl className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-[max-content_1fr]">
+            {details.map((line, index) => (
+              <div key={`${line.label}-${index}`} className="contents">
+                <dt className="text-sm text-[var(--muted)]">{line.label}</dt>
+                <dd className="text-sm break-words text-[var(--text)]">
+                  {line.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ) : null}
     </SectionCard>
   );
 }
 
-function StepRow({ step }: { step: RunStep }) {
-  return (
-    <li className="flex flex-col gap-1 border-l-2 border-[var(--ring)] pl-4">
-      <div className="flex flex-wrap items-center gap-2">
-        {/* The manifest's own kicker vocabulary. Kicker is the component the
-            design system already uses for exactly this eyebrow. */}
-        <Kicker className="mb-0">{step.stepId}</Kicker>
-        <StatusPill status={outcomeStatus(step.outcome)} />
-      </div>
-      <p className="text-sm text-[var(--text)]">{step.summary}</p>
-      {step.heldReason ? (
-        <p className="text-xs text-[var(--warning-text)]">{step.heldReason}</p>
-      ) : null}
-      <p className="text-xs text-[var(--muted)]">
-        {formatWhen(step.occurredAt)}
-      </p>
-    </li>
-  );
+/** A row's icon (24): its outcome to the eye; `OUTCOME_WORDS` says it to a screen reader. */
+function ProgressIcon({ outcome }: { outcome: ProgressRow["outcome"] }) {
+  const common = { size: 24, "aria-hidden": true } as const;
+  if (outcome === "ok")
+    return (
+      <CheckCircleIcon {...common} className="text-[var(--success-text)]" />
+    );
+  if (outcome === "held")
+    return <HandPalmIcon {...common} className="text-[var(--warning-text)]" />;
+  if (outcome === "failed")
+    return (
+      <WarningCircleIcon {...common} className="text-[var(--error-text)]" />
+    );
+  return <CircleNotchIcon {...common} className="text-[var(--muted)]" />;
 }
 
-/**
- * A step outcome in the vocabulary StatusPill already knows.
- *
- * `ok` is the one word the pill has no tone for, because no status anywhere else
- * uses it. Mapping it to `succeeded` reuses the map instead of growing it.
- */
-function outcomeStatus(outcome: RunStep["outcome"]): string {
-  return outcome === "ok" ? "succeeded" : outcome;
+function ProgressItem({ row }: { row: ProgressRow }) {
+  return (
+    <li className="flex items-start gap-3">
+      <span className="mt-0.5 shrink-0">
+        <ProgressIcon outcome={row.outcome} />
+      </span>
+      <div className="flex min-w-0 flex-col gap-1">
+        <p className="text-sm font-medium text-[var(--text)]">{row.title}</p>
+        {row.outcome === "working" ? null : (
+          <span className="sr-only">{OUTCOME_WORDS[row.outcome]}</span>
+        )}
+        {row.sub ? (
+          <p className="text-sm text-[var(--muted)]">{row.sub}</p>
+        ) : null}
+        {row.heldReason ? (
+          <p className="text-xs text-[var(--warning-text)]">{row.heldReason}</p>
+        ) : null}
+        {row.occurredAt ? (
+          <p className="text-xs text-[var(--muted)]">
+            {formatWhen(row.occurredAt)}
+          </p>
+        ) : null}
+      </div>
+    </li>
+  );
 }
 
 function Fact({ label, value }: { label: string; value: string }) {

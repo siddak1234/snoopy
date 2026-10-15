@@ -2983,7 +2983,7 @@ request is stored and nobody is told (backend SYSTEM-MANIFEST §12.1 #36). Test 
 
 **2026-10-13 — the Run window asks before a run's file goes to an AI,** as the iPhone app does
 (Apple's App Review Guideline 5.1.2(i)): "AI reads this file", over the Run window, in the app's
-words byte for byte (`app/account/flows/ai-consent.ts`, pinned by `test/ai-consent.test.mjs`),
+words byte for byte (~~`app/account/flows/ai-consent.ts`~~, pinned by `test/ai-consent.test.mjs`),
 before any run whose input carries a file — the website cannot tell which automation uses a model —
 and never before one without. Agreed once per person per browser (localStorage,
 `autom8x.ai-consent.v1.<the person's id>`); a failed read asks again, a failed write still starts
@@ -3154,3 +3154,262 @@ _Since then, 2026-10-14_: production serves `cceee630…` (backend `ecc4d2f`, re
 Deployed contract job passes on this branch. The full local gate ran before the push — the browser suites included: Chromium and
 Firefox green, WebKit failing the same 69 fixture tests it fails on unchanged `main` — and the app completes again the same way
 since `snoopy-mobile` #63 (`fcc2f79`).
+
+**2026-10-14 — the Invoice Processing update's shared screens (backend BUILD-PLAN 25.4.15–25.4.25,
+ADR-0036–0038; the spec's §3–§4).** The owner's build-19 feedback (9 items, 2026-10-14) and
+"ensure web is also updated accordingly" (25.4.25). The contract is regenerated from backend `main`
+`57eac70` (#210): `platform.d.ts` `ab30738d…`, `automations.d.ts` `ca1fd0eb…`, `connections.d.ts`
+`bf50b980…` — live only with the release that serves it, so CI's Deployed contract job is red until
+then, by design. What changed, by the spec's items:
+
+- **U2 — a flow's team follows its category.** Add sends the flow alone (`subscribeToAutomation`,
+  `app/account/flows/actions.ts`): the platform puts it in the team of its category, made when the
+  workspace has none. The team picker, "Create a team first.", "Ask to join a team first." and
+  their links are gone from the card, and Create a team from Teams, its empty screen and the
+  dashboard (~~`components/dashboard/CreateTeamButton.tsx`~~, ~~`components/dashboard/CreateTeamDialog.tsx`~~,
+  `createProjectAction` and `lib/tenancy.ts`'s `createProject` removed). A flow's row says
+  "Team: {kind}"; a held card says "Added ✓". A refused add (404, 502) is "Could not add this flow.
+  Try again." `lib/team-types.ts` is held both ways to the published categories at typecheck.
+- **U4/U5 — the Connect vendor page and the logos.** `app/account/flows/[subscriptionId]/vendor/`:
+  each optional vendor by its own logo, and None; Intuit's Connect to QuickBooks button for an
+  owner or admin, "Ask an owner or admin to connect it." for a member, "Disconnect from QuickBooks"
+  once connected, confirmed first ("Disconnect from QuickBooks?", as in the app — and every
+  Disconnect on Connections the same way); the choice saved as the flow's `connection` setting, the rest of its settings
+  read on the server and sent whole. A connect started there comes back to it from Connections
+  (`app/account/connections/pending-connect.ts`, a UUID-shaped path only). Intuit's four files in
+  `public/vendors/`, byte for byte (`lib/brand-logos.ts`, `components/dashboard/VendorLogo.tsx`,
+  served `unoptimized`, 24 px tall, the theme picking the file, 12 px of clear space its own;
+  Intuit's button never faded while the page waits); Connections shows the logo and
+  Intuit's words, and no longer the provider's id or "Only providers configured for this
+  deployment are shown."
+- **U8 — the AI consent on the account.** "AI reads your documents" once while
+  `aiDocumentReading` is null (`app/account/layout.tsx`, `components/account/AiConsentCard.tsx`),
+  Settings › AI's switch (`components/account/AiReadingSetting.tsx`), and Start run's gate for a run
+  with a file on a flow that `usesAi` (`lib/ai-consent.ts`), all through
+  `PUT /v1/session/ai-document-reading`. The per-run dialog and its localStorage agreement are
+  removed in the same change (~~`app/account/flows/AiConsentDialog.tsx`~~,
+  ~~`app/account/flows/ai-consent.ts`~~).
+- **U9/U3 — a run's progress and details.** One row per visible group with a reported step
+  (`lib/run-progress.ts`), titled by the group, never by a step's id, never "Not run"; "Working…"
+  last while it runs; "Waiting for approval." for a held run; the flow's name, not its template id
+  and version; a succeeded run's `details` under Details.
+- **U11 — the words.** Set up: "Set up {name}", "Team: {kind}", numbered sections (Connect,
+  Settings, Email) with `components/ui/NumberedStep.tsx`, "Optional", "$" on an amount, "Save",
+  "Enter an amount for {title}." and "Fill in: {titles}." before sending, "Could not save. Try
+  again." after; the Run window's "Fill this in, then start the run.", Upload and Take photo (icons
+  20), no "(optional)"; "Go live" is "Turn on", and a file refused because the flow is paused says
+  "Turn it on first; a paused flow takes no files." (the app's words). The privacy page (§3.K):
+  "Invoice Processing", the second read only on a problem, the details shown to the workspace, and
+  None; dated October 14, 2026; its baselines re-recorded on both renderers.
+
+Guards, each bitten by hand — the guarded code broken, the guard RED, the file restored from a kept
+copy (sha256 checked equal), the guard GREEN: W1 the four Intuit files' sha256, the button's too,
+the light theme's dark wordmark, `unoptimized` (`test/brand-logos.test.mjs`); W2 the card only while
+never asked, Start run's gate, the Run window asking before it starts, the per-run words gone, the
+layout's once, the card's words (`test/ai-consent.test.mjs`); W3 never a step id, one row per
+group, groups for the run's own version only, the run page drawing no step id
+(`test/run-progress.test.mjs`); U2 no team sent, the removed words, the 404/502 words, no Create on
+Teams (`test/automation-contract.test.mjs`, `test/tenancy-contract.test.mjs`), a kind added or
+removed failing typecheck (`lib/team-types.ts`); U4 only a vendor path gone back to, taken once, the
+save changing the flow's own setting; U11 the section names, an empty amount, no "(optional)"
+(`test/vendor-page.test.mjs`). The fixture Edge (`e2e/fixtures/public-edge.ts`) answers the new
+contract: each person's AI answer (allowed, so no other test meets the card), the save route,
+Invoice Processing's flow, vendor page, QuickBooks and grouped run, and the category team made on
+an add.
+
+**2026-10-14 — the review of the Invoice Processing screens, answered.** A single-pass review of
+`b1697e1` found no blocker and five should-fix findings; each was re-checked against the code and
+all five held. Fixed in one commit on top:
+
+- **The privacy page said less than v2 does.** With None a document's details are saved and the
+  "Also email" summary is still sent, and the summary is built from what was read, not only from
+  QuickBooks' answer (at `1defad9`:
+  `snoopy-automations/automations/invoice-processing/src/writes/mail.ts`,
+  `snoopy-automations/automations/invoice-processing/src/details.ts`,
+  `snoopy-automations/automations/invoice-processing/src/steps/notify.ts`). The session's words, for the two sentences the spec's §3.K does not give:
+  "…to read a bill, receipt, credit note or statement before saving its details, recording it in
+  QuickBooks Online, or comparing it with what QuickBooks holds." and "…a short summary of each
+  document it saves, records or compares is emailed there, built from the details read from the
+  document and, when it records the document in QuickBooks or compares it with what QuickBooks
+  holds, from QuickBooks' answer." §3.K's own sentences are unchanged. The date is October 14,
+  2026, the day the page goes live with the release (Terms is unchanged and keeps October 13).
+  Both baselines re-recorded, each first failing on the old one.
+- **Disconnect had no confirm** on the vendor page, and none on Connections, while the app confirms
+  both. Now `Modal` asks "Disconnect from QuickBooks?" (else "Disconnect {name}?") — "You can
+  connect it again any time." — with Cancel and a red Disconnect, held while it sends, its refusal
+  in the dialog (register F52, F76). A vendor disconnected on its page is no longer the choice:
+  None, until it is connected again, as in the app.
+- **A v1 flow's unmet QuickBooks went to a vendor page that is not there.** Whether a flow has a
+  vendor to choose is now read from its own pinned `setup`, never from the catalog's newest version
+  (`app/account/flows/vendor-path.ts`: `unmetLines`, `vendorChoice`, pure and unit-tested): a v1
+  flow says "Connect QuickBooks Online first." and goes to Connections.
+- **The logo's clear space** was 4 px under it on Connections and in Set up. `VendorLogo` now keeps
+  12 px of its own on every side (Intuit asks half the symbol's height, about 11 px at 24 tall);
+  a caller pulls it only into padding it owns.
+
+The nits taken: Intuit's button is no longer faded while the page waits (Intuit: "Do not modify the
+appearance of any button graphics"); Set up's Connect vendor is a `Button`, and a `Button` that
+links passes `prefetch={false}` (the no-prefetch test now reads those too); a progress row says its
+outcome in words to a screen reader ("Succeeded", "Held", "Failed" — the run's own status words);
+the paused-flow upload refusal says "Turn it on first"; `Modal`'s comment names the consent card.
+"Connect {displayName} first." for a connection a flow cannot run without is the session's words,
+as the app says it. Left for a spec amendment, not changed here: the run page's "Trigger" fact and
+Activity's "· v2", and "Optional" on Approval limit, which may not be left blank. Left for the
+backend: the vendor page lists the catalog's newest optional connections, since a subscription does
+not publish its pinned version's (a backend §12.1 row to file). Not a defect: the vendor page's
+reads fall back only when no backend is configured; a platform that cannot answer throws to the
+account area's boundary, as every page's read does.
+
+Guards, each bitten by hand (RED, restored sha256-equal, GREEN): the v1 line, `unmetLines` and
+`vendorChoice` (`test/vendor-page.test.mjs`, and the e2e on a v1 fixture flow); the confirm's words
+and red button, one alert (`test/brand-logos.test.mjs`, `test/structure-contract.test.mjs`); a
+`Button` link's prefetch (`test/session-contract.test.mjs`); the outcome words
+(`test/run-progress.test.mjs`); the refusal words (`test/upload-refusals.test.mjs`); and in the
+browser, each disconnect confirmed (`e2e/account-surfaces.spec.ts` 13, two new rows in
+`e2e/dialogs.spec.ts`), the clear space measured on the vendor page, Connections and Set up, the
+button's opacity while Save waits, the light theme's preferred logo, and the vendor page's owner and
+member checks as two tests.
+
+The full local gate (`npm run verify`, the contract read from backend `57eac70`'s docs): every step
+green but the fixture suite's WebKit leg — Chromium and Firefox no failure; WebKit 65, of which 57
+fail on unchanged `main` (`c0bd411`) by the same title, 3 are `b1697e1`'s renames of titles failing
+there, and 5 are new tests of the classes `main` fails on this Mac (the two Disconnect rows' Escape
+and hold, and the vendor page's member test). The vendor page's owner test, failing in WebKit while
+it shared its test with the member's session, now passes there.
+
+_Since then, 2026-10-14_: production serves this contract — `ab30738d…`, `ca1fd0eb…`, `bf50b980…`,
+byte for byte — since the thirty-first promotion (backend `8e16301`, read back 21:51:37Z). So it is
+`main`'s generated types (`c0bd411`, backend `82bd743`'s `93fd335c…`) that are now stale against
+production: a website change without this one fails the local gate's contract-hash tests (F6, F7 in
+`test:contracts`, read against backend `main`'s contracts, the ones production serves) and CI's
+Deployed contract job, which reads production itself. The local push gate's change below
+(register F104) failed its own change audit there and nowhere else, so it cannot ship alone, and
+these screens ship with it, in one pull request. Its gate ran Chromium and Firefox only; the WebKit
+failures this entry counts are no longer a local gate's (below).
+
+## Round 17 — the local push gate runs Chromium and Firefox; WebKit runs in GitHub CI on Linux, where it passes (the owner's decision of 2026-10-14)
+
+Every push of this repository needs a change-audit PASS for its tree (AGENTS.md rule 8), and the
+audit's gates run the browser suites. On the owner's Mac (macOS 26.6.2, Playwright 1.62.1's
+WebKit), WebKit fails dozens of the fixture suite's tests even on unchanged `main` — about 57 on
+`c0bd411`, and the 69 the B5 entry's note of 2026-10-14 records — mostly in two ways: after a session cookie is
+swapped in the middle of a test (`presentSession`, `e2e/helpers.ts`) the page goes on as the session
+it had, and focus does not come back to the control that opened a dialog once it closes. In GitHub
+CI, on Linux, the same tests pass: PR #49's "Authenticated fixture suite (webkit)" passed 269 and
+skipped 1 (run 38520239746, job 115708036990). So no push could earn the marker on this machine,
+and pushes went out with `--no-verify`.
+
+The owner was offered three ways out: A, paste the push command once; B, a permission rule; C, fix
+the cause — "the local guard runs Chromium + Firefox; WebKit runs only in GitHub CI on Linux, where
+it passes". The owner's answer, 2026-10-14: "okay then do c right, what helps us in the long term".
+
+- **F104** (new): `playwright.config.ts` gives Playwright the WebKit project only when
+  `GITHUB_ACTIONS` is `"true"` or `AUTOM8X_WEBKIT` is `1`. GitHub sets `GITHUB_ACTIONS=true` on every
+  runner, inside a job's container too (PR #49's WebKit leg: `GITHUB_ACTIONS=true` and `CI=true`
+  in the Playwright container's environment). `CI` is not the switch: `npm run verify` and the
+  change audit set `CI=1` for `test:browser`, and `scripts/run-browser-fixtures.mjs` sets it for
+  itself, to keep Playwright from reusing a stale server. So a run on this machine —
+  `npm run test:browser`, `npm run test:browser:fixtures`, `npm run verify`, the change audit — runs
+  Chromium and Firefox, and its first line says so: "Browser engines here: Chromium and Firefox.
+  WebKit runs in GitHub CI on Linux, where it passes; AUTOM8X_WEBKIT=1 runs it here too." Each
+  Playwright worker loads the config again, with `TEST_WORKER_INDEX` set, and says nothing, so a run
+  says it once. Asked for by name without the opt-in (`--project=webkit`), WebKit is refused out
+  loud by Playwright — `Project(s) "webkit" not found` — under that line.
+- **What did not change.** `.github/workflows/ci.yml` is untouched: the browser job runs every
+  project, the fixture suite keeps a leg per engine — WebKit's with `--project=webkit` — and
+  all-green needs both jobs, so a WebKit failure still blocks a merge. `scripts/audit/record-pass.mjs`
+  keeps its gate list and its floors: 3 s for `test:browser` and 15 s for `test:browser:fixtures`
+  are there to refuse a faked instant pass, and a two-engine run still takes minutes (below). The
+  pre-push hook, the marker, `scripts/verify.mjs`, `scripts/audit/run-gates.mjs` and
+  `scripts/run-browser-fixtures.mjs` are unchanged.
+- **The cost, plainly.** A failure that only WebKit shows is now first seen in the pull request's
+  CI, not before the push. CI still blocks the merge on it.
+  `AUTOM8X_WEBKIT=1 npm run test:browser:fixtures -- --project=webkit` runs it here on purpose, this
+  Mac's failures included.
+- **The tests.** `test/browser-engines.test.mjs` (new, four tests) reads what Playwright would run
+  from Playwright itself (`--list`) under each environment, not from the config's text, which names
+  all three engines whichever a run gets: CI keeps a fixture leg per engine on Linux, the browser
+  job on every project, all-green needing both, and nothing in CI setting either switch; on a
+  GitHub runner Playwright has all three engines and finds `--project=webkit`; a run here — with
+  `CI=1`, `CI=true` or none, and with an opt-in that is not exactly `1` or a `GITHUB_ACTIONS` that
+  is not exactly `true` — has Chromium and Firefox, says the line once (a worker never), and refuses
+  `--project=webkit`, and no local gate sets either switch for itself; `AUTOM8X_WEBKIT=1` brings
+  WebKit back. The F91 test's listing now sets `AUTOM8X_WEBKIT=1`, so its pattern is still checked
+  in all three engines on any machine.
+
+Proved red with `node --test` on `test/browser-engines.test.mjs` and
+`test/structure-contract.test.mjs`, each file restored from a kept copy and its sha256 checked
+equal, then 31 of 31 passing:
+
+| Guard | Broken by | Red |
+| --- | --- | --- |
+| CI keeps WebKit | `webkit` dropped from the fixtures matrix | the CI test, the GitHub-runner test, F90 |
+| all-green needs the fixture legs | `fixtures` taken out of its needs | the CI test, F88 |
+| all-green needs the browser job | `browser` taken out of its needs | the CI test, F88 |
+| The browser job runs every project | `-- --project=chromium --project=firefox` added | the CI test, F91 |
+| The legs run on Linux | the fixtures job on `macos-15` | the CI test |
+| CI never turns the switch off | `GITHUB_ACTIONS: "false"` in the fixtures job's env | the CI test |
+| A GitHub runner gets WebKit | the `GITHUB_ACTIONS` clause taken out | the GitHub-runner test |
+| `CI` is not the switch | `Boolean(process.env.CI)` in its place | the local test |
+| A local run leaves WebKit out | the filter taken out | the local test |
+| The line is said | `console.log` made `String` | the local test |
+| Once, not once per worker | the `TEST_WORKER_INDEX` check taken out | the local test |
+| No local gate opts in by itself | `AUTOM8X_WEBKIT: "1"` in the change audit's `test:browser` env | the local test |
+| The opt-in brings WebKit back | the `AUTOM8X_WEBKIT` clause taken out | the opt-in test, F91 |
+
+**The gate.** `npm run verify` on this change, on the owner's Mac, Node 22.23.2, with
+`SNOOPY_BACKEND_ROOT` at a read-only copy of the three contracts of `snoopy-backend` `82bd743`, the
+ones the generated files name by sha256: every gate exited 0 — `format:check`, `lint`, `typecheck`,
+`audit:boundaries`, `test:contracts` (213 of 213), `verify:platform-contracts`, `build:no-backend`,
+`probe:no-backend`, `build`, `test:browser` (21 s: 34 passed — Chromium 20, Firefox 14 — 538 skipped
+for want of the fixture, none failed) and `test:browser:fixtures` (530 s: 538 passed, 269 in each
+engine, and 2 skipped, the keyboard journey in each; none failed) — and the facts file was written.
+Each browser gate said the engine line once. CI's WebKit leg lists the same 270 fixture tests.
+
+**Ships with the Invoice Processing screens.** This change's own change audit, on `c0bd411`, failed
+at one gate only: `test:contracts`, 211 of 213 — the contract-hash tests F6 and F7, because the
+generated types `main` holds (backend `82bd743`'s `93fd335c…`, `cceee630…`, `ab70cb0f…`) are stale
+against the contracts production serves since the thirty-first promotion (backend `8e16301`:
+`ab30738d…`, `ca1fd0eb…`, `bf50b980…`); the same tree passed 213 of 213 against `82bd743`'s. Every
+website change fails there, and CI's Deployed contract job, until the types are regenerated, and the
+Invoice Processing screens above regenerate them from exactly those contracts. So the two ship as
+one pull request: this change on top of those screens (the note of 2026-10-14 above).
+
+**The audit's two uncovered surfaces, now tested.** The audit found two surfaces no test held, and
+`test/browser-engines.test.mjs` has two more tests, six in all:
+
+- **The marketing baselines stay Chromium's.** `e2e/marketing.visual.spec.ts`, listed by
+  Playwright under `CI=1`, a GitHub runner's environment and `AUTOM8X_WEBKIT=1`: status 0, only
+  Chromium, and at least one test. Firefox's and WebKit's `testIgnore` now sit in the typed
+  `projects` list this change made, and a project that dropped one would draw pixels no baseline
+  holds.
+- **The engine tests hold under GitHub's own environment.** CI's gates job runs `test:contracts`
+  with `GITHUB_ACTIONS=true` for the whole run; each listing here starts from an environment with
+  neither switch. The file now runs its local and opt-in tests again in a child whose environment
+  has `GITHUB_ACTIONS=true` and `CI=true` — and `AUTOM8X_WEBKIT=1` and `TEST_WORKER_INDEX`, as a
+  shell or a worker may hold them — and both must run and pass there.
+
+Proved red with `node --test` on `test/browser-engines.test.mjs`, only the guarding test red each
+time, each file restored from a kept copy and its sha256 checked equal, then 6 of 6 passing:
+
+| Guard | Broken by | Red |
+| --- | --- | --- |
+| Firefox leaves the baselines out | Firefox's `testIgnore` taken out | the marketing test, at `CI=1` |
+| WebKit leaves the baselines out | WebKit's `testIgnore` taken out | the marketing test, on a GitHub runner |
+| Chromium keeps them | Chromium given the same `testIgnore` | the marketing test: no tests found, not status 0 |
+| A listing drops GitHub's switch | `delete bare.GITHUB_ACTIONS` taken out | the nested test (its local test red inside) |
+| A listing drops the opt-in | `delete bare.AUTOM8X_WEBKIT` taken out | the nested test (its local test red inside) |
+| A listing drops a worker's index | `delete bare.TEST_WORKER_INDEX` taken out | the nested test (its local test red inside) |
+
+**The gate, the two together.** `npm run verify` on the Invoice Processing screens with this change
+on top, on the owner's Mac, Node 22.23.2, default `TMPDIR`, `GITHUB_ACTIONS` and `AUTOM8X_WEBKIT`
+unset, `SNOOPY_BACKEND_ROOT` at a read-only extract of backend `57eac70`'s docs (its three
+contracts byte for byte the ones production serves): every gate exited 0 — `format:check`, `lint`,
+`typecheck`, `audit:boundaries`, `test:contracts` (233 of 233), `verify:platform-contracts`,
+`build:no-backend`, `probe:no-backend`, `build`, `test:browser` (19 s: 34 passed — Chromium 20,
+Firefox 14 — 554 skipped for want of the fixture, none failed) and `test:browser:fixtures` (532 s:
+554 passed, 277 in each engine, and 2 skipped, the keyboard journey in each; none failed) — and the
+facts file was written. WebKit did not run: each browser gate said the engine line once, and
+Playwright listed Chromium and Firefox alone. CI's WebKit leg lists the same 278 fixture tests.
+
+F104 is the last number.

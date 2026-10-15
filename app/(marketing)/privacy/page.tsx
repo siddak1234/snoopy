@@ -20,7 +20,7 @@ export default function PrivacyPage() {
           Privacy Policy
         </h1>
         <p className="mt-6 max-w-[56ch] text-base leading-7 text-[color-mix(in_srgb,var(--color-text)_78%,transparent)]">
-          Effective and last updated: October 13, 2026. This policy explains
+          Effective and last updated: October 14, 2026. This policy explains
           what information Autom8x collects, why, and what we do with it. It is
           written to be read; if anything is unclear, contact us at{" "}
           <LegalLink href={`mailto:${LEGAL_EMAIL}`}>{LEGAL_EMAIL}</LegalLink>.
@@ -129,23 +129,24 @@ export default function PrivacyPage() {
         <LegalSection heading="Documents read by AI">
           <p>
             An automation can have an AI model read the file given to its run,
-            and no other file. Bills &amp; Receipts does, to read a bill,
-            receipt, credit note or statement before recording it in QuickBooks
-            Online or comparing it with what QuickBooks holds. The platform
-            sends the document, with Autom8x&apos;s fixed instructions for
-            reading it, to OpenRouter, which passes the request to the provider
-            of an AI model. For Bills &amp; Receipts, nothing else from your
-            workspace goes with it: not your name, email address or other
-            account details, not the flow&apos;s settings or what was typed to
-            start the run (such as who paid), and nothing read from QuickBooks;
-            even the file&apos;s own name is left out. The document itself goes
-            as uploaded, including anything stored inside the file, such as a
-            PDF&apos;s title or author. A second model, from a different maker,
-            then reads the document again to check the first reading, and a
-            model that gives no usable answer is replaced by the next one on its
-            list, each request under the rules below. The answer goes back to
-            the automation, and what the run makes of it is kept with the
-            run&apos;s results.
+            and no other file. Invoice Processing does, to read a bill, receipt,
+            credit note or statement before saving its details, recording it in
+            QuickBooks Online, or comparing it with what QuickBooks holds. The
+            platform sends the document, with Autom8x&apos;s fixed instructions
+            for reading it, to OpenRouter, which passes the request to the
+            provider of an AI model. For Invoice Processing, nothing else from
+            your workspace goes with it: not your name, email address or other
+            account details, not the flow&apos;s settings, and nothing read from
+            QuickBooks; even the file&apos;s own name is left out. The document
+            itself goes as uploaded, including anything stored inside the file,
+            such as a PDF&apos;s title or author. Only when the first reading
+            looks wrong (totals that don&apos;t add up, unclear details, or an
+            amount over the flow&apos;s approval limit) does a second model,
+            from a different maker, read it again. A model that gives no usable
+            answer is replaced by the next one on its list, each request under
+            the rules below. What the run makes of the document is kept with the
+            run&apos;s results, and the details it saved are shown to the
+            members of your workspace.
           </p>
           <p>
             Every request tells OpenRouter to use only endpoints in the United
@@ -216,21 +217,22 @@ export default function PrivacyPage() {
         <LegalSection heading="QuickBooks Online data">
           <p>
             A workspace&apos;s owners and admins can connect its QuickBooks
-            Online company so that an automation, such as Bills &amp; Receipts,
+            Online company so that an automation, such as Invoice Processing,
             can work in it. The connection is approved on Intuit&apos;s own
             consent page, and Autom8x asks only for access to QuickBooks Online
             accounting (the com.intuit.quickbooks.accounting scope). Through it
             the platform can read the company&apos;s records and settings and
             create vendors, bills, expenses, vendor credits, journal entries and
             invoices; it cannot change or delete a record that already exists.
-            Bills &amp; Receipts reads the company&apos;s information and
+            Invoice Processing reads the company&apos;s information and
             settings, looks up its accounts, vendors, customers, employees,
             bills, expenses, vendor credits and journal entries, and creates
-            vendors, bills, expenses, vendor credits and journal entries: a bill
-            is recorded as a bill and a receipt as an expense, or as a journal
-            entry or a bill when someone paid with their own money; a credit
-            note as a vendor credit, or as a card refund when it was refunded to
-            a card; and a statement is compared, not recorded.
+            vendors, bills, expenses and vendor credits: a bill is recorded as a
+            bill and a receipt as an expense; a credit note as a vendor credit,
+            or as a card refund when it was refunded to a card; and a statement
+            is compared, not recorded. When you choose None instead of
+            QuickBooks, it saves the details it read and calls QuickBooks for
+            nothing.
           </p>
           <p>
             Intuit&apos;s tokens for the connection are stored encrypted
@@ -244,10 +246,13 @@ export default function PrivacyPage() {
             data is used only to run your workspace&apos;s own automations and
             show you what they did; none of it is sent to an AI model, and it is
             never sold or used for advertising. Autom8x does not process
-            QuickBooks data on Intuit&apos;s behalf. If you give Bills &amp;
-            Receipts an address in its &quot;Also email&quot; setting, such as
-            your bookkeeper&apos;s, a short summary of each document it records
-            or compares, built from QuickBooks&apos; answer, is emailed there.
+            QuickBooks data on Intuit&apos;s behalf. If you give Invoice
+            Processing an address in its &quot;Also email&quot; setting, such as
+            your bookkeeper&apos;s, a short summary of each document it saves,
+            records or compares is emailed there, built from the details read
+            from the document and, when it records the document in QuickBooks or
+            compares it with what QuickBooks holds, from QuickBooks&apos;
+            answer.
           </p>
           <p>
             An owner or admin can disconnect QuickBooks at any time on the

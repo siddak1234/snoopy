@@ -10,18 +10,23 @@ import {
   type AutomationCatalogEntry,
   type Subscription,
 } from "@/lib/automations";
+import {
+  emptyConnectionsWhenUnavailable,
+  listConnectionProviders,
+  type ConnectionProvider,
+} from "@/lib/connections";
 import { heldCopy } from "@/lib/held-flow";
 import { flowsOverPlan, overPlanSentence } from "@/lib/plan-limit";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { AutomationActions } from "./AutomationActions";
-import { AddAutomation, type AddScope } from "./AddAutomation";
+import { AddAutomation } from "./AddAutomation";
 import { MoveVersionButton } from "./MoveVersionButton";
 import { WebhookAddressButton } from "./WebhookAddressButton";
+import { unmetLines, vendorChoice } from "./vendor-path";
 import {
   administers,
-  teamDirectoryIfThere,
   listWorkspaceProjects,
   resolveActiveWorkspaceId,
   roleInWorkspace,
@@ -36,32 +41,32 @@ import {
  * holds the status, the pinned version, and any unmet connections. Joining them
  * here is what lets one card show both "Added" and "Live".
  *
+ * **A flow goes to the team of its category** (backend ADR-0036; the owner,
+ * 2026-10-14: "theres no choose a team. there will be pre existing teams
+ * depending on which flows are added"): Add sends no team, and the platform
+ * puts the flow in the team of its kind — the card's category — making it when
+ * the workspace has none. Every flow says its team, "Team: Accounting"; one
+ * added to the whole workspace before teams says that instead.
+ *
  * **A workspace holds each flow once** (the owner, build 12's #9; register
  * F87): Personal is one workspace and each organization another. A flow is
- * held while a subscription of it is not archived, in any team or the whole
- * workspace (`heldCopy`), and a card whose flow is held offers no team at all:
- * it says where the flow is, "Added · Team: {kind}", with the way to it. The
- * platform still takes one per team (backend 18.6.2) until its own guard
- * lands, so the Add action refuses a second copy too. A card still lists every
- * subscription it has, each under its own scope (register F21), so a duplicate
- * from before is listed, never hidden. Each is visible only to the people who
- * can see its team — the platform filters the list (a team is a project in its
- * contract).
- *
- * **A flow is added to a team** (the owner, build 10): the whole workspace is
- * no longer offered, and with no team yet nothing can be added — an owner or
- * admin is sent to make one. The platform is unchanged: a flow added to the
- * whole workspace before stays, listed and labelled "Whole workspace".
+ * held while a subscription of it is not archived (`heldCopy`), and its card
+ * then says "Added ✓", which goes to it. A card still lists every subscription
+ * it has (register F21), so a duplicate from before is listed, never hidden.
+ * Each is visible only to the people who can see its team — the platform
+ * filters the list (a team is a project in its contract).
  *
  * Archived flows are read by name (`status=archived`, backend §12.1 #203) and
  * listed last, each with the day it was archived (BUILD-PLAN 24.11.11) and
  * Unarchive (the owner, build 12's #4): the card's own Add, which adds the
- * flow afresh — the platform's archive is one-way — to the team it had, or,
- * from the whole workspace, to a team as the card offers them (D4). A flow
- * held again says where it is instead, as its card does.
+ * flow afresh — the platform's archive is one-way. A flow held again says
+ * where it is instead, as its card does.
  */
 
 export const dynamic = "force-dynamic";
+
+/** The card's subtitle (spec §3.A). */
+const SUBTITLE = "Ready-made flows for your teams.";
 
 export default async function FlowsPage() {
   const session = await getAppSession();
@@ -69,27 +74,28 @@ export default async function FlowsPage() {
 
   if (!workspaceId) {
     return (
-      <SectionCard
-        title="Flows"
-        subheader="Browse flows and add them to your workspace"
-      >
+      <SectionCard title="Flows" subheader={SUBTITLE}>
         <EmptyRow text="No workspace is active yet." />
       </SectionCard>
     );
   }
 
-  const [catalog, subscriptions, archived, projects, role] = await Promise.all([
-    emptyWhenUnavailable(() => listAutomations(workspaceId), {
-      automations: [],
-      categories: [],
-    }),
-    emptyWhenUnavailable(() => listSubscriptions(workspaceId), {
-      subscriptions: [],
-    }),
-    emptyWhenUnavailable(() => listArchivedSubscriptions(workspaceId), []),
-    emptyWhenUnavailable(() => listWorkspaceProjects(workspaceId), []),
-    roleInWorkspace(workspaceId),
-  ]);
+  const [catalog, subscriptions, archived, projects, providers, role] =
+    await Promise.all([
+      emptyWhenUnavailable(() => listAutomations(workspaceId), {
+        automations: [],
+        categories: [],
+      }),
+      emptyWhenUnavailable(() => listSubscriptions(workspaceId), {
+        subscriptions: [],
+      }),
+      emptyWhenUnavailable(() => listArchivedSubscriptions(workspaceId), []),
+      emptyWhenUnavailable(() => listWorkspaceProjects(workspaceId), []),
+      emptyConnectionsWhenUnavailable(listConnectionProviders, {
+        providers: [],
+      }),
+      roleInWorkspace(workspaceId),
+    ]);
   const canAdminister = administers(role);
   // Over the plan's flow allowance, the whole workspace's (decision 7a3).
   const overPlan = flowsOverPlan(subscriptions.flowAllowance);
@@ -107,45 +113,15 @@ export default async function FlowsPage() {
       entry,
     ]);
   }
-  const openProjects = projects.filter(
-    (project) => project.status !== "archived",
-  );
-  // A plain member on no team (the owner's build 10, found by the change
-  // audit): if the organization has teams they could ask to join, the card
-  // says so rather than that the first team is still to be made. Read only in
-  // that state; an owner or admin sees every team already.
-  const canAskToJoin =
-    !canAdminister && openProjects.length === 0
-      ? (await teamDirectoryIfThere(workspaceId)).some(
-          (entry) => entry.access !== "member",
-        )
-      : false;
   const catalogEntry = new Map(
     catalog.automations.map((entry) => [entry.templateId, entry]),
   );
   // An archived flow keeps the team it was in, deleted or not. A team is its
   // kind (the owner, build 9).
-  const teamName = new Map(
-    projects.map((project) => [project.id, project.type]),
-  );
-  const place = (copy: Subscription) =>
-    copy.projectId
-      ? `Team: ${teamName.get(copy.projectId) ?? "a team"}`
-      : "Whole workspace";
-  // Unarchiving is adding afresh, by the card's own Add (the owner, build
-  // 12's #4): to the team the flow had while that team is open; otherwise —
-  // the whole workspace, or a team deleted since — to a team, offered as the
-  // card offers them, and never the whole workspace (D4).
-  const teamsOffered: AddScope[] = openProjects.map((project) => ({
-    projectId: project.id,
-    label: `Team: ${project.type}`,
-  }));
+  const place = placeOf(projects, catalogEntry);
 
   return (
-    <SectionCard
-      title="Flows"
-      subheader="Browse flows and add them to your workspace"
-    >
+    <SectionCard title="Flows" subheader={SUBTITLE}>
       {overPlan ? (
         // Every flow is held from starting a run, so this is said above them
         // all, in the app's words (the owner's build 13 decision 7a3).
@@ -172,11 +148,11 @@ export default async function FlowsPage() {
               key={`${automation.templateId}.v${automation.version}`}
               automation={automation}
               subscriptions={byTemplate.get(automation.templateId) ?? []}
-              projects={openProjects}
+              place={place}
+              providers={providers.providers}
               canAdminister={canAdminister}
-              canAskToJoin={canAskToJoin}
               workspaceId={workspaceId}
-              userId={session?.user.id ?? ""}
+              aiDocumentReading={session?.user.aiDocumentReading}
             />
           ))}
         </div>
@@ -202,9 +178,6 @@ export default async function FlowsPage() {
                 subscriptions.subscriptions,
                 subscription.templateId,
               );
-              const had = teamsOffered.find(
-                (scope) => scope.projectId === subscription.projectId,
-              );
               return (
                 <li
                   key={subscription.id}
@@ -229,7 +202,7 @@ export default async function FlowsPage() {
                         href={`#flow-${twin.id}`}
                         className="inline-flex min-h-6 items-center text-xs text-[var(--muted)] underline underline-offset-2"
                       >
-                        Added · {place(twin)}
+                        Added ✓
                       </a>
                     ) : (
                       <AddAutomation
@@ -237,10 +210,6 @@ export default async function FlowsPage() {
                         templateId={subscription.templateId}
                         name={name}
                         available={entry.available}
-                        scopes={had ? [had] : teamsOffered}
-                        hasTeam={teamsOffered.length > 0}
-                        canAdminister={canAdminister}
-                        canAskToJoin={canAskToJoin}
                         unarchive
                       />
                     )}
@@ -255,43 +224,50 @@ export default async function FlowsPage() {
   );
 }
 
+/**
+ * Where a flow is, in words (spec §3.A, §3.D): "Team: {kind}" — a team is its
+ * kind (the owner, build 9), and a flow's team is the one of its category
+ * (backend ADR-0036), so a team this person cannot list is still named by the
+ * category. A flow added to the whole workspace before teams says so.
+ */
+function placeOf(
+  projects: Project[],
+  catalog: Map<string, AutomationCatalogEntry>,
+) {
+  const teamKind = new Map(
+    projects.map((project) => [project.id, project.type]),
+  );
+  return (subscription: Subscription) => {
+    if (!subscription.projectId) return "Whole workspace";
+    const kind =
+      teamKind.get(subscription.projectId) ??
+      catalog.get(subscription.templateId)?.category;
+    return kind ? `Team: ${kind}` : "Team";
+  };
+}
+
 function AutomationCard({
   automation,
   subscriptions,
-  projects,
+  place,
+  providers,
   canAdminister,
-  canAskToJoin,
   workspaceId,
-  userId,
+  aiDocumentReading,
 }: {
   automation: AutomationCatalogEntry;
   subscriptions: Subscription[];
-  projects: Project[];
+  place: (subscription: Subscription) => string;
+  providers: ConnectionProvider[];
   canAdminister: boolean;
-  /** A plain member on no team, in an organization with a team they could ask to join. */
-  canAskToJoin: boolean;
   /** The workspace this page shows; every action on the card is refused once it is not active. */
   workspaceId: string;
-  /** The signed-in person: the Run window keeps their AI consent under their id. */
-  userId: string;
+  /** The account's AI consent, which a run with a file waits for (backend ADR-0038). */
+  aiDocumentReading: "allowed" | "declined" | null | undefined;
 }) {
-  // A team is its kind (the owner, build 9).
-  const projectName = new Map(
-    projects.map((project) => [project.id, project.type]),
-  );
-  const where = (subscription: Subscription) =>
-    subscription.projectId
-      ? `Team: ${projectName.get(subscription.projectId) ?? "a team"}`
-      : "Whole workspace";
-  // Held anywhere in the workspace, the flow is offered to no team (the owner,
-  // build 12's #9): Add is not drawn. Held nowhere, every open team is offered,
-  // and the whole workspace never is (the owner, build 10) — a row added there
-  // before keeps its place above.
+  // Held anywhere in the workspace, the flow is added once (the owner, build
+  // 12's #9): "Added ✓" goes to it, and Add is not drawn.
   const held = heldCopy(subscriptions, automation.templateId);
-  const scopes: AddScope[] = projects.map((project) => ({
-    projectId: project.id,
-    label: `Team: ${project.type}`,
-  }));
 
   return (
     <div className="bubble flex flex-col gap-3 p-5">
@@ -314,20 +290,12 @@ function AutomationCard({
 
       <p className="text-sm text-[var(--muted)]">{automation.description}</p>
 
-      <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--muted)]">
-        <div className="flex gap-1">
-          <dt>Version</dt>
-          <dd className="text-[var(--text)]">v{automation.version}</dd>
-        </div>
-        <div className="flex gap-1">
-          <dt>Price</dt>
-          <dd className="text-[var(--text)]">
-            {automation.monthlyPriceUsd === 0
-              ? "Included"
-              : `$${automation.monthlyPriceUsd}/mo`}
-          </dd>
-        </div>
-      </dl>
+      {/* The price; the version is not the card's to say (spec §3.A, S9). */}
+      <p className="text-xs text-[var(--text)]">
+        {automation.monthlyPriceUsd === 0
+          ? "Included"
+          : `$${automation.monthlyPriceUsd}/mo`}
+      </p>
 
       {/* `available` is evidence from a reachability probe. Saying so beats an
           Add button that fails at the first run. */}
@@ -338,7 +306,7 @@ function AutomationCard({
       ) : null}
 
       {subscriptions.map((subscription) => (
-        // Where "Added · …" below goes: the flow, its controls first after it.
+        // Where "Added ✓" below goes: the flow, its controls first after it.
         <div
           key={subscription.id}
           id={`flow-${subscription.id}`}
@@ -346,22 +314,28 @@ function AutomationCard({
           className="flex flex-col gap-2 border-t border-[var(--ring)] pt-3"
         >
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-[var(--muted)]">{where(subscription)}</p>
+            <p className="text-xs text-[var(--muted)]">{place(subscription)}</p>
             <StatusPill status={subscription.status} />
           </div>
 
-          {subscription.unmetConnections.length > 0 ? (
-            <p className="text-xs text-[var(--warning-text)]">
+          {unmetLines(
+            subscription,
+            automation.requiredConnections,
+            providers,
+          ).map((line) => (
+            <p
+              key={line.providerId}
+              className="text-xs text-[var(--warning-text)]"
+            >
               <Link
                 prefetch={false}
-                href="/account/connections"
+                href={line.href}
                 className="underline underline-offset-2"
               >
-                Connect {subscription.unmetConnections.join(", ")}
-              </Link>{" "}
-              before going live.
+                {line.text}
+              </Link>
             </p>
-          ) : null}
+          ))}
 
           {/* A subscription runs the version it PINNED (backend ADR-0030), and
               adding an automation pins the newest. It moves in place (backend
@@ -401,12 +375,22 @@ function AutomationCard({
 
           <AutomationActions
             workspaceId={workspaceId}
-            userId={userId}
             name={automation.name}
+            team={place(subscription)}
             available={automation.available}
+            // A run with a file on a flow that reads it with AI waits for the
+            // account's answer (backend ADR-0038). The catalog says it of the
+            // version it lists, the one a flow is added at.
+            usesAi={automation.usesAi === true}
+            aiDocumentReading={aiDocumentReading}
             // The settings of the version it RUNS, which the platform checks a
             // save against — not the catalog's newest (backend §12.1 #185).
             setup={subscription.setup ?? []}
+            vendor={vendorChoice(
+              subscription,
+              automation.requiredConnections,
+              providers,
+            )}
             subscription={{
               id: subscription.id,
               status: subscription.status,
@@ -421,15 +405,14 @@ function AutomationCard({
       ))}
 
       <div className="mt-auto">
-        {/* Held, it says where, whatever teams there are, and goes to it — the
-            app's "Added ✓" with its team (the owner, build 12's #9). Nothing
-            is offered: not a team, not Create a team first. */}
+        {/* Held, it says so and goes to it (the owner, build 12's #9); its
+            team is on its row above. */}
         {held ? (
           <a
             href={`#flow-${held.id}`}
             className="inline-flex min-h-6 items-center text-xs text-[var(--muted)] underline underline-offset-2"
           >
-            Added · {where(held)}
+            Added ✓
           </a>
         ) : (
           <AddAutomation
@@ -437,10 +420,6 @@ function AutomationCard({
             templateId={automation.templateId}
             name={automation.name}
             available={automation.available}
-            scopes={scopes}
-            hasTeam={projects.length > 0}
-            canAdminister={canAdminister}
-            canAskToJoin={canAskToJoin}
           />
         )}
       </div>

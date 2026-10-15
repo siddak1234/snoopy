@@ -2,6 +2,7 @@ import Link from "next/link";
 import type {
   AnchorHTMLAttributes,
   ButtonHTMLAttributes,
+  ComponentProps,
   RefAttributes,
 } from "react";
 
@@ -33,9 +34,14 @@ type ButtonAsButton = CommonProps &
   ButtonHTMLAttributes<HTMLButtonElement> &
   RefAttributes<HTMLButtonElement> & { href?: undefined };
 
+// `prefetch` reaches the Link: the account area never prefetches (backend
+// §12.1 #160), so a button that links there passes `prefetch={false}`.
 type ButtonAsLink = CommonProps &
   Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> &
-  RefAttributes<HTMLAnchorElement> & { href: string };
+  RefAttributes<HTMLAnchorElement> & {
+    href: string;
+    prefetch?: ComponentProps<typeof Link>["prefetch"];
+  };
 
 export type ButtonProps = ButtonAsButton | ButtonAsLink;
 

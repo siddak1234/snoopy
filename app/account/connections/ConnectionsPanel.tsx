@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useEffect,
   useState,
   useSyncExternalStore,
   useTransition,
@@ -12,33 +13,22 @@ import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import { FormInput } from "@/components/ui/FormInput";
 import Modal from "@/components/ui/Modal";
+import {
+  VendorConnectButton,
+  VendorLogo,
+} from "@/components/dashboard/VendorLogo";
+import { DISCONNECT_BODY, brandLogo, disconnectTitle } from "@/lib/brand-logos";
 import type { Connection, ConnectionProvider } from "@/lib/connections";
 import {
   beginConnectionAuthorization,
   connectProviderWithKey,
   disconnectConnection,
 } from "./actions";
-
-/**
- * Which provider this tab's last Connect, Reconnect or Replace left for, so the
- * page a connect returns to can say whether THAT provider's connection is still
- * active. The callback carries only `status` (`app/connections/page.tsx`), and
- * the page used to read "some provider is connected" as "yours is still
- * active": a first connect of one provider that did not finish told a person
- * with another provider connected that their existing connection still worked
- * (register F100). This tab's storage, and a provider id only — never a
- * credential.
- */
-const PENDING_CONNECT = "autom8x.connections.pending";
-
-function rememberPendingConnect(providerId: string) {
-  try {
-    sessionStorage.setItem(PENDING_CONNECT, providerId);
-  } catch {
-    // Storage refused (a private window, a policy): the page then says only
-    // that the connection could not be completed, which is always true.
-  }
-}
+import {
+  PENDING_CONNECT,
+  rememberConnect,
+  takeConnectReturn,
+} from "./pending-connect";
 
 function pendingConnect(): string | null {
   try {
@@ -63,6 +53,10 @@ const noSubscription = () => () => {};
  * account for every automation that uses this connection — so it is its own
  * control, confirmed first, and it names the exact connection it replaces
  * (backend 22.5.3, ADR-0026).
+ *
+ * **Disconnect** ends the connection every flow in the workspace acts through
+ * (the contract's own words), so it is confirmed first, as in the app — in the
+ * vendor's words where it has them: "Disconnect from QuickBooks?" (spec §3.I).
  */
 export function ConnectionsPanel({
   connections,
@@ -87,7 +81,9 @@ export function ConnectionsPanel({
     null,
   );
   const [pending, startTransition] = useTransition();
-  const [disconnecting, setDisconnecting] = useState<string | null>(null);
+  // The connection whose disconnect is being confirmed, and its refusal.
+  const [disconnecting, setDisconnecting] = useState<Connection | null>(null);
+  const [disconnectError, setDisconnectError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [replacing, setReplacing] = useState<Connection | null>(null);
   const [replaceError, setReplaceError] = useState<string | null>(null);
@@ -99,6 +95,14 @@ export function ConnectionsPanel({
     pendingConnect,
     () => undefined,
   );
+
+  // A connect started on a flow's vendor page goes back there once the
+  // vendor's sign-in has landed here (spec §3.C), with how it ended.
+  useEffect(() => {
+    if (!callbackStatus) return;
+    const back = takeConnectReturn();
+    if (back) router.replace(`${back}?status=${callbackStatus}`);
+  }, [callbackStatus, router]);
 
   const close = () => {
     setSelectedProvider(null);
@@ -134,7 +138,7 @@ export function ConnectionsPanel({
         setError(result.ok ? "Could not start the connection" : result.error);
         return;
       }
-      rememberPendingConnect(provider.providerId);
+      rememberConnect(provider.providerId);
       window.location.assign(result.authorizationUrl);
     });
   };
@@ -169,7 +173,7 @@ export function ConnectionsPanel({
         );
         return;
       }
-      rememberPendingConnect(connection.providerId);
+      rememberConnect(connection.providerId);
       window.location.assign(result.authorizationUrl);
     });
   };
@@ -196,16 +200,23 @@ export function ConnectionsPanel({
     submitKey(data);
   };
 
-  const disconnect = async (connectionId: string) => {
-    setError(null);
-    setDisconnecting(connectionId);
-    try {
-      const result = await disconnectConnection(workspaceId, connectionId);
-      if (!result.ok) setError(result.error);
-      else router.refresh();
-    } finally {
+  const closeDisconnect = () => {
+    if (pending) return;
+    setDisconnecting(null);
+    setDisconnectError(null);
+  };
+
+  const confirmDisconnect = (connection: Connection) => {
+    setDisconnectError(null);
+    startTransition(async () => {
+      const result = await disconnectConnection(workspaceId, connection.id);
+      if (!result.ok) {
+        setDisconnectError(result.error);
+        return;
+      }
       setDisconnecting(null);
-    }
+      router.refresh();
+    });
   };
 
   // A live connection for a provider is one already `connected`. It changes both
@@ -266,71 +277,80 @@ export function ConnectionsPanel({
             No external accounts are connected yet.
           </p>
         ) : (
-          connections.map((connection) => (
-            <div
-              key={connection.id}
-              className="flex flex-col gap-4 py-1 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-medium text-[var(--text)]">
-                    {connection.externalAccount.displayName}
+          connections.map((connection) => {
+            const provider = providerNamed.get(connection.providerId);
+            const logo = brandLogo(provider?.icon);
+            return (
+              <div
+                key={connection.id}
+                className="flex flex-col gap-4 py-1 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* The vendor's own logo, where it has one (spec §3.I),
+                      in its own clear space; its left padding sits in the
+                      card's, so the logo lines up with the words below. */}
+                    {logo ? <VendorLogo logo={logo} className="-ml-3" /> : null}
+                    <p className="font-medium text-[var(--text)]">
+                      {connection.externalAccount.displayName}
+                    </p>
+                    <StatusPill status={connection.status} />
+                  </div>
+                  {/* `usedByCount` is live subscriptions only — a draft is being
+                    set up, not running — so the label says "live" to match.
+                    The vendor by its name, never its id; a logo says it. */}
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    {provider && !logo ? `${provider.displayName} · ` : ""}
+                    Used by {connection.usedByCount} live{" "}
+                    {connection.usedByCount === 1 ? "flow" : "flows"}
                   </p>
-                  <StatusPill status={connection.status} />
+                  {connection.errorCode ? (
+                    <p className="mt-1 text-xs text-[var(--warning-text)]">
+                      This connection needs attention before it can be used.
+                    </p>
+                  ) : null}
                 </div>
-                {/* `usedByCount` is live subscriptions only — a draft is being
-                    set up, not running — so the label says "live" to match. */}
-                <p className="mt-1 text-sm text-[var(--muted)]">
-                  {connection.providerId} · Used by {connection.usedByCount}{" "}
-                  live {connection.usedByCount === 1 ? "flow" : "flows"}
-                </p>
-                {connection.errorCode ? (
-                  <p className="mt-1 text-xs text-[var(--warning-text)]">
-                    This connection needs attention before it can be used.
-                  </p>
-                ) : null}
-              </div>
-              {canManage ? (
-                <div className="flex flex-wrap gap-2">
-                  {replaceable(connection) ? (
+                {canManage ? (
+                  <div className="flex flex-wrap gap-2">
+                    {replaceable(connection) ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={pending}
+                        onClick={() => {
+                          setError(null);
+                          setNotice(null);
+                          setReplacing(connection);
+                        }}
+                      >
+                        Replace account
+                      </Button>
+                    ) : null}
+                    {/* Red: it ends the connection every flow here acts
+                      through (the owner's build 12, #5). */}
                     <Button
-                      variant="secondary"
+                      variant="danger"
                       size="sm"
                       disabled={pending}
                       onClick={() => {
                         setError(null);
                         setNotice(null);
-                        setReplacing(connection);
+                        setDisconnecting(connection);
                       }}
                     >
-                      Replace account
+                      {logo ? logo.disconnectLabel : "Disconnect"}
                     </Button>
-                  ) : null}
-                  {/* Red: it ends the connection every flow here acts
-                      through (the owner's build 12, #5). */}
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    disabled={pending || disconnecting === connection.id}
-                    onClick={() => disconnect(connection.id)}
-                  >
-                    {disconnecting === connection.id
-                      ? "Disconnecting…"
-                      : "Disconnect"}
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          ))
+                  </div>
+                ) : null}
+              </div>
+            );
+          })
         )}
       </div>
 
       <div className="mt-5 border-t border-[var(--ring)] pt-5">
         <p className="text-sm font-medium text-[var(--text)]">
           Available connections
-        </p>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Only providers configured for this deployment are shown.
         </p>
         {canManage ? null : (
           <p className="mt-1 text-sm text-[var(--muted)]">
@@ -339,35 +359,58 @@ export function ConnectionsPanel({
           </p>
         )}
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {providers.map((provider) => (
-            <div
-              key={provider.providerId}
-              className="bubble flex flex-col gap-3 p-4"
-            >
-              <div>
-                <p className="font-medium text-[var(--text)]">
-                  {provider.displayName}
-                </p>
-                <p className="mt-1 text-sm text-[var(--muted)]">
-                  {provider.description}
-                </p>
+          {providers.map((provider) => {
+            const logo = brandLogo(provider.icon);
+            return (
+              <div
+                key={provider.providerId}
+                className="bubble flex flex-col gap-3 p-4"
+              >
+                <div>
+                  {/* A vendor's own logo carries its name (spec §3.I). Its
+                    clear space reaches into the card's padding above and to
+                    the left, so it lines up with a name in the next card. */}
+                  {logo ? (
+                    <VendorLogo logo={logo} className="-mt-3 -ml-3" />
+                  ) : (
+                    <p className="font-medium text-[var(--text)]">
+                      {provider.displayName}
+                    </p>
+                  )}
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    {provider.description}
+                  </p>
+                </div>
+                {/* A vendor with its own connect button: shown until it is
+                  connected, then hidden — its disconnect is on the account's
+                  row above (Intuit's technical requirement 1.1). */}
+                {canManage ? (
+                  logo ? (
+                    connectedProviderIds.has(provider.providerId) ? null : (
+                      <VendorConnectButton
+                        logo={logo}
+                        disabled={pending}
+                        onClick={() => connect(provider)}
+                      />
+                    )
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={pending}
+                      onClick={() => connect(provider)}
+                    >
+                      {pending
+                        ? "Connecting…"
+                        : reconnectableProviderIds.has(provider.providerId)
+                          ? "Reconnect"
+                          : "Connect"}
+                    </Button>
+                  )
+                ) : null}
               </div>
-              {canManage ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={pending}
-                  onClick={() => connect(provider)}
-                >
-                  {pending
-                    ? "Connecting…"
-                    : reconnectableProviderIds.has(provider.providerId)
-                      ? "Reconnect"
-                      : "Connect"}
-                </Button>
-              ) : null}
-            </div>
-          ))}
+            );
+          })}
         </div>
         {providers.length === 0 ? (
           <p className="mt-4 text-sm text-[var(--muted)]">
@@ -378,9 +421,56 @@ export function ConnectionsPanel({
 
       {/* One refusal, one alert (register F52): while a dialog is open its own
           alert carries the answer, so the panel's does not repeat it. */}
-      {selectedProvider || replacing ? null : (
+      {selectedProvider || replacing || disconnecting ? null : (
         <FormError message={error} className="mt-4" />
       )}
+
+      {disconnecting ? (
+        <Modal
+          onClose={closeDisconnect}
+          bubble
+          ariaLabelledBy="disconnect-connection-title"
+          ariaDescribedBy="disconnect-connection-description"
+          zIndex={100}
+          dismissible={!pending}
+        >
+          <h2
+            id="disconnect-connection-title"
+            className="text-xl font-semibold text-[var(--text)]"
+          >
+            {disconnectTitle(
+              providerNamed.get(disconnecting.providerId)?.icon,
+              providerNamed.get(disconnecting.providerId)?.displayName ??
+                disconnecting.externalAccount.displayName,
+            )}
+          </h2>
+          <p
+            id="disconnect-connection-description"
+            className="mt-1 text-sm text-[var(--muted)]"
+          >
+            {DISCONNECT_BODY}
+          </p>
+          <FormError message={disconnectError} className="mt-3" />
+          <div className="mt-6 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={closeDisconnect}
+              disabled={pending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => confirmDisconnect(disconnecting)}
+              disabled={pending}
+            >
+              {pending ? "Disconnecting…" : "Disconnect"}
+            </Button>
+          </div>
+        </Modal>
+      ) : null}
 
       {replacing ? (
         <Modal
