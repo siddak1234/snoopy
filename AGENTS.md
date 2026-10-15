@@ -56,9 +56,15 @@ wrong repo.** Say so and stop. Then read the current round's card in
 6. **Prisma is gone** — removed in Round 5 (plan items 4.6.4–4.6.7). Rule 5's
    audit refuses it, a direct database import, or a Supabase SDK coming back.
 7. **`npm run verify` green before every commit** — the whole offline gate in
-   one command, listed in the README.
+   one command, listed in the README. On a developer's machine its browser
+   suites run in Chromium and Firefox. WebKit runs in GitHub CI on Linux, where
+   it passes, and all-green needs it there; on the owner's Mac, Playwright's
+   WebKit fails dozens of tests that pass in CI, even on unchanged `main`
+   (the owner's decision of 2026-10-14, register F104). `AUTOM8X_WEBKIT=1`
+   runs WebKit locally on purpose.
 8. **No push without a passing change audit.** `/audit-change` must PASS for the
    exact tree being pushed — it maps the blast radius of the change and tests
-   it, not just the changed feature. The Claude hook in `.claude/settings.json`
-   and the native hook (armed once per clone via
-   `bash scripts/install-git-hooks.sh`) both enforce the marker.
+   it, not just the changed feature. Its gates are rule 7's, so its browser
+   suites run in Chromium and Firefox, and the pull request's CI runs WebKit.
+   The Claude hook in `.claude/settings.json` and the native hook (armed once
+   per clone via `bash scripts/install-git-hooks.sh`) both enforce the marker.

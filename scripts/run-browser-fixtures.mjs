@@ -16,7 +16,7 @@ const playwrightSelectors = process.argv.slice(2);
 // buttons' pixel contrast were identical (register F91) — so they run once,
 // there, not again in each of the three legs. /login stays: its provider list
 // is the platform's, and only the fixture can show the page with one. The
-// fourteen authenticated baselines run only here. Matched on Playwright's grep
+// fifteen authenticated baselines run only here. Matched on Playwright's grep
 // title — "<project> <file, relative to testDir> <describe…> <title>", e.g.
 // "chromium accessibility.spec.ts public accessibility baseline: /" — anchored
 // to the project, this spec's file and the title's end, so /login, the

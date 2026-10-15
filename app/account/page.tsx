@@ -13,10 +13,8 @@ import {
   PlatformServerError,
 } from "@/lib/platform-server";
 import {
-  administers,
   listAccessibleProjects,
   resolveActiveWorkspaceId,
-  roleInWorkspace,
 } from "@/lib/tenancy";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { StatusPill } from "@/components/dashboard/StatusPill";
@@ -96,7 +94,7 @@ export default async function AccountDashboardPage() {
   const activeWorkspaceId = session
     ? await resolveActiveWorkspaceId(session)
     : undefined;
-  const [topProjects, overview, canCreateTeam] = session
+  const [topProjects, overview] = session
     ? await Promise.all([
         // A deleted team is archived, and leaves every team list — this one too.
         listAccessibleProjects().then((projects) =>
@@ -105,11 +103,8 @@ export default async function AccountDashboardPage() {
             .slice(0, 3),
         ),
         readOverview(activeWorkspaceId),
-        // Only an owner or admin creates a team (backend 24.12.1), so Create
-        // is offered to them alone, as on the Teams page.
-        roleInWorkspace(activeWorkspaceId).then(administers),
       ])
-    : [[], null, false];
+    : [[], null];
 
   // Show workspace name tags when the user's top projects span multiple workspaces
   const uniqueWorkspaceIds = new Set(
@@ -247,17 +242,6 @@ export default async function AccountDashboardPage() {
         {topProjects.length === 0 ? (
           <>
             <p className="mt-3 text-sm text-[var(--muted)]">No teams yet.</p>
-            {canCreateTeam ? (
-              <div className="mt-3">
-                <Link
-                  prefetch={false}
-                  href="/account/teams"
-                  className="btn-secondary inline-flex px-4 py-2 text-sm"
-                >
-                  Create a team
-                </Link>
-              </div>
-            ) : null}
           </>
         ) : (
           <>

@@ -10,6 +10,7 @@ import { extractDomain, isPublicDomain } from "@/lib/domain-utils";
 import SectionCard from "@/components/dashboard/SectionCard";
 import DeleteAccountButton from "@/components/account/DeleteAccountButton";
 import LinkedAccountsSection from "@/components/account/LinkedAccountsSection";
+import { AiReadingSetting } from "@/components/account/AiReadingSetting";
 import { SetupOrgForm } from "@/app/onboarding/setup-org/SetupOrgForm";
 import { WorkspaceExportSection } from "./WorkspaceExportSection";
 
@@ -49,6 +50,15 @@ export default async function AccountSettingsPage() {
         </p>
       </div>
       <LinkedAccountsSection />
+      {/* The account's AI consent (backend ADR-0038), once the platform
+          says it — absent from a platform from before it asked. */}
+      {session && session.user.aiDocumentReading !== undefined ? (
+        <AiReadingSetting
+          // Drawn afresh when the answer changes elsewhere — the card's.
+          key={session.user.aiDocumentReading ?? "unanswered"}
+          initialOn={session.user.aiDocumentReading === "allowed"}
+        />
+      ) : null}
 
       {showOrgCreate ? (
         <div className="border-t border-[var(--ring)] py-5">

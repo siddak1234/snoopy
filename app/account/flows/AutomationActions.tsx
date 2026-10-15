@@ -1,10 +1,20 @@
 "use client";
 
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { PlayIcon } from "@phosphor-icons/react/dist/ssr/Play";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import Modal from "@/components/ui/Modal";
+import { AiConsentCard } from "@/components/account/AiConsentCard";
+import { saveAiDocumentReading } from "@/app/account/ai-consent-actions";
+import {
+  AI_READING_OFF,
+  AI_SETTING,
+  runCarriesFile,
+  runGate,
+  type AiChoice,
+} from "@/lib/ai-consent";
 import type {
   AutomationRunInputField,
   AutomationSetupField,
@@ -17,13 +27,9 @@ import {
   startRun,
   type ActionResult,
 } from "./actions";
-import { AiConsentDialog } from "./AiConsentDialog";
-import { hasAiConsent, recordAiConsent, runCarriesFile } from "./ai-consent";
 import { RunInputFields, SetupFields } from "./ManifestFields";
-
-// This browser's storage, reached only inside ai-consent.ts's guards: in a
-// browser that refuses it, reading `window.localStorage` itself throws.
-const browserStorage = () => window.localStorage;
+import { setupProblem } from "./setup-check";
+import type { VendorChoiceRow } from "./vendor-path";
 
 /**
  * The buttons for one subscription on a flow's card — adding is
@@ -38,24 +44,37 @@ const browserStorage = () => window.localStorage;
  * The work happens in server actions, so nothing here knows the backend origin
  * and no fetch call is written by hand.
  *
- * A refusal is shown rather than swallowed: "Go live" can fail because a
+ * A refusal is shown rather than swallowed: "Turn on" can fail because a
  * connection is unmet, which is an answer a person needs, not console noise.
  *
- * A run whose input carries a file is asked about first, once per person in
- * this browser — the file goes to an AI model (`ai-consent.ts`, as the app
- * asks).
+ * **A run with a file on a flow that reads it with AI** waits for the account's
+ * answer to "AI reads your documents" (backend ADR-0038; spec §3.H), asked
+ * once and kept by the platform — never per run: never answered, the card is
+ * asked over the Run window and Allow starts the run; answered Not now, Start
+ * run says AI reading is off, and its Turn on allows it and starts the run.
  */
 export function AutomationActions({
   name,
+  team,
   available,
+  usesAi,
+  aiDocumentReading,
   setup,
+  vendor,
   subscription,
   workspaceId,
-  userId,
 }: {
   name: string;
+  /** Where the flow is, as its row says it: "Team: Accounting". */
+  team: string;
   available: boolean;
+  /** Whether a run of this flow may send a file to an AI model (backend ADR-0038). */
+  usesAi: boolean;
+  /** The account's answer; undefined from a platform that does not ask. */
+  aiDocumentReading: AiChoice;
   setup: AutomationSetupField[];
+  /** The flow's vendor choice, for Set up's Connect row; null with none to choose. */
+  vendor: VendorChoiceRow | null;
   subscription: {
     id: string;
     status: SubscriptionStatus;
@@ -66,8 +85,6 @@ export function AutomationActions({
   };
   /** The workspace this page shows; every action is refused once it is not active. */
   workspaceId: string;
-  /** The signed-in person, whose agreement to the AI consent this browser keeps. */
-  userId: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -97,9 +114,16 @@ export function AutomationActions({
   // Bumped to empty the file fields when the platform will not take a file.
   const [fileRound, setFileRound] = useState(0);
   const newRunKey = () => setRunKey(`run-${crypto.randomUUID()}`);
-  // A run held for the AI consent: its form's values as Start run sent them,
-  // started as they are once the person agrees.
+  // The account's answer: one given here — the card over the Run window, or
+  // Turn on — until the page, read again, says it too.
+  const [answeredHere, setAnsweredHere] = useState<
+    "allowed" | "declined" | undefined
+  >(undefined);
+  const aiChoice: AiChoice = answeredHere ?? aiDocumentReading;
+  // A run held for the account's answer: its form's values as Start run sent
+  // them, started as they are once the person allows it.
   const [awaitingConsent, setAwaitingConsent] = useState<FormData | null>(null);
+  const runForm = useRef<HTMLFormElement>(null);
 
   const submit = (
     action: (data: FormData) => Promise<ActionResult>,
@@ -145,12 +169,25 @@ export function AutomationActions({
       handler(data);
     };
 
+  // Set up's save (spec §3.B): an empty amount or required field is said
+  // before anything is sent; a vendor chosen and not connected is said with
+  // its name; anything else the platform refuses is the action's words.
   const submitSetup = (data: FormData) => {
     setError(null);
+    const problem = setupProblem(setup, data);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     startTransition(async () => {
       const result = await saveSubscriptionConfiguration(data);
       if (!result.ok) {
-        setError(result.error);
+        setError(
+          result.state === "vendor-not-connected" &&
+            vendor?.displayName !== undefined
+            ? `Connect ${vendor.displayName} first, or choose None.`
+            : result.error,
+        );
         return;
       }
       close();
@@ -177,30 +214,58 @@ export function AutomationActions({
     });
   };
 
-  // A run whose input carries a file waits for the AI consent, unless this
-  // person agreed in this browser before; a run with no file never asks. While
-  // the consent is open nothing else starts a run — not the form sent again,
-  // not an agreement kept meanwhile from another tab.
+  // A run with a file on a flow that reads it with AI starts only once the
+  // account allowed it (spec §3.H). While the card is open nothing else
+  // starts a run — not the form sent again.
   const submitRun = (data: FormData) => {
     if (awaitingConsent) return;
-    if (runCarriesFile(data) && !hasAiConsent(browserStorage, userId)) {
+    const gate = runGate({
+      usesAi,
+      carriesFile: runCarriesFile(data),
+      choice: aiChoice,
+    });
+    if (gate === "ask") {
       setAwaitingConsent(data);
+      return;
+    }
+    if (gate === "off") {
+      // Said under Start run already; its Turn on is the way on.
+      document
+        .getElementById(`automation-run-${subscription.id}-ai-on`)
+        ?.focus();
       return;
     }
     sendRun(data);
   };
 
-  // Agreed: kept for next time if this browser can keep it, and the run starts
-  // either way, with the values it was held with.
-  const agreeAndStart = () => {
-    if (!awaitingConsent) return;
-    recordAiConsent(browserStorage, userId);
+  // Answered over the Run window: Allow starts the run it held, with the
+  // values it was held with; Not now starts nothing, and Start run then says
+  // AI reading is off.
+  const answered = (choice: "allowed" | "declined") => {
+    const held = awaitingConsent;
     setAwaitingConsent(null);
-    sendRun(awaitingConsent);
+    setAnsweredHere(choice);
+    if (choice === "allowed" && held) sendRun(held);
   };
 
-  // Cancelled: nothing is kept and nothing starts; the Run window is as it was.
-  const cancelConsent = () => setAwaitingConsent(null);
+  // Turn on (spec §3.H): the account allows it, then the run starts with the
+  // form as it is now.
+  const allowAndStart = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await saveAiDocumentReading("allowed");
+      if (!result.ok) {
+        setError(AI_SETTING.saveFailed);
+        return;
+      }
+      setAnsweredHere("allowed");
+      const form = runForm.current;
+      if (!form) return;
+      const data = new FormData(form);
+      data.set("workspaceId", workspaceId);
+      sendRun(data);
+    });
+  };
 
   const confirmArchive = () => {
     setError(null);
@@ -223,6 +288,7 @@ export function AutomationActions({
     subscription.status === "live" &&
     (subscription.runInput?.length ?? 0) > 0 &&
     available;
+  const readingOff = usesAi && aiChoice === "declined";
 
   return (
     <div className="mt-auto flex flex-col gap-2">
@@ -259,7 +325,7 @@ export function AutomationActions({
               )
             }
           >
-            {pending ? "Working…" : "Go live"}
+            {pending ? "Working…" : "Turn on"}
           </Button>
         ) : (
           <Button
@@ -307,21 +373,29 @@ export function AutomationActions({
             id={`automation-setup-${subscription.id}-title`}
             className="text-xl font-semibold text-[var(--text)]"
           >
-            Flow setup
+            Set up {name}
           </h2>
           <p
             id={`automation-setup-${subscription.id}-description`}
             className="mt-1 text-sm text-[var(--muted)]"
           >
-            Complete the settings supplied by this flow.
+            {team}
           </p>
-          <form onSubmit={fromForm(submitSetup)} className="mt-6 space-y-6">
+          <form
+            onSubmit={fromForm(submitSetup)}
+            noValidate
+            className="mt-6 space-y-6"
+          >
             <input
               type="hidden"
               name="subscriptionId"
               value={subscription.id}
             />
-            <SetupFields setup={setup} config={subscription.config} />
+            <SetupFields
+              setup={setup}
+              config={subscription.config}
+              vendor={vendor}
+            />
             <FormError message={error} />
             <div className="flex flex-wrap gap-2 pt-2">
               <Button
@@ -333,7 +407,7 @@ export function AutomationActions({
                 Cancel
               </Button>
               <Button type="submit" disabled={pending}>
-                {pending ? "Saving…" : "Save setup"}
+                {pending ? "Saving…" : "Save"}
               </Button>
             </div>
           </form>
@@ -358,11 +432,10 @@ export function AutomationActions({
             id={`automation-run-${subscription.id}-description`}
             className="mt-1 text-sm text-[var(--muted)]"
           >
-            Enter what this run needs. It starts when you submit, or waits its
-            turn if this flow is busy, and its page shows each step as it
-            happens.
+            Fill this in, then start the run.
           </p>
           <form
+            ref={runForm}
             onSubmit={fromForm(submitRun)}
             onChange={newRunKey}
             className="mt-6 space-y-6"
@@ -390,19 +463,42 @@ export function AutomationActions({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={pending || uploading}>
+              <Button
+                type="submit"
+                disabled={pending || uploading}
+                className="inline-flex items-center gap-2"
+              >
+                <PlayIcon size={20} aria-hidden />
                 {pending ? "Starting…" : uploading ? "Uploading…" : "Start run"}
               </Button>
             </div>
+            {readingOff ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-sm text-[var(--muted)]">
+                  {AI_READING_OFF.line}
+                </p>
+                <Button
+                  id={`automation-run-${subscription.id}-ai-on`}
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={pending || uploading}
+                  onClick={allowAndStart}
+                >
+                  {AI_READING_OFF.turnOn}
+                </Button>
+              </div>
+            ) : null}
           </form>
         </Modal>
       ) : null}
 
       {dialog === "run" && awaitingConsent ? (
-        <AiConsentDialog
-          subscriptionId={subscription.id}
-          onAgree={agreeAndStart}
-          onCancel={cancelConsent}
+        <AiConsentCard
+          id={`automation-ai-consent-${subscription.id}`}
+          zIndex={110}
+          onClose={() => setAwaitingConsent(null)}
+          onAnswered={answered}
         />
       ) : null}
 

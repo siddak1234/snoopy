@@ -7,6 +7,8 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { CameraIcon } from "@phosphor-icons/react/dist/ssr/Camera";
+import { UploadSimpleIcon } from "@phosphor-icons/react/dist/ssr/UploadSimple";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import type { AutomationRunInputField } from "@/lib/automations";
@@ -54,8 +56,9 @@ const unknownOnServer = () => false;
  * What is sent is `run-file-image.ts`'s (backend BUILD-PLAN 25.8.5, the owner's
  * decision 8 of 2026-10-10), as the app sends it: a PDF as it is; a JPEG or a
  * PNG, and every photo, drawn upright and saved as a JPEG whose long side is at
- * most 2,576 px; anything else refused in words before anything is sent. On a
- * phone or a tablet the field also offers Take photo, the camera.
+ * most 2,576 px; anything else refused in words before anything is sent. The
+ * file is chosen with Upload; on a phone or a tablet the field also offers
+ * Take photo, the camera (spec §3.D: icons 20 inside a button).
  *
  * An upload belongs to the field that started it: its busy state is reported
  * under the field's key, it stops when the field goes (the form closed), and an
@@ -196,60 +199,74 @@ export function RunFileField({
           value={state.artifactId}
         />
       ) : null}
+      {/* The field's title and help are the manifest's (spec §3.D); a file
+          field says nothing about being optional. */}
       <label
         htmlFor={inputId}
         className="block text-sm font-medium text-[var(--text)]"
       >
         {field.title}
-        {field.required ? null : (
-          <span className="ml-1 font-normal text-[var(--muted)]">
-            (optional)
-          </span>
-        )}
       </label>
-      <p className="mt-1 text-xs text-[var(--muted)]">{field.description}</p>
+      <p id={`${inputId}-help`} className="mt-1 text-xs text-[var(--muted)]">
+        {field.description}
+      </p>
+      {/* The chooser, opened by Upload: a file input styled `display:none`
+          and opened by its click(), as MDN describes. */}
       <input
         ref={input}
         id={inputId}
         type="file"
         accept={RUN_FILE_ACCEPT}
+        hidden
         disabled={state.kind === "uploading"}
         onChange={(event) =>
           void choose(event.currentTarget.files?.[0], "chooser")
         }
-        className="mt-2 block w-full text-sm text-[var(--text)] file:mr-3 file:rounded-lg file:border file:border-[var(--ring)] file:bg-[var(--card)] file:px-3 file:py-1.5 file:text-sm file:text-[var(--text)]"
       />
-      {offersCamera ? (
-        <>
-          {/* The camera, opened by Take photo: a file input styled
-              `display:none` and opened by its click(), as MDN describes. It
-              has no name, so the form never carries it — only the file's id. */}
-          <input
-            ref={camera}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            hidden
-            disabled={state.kind === "uploading"}
-            onChange={(event) => {
-              const photo = event.currentTarget.files?.[0];
-              // Emptied at once: every photo is a new choice. Closing the
-              // camera keeps whatever the field already held.
-              event.currentTarget.value = "";
-              if (photo) void choose(photo, "camera");
-            }}
-          />
-          <Button
-            variant="secondary"
-            size="sm"
-            className="mt-2"
-            disabled={state.kind === "uploading"}
-            onClick={() => camera.current?.click()}
-          >
-            Take photo<span className="sr-only"> for {field.title}</span>
-          </Button>
-        </>
-      ) : null}
+      <div className="mt-2 flex flex-wrap gap-2">
+        {offersCamera ? (
+          <>
+            {/* The camera, opened by Take photo, as the chooser is. It has
+                no name, so the form never carries it — only the file's id. */}
+            <input
+              ref={camera}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              hidden
+              disabled={state.kind === "uploading"}
+              onChange={(event) => {
+                const photo = event.currentTarget.files?.[0];
+                // Emptied at once: every photo is a new choice. Closing the
+                // camera keeps whatever the field already held.
+                event.currentTarget.value = "";
+                if (photo) void choose(photo, "camera");
+              }}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              className="inline-flex items-center gap-2"
+              disabled={state.kind === "uploading"}
+              onClick={() => camera.current?.click()}
+            >
+              <CameraIcon size={20} aria-hidden />
+              Take photo<span className="sr-only"> for {field.title}</span>
+            </Button>
+          </>
+        ) : null}
+        <Button
+          variant="secondary"
+          size="sm"
+          className="inline-flex items-center gap-2"
+          aria-describedby={`${inputId}-help`}
+          disabled={state.kind === "uploading"}
+          onClick={() => input.current?.click()}
+        >
+          <UploadSimpleIcon size={20} aria-hidden />
+          Upload<span className="sr-only"> for {field.title}</span>
+        </Button>
+      </div>
       <p aria-live="polite" className="mt-1 text-xs text-[var(--muted)]">
         {state.kind === "uploading"
           ? `Uploading ${state.name}…`

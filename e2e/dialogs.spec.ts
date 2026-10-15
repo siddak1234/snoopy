@@ -15,7 +15,7 @@ import {
 } from "./helpers";
 
 /**
- * Every dialog `components/ui/Modal.tsx` serves — sixteen, one row each — held
+ * Every dialog `components/ui/Modal.tsx` serves — seventeen, one row each — held
  * to the same behaviours (filed at Round 15's close; the register's § "The
  * backlog before Round 17"):
  *
@@ -45,6 +45,7 @@ test.beforeEach(async () => {
 
 const busy = "The platform is busy right now. Try again in 30 seconds.";
 const team = "/account/teams/33333333-3333-4333-8333-333333333333";
+const vendorPage = "/account/flows/f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1/vendor";
 
 /** A server action, as its page sends it: a POST to the page's own URL. */
 const actionOn = (path: string) => ({
@@ -78,6 +79,8 @@ type Holding = {
 type Dialog = {
   /** Its accessible name. */
   name: string;
+  /** A fixture state the page needs before it is opened. */
+  state?: string;
   /** Where it is opened — by the owner, unless a session is named. */
   path: string;
   session?: "member";
@@ -125,7 +128,47 @@ const dialogs: Dialog[] = [
     },
   },
   {
-    name: "Flow setup",
+    // Disconnect is confirmed first, as in the app (spec §3.I).
+    name: "Disconnect Fixture OAuth provider?",
+    path: "/account/connections",
+    opener: (page) =>
+      page
+        .locator("main")
+        .getByRole("button", { name: "Disconnect", exact: true }),
+    holds: {
+      ...actionOn("/account/connections"),
+      prepare: refusedAsBusy,
+      send: "Disconnect",
+      busy: "Disconnecting…",
+      cancel: "Cancel",
+      answered: (_, dialog) =>
+        expect(dialog.getByRole("alert")).toHaveText(busy),
+      staysOpen: true,
+    },
+  },
+  {
+    // A flow's Connect vendor page: QuickBooks's disconnect, in Intuit's words
+    // (spec §3.C).
+    name: "Disconnect from QuickBooks?",
+    path: vendorPage,
+    state: "quickbooks-connected",
+    opener: (page) =>
+      page
+        .locator("main")
+        .getByRole("button", { name: "Disconnect from QuickBooks" }),
+    holds: {
+      ...actionOn(vendorPage),
+      prepare: refusedAsBusy,
+      send: "Disconnect",
+      busy: "Disconnecting…",
+      cancel: "Cancel",
+      answered: (_, dialog) =>
+        expect(dialog.getByRole("alert")).toHaveText(busy),
+      staysOpen: true,
+    },
+  },
+  {
+    name: "Set up Manual input automation",
     path: "/account/flows",
     opener: (page) =>
       automationCard(page, "Manual input automation").getByRole("button", {
@@ -142,13 +185,22 @@ const dialogs: Dialog[] = [
       }),
   },
   {
-    // Asked over the Run window, by its Start run, once a file is chosen
-    // (app/account/flows/AiConsentDialog.tsx): it closes alone, and focus
-    // goes back to Start run.
-    name: "AI reads this file",
+    // "AI reads your documents" (backend ADR-0038), asked over the Run window
+    // by its Start run, once a file is chosen, while the account has never
+    // answered — the account area's own card, shown first on the page,
+    // closed (components/account/AiConsentCard.tsx). It closes alone, and
+    // focus goes back to Start run.
+    name: "AI reads your documents",
     path: "/account/flows",
+    state: "ai-reading-unasked",
     files: true,
     before: async (page) => {
+      const card = page.getByRole("dialog", {
+        name: "AI reads your documents",
+      });
+      await expect(card).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(card).toHaveCount(0);
       await automationCard(page, "Manual input automation")
         .getByRole("button", { name: "Run", exact: true })
         .click();
@@ -335,27 +387,6 @@ const dialogs: Dialog[] = [
     },
   },
   {
-    name: "Create a team",
-    path: "/account/teams",
-    opener: (page) =>
-      page.locator("main").getByRole("button", { name: "Create a team" }),
-    holds: {
-      ...actionOn("/account/teams"),
-      prepare: async (page, dialog) => {
-        await dialog
-          .getByLabel("Kind of team", { exact: true })
-          .selectOption("Finance");
-        await refusedAsBusy(page);
-      },
-      send: "Create team",
-      busy: "Creating…",
-      cancel: "Cancel",
-      answered: (_, dialog) =>
-        expect(dialog.getByRole("alert")).toHaveText(busy),
-      staysOpen: true,
-    },
-  },
-  {
     name: "Remove Fixture Member?",
     path: "/account/organization",
     opener: (page) =>
@@ -393,6 +424,7 @@ const dialogs: Dialog[] = [
 ];
 
 async function open(page: Page, dialog: Dialog): Promise<Locator> {
+  if (dialog.state) await fixtureControl(dialog.state);
   if (dialog.session) await presentSession(page, dialog.session);
   await page.goto(dialog.path);
   await dialog.before?.(page);

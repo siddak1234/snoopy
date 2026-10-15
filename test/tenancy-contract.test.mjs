@@ -48,7 +48,6 @@ test("tenancy mutations use unique idempotency keys", () => {
     "workspace-update",
     "workspace-member",
     "workspace-activate",
-    "project-create",
     "project-update",
     "project-member",
     "organization-join",
@@ -64,6 +63,12 @@ test("tenancy mutations use unique idempotency keys", () => {
   ]) {
     assert.match(tenancy, new RegExp(`newIdempotencyKey\\("${prefix}"\\)`));
   }
+  // No one creates a team here (backend ADR-0036): the platform makes the
+  // team of a flow's category, so the website has no create to key.
+  assert.doesNotMatch(
+    tenancy,
+    /project-create|export async function createProject\(/u,
+  );
 });
 
 test("setup's keys are the form's, one per intent, and a retry after a refused claim claims on the organization already made (backend §12.1 #186)", () => {
@@ -120,7 +125,7 @@ test("cursor handling remains opaque and project actions do not revive local pol
   assert.match(tenancy, /encodeURIComponent\(cursor\)/);
   assert.match(tenancy, /nextCursor: response\.nextCursor/);
   assert.doesNotMatch(actions, /prisma|canUserPerform|getProjectRole/iu);
-  assert.match(actions, /createProject\(/);
+  assert.doesNotMatch(actions, /createProject/u);
   assert.match(actions, /updateProject\(/);
   assert.match(actions, /upsertProjectMembership\(/);
   assert.match(actions, /removeProjectMembership\(/);
@@ -151,7 +156,6 @@ test("bounded session previews are never used as workspace authority", () => {
     "app/account/billing/actions.ts",
     "app/account/connections/actions.ts",
     "app/account/settings/export-actions.ts",
-    "app/account/teams/actions.ts",
   ]) {
     const source = readFileSync(file, "utf8");
     assert.match(source, /activeWorkspaceIfShown\(/u, file);
@@ -253,7 +257,6 @@ test("an action on a page's workspace refuses once another tab changed it — bi
   for (const file of [
     "app/account/billing/actions.ts",
     "app/account/flows/actions.ts",
-    "app/account/teams/actions.ts",
   ]) {
     const source = readFileSync(file, "utf8");
     assert.doesNotMatch(
@@ -265,52 +268,36 @@ test("an action on a page's workspace refuses once another tab changed it — bi
   }
 });
 
-test("a team is its kind, created in the workspace the page showed while it is still the active one — no picker, no name, no description (register F57, the owner's build 9)", () => {
-  const create =
-    /export async function createProjectAction\([\s\S]*?\n\}/u.exec(actions);
-  assert.ok(create, "createProjectAction not found; this test is blind");
-  // Compared before anything is created, and created where the server
-  // resolved — never the first organization listed, never another tab's.
-  assert.match(
-    create[0],
-    /const workspaceId = await activeWorkspaceIfShown\(\s*String\(formData\.get\("workspaceId"\) \?\? ""\),\s*\);\s*if \(!workspaceId\) return \{ ok: false, error: WORKSPACE_CHANGED \};\s*const project = await createProject\(workspaceId, \{ name: type, type \}\);/u,
-  );
-  assert.doesNotMatch(create[0], /description|workspaceTheyAreIn/u);
-  // Other's own words are the team's name as well: the platform's 2 to 60.
-  assert.match(create[0], /if \(type\.length < 2 \|\| type\.length > 60\) \{/u);
-  const dialog = readFileSync(
+test("no one creates a team: a flow goes to the team of its category, which the platform makes when it is first needed — no Create on Teams or the dashboard, and no create action (backend ADR-0036; the owner, 2026-10-14)", () => {
+  for (const gone of [
+    "components/dashboard/CreateTeamButton.tsx",
     "components/dashboard/CreateTeamDialog.tsx",
-    "utf8",
-  );
-  assert.match(dialog, /data\.set\("workspaceId", workspace\.id\);/u);
-  assert.doesNotMatch(
-    dialog,
-    /name="(?:workspaceId|name|description)"/u,
-    "the workspace is the page's, and a team has no name or description field",
-  );
-  // The active workspace — a personal one included — for its owners and
-  // admins only: a plain member of an organization is offered no Create, as
-  // the platform would refuse it (register F8).
-  const page = readFileSync("app/account/teams/page.tsx", "utf8");
+  ])
+    assert.ok(!existsSync(gone), `${gone} is gone`);
+  assert.doesNotMatch(actions, /createProjectAction|createRefusal/u);
+  for (const page of [
+    "app/account/teams/page.tsx",
+    "app/account/page.tsx",
+    "app/account/flows/page.tsx",
+  ]) {
+    const source = readFileSync(page, "utf8");
+    assert.doesNotMatch(
+      source,
+      /CreateTeam|Create a team|canCreateTeam/u,
+      page,
+    );
+  }
+  // The team kinds are the catalog's categories, held to the published list
+  // both ways at typecheck (lib/team-types.ts).
+  const kinds = readFileSync("lib/team-types.ts", "utf8");
+  assert.match(kinds, /\] as const satisfies readonly TeamKind\[\];/u);
   assert.match(
-    page,
-    /const active = workspaces\.find\(\s*\(workspace\) => workspace\.id === activeWorkspaceId,\s*\);\s*const create =\s*active && administers\(active\.role\) \? \(\s*<CreateTeamButton\s+workspace=\{\{ id: active\.id, name: active\.name, type: active\.type \}\}/u,
-  );
-  assert.doesNotMatch(page, /places=|initialWorkspaceId=/u);
-});
-
-test("Create's refusals are the app's sentences — a kind the workspace already has, and a plain member of an organization (build 10)", () => {
-  assert.match(
-    actions,
-    /if \(error\.status === 409 && error\.details\?\.reason === "team_kind_taken"\)\s*return `This workspace already has a team for \$\{kind\}\.`;/u,
-  );
-  assert.match(
-    actions,
-    /if \(error\.status === 403\)\s*return "Only an owner or admin can create a team here\.";/u,
+    kinds,
+    /export type TeamKind =\s*components\["schemas"\]\["AutomationCatalogEntry"\]\["category"\];/u,
   );
   assert.match(
-    actions,
-    /return \{ ok: false, error: createRefusal\(error, type\) \};/u,
+    kinds,
+    /const everyKindListed: readonly \(typeof TEAM_TYPES\)\[number\]\[\] =\s*\[\] as TeamKind\[\];/u,
   );
 });
 
@@ -374,12 +361,11 @@ test("asking to join a team is the published operations, keyed, and absent befor
       "u",
     ),
   );
-  for (const page of [
+  assert.match(
+    readFileSync("app/account/teams/page.tsx", "utf8"),
+    /teamDirectoryIfThere\(/u,
     "app/account/teams/page.tsx",
-    "app/account/flows/page.tsx",
-  ]) {
-    assert.match(readFileSync(page, "utf8"), /teamDirectoryIfThere\(/u, page);
-  }
+  );
   assert.match(
     readFileSync("app/account/teams/[id]/page.tsx", "utf8"),
     tolerates404,
@@ -404,6 +390,7 @@ test("the old Teams pages and the team grants are gone, and their old addresses 
     "app/account/teams/[teamId]",
     "app/account/teams/CreateTeamForm.tsx",
     "components/dashboard/CreateProjectDialog.tsx",
+    "components/dashboard/CreateTeamDialog.tsx",
   ])
     assert.ok(!existsSync(gone), `${gone} is gone`);
   assert.doesNotMatch(tenancy, /team-grants|teamPath\(|\/teams`/u);
@@ -477,10 +464,6 @@ test("no server action acts on the workspace active NOW rather than the one its 
     [
       "app/account/connections/ConnectionsPanel.tsx",
       /data\.set\("workspaceId", workspaceId\)/u,
-    ],
-    [
-      "components/dashboard/CreateTeamDialog.tsx",
-      /data\.set\("workspaceId", workspace\.id\)/u,
     ],
   ]) {
     assert.match(readFileSync(file, "utf8"), sends, file);

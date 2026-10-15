@@ -3,49 +3,33 @@ import { UsersThreeIcon } from "@phosphor-icons/react/dist/ssr/UsersThree";
 import { getAppSession } from "@/lib/app-session";
 import { loginHref } from "@/lib/platform-api";
 import {
-  administers,
   listWorkspaceProjects,
   listWorkspaces,
-  resolveActiveWorkspaceId,
   teamDirectoryIfThere,
 } from "@/lib/tenancy";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { ProjectList } from "@/components/dashboard/ProjectList";
 import type { ProjectListItem } from "@/components/dashboard/ProjectList";
-import { CreateTeamButton } from "@/components/dashboard/CreateTeamButton";
 import { AskToJoinList } from "@/components/dashboard/AskToJoinList";
 
 /**
  * Teams (BUILD-PLAN 24.11.11). A team is a sub-organization with its own flows
  * — a project, in the platform's contract. Every team this person is on, in
  * every workspace they are in, grouped by workspace (an organization's owners
- * and admins see all of its teams); Create a team; and, in each organization,
- * the teams they could ask to join. A deleted (archived) team is not listed.
+ * and admins see all of its teams); and, in each organization, the teams they
+ * could ask to join. A deleted (archived) team is not listed.
  *
- * A team is created in the workspace being worked in — the active one, a
- * personal workspace included — and, in an organization, only by its owners
- * and admins (the owner, build 9). In a personal workspace its owner is the
- * only member, so the one rule covers both: a plain member is offered no
- * Create, as the platform would refuse it (register F8).
+ * No one creates a team here (backend ADR-0036; the owner, 2026-10-14: "theres
+ * no choose a team. there will be pre existing teams depending on which flows
+ * are added"): a flow goes to the team of its category, which the platform
+ * makes the first time a flow of that category is added.
  */
 export default async function AccountTeamsPage() {
   const session = await getAppSession();
   if (!session) redirect(loginHref("/account/teams"));
 
-  const [workspaces, activeWorkspaceId] = await Promise.all([
-    listWorkspaces(),
-    resolveActiveWorkspaceId(session),
-  ]);
-  const active = workspaces.find(
-    (workspace) => workspace.id === activeWorkspaceId,
-  );
-  const create =
-    active && administers(active.role) ? (
-      <CreateTeamButton
-        workspace={{ id: active.id, name: active.name, type: active.type }}
-      />
-    ) : null;
+  const workspaces = await listWorkspaces();
   const groups = await Promise.all(
     workspaces.map(async (workspace) => {
       const [visible, directory] = await Promise.all([
@@ -84,19 +68,11 @@ export default async function AccountTeamsPage() {
           : "Your teams, and the ones you can ask to join"
       }
     >
-      {/* The empty screen carries Create itself: one button, never two. */}
-      {create && shown.length > 0 ? (
-        <div className="flex flex-wrap items-center justify-end gap-2 py-3 first:pt-0">
-          {create}
-        </div>
-      ) : null}
-
       {shown.length === 0 ? (
         <EmptyRow
           icon={<UsersThreeIcon size={32} />}
           title="No teams yet"
           text="A team has its own flows and its own people."
-          action={create}
         />
       ) : (
         shown.map(({ workspace, mine, askable }, index) => {
