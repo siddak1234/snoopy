@@ -1,52 +1,29 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle";
-import { CircleNotchIcon } from "@phosphor-icons/react/dist/ssr/CircleNotch";
-import { HandPalmIcon } from "@phosphor-icons/react/dist/ssr/HandPalm";
-import { WarningCircleIcon } from "@phosphor-icons/react/dist/ssr/WarningCircle";
 import { getAppSession } from "@/lib/app-session";
 import {
   emptyWhenUnavailable,
-  formatWhen,
+  listApprovals,
   listAutomations,
   readRun,
-  type RunOrigin,
 } from "@/lib/automations";
 import { PlatformServerError } from "@/lib/platform-server";
-import {
-  OUTCOME_WORDS,
-  progressRows,
-  type ProgressRow,
-} from "@/lib/run-progress";
-import SectionCard from "@/components/dashboard/SectionCard";
-import { StatusPill } from "@/components/dashboard/StatusPill";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
-import { CancelRunButton } from "./CancelRunButton";
+import { RunLive, type RunFlow } from "./RunLive";
 
 /**
- * One run: what it came to, its progress, and what it saved.
+ * One run (Build 21, spec A7): named by its FULL id (A8; the owner's D4 and
+ * AM2), every step from the start with where the run is, each document it read
+ * and Download JSON — drawn here once, then kept live by `RunLive`.
  *
  * The screen renders `steps` — what the automation reported against the steps
  * its manifest declares — and not `events`, which is the platform's own record
- * of state transitions. Both come back from the same read; only one is written
- * for a person. The progress is drawn from the flow's visible groups of steps
- * (spec §3.E; backend ADR-0037): one row per group that has a reported step,
- * each titled by its group and never by a step's id, and no row for a step
- * that did not run. A succeeded run's saved details follow, as the automation
- * wrote them for people (`RunDetail.details`).
+ * of state transitions. The run names no flow (`Run.templateId`'s own words: a
+ * screen joins the catalog), so its name, steps' titles and groups come from
+ * there. A held run's approval is read too: a waiting document whose approval
+ * was refused or ran out says "Not approved" (S21).
  */
 
 export const dynamic = "force-dynamic";
-
-// Every origin the contract names, so a run says how it started. A new origin
-// fails the build here rather than reading as a manual start — which the
-// website no longer offers.
-const ORIGIN_LABEL: Record<RunOrigin, string> = {
-  trigger: "Triggered",
-  manual: "Manual",
-  "approval-continuation": "After approval",
-  "retry-continuation": "After retry",
-};
 
 export default async function RunDetailPage(
   props: PageProps<"/account/runs/[runId]">,
@@ -70,178 +47,48 @@ export default async function RunDetailPage(
     throw error;
   }
 
-  const { run, steps, details } = detail;
-  // The run names no flow (`Run.templateId`'s own words: a screen joins the
-  // catalog), so its name, steps' titles and groups come from there.
-  const catalog = await emptyWhenUnavailable(
-    () => listAutomations(workspaceId),
-    { automations: [], categories: [] },
-  );
+  const [catalog, approvals] = await Promise.all([
+    emptyWhenUnavailable(() => listAutomations(workspaceId), {
+      automations: [],
+      categories: [],
+    }),
+    detail.run.status === "held"
+      ? emptyWhenUnavailable(() => listApprovals(workspaceId), {
+          approvals: [],
+        })
+      : { approvals: [] },
+  ]);
   const entry = catalog.automations.find(
-    (candidate) => candidate.templateId === run.templateId,
+    (candidate) => candidate.templateId === detail.run.templateId,
   );
-  const rows = progressRows({
-    steps,
-    manifest: entry,
-    runVersion: run.templateVersion,
-    running: run.status === "pending" || run.status === "running",
-  });
+  const flow: RunFlow = entry
+    ? {
+        name: entry.name,
+        version: entry.version,
+        pipeline: entry.pipeline.map((step) => ({
+          id: step.id,
+          title: step.title,
+          ...(step.group ? { group: step.group } : {}),
+        })),
+        ...(entry.groups
+          ? {
+              groups: entry.groups.map((group) => ({
+                id: group.id,
+                title: group.title,
+              })),
+            }
+          : {}),
+      }
+    : null;
 
   return (
-    <SectionCard
-      title="Run"
-      subheader={entry?.name}
-      primaryAction={<StatusPill status={run.status} />}
-    >
-      <div className="py-5 first:pt-0">
-        <dl className="grid gap-3 sm:grid-cols-3">
-          <Fact
-            label="Started"
-            value={run.startedAt ? formatWhen(run.startedAt) : "—"}
-          />
-          <Fact
-            label="Ended"
-            value={run.endedAt ? formatWhen(run.endedAt) : "—"}
-          />
-          <Fact label="Trigger" value={ORIGIN_LABEL[run.origin]} />
-        </dl>
-
-        {/* Only the two states the platform cancels; any other answers 404. */}
-        {run.status === "pending" || run.status === "running" ? (
-          <div className="mt-4">
-            <CancelRunButton runId={run.id} workspaceId={run.workspaceId} />
-          </div>
-        ) : null}
-
-        {/* A continuation belongs to the run it continues. The link is how a
-            person follows the chain rather than reading two unrelated runs. */}
-        {run.continuesRunId ? (
-          <p className="mt-4 text-sm text-[var(--muted)]">
-            Continues{" "}
-            <Link
-              prefetch={false}
-              href={`/account/runs/${run.continuesRunId}`}
-              className="text-[var(--accent)] underline underline-offset-2"
-            >
-              the run that was held
-            </Link>
-            .
-          </p>
-        ) : null}
-
-        {/* Why a run ended, in the automation's own words. `failureReason` is
-            present only on a failed run and `resultSummary` only on a succeeded
-            one; without them a failed run showed only its status pill. */}
-        {run.failureReason ? (
-          <p
-            role="alert"
-            className="mt-4 rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--error-text)]"
-          >
-            {run.failureReason}
-          </p>
-        ) : null}
-        {run.resultSummary ? (
-          <p className="mt-4 text-sm text-[var(--success-text)]">
-            {run.resultSummary}
-          </p>
-        ) : null}
-        {/* Held for a person's decision (spec §3.E): said in words, the
-            decision itself on Approvals. */}
-        {run.status === "held" ? (
-          <p className="mt-4 text-sm text-[var(--warning-text)]">
-            Waiting for approval.
-          </p>
-        ) : null}
-      </div>
-
-      <div className="py-5">
-        <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-          Progress
-        </h2>
-        {steps.length === 0 ? (
-          <p className="mt-3 text-sm text-[var(--muted)]">
-            No steps reported yet.
-          </p>
-        ) : (
-          <ol className="mt-4 flex flex-col gap-4">
-            {rows.map((row) => (
-              <ProgressItem key={row.key} row={row} />
-            ))}
-          </ol>
-        )}
-      </div>
-
-      {/* What a succeeded run saved, as its automation wrote it for people
-          (backend ADR-0037); a run that saved none has no section. */}
-      {details && details.length > 0 ? (
-        <div className="py-5">
-          <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-            Details
-          </h2>
-          <dl className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-[max-content_1fr]">
-            {details.map((line, index) => (
-              <div key={`${line.label}-${index}`} className="contents">
-                <dt className="text-sm text-[var(--muted)]">{line.label}</dt>
-                <dd className="text-sm break-words text-[var(--text)]">
-                  {line.value}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      ) : null}
-    </SectionCard>
-  );
-}
-
-/** A row's icon (24): its outcome to the eye; `OUTCOME_WORDS` says it to a screen reader. */
-function ProgressIcon({ outcome }: { outcome: ProgressRow["outcome"] }) {
-  const common = { size: 24, "aria-hidden": true } as const;
-  if (outcome === "ok")
-    return (
-      <CheckCircleIcon {...common} className="text-[var(--success-text)]" />
-    );
-  if (outcome === "held")
-    return <HandPalmIcon {...common} className="text-[var(--warning-text)]" />;
-  if (outcome === "failed")
-    return (
-      <WarningCircleIcon {...common} className="text-[var(--error-text)]" />
-    );
-  return <CircleNotchIcon {...common} className="text-[var(--muted)]" />;
-}
-
-function ProgressItem({ row }: { row: ProgressRow }) {
-  return (
-    <li className="flex items-start gap-3">
-      <span className="mt-0.5 shrink-0">
-        <ProgressIcon outcome={row.outcome} />
-      </span>
-      <div className="flex min-w-0 flex-col gap-1">
-        <p className="text-sm font-medium text-[var(--text)]">{row.title}</p>
-        {row.outcome === "working" ? null : (
-          <span className="sr-only">{OUTCOME_WORDS[row.outcome]}</span>
-        )}
-        {row.sub ? (
-          <p className="text-sm text-[var(--muted)]">{row.sub}</p>
-        ) : null}
-        {row.heldReason ? (
-          <p className="text-xs text-[var(--warning-text)]">{row.heldReason}</p>
-        ) : null}
-        {row.occurredAt ? (
-          <p className="text-xs text-[var(--muted)]">
-            {formatWhen(row.occurredAt)}
-          </p>
-        ) : null}
-      </div>
-    </li>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-xs text-[var(--muted)]">{label}</dt>
-      <dd className="mt-0.5 text-sm text-[var(--text)]">{value}</dd>
-    </div>
+    <RunLive
+      workspaceId={workspaceId}
+      initial={detail}
+      flow={flow}
+      approvals={approvals.approvals.filter(
+        (approval) => approval.runId === detail.run.id,
+      )}
+    />
   );
 }

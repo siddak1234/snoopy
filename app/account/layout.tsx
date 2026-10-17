@@ -13,8 +13,6 @@ import {
   DashboardHeader,
 } from "@/components/dashboard/DashboardNav";
 import { AccountTopBar } from "@/components/dashboard/AccountTopBar";
-import { AiConsentOnce } from "@/components/account/AiConsentCard";
-import { asksForConsent } from "@/lib/ai-consent";
 
 const SIGN_IN = loginHref("/account");
 
@@ -26,11 +24,7 @@ async function readAccountShell() {
   // deciding that an organization membership is absent.
   const workspaces = await listWorkspaces();
   const activeWorkspaceId = await resolveActiveWorkspaceId(session);
-  return {
-    workspaces,
-    activeWorkspaceId,
-    aiDocumentReading: session.user.aiDocumentReading,
-  };
+  return { workspaces, activeWorkspaceId };
 }
 
 export default async function AccountLayout({
@@ -57,7 +51,7 @@ export default async function AccountLayout({
   }
   if (!shell) redirect(SIGN_IN);
 
-  const { workspaces, activeWorkspaceId, aiDocumentReading } = shell;
+  const { workspaces, activeWorkspaceId } = shell;
   // The organization page shows where it renders: for the active
   // organization's owners and admins, who may do everything on it (register
   // F55). Teams is for everyone (BUILD-PLAN 24.11.11).
@@ -85,10 +79,6 @@ export default async function AccountLayout({
           <main>{children}</main>
         </div>
       </div>
-      {/* "AI reads your documents", once, while the account has never
-          answered (backend ADR-0038; spec §3.G) — after sign-in, for a new
-          account and an existing one alike. */}
-      {asksForConsent(aiDocumentReading) ? <AiConsentOnce /> : null}
     </div>
   );
 }

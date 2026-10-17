@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CaretRightIcon } from "@phosphor-icons/react/dist/ssr/CaretRight";
 import { getAppSession } from "@/lib/app-session";
 import {
   formatWhen,
@@ -12,12 +13,13 @@ import {
   PlatformNotConfiguredError,
   PlatformServerError,
 } from "@/lib/platform-server";
-import {
-  listAccessibleProjects,
-  resolveActiveWorkspaceId,
-} from "@/lib/tenancy";
+import { flowPath, quickRunRows } from "@/lib/flow-steps";
+import { runLabel } from "@/lib/run-progress";
+import { listWorkspaceProjects, resolveActiveWorkspaceId } from "@/lib/tenancy";
 import SectionCard from "@/components/dashboard/SectionCard";
+import { FlowIcon } from "@/components/dashboard/FlowIcon";
 import { StatusPill } from "@/components/dashboard/StatusPill";
+import { placeOf } from "./flows/place";
 
 /** The first instant of this month, UTC — the zone every date on these pages is in. */
 function startOfMonthUtc(now: Date): string {
@@ -38,20 +40,40 @@ function startOfMonthUtc(now: Date): string {
  * "Unavailable" and the rest still show, rather than one read taking the whole
  * home with it. A session that ended is not a figure's to absorb, so it goes to
  * the account area's boundary as every other page's does.
+ *
+ * **Run a flow** (Build 21, spec A9; the owner's "when a user wants to run a
+ * random flow. they shouldnt have to do a bunch of work in the app"; the
+ * session's S16): every live flow, first on the page, each opening its flow's
+ * Step 1 — three presses from here to a started run. ~~Teams, the first three
+ * teams~~ until Build 21 (the owner's AM5: "remove lsit teams on bottom of home
+ * page, it is useless"); teams stay on their own page.
  */
 async function readOverview(workspaceId: string | undefined) {
   if (!workspaceId) return null;
-  const [subscriptions, stats, connections, runs, catalog] = await Promise.all([
-    figure(() => listSubscriptions(workspaceId)),
-    figure(() => readRunStats(workspaceId, startOfMonthUtc(new Date()))),
-    figure(() => listConnections(workspaceId)),
-    figure(() => listRuns(workspaceId)),
-    figure(() => listAutomations(workspaceId)),
-  ]);
+  const [subscriptions, stats, connections, runs, catalog, projects] =
+    await Promise.all([
+      figure(() => listSubscriptions(workspaceId)),
+      figure(() => readRunStats(workspaceId, startOfMonthUtc(new Date()))),
+      figure(() => listConnections(workspaceId)),
+      figure(() => listRuns(workspaceId)),
+      figure(() => listAutomations(workspaceId)),
+      figure(() => listWorkspaceProjects(workspaceId)),
+    ]);
   const nameFor = new Map(
     (catalog?.automations ?? []).map((entry) => [entry.templateId, entry.name]),
   );
+  const team = placeOf(
+    projects ?? [],
+    new Map(
+      (catalog?.automations ?? []).map((entry) => [entry.templateId, entry]),
+    ),
+  );
   return {
+    quickRuns: quickRunRows(
+      subscriptions?.subscriptions ?? null,
+      catalog?.automations ?? [],
+      team,
+    ),
     automations:
       subscriptions?.subscriptions.filter(
         (entry) => entry.status !== "archived",
@@ -94,23 +116,7 @@ export default async function AccountDashboardPage() {
   const activeWorkspaceId = session
     ? await resolveActiveWorkspaceId(session)
     : undefined;
-  const [topProjects, overview] = session
-    ? await Promise.all([
-        // A deleted team is archived, and leaves every team list — this one too.
-        listAccessibleProjects().then((projects) =>
-          projects
-            .filter(({ project }) => project.status !== "archived")
-            .slice(0, 3),
-        ),
-        readOverview(activeWorkspaceId),
-      ])
-    : [[], null];
-
-  // Show workspace name tags when the user's top projects span multiple workspaces
-  const uniqueWorkspaceIds = new Set(
-    topProjects.map(({ project }) => project.workspaceId),
-  );
-  const isMultiWorkspace = uniqueWorkspaceIds.size > 1;
+  const overview = session ? await readOverview(activeWorkspaceId) : null;
 
   return (
     <SectionCard
@@ -136,6 +142,47 @@ export default async function AccountDashboardPage() {
         </Link>
       }
     >
+      {overview && overview.quickRuns.length > 0 ? (
+        <section
+          aria-labelledby="run-a-flow-title"
+          data-testid="run-a-flow"
+          className="py-5 first:pt-0"
+        >
+          <h2
+            id="run-a-flow-title"
+            className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
+          >
+            Run a flow
+          </h2>
+          <ul className="mt-3 flex flex-col divide-y divide-[var(--ring)]">
+            {overview.quickRuns.map((row) => (
+              <li key={row.id}>
+                <Link
+                  prefetch={false}
+                  href={`${flowPath(row.id)}#run`}
+                  className="flex min-h-14 items-center gap-3 rounded-xl px-2 py-3 transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                >
+                  <FlowIcon name={row.icon} />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-sm font-medium text-[var(--text)]">
+                      {row.name}
+                    </span>
+                    <span className="truncate text-xs text-[var(--muted)]">
+                      {row.team}
+                    </span>
+                  </span>
+                  <CaretRightIcon
+                    aria-hidden
+                    size={16}
+                    className="shrink-0 text-[var(--muted)]"
+                  />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <div className="py-5 first:pt-0">
         <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Quick actions
@@ -218,8 +265,8 @@ export default async function AccountDashboardPage() {
                 >
                   <span className="font-medium text-[var(--text)]">{name}</span>
                   <StatusPill status={run.status} />
-                  <span className="text-xs text-[var(--muted)]">
-                    {formatWhen(run.createdAt)}
+                  <span className="text-xs break-all text-[var(--muted)]">
+                    {formatWhen(run.createdAt)} · {runLabel(run.id)}
                   </span>
                 </Link>
               </li>
@@ -231,59 +278,6 @@ export default async function AccountDashboardPage() {
             <p className="mt-1 text-xs text-[var(--muted)]">
               Add a flow to see its runs here.
             </p>
-          </>
-        )}
-      </div>
-
-      <div className="py-5">
-        <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-          Teams
-        </h2>
-        {topProjects.length === 0 ? (
-          <>
-            <p className="mt-3 text-sm text-[var(--muted)]">No teams yet.</p>
-          </>
-        ) : (
-          <>
-            <ul className="mt-3 space-y-2">
-              {topProjects.map(({ project, workspace }) => (
-                <li key={project.id}>
-                  <Link
-                    prefetch={false}
-                    href={`/account/teams/${project.id}`}
-                    className="flex flex-wrap items-center gap-2 rounded-xl px-2 py-2 transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
-                  >
-                    {/* A team is its kind (the owner, build 9). */}
-                    <span className="font-medium text-[var(--text)]">
-                      {project.type}
-                    </span>
-                    <span className="inline-flex rounded-full bg-[var(--chip-bg)] px-2.5 py-0.5 text-xs font-medium text-[var(--chip-text)]">
-                      {project.status === "active"
-                        ? "Active"
-                        : project.status === "paused"
-                          ? "Paused"
-                          : project.status === "draft"
-                            ? "Draft"
-                            : "Archived"}
-                    </span>
-                    {isMultiWorkspace ? (
-                      <span className="text-xs text-[var(--muted)]">
-                        · {workspace.name}
-                      </span>
-                    ) : null}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-3">
-              <Link
-                prefetch={false}
-                href="/account/teams"
-                className="text-sm font-medium text-[var(--link)] transition hover:underline focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
-              >
-                View all teams
-              </Link>
-            </div>
           </>
         )}
       </div>

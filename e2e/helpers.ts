@@ -44,9 +44,25 @@ export function automationCard(page: Page, name: string) {
   return page.getByRole("heading", { name }).locator("xpath=../../..");
 }
 
-// A provider's card under "Available connections", found by its name.
-export function providerCard(page: Page, name: string) {
-  return page.getByText(name, { exact: true }).locator("xpath=../..");
+// A provider's one connection row (Build 21, spec A4), on Connections, a
+// flow's page or its Set up, found by the provider's id.
+export function connectionRow(page: Page, providerId: string) {
+  return page.getByTestId(`connection-${providerId}`);
+}
+
+// A flow's own page (Build 21, spec A6): where it is run, set up again,
+// paused, moved and archived. The fixture's flows, by subscription.
+export const FLOWS = {
+  manual: "/account/flows/99999999-9999-4999-8999-999999999999",
+  invoice: "/account/flows/f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1",
+  webhook: "/account/flows/cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
+  archivable: "/account/flows/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+} as const;
+
+// Step 1's run form on a flow's page (spec A6): the run's fields and Start
+// run, or Turn on while the flow is off.
+export function runForm(page: Page) {
+  return page.getByTestId("run-form");
 }
 
 // The fixture's own controls, never the published API.

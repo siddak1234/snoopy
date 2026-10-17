@@ -2983,7 +2983,7 @@ request is stored and nobody is told (backend SYSTEM-MANIFEST §12.1 #36). Test 
 
 **2026-10-13 — the Run window asks before a run's file goes to an AI,** as the iPhone app does
 (Apple's App Review Guideline 5.1.2(i)): "AI reads this file", over the Run window, in the app's
-words byte for byte (~~`app/account/flows/ai-consent.ts`~~, pinned by `test/ai-consent.test.mjs`),
+words byte for byte (~~`app/account/flows/ai-consent.ts`~~, pinned by ~~`test/ai-consent.test.mjs`~~),
 before any run whose input carries a file — the website cannot tell which automation uses a model —
 and never before one without. Agreed once per person per browser (localStorage,
 `autom8x.ai-consent.v1.<the person's id>`); a failed read asks again, a failed write still starts
@@ -2998,7 +2998,7 @@ request with a cookie from any Origin but the website's
 (`snoopy-backend/apps/api/src/modules/automations/routes.ts:94`,
 `snoopy-backend/apps/api/src/app.ts:1354-1359`) — but the person can, and so can code already
 running on the site. The app, too, asks on the phone alone.
-`test/ai-consent.test.mjs` holds the Run window as the only code here that starts a run. Open for
+~~`test/ai-consent.test.mjs`~~ holds the Run window as the only code here that starts a run. Open for
 `snoopy-backend`: a record of the agreement that the start checks.
 
 **2026-10-13 — Gate 25's review of #48: the deletion page's words held in the browser.** No test
@@ -3177,15 +3177,15 @@ then, by design. What changed, by the spec's items:
   Disconnect on Connections the same way); the choice saved as the flow's `connection` setting, the rest of its settings
   read on the server and sent whole. A connect started there comes back to it from Connections
   (`app/account/connections/pending-connect.ts`, a UUID-shaped path only). Intuit's four files in
-  `public/vendors/`, byte for byte (`lib/brand-logos.ts`, `components/dashboard/VendorLogo.tsx`,
+  `public/vendors/`, byte for byte (`lib/brand-logos.ts`, ~~`components/dashboard/VendorLogo.tsx`~~,
   served `unoptimized`, 24 px tall, the theme picking the file, 12 px of clear space its own;
   Intuit's button never faded while the page waits); Connections shows the logo and
   Intuit's words, and no longer the provider's id or "Only providers configured for this
   deployment are shown."
 - **U8 — the AI consent on the account.** "AI reads your documents" once while
-  `aiDocumentReading` is null (`app/account/layout.tsx`, `components/account/AiConsentCard.tsx`),
-  Settings › AI's switch (`components/account/AiReadingSetting.tsx`), and Start run's gate for a run
-  with a file on a flow that `usesAi` (`lib/ai-consent.ts`), all through
+  `aiDocumentReading` is null (`app/account/layout.tsx`, ~~`components/account/AiConsentCard.tsx`~~),
+  Settings › AI's switch (~~`components/account/AiReadingSetting.tsx`~~), and Start run's gate for a run
+  with a file on a flow that `usesAi` (~~`lib/ai-consent.ts`~~), all through
   `PUT /v1/session/ai-document-reading`. The per-run dialog and its localStorage agreement are
   removed in the same change (~~`app/account/flows/AiConsentDialog.tsx`~~,
   ~~`app/account/flows/ai-consent.ts`~~).
@@ -3206,7 +3206,7 @@ Guards, each bitten by hand — the guarded code broken, the guard RED, the file
 copy (sha256 checked equal), the guard GREEN: W1 the four Intuit files' sha256, the button's too,
 the light theme's dark wordmark, `unoptimized` (`test/brand-logos.test.mjs`); W2 the card only while
 never asked, Start run's gate, the Run window asking before it starts, the per-run words gone, the
-layout's once, the card's words (`test/ai-consent.test.mjs`); W3 never a step id, one row per
+layout's once, the card's words (~~`test/ai-consent.test.mjs`~~); W3 never a step id, one row per
 group, groups for the run's own version only, the run page drawing no step id
 (`test/run-progress.test.mjs`); U2 no team sent, the removed words, the 404/502 words, no Create on
 Teams (`test/automation-contract.test.mjs`, `test/tenancy-contract.test.mjs`), a kind added or
@@ -3413,3 +3413,205 @@ facts file was written. WebKit did not run: each browser gate said the engine li
 Playwright listed Chromium and Firefox alone. CI's WebKit leg lists the same 278 fixture tests.
 
 F104 is the last number.
+
+## Round 17 — Build 21's screens: a flow's page and its Set up, a run's page live with its documents, one connection row, every run by its full id, and no AI consent (backend BUILD-PLAN 25.4.37–25.4.46) — 2026-10-17
+
+The owner's thirteen TestFlight
+items on build 20 (2026-10-15, 01:38–01:58Z), his decisions D1–D4, the quick-run ask ("when a user
+wants to run a random flow. they shouldnt have to do a bunch of work in the app"), the Intuit
+decision ("we will list on apples app store not intuits. so we do not need that") and "go with all"
+(~04:15Z, the A/B/C list it answered — not the session's choices), as corrected by him the same
+evening (AM1–AM8, ~22:15Z and ~22:35Z, which override the spec where they differ). The same
+behaviour as the app (`snoopy-mobile` `round-17/b21-screens` `651ab72`; the owner's "mobile = web
+parity"): its words, its order and its rules, ported module by module. The contract is the round's
+(`b21-contract`: `automations.yaml` `8b6b6f78…`, `openapi.yaml` `0f20ff23…`, `connections.yaml`
+`bf50b980…` — `RunDocument` with `number`, `numberLabel` and `references`, `RunDetail.documents`,
+`GET …/runs/{runId}/documents`, `AutomationSetupField.providers` and `.group`); it is regenerated
+from backend `main` once Release 1 is read back, and until then the Deployed contract job is red by
+design (it reads production, and was not run). What changed, by the spec's items:
+
+- **A1 — no AI consent anywhere** (D1: "we dont need to say this at all … the terms and privacy
+  policy includes that information"). Gone: the card once on the account (~~`components/account/AiConsentCard.tsx`~~),
+  Settings › AI (~~`components/account/AiReadingSetting.tsx`~~), Start run's gate (~~`lib/ai-consent.ts`~~),
+  the save (~~`lib/ai-document-reading.ts`~~, ~~`app/account/ai-consent-actions.ts`~~), the
+  session's `aiDocumentReading` and ~~`test/ai-consent.test.mjs`~~. A run with a file starts at the
+  press; the fixture's people now answer the platform's question never-asked, and none is shown the
+  card. The sign-in line is unchanged, word for word.
+- **A2 — Connect vendor saves at the tap and goes back** (item 2). One step's vendors
+  (`?field=`, backend ADR-0040) — each the one connection row with a check (24) on the chosen —
+  then None; a tap on a connected vendor or None is saved and the flow's page follows; a vendor not
+  connected, for an owner or admin, goes to its sign-in and comes back chosen, saved and gone back
+  from that one tap; for a member it is no choice, "Ask an owner or admin to connect it." The
+  tapped row says "Saving…"; a refused save, "Could not save. Try again." under the rows. ~~Save,
+  Intuit's Connect to QuickBooks button image and "Disconnect from QuickBooks"~~ — disconnecting is
+  Connections' (S13). `app/account/flows/VendorRows.tsx` draws the rows here and on Set up.
+- **A3 — the vendor row says its state** (items 4 and 5): on the flow's page, the step that
+  records shows the vendor chosen — its mark, its name, "Connected" or "Not connected", or None
+  and "Save the details only." — and the whole row opens Connect vendor. No "Connect vendor"
+  button anywhere.
+- **A4 — one connection row** (items 6 and 7; `components/dashboard/ConnectionRow.tsx`): the
+  vendor's mark at 24 × 24 — QuickBooks' round symbol, the app's own crop of Intuit's preferred
+  logo (`public/vendors/quickbooks-symbol.png`, 536 × 536, `616e1f16…`, pixel-equal to the logo's
+  top-left square), the design's Google glyph (`components/ui/ProviderGlyph.tsx`) — its name, the
+  account's email or its state, and one button of ours: Connect, Reconnect or Disconnect, asked
+  first ("{n} live flows use it. They stop until you connect it again."). At least 64 px tall for
+  every provider. Connections is one list of rows: ~~Available connections, descriptions, "Used
+  by N live flows", Replace account~~. The two Intuit button files are removed, with their styles.
+- **A5 — Account's one line and the providers' glyphs** (items 8 and 9): "Sign in with any of
+  these.", and each sign-in row by its glyph at 24.
+- **A6 and AM4 — a flow's page, and Set up once** (item 12, D3; AM4: "set up page is initial,
+  after that flow page is the run page"). `app/account/flows/[subscriptionId]/page.tsx`: its name,
+  status and team; Dashboard — Runs, Successes, Failures, read again every 5 s while a run of it
+  goes on and whenever the page is shown again, each opening Activity for it; Steps — numbered,
+  Step 1 holding the run's fields (titles only) and Start run, or Turn on while the flow is off,
+  and what it is owed, the vendor in its step; Connections; then Pause, the move, Edit setup, the
+  webhook address and Archive flow. `…/setup/page.tsx`: 1 · Connect (each step's vendors, and each
+  account it cannot run without), then its settings — title and input, no help line — and Turn on
+  for a draft (saved and turned on in one change) or Save. Add opens Set up; the Flows card says
+  the flow's team, status and Open.
+- **A7 — a run's page, live** (items 10 and 11; `app/account/runs/[runId]/RunLive.tsx`,
+  `lib/run-progress.ts`, `lib/run-documents.ts`): every group from the start, each in words —
+  Waiting, Working…, "Done · 2:32 PM", "Waiting for approval: {why}", the run's failure, Skipped,
+  Stopped — never a step's own words or id; Duration and Steps done (done or skipped over all);
+  read again every 2 s while pending or running; each document on its own card ("Document 1 of
+  3", its chip, type and seller, place, date and time, its numbers by their printed labels, its
+  lines with "{quantity} × {unit price}", totals, how it was paid, the result and the
+  automation's own lines; "Not approved" for a waiting one whose approval was refused or ran out);
+  Details only for a run with none; the facts end with the full Run ID; Download JSON saves the
+  platform's file as `run-{full id}.json`.
+- **A8 — every run by its full id** (D4, AM2): the run page's title, Activity's and Home's rows
+  ("{when} · Run {id}", ~~"· v{version}"~~), an approval's card. The request id is never shown.
+- **A9 — Run a flow, first on the dashboard; no Teams list** (the quick-run ask; AM5): every live
+  flow, its icon, name and team, each to its page's Step 1 (`#run`) — three presses to a started
+  run. Teams stay on their own page.
+- **The privacy page** — only what v3 made untrue: dated October 17, 2026; a file's every bill,
+  invoice, receipt, credit note, statement and other financial document read (AM1: no "up to
+  five"; AM8); each document's details kept with the run, shown to the workspace and downloadable
+  (the spec's sentence); the results emailed to the person who started the run or, for a run
+  nobody started, the workspace's owners and admins (AM3: no "Also email" or "Send results to").
+
+**The session's choices** (none is the owner's; listed for him with the checklist), from the
+spec as built: S11, S12, S13, S14, S16, S21, S23, S24, S25, S26, S30; and the app's M2, M3, M4, M5,
+M8, M10 and M13, which the website follows for parity. This lane's own:
+
+| # | Choice |
+| --- | --- |
+| W1 | Set up is a page of its own, `/account/flows/{id}/setup`. Add makes the flow — a draft, as the website always made it — and opens it; its Turn on sends the settings and `live` in one change. |
+| W2 | A Dashboard tile opens Activity for the flow (`?flow=`) and its outcome (`&status=succeeded` or `failed`); Activity's subheader then says "{flow}", or "{flow} · Successes" / "· Failures". |
+| W3 | Download JSON reads the platform's file through `/api/platform` at the press and saves it under the name the platform gives it; refused, "Could not download. Try again." |
+| W4 | A step's time on the run page is UTC, as every date on these pages ("Done · 2:32 PM"), so the server and the browser draw the same words. |
+| W5 | Of several rows the platform lists for one provider, the live one speaks for its row. |
+| W6 | Replace account is off the website's action too (`beginConnectionAuthorization` takes no connection to replace); the platform's route stays, unused. |
+| W7 | Each vendor row is a button with the radio role: a tap is the choice — and saves, on Connect vendor — while the arrow keys move nothing. |
+| W8 | A connect started on a flow's page, its Set up or its Connect vendor page comes back to it, through Connections (`pending-connect.ts`: those exact shapes only, the step's `?field=` kept). |
+| W9 | A flow's pages and a run's page carry a Back arrow (24, named "Back"); their small-screen titles are "Flow", "Set up", "Connect vendor". |
+| W10 | Run a flow draws a flow's icon from a small explicit map (Receipt and four more), else the flow arrow. |
+| W11 | The privacy page's two sentences that AM1, AM3 and AM8 made untrue are the session's words (above); it is dated the day it was built, October 17, 2026 — re-dated, and its baselines re-pinned, if it merges later (S26). |
+
+**Guards proved to bite.** Thirty-two runs of one script (the session's `b21-web-tools/bites/bite.py`,
+its logs beside it), Node 22.23.2, each on the final tree: one exact edit, the guarding test run
+with `node --test` (red), the file restored from its saved copy — its sha256 equal every time —
+and the test run again (green).
+
+| Guard | Broken by | What failed |
+| --- | --- | --- |
+| A1 · no AI consent in any runtime file | `// usesAi` added to lib/flow-steps.ts | `build21-screens` "no runtime file says or wires the AI consent" |
+| A1 · the sign-in line is today's, and says nothing of AI | "AI reads your documents. " put before it | `build21-screens` "the sign-in line is today's" |
+| A2 · a tap saves and goes back | the push to the flow's page after the save taken out | `vendor-page` "Connect vendor: a tap saves and goes back" |
+| A2 · a member's vendor not connected is no choice | the row tappable for anyone | `vendor-page` "Connect vendor: a tap saves and goes back" |
+| A3 · the vendor row says its state | always "Not connected" | `flow-steps` "the flow page reads top to bottom" |
+| A4 · one least height, 64 | min-h-16 made min-h-14 | `connection-rows` "Connections lists every provider in one row each" |
+| A4 · line 2 is the account's email | the email never said | `connection-rows` "line 2: the account's email" |
+| A4 · Disconnect says what it stops | "They stop" made "It stops" for several | `connection-rows` "one button: Connect, Reconnect, Disconnect" |
+| A4 · no Replace account | Replace account put back on the row | `structure-contract` "Replace account is off the connection row" |
+| A5 · Account's one line | the old lead back | `session-contract` "the Linked accounts lead is one line" |
+| A5 · the providers' glyphs | the glyph not drawn | `session-contract` "the Linked accounts lead is one line" |
+| A6 · Step 1 holds the document and Start run | Step 1's controls not drawn | `flow-steps` "the flow page reads top to bottom" |
+| A6 · the Dashboard is live | the timer's condition inverted | `flow-steps` "the Dashboard is live" |
+| AM4 · Save keeps the flow's status | `status: "live"` sent with Save too | `automation-contract` "the setup UI is generated from the pinned version's metadata" |
+| A7 · a group's precedence | failed before held | `run-progress` "a group is working over held" |
+| A7 · a step passed over is Skipped | Waiting for it | `run-progress` "each step on its own" |
+| A7 · Steps done counts skipped groups | done only | `run-progress` "Steps done counts" |
+| A7 · never a step's own summary | a done group says its last step's summary | `run-progress` "never '34 accounts read'" |
+| A7 · "{quantity} × {unit price}" | never drawn | `run-documents` "every line" |
+| A7 · a document's own number under its printed label | always "No." | `run-documents` "its numbers" |
+| A7 · Download JSON is run-{full id}.json | the first eight | `run-documents` "Download JSON" |
+| A7 · Not approved | never | `run-documents` "reads Not approved" |
+| A8 · "Run {full id}" | the first eight | `run-progress` "a run is named by its FULL id" |
+| A8 · Activity's rows by the full id | "· v{version}" back | `run-progress` "a run is named by its FULL id" |
+| A8 · an approval's run by its full id | the run's id not drawn | `run-progress` "a run is named by its FULL id" |
+| A9 · Run a flow lists live flows only | every flow | `flow-steps` "Run a flow: every live flow" |
+| A9 · each to its Step 1 | #run taken off the link | `flow-steps` "Home: Run a flow first" |
+| AM5 · no Teams list on Home | a Teams heading drawn | `flow-steps` "Home: Run a flow first" |
+| vocabulary · no "Connect vendor ›" | put back in a runtime file | `build21-screens` "Connect vendor ›" |
+| A8 · a run's request id never shown | read in Activity | `build21-screens` "a run's request id is never shown" |
+| privacy · the AM3 sentence | "Also email" back | `build21-screens` "the privacy page says what v3 does" |
+| A4 · the QuickBooks symbol is the app's file | the symbol's file swapped for the full logo | `brand-logos` "a mark is resolved by the provider's icon name alone" |
+
+**The privacy baselines.** The page's text changed, so `privacy-darwin.png` and
+`privacy-linux.png` were re-recorded — darwin on this Mac's Chromium against a production build
+(1440 × 6761), linux in CI's pinned Playwright image with Node 22.23.2 (1440 × 6785); each first
+failed on its old baseline, then all six marketing pages passed.
+
+**The gate.** `npm run verify` on this change, on the owner's Mac, Node 22.23.2, default `TMPDIR`,
+`SNOOPY_BACKEND_ROOT` at the round's `b21-contract`, under the gate lock: every gate exited 0 —
+`format:check`, `lint`, `typecheck`, `audit:boundaries`, `test:contracts` (269 of 269),
+`verify:platform-contracts`, `build:no-backend`, `probe:no-backend`, `build`, `test:browser` (20 s:
+34 passed, 522 skipped for want of the fixture, none failed) and `test:browser:fixtures` (530 s: 522
+passed, 261 in each of Chromium and Firefox, and 2 skipped, the keyboard journey in each; none
+failed) — and the facts file was written. WebKit did not run here; it runs in GitHub CI (register
+F104). This paragraph was added after that run; `format:check` and the document check ran again
+on the commit. The Deployed contract check was not run (it reads production): it is red by design
+until Release 1 serves the round's contract.
+
+**Found, not changed here:** in the light theme, the account area's Sign out button measures 3.9:1
+against the page (axe's `color-contrast`, `btn-danger` on the light ground) — no page's light-theme
+scan held it before this change, and this change does not touch it.
+
+**2026-10-17 — the review of Build 21's screens.** One independent pass over
+`round-17/b21-screens` at `aa4e482` against the spec's AM1–AM8 and A1–A9, the website's side of
+C1/C2 and the privacy page, the owner's build 20 words and screenshots, the app's branch for the
+same screens (`snoopy-mobile` `bb2f8e1`) and the round's contract. Fixed here:
+
+- **should-fix — a vendor row's state said only on screen.** Each vendor row on Connect vendor and
+  Set up is named by its vendor alone (`aria-label`), and the flow page's vendor row "{vendor}:
+  change the vendor", so a screen reader never heard "Connected", "Not connected", "Saving…" or a
+  member's "Ask an owner or admin to connect it." — build 20's items 4 and 5 again, for anyone who
+  listens. Each row is now described by its line (`aria-describedby`;
+  `components/dashboard/ConnectionRow.tsx` names the line, `app/account/flows/VendorRows.tsx` and
+  `app/account/flows/[subscriptionId]/page.tsx` point at it).
+- **nit — Activity's address taken as given.** `?flow=` was sent to the platform whatever it held;
+  the platform refuses a `subscriptionId` that is not a UUID, which took the page to its error
+  boundary. Only a UUID-shaped id filters now; anything else is no filter (`activityFilter`,
+  `lib/flow-steps.ts`).
+- **nit — the flow page read the catalog's settings for a version that declares none.** Its vendor
+  rows came from `subscription.setup ?? entry.setup`, so a flow on an older version with no
+  settings would have shown the newest version's vendor row, opening a Connect vendor page that is
+  not found; it reads the version it runs, as its Set up and Connect vendor pages do (backend
+  §12.1 #185).
+- **nit** — the Linked accounts test's title still said the lead that A5 removed.
+
+Found, not changed here (the app's lane, `snoopy-mobile`): the app's flow-page vendor row and
+Connect vendor rows are labelled by the vendor alone too (`snoopy-mobile/app/(tabs)/flows/detail.tsx`,
+`snoopy-mobile/components/flows/vendor-choice.tsx`), and its flow page and vendor page fall back
+to the catalog's settings (`subscription.setup ?? entry?.setup`).
+
+Guards proved to bite, each on the final tree (red, then the file restored from its saved copy —
+sha256 equal — then green): `flow-steps` "Activity is filtered only by a flow id shaped as one"
+(the UUID check made "any text"); `flow-steps` "a flow's own pages draw the settings of the
+version it RUNS" (the catalog's fallback put back); and, the three fixed files
+(`components/dashboard/ConnectionRow.tsx`, `app/account/flows/VendorRows.tsx`,
+`app/account/flows/[subscriptionId]/page.tsx`) put back to `aa4e482`'s bytes together, two
+fixture tests in Chromium — "Connect vendor: the step's vendors…" (`toHaveAccessibleDescription`)
+and "a member on the Connect vendor page…" (the same).
+
+Checked and not a defect: a run's page on a phone — its title, the full id, wraps at its hyphens
+in Chromium, Firefox and WebKit, even for an id whose every part starts with a digit, so the page
+is no wider than a 375 px screen; the fixture test "on a phone, a run's page is no wider than the
+screen…" now holds it (a guard, not a fix: it passes on `aa4e482` too).
+
+The gate: `npm run verify` on the review's tree, Node 22.23.2, default `TMPDIR`,
+`SNOOPY_BACKEND_ROOT` at the round's `b21-contract`, under the gate lock — every gate exited 0
+(`test:contracts` 271 of 271; `test:browser` 34 passed; `test:browser:fixtures` 524 passed, 262
+in each of Chromium and Firefox, 2 skipped, none failed). This paragraph was added after that
+run; `format:check` and the document check ran again on the commit.

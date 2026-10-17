@@ -263,10 +263,12 @@ test("OAuth provider UI consumes the generated public provider policy", () => {
   assert.match(linkedAccounts, /state\.providers\.map/);
 });
 
-test("the Linked accounts lead says a linked account signs you in to this same account, in the app and on the website, and to link one before signing in with it (the owner's build 12, #8; register F86)", () => {
+test("the Linked accounts lead is one line — Sign in with any of these. — and each sign-in row draws its provider's own glyph, never a key (Build 21, spec A5; the owner's build 20 items 8 and 9)", () => {
   // The paragraph under the heading once the accounts are read, as a person
-  // reads it: JSX's wrapped lines joined by one space. Its first two sentences
-  // are the app's too; the credentials sentence is this page's own.
+  // reads it: JSX's wrapped lines joined by one space. The app's words, byte
+  // for byte (snoopy-mobile `ACCOUNT_LEAD`). ~~What linking does, the
+  // same-email join and the credentials sentence~~ (register F86) until
+  // Build 21: "Why is there a paragraph. It should be short not an essay".
   const prose = readFileSync(
     "components/account/LinkedAccountsSection.tsx",
     "utf8",
@@ -276,14 +278,18 @@ test("the Linked accounts lead says a linked account signs you in to this same a
   ]
     .map(([, text]) => text.trim())
     .filter((text) => text !== "Loading…");
-  assert.deepEqual(leads, [
-    "Any account linked here signs you in to this same account, in the app and on the website. Signing in with Google, Microsoft or Apple at the same email address as this account joins this account too. To use one with a different email address, link it before you first sign in with it. Provider credentials are handled by the Autom8x backend and never exposed to this page.",
-  ]);
+  assert.deepEqual(leads, ["Sign in with any of these."]);
   assert.doesNotMatch(
     prose,
-    /Link additional sign-in options to this account\./u,
-    "the old lead said nothing of what a linked account does",
+    /Any account linked here|Provider credentials are handled/u,
+    "the paragraph is gone",
   );
+  // Google, Microsoft and Apple by the design's glyphs, at 24; no key icon.
+  assert.match(
+    prose,
+    /\{isGlyphProvider\(id\) \? \( <ProviderGlyph provider=\{id\} size=\{24\}/u,
+  );
+  assert.doesNotMatch(prose, /KeyIcon|\/Key"/u);
 });
 
 test("a server-side call sends the Edge cookies, never cookie attributes (register F51)", async () => {

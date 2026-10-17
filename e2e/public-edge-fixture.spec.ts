@@ -4,12 +4,13 @@ import {
   expect,
   test,
   type BrowserContext,
-  type Locator,
   type Page,
   type Request,
 } from "@playwright/test";
 import {
+  FLOWS,
   automationCard,
+  connectionRow,
   expectNoAxeViolations,
   fixtureControl,
   fixtureRead,
@@ -17,7 +18,7 @@ import {
   isServerAction,
   observe,
   presentSession,
-  providerCard,
+  runForm,
   settledAnimations,
   worstContrast,
 } from "./helpers";
@@ -50,8 +51,8 @@ test("the pasted-key 409 retry preserves the original connection intent", async 
     (request) => request.method() === "POST",
   );
   await page.goto("/account/connections");
-  await providerCard(page, "Fixture key provider")
-    .getByRole("button", { name: "Connect" })
+  await connectionRow(page, "fixture-key")
+    .getByRole("button", { name: "Connect Fixture key provider" })
     .click();
   await expect(page.locator('input[name="idempotencyKey"]')).not.toHaveValue(
     "",
@@ -70,17 +71,21 @@ test("the pasted-key 409 retry preserves the original connection intent", async 
   ).toHaveCount(1);
   await page.getByRole("button", { name: "Retry verification" }).click();
   await expect.poll(() => serverActionRequests.length).toBe(2);
-  await expect(page.getByText("Fixture account")).toBeVisible();
+  // Connected: its row says so, and its one button is Disconnect.
+  const row = connectionRow(page, "fixture-key");
+  await expect(row).toContainText("Connected");
+  await expect(
+    row.getByRole("button", { name: "Disconnect Fixture key provider" }),
+  ).toBeVisible();
 });
 
 test("a dialog that sends nothing yet closes on a click outside it, as on Escape (components/ui/Modal's default)", async ({
   page,
 }) => {
   await page.goto("/account/connections");
-  const connect = providerCard(page, "Fixture key provider").getByRole(
-    "button",
-    { name: "Connect" },
-  );
+  const connect = connectionRow(page, "fixture-key").getByRole("button", {
+    name: "Connect Fixture key provider",
+  });
   const dialog = page.getByRole("dialog", {
     name: "Connect Fixture key provider",
   });
@@ -94,38 +99,120 @@ test("a dialog that sends nothing yet closes on a click outside it, as on Escape
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
-test("Reconnect on a connection that already holds what it needs asks no consent, and says so (backend §12.1 #172)", async ({
+test("Connect on a vendor someone connected since the page was read asks no consent, and says so (backend §12.1 #172)", async ({
   page,
 }) => {
   const consent = observe(page, (request) =>
-    request.url().startsWith("https://oauth.invalid/"),
+    request.url().includes("/connections?status="),
   );
+  await fixtureControl("google-disconnected");
   await page.goto("/account/connections");
-  await providerCard(page, "Fixture OAuth provider")
-    .getByRole("button", { name: "Reconnect" })
-    .click();
+  const row = connectionRow(page, "google");
+  await expect(row).toContainText("Not connected");
+  // Another admin connects it meanwhile; the platform reuses that grant.
+  await fixtureControl("google-connected");
+  await row.getByRole("button", { name: "Connect Google" }).click();
   await expect(
     page.getByRole("status").filter({ hasText: "already connected" }),
   ).toHaveText(
-    "Fixture OAuth provider is already connected as Fixture OAuth account, with everything it needs — there is nothing to authorize.",
+    "Google is already connected as person@example.com, with everything it needs — there is nothing to authorize.",
   );
   await expect(page).toHaveURL(/\/account\/connections$/);
   expect(consent).toEqual([]);
-});
-
-test("a connection says how many live flows use it — flows, as every signed-in page says (BUILD-PLAN 24.11.11)", async ({
-  page,
-}) => {
-  await page.goto("/account/connections");
+  // Read again: its row says the account, and Disconnect.
+  await expect(row).toContainText("person@example.com");
   await expect(
-    // The provider by its name, never its id (spec §3.0 rule 4).
-    page.getByText("Fixture OAuth provider · Used by 1 live flow", {
-      exact: true,
-    }),
+    row.getByRole("button", { name: "Disconnect Google" }),
   ).toBeVisible();
 });
 
-test("a connection that needs reauthorization is repaired by Reconnect, not reused (backend §12.1 #175)", async ({
+test("Connections: one row per vendor — its mark at 24, its name, the account's email or its state, our own button — at one least height, and nothing else said (Build 21, spec A4; the owner's build 20 items 6 and 7)", async ({
+  page,
+}) => {
+  await page.goto("/account/connections");
+  const google = connectionRow(page, "google");
+  await expect(google.getByRole("img", { name: "Google" })).toBeVisible();
+  await expect(google).toContainText("Google");
+  await expect(google).toContainText("person@example.com");
+  await expect(
+    google.getByRole("button", { name: "Disconnect Google" }),
+  ).toHaveText("Disconnect");
+  const quickbooks = connectionRow(page, "quickbooks");
+  await expect(
+    quickbooks.getByRole("img", { name: "QuickBooks" }),
+  ).toHaveAttribute("src", "/vendors/quickbooks-symbol.png");
+  await expect(quickbooks).toContainText("QuickBooks Online");
+  await expect(quickbooks).toContainText("Not connected");
+  // Our own Connect: no vendor's button image (the owner's ~04:15Z).
+  await expect(
+    quickbooks.getByRole("button", { name: "Connect QuickBooks Online" }),
+  ).toHaveText("Connect");
+  await expect(page.locator('img[src*="connect-to-quickbooks"]')).toHaveCount(
+    0,
+  );
+  // One least height for every row — Google's and QuickBooks' the same — and
+  // every mark 24 × 24, in both palettes.
+  const measured = async () => {
+    const heights = await page
+      .locator("[data-connection-row]")
+      .evaluateAll((rows) =>
+        rows.map((row) => Math.round(row.getBoundingClientRect().height)),
+      );
+    expect(heights.length).toBe(4);
+    expect(new Set(heights).size).toBe(1);
+    expect(heights[0]).toBeGreaterThanOrEqual(64);
+    for (const mark of await page
+      .locator("[data-connection-row] [data-mark]")
+      .all()) {
+      const box = await mark.boundingBox();
+      expect([Math.round(box!.width), Math.round(box!.height)]).toEqual([
+        24, 24,
+      ]);
+    }
+    return heights[0];
+  };
+  const dark = await measured();
+  // No description, no "Used by", no Available connections, no Replace account.
+  for (const gone of [
+    "Records bills and receipts.",
+    "Reads and sends email.",
+    "Available connections",
+    "Replace account",
+  ]) {
+    await expect(page.getByText(gone)).toHaveCount(0);
+  }
+  await expect(page.getByText(/Used by/u)).toHaveCount(0);
+  await expectNoAxeViolations(page);
+  // The light palette: the same rows, at the same height.
+  await page.evaluate(() => localStorage.setItem("theme", "light"));
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  expect(await measured()).toBe(dark);
+  await page.evaluate(() => localStorage.removeItem("theme"));
+  await page.reload();
+  // Disconnect asks first, saying what it stops.
+  const disconnect = google.getByRole("button", { name: "Disconnect Google" });
+  await disconnect.click();
+  const dialog = page.getByRole("dialog", { name: "Disconnect Google?" });
+  await expect(dialog).toContainText(
+    "2 live flows use it. They stop until you connect it again.",
+  );
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(disconnect).toBeFocused();
+  await disconnect.click();
+  await page
+    .getByRole("dialog", { name: "Disconnect Google?" })
+    .getByRole("button", { name: "Disconnect", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(google).toContainText("Not connected");
+  await expect(
+    google.getByRole("button", { name: "Connect Google" }),
+  ).toBeVisible();
+});
+
+test("a connection that needs reauthorization says so on its row, and is repaired by Reconnect, not reused (backend §12.1 #175)", async ({
   page,
 }) => {
   await page.route("https://oauth.invalid/**", (route) =>
@@ -137,44 +224,10 @@ test("a connection that needs reauthorization is repaired by Reconnect, not reus
   );
   await fixtureControl("oauth-connection-broken");
   await page.goto("/account/connections");
-  await expect(
-    page.getByText("This connection needs attention before it can be used."),
-  ).toBeVisible();
-  await providerCard(page, "Fixture OAuth provider")
-    .getByRole("button", { name: "Reconnect" })
-    .click();
-  await page.waitForURL(/^https:\/\/oauth\.invalid\/authorize/);
-});
-
-test("Replace account is confirmed first, names the connection it replaces, and goes to the provider's consent (backend ADR-0026)", async ({
-  page,
-}) => {
-  await page.route("https://oauth.invalid/**", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "text/html",
-      body: "<h1>consent</h1>",
-    }),
-  );
-  await page.goto("/account/connections");
-  const replace = page.getByRole("button", { name: "Replace account" });
-  await replace.click();
-  const dialog = page.getByRole("dialog", {
-    name: "Replace Fixture OAuth account?",
-  });
-  await expect(dialog).toContainText(
-    "Fixture OAuth account stays connected until that sign-in completes",
-  );
-  await expectNoAxeViolations(page);
-  // Keeping the account changes nothing and hands focus back.
-  await dialog.getByRole("button", { name: "Keep this account" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(replace).toBeFocused();
-  await replace.click();
-  // The fixture asks for consent only when the id sent is the live one's.
-  await page
-    .getByRole("dialog", { name: "Replace Fixture OAuth account?" })
-    .getByRole("button", { name: "Replace account" })
+  const row = connectionRow(page, "fixture-oauth");
+  await expect(row).toContainText("Needs attention");
+  await row
+    .getByRole("button", { name: "Reconnect Fixture OAuth provider" })
     .click();
   await page.waitForURL(/^https:\/\/oauth\.invalid\/authorize/);
 });
@@ -218,7 +271,7 @@ test("an unfinished connect says the connection is still active only when the pr
   await expect(banner).toHaveText(notCompleted);
 });
 
-test("Replace and Reconnect remember the provider before they leave for its consent (register F100)", async ({
+test("Reconnect remembers the provider before it leaves for its consent (register F100)", async ({
   page,
 }) => {
   await page.route("https://oauth.invalid/**", (route) =>
@@ -231,27 +284,12 @@ test("Replace and Reconnect remember the provider before they leave for its cons
   const banner = page
     .getByRole("alert")
     .filter({ hasText: "Try again or contact an owner." });
-  // Replace keeps the account it replaces until the new sign-in completes, so
-  // an unfinished replace leaves that connection active.
-  await page.goto("/account/connections");
-  await page.getByRole("button", { name: "Replace account" }).click();
-  await page
-    .getByRole("dialog", { name: "Replace Fixture OAuth account?" })
-    .getByRole("button", { name: "Replace account" })
-    .click();
-  await page.waitForURL(/^https:\/\/oauth\.invalid\/authorize/);
-  await page.goto("/account/connections?status=error");
-  await expect(banner).toHaveText(stillActive);
-  // Reconnect on a connection that needs reauthorization: remembered too, and
+  // Reconnect on a connection that needs reauthorization: remembered, and
   // that connection is not active, so the page does not say it is.
-  await page.evaluate(
-    (key) => sessionStorage.removeItem(key),
-    pendingConnectKey,
-  );
   await fixtureControl("oauth-connection-broken");
   await page.goto("/account/connections");
-  await providerCard(page, "Fixture OAuth provider")
-    .getByRole("button", { name: "Reconnect" })
+  await connectionRow(page, "fixture-oauth")
+    .getByRole("button", { name: "Reconnect Fixture OAuth provider" })
     .click();
   await page.waitForURL(/^https:\/\/oauth\.invalid\/authorize/);
   await page.goto("/account/connections?status=error");
@@ -262,27 +300,6 @@ test("Replace and Reconnect remember the provider before they leave for its cons
       pendingConnectKey,
     ),
   ).toBe("fixture-oauth");
-});
-
-test("a replacement named after the connection changed is refused as stale, and nothing is replaced", async ({
-  page,
-}) => {
-  await page.goto("/account/connections");
-  // Another admin replaces it after this page read it.
-  await fixtureControl("oauth-connection-replaced");
-  await page.getByRole("button", { name: "Replace account" }).click();
-  const dialog = page.getByRole("dialog", {
-    name: "Replace Fixture OAuth account?",
-  });
-  await dialog.getByRole("button", { name: "Replace account" }).click();
-  await expect(dialog.getByRole("alert")).toHaveText(
-    "This connection changed since the page loaded, so nothing was replaced. Reload the page to see it, then choose again.",
-  );
-  // Said once, in the dialog (register F52).
-  await expect(
-    page.getByRole("alert").filter({ hasText: "This connection changed" }),
-  ).toHaveCount(1);
-  await expect(page).toHaveURL(/\/account\/connections$/);
 });
 
 test("subscription refusals render only the two documented entitlement states", async ({
@@ -318,32 +335,27 @@ test("over the plan's flow allowance, Flows says so and a run's start is refused
   await fixtureControl("over-plan");
   await page.goto("/account/flows");
   await expect(page.getByTestId("flows-over-plan")).toHaveText(sentence);
-  await automationCard(page, "Manual input automation")
-    .getByRole("button", { name: "Run", exact: true })
-    .click();
-  const dialog = page.getByRole("dialog", {
-    name: "Run Manual input automation",
-  });
-  await dialog.getByLabel("Vendor").fill("Acme Supplies");
-  await dialog.getByLabel("Amount").fill("10");
-  await dialog.getByLabel("Invoice reference").fill("R-1");
-  await dialog.getByRole("button", { name: "Start run" }).click();
-  await expect(dialog.getByRole("alert")).toHaveText(sentence);
-  await expect(page).toHaveURL(/\/account\/flows$/);
+  await page.goto(FLOWS.manual);
+  const form = runForm(page);
+  await form.getByLabel("Vendor").fill("Acme Supplies");
+  await form.getByLabel("Amount").fill("10");
+  await form.getByLabel("Invoice reference").fill("R-1");
+  await form.getByRole("button", { name: "Start run" }).click();
+  await expect(form.getByRole("alert")).toHaveText(sentence);
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.manual}$`, "u"));
 });
 
 test("within the plan, Flows says nothing of it", async ({ page }) => {
   await page.goto("/account/flows");
   await expect(
-    automationCard(page, "Manual input automation").getByRole("button", {
-      name: "Run",
-      exact: true,
+    automationCard(page, "Manual input automation").getByRole("link", {
+      name: "Open Manual input automation",
     }),
   ).toBeVisible();
   await expect(page.getByTestId("flows-over-plan")).toHaveCount(0);
 });
 
-test("a live automation whose pinned version declares run input is started from its form, and the run's page follows", async ({
+test("a live flow whose pinned version declares run input is opened from its card and started from Step 1 of its page, and the run's page follows (Build 21, spec A6)", async ({
   page,
 }) => {
   // Backend §12.1 #162, ADR-0030. The fixture creates the run only when the
@@ -351,26 +363,29 @@ test("a live automation whose pinned version declares run input is started from 
   // page proves the form sent a number for money and nothing undeclared.
   await page.goto("/account/flows");
   const card = automationCard(page, "Manual input automation");
-  await expect(card.getByRole("button", { name: "Pause" })).toBeVisible();
-  await card.getByRole("button", { name: "Run", exact: true }).click();
-  const dialog = page.getByRole("dialog", {
-    name: "Run Manual input automation",
-  });
-  await expect(dialog).toBeVisible();
-  // The declared fields, in order. The file is optional, so a run starts
-  // without one (backend FR-14; a file is chosen in the tests below).
-  await expect(dialog.getByLabel("Vendor")).toBeVisible();
-  await expect(dialog.getByLabel("Amount")).toHaveAttribute("type", "number");
-  await expect(dialog.getByLabel("Invoice reference")).toBeVisible();
-  await expect(dialog.getByLabel("Invoice file")).toHaveAttribute(
-    "type",
-    "file",
-  );
+  // The card holds no Run, Set up, Pause or Archive any more: Open.
+  for (const gone of ["Run", "Set up", "Pause", "Archive flow"]) {
+    await expect(
+      card.getByRole("button", { name: gone, exact: true }),
+    ).toHaveCount(0);
+  }
+  await card
+    .getByRole("link", { name: "Open Manual input automation" })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.manual}$`, "u"));
+  const form = runForm(page);
+  // The declared fields, in order, titles only. The file is optional, so a
+  // run starts without one (backend FR-14; a file is chosen in the tests below).
+  await expect(form.getByLabel("Vendor")).toBeVisible();
+  await expect(form.getByLabel("Amount")).toHaveAttribute("type", "number");
+  await expect(form.getByLabel("Invoice reference")).toBeVisible();
+  await expect(form.getByLabel("Invoice file")).toHaveAttribute("type", "file");
+  await expect(form.getByText("Who sent the invoice.")).toHaveCount(0);
   await expectNoAxeViolations(page);
-  await dialog.getByLabel("Vendor").fill("Acme Supplies");
-  await dialog.getByLabel("Amount").fill("120.50");
-  await dialog.getByLabel("Invoice reference").fill("INV-1001");
-  await dialog.getByRole("button", { name: "Start run" }).click();
+  await form.getByLabel("Vendor").fill("Acme Supplies");
+  await form.getByLabel("Amount").fill("120.50");
+  await form.getByLabel("Invoice reference").fill("INV-1001");
+  await form.getByRole("button", { name: "Start run" }).click();
   await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
   await expect(page.getByText("Manual", { exact: true })).toBeVisible();
 });
@@ -380,13 +395,8 @@ test("a refused start keeps what was typed and the same idempotency key, so resu
 }) => {
   // React resets an action form's fields when the action settles; these forms
   // submit from onSubmit so a refusal keeps them (the change audit's P12b).
-  await page.goto("/account/flows");
-  await automationCard(page, "Manual input automation")
-    .getByRole("button", { name: "Run", exact: true })
-    .click();
-  const dialog = page.getByRole("dialog", {
-    name: "Run Manual input automation",
-  });
+  await page.goto(FLOWS.manual);
+  const dialog = runForm(page);
   await dialog.getByLabel("Vendor").fill("Acme Supplies");
   await dialog.getByLabel("Amount").fill("10");
   await dialog.getByLabel("Invoice reference").fill("R-1");
@@ -414,14 +424,8 @@ test("a start refused because its flow and the flow's queue are full says so in 
   // only with as many waiting as the flow runs at once is a start refused —
   // 429 `max_concurrent_runs` — and nothing is created. Any other 429 keeps
   // the platform's words (the test above).
-  await page.goto("/account/flows");
-  await automationCard(page, "Manual input automation")
-    .getByRole("button", { name: "Run", exact: true })
-    .click();
-  const dialog = page.getByRole("dialog", {
-    name: "Run Manual input automation",
-  });
-  await expect(dialog).toContainText("Fill this in, then start the run.");
+  await page.goto(FLOWS.manual);
+  const dialog = runForm(page);
   await dialog.getByLabel("Vendor").fill("Acme Supplies");
   await dialog.getByLabel("Amount").fill("10");
   await dialog.getByLabel("Invoice reference").fill("R-1");
@@ -432,7 +436,7 @@ test("a start refused because its flow and the flow's queue are full says so in 
   await expect(dialog.getByRole("alert")).toHaveText(
     "This flow is busy and its queue is full, so the run was not started. Try again once one of its runs has ended.",
   );
-  await expect(page).toHaveURL(/\/account\/flows$/);
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.manual}$`, "u"));
   await expect(dialog.getByLabel("Vendor")).toHaveValue("Acme Supplies");
   await expect(key).toHaveValue(sent);
   // Room again: the same start, with the same key, goes through.
@@ -440,56 +444,57 @@ test("a start refused because its flow and the flow's queue are full says so in 
   await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
 });
 
-test("a refused set-up save stays in its dialog, says so in the spec's words, and keeps what was typed", async ({
+test("a refused Set up save stays on its page, says so in the spec's words, and keeps what was typed; saved, the flow's page follows and the flow stays on (the owner's AM4; the app's M2)", async ({
   page,
 }) => {
   // The change audit's P11: a failed save used to revalidate the page, and under
-  // a refusal that re-render replaced the dialog with the "busy" panel.
-  await page.goto("/account/flows");
-  await automationCard(page, "Manual input automation")
-    .getByRole("button", { name: "Set up" })
-    .click();
-  const dialog = page.getByRole("dialog", {
-    name: "Set up Manual input automation",
-  });
-  await expect(dialog.getByLabel("Spending limit")).toHaveValue("500");
+  // a refusal that re-render replaced the form with the "busy" panel.
+  await page.goto(FLOWS.manual);
+  await page.getByRole("link", { name: "Edit setup" }).click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.manual}/setup$`, "u"));
+  await expect(
+    page.getByRole("heading", { name: "Set up Manual input automation" }),
+  ).toBeVisible();
+  const main = page.locator("main");
+  await expect(main.getByLabel("Spending limit")).toHaveValue("500");
+  // No help line under a setting (spec A6; S11) — a switch still says what it switches.
+  await expect(
+    main.getByText("Runs above this amount wait for approval."),
+  ).toHaveCount(0);
   await expectNoAxeViolations(page);
-  // A notifications switch says what it switches, in words (register F22).
-  await expect(dialog.getByLabel("Failure notices")).toBeVisible();
-  await expect(dialog).toContainText(
+  await expect(main.getByLabel("Failure notices")).toBeVisible();
+  await expect(main).toContainText(
     "Controls the notification sent when a run fails.",
   );
-  await dialog.getByLabel("Spending limit").fill("99");
+  // A flow already on is saved, never turned on again.
+  await expect(main.getByRole("button", { name: "Turn on" })).toHaveCount(0);
+  await main.getByLabel("Spending limit").fill("99");
   await presentSession(page, "throttled");
-  await dialog.getByRole("button", { name: "Save", exact: true }).click();
-  // Spec §3.B: the save's refusal in its own words, not the platform's.
-  await expect(dialog.getByRole("alert")).toHaveText(
+  await main.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(main.getByRole("alert")).toHaveText(
     "Could not save. Try again.",
   );
-  await expect(dialog.getByLabel("Spending limit")).toHaveValue("99");
+  await expect(main.getByLabel("Spending limit")).toHaveValue("99");
   // An amount emptied is said before anything is sent.
   await presentSession(page, "owner");
-  await dialog.getByLabel("Spending limit").fill("");
-  await dialog.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(dialog.getByRole("alert")).toHaveText(
+  await main.getByLabel("Spending limit").fill("");
+  await main.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(main.getByRole("alert")).toHaveText(
     "Enter an amount for Spending limit.",
   );
-  await dialog.getByLabel("Spending limit").fill("99");
-  await dialog.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await main.getByLabel("Spending limit").fill("99");
+  await main.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.manual}$`, "u"));
+  await expect(page.getByText(/^live$/iu)).toBeVisible();
 });
 
-test("a live flow that declares no run input offers no Run; Archive flow is confirmed, gives Add back, and lists it under Archived flows with the day (BUILD-PLAN 24.11.11, the owner's build 9)", async ({
+test("a live flow that declares no run input offers no Start run; Archive flow, last on its page, is confirmed, gives Add back, and lists it under Archived flows with the day (BUILD-PLAN 24.11.11, the owner's build 9)", async ({
   page,
 }) => {
   // Backend §12.1 #169 and #92: archiving is how a workspace frees a plan
   // slot; #203: the archived ones are read by name.
   await page.goto("/account/flows");
   const card = automationCard(page, "Archivable automation");
-  await expect(card.getByRole("button", { name: "Pause" })).toBeVisible();
-  await expect(
-    card.getByRole("button", { name: "Run", exact: true }),
-  ).toHaveCount(0);
   // Held, so its card says Added ✓, and offers no Add (the owner's build 12,
   // #9; spec §3.A).
   const held = card.getByRole("link", { name: "Added ✓" });
@@ -498,7 +503,11 @@ test("a live flow that declares no run input offers no Run; Archive flow is conf
   await expect(
     page.getByRole("heading", { name: "Archived flows" }),
   ).toHaveCount(0);
-  const archive = card.getByRole("button", { name: "Archive flow" });
+  await page.goto(FLOWS.archivable);
+  await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
+  await expect(runForm(page)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Start run" })).toHaveCount(0);
+  const archive = page.getByRole("button", { name: "Archive flow" });
   await archive.click();
   const dialog = page.getByRole("dialog", {
     name: "Archive Archivable automation?",
@@ -512,19 +521,15 @@ test("a live flow that declares no run input offers no Run; Archive flow is conf
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(archive).toBeFocused();
-  await expect(card.getByRole("button", { name: "Pause" })).toBeVisible();
   await archive.click();
   await page
     .getByRole("dialog", { name: "Archive Archivable automation?" })
     .getByRole("button", { name: "Archive", exact: true })
     .click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  // An archived flow holds nothing: Add is back, and "Added" is gone.
+  // Archived, it goes back to Flows: Add is back, and "Added" is gone.
+  await expect(page).toHaveURL(/\/account\/flows$/);
   await expect(card.getByRole("button", { name: "Add" })).toBeVisible();
   await expect(held).toHaveCount(0);
-  await expect(card.getByRole("button", { name: "Archive flow" })).toHaveCount(
-    0,
-  );
   await expect(
     page.getByRole("heading", { name: "Archived flows" }),
   ).toBeVisible();
@@ -540,28 +545,31 @@ test("a live flow that declares no run input offers no Run; Archive flow is conf
   await expect(archived).toContainText("Archived Sep 30, 2026");
 });
 
-test("Pause and Turn on move a live subscription and back, and the card follows (register F38)", async ({
+test("Pause, at the bottom of a flow's page, and Turn on, in its Step 1, move a live flow and back, and its status follows (register F38; the app's M4)", async ({
   page,
 }) => {
-  await page.goto("/account/flows");
-  const card = automationCard(page, "Manual input automation");
-  await expect(card.getByText(/^live$/i)).toBeVisible();
-  await card.getByRole("button", { name: "Pause" }).click();
-  await expect(card.getByText(/^paused$/i)).toBeVisible();
-  // A paused automation starts nothing, so it offers no Run.
-  await expect(
-    card.getByRole("button", { name: "Run", exact: true }),
-  ).toHaveCount(0);
-  await card.getByRole("button", { name: "Turn on" }).click();
-  await expect(card.getByText(/^live$/i)).toBeVisible();
-  await expect(card.getByRole("button", { name: "Pause" })).toBeVisible();
+  await page.goto(FLOWS.manual);
+  const status = page.getByText(/^(live|paused)$/iu);
+  await expect(status).toHaveText(/^live$/iu);
+  await page.getByRole("button", { name: "Pause" }).click();
+  await expect(status).toHaveText(/^paused$/iu);
+  // A paused flow starts nothing: Step 1 holds Turn on in Start run's place,
+  // the fields kept — and there is no second Turn on at the bottom.
+  const form = runForm(page);
+  await expect(form.getByRole("button", { name: "Start run" })).toHaveCount(0);
+  await expect(form.getByLabel("Vendor")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Turn on" })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Pause" })).toHaveCount(0);
+  await form.getByRole("button", { name: "Turn on" }).click();
+  await expect(status).toHaveText(/^live$/iu);
+  await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
 });
 
 test("a subscription pinned to an older version moves to the newest in place, confirmed first (backend §12.1 #126)", async ({
   page,
 }) => {
-  await page.goto("/account/flows");
-  const card = automationCard(page, "Webhook automation");
+  await page.goto(FLOWS.webhook);
+  const card = page.locator("main");
   await expect(card).toContainText("This runs v1; v2 is available.");
   const move = card.getByRole("button", { name: "Move to v2" });
   await move.click();
@@ -581,19 +589,17 @@ test("a subscription pinned to an older version moves to the newest in place, co
   // It runs the newest now, so nothing is offered to move to.
   await expect(card.getByText("This runs v1; v2 is available.")).toHaveCount(0);
   await expect(card.getByRole("button", { name: "Move to v2" })).toHaveCount(0);
-  // The button went with the note it sat in; focus is on the card's heading,
+  // The button went with the note it sat in; focus is on the page's Steps,
   // not dropped on the page.
-  await expect(
-    card.getByRole("heading", { name: "Webhook automation" }),
-  ).toBeFocused();
+  await expect(page.getByRole("heading", { name: "Steps" })).toBeFocused();
 });
 
 test("a move the platform holds for a pending approval is said in words, and the subscription stays where it was (backend §12.1 #126)", async ({
   page,
 }) => {
   await fixtureControl("approval-pending-on-move");
-  await page.goto("/account/flows");
-  const card = automationCard(page, "Webhook automation");
+  await page.goto(FLOWS.webhook);
+  const card = page.locator("main");
   await card.getByRole("button", { name: "Move to v2" }).click();
   const dialog = page.getByRole("dialog", {
     name: "Move Webhook automation to v2?",
@@ -611,8 +617,8 @@ test("a move refused while a run of the automation is still going is said in wor
   page,
 }) => {
   await fixtureControl("runs-in-flight-on-move");
-  await page.goto("/account/flows");
-  const card = automationCard(page, "Webhook automation");
+  await page.goto(FLOWS.webhook);
+  const card = page.locator("main");
   await card.getByRole("button", { name: "Move to v2" }).click();
   const dialog = page.getByRole("dialog", {
     name: "Move Webhook automation to v2?",
@@ -629,8 +635,8 @@ test("a move refused while a run of the automation is still going is said in wor
 test("each refusal of a move the platform names is said in its words, one it does not name by its title, and the subscription stays where it was (backend §12.1 #126)", async ({
   page,
 }) => {
-  await page.goto("/account/flows");
-  const card = automationCard(page, "Webhook automation");
+  await page.goto(FLOWS.webhook);
+  const card = page.locator("main");
   await card.getByRole("button", { name: "Move to v2" }).click();
   const dialog = page.getByRole("dialog", {
     name: "Move Webhook automation to v2?",
@@ -665,11 +671,11 @@ test("each refusal of a move the platform names is said in its words, one it doe
 test("a move whose settings do not fit is answered with the new version's settings, saved with the move in one change (backend §12.1 #185)", async ({
   page,
 }) => {
-  await page.goto("/account/flows");
-  const card = automationCard(page, "Webhook automation");
+  await page.goto(FLOWS.webhook);
+  const card = page.locator("main");
   // Set up draws the version the flow runs: v1 declares no setting, though the
   // catalog's v2 does, so there is nothing to set up yet.
-  await expect(card.getByRole("button", { name: "Set up" })).toHaveCount(0);
+  await expect(card.getByRole("link", { name: "Edit setup" })).toHaveCount(0);
 
   await fixtureControl("move-refused?status=422&reason=invalid_config");
   await card.getByRole("button", { name: "Move to v2" }).click();
@@ -690,21 +696,22 @@ test("a move whose settings do not fit is answered with the new version's settin
   await expect(page.getByRole("dialog")).toHaveCount(0);
   // Moved: no newer version to offer, and v2's setting is the flow's to set up.
   await expect(card).not.toContainText("v2 is available");
-  await expect(card.getByRole("button", { name: "Set up" })).toBeVisible();
+  await expect(card.getByRole("link", { name: "Edit setup" })).toBeVisible();
 });
 
 test("a move's dialog cannot be dismissed while the platform decides, so its refusal is not lost (backend §12.1 #126)", async ({
   page,
 }) => {
   await fixtureControl("approval-pending-on-move");
-  await page.goto("/account/flows");
-  await automationCard(page, "Webhook automation")
+  await page.goto(FLOWS.webhook);
+  await page
+    .locator("main")
     .getByRole("button", { name: "Move to v2" })
     .click();
   const dialog = page.getByRole("dialog", {
     name: "Move Webhook automation to v2?",
   });
-  const move = await holdRequest(page, "**/account/flows", isServerAction);
+  const move = await holdRequest(page, `**${FLOWS.webhook}`, isServerAction);
   await dialog.getByRole("button", { name: "Move to v2" }).click();
   await move.arrived;
   // Neither Escape nor the backdrop closes it while the answer is on its way.
@@ -729,11 +736,12 @@ test("a move's dialog closes on an Escape pressed the moment its answer enables 
   page,
 }) => {
   await fixtureControl("approval-pending-on-move");
-  await page.goto("/account/flows");
-  await automationCard(page, "Webhook automation")
+  await page.goto(FLOWS.webhook);
+  await page
+    .locator("main")
     .getByRole("button", { name: "Move to v2" })
     .click();
-  const move = await holdRequest(page, "**/account/flows", isServerAction);
+  const move = await holdRequest(page, `**${FLOWS.webhook}`, isServerAction);
   await page
     .getByRole("dialog", { name: "Move Webhook automation to v2?" })
     .getByRole("button", { name: "Move to v2" })
@@ -763,14 +771,14 @@ test("an owner makes a webhook automation's address, sees its secret once, and a
 }) => {
   const address =
     "https://hooks.example.test/v1/webhooks/efefefef-efef-4fef-8fef-efefefefefef";
-  await page.goto("/account/flows");
-  const card = automationCard(page, "Webhook automation");
-  // A manual automation has no address to give.
+  await page.goto(FLOWS.webhook);
+  const card = page.locator("main");
+  // A manual flow has no address to give.
+  await page.goto(FLOWS.manual);
   await expect(
-    automationCard(page, "Manual input automation").getByRole("button", {
-      name: "Webhook address",
-    }),
+    card.getByRole("button", { name: "Webhook address" }),
   ).toHaveCount(0);
+  await page.goto(FLOWS.webhook);
   const open = card.getByRole("button", { name: "Webhook address" });
   await open.click();
   const dialog = page.getByRole("dialog", { name: "Webhook address" });
@@ -810,13 +818,14 @@ test("a webhook address's dialog cannot be dismissed while a secret is being mad
 }) => {
   // Making a secret stops the old one when the platform answers, and the new
   // one exists only in that answer: a dialog closed meanwhile lost it.
-  await page.goto("/account/flows");
-  await automationCard(page, "Webhook automation")
+  await page.goto(FLOWS.webhook);
+  await page
+    .locator("main")
     .getByRole("button", { name: "Webhook address" })
     .click();
   const dialog = page.getByRole("dialog", { name: "Webhook address" });
   await expect(dialog.getByText("This flow has no address yet.")).toBeVisible();
-  const issue = await holdRequest(page, "**/account/flows", isServerAction);
+  const issue = await holdRequest(page, `**${FLOWS.webhook}`, isServerAction);
   await dialog.getByRole("button", { name: "Create address" }).click();
   await issue.arrived;
   await page.keyboard.press("Escape");
@@ -830,15 +839,15 @@ test("a webhook automation's address is offered to an admin and to no plain memb
   page,
 }) => {
   await presentSession(page, "admin");
-  await page.goto("/account/flows");
+  await page.goto(FLOWS.webhook);
   await expect(
-    automationCard(page, "Webhook automation").getByRole("button", {
+    page.locator("main").getByRole("button", {
       name: "Webhook address",
     }),
   ).toBeVisible();
   await presentSession(page, "member");
   await page.reload();
-  const card = automationCard(page, "Webhook automation");
+  const card = page.locator("main");
   await expect(card.getByRole("button", { name: "Move to v2" })).toBeVisible();
   await expect(
     card.getByRole("button", { name: "Webhook address" }),
@@ -850,8 +859,8 @@ test("a webhook address the platform will not read says so in its dialog, and of
 }) => {
   // A plain member is offered no address at all, so the owner's own read is
   // the one refused — as it is once they are no longer an admin — or failed.
-  await page.goto("/account/flows");
-  const open = automationCard(page, "Webhook automation").getByRole("button", {
+  await page.goto(FLOWS.webhook);
+  const open = page.locator("main").getByRole("button", {
     name: "Webhook address",
   });
   const dialog = page.getByRole("dialog", { name: "Webhook address" });
@@ -874,8 +883,8 @@ test("a webhook address the platform will not read says so in its dialog, and of
 test("a webhook address read before is not shown again beside a read the platform now refuses (backend §12.1 #91)", async ({
   page,
 }) => {
-  await page.goto("/account/flows");
-  const open = automationCard(page, "Webhook automation").getByRole("button", {
+  await page.goto(FLOWS.webhook);
+  const open = page.locator("main").getByRole("button", {
     name: "Webhook address",
   });
   const dialog = page.getByRole("dialog", { name: "Webhook address" });
@@ -896,8 +905,9 @@ test("a webhook address read before is not shown again beside a read the platfor
 test("an address the platform will not make is said in words, and no secret is shown (backend §12.1 #91)", async ({
   page,
 }) => {
-  await page.goto("/account/flows");
-  await automationCard(page, "Webhook automation")
+  await page.goto(FLOWS.webhook);
+  await page
+    .locator("main")
     .getByRole("button", { name: "Webhook address" })
     .click();
   const dialog = page.getByRole("dialog", { name: "Webhook address" });
@@ -924,8 +934,8 @@ test("an address the platform has no public origin for is shown by its id, and i
   await fixtureControl("webhook-no-origin");
   await fixtureControl("webhook-last-outcome?outcome=trigger_kind_mismatch");
   const id = "Address id efefefef-efef-4fef-8fef-efefefefefef";
-  await page.goto("/account/flows");
-  const open = automationCard(page, "Webhook automation").getByRole("button", {
+  await page.goto(FLOWS.webhook);
+  const open = page.locator("main").getByRole("button", {
     name: "Webhook address",
   });
   await open.click();
@@ -952,8 +962,8 @@ test("a secret whose answer was lost is asked for again with the same key, and i
 }) => {
   // The platform derives the secret from the press's key: a retry carrying it
   // is answered with the secret the lost answer carried, and nothing rotates.
-  await page.goto("/account/flows");
-  const open = automationCard(page, "Webhook automation").getByRole("button", {
+  await page.goto(FLOWS.webhook);
+  const open = page.locator("main").getByRole("button", {
     name: "Webhook address",
   });
   const dialog = page.getByRole("dialog", { name: "Webhook address" });
@@ -1156,40 +1166,15 @@ async function decodedImage(
   };
 }
 
-// "AI reads your documents", the account's AI consent (backend ADR-0038;
-// spec §3.G): shown once while the account has never answered, and over the
-// Run window before a run with a file on a flow that reads it with AI. The
-// fixture's people have allowed it, so no other test meets it.
-function aiConsent(page: Page) {
-  return page.getByRole("dialog", {
-    name: "AI reads your documents",
-    exact: true,
-  });
-}
-
-// What the platform keeps of each person's answer.
-async function aiReading() {
-  return (
-    await fixtureRead<{ aiReading: Record<string, string | null> }>("counts")
-  ).aiReading;
-}
-const ownerId = "22222222-2222-4222-8222-222222222222";
-
-// The Run dialog of the manual automation, with its three typed fields filled.
+// Step 1 of the manual flow's page (Build 21, spec A6), with its three typed
+// fields filled — where the Run window was until Build 21.
 async function openFilledRun(page: Page) {
-  await page.goto("/account/flows");
-  await automationCard(page, "Manual input automation")
-    .getByRole("button", { name: "Run", exact: true })
-    .click();
-  const dialog = page.getByRole("dialog", {
-    name: "Run Manual input automation",
-  });
-  // Opened, the dialog puts focus on its first field; typing waits for it.
-  await expect(dialog.getByLabel("Vendor")).toBeFocused();
-  await dialog.getByLabel("Vendor").fill("Acme Supplies");
-  await dialog.getByLabel("Amount").fill("120.50");
-  await dialog.getByLabel("Invoice reference").fill("INV-1001");
-  return dialog;
+  await page.goto(FLOWS.manual);
+  const form = runForm(page);
+  await form.getByLabel("Vendor").fill("Acme Supplies");
+  await form.getByLabel("Amount").fill("120.50");
+  await form.getByLabel("Invoice reference").fill("INV-1001");
+  return form;
 }
 
 const invoicePdf = {
@@ -1220,9 +1205,9 @@ test.describe("a file for a run (backend FR-14)", () => {
     expect(puts).toHaveLength(1);
     await expectNoAxeViolations(page);
     await dialog.getByRole("button", { name: "Start run" }).click();
-    // The account allowed AI reading ("the account's AI consent", below), so
-    // a run with a file starts at once.
-    await expect(aiConsent(page)).toHaveCount(0);
+    // Nothing is asked first (the owner's D1): the run starts at the press —
+    // though the fixture's account never answered the AI question.
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
     // The platform received the file's id, and gave the file to that run.
     expect(await fixtureFiles()).toEqual([
@@ -1259,7 +1244,7 @@ test.describe("a file for a run (backend FR-14)", () => {
     ).toBeEnabled();
   });
 
-  test("a form closed mid-upload stops the upload, and opened again it is not held Uploading…", async ({
+  test("a page left mid-upload stops the upload, and back on it Start run is not held Uploading…", async ({
     page,
   }) => {
     const put = await holdRequest(
@@ -1270,19 +1255,14 @@ test.describe("a file for a run (backend FR-14)", () => {
     const dialog = await openFilledRun(page);
     await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
     await put.arrived;
-    await dialog.getByRole("button", { name: "Cancel" }).click();
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    await automationCard(page, "Manual input automation")
-      .getByRole("button", { name: "Run", exact: true })
-      .click();
+    await page.goto("/account/flows");
+    await page.goto(FLOWS.manual);
     await expect(
       dialog.getByRole("button", { name: "Start run" }),
     ).toBeEnabled();
     await expect(dialog.getByText(/Uploading/u)).toHaveCount(0);
     // The abandoned upload was stopped: letting it through lands nothing.
     put.release();
-    // Opened, the dialog puts focus on its first field; typing waits for it.
-    await expect(dialog.getByLabel("Vendor")).toBeFocused();
     await dialog.getByLabel("Vendor").fill("Acme Supplies");
     await dialog.getByLabel("Amount").fill("120.50");
     await dialog.getByLabel("Invoice reference").fill("INV-1001");
@@ -1333,15 +1313,14 @@ test.describe("a file for a run (backend FR-14)", () => {
     const dialog = await openFilledRun(page);
     await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
     await first.arrived;
-    await dialog.getByRole("button", { name: "Cancel" }).click();
+    // Left mid-upload, and back.
+    await page.goto("/account/flows");
     const second = await holdRequest(
       page,
       "https://127.0.0.1:3443/__fixture/objects/**",
       (request) => request.method() === "PUT",
     );
-    await automationCard(page, "Manual input automation")
-      .getByRole("button", { name: "Run", exact: true })
-      .click();
+    await page.goto(FLOWS.manual);
     await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
     await second.arrived;
     const start = dialog.getByRole("button", { name: /Start run|Uploading…/u });
@@ -1691,44 +1670,6 @@ test.describe("a file for a run (backend FR-14)", () => {
     // Said once its one completion was answered: a retry would come first.
     expect(await uploadCompletions()).toBe(1);
   });
-
-  test("the Run dialog dismissed by Escape or by a click outside it mid-upload closes, stops the upload, and opened again is not held Uploading…", async ({
-    page,
-  }) => {
-    const dialog = await openFilledRun(page);
-    const run = automationCard(page, "Manual input automation").getByRole(
-      "button",
-      { name: "Run", exact: true },
-    );
-    const held: Awaited<ReturnType<typeof holdRequest>>[] = [];
-    for (const dismiss of [
-      () => page.keyboard.press("Escape"),
-      () => page.mouse.click(4, 4),
-    ]) {
-      const put = await holdRequest(
-        page,
-        "https://127.0.0.1:3443/__fixture/objects/**",
-        (request) => request.method() === "PUT",
-      );
-      held.push(put);
-      await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
-      await put.arrived;
-      await dismiss();
-      await expect(page.getByRole("dialog")).toHaveCount(0);
-      await run.click();
-      await expect(
-        dialog.getByRole("button", { name: "Start run" }),
-      ).toBeEnabled();
-      await expect(dialog.getByText(/Uploading/u)).toHaveCount(0);
-    }
-    // The abandoned uploads were stopped: let through, neither lands.
-    for (const put of held) put.release();
-    await page.waitForTimeout(1_000);
-    expect(await fixtureFiles()).toEqual([]);
-    expect((await fixtureRead<{ storePuts: number }>("counts")).storePuts).toBe(
-      0,
-    );
-  });
 });
 
 test.describe("a photo or an image for a run (backend BUILD-PLAN 25.8.5)", () => {
@@ -1993,294 +1934,14 @@ test.describe("a photo or an image for a run (backend BUILD-PLAN 25.8.5)", () =>
   });
 });
 
-test.describe("the account's AI consent (backend ADR-0038; spec §3.G–§3.H; Apple App Review 5.1.2(i))", () => {
-  // The browser PUTs the file straight to the fixture's object store, whose
-  // certificate is the fixture's own.
-  test.use({ ignoreHTTPSErrors: true });
-
-  const body =
-    "Some flows send a document you add to AI models, through OpenRouter, to read it. They don't keep it.";
-
-  // The Run window, filled, with a file chosen and uploaded — the account
-  // area's own card closed first when the account was never asked.
-  async function withFile(page: Page, { asked = false } = {}) {
-    await page.goto("/account/flows");
-    if (asked) {
-      await expect(aiConsent(page)).toBeVisible();
-      await page.keyboard.press("Escape");
-      await expect(aiConsent(page)).toHaveCount(0);
-    }
-    await automationCard(page, "Manual input automation")
-      .getByRole("button", { name: "Run", exact: true })
-      .click();
-    const dialog = page.getByRole("dialog", {
-      name: "Run Manual input automation",
-    });
-    await expect(dialog.getByLabel("Vendor")).toBeFocused();
-    await dialog.getByLabel("Vendor").fill("Acme Supplies");
-    await dialog.getByLabel("Amount").fill("120.50");
-    await dialog.getByLabel("Invoice reference").fill("INV-1001");
-    await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
-    await expect(
-      dialog.getByText("Ready: invoice.pdf (24 bytes)"),
-    ).toBeVisible();
-    return dialog;
-  }
-
-  test("an account never asked sees the card once, in the spec's words; Allow keeps the answer on the account, and the card is gone for good", async ({
-    page,
-  }) => {
-    await fixtureControl("ai-reading-unasked");
-    await page.goto("/account");
-    const card = aiConsent(page);
-    await expect(card).toBeVisible();
-    await expect(card.getByRole("heading")).toHaveText(
-      "AI reads your documents",
-    );
-    await expect(card.locator("p")).toHaveText([
-      body,
-      "See our Privacy Policy.",
-    ]);
-    await expect(card).toHaveAccessibleDescription(
-      `${body} See our Privacy Policy.`,
-    );
-    const policy = card.getByRole("link", {
-      name: "Privacy Policy",
-      exact: true,
-    });
-    await expect(policy).toHaveAttribute("href", "/privacy");
-    // A new tab: the card waits here.
-    await expect(policy).toHaveAttribute("target", "_blank");
-    await expect(card.getByRole("button")).toHaveText(["Not now", "Allow"]);
-    await expect(
-      card.getByRole("button", { name: "Allow", exact: true }),
-    ).toHaveClass(/btn-primary/);
-    await expectNoAxeViolations(page);
-    await card.getByRole("button", { name: "Allow", exact: true }).click();
-    await expect(card).toHaveCount(0);
-    expect((await aiReading())[ownerId]).toBe("allowed");
-    // Kept by the platform, so a new visit — any page — asks nothing.
-    await page.goto("/account/flows");
-    await expect(
-      automationCard(page, "Manual input automation").getByRole("button", {
-        name: "Run",
-        exact: true,
-      }),
-    ).toBeVisible();
-    await page.waitForTimeout(500);
-    await expect(aiConsent(page)).toHaveCount(0);
-  });
-
-  test("Not now keeps the answer as no; closed unanswered — Escape or a click outside — it saves nothing and asks again on the next visit", async ({
-    page,
-  }) => {
-    await fixtureControl("ai-reading-unasked");
-    for (const dismiss of [
-      () => page.keyboard.press("Escape"),
-      () => page.mouse.click(4, 4),
-    ]) {
-      await page.goto("/account/flows");
-      await expect(aiConsent(page)).toBeVisible();
-      await dismiss();
-      await expect(aiConsent(page)).toHaveCount(0);
-      expect((await aiReading())[ownerId]).toBeNull();
-    }
-    await page.goto("/account/flows");
-    await aiConsent(page)
-      .getByRole("button", { name: "Not now", exact: true })
-      .click();
-    await expect(aiConsent(page)).toHaveCount(0);
-    expect((await aiReading())[ownerId]).toBe("declined");
-    await page.reload();
-    await page.waitForTimeout(500);
-    await expect(aiConsent(page)).toHaveCount(0);
-  });
-
-  test("a save the platform refuses is said in the card, which stays to be answered again", async ({
-    page,
-  }) => {
-    await fixtureControl("ai-reading-unasked");
-    await fixtureControl("ai-reading-refusing");
-    await page.goto("/account");
-    const card = aiConsent(page);
-    await card.getByRole("button", { name: "Allow", exact: true }).click();
-    await expect(card.getByRole("alert")).toHaveText(
-      "Could not save your choice. Try again.",
-    );
-    await expect(card).toBeVisible();
-    expect((await aiReading())[ownerId]).toBeNull();
-    await card.getByRole("button", { name: "Allow", exact: true }).click();
-    await expect(card).toHaveCount(0);
-    expect((await aiReading())[ownerId]).toBe("allowed");
-  });
-
-  test("Settings › AI: the switch says the account's answer and changes it; a refused save moves it back, said in words", async ({
-    page,
-  }) => {
-    await page.goto("/account/settings");
-    await expect(
-      page.getByRole("heading", { name: "AI", exact: true }),
-    ).toBeVisible();
-    const toggle = page.getByRole("switch", { name: "AI reads documents" });
-    await expect(toggle).toBeChecked();
-    await expectNoAxeViolations(page);
-    await toggle.click();
-    await expect(toggle).not.toBeChecked();
-    await expect
-      .poll(async () => (await aiReading())[ownerId])
-      .toBe("declined");
-    await fixtureControl("ai-reading-refusing");
-    await toggle.click();
-    await expect(page.locator("main").getByRole("alert")).toHaveText(
-      "Could not save. Try again.",
-    );
-    await expect(toggle).not.toBeChecked();
-    expect((await aiReading())[ownerId]).toBe("declined");
-  });
-
-  test("allowed, a run with a file starts at once: the per-run question is gone", async ({
-    page,
-  }) => {
-    const dialog = await withFile(page);
-    await dialog.getByRole("button", { name: "Start run" }).click();
-    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    expect(await fixtureFiles()).toEqual([
-      { filename: "invoice.pdf", sizeBytes: 24, runId: "fixture-run-started" },
-    ]);
-  });
-
-  test("never asked, a run with a file asks the card over the Run window: closed, nothing starts and the Run window is as it was; Allow starts the run it held, with its file", async ({
-    page,
-  }) => {
-    await fixtureControl("ai-reading-unasked");
-    const dialog = await withFile(page, { asked: true });
-    const key = dialog.locator('input[name="idempotencyKey"]');
-    const sent = await key.inputValue();
-    for (const dismiss of [
-      () => page.keyboard.press("Escape"),
-      () => page.mouse.click(4, 4),
-    ]) {
-      await dialog.getByRole("button", { name: "Start run" }).click();
-      await expect(aiConsent(page)).toBeVisible();
-      await dismiss();
-      await expect(aiConsent(page)).toHaveCount(0);
-      await expect(dialog).toBeVisible();
-      await expect(dialog.getByLabel("Vendor")).toHaveValue("Acme Supplies");
-      await expect(
-        dialog.getByText("Ready: invoice.pdf (24 bytes)"),
-      ).toBeVisible();
-      await expect(key).toHaveValue(sent);
-    }
-    // Nothing started, and nothing saved.
-    expect(await fixtureFiles()).toEqual([
-      { filename: "invoice.pdf", sizeBytes: 24 },
-    ]);
-    expect((await aiReading())[ownerId]).toBeNull();
-    await dialog.getByRole("button", { name: "Start run" }).click();
-    await aiConsent(page)
-      .getByRole("button", { name: "Allow", exact: true })
-      .click();
-    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
-    expect((await aiReading())[ownerId]).toBe("allowed");
-    expect(await fixtureFiles()).toEqual([
-      { filename: "invoice.pdf", sizeBytes: 24, runId: "fixture-run-started" },
-    ]);
-  });
-
-  test("Not now over the Run window starts nothing; Start run then says AI reading is off, and its Turn on allows it and starts the run with its file", async ({
-    page,
-  }) => {
-    await fixtureControl("ai-reading-unasked");
-    const dialog = await withFile(page, { asked: true });
-    await expect(dialog.getByText("AI reading is off.")).toHaveCount(0);
-    await dialog.getByRole("button", { name: "Start run" }).click();
-    await aiConsent(page)
-      .getByRole("button", { name: "Not now", exact: true })
-      .click();
-    await expect(aiConsent(page)).toHaveCount(0);
-    expect((await aiReading())[ownerId]).toBe("declined");
-    await expect(dialog.getByText("AI reading is off.")).toBeVisible();
-    const turnOn = dialog.getByRole("button", { name: "Turn on" });
-    // Start run again starts nothing and asks nothing: Turn on is the way.
-    await dialog.getByRole("button", { name: "Start run" }).click();
-    await expect(turnOn).toBeFocused();
-    await expect(aiConsent(page)).toHaveCount(0);
-    await expect(page).toHaveURL(/\/account\/flows$/);
-    expect(await fixtureFiles()).toEqual([
-      { filename: "invoice.pdf", sizeBytes: 24 },
-    ]);
-    await expectNoAxeViolations(page);
-    await turnOn.click();
-    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
-    expect((await aiReading())[ownerId]).toBe("allowed");
-    expect(await fixtureFiles()).toEqual([
-      { filename: "invoice.pdf", sizeBytes: 24, runId: "fixture-run-started" },
-    ]);
-  });
-
-  test("with AI reading off, a run with no file starts as it is", async ({
-    page,
-  }) => {
-    await fixtureControl("ai-reading-declined");
-    await openFilledRun(page);
-    const dialog = page.getByRole("dialog", {
-      name: "Run Manual input automation",
-    });
-    await expect(dialog.getByText("AI reading is off.")).toBeVisible();
-    await dialog.getByRole("button", { name: "Start run" }).click();
-    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
-  });
-
-  test("a page left while the card is open over the Run window scrolls again: the two close together", async ({
-    page,
-  }) => {
-    // Reached in the page, so going back is the app's own navigation and
-    // both dialogs close in one render.
-    await fixtureControl("ai-reading-unasked");
-    await page.goto("/account");
-    await expect(aiConsent(page)).toBeVisible();
-    await page.keyboard.press("Escape");
-    await page
-      .getByRole("complementary", { name: "Dashboard navigation" })
-      .getByRole("link", { name: "Flows", exact: true })
-      .click();
-    await expect(page).toHaveURL(/\/account\/flows$/);
-    await automationCard(page, "Manual input automation")
-      .getByRole("button", { name: "Run", exact: true })
-      .click();
-    const dialog = page.getByRole("dialog", {
-      name: "Run Manual input automation",
-    });
-    await expect(dialog.getByLabel("Vendor")).toBeFocused();
-    await dialog.getByLabel("Vendor").fill("Acme Supplies");
-    await dialog.getByLabel("Amount").fill("120.50");
-    await dialog.getByLabel("Invoice reference").fill("INV-1001");
-    await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
-    await expect(
-      dialog.getByText("Ready: invoice.pdf (24 bytes)"),
-    ).toBeVisible();
-    await dialog.getByRole("button", { name: "Start run" }).click();
-    await expect(aiConsent(page)).toBeVisible();
-    const overflow = () => page.evaluate(() => document.body.style.overflow);
-    expect(await overflow()).toBe("hidden");
-    await page.goBack();
-    await expect(page).toHaveURL(/\/account$/);
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect.poll(overflow).toBe("");
-  });
-});
-
 test("a ghost button keeps AA contrast when hovered and when pressed (register F64)", async ({
   page,
 }) => {
-  await page.goto("/account/flows");
+  await page.goto(FLOWS.archivable);
   // Archive flow was this test's ghost until it turned red (the owner's build
   // 12, #5; register F85). The ghost measured now is its dialog's Cancel, on
   // the same surface.
-  await automationCard(page, "Archivable automation")
-    .getByRole("button", { name: "Archive flow" })
-    .click();
+  await page.getByRole("button", { name: "Archive flow" }).click();
   const ghost = page
     .getByRole("dialog", { name: "Archive Archivable automation?" })
     .getByRole("button", { name: "Cancel" });
@@ -2310,11 +1971,8 @@ test("a ghost button keeps AA contrast when hovered and when pressed (register F
 test("a danger button keeps AA contrast at rest, hovered and pressed: Archive flow (the owner's build 12, #5; register F85)", async ({
   page,
 }) => {
-  await page.goto("/account/flows");
-  const archive = automationCard(page, "Archivable automation").getByRole(
-    "button",
-    { name: "Archive flow" },
-  );
+  await page.goto(FLOWS.archivable);
+  const archive = page.getByRole("button", { name: "Archive flow" });
   await expect(archive).toHaveClass(/btn-danger/);
   // Hovered, the stronger tint darkens the ground under the red: its resting
   // text computes to 4.45:1 there, so the hover takes the hover step.
@@ -2361,10 +2019,16 @@ test("a flow is held once per workspace: its row says its team, and its card say
   await expect(page).toHaveURL(/#flow-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb$/u);
   const row = page.locator("#flow-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
   await expect(row).toContainText("Team: general");
-  await expect(row.getByRole("button", { name: "Turn on" })).toBeVisible();
+  // Its team, its status and Open — its page, where it is turned on.
+  await expect(
+    row.getByRole("link", { name: "Open Team draft automation" }),
+  ).toHaveAttribute(
+    "href",
+    "/account/flows/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  );
 });
 
-test("Add sends no team: the flow goes to the team of its category, which the platform makes when the workspace has none, and Teams then lists it (backend ADR-0036; the owner, 2026-10-14)", async ({
+test("Add sends no team: the flow goes to the team of its category, which the platform makes when the workspace has none, and its Set up opens; Teams then lists it (backend ADR-0036; the owner, 2026-10-14; AM4)", async ({
   page,
 }) => {
   await page.goto("/account/flows");
@@ -2381,6 +2045,17 @@ test("Add sends no team: the flow goes to the team of its category, which the pl
   await expect(card.getByRole("combobox")).toHaveCount(0);
   await expect(card.getByRole("link", { name: "Added ✓" })).toHaveCount(0);
   await card.getByRole("button", { name: "Add" }).click();
+  // Added, its Set up opens — one page, once (the owner's AM4) — in its team.
+  await expect(page).toHaveURL(
+    /\/account\/flows\/cccccccc-cccc-4ccc-8ccc-55555550cccc\/setup$/u,
+  );
+  const main = page.locator("main");
+  await expect(
+    main.getByRole("heading", { name: "Set up Project automation", level: 1 }),
+  ).toBeVisible();
+  await expect(main).toContainText("Team: Operations");
+  await expect(main.getByRole("button", { name: "Turn on" })).toBeVisible();
+  await page.goto("/account/flows");
   await expect(
     card.locator("p", { hasText: "Team: Operations" }),
   ).toBeVisible();
@@ -2412,7 +2087,7 @@ test("Add on a page drawn before another tab added that flow is refused in words
     await other.goto("/account/flows");
     const there = automationCard(other, "Project automation");
     await there.getByRole("button", { name: "Add" }).click();
-    await expect(there.getByRole("link", { name: "Added ✓" })).toBeVisible();
+    await expect(other).toHaveURL(/\/setup$/u);
   } finally {
     await other.close();
   }
@@ -2442,18 +2117,18 @@ test("a flow held twice from before one flow per workspace keeps both copies lis
   await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
 });
 
-test("Unarchive adds an archived flow afresh by its card's own Add, to the team of its category, and the row then says Added ✓, going to it (the owner's build 12, #4 and #9; backend ADR-0036)", async ({
+test("Unarchive adds an archived flow afresh by its card's own Add, to the team of its category, and opens its Set up; the row then says Added ✓, going to it (the owner's build 12, #4 and #9; backend ADR-0036; AM4)", async ({
   page,
 }) => {
-  await page.goto("/account/flows");
-  const card = automationCard(page, "Archivable automation");
-  await card.getByRole("button", { name: "Archive flow" }).click();
+  await page.goto(FLOWS.archivable);
+  await page.getByRole("button", { name: "Archive flow" }).click();
   await page
     .getByRole("dialog", { name: "Archive Archivable automation?" })
     .getByRole("button", { name: "Archive", exact: true })
     .click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/account\/flows$/);
 
+  const card = automationCard(page, "Archivable automation");
   const row = page
     .locator("main li")
     .filter({ hasText: "Archivable automation" });
@@ -2466,7 +2141,12 @@ test("Unarchive adds an archived flow afresh by its card's own Add, to the team 
   await expect(row.getByRole("link", { name: "Added ✓" })).toHaveCount(0);
   await expectNoAxeViolations(page);
   await unarchive.click();
+  await expect(page).toHaveURL(
+    /\/account\/flows\/a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2\/setup$/u,
+  );
+  await expect(page.locator("main")).toContainText("Team: Operations");
 
+  await page.goto("/account/flows");
   const added = row.getByRole("link", { name: "Added ✓" });
   await expect(added).toHaveAttribute(
     "href",
@@ -2521,9 +2201,8 @@ test("with no team yet, anyone in the workspace adds a flow and its team is made
   await expectNoAxeViolations(page);
   const card = automationCard(page, "Project automation");
   await card.getByRole("button", { name: "Add" }).click();
-  await expect(
-    card.locator("p", { hasText: "Team: Operations" }),
-  ).toBeVisible();
+  await expect(page).toHaveURL(/\/setup$/u);
+  await expect(page.locator("main")).toContainText("Team: Operations");
 });
 
 // Invoice Processing (backend ADR-0036–0038; the spec's §2.1): a flow whose
@@ -2537,240 +2216,199 @@ async function invoiceSettings() {
   ).invoiceConfig;
 }
 
-/**
- * The logo's clear space (spec §4.2: at least 12; Intuit's half the symbol's
- * height, about 11 at 24 tall): nothing beside it comes within 12 px of the
- * image on any side.
- */
-async function expectClearSpace(logo: Locator, neighbours: Locator[]) {
-  const image = await logo.boundingBox();
-  expect(image, "the logo is drawn").not.toBeNull();
-  if (!image) return;
-  for (const neighbour of neighbours) {
-    const box = await neighbour.boundingBox();
-    expect(box, `${neighbour} is drawn`).not.toBeNull();
-    if (!box) continue;
-    const apart = Math.max(
-      image.x - (box.x + box.width),
-      box.x - (image.x + image.width),
-      image.y - (box.y + box.height),
-      box.y - (image.y + image.height),
-    );
-    expect(
-      apart,
-      `${neighbour} is within the logo's clear space`,
-    ).toBeGreaterThanOrEqual(12);
-  }
-}
-
-test("Invoice Processing's card and Set up say the spec's words: its category, Included, its team, and numbered sections — Connect, Settings, Email — the vendor first (spec §3.A–§3.B)", async ({
+test("Invoice Processing: its card says its category, Included and its team; Add opens Set up — one page: 1 · Connect, its vendors and None; 2 · Settings, the Approval limit, no line under it — and Turn on turns it on and opens its page (the owner's AM4; spec A6)", async ({
   page,
 }) => {
+  await fixtureControl("invoice-not-added");
   await page.goto("/account/flows");
   const card = automationCard(page, "Invoice Processing");
   await expect(card).toContainText("Accounting");
   await expect(card).toContainText("Included");
-  await expect(card).not.toContainText(/Version|v2/u);
+  await expect(card).not.toContainText(/Version|v3/u);
+  await card.getByRole("button", { name: "Add" }).click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
+  const main = page.locator("main");
   await expect(
-    card.locator("p", { hasText: "Team: Accounting" }),
+    main.getByRole("heading", { name: "Set up Invoice Processing", level: 1 }),
   ).toBeVisible();
-  await card.getByRole("button", { name: "Set up" }).click();
-  const dialog = page.getByRole("dialog", {
-    name: "Set up Invoice Processing",
-  });
-  await expect(dialog).toHaveAccessibleDescription("Team: Accounting");
-  await expect(dialog.getByRole("heading", { level: 3 })).toHaveText([
+  await expect(main).toContainText("Team: Accounting");
+  await expect(main.getByRole("heading", { level: 3 })).toHaveText([
     "Connect",
     "Settings",
-    "Email",
   ]);
-  for (const number of ["01", "02", "03"]) {
-    await expect(dialog.getByText(number, { exact: true })).toBeVisible();
+  for (const number of ["01", "02"]) {
+    await expect(main.getByText(number, { exact: true })).toBeVisible();
   }
-  const connect = dialog.getByRole("group", { name: "Connect" });
-  await expect(connect).toContainText("None");
+  const vendors = main.getByRole("radiogroup", { name: "Vendor" });
+  await expect(vendors.getByRole("radio")).toHaveCount(2);
+  await expect(vendors.getByRole("radio", { name: "None" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
   await expect(
-    connect.getByRole("link", { name: "Connect vendor" }),
-  ).toHaveAttribute("href", vendorPage);
-  await expect(dialog.getByLabel("Approval limit")).toHaveValue("500");
-  await expect(dialog.getByRole("group", { name: "Settings" })).toContainText(
+    vendors.getByRole("radio", { name: "QuickBooks Online" }),
+  ).toContainText("Not connected");
+  await expect(main.getByLabel("Approval limit")).toHaveValue("500");
+  // No help line, and no email to give (the owner's AM3).
+  for (const gone of [
     "Amounts over this wait for approval.",
-  );
-  await expect(dialog.getByRole("group", { name: "Email" })).toContainText(
-    "Gets a short summary of each one.",
-  );
-  await expect(dialog.getByText("Optional", { exact: true })).toHaveCount(2);
+    "Where the details go.",
+    "Send results to",
+    "Also email",
+  ]) {
+    await expect(main.getByText(gone)).toHaveCount(0);
+  }
+  await expect(main.getByText("Optional", { exact: true })).toHaveCount(1);
   await expectNoAxeViolations(page);
-  await dialog.getByLabel("Also email").fill("books@example.test");
-  await dialog.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  // Saved whole, the vendor choice kept as it was.
+  await main.getByRole("button", { name: "Turn on" }).click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
+  await expect(page.getByText(/^live$/iu)).toBeVisible();
   expect(await invoiceSettings()).toEqual({
     vendor: "none",
     holdAboveAmount: 500,
-    notifyEmail: "books@example.test",
   });
 });
 
-test("the Connect vendor page shows each vendor by its own logo, and None; Intuit's own button connects QuickBooks, as Intuit draws it even while the page waits; the light theme shows the preferred logo (spec §3.C, §4)", async ({
+test("Connect vendor: the step's vendors by their marks, then None; a tap saves once and goes back to the flow — no Done, no Save, no Intuit button — and the flow's vendor row says its state (spec A2, A3; the owner's build 20 items 2, 4 and 5)", async ({
   page,
 }) => {
-  await page.goto(vendorPage);
+  await fixtureControl("quickbooks-connected");
+  await page.goto(FLOWS.invoice);
+  const vendorRow = page.getByTestId("flow-vendor-vendor");
+  await expect(vendorRow).toContainText("None");
+  await expect(vendorRow).toContainText("Save the details only.");
+  // Named by its vendor, and its line said too — to a screen reader as well.
+  await expect(vendorRow).toHaveAccessibleName("None: change the vendor");
+  await expect(vendorRow).toHaveAccessibleDescription("Save the details only.");
+  await vendorRow.click();
+  await expect(page).toHaveURL(
+    new RegExp(`${vendorPage}\\?field=vendor$`, "u"),
+  );
   const main = page.locator("main");
   await expect(
     main.getByRole("heading", { name: "Connect vendor", level: 1 }),
   ).toBeVisible();
   await expect(main).toContainText("For Invoice Processing");
-  const radios = main.getByRole("radio");
-  await expect(radios).toHaveCount(2);
-  // QuickBooks by its logo alone — the reversed one on the dark ground, 24
-  // tall — and no name beside it.
-  const quickbooks = main.getByRole("radio", { name: /QuickBooks/u });
-  await expect(quickbooks).toBeDisabled();
-  const logo = main.locator('img[src="/vendors/quickbooks-logo-reversed.png"]');
-  await expect(logo).toBeVisible();
-  expect((await logo.boundingBox())?.height).toBe(24);
+  await expect(main.getByRole("radio")).toHaveCount(2);
+  const quickbooks = main.getByRole("radio", { name: "QuickBooks Online" });
+  await expect(quickbooks).toContainText("Connected");
+  await expect(quickbooks).toHaveAccessibleDescription("Connected");
   await expect(
-    main.locator('img[src="/vendors/quickbooks-logo.png"]'),
-  ).toBeHidden();
-  await expect(main).not.toContainText("QuickBooks Online");
-  const none = main.getByRole("radio", { name: /None/u });
-  await expect(none).toBeChecked();
-  await expect(main).toContainText("Save the details only.");
-  const connect = main.getByRole("button", { name: "Connect to QuickBooks" });
-  await expect(connect).toBeVisible();
-  await expect(connect.locator("img").first()).toHaveAttribute(
-    "src",
-    "/vendors/connect-to-quickbooks.svg",
+    main.getByRole("radio", { name: "None" }),
+  ).toHaveAccessibleDescription("Save the details only.");
+  await expect(
+    quickbooks.getByRole("img", { name: "QuickBooks" }),
+  ).toHaveAttribute("src", "/vendors/quickbooks-symbol.png");
+  await expect(main.getByRole("radio", { name: "None" })).toHaveAttribute(
+    "aria-checked",
+    "true",
   );
-  await expectClearSpace(logo, [
-    connect,
-    main.getByText("None", { exact: true }),
-  ]);
+  for (const gone of ["Save", "Done"]) {
+    await expect(
+      main.getByRole("button", { name: gone, exact: true }),
+    ).toHaveCount(0);
+  }
+  await expect(main.getByRole("button", { name: /Disconnect/u })).toHaveCount(
+    0,
+  );
+  await expect(page.locator('img[src*="connect-to-quickbooks"]')).toHaveCount(
+    0,
+  );
   await expectNoAxeViolations(page);
-
-  // While Save is answered the button waits, disabled — and still looks as
-  // Intuit draws it: never faded.
-  const saved = await holdRequest(page, `**${vendorPage}`, isServerAction);
-  await main.getByRole("button", { name: "Save", exact: true }).click();
-  await saved.arrived;
-  await expect(connect).toBeDisabled();
-  expect(
-    await connect.evaluate((button) => getComputedStyle(button).opacity),
-  ).toBe("1");
-  saved.release();
-  await expect(page).toHaveURL(
-    new RegExp(`/account/flows#flow-${invoiceFlow}$`, "u"),
-  );
-
-  // On the light ground, Intuit's preferred logo — the dark wordmark.
-  await page.addInitScript(() => {
-    try {
-      localStorage.setItem("theme", "light");
-    } catch {
-      /* the page falls back to its default */
-    }
-  });
-  await page.goto(vendorPage);
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  const preferred = main.locator('img[src="/vendors/quickbooks-logo.png"]');
-  await expect(preferred).toBeVisible();
-  expect((await preferred.boundingBox())?.height).toBe(24);
-  await expect(logo).toBeHidden();
-});
-
-test("a member on the Connect vendor page is told who connects a vendor, and offered no Connect to QuickBooks (spec §3.C)", async ({
-  page,
-}) => {
-  await presentSession(page, "member");
-  await page.goto(vendorPage);
-  const main = page.locator("main");
-  await expect(
-    main.getByRole("heading", { name: "Connect vendor", level: 1 }),
-  ).toBeVisible();
-  await expect(main).toContainText("Ask an owner or admin to connect it.");
-  await expect(
-    main.getByRole("button", { name: "Connect to QuickBooks" }),
-  ).toHaveCount(0);
-  await expect(main.getByRole("radio", { name: /None/u })).toBeChecked();
-});
-
-test("Connect to QuickBooks goes to Intuit and back to the vendor page, where QuickBooks is the choice; Save keeps it as the flow's setting, and Connections shows its logo and Disconnect from QuickBooks (spec §3.C, §3.I)", async ({
-  page,
-}) => {
-  await page.goto(vendorPage);
-  await page
-    .locator("main")
-    .getByRole("button", { name: "Connect to QuickBooks" })
-    .click();
-  // Through the platform's callback landing and Connections, back here.
-  await expect(page).toHaveURL(
-    new RegExp(`${vendorPage}\\?status=connected$`, "u"),
-  );
-  const main = page.locator("main");
-  const quickbooks = main.getByRole("radio", { name: /QuickBooks/u });
-  await expect(quickbooks).toBeChecked();
-  await expect(main).toContainText("Connected");
-  await expect(
-    main.getByRole("button", { name: "Disconnect from QuickBooks" }),
-  ).toBeVisible();
-  await expect(
-    main.getByRole("button", { name: "Connect to QuickBooks" }),
-  ).toHaveCount(0);
-  await main.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page).toHaveURL(
-    new RegExp(`/account/flows#flow-${invoiceFlow}$`, "u"),
-  );
-  // Every other setting kept: the platform replaces them whole.
+  // One tap: chosen, saved — the other settings as they were — and back.
+  const saves = async () =>
+    (await fixtureRead<{ invoiceSaves: unknown[] }>("counts")).invoiceSaves
+      .length;
+  const before = await saves();
+  await quickbooks.click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
   expect(await invoiceSettings()).toEqual({
     vendor: "quickbooks",
     holdAboveAmount: 500,
   });
-  const card = automationCard(page, "Invoice Processing");
-  await card.getByRole("button", { name: "Set up" }).click();
-  const setup = page.getByRole("dialog", { name: "Set up Invoice Processing" });
-  const setupLogo = setup.locator(
-    'img[src="/vendors/quickbooks-logo-reversed.png"]',
+  expect(await saves()).toBe(before + 1);
+  // The vendor row says its state — never "Connect vendor".
+  await expect(vendorRow).toContainText("QuickBooks Online");
+  await expect(vendorRow).toContainText("Connected");
+  await expect(vendorRow).toHaveAccessibleDescription("Connected");
+  await expect(page.locator("main")).not.toContainText("Connect vendor");
+  // None, tapped: saved once, and back.
+  await vendorRow.click();
+  await main.getByRole("radio", { name: "None" }).click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
+  expect(await invoiceSettings()).toEqual({
+    vendor: "none",
+    holdAboveAmount: 500,
+  });
+  expect(await saves()).toBe(before + 2);
+});
+
+test("a member on the Connect vendor page is told who connects a vendor, which is no choice for them (spec A2)", async ({
+  page,
+}) => {
+  await presentSession(page, "member");
+  await page.goto(`${vendorPage}?field=vendor`);
+  const main = page.locator("main");
+  await expect(
+    main.getByRole("heading", { name: "Connect vendor", level: 1 }),
+  ).toBeVisible();
+  const quickbooks = main.getByRole("radio", { name: "QuickBooks Online" });
+  await expect(quickbooks).toContainText(
+    "Ask an owner or admin to connect it.",
   );
-  await expect(setupLogo).toBeVisible();
-  await expect(setup).not.toContainText("Not connected");
-  await expectClearSpace(setupLogo, [
-    setup.getByRole("heading", { name: "Connect", exact: true }),
-    setup.getByRole("link", { name: "Connect vendor" }),
-    setup.getByLabel("Approval limit"),
-  ]);
-  await setup.getByRole("button", { name: "Cancel" }).click();
+  // Said to a screen reader too: why the row is no choice.
+  await expect(quickbooks).toHaveAccessibleDescription(
+    "Ask an owner or admin to connect it.",
+  );
+  await expect(quickbooks).toBeDisabled();
+  await expect(main.getByRole("button", { name: /Connect/u })).toHaveCount(0);
+  await expect(main.getByRole("radio", { name: "None" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+});
+
+test("a vendor not connected, tapped by an owner, goes to its sign-in and back — chosen, saved and back to the flow from that one tap; Connections then says it, with our Disconnect, asked first (spec A2, A4)", async ({
+  page,
+}) => {
+  await page.goto(`${vendorPage}?field=vendor`);
+  await page
+    .locator("main")
+    .getByRole("radio", { name: "QuickBooks Online" })
+    .click();
+  // Through the platform's callback landing, Connections and the vendor
+  // page, back to the flow.
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
+  expect(await invoiceSettings()).toEqual({
+    vendor: "quickbooks",
+    holdAboveAmount: 500,
+  });
+  await expect(page.getByTestId("flow-vendor-vendor")).toContainText(
+    "Connected",
+  );
+  // Its Connections row too: QuickBooks, connected.
+  const flowRow = connectionRow(page, "quickbooks");
+  await expect(flowRow).toContainText("Connected");
 
   await page.goto("/account/connections");
-  await expect(main).not.toContainText(
-    "Only providers configured for this deployment are shown.",
-  );
-  await expect(main).not.toContainText("quickbooks ·");
-  // The account's row: QuickBooks's logo, in its own clear space.
-  const account = main.getByText("Fixture Company", { exact: true });
-  const row = account.locator("xpath=../..");
-  const rowLogo = row.locator(
-    'img[src="/vendors/quickbooks-logo-reversed.png"]',
-  );
-  await expect(rowLogo).toBeVisible();
-  await expectClearSpace(rowLogo, [account, row.getByText(/^Used by /u)]);
-  const disconnect = main.getByRole("button", {
-    name: "Disconnect from QuickBooks",
+  const row = connectionRow(page, "quickbooks");
+  await expect(row).toContainText("Connected");
+  const disconnect = row.getByRole("button", {
+    name: "Disconnect QuickBooks Online",
   });
-  await expect(disconnect).toBeVisible();
-  // Connected, Intuit's button is hidden (its technical requirement 1.1).
-  await expect(
-    main.getByRole("button", { name: "Connect to QuickBooks" }),
-  ).toHaveCount(0);
+  await expect(disconnect).toHaveText("Disconnect");
   await expectNoAxeViolations(page);
-  // Disconnect is confirmed first, in Intuit's words — and Cancel keeps it.
+  // Disconnect is asked first, saying what it stops — and Cancel keeps it.
   await disconnect.click();
   const confirm = page.getByRole("dialog", {
-    name: "Disconnect from QuickBooks?",
+    name: "Disconnect QuickBooks Online?",
   });
   await expect(confirm).toHaveAccessibleDescription(
-    "You can connect it again any time.",
+    "1 live flow uses it. It stops until you connect it again.",
   );
+  await expect(
+    confirm.getByRole("button", { name: "Disconnect", exact: true }),
+  ).toHaveClass(/btn-danger/u);
   await expectNoAxeViolations(page);
   await confirm.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -2781,176 +2419,397 @@ test("Connect to QuickBooks goes to Intuit and back to the vendor page, where Qu
   });
 });
 
-test("Available connections shows QuickBooks by its logo, in its own clear space, with Intuit's Connect to QuickBooks (spec §3.I, §4.2)", async ({
-  page,
-}) => {
-  await page.goto("/account/connections");
-  const main = page.locator("main");
-  const logo = main.locator('img[src="/vendors/quickbooks-logo-reversed.png"]');
-  await expect(logo).toBeVisible();
-  expect((await logo.boundingBox())?.height).toBe(24);
-  const connect = main.getByRole("button", { name: "Connect to QuickBooks" });
-  await expect(connect).toBeVisible();
-  await expectClearSpace(logo, [
-    main.getByText("Records bills and receipts.", { exact: true }),
-    connect,
-  ]);
-});
-
-test("a vendor chosen and not connected is said: the card's line goes to the vendor page, Turn on waits, and Set up says Not connected (spec §3.B, §3.D)", async ({
+test("a vendor chosen and not connected is said in Step 1, going to its vendor page, and Turn on waits; Set up says Not connected (spec A3, A6)", async ({
   page,
 }) => {
   await fixtureControl("quickbooks-connected");
   await fixtureControl("invoice-paused");
-  await page.goto(vendorPage);
-  const main = page.locator("main");
-  // A tap on the row chooses it.
-  await main
-    .locator('img[src="/vendors/quickbooks-logo-reversed.png"]')
+  // Chosen while connected, then disconnected on Connections.
+  await page.goto(`${vendorPage}?field=vendor`);
+  await page
+    .locator("main")
+    .getByRole("radio", { name: "QuickBooks Online" })
     .click();
-  await expect(main.getByRole("radio", { name: /QuickBooks/u })).toBeChecked();
-  await main.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page).toHaveURL(
-    new RegExp(`/account/flows#flow-${invoiceFlow}$`, "u"),
-  );
-  // Disconnected again on the vendor page, in Intuit's words, confirmed
-  // first — as in the app.
-  await page.goto(vendorPage);
-  await main
-    .getByRole("button", { name: "Disconnect from QuickBooks" })
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
+  await page.goto("/account/connections");
+  await connectionRow(page, "quickbooks")
+    .getByRole("button", { name: "Disconnect QuickBooks Online" })
     .click();
-  const confirm = page.getByRole("dialog", {
-    name: "Disconnect from QuickBooks?",
-  });
-  await expect(confirm).toHaveAccessibleDescription(
-    "You can connect it again any time.",
-  );
-  await expect(
-    confirm.getByRole("button", { name: "Disconnect", exact: true }),
-  ).toHaveClass(/btn-danger/u);
-  await expectNoAxeViolations(page);
-  await confirm
+  await page
+    .getByRole("dialog", { name: "Disconnect QuickBooks Online?" })
     .getByRole("button", { name: "Disconnect", exact: true })
     .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(
-    main.getByRole("button", { name: "Connect to QuickBooks" }),
-  ).toBeVisible();
-  // A vendor no longer connected is no choice: None, until it is again.
-  await expect(main.getByRole("radio", { name: /None/u })).toBeChecked();
-  await page.goto("/account/flows");
-  const card = automationCard(page, "Invoice Processing");
-  const line = card.getByRole("link", {
-    name: "Connect QuickBooks Online first, or choose None.",
-  });
-  await expect(line).toHaveAttribute("href", vendorPage);
-  await expect(card.getByRole("button", { name: "Turn on" })).toBeDisabled();
-  await card.getByRole("button", { name: "Set up" }).click();
-  const setup = page.getByRole("dialog", { name: "Set up Invoice Processing" });
-  const notConnected = setup.getByText("Not connected", { exact: true });
-  await expect(notConnected).toBeVisible();
-  await expectClearSpace(
-    setup.locator('img[src="/vendors/quickbooks-logo-reversed.png"]'),
-    [notConnected, setup.getByRole("link", { name: "Connect vendor" })],
+  await expect(connectionRow(page, "quickbooks")).toContainText(
+    "Not connected",
   );
+
+  await page.goto(FLOWS.invoice);
+  const vendorRow = page.getByTestId("flow-vendor-vendor");
+  await expect(vendorRow).toContainText("QuickBooks Online");
+  await expect(vendorRow).toContainText("Not connected");
+  await expect(
+    page.getByRole("link", {
+      name: "Connect QuickBooks Online first, or choose None.",
+    }),
+  ).toHaveAttribute("href", `${vendorPage}?field=vendor`);
+  await expect(
+    runForm(page).getByRole("button", { name: "Turn on" }),
+  ).toBeDisabled();
+  await page.getByRole("link", { name: "Edit setup" }).click();
+  const radio = page
+    .locator("main")
+    .getByRole("radio", { name: "QuickBooks Online" });
+  await expect(radio).toHaveAttribute("aria-checked", "true");
+  await expect(radio).toContainText("Not connected");
 });
 
-test("a flow still on v1, whose QuickBooks the catalog's newer version makes optional, is sent to Connections: its own version has no vendor to choose, so no vendor page (spec §3.D)", async ({
+test("a flow still on v1, whose QuickBooks the catalog's newer version makes optional, is sent to Connections from Step 1: its own version has no vendor to choose, so no vendor row and no vendor page (spec A6)", async ({
   page,
 }) => {
   await fixtureControl("invoice-v1");
-  await page.goto("/account/flows");
-  const card = automationCard(page, "Invoice Processing");
+  await page.goto(FLOWS.invoice);
   await expect(
-    card.getByRole("link", { name: "Connect QuickBooks Online first." }),
+    page.getByRole("link", { name: "Connect QuickBooks Online first." }),
   ).toHaveAttribute("href", "/account/connections");
-  await expect(card.getByText(/or choose None/u)).toHaveCount(0);
-  await expect(card.locator(`a[href="${vendorPage}"]`)).toHaveCount(0);
+  await expect(page.getByText(/or choose None/u)).toHaveCount(0);
+  await expect(page.getByTestId("flow-vendor-vendor")).toHaveCount(0);
+  await expect(page.locator(`a[href^="${vendorPage}"]`)).toHaveCount(0);
+  await expect(page.locator("main")).toContainText(
+    "This runs v1; v3 is available.",
+  );
   // Its vendor page is the same "not found" any other id is.
-  const response = await page.goto(vendorPage);
+  const response = await page.goto(`${vendorPage}?field=vendor`);
   expect(response?.status()).toBe(404);
 });
 
-test("a finished run of a grouped flow shows its progress by group — never a step's id, never Not run — and the details it saved (spec §3.E; backend ADR-0037)", async ({
+test("a finished run of three receipts: its full id, every step done, each receipt on its own card — seller, place, numbers, lines, totals — and Download JSON gives the platform's file by that id (spec A7, A8; the owner's ~04:05Z and AM7)", async ({
   page,
 }) => {
   await page.goto("/account/runs/fixture-run-invoice");
   const main = page.locator("main");
+  await expect(main.getByRole("heading", { level: 1 })).toHaveText(
+    "Run fixture-run-invoice",
+  );
   await expect(main).toContainText("Invoice Processing");
-  await expect(main).not.toContainText("fixture-invoice");
-  await expect(main).toContainText("Saved: Acme Supplies, $120.00.");
-  await expect(
-    main.getByRole("heading", { name: "Progress", exact: true }),
-  ).toBeVisible();
-  const rows = main.locator("ol > li");
-  await expect(rows).toHaveCount(4);
-  await expect(rows.locator("p.font-medium")).toHaveText([
-    "Received",
-    "Read",
-    "Checked",
-    "Done",
+  await expect(main).not.toContainText("fixture-invoice ");
+  await expect(main.getByTestId("run-result")).toHaveText(
+    "3 receipts: 3 saved.",
+  );
+  await expect(main.getByTestId("run-tile-Duration")).toHaveText("19s");
+  await expect(main.getByTestId("run-tile-Steps done")).toHaveText("4 / 4");
+  const steps = main.getByTestId("run-steps").locator("li");
+  await expect(steps.locator("p.font-medium")).toHaveText([
+    "1 · Received",
+    "2 · Read",
+    "3 · Checked",
+    "4 · Done",
   ]);
-  // Each row's outcome in words too, not by its icon alone — which a screen
-  // reader does not see.
-  for (let row = 0; row < 4; row += 1) {
-    await expect(rows.nth(row).locator(".sr-only")).toHaveText("Succeeded");
-  }
-  await expect(rows.nth(1)).toContainText("Second read matches");
-  for (const gone of ["Not run", "check-document", "verify-read", "Emailed"]) {
+  await expect(steps.locator("p:not(.font-medium)")).toHaveText([
+    "Done · 12:00 PM",
+    "Done · 12:02 PM",
+    "Done · 12:03 PM",
+    "Done · 12:04 PM",
+  ]);
+  // Never a step's own words, never its id (B6).
+  for (const gone of [
+    "Photo, 1 page",
+    "Totals checked",
+    "check-documents",
+    "save-documents",
+    "Progress",
+  ]) {
     await expect(main).not.toContainText(gone);
   }
+  const cards = main.getByRole("article");
+  await expect(cards).toHaveCount(3);
+  await expect(cards.nth(0)).toHaveAccessibleName("Document 1 of 3");
+  await expect(main.getByTestId("document-1-chip")).toHaveText("Saved");
+  for (const words of [
+    "Receipt · Lowe's",
+    "2150 W Shaw Ave, Fresno, CA 93711 · Store 1234",
+    "Oct 14, 2026 · 2:32 PM",
+    "Receipt #48291",
+    "Register07",
+    "2X4-8 STUD",
+    "4 × $3.98",
+    "Subtotal$15.92",
+    "Tax$1.27",
+    "Total$17.19",
+    "PaidCard ending 4417",
+    "ResultSaved",
+    "CategoryMaterials",
+  ]) {
+    await expect(cards.nth(0)).toContainText(words);
+  }
+  for (const words of [
+    "Receipt · The Home Depot",
+    "More lines on the document.",
+    "Discount−$2.00",
+    "PaidCash",
+  ]) {
+    await expect(cards.nth(1)).toContainText(words);
+  }
+  for (const words of [
+    "Receipt · Shell",
+    "Clovis, CA",
+    "Oct 14, 2026 · 7:05 AM",
+    "Auth code559301",
+  ]) {
+    await expect(cards.nth(2)).toContainText(words);
+  }
+  // Documents, so no Details; the facts end with the full Run ID.
   await expect(
     main.getByRole("heading", { name: "Details", exact: true }),
-  ).toBeVisible();
-  await expect(main.locator("dt")).toHaveText([
-    "Started",
-    "Ended",
-    "Trigger",
-    "Type",
-    "Seller",
-    "Total",
-    "Category",
-  ]);
-  await expect(main.locator("dd").nth(5)).toHaveText("$120.00");
+  ).toHaveCount(0);
+  await expect(main.getByTestId("run-fact-Run ID")).toHaveText(
+    "fixture-run-invoice",
+  );
+  await expect(main.getByRole("link", { name: "View flow" })).toHaveAttribute(
+    "href",
+    FLOWS.invoice,
+  );
   await expectNoAxeViolations(page);
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    main.getByRole("button", { name: "Download JSON" }).click(),
+  ]);
+  expect(download.suggestedFilename()).toBe("run-fixture-run-invoice.json");
+  const file = JSON.parse(
+    await new Promise<string>((resolve, reject) => {
+      download
+        .createReadStream()
+        .then((stream) => {
+          const chunks: Buffer[] = [];
+          stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+          stream.on("end", () =>
+            resolve(Buffer.concat(chunks).toString("utf8")),
+          );
+          stream.on("error", reject);
+        })
+        .catch(reject);
+    }),
+  );
+  expect(file.runId).toBe("fixture-run-invoice");
+  expect(
+    file.documents.map(
+      (document: { vendor: { name: string } }) => document.vendor.name,
+    ),
+  ).toEqual(["Lowe's", "The Home Depot", "Shell"]);
+});
 
-  // A run still going: its steps as they came, titled by their line — the
-  // flow declares no groups — and a last row saying it is working.
+test("a run is named by its full id, never its request id; a run of an older version is drawn by what it reported — never '34 accounts read' — its failure on its last step (spec A7, A8; run 793eef82 as it ran)", async ({
+  page,
+}) => {
+  await page.goto("/account/runs/793eef82-102d-81be-a2d3-9e8d4e2b2c36");
+  const main = page.locator("main");
+  await expect(main.getByRole("heading", { level: 1 })).toHaveText(
+    "Run 793eef82-102d-81be-a2d3-9e8d4e2b2c36",
+  );
+  await expect(main).not.toContainText("1e3231c6");
+  await expect(main.getByTestId("run-result")).toHaveText(
+    "Add one document per file.",
+  );
+  await expect(main).not.toContainText("34 accounts read");
+  const steps = main.getByTestId("run-steps").locator("li");
+  await expect(steps).toHaveCount(6);
+  await expect(steps.last()).toHaveAttribute("data-state", "failed");
+  await expect(steps.last()).toContainText("Add one document per file.");
+  // Activity names it by its full id too.
+  await page.goto(
+    "/account/runs?flow=f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1&status=failed",
+  );
+  await expect(main).toContainText("Invoice Processing · Failures");
+  await expect(main).toContainText("Run 793eef82-102d-81be-a2d3-9e8d4e2b2c36");
+  await expect(main).not.toContainText("v2");
+});
+
+test("on a phone, a run's page is no wider than the screen: its title, the full id, wraps at its hyphens — even an id whose every part starts with a digit (spec A8; the owner's AM2)", async ({
+  page,
+}) => {
+  // Any run id is a run here. The title is the whole id (AM2); a browser
+  // breaks it after a hyphen, so it never pushes the page sideways.
+  const id = "3f2c1a9e-5b7d-4e2a-9c1b-7d8e9f0a1b2c";
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto(`/account/runs/${id}`);
+  const title = page.locator("main").getByRole("heading", { level: 1 });
+  await expect(title).toHaveText(`Run ${id}`);
+  // The heading holds its words, and the page scrolls no way but down.
+  expect(
+    await title.evaluate(
+      (heading) => heading.scrollWidth - heading.clientWidth,
+    ),
+  ).toBeLessThanOrEqual(0);
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    ),
+  ).toBeLessThanOrEqual(0);
+});
+
+test("a held run's document whose approval was refused reads Not approved, and the run its decision; the group it waits in says why (spec A7; S21)", async ({
+  page,
+}) => {
+  await page.goto("/account/runs/fixture-run-invoice-held");
+  const main = page.locator("main");
+  await expect(main.getByTestId("run-result")).toHaveText("Rejected");
+  await expect(main.getByTestId("document-1-chip")).toHaveText("Saved");
+  await expect(main.getByTestId("document-2-chip")).toHaveText("Not approved");
+  const done = main.getByTestId("run-step-group:done");
+  await expect(done).toHaveAttribute("data-state", "held");
+  await expect(done).toContainText(
+    "Waiting for approval: Document 2: the total can't be read.",
+  );
+  await expect(main.getByTestId("run-tile-Steps done")).toHaveText("3 / 4");
+});
+
+test("a run still going, of a flow with no groups, is drawn by what it reported and a last row saying it is working — never a step id", async ({
+  page,
+}) => {
   await page.goto("/account/runs/fixture-run-running");
-  await expect(main.locator("ol > li").last()).toHaveText("Working…");
+  const main = page.locator("main");
+  const steps = main.getByTestId("run-steps").locator("li");
+  await expect(steps.last()).toContainText("Working…");
   await expect(main).not.toContainText("validate-input");
   await expect(
     main.getByRole("heading", { name: "Details", exact: true }),
   ).toHaveCount(0);
 });
 
-test.describe("Invoice Processing's Run window", () => {
+test.describe("Invoice Processing's page, Step 1 to its run (spec A6, A7, A9)", () => {
   // The browser PUTs the file straight to the fixture's object store.
   test.use({ ignoreHTTPSErrors: true });
 
-  test("the file field in the manifest's words, Upload, no (optional), and the run started with its file (spec §3.D)", async ({
+  test("the page reads top to bottom — Dashboard, Steps with the Document and Start run in Step 1 and the vendor in Done, Connections, Edit setup — and the run's page shows every step from the start, each as it is done, and its documents when it ends", async ({
     page,
   }) => {
-    await page.goto("/account/flows");
-    await automationCard(page, "Invoice Processing")
-      .getByRole("button", { name: "Run", exact: true })
-      .click();
-    const dialog = page.getByRole("dialog", { name: "Run Invoice Processing" });
-    await expect(dialog).toHaveAccessibleDescription(
-      "Fill this in, then start the run.",
+    await page.goto(FLOWS.invoice);
+    const main = page.locator("main");
+    await expect(main.getByRole("heading", { level: 1 })).toHaveText(
+      "Invoice Processing",
     );
-    await expect(dialog).toContainText("Document");
-    await expect(dialog).toContainText("A PDF or photo of a bill or receipt.");
-    await expect(dialog).not.toContainText("(optional)");
+    await expect(main).toContainText("Team: Accounting");
+    await expect(main.getByRole("heading", { level: 2 })).toHaveText([
+      "Dashboard",
+      "Steps",
+      "Connections",
+    ]);
+    // No description under the name (S24), and no help line anywhere.
+    await expect(main).not.toContainText(
+      "Reads bills and receipts, then saves",
+    );
+    await expect(main).not.toContainText(
+      "A PDF or photo of bills or receipts.",
+    );
+    const steps = main.locator('[data-testid^="flow-step-"]');
+    await expect(steps.locator("> p.font-medium")).toHaveText([
+      "1 · Received",
+      "2 · Read",
+      "3 · Checked",
+      "4 · Done",
+    ]);
+    const form = steps.nth(0).getByTestId("run-form");
+    await expect(form).toContainText("Document");
+    await expect(form).not.toContainText("(optional)");
     await expect(
-      dialog.getByRole("button", { name: "Upload for Document" }),
+      form.getByRole("button", { name: "Upload for Document" }),
     ).toBeVisible();
+    await expect(steps.nth(3).getByTestId("flow-vendor-vendor")).toContainText(
+      "None",
+    );
+    await expect(connectionRow(page, "quickbooks")).toContainText(
+      "Not connected",
+    );
+    await expect(
+      main.getByRole("link", { name: "Edit setup" }),
+    ).toHaveAttribute("href", `${FLOWS.invoice}/setup`);
     await expectNoAxeViolations(page);
-    await dialog.getByLabel("Document").setInputFiles(invoicePdf);
+    await form.getByLabel("Document").setInputFiles(invoicePdf);
+    await expect(form.getByText("Ready: invoice.pdf (24 bytes)")).toBeVisible();
+    await form.getByRole("button", { name: "Start run" }).click();
+    await expect(page).toHaveURL(
+      /\/account\/runs\/fixture-run-invoice-started$/,
+    );
+    // Every group from the start: the first working, the rest waiting.
+    const rows = main.getByTestId("run-steps").locator("li");
+    await expect(rows).toHaveCount(4);
+    await expect(rows.nth(0)).toHaveAttribute("data-state", "working");
+    for (const n of [1, 2, 3]) {
+      await expect(rows.nth(n)).toHaveAttribute("data-state", "waiting");
+    }
+    await expect(main.getByTestId("run-tile-Steps done")).toHaveText("0 / 4");
     await expect(
-      dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+      main.getByRole("button", { name: "Cancel run" }),
     ).toBeVisible();
-    await dialog.getByRole("button", { name: "Start run" }).click();
+    // Read again while it goes on: its first step done, the next working.
+    await fixtureControl("invoice-run-advance");
+    await expect(rows.nth(0)).toHaveAttribute("data-state", "done");
+    await expect(rows.nth(1)).toHaveAttribute("data-state", "working");
+    await expect(main.getByTestId("run-tile-Steps done")).toHaveText("1 / 4");
+    // Ended: every group done, its three receipts, and nothing to cancel.
+    await fixtureControl("invoice-run-advance");
+    await expect(main.getByText(/^succeeded$/iu)).toBeVisible();
+    await expect(main.getByTestId("run-tile-Steps done")).toHaveText("4 / 4");
+    await expect(main.getByRole("article")).toHaveCount(3);
+    await expect(main.getByRole("button", { name: "Cancel run" })).toHaveCount(
+      0,
+    );
+    await expect(
+      main.getByRole("button", { name: "Download JSON" }),
+    ).toBeVisible();
+  });
+
+  test("the Dashboard is live: a run of the flow ending changes its tiles without leaving the page, and a tile opens Activity for the flow and that outcome (spec A6; S30)", async ({
+    page,
+  }) => {
+    await fixtureControl("invoice-run-started");
+    await page.goto(FLOWS.invoice);
+    await expect(page.getByTestId("flow-stat-Runs")).toHaveText("4");
+    await expect(page.getByTestId("flow-stat-Successes")).toHaveText("1");
+    await expect(page.getByTestId("flow-stat-Failures")).toHaveText("1");
+    await fixtureControl("invoice-run-advance");
+    await fixtureControl("invoice-run-advance");
+    await expect(page.getByTestId("flow-stat-Successes")).toHaveText("2", {
+      timeout: 15_000,
+    });
+    await page.getByTestId("flow-stat-Successes").click();
+    await expect(page).toHaveURL(
+      /\/account\/runs\?flow=f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1&status=succeeded$/u,
+    );
+    const main = page.locator("main");
+    await expect(main).toContainText("Invoice Processing · Successes");
+    await expect(
+      main.getByRole("link", { name: "Run of Invoice Processing, succeeded" }),
+    ).toHaveCount(2);
+    await expect(main).toContainText("Run fixture-run-invoice-started");
+  });
+
+  test("Run a flow, first on the dashboard: three presses start a run — the flow, Upload, Start run (spec A9; the owner's quick-run ask)", async ({
+    page,
+  }) => {
+    await page.goto("/account");
+    const quick = page.getByTestId("run-a-flow");
+    // Every live flow, by its name and its team.
+    await expect(quick.getByRole("link")).toHaveCount(4);
+    await expect(quick).toContainText("Invoice Processing");
+    await expect(quick).toContainText("Team: Accounting");
+    await expect(quick).not.toContainText("Team draft automation");
+    await expectNoAxeViolations(page);
+    // 1: the flow — its page, at Step 1.
+    await quick.getByRole("link", { name: /Invoice Processing/u }).click();
+    await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}#run$`, "u"));
+    const form = runForm(page);
+    // 2: Upload (the file sheet is the system's, not counted).
+    const [chooser] = await Promise.all([
+      page.waitForEvent("filechooser"),
+      form.getByRole("button", { name: "Upload for Document" }).click(),
+    ]);
+    await chooser.setFiles(invoicePdf);
+    await expect(form.getByText("Ready: invoice.pdf (24 bytes)")).toBeVisible();
+    // 3: Start run.
+    await form.getByRole("button", { name: "Start run" }).click();
     await expect(page).toHaveURL(
       /\/account\/runs\/fixture-run-invoice-started$/,
     );
@@ -3089,7 +2948,7 @@ test("a figure the platform cannot answer reads Unavailable, and the rest of the
       .locator("xpath=following-sibling::dd[1]");
   await expect(figure("Runs this month")).toHaveText("Unavailable");
   await expect(figure("Flows")).toHaveText("5");
-  await expect(figure("Integrations")).toHaveText("1");
+  await expect(figure("Integrations")).toHaveText("2");
   await expect(
     page.getByRole("link", { name: "Run of Manual input automation, running" }),
   ).toBeVisible();
@@ -3133,17 +2992,19 @@ test("the dashboard shows the workspace's own numbers and names its recent runs 
       .locator("dt", { hasText: term })
       .locator("xpath=following-sibling::dd[1]");
   // Five subscriptions that are not archived — Invoice Processing's among
-  // them; the platform's tally of this month's runs; the one connected
-  // integration.
+  // them; the platform's tally of this month's runs; the two connected
+  // integrations.
   await expect(figure("Flows")).toHaveText("5");
   await expect(figure("Runs this month")).toHaveText(
     "3 · 1 succeeded · 1 failed",
   );
-  await expect(figure("Integrations")).toHaveText("1");
+  await expect(figure("Integrations")).toHaveText("2");
   await expect(
     page.getByRole("link", { name: "Run of Manual input automation, running" }),
   ).toBeVisible();
   await expect(page.locator("main")).not.toContainText("fixture-manual-input");
+  // Each recent run by its full id (spec A8).
+  await expect(page.locator("main")).toContainText("Run fixture-run-running");
   // Its actions lead to the pages that do what they say (register F54).
   await expect(
     page.getByRole("link", { name: "Browse flows" }).first(),
@@ -3677,19 +3538,24 @@ test("an export from a page whose workspace was switched away in another tab say
   ).toMatchObject({ exportCount: 0, exportJobStarted: false });
 });
 
-test("Settings shows the Linked accounts lead: a linked account signs you in to this same account, in the app and on the website — link one before signing in with it (the owner's build 12, #8; register F86)", async ({
+test("Settings shows the Linked accounts lead in one line — Sign in with any of these. — and each sign-in account by its provider's glyph (Build 21, spec A5; the owner's build 20 items 8 and 9; ~~register F86's sentences~~)", async ({
   page,
 }) => {
   await page.goto("/account/settings");
-  // The paragraph under the heading, once the accounts are read: the app's two
-  // sentences, then this page's own about credentials.
+  // One line under the heading, once the accounts are read, as in the app
+  // (Build 21, spec A5; the owner's build 20 item 9).
   const lead = page
     .locator("main")
     .getByRole("heading", { name: "Linked accounts" })
     .locator("xpath=following-sibling::p[1]");
-  await expect(lead).toHaveText(
-    "Any account linked here signs you in to this same account, in the app and on the website. Signing in with Google, Microsoft or Apple at the same email address as this account joins this account too. To use one with a different email address, link it before you first sign in with it. Provider credentials are handled by the Autom8x backend and never exposed to this page.",
-  );
+  await expect(lead).toHaveText("Sign in with any of these.");
+  // Each sign-in account by its provider's own glyph, never a key.
+  const rows = page
+    .locator("main li")
+    .filter({ hasText: /Google|Microsoft|Apple/u });
+  for (const row of await rows.all()) {
+    await expect(row.locator("svg").first()).toBeVisible();
+  }
   await expect(
     page.getByText("Link additional sign-in options to this account."),
   ).toHaveCount(0);
@@ -3862,20 +3728,23 @@ test("no one creates a team: Teams, its empty screen and the dashboard offer no 
   await expect(main.getByRole("button")).toHaveCount(0);
   await expectNoAxeViolations(page);
   await page.goto("/account");
-  await expect(main.getByText("No teams yet.")).toBeVisible();
   await expect(main).not.toContainText("Create a team");
   expect(await createdTeams()).toEqual([]);
 });
 
-test("the dashboard titles a team by its kind (the owner's build 9)", async ({
+test('the dashboard lists no teams — Teams stay on their own page (the owner\'s AM5: "remove lsit teams on bottom of home page, it is useless")', async ({
   page,
 }) => {
   await page.goto("/account");
   const main = page.locator("main");
-  // A team made before a team was its kind keeps a name at the platform; the
-  // dashboard titles it by its kind, as every team list does.
-  await expect(main.getByRole("link", { name: /general/ })).toBeVisible();
-  await expect(main).not.toContainText("Fixture Project");
+  await expect(main.getByTestId("run-a-flow")).toBeVisible();
+  await expect(
+    main.getByRole("heading", { name: "Teams", exact: true }),
+  ).toHaveCount(0);
+  await expect(main.getByRole("link", { name: "View all teams" })).toHaveCount(
+    0,
+  );
+  await expect(main.getByRole("link", { name: /general/ })).toHaveCount(0);
 });
 
 test("a team's owner adds someone from the organization, and the team lists who is on it (backend §12.1 #173)", async ({
@@ -4171,7 +4040,9 @@ test("keyboard reaches dashboard navigation and preserves a visible focus target
   await page.goto("/account/connections");
   await page.keyboard.press("Tab");
   await expect(page.locator(":focus")).toBeVisible();
-  await page.getByRole("button", { name: "Connect", exact: true }).focus();
+  await page
+    .getByRole("button", { name: "Connect Fixture key provider" })
+    .focus();
   await page.keyboard.press("Enter");
   await expect(
     page.getByRole("heading", { name: "Connect Fixture key provider" }),
@@ -4181,7 +4052,7 @@ test("keyboard reaches dashboard navigation and preserves a visible focus target
     page.getByRole("heading", { name: "Connect Fixture key provider" }),
   ).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Connect", exact: true }),
+    page.getByRole("button", { name: "Connect Fixture key provider" }),
   ).toBeFocused();
 });
 
@@ -4485,7 +4356,7 @@ test("a member is offered no control the platform would refuse them — connecti
   ).toBeVisible();
   await expect(
     page.getByRole("button", {
-      name: /^(Connect|Reconnect|Disconnect|Replace account)$/,
+      name: /^(Connect|Reconnect|Disconnect|Replace account)\b/,
     }),
   ).toHaveCount(0);
   await page.goto("/account/settings");
