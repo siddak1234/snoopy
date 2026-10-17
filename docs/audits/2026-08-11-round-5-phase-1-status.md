@@ -3567,3 +3567,51 @@ until Release 1 serves the round's contract.
 **Found, not changed here:** in the light theme, the account area's Sign out button measures 3.9:1
 against the page (axe's `color-contrast`, `btn-danger` on the light ground) — no page's light-theme
 scan held it before this change, and this change does not touch it.
+
+**2026-10-17 — the review of Build 21's screens.** One independent pass over
+`round-17/b21-screens` at `aa4e482` against the spec's AM1–AM8 and A1–A9, the website's side of
+C1/C2 and the privacy page, the owner's build 20 words and screenshots, the app's branch for the
+same screens (`snoopy-mobile` `bb2f8e1`) and the round's contract. Fixed here:
+
+- **should-fix — a vendor row's state said only on screen.** Each vendor row on Connect vendor and
+  Set up is named by its vendor alone (`aria-label`), and the flow page's vendor row "{vendor}:
+  change the vendor", so a screen reader never heard "Connected", "Not connected", "Saving…" or a
+  member's "Ask an owner or admin to connect it." — build 20's items 4 and 5 again, for anyone who
+  listens. Each row is now described by its line (`aria-describedby`;
+  `components/dashboard/ConnectionRow.tsx` names the line, `app/account/flows/VendorRows.tsx` and
+  `app/account/flows/[subscriptionId]/page.tsx` point at it).
+- **nit — Activity's address taken as given.** `?flow=` was sent to the platform whatever it held;
+  the platform refuses a `subscriptionId` that is not a UUID, which took the page to its error
+  boundary. Only a UUID-shaped id filters now; anything else is no filter (`activityFilter`,
+  `lib/flow-steps.ts`).
+- **nit — the flow page read the catalog's settings for a version that declares none.** Its vendor
+  rows came from `subscription.setup ?? entry.setup`, so a flow on an older version with no
+  settings would have shown the newest version's vendor row, opening a Connect vendor page that is
+  not found; it reads the version it runs, as its Set up and Connect vendor pages do (backend
+  §12.1 #185).
+- **nit** — the Linked accounts test's title still said the lead that A5 removed.
+
+Found, not changed here (the app's lane, `snoopy-mobile`): the app's flow-page vendor row and
+Connect vendor rows are labelled by the vendor alone too (`snoopy-mobile/app/(tabs)/flows/detail.tsx`,
+`snoopy-mobile/components/flows/vendor-choice.tsx`), and its flow page and vendor page fall back
+to the catalog's settings (`subscription.setup ?? entry?.setup`).
+
+Guards proved to bite, each on the final tree (red, then the file restored from its saved copy —
+sha256 equal — then green): `flow-steps` "Activity is filtered only by a flow id shaped as one"
+(the UUID check made "any text"); `flow-steps` "a flow's own pages draw the settings of the
+version it RUNS" (the catalog's fallback put back); and, the three fixed files
+(`components/dashboard/ConnectionRow.tsx`, `app/account/flows/VendorRows.tsx`,
+`app/account/flows/[subscriptionId]/page.tsx`) put back to `aa4e482`'s bytes together, two
+fixture tests in Chromium — "Connect vendor: the step's vendors…" (`toHaveAccessibleDescription`)
+and "a member on the Connect vendor page…" (the same).
+
+Checked and not a defect: a run's page on a phone — its title, the full id, wraps at its hyphens
+in Chromium, Firefox and WebKit, even for an id whose every part starts with a digit, so the page
+is no wider than a 375 px screen; the fixture test "on a phone, a run's page is no wider than the
+screen…" now holds it (a guard, not a fix: it passes on `aa4e482` too).
+
+The gate: `npm run verify` on the review's tree, Node 22.23.2, default `TMPDIR`,
+`SNOOPY_BACKEND_ROOT` at the round's `b21-contract`, under the gate lock — every gate exited 0
+(`test:contracts` 271 of 271; `test:browser` 34 passed; `test:browser:fixtures` 524 passed, 262
+in each of Chromium and Firefox, 2 skipped, none failed). This paragraph was added after that
+run; `format:check` and the document check ran again on the commit.

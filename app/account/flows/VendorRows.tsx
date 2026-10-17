@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import {
@@ -85,6 +85,10 @@ export function VendorRows({
     message: string;
   } | null>(null);
   const busy = saving ?? (connecting ? connectingFor : null);
+  // Each row is named by its vendor alone and described by its line — its
+  // state, "Saving…", or who connects it — so a screen reader says both.
+  const lineIds = useId();
+  const lineId = (choice: string) => `${lineIds}-${choice}`;
 
   const connect = (option: VendorOption) => {
     setConnectingFor(option.providerId);
@@ -153,6 +157,7 @@ export function VendorRows({
               role="radio"
               aria-checked={isChosen}
               aria-label={option.displayName}
+              aria-describedby={lineId(option.providerId)}
               disabled={
                 !tappable || (busy !== null && busy !== option.providerId)
               }
@@ -165,6 +170,7 @@ export function VendorRows({
                 name={option.displayName}
                 line={line.text}
                 lineTone={line.tone}
+                lineId={lineId(option.providerId)}
                 right={<ChoiceMark chosen={isChosen} />}
               />
             </button>
@@ -184,6 +190,7 @@ export function VendorRows({
         role="radio"
         aria-checked={chosen === NONE}
         aria-label="None"
+        aria-describedby={lineId(NONE)}
         disabled={busy !== null && busy !== NONE}
         onClick={() => tap(null)}
         data-testid="vendor-none"
@@ -193,6 +200,7 @@ export function VendorRows({
           mark={<NoneMark />}
           name="None"
           line={busy === NONE ? VENDOR_SAVING : VENDOR_NONE_SUB}
+          lineId={lineId(NONE)}
           right={<ChoiceMark chosen={chosen === NONE} />}
         />
       </button>

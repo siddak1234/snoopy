@@ -135,9 +135,10 @@ export default async function FlowPage(
     "connected";
 
   // Each step's vendor choice (backend ADR-0040), from the version the flow
-  // runs; the catalog's, absent that.
-  const setup: AutomationSetupField[] =
-    subscription.setup ?? entry?.setup ?? [];
+  // RUNS — none when it declares none — never the catalog's newer one
+  // (backend §12.1 #185), as its Set up and its Connect vendor page read it:
+  // a row drawn from the catalog's would open a vendor page that is not found.
+  const setup: AutomationSetupField[] = subscription.setup ?? [];
   const vendorFields = connectionFields(setup);
   const declared = entry?.requiredConnections ?? [];
   const nameOf = (providerId: string) =>
@@ -172,6 +173,8 @@ export default async function FlowPage(
         href={vendorPath(subscription.id, key)}
         data-testid={`flow-vendor-${key}`}
         aria-label={`${none ? "None" : nameOf(chosen)}: change the vendor`}
+        // Its state — Connected, Not connected, or None's line — said too.
+        aria-describedby={`flow-vendor-${key}-line`}
         className={`${CONNECTION_ROW} rounded-[var(--radius-md)] px-2 transition hover:bg-[var(--surface-hover)]`}
       >
         <ConnectionRowBody
@@ -191,6 +194,7 @@ export default async function FlowPage(
                 : "Not connected"
           }
           lineTone={none ? "muted" : isConnected ? "ok" : "warn"}
+          lineId={`flow-vendor-${key}-line`}
           right={
             <CaretRightIcon
               aria-hidden

@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { test } from "node:test";
 import {
   NONE,
+  activityFilter,
   chosenVendor,
   connectionFields,
   fieldProviders,
@@ -258,5 +259,48 @@ test("the Dashboard is live: read again every 5 s while a run of the flow is pen
   ]) {
     assert.ok(dashboard.includes(`label: "${label}"`), label);
     assert.ok(dashboard.includes(href), href);
+  }
+});
+
+test("Activity is filtered only by a flow id shaped as one — a UUID, as the platform's subscriptionId — and an outcome its tiles name; anything else in the address is no filter, never a refused read that takes the page with it (spec A6; the session's W2)", () => {
+  const flow = "f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1";
+  assert.deepEqual(activityFilter(flow, "failed"), {
+    flowId: flow,
+    outcome: "failed",
+  });
+  assert.deepEqual(activityFilter(flow, "succeeded"), {
+    flowId: flow,
+    outcome: "succeeded",
+  });
+  assert.deepEqual(activityFilter(flow, undefined), { flowId: flow });
+  for (const notAFlow of [
+    "not-a-flow",
+    "",
+    `${flow}x`,
+    ` ${flow}`,
+    `${flow}/../x`,
+    "f1f1f1f1f1f14f1f8f1ff1f1f1f1f1f1",
+    [flow],
+    undefined,
+  ]) {
+    assert.deepEqual(activityFilter(notAFlow, "held"), {}, String(notAFlow));
+  }
+  const activity = read("app/account/runs/page.tsx");
+  assert.match(
+    activity,
+    /const \{ flowId, outcome \} = activityFilter\(flow, status\);/u,
+  );
+  assert.doesNotMatch(activity, /typeof flow === "string"/u);
+});
+
+test("a flow's own pages draw the settings of the version it RUNS — never the catalog's newer one (backend §12.1 #185) — so its vendor row never opens a vendor page that is not found", () => {
+  for (const path of [
+    "app/account/flows/[subscriptionId]/page.tsx",
+    "app/account/flows/[subscriptionId]/setup/page.tsx",
+    "app/account/flows/[subscriptionId]/vendor/page.tsx",
+  ]) {
+    const page = read(path);
+    assert.match(page, /subscription\??\.setup \?\? \[\]/u, path);
+    assert.doesNotMatch(page, /setup \?\? entry\??\.setup/u, path);
   }
 });

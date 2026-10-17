@@ -88,18 +88,26 @@ const LINE_TONE: Record<ConnectionLineTone, string> = {
   err: "text-[var(--error-text)]",
 };
 
-/** What a row holds: the mark, the name and its line, then the right side. */
+/**
+ * What a row holds: the mark, the name and its line, then the right side.
+ * `lineId` names the line, for a row that is a control named by the vendor
+ * alone (`aria-label`) to describe itself by it (`aria-describedby`) — so a
+ * screen reader hears "Connected", "Not connected" or "Ask an owner or admin
+ * to connect it." as a sighted person reads it.
+ */
 export function ConnectionRowBody({
   mark,
   name,
   line,
   lineTone = "muted",
+  lineId,
   right,
 }: {
   mark: ReactNode;
   name: string;
   line?: string | null;
   lineTone?: ConnectionLineTone;
+  lineId?: string;
   right?: ReactNode;
 }) {
   return (
@@ -110,7 +118,11 @@ export function ConnectionRowBody({
           {name}
         </span>
         {line ? (
-          <span data-line className={`truncate text-xs ${LINE_TONE[lineTone]}`}>
+          <span
+            id={lineId}
+            data-line
+            className={`truncate text-xs ${LINE_TONE[lineTone]}`}
+          >
             {line}
           </span>
         ) : null}

@@ -2277,6 +2277,9 @@ test("Connect vendor: the step's vendors by their marks, then None; a tap saves 
   const vendorRow = page.getByTestId("flow-vendor-vendor");
   await expect(vendorRow).toContainText("None");
   await expect(vendorRow).toContainText("Save the details only.");
+  // Named by its vendor, and its line said too — to a screen reader as well.
+  await expect(vendorRow).toHaveAccessibleName("None: change the vendor");
+  await expect(vendorRow).toHaveAccessibleDescription("Save the details only.");
   await vendorRow.click();
   await expect(page).toHaveURL(
     new RegExp(`${vendorPage}\\?field=vendor$`, "u"),
@@ -2289,6 +2292,10 @@ test("Connect vendor: the step's vendors by their marks, then None; a tap saves 
   await expect(main.getByRole("radio")).toHaveCount(2);
   const quickbooks = main.getByRole("radio", { name: "QuickBooks Online" });
   await expect(quickbooks).toContainText("Connected");
+  await expect(quickbooks).toHaveAccessibleDescription("Connected");
+  await expect(
+    main.getByRole("radio", { name: "None" }),
+  ).toHaveAccessibleDescription("Save the details only.");
   await expect(
     quickbooks.getByRole("img", { name: "QuickBooks" }),
   ).toHaveAttribute("src", "/vendors/quickbooks-symbol.png");
@@ -2323,6 +2330,7 @@ test("Connect vendor: the step's vendors by their marks, then None; a tap saves 
   // The vendor row says its state — never "Connect vendor".
   await expect(vendorRow).toContainText("QuickBooks Online");
   await expect(vendorRow).toContainText("Connected");
+  await expect(vendorRow).toHaveAccessibleDescription("Connected");
   await expect(page.locator("main")).not.toContainText("Connect vendor");
   // None, tapped: saved once, and back.
   await vendorRow.click();
@@ -2346,6 +2354,10 @@ test("a member on the Connect vendor page is told who connects a vendor, which i
   ).toBeVisible();
   const quickbooks = main.getByRole("radio", { name: "QuickBooks Online" });
   await expect(quickbooks).toContainText(
+    "Ask an owner or admin to connect it.",
+  );
+  // Said to a screen reader too: why the row is no choice.
+  await expect(quickbooks).toHaveAccessibleDescription(
     "Ask an owner or admin to connect it.",
   );
   await expect(quickbooks).toBeDisabled();
@@ -2610,6 +2622,31 @@ test("a run is named by its full id, never its request id; a run of an older ver
   await expect(main).toContainText("Invoice Processing · Failures");
   await expect(main).toContainText("Run 793eef82-102d-81be-a2d3-9e8d4e2b2c36");
   await expect(main).not.toContainText("v2");
+});
+
+test("on a phone, a run's page is no wider than the screen: its title, the full id, wraps at its hyphens — even an id whose every part starts with a digit (spec A8; the owner's AM2)", async ({
+  page,
+}) => {
+  // Any run id is a run here. The title is the whole id (AM2); a browser
+  // breaks it after a hyphen, so it never pushes the page sideways.
+  const id = "3f2c1a9e-5b7d-4e2a-9c1b-7d8e9f0a1b2c";
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto(`/account/runs/${id}`);
+  const title = page.locator("main").getByRole("heading", { level: 1 });
+  await expect(title).toHaveText(`Run ${id}`);
+  // The heading holds its words, and the page scrolls no way but down.
+  expect(
+    await title.evaluate(
+      (heading) => heading.scrollWidth - heading.clientWidth,
+    ),
+  ).toBeLessThanOrEqual(0);
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    ),
+  ).toBeLessThanOrEqual(0);
 });
 
 test("a held run's document whose approval was refused reads Not approved, and the run its decision; the group it waits in says why (spec A7; S21)", async ({
@@ -3501,7 +3538,7 @@ test("an export from a page whose workspace was switched away in another tab say
   ).toMatchObject({ exportCount: 0, exportJobStarted: false });
 });
 
-test("Settings shows the Linked accounts lead: a linked account signs you in to this same account, in the app and on the website — link one before signing in with it (the owner's build 12, #8; register F86)", async ({
+test("Settings shows the Linked accounts lead in one line — Sign in with any of these. — and each sign-in account by its provider's glyph (Build 21, spec A5; the owner's build 20 items 8 and 9; ~~register F86's sentences~~)", async ({
   page,
 }) => {
   await page.goto("/account/settings");

@@ -12,6 +12,7 @@ import {
 import SectionCard from "@/components/dashboard/SectionCard";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { StatusPill } from "@/components/dashboard/StatusPill";
+import { activityFilter } from "@/lib/flow-steps";
 import { runLabel } from "@/lib/run-progress";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 
@@ -39,9 +40,7 @@ export default async function RunsPage(props: PageProps<"/account/runs">) {
   const { flow, status } = await props.searchParams;
   const session = await getAppSession();
   const workspaceId = await resolveActiveWorkspaceId(session);
-  const flowId = typeof flow === "string" && flow ? flow : undefined;
-  const outcome =
-    status === "succeeded" || status === "failed" ? status : undefined;
+  const { flowId, outcome } = activityFilter(flow, status);
 
   if (!workspaceId) {
     return (

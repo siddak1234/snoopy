@@ -212,3 +212,26 @@ export function quickRunRows(
       };
     });
 }
+
+const FLOW_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+
+/**
+ * What Activity is filtered by, from its address (spec A6; the session's W2):
+ * a flow's Dashboard opens it for that flow (`?flow=`) and an outcome
+ * (`&status=succeeded` or `failed`). Only a flow id shaped as one — a UUID,
+ * as the platform's `subscriptionId` is — is sent on to the platform, which
+ * refuses any other (400) and would take the page with it; anything else in
+ * the address is read as no filter at all.
+ */
+export function activityFilter(
+  flow: unknown,
+  status: unknown,
+): { flowId?: string; outcome?: "succeeded" | "failed" } {
+  return {
+    ...(typeof flow === "string" && FLOW_ID.test(flow) ? { flowId: flow } : {}),
+    ...(status === "succeeded" || status === "failed"
+      ? { outcome: status }
+      : {}),
+  };
+}
