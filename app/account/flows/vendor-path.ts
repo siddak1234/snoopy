@@ -1,52 +1,34 @@
 /**
- * A flow's vendor (spec §3.B–§3.D; backend ADR-0037): its Connect vendor page,
- * the choice Set up shows, and what an unmet connection asks for. A connect
- * started on the vendor page comes back to it
- * (`app/account/connections/pending-connect.ts`).
+ * A flow's vendor (spec A2, A3, A6; backend ADR-0037, ADR-0040): its Connect
+ * vendor page — one per step's connection choice (`?field=`) — and what Step 1
+ * says the flow is owed. A connect started on the flow's pages comes back to
+ * them (`app/account/connections/pending-connect.ts`).
  *
- * Only a flow whose PINNED version declares a `connection` setting has a vendor
- * to choose, and so a vendor page (`[subscriptionId]/vendor/page.tsx`): the
- * catalog describes the newest version, so a flow still on an older one — every
- * v1 flow of Invoice Processing — is judged by its own `setup`, never by the
- * catalog's.
+ * Only a flow whose PINNED version declares a `connection` setting has a
+ * vendor to choose, and so a vendor page (`[subscriptionId]/vendor/page.tsx`):
+ * the catalog describes the newest version, so a flow still on an older one —
+ * every v1 flow of Invoice Processing — is judged by its own `setup`, never by
+ * the catalog's.
  *
  * No React and no `@/` import here: the unit test loads this file as it is.
  */
 
-/** A flow's Connect vendor page (spec §3.C). */
-export function vendorPath(subscriptionId: string): string {
-  return `/account/flows/${encodeURIComponent(subscriptionId)}/vendor`;
+/** A flow's Connect vendor page for one step's choice (spec A2). */
+export function vendorPath(subscriptionId: string, field?: string): string {
+  const path = `/account/flows/${encodeURIComponent(subscriptionId)}/vendor`;
+  return field ? `${path}?field=${encodeURIComponent(field)}` : path;
 }
 
-/**
- * The flow's vendor choice — its `connection` setting (backend ADR-0037) — as
- * Set up's Connect row shows it (spec §3.B), with the way to the vendor page.
- */
-export type VendorChoiceRow = {
-  /** The setting's key. */
-  key: string;
-  /** `none`, or the chosen provider. */
-  providerId: string;
-  /** The flow's vendor page. */
-  href: string;
-  displayName?: string;
-  /** The provider's published icon name, which may name its logo. */
-  icon?: string | null;
-  /** False while the chosen vendor is not connected. */
-  connected?: boolean;
-};
-
-/** What an unmet connection asks for, and where it is done (spec §3.D). */
-export type UnmetLine = { providerId: string; text: string; href: string };
+/** What Step 1 says the flow is owed, and where it is done (spec A6). */
+export type OwedLine = { key: string; text: string; href: string };
 
 type SetupField = {
   key: string;
-  title: string;
   control: string;
   defaultValue?: unknown;
 };
 
-/** A subscription, as far as its vendor goes. */
+/** A subscription, as far as what it is owed goes. */
 type Flow = {
   id: string;
   config: Record<string, unknown>;
@@ -62,84 +44,65 @@ type Declared = {
   optional: boolean;
 };
 
-type Provider = { providerId: string; displayName: string; icon?: string };
-
-/** The flow's own vendor setting, or undefined when its pinned version has none. */
-function vendorField(flow: Flow): SetupField | undefined {
-  return (flow.setup ?? []).find(
-    (candidate) => candidate.control === "connection",
-  );
-}
+type Provider = { providerId: string; displayName: string };
 
 /**
- * The flow's vendor choice, as Set up's Connect row shows it (spec §3.B): the
- * flow's `connection` setting — `none` or an optional connection's provider —
- * with that vendor's name and mark, and whether it still needs connecting,
- * which the platform says by listing it in `unmetConnections` (backend
- * ADR-0037). Null for a flow with no vendor to choose.
+ * What the flow is owed, in words and with the way to it (spec A6, the app's
+ * Step 1): first each vendor a step chose that is not connected — "Connect
+ * QuickBooks Online first, or choose None." — on that step's vendor page; then,
+ * in one line, every account it cannot run without — and any account of a flow
+ * whose pinned version has no vendor to choose, such as a v1 flow the
+ * catalog's newer version makes optional — "Connect {names} first.", on
+ * Connections. `connected` says whether the workspace's connection to a
+ * provider is live. Never the provider's raw id.
  */
-export function vendorChoice(
+export function owedLines(
   flow: Flow,
   declared: readonly Declared[],
   providers: readonly Provider[],
-): VendorChoiceRow | null {
-  const field = vendorField(flow);
-  if (!field) return null;
-  const value = flow.config[field.key] ?? field.defaultValue ?? "none";
-  const providerId = typeof value === "string" ? value : "none";
-  if (providerId === "none") {
-    return { key: field.key, providerId, href: vendorPath(flow.id) };
+  connected: (providerId: string) => boolean,
+): OwedLine[] {
+  const fields = (flow.setup ?? []).filter(
+    (field) => field.control === "connection",
+  );
+  const nameOf = (providerId: string) =>
+    declared.find((candidate) => candidate.providerId === providerId)
+      ?.displayName ??
+    providers.find((provider) => provider.providerId === providerId)
+      ?.displayName ??
+    "its account";
+  const lines: OwedLine[] = [];
+  const chosen = new Set<string>();
+  for (const field of fields) {
+    const value = flow.config[field.key] ?? field.defaultValue;
+    const providerId =
+      typeof value === "string" && value !== "" ? value : "none";
+    if (providerId === "none" || connected(providerId)) continue;
+    chosen.add(providerId);
+    lines.push({
+      key: `vendor:${field.key}`,
+      text: `Connect ${nameOf(providerId)} first, or choose None.`,
+      href: vendorPath(flow.id, field.key),
+    });
   }
-  const provider = providers.find(
-    (candidate) => candidate.providerId === providerId,
+  // An optional account is a step's to choose only where the version has the
+  // choice; otherwise the flow cannot run without it.
+  const optional = new Set(
+    fields.length > 0
+      ? declared
+          .filter((connection) => connection.optional)
+          .map((connection) => connection.providerId)
+      : [],
   );
-  const connection = declared.find(
-    (candidate) => candidate.providerId === providerId,
+  const owed = flow.unmetConnections.filter(
+    (providerId) => !optional.has(providerId) && !chosen.has(providerId),
   );
-  return {
-    key: field.key,
-    providerId,
-    href: vendorPath(flow.id),
-    displayName:
-      connection?.displayName ?? provider?.displayName ?? field.title,
-    icon: provider?.icon ?? null,
-    connected: !flow.unmetConnections.includes(providerId),
-  };
-}
-
-/**
- * What an unmet connection asks for, in words and with the way to it (spec
- * §3.D): a vendor the flow chose is connected, or None chosen instead, on the
- * flow's vendor page; a connection the flow cannot run without — and any
- * connection of a flow whose pinned version has no vendor to choose, such as a
- * v1 flow the catalog's newer version makes optional — is connected on
- * Connections. Never the provider's raw id.
- */
-export function unmetLines(
-  flow: Flow,
-  declared: readonly Declared[],
-  providers: readonly Provider[],
-): UnmetLine[] {
-  const choosable = vendorField(flow) !== undefined;
-  return flow.unmetConnections.map((providerId) => {
-    const connection = declared.find(
-      (candidate) => candidate.providerId === providerId,
-    );
-    const displayName =
-      connection?.displayName ??
-      providers.find((provider) => provider.providerId === providerId)
-        ?.displayName ??
-      "its account";
-    return choosable && connection?.optional
-      ? {
-          providerId,
-          text: `Connect ${displayName} first, or choose None.`,
-          href: vendorPath(flow.id),
-        }
-      : {
-          providerId,
-          text: `Connect ${displayName} first.`,
-          href: "/account/connections",
-        };
-  });
+  if (owed.length > 0) {
+    lines.push({
+      key: "accounts",
+      text: `Connect ${[...new Set(owed)].map(nameOf).join(", ")} first.`,
+      href: "/account/connections",
+    });
+  }
+  return lines;
 }

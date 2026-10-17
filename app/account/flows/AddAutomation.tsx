@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { setupPath } from "@/lib/flow-steps";
 import { subscribeToAutomation } from "./actions";
 
 /**
@@ -21,6 +23,10 @@ import { subscribeToAutomation } from "./actions";
  * An archived flow's row draws this too, as Unarchive (the owner, build 12's
  * #4): unarchiving is adding the flow afresh, so it is this Add — the same
  * action and refusals — in that word.
+ *
+ * **Added, its Set up opens** (Build 21; the owner's AM4: "set up page is
+ * initial, after that flow page is the run page"): one simple page with its
+ * vendors and its few settings, and Turn on.
  */
 export function AddAutomation({
   templateId,
@@ -37,6 +43,7 @@ export function AddAutomation({
   /** Drawn on an archived flow's row: "Unarchive", named for its flow. */
   unarchive?: boolean;
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -47,7 +54,11 @@ export function AddAutomation({
       data.append("templateId", templateId);
       data.append("workspaceId", workspaceId);
       const result = await subscribeToAutomation(data);
-      if (!result.ok) setError(result.error);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      if (result.subscriptionId) router.push(setupPath(result.subscriptionId));
     });
   };
 

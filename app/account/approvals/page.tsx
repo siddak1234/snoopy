@@ -10,6 +10,7 @@ import {
 import SectionCard from "@/components/dashboard/SectionCard";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { StatusPill } from "@/components/dashboard/StatusPill";
+import { runLabel } from "@/lib/run-progress";
 import { ApprovalDecision } from "./ApprovalDecision";
 
 /**
@@ -102,6 +103,13 @@ function ApprovalRow({
         >
           View the run
         </Link>
+        {/* The run it holds, by its full id (Build 21, spec A8; the owner's D4 and AM2). */}
+        <span
+          data-testid={`approval-run-${approval.id}`}
+          className="text-xs break-all text-[var(--muted)]"
+        >
+          {runLabel(approval.runId)}
+        </span>
       </div>
 
       {!canDecide ? (

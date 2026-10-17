@@ -109,9 +109,15 @@ const pathToTitle: Record<string, string> = {
 };
 
 function getPageTitle(pathname: string): string {
-  // Detail pages: /account/runs/[runId], /account/teams/[id]
+  // Detail pages: /account/runs/[runId], /account/teams/[id], and a flow's own
+  // pages — its page, its Set up and its Connect vendor (Build 21, spec A6).
   if (pathname.startsWith("/account/runs/")) return "Run";
   if (pathname.startsWith("/account/teams/")) return "Team";
+  if (pathname.startsWith("/account/flows/")) {
+    if (pathname.endsWith("/setup")) return "Set up";
+    if (pathname.endsWith("/vendor")) return "Connect vendor";
+    return "Flow";
+  }
   return pathToTitle[pathname] ?? "Dashboard";
 }
 

@@ -19,12 +19,10 @@ function focusableChildren(container: HTMLElement): HTMLElement[] {
 }
 
 /**
- * The dialogs open now, the first opened first. One can open over another —
- * the account's AI consent, asked by Start run, opens over the Run window
- * (`components/account/AiConsentCard.tsx`) — and then only the one on top
- * answers the keyboard: Escape closes it alone, and Tab stays inside it. The
- * page scrolls again once the last of them has closed, whatever the order they
- * close in.
+ * The dialogs open now, the first opened first. One can open over another,
+ * and then only the one on top answers the keyboard: Escape closes it alone,
+ * and Tab stays inside it. The page scrolls again once the last of them has
+ * closed, whatever the order they close in.
  */
 const openDialogs: symbol[] = [];
 let overflowBeforeDialogs = "";

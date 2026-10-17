@@ -46,6 +46,24 @@ const FIELDS_PATH = resolve(
   "../app/account/flows/ManifestFields.tsx",
 );
 const PAGE_PATH = resolve(import.meta.dirname, "../app/account/flows/page.tsx");
+// A flow's own page, its Set up and its Step 1 (Build 21, spec A6; the
+// owner's AM4): where a flow is run, set up again, moved and archived.
+const FLOW_PAGE_PATH = resolve(
+  import.meta.dirname,
+  "../app/account/flows/[subscriptionId]/page.tsx",
+);
+const SETUP_PAGE_PATH = resolve(
+  import.meta.dirname,
+  "../app/account/flows/[subscriptionId]/setup/page.tsx",
+);
+const SETUP_FORM_PATH = resolve(
+  import.meta.dirname,
+  "../app/account/flows/[subscriptionId]/setup/SetupForm.tsx",
+);
+const RUN_START_PATH = resolve(
+  import.meta.dirname,
+  "../app/account/flows/RunStart.tsx",
+);
 const PLATFORM_SERVER_PATH = resolve(
   import.meta.dirname,
   "../lib/platform-server.ts",
@@ -83,6 +101,10 @@ const actions = readFileSync(ACTIONS_PATH, "utf8");
 const actionsUi = readFileSync(ACTIONS_UI_PATH, "utf8");
 const fields = readFileSync(FIELDS_PATH, "utf8");
 const page = readFileSync(PAGE_PATH, "utf8");
+const flowPage = readFileSync(FLOW_PAGE_PATH, "utf8");
+const setupPage = readFileSync(SETUP_PAGE_PATH, "utf8");
+const setupForm = readFileSync(SETUP_FORM_PATH, "utf8");
+const runStart = readFileSync(RUN_START_PATH, "utf8");
 const platformServer = readFileSync(PLATFORM_SERVER_PATH, "utf8");
 const entitlements = readFileSync(ENTITLEMENTS_PATH, "utf8");
 
@@ -130,15 +152,18 @@ test("generated automation contract is present and used by the facade", () => {
 
 test("the setup UI is generated from the pinned version's metadata (backend §12.1 #185)", () => {
   // One renderer for both manifest declarations — setup and run input (backend
-  // ADR-0030) — in ManifestFields.tsx; the card only chooses which to show. The
-  // fields are the version the subscription PINS, which the platform checks a
-  // save against, not the catalog's newest (§12.1 #185) — and the move dialog
-  // draws the newest's, which is where a move goes.
-  assert.match(page, /setup=\{subscription\.setup \?\? \[\]\}/);
-  assert.doesNotMatch(page, /setup=\{automation\.setup\}/);
-  assert.match(page, /targetSetup=\{automation\.setup\}/);
-  assert.doesNotMatch(actionsUi, /SETUP_SECTIONS/);
-  assert.match(actionsUi, /<SetupFields\s+setup=\{setup\}/);
+  // ADR-0030) — in ManifestFields.tsx. Set up draws the version the
+  // subscription PINS, which the platform checks a save against, not the
+  // catalog's newest (§12.1 #185) — and the move dialog draws the newest's,
+  // which is where a move goes.
+  assert.match(
+    setupPage,
+    /const setup: AutomationSetupField\[\] = subscription\.setup \?\? \[\];/,
+  );
+  assert.doesNotMatch(setupPage, /setup=\{entry\.setup\}/);
+  assert.match(flowPage, /targetSetup: entry\.setup/);
+  assert.doesNotMatch(setupForm, /SETUP_SECTIONS/);
+  assert.match(setupForm, /<SetupFields\s+setup=\{setup\}/);
   assert.match(fields, /for \(const field of setup\)/);
   assert.match(fields, /currentGroup\?\.section === field\.section/);
   assert.match(
@@ -147,20 +172,26 @@ test("the setup UI is generated from the pinned version's metadata (backend §12
   );
   // toggle is a checkbox, money a number, email an email; text and
   // resource-picker are text, because no contract lists resources to pick
-  // from. The vendor choice (`connection`, backend ADR-0037) is its own row.
+  // from. A vendor choice (`connection`, backend ADR-0037) is drawn as its
+  // vendors on Set up, and carried as it is everywhere else.
   assert.match(fields, /field\.control === "toggle"/);
   assert.match(
     fields,
     /field\.control === "money"\s*\?\s*"number"\s*:\s*field\.control === "email"\s*\?\s*"email"\s*:\s*"text"/,
   );
-  assert.match(fields, /field\.control === "connection" \? \(\s*<VendorField/);
+  assert.match(fields, /if \(field\.control === "connection"\) continue;/);
   assert.match(fields, /name=\{`\$\{prefix\}:\$\{field\.key\}`\}/);
   assert.match(fields, /prefix="config"/);
   assert.match(fields, /field\.defaultValue/);
   assert.match(fields, /field\.notifies/);
-  assert.match(actions, /saveSubscriptionConfiguration/);
+  // No help line under any setting (spec A6, B5; the session's S11).
+  assert.doesNotMatch(fields, /field\.description|hint=/u);
+  assert.match(actions, /export async function saveSetup/);
   assert.match(actions, /declaredValues\(formData, "config"\)/);
-  assert.match(actions, /const body: UpdateSubscriptionRequest = \{ config \}/);
+  assert.match(
+    actions,
+    /const body: UpdateSubscriptionRequest = turnOn\s*\?\s*\{ config, status: "live" \}\s*:\s*\{ config \};/,
+  );
 });
 
 test("subscription entitlement states use only the documented reason tokens", () => {
@@ -426,35 +457,39 @@ test("automation list reads consume generated operation response types", () => {
 test("a manual run is started only from the pinned version's declared input — never raw JSON", () => {
   // The Run-now dialog took raw JSON and stays retired (owner, 2026-09-24).
   // Its replacement is the owner's decision in backend ADR-0030 (§12.1 #162): a
-  // form rendered from `Subscription.runInput`, which the platform also checks.
-  assert.doesNotMatch(
-    actionsUi,
-    /Run now|runOpen|triggerRun|<textarea|JSON\.parse/u,
-    "the retired raw-JSON dialog must not come back",
-  );
+  // form rendered from `Subscription.runInput`, which the platform also checks
+  // — since Build 21 in Step 1 of the flow's page (spec A6).
+  for (const ui of [actionsUi, runStart, flowPage]) {
+    assert.doesNotMatch(
+      ui,
+      /Run now|runOpen|triggerRun|<textarea|JSON\.parse/u,
+      "the retired raw-JSON dialog must not come back",
+    );
+  }
   assert.doesNotMatch(actions, /JSON\.parse/u, "no action accepts raw JSON");
   // Offered only when it can be honest: live, available, and declared.
-  assert.match(actionsUi, /subscription\.status === "live"/);
-  assert.match(actionsUi, /subscription\.runInput\?\.length \?\? 0\) > 0/);
   assert.match(
-    actionsUi,
-    /<RunInputFields\s+runInput=\{subscription\.runInput\}/,
+    runStart,
+    /const canRun = live && available && runInput\.length > 0;/,
   );
+  assert.match(runStart, /<RunInputFields\s+runInput=\{runInput\}/);
   // The pinned version's declaration, not the catalog's newest.
-  assert.match(page, /runInput: subscription\.runInput/);
+  assert.match(flowPage, /runInput=\{subscription\.runInput \?\? \[\]\}/);
   assert.match(fields, /prefix="input"/);
   // The run is created through the generated client, once per key, and the
   // person is taken to its page.
   assert.match(actions, /declaredValues\(formData, "input"\)/);
-  // The key is the form's, made when the dialog opens and whenever a value
-  // changes, so a resubmission after a lost answer cannot start a second run.
-  assert.match(actionsUi, /name="idempotencyKey" value=\{runKey\}/);
-  assert.match(actionsUi, /onChange=\{newRunKey\}/);
-  assert.match(actionsUi, /if \(which === "run"\) newRunKey\(\)/);
+  // The key is the form's — the server's with the page, then a new one
+  // whenever a value changes — so a resubmission after a lost answer cannot
+  // start a second run.
+  assert.match(runStart, /name="idempotencyKey" value=\{runKey\}/);
+  assert.match(runStart, /onChange=\{newRunKey\}/);
+  assert.match(runStart, /useState\(initialKey\)/);
+  assert.match(flowPage, /initialKey=\{newIdempotencyKey\("run"\)\}/);
   assert.match(actions, /formData\.get\("idempotencyKey"\)/);
   assert.doesNotMatch(actions, /newIdempotencyKey\("run"\)/);
   assert.match(
-    actionsUi,
+    runStart,
     /router\.push\(`\/account\/runs\/\$\{result\.runId\}`\)/,
   );
 });
@@ -472,7 +507,7 @@ test("archiving is its own confirmed action, and the generic status action canno
     /"archived"/u,
     "the unconfirmed status action must not accept archived",
   );
-  assert.match(actionsUi, /archiveSubscription\(/);
+  assert.match(actionsUi, /run\(\s*archiveSubscription,/);
   // Archive flow, in the app's words (the owner's build 9; build 10's
   // wording): where it goes, that its runs stay, and that it can be unarchived
   // (build 12's #4).
@@ -530,7 +565,7 @@ test("a flow is added with no team: the platform puts it in the team of its cate
   // one this person cannot list — or, added before teams, the whole
   // workspace.
   assert.match(
-    page,
+    read("app/account/flows/place.ts"),
     /if \(!subscription\.projectId\) return "Whole workspace";\s*const kind =\s*teamKind\.get\(subscription\.projectId\) \?\?\s*catalog\.get\(subscription\.templateId\)\?\.category;\s*return kind \? `Team: \$\{kind\}` : "Team";/u,
   );
   // The removed words (spec §3.A): no source file says them.
@@ -729,9 +764,18 @@ test("a run that can still stop offers Cancel, and nothing else does (cancelRun)
     resolve(import.meta.dirname, "../app/account/runs/[runId]/page.tsx"),
     "utf8",
   );
+  const live = readFileSync(
+    resolve(import.meta.dirname, "../app/account/runs/[runId]/RunLive.tsx"),
+    "utf8",
+  );
+  assert.match(runPage, /<RunLive\b/u);
   assert.match(
-    runPage,
-    /run\.status === "pending" \|\| run\.status === "running" \? \(\s*<div className="mt-4">\s*<CancelRunButton runId=\{run\.id\} workspaceId=\{run\.workspaceId\} \/>/u,
+    live,
+    /const going = run\.status === "pending" \|\| run\.status === "running";/u,
+  );
+  assert.match(
+    live,
+    /\{going \? \(\s*<CancelRunButton runId=\{run\.id\} workspaceId=\{run\.workspaceId\} \/>/u,
   );
   // The run the page showed, in the workspace it showed: after a switch in
   // another tab the same id would 404 elsewhere and read as "already stopped".
@@ -848,7 +892,7 @@ test("a run's file goes straight to the store, and the run carries only its id (
     /method: "PUT",\s*body: file,\s*credentials: "omit",/u,
   );
   // The run waits for the file.
-  assert.match(actionsUi, /disabled=\{pending \|\| uploading\}/u);
+  assert.match(runStart, /disabled=\{pending \|\| uploading\}/u);
   // Through the generated client, every id encoded where the path is built.
   assert.match(
     client,
@@ -887,7 +931,7 @@ test("a run refused for its file says so and empties the file field to choose ag
     /if \(error\.status === 422 && known\) \{[\s\S]*?reason === "artifact_unavailable"\s*\?\s*\{ state: "file-unavailable" as const \}/u,
   );
   assert.match(
-    actionsUi,
+    runStart,
     /if \(result\.state === "file-unavailable"\) \{\s*setFileRound\(\(round\) => round \+ 1\);\s*newRunKey\(\);/u,
   );
   assert.match(fields, /key=\{`\$\{field\.key\}:\$\{fileRound\}`\}/u);
@@ -903,13 +947,14 @@ test("a run refused for its file says so and empties the file field to choose ag
 test("a subscription moves to the newest version in place, and each refusal the platform names is said in words (backend §12.1 #126)", () => {
   assert.match(
     actions,
-    /await updateSubscription\(\s*workspaceId,\s*subscriptionId,\s*\{ templateVersion \},\s*"version",\s*\);\s*revalidatePath\("\/account\/flows"\);/u,
+    /await updateSubscription\(\s*workspaceId,\s*subscriptionId,\s*\{ templateVersion \},\s*"version",\s*\);\s*revalidatePath\("\/account\/flows", "layout"\);/u,
   );
   assert.match(
-    page,
-    /subscription\.templateVersion < automation\.version \? \([\s\S]*?<MoveVersionButton/u,
+    flowPage,
+    /entry && subscription\.templateVersion < entry\.version\s*\?\s*\{\s*from: subscription\.templateVersion,\s*to: entry\.version,/u,
   );
-  assert.doesNotMatch(page, /archive it and add it again/u);
+  assert.match(actionsUi, /\{newer \? \([\s\S]*?<MoveVersionButton/u);
+  assert.doesNotMatch(actionsUi, /archive it and add it again/u);
   if (available) {
     assert.deepEqual(
       refusalKeys(actions, "MOVE_REFUSALS"),
@@ -922,10 +967,11 @@ test("a webhook address is offered for a webhook-started automation to an owner 
   const button = read("app/account/flows/WebhookAddressButton.tsx");
   const webhook = read("app/account/flows/webhook-actions.ts");
   assert.match(
-    page,
-    /subscription\.triggerKind === "webhook" && canAdminister \? \(\s*<div>\s*<WebhookAddressButton/u,
+    flowPage,
+    /webhook=\{subscription\.triggerKind === "webhook" && canManage\}/u,
   );
-  assert.match(page, /const canAdminister = administers\(role\);/u);
+  assert.match(flowPage, /const canManage = administers\(role\);/u);
+  assert.match(actionsUi, /\{webhook \? \([\s\S]*?<WebhookAddressButton/u);
   // Shown once, in the dialog, and forgotten when it closes.
   assert.doesNotMatch(
     button,

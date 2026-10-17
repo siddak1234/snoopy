@@ -189,12 +189,25 @@ test("a page offers owner-or-admin controls by the platform's own rule (register
     "app/account/connections/ConnectionsPanel.tsx",
     "utf8",
   );
-  // Every control that changes the connection sits behind the gate.
-  assert.equal(
-    (panel.match(/\{canManage \? \(/gu) ?? []).length,
-    2,
-    "Disconnect and Connect/Reconnect are each behind canManage",
+  // Every control that changes the connection sits behind the gate: the
+  // row's one button (Build 21, spec A4) — Disconnect, or Connect/Reconnect.
+  assert.match(
+    panel,
+    /right=\{\s*!canManage \? null : action === DISCONNECT_LABEL \? \(/u,
+    "the row's button is behind canManage",
   );
+  assert.equal(
+    (panel.match(/onClick=\{\(\) => press\(provider\)\}/gu) ?? []).length,
+    2,
+    "Disconnect and Connect/Reconnect are the row's only controls",
+  );
+  // The flow's page and Set up draw the same rows, by the same rule.
+  for (const path of [
+    "app/account/flows/[subscriptionId]/page.tsx",
+    "app/account/flows/[subscriptionId]/setup/page.tsx",
+  ]) {
+    assert.match(readFileSync(path, "utf8"), /administers\(role\)/u, path);
+  }
   const settings = readFileSync("app/account/settings/page.tsx", "utf8");
   // With the workspace the page showed, which every export is held to
   // (register F28).

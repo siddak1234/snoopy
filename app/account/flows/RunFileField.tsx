@@ -41,7 +41,8 @@ function watchPointer(changed: () => void) {
 }
 
 const onPhoneOrTablet = () => window.matchMedia(PHONE_OR_TABLET).matches;
-// The server cannot know; the field is drawn only in a dialog a click opens.
+// The server cannot know: Take photo is drawn once the browser says it is a
+// phone or a tablet.
 const unknownOnServer = () => false;
 
 /**
@@ -199,17 +200,15 @@ export function RunFileField({
           value={state.artifactId}
         />
       ) : null}
-      {/* The field's title and help are the manifest's (spec §3.D); a file
-          field says nothing about being optional. */}
+      {/* The manifest's title alone (spec A6, Step 1: titles only — no line
+          under it, Build 21); a file field says nothing about being
+          optional. */}
       <label
         htmlFor={inputId}
         className="block text-sm font-medium text-[var(--text)]"
       >
         {field.title}
       </label>
-      <p id={`${inputId}-help`} className="mt-1 text-xs text-[var(--muted)]">
-        {field.description}
-      </p>
       {/* The chooser, opened by Upload: a file input styled `display:none`
           and opened by its click(), as MDN describes. */}
       <input
@@ -259,7 +258,6 @@ export function RunFileField({
           variant="secondary"
           size="sm"
           className="inline-flex items-center gap-2"
-          aria-describedby={`${inputId}-help`}
           disabled={state.kind === "uploading"}
           onClick={() => input.current?.click()}
         >

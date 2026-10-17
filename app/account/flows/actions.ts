@@ -22,6 +22,10 @@ import { activeWorkspaceIfShown, WORKSPACE_CHANGED } from "@/lib/tenancy";
 /**
  * Mutations on the automation surface.
  *
+ * **Flows is revalidated with every page under it** (`"layout"`): a flow's
+ * own page, its Set up and its Connect vendor page show what the mutation
+ * changed as well as the list does (Build 21, spec A6).
+ *
  * **A path is revalidated only when the mutation succeeded.** Revalidating after a
  * refusal re-renders the page, and under a platform that is refusing requests
  * (backend §12.1 #160) that re-render is the "busy" panel — replacing the dialog,
@@ -136,7 +140,7 @@ export async function subscribeToAutomation(
     if (heldCopy(subscriptions, templateId))
       return { ok: false, error: ALREADY_IN_WORKSPACE };
     const response = await createSubscription(workspaceId, body);
-    revalidatePath("/account/flows");
+    revalidatePath("/account/flows", "layout");
     revalidatePath("/account/teams");
     return { ok: true, subscriptionId: response.subscription.id };
   } catch (error) {
@@ -185,37 +189,71 @@ function declaredValues(
 }
 
 /**
- * Set up's save (spec §3.B). The vendor the flow chose not connected is said
- * by the dialog, which knows the vendor's name; anything else the platform
- * refuses is "Could not save. Try again." — its words name a status, not what
- * to do. A workspace switched away in another tab is said as it is everywhere.
+ * Set up's one button (Build 21; the owner's AM4: "set up page is initial …
+ * set up should be made simple"): every setting the page holds — each step's
+ * vendor and the few settings, each posted as `config:<key>` — saved whole;
+ * for a draft, with the flow turned on in the same change (`turnOn`), and for
+ * a flow on or paused, its status kept. A vendor chosen and not connected is
+ * said by the page, which knows its name (`vendor-not-connected`); a turn-on
+ * refused by the plan in the platform's words for it; anything else in the
+ * button's own words. A workspace switched away in another tab is said as it
+ * is everywhere.
  */
-export async function saveSubscriptionConfiguration(
-  formData: FormData,
-): Promise<ActionResult> {
+export async function saveSetup(formData: FormData): Promise<ActionResult> {
   const subscriptionId = String(formData.get("subscriptionId") ?? "");
   if (!subscriptionId)
     return { ok: false, error: "A subscription is required." };
-
+  const turnOn = formData.get("turnOn") === "true";
   const config = declaredValues(formData, "config");
-
-  const body: UpdateSubscriptionRequest = { config };
-  return saveConfig(formData, subscriptionId, body);
+  const body: UpdateSubscriptionRequest = turnOn
+    ? { config, status: "live" }
+    : { config };
+  const refused = turnOn ? TURN_ON_REFUSED : SAVE_REFUSED;
+  try {
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+    await updateSubscription(
+      workspaceId,
+      subscriptionId,
+      body,
+      turnOn ? "status" : "subscription-config",
+    );
+    revalidatePath("/account/flows", "layout");
+    return { ok: true, subscriptionId };
+  } catch (error) {
+    if (!(error instanceof PlatformServerError)) throw error;
+    if (error.status === 422 && error.details?.reason === "unmet_connections")
+      return { ok: false, error: refused, state: "vendor-not-connected" };
+    if (turnOn) {
+      const entitlement = subscriptionEntitlementState(
+        error.status,
+        error.details,
+      );
+      if (entitlement === "plan-limit")
+        return {
+          ok: false,
+          error: overPlanRefusal(error.details),
+          state: "plan-limit",
+        };
+    }
+    return { ok: false, error: refused };
+  }
 }
 
 /**
- * The vendor page's save (spec §3.C): the flow's settings as the platform
- * holds them, with its `connection` setting — the vendor it chose, or `none`
- * — changed. The platform replaces a flow's settings whole, so every other
- * value is sent as it was read here, never as the page sent it; and the
- * setting changed is the one the flow's pinned version declares, never a key
- * the page names.
+ * The vendor page's save (spec A2): the flow's settings as the platform
+ * holds them, with ONE step's `connection` setting — the vendor it chose, or
+ * `none` — changed. The platform replaces a flow's settings whole, so every
+ * other value is sent as it was read here, never as the page sent it; and the
+ * setting changed is one the flow's pinned version declares (the page's
+ * `field`, else its only one), never another key the page names.
  */
 export async function saveVendorChoice(
   formData: FormData,
 ): Promise<ActionResult> {
   const subscriptionId = String(formData.get("subscriptionId") ?? "");
   const choice = String(formData.get("choice") ?? "");
+  const fieldKey = String(formData.get("field") ?? "");
   if (!subscriptionId || !choice) return { ok: false, error: SAVE_REFUSED };
   try {
     const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
@@ -224,9 +262,12 @@ export async function saveVendorChoice(
     const subscription = subscriptions.find(
       (candidate) => candidate.id === subscriptionId,
     );
-    const field = subscription?.setup?.find(
+    const fields = (subscription?.setup ?? []).filter(
       (candidate) => candidate.control === "connection",
     );
+    const field = fieldKey
+      ? fields.find((candidate) => candidate.key === fieldKey)
+      : fields[0];
     if (!subscription || !field) return { ok: false, error: SAVE_REFUSED };
     const body: UpdateSubscriptionRequest = {
       config: { ...subscription.config, [field.key]: choice },
@@ -240,6 +281,7 @@ export async function saveVendorChoice(
 }
 
 const SAVE_REFUSED = "Could not save. Try again.";
+const TURN_ON_REFUSED = "Could not turn it on. Try again.";
 
 async function saveConfig(
   formData: FormData,
@@ -255,7 +297,7 @@ async function saveConfig(
       body,
       "subscription-config",
     );
-    revalidatePath("/account/flows");
+    revalidatePath("/account/flows", "layout");
     return { ok: true };
   } catch (error) {
     if (!(error instanceof PlatformServerError)) throw error;
@@ -298,11 +340,10 @@ const FLOW_QUEUE_FULL =
  * answer was lost therefore carries the same key, and the platform returns the
  * run it already started instead of starting a second one.
  *
- * **It does not ask before a run's file goes to an AI** — the account's answer
- * is asked once and kept by the platform (backend ADR-0038), and the Run window
- * holds a run with a file on a flow that `usesAi` until it is "allowed"
- * (`lib/ai-consent.ts`); the platform does not check, so the Run window stays
- * this action's only caller (test/ai-consent.test.mjs).
+ * **Nothing is asked before a run's file goes to an AI** (the owner's D1 of
+ * 2026-10-15: "we dont need to say this at all … the terms and privacy policy
+ * includes that information"): a run starts at the press of Start run, in
+ * Step 1 of its flow's page.
  */
 export async function startRun(formData: FormData): Promise<ActionResult> {
   const subscriptionId = String(formData.get("subscriptionId") ?? "");
@@ -396,7 +437,7 @@ export async function archiveSubscription(
     updateSubscription(workspaceId, subscriptionId, body, "archive"),
   );
   if (result.ok) {
-    revalidatePath("/account/flows");
+    revalidatePath("/account/flows", "layout");
     revalidatePath("/account/billing");
   }
   return result;
@@ -445,7 +486,7 @@ export async function moveSubscriptionVersion(
       { templateVersion },
       "version",
     );
-    revalidatePath("/account/flows");
+    revalidatePath("/account/flows", "layout");
     return { ok: true };
   } catch (error) {
     if (!(error instanceof PlatformServerError)) throw error;
@@ -490,7 +531,7 @@ export async function moveWithConfiguration(
       { config, templateVersion },
       "version",
     );
-    revalidatePath("/account/flows");
+    revalidatePath("/account/flows", "layout");
     return { ok: true };
   } catch (error) {
     if (!(error instanceof PlatformServerError)) throw error;
@@ -514,7 +555,7 @@ export async function setSubscriptionStatus(
   const result = await attempt(formData, (workspaceId) =>
     updateSubscription(workspaceId, subscriptionId, body, "status"),
   );
-  if (result.ok) revalidatePath("/account/flows");
+  if (result.ok) revalidatePath("/account/flows", "layout");
   return result;
 }
 

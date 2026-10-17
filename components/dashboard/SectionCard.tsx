@@ -7,6 +7,7 @@ export default function SectionCard({
   subheader,
   primaryAction,
   secondaryAction,
+  back,
   children,
 }: {
   title: string;
@@ -16,6 +17,8 @@ export default function SectionCard({
   subheader?: string;
   primaryAction?: React.ReactNode;
   secondaryAction?: React.ReactNode;
+  /** The way back, before the title (a flow's own pages: `BackLink`). */
+  back?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const defaultSubheader: Record<string, string> = {
@@ -31,13 +34,18 @@ export default function SectionCard({
   return (
     <div className="bubble px-6 py-6 sm:px-8 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-medium text-[var(--text)]">
-            {greeting ?? title}
-          </h1>
-          {subheaderText ? (
-            <p className="mt-1 text-sm text-[var(--muted)]">{subheaderText}</p>
-          ) : null}
+        <div className={back ? "flex min-w-0 items-start gap-3" : undefined}>
+          {back}
+          <div className="min-w-0">
+            <h1 className="text-2xl font-medium text-[var(--text)]">
+              {greeting ?? title}
+            </h1>
+            {subheaderText ? (
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                {subheaderText}
+              </p>
+            ) : null}
+          </div>
         </div>
         {(primaryAction ?? secondaryAction) ? (
           <div className="flex shrink-0 flex-wrap items-center gap-2">

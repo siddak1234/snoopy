@@ -320,11 +320,6 @@ function initialState() {
       status: number;
     }[],
     domainClaimsRefused: 0,
-    // Backend ADR-0038: each person's answer to "AI reads your documents" —
-    // allowed, so no other test meets the card; null while never asked.
-    aiReading: new Map<string, "allowed" | "declined" | null>(),
-    // How many of the next answers the platform fails to save (502).
-    aiReadingRefusing: 0,
     // Backend ADR-0036: the next Add refused with this status — a workspace
     // or team the platform could not find or make (404), or its team service
     // unanswered (502).
@@ -337,16 +332,21 @@ function initialState() {
     quickbooksConnected: false,
     // The flow still on v1 (Bills & Receipts, which the catalog now names
     // Invoice Processing): its pinned version declares no vendor setting and
-    // cannot run without QuickBooks, though the catalog's v2 makes it optional.
+    // cannot run without QuickBooks, though the catalog's v3 makes it optional.
     invoiceV1: false,
+    // Build 21 (spec A4): Google, connected as person@example.com.
+    googleConnected: true,
+    // Build 21 (spec A6; the owner's AM4): whether the workspace holds Invoice
+    // Processing — not yet, its card offers Add, which opens its Set up.
+    invoiceAdded: true,
+    // Build 21 (spec A7): the run a person starts from Step 1, as it goes —
+    // pending, then running with its first step done, then succeeded with its
+    // three receipts; and whether one was started.
+    invoiceRunStage: 0,
+    invoiceRunStarted: false,
   };
 }
 let state = initialState();
-
-/** A person's answer to "AI reads your documents" (backend ADR-0038). */
-function aiReadingOf(user: string): "allowed" | "declined" | null {
-  return state.aiReading.has(user) ? state.aiReading.get(user)! : "allowed";
-}
 
 const session = {
   authenticated: true,
@@ -355,7 +355,9 @@ const session = {
     email: "owner@example.test",
     displayName: "Fixture Owner",
     activeWorkspaceId: workspaceId,
-    aiDocumentReading: "allowed" as "allowed" | "declined" | null,
+    // The platform still sends the account's AI answer (the session's S9),
+    // never asked; the website reads none of it (Build 21, the owner's D1).
+    aiDocumentReading: null,
   },
   workspaces: [workspace],
 } satisfies Platform["SessionResponse"];
@@ -366,7 +368,7 @@ const requesterSession = {
     userId: requesterUserId,
     email: "requester@example.test",
     displayName: "Fixture Requester",
-    aiDocumentReading: "allowed" as "allowed" | "declined" | null,
+    aiDocumentReading: null,
   },
   workspaces: [],
 } satisfies Platform["SessionResponse"];
@@ -596,9 +598,50 @@ const quickbooksProvider = {
 } satisfies Connections["ConnectionProvider"];
 const quickbooksConnectionId = "d1d1d1d1-d1d1-4d1d-8d1d-d1d1d1d1d1d1";
 
+// Google, connected as an account with an email (Build 21, spec A4: "Google
+// row: glyph · Google · person@example.com · Disconnect"; a reserved example
+// address, never a real one in this public repository).
+const googleProvider = {
+  providerId: "google",
+  displayName: "Google",
+  description: "Reads and sends email.",
+  icon: "GoogleLogo",
+  scopes: ["https://www.googleapis.com/auth/gmail.readonly"],
+  authType: "oauth2",
+} satisfies Connections["ConnectionProvider"];
+const googleConnectionId = "a7a7a7a7-a7a7-4a7a-8a7a-a7a7a7a7a7a7";
+
+function googleConnection(): Connections["Connection"] {
+  return {
+    id: googleConnectionId,
+    providerId: googleProvider.providerId,
+    workspaceId,
+    externalAccount: {
+      id: "fixture-google-account",
+      displayName: "person@example.com",
+    },
+    status: "connected",
+    requiredScopes: googleProvider.scopes,
+    grantedScopes: googleProvider.scopes,
+    usedByCount: 2,
+  };
+}
+
+// Invoice Processing v3, as its manifest declares it (snoopy-automations
+// manifests/invoice-processing.v3.json; Build 21, spec §3.1–§3.2 with the
+// owner's AM3: no "Send results to"): the vendor choice names QuickBooks and
+// the Done step (`providers`, `group`, backend ADR-0040), the Approval limit
+// the Checked step, four groups, and its 22 steps in their groups' order.
+const invoiceStep = (
+  id: string,
+  kicker: "TRIGGER" | "AI STEP" | "ACTION",
+  group: string,
+  title: string,
+  description: string,
+) => ({ id, kicker, group, title, description });
 const invoiceAutomation = {
   templateId: "fixture-invoice",
-  version: 2,
+  version: 3,
   name: "Invoice Processing",
   description:
     "Reads bills and receipts, then saves the details or records them in QuickBooks.",
@@ -625,6 +668,8 @@ const invoiceAutomation = {
       control: "connection",
       defaultValue: "none",
       required: false,
+      providers: [quickbooksProvider.providerId],
+      group: "done",
     },
     {
       section: "rules",
@@ -634,23 +679,16 @@ const invoiceAutomation = {
       control: "money",
       defaultValue: 500,
       required: false,
-    },
-    {
-      section: "notifications",
-      key: "notifyEmail",
-      title: "Also email",
-      description: "Gets a short summary of each one.",
-      control: "email",
-      required: false,
+      group: "checked",
     },
   ],
   groups: [
+    { id: "received", title: "Received", description: "Add a PDF or photo." },
     {
-      id: "received",
-      title: "Received",
-      description: "You add a PDF or photo.",
+      id: "read",
+      title: "Read",
+      description: "AI reads each bill or receipt.",
     },
-    { id: "read", title: "Read", description: "AI reads the details." },
     {
       id: "checked",
       title: "Checked",
@@ -661,55 +699,162 @@ const invoiceAutomation = {
       title: "Done",
       description: "Saved, or recorded in QuickBooks.",
     },
-    {
-      id: "emailed",
-      title: "Emailed",
-      description: "A summary goes to Also email.",
-    },
   ],
   pipeline: [
-    {
-      id: "receive",
-      kicker: "TRIGGER",
-      group: "received",
-      title: "Document received",
-      description: "A PDF or photo arrives.",
-    },
-    {
-      id: "extract",
-      kicker: "AI STEP",
-      group: "read",
-      title: "Document read",
-      description: "AI reads the details.",
-    },
-    {
-      id: "check-document",
-      kicker: "ACTION",
-      group: "checked",
-      title: "Details checked",
-      description: "Checks totals and dates.",
-    },
-    {
-      id: "verify-read",
-      kicker: "AI STEP",
-      group: "read",
-      title: "Read again",
-      description: "Only when something looks wrong.",
-    },
-    {
-      id: "save-details",
-      kicker: "ACTION",
-      group: "done",
-      title: "Details saved",
-      description: "Saves the details for your team.",
-    },
-    {
-      id: "notify",
-      kicker: "ACTION",
-      group: "emailed",
-      title: "Summary emailed",
-      description: "Sends a summary to Also email.",
-    },
+    invoiceStep(
+      "receive",
+      "TRIGGER",
+      "received",
+      "Document received",
+      "A PDF or photo arrives.",
+    ),
+    invoiceStep(
+      "extract",
+      "AI STEP",
+      "read",
+      "Documents read",
+      "AI reads each document.",
+    ),
+    invoiceStep(
+      "check-documents",
+      "ACTION",
+      "read",
+      "Documents checked",
+      "Checks totals and dates.",
+    ),
+    invoiceStep(
+      "verify-read",
+      "AI STEP",
+      "read",
+      "Read again",
+      "Only when something looks wrong.",
+    ),
+    invoiceStep(
+      "read-company",
+      "ACTION",
+      "checked",
+      "QuickBooks checked",
+      "Checks QuickBooks is connected.",
+    ),
+    invoiceStep(
+      "read-preferences",
+      "ACTION",
+      "checked",
+      "QuickBooks settings read",
+      "Reads currency and closed dates.",
+    ),
+    invoiceStep(
+      "find-accounts",
+      "ACTION",
+      "checked",
+      "Accounts read",
+      "Reads your accounts from QuickBooks.",
+    ),
+    invoiceStep(
+      "find-vendors",
+      "ACTION",
+      "checked",
+      "Vendors looked up",
+      "Finds each vendor in QuickBooks.",
+    ),
+    invoiceStep(
+      "find-names",
+      "ACTION",
+      "checked",
+      "Names checked",
+      "QuickBooks allows each name once.",
+    ),
+    invoiceStep(
+      "find-duplicates",
+      "ACTION",
+      "checked",
+      "Duplicates checked",
+      "Looks for the same number or amount.",
+    ),
+    invoiceStep(
+      "find-related",
+      "ACTION",
+      "checked",
+      "Related records looked up",
+      "Looks for a bill it pays.",
+    ),
+    invoiceStep(
+      "decide",
+      "ACTION",
+      "checked",
+      "Ready to record?",
+      "Records each one, or waits for approval.",
+    ),
+    invoiceStep(
+      "create-vendors",
+      "ACTION",
+      "done",
+      "Vendors added",
+      "Adds new vendors.",
+    ),
+    invoiceStep(
+      "create-records",
+      "ACTION",
+      "done",
+      "Recorded in QuickBooks",
+      "Creates bills and expenses.",
+    ),
+    invoiceStep(
+      "save-documents",
+      "ACTION",
+      "done",
+      "Details saved",
+      "Saves the details for your team.",
+    ),
+    invoiceStep(
+      "ask-approval",
+      "ACTION",
+      "done",
+      "Needs your approval",
+      "Waits for your approval.",
+    ),
+    invoiceStep(
+      "confirm-company",
+      "ACTION",
+      "done",
+      "Company checked again",
+      "After approval.",
+    ),
+    invoiceStep(
+      "confirm-vendors",
+      "ACTION",
+      "done",
+      "Vendors checked again",
+      "After approval.",
+    ),
+    invoiceStep(
+      "create-approved-vendors",
+      "ACTION",
+      "done",
+      "Approved vendors added",
+      "After approval.",
+    ),
+    invoiceStep(
+      "confirm-no-duplicates",
+      "ACTION",
+      "done",
+      "Duplicates checked again",
+      "After approval.",
+    ),
+    invoiceStep(
+      "create-approved-records",
+      "ACTION",
+      "done",
+      "Approved documents recorded",
+      "After approval.",
+    ),
+    invoiceStep(
+      "save-approved",
+      "ACTION",
+      "done",
+      "Approved details saved",
+      "After approval.",
+    ),
   ],
 } satisfies Automations["AutomationCatalogEntry"];
 
@@ -721,7 +866,7 @@ const accountingTeamId = "acacacac-acac-4cac-8cac-acacacacacac";
 function invoiceSubscription(): Automations["Subscription"] {
   if (state.invoiceV1) {
     return {
-      ...invoiceV2Subscription(),
+      ...invoiceV3Subscription(),
       templateVersion: 1,
       config: { defaultCategory: "Office supplies" },
       // v1 required QuickBooks; it declared no vendor setting.
@@ -740,16 +885,16 @@ function invoiceSubscription(): Automations["Subscription"] {
       ],
     };
   }
-  return invoiceV2Subscription();
+  return invoiceV3Subscription();
 }
 
-function invoiceV2Subscription(): Automations["Subscription"] {
+function invoiceV3Subscription(): Automations["Subscription"] {
   const vendor = state.invoiceConfig.vendor;
   return {
     id: invoiceSubscriptionId,
     workspaceId,
     templateId: invoiceAutomation.templateId,
-    templateVersion: 2,
+    templateVersion: 3,
     name: "Invoice Processing",
     status: state.invoiceStatus,
     config: state.invoiceConfig,
@@ -764,7 +909,7 @@ function invoiceV2Subscription(): Automations["Subscription"] {
       {
         key: "invoiceFile",
         title: "Document",
-        description: "A PDF or photo of a bill or receipt.",
+        description: "A PDF or photo of bills or receipts.",
         control: "artifact",
         required: false,
       },
@@ -825,7 +970,7 @@ function fixtureCatalog(): Automations["AutomationCatalogResponse"] {
         subscribed: state.projectAutomationScopes.length > 0,
       },
       teamDraftAutomation,
-      invoiceAutomation,
+      { ...invoiceAutomation, subscribed: state.invoiceAdded },
     ],
     categories: ["All", "Accounting", "Operations"],
   };
@@ -939,31 +1084,260 @@ const startedRunId = "fixture-run-started";
 // the rest of the test once it is (backend `cancelRun`).
 const runningRunId = "fixture-run-running";
 const runInputFailure = "input must carry vendor, amount, and reference";
-// Invoice Processing's runs (backend ADR-0037): one that saved its details,
-// read by its page, and the one a person starts from its Run window.
+// Invoice Processing's runs (Build 21, spec A7; backend ADR-0039): one that
+// read three receipts from one photo, from three sellers, and saved each — the
+// owner's ~04:05Z, "it was 3 receipts in one picture"; one held for a
+// document whose total could not be read, its approval refused; v2's run
+// 793eef82 as it failed on 2026-10-15, titled then by its request id; and the
+// one a person starts from Step 1, which goes as the fixture advances it.
 const invoiceRunId = "fixture-run-invoice";
+const invoiceHeldRunId = "fixture-run-invoice-held";
+const invoiceV2RunId = "793eef82-102d-81be-a2d3-9e8d4e2b2c36";
 const invoiceStartedRunId = "fixture-run-invoice-started";
+const invoiceRunIds = [invoiceRunId, invoiceHeldRunId, invoiceV2RunId];
+
+/** One of three receipts as v3 writes it (spec §1.1, AM7). */
+function receipt(
+  index: number,
+  overrides: Partial<Automations["RunDocument"]>,
+): Automations["RunDocument"] {
+  return {
+    index,
+    status: "saved",
+    statusText: "Saved",
+    type: "receipt",
+    vendor: { name: null, address: null, city: null, storeNumber: null },
+    number: null,
+    numberLabel: null,
+    references: [],
+    date: "2026-10-14",
+    time: null,
+    currency: "USD",
+    lineItems: [],
+    lineItemsComplete: true,
+    subtotal: null,
+    tax: null,
+    tip: null,
+    discount: null,
+    total: null,
+    payment: { method: "not_shown", cardLast4: null },
+    recordedIn: null,
+    details: [],
+    ...overrides,
+  };
+}
+
+const threeReceipts: Automations["RunDocument"][] = [
+  receipt(1, {
+    vendor: {
+      name: "Lowe's",
+      address: "2150 W Shaw Ave",
+      city: "Fresno, CA 93711",
+      storeNumber: "1234",
+    },
+    number: "48291",
+    numberLabel: "Receipt #",
+    references: [{ label: "Register", value: "07" }],
+    time: "14:32",
+    lineItems: [
+      {
+        description: "2X4-8 STUD",
+        quantity: "4",
+        unitPrice: "3.98",
+        amount: "15.92",
+      },
+    ],
+    subtotal: "15.92",
+    tax: "1.27",
+    total: "17.19",
+    payment: { method: "card", cardLast4: "4417" },
+    details: [{ label: "Category", value: "Materials" }],
+  }),
+  receipt(2, {
+    vendor: {
+      name: "The Home Depot",
+      address: "3780 W Shaw Ave",
+      city: "Fresno, CA 93711",
+      storeNumber: null,
+    },
+    number: "6620-00071",
+    lineItems: [
+      {
+        description: "Wood screws",
+        quantity: "2",
+        unitPrice: "8.47",
+        amount: "16.94",
+      },
+      { description: "Bag", quantity: null, unitPrice: null, amount: "0.10" },
+    ],
+    lineItemsComplete: false,
+    subtotal: "17.04",
+    tax: "1.36",
+    discount: "2.00",
+    total: "16.40",
+    payment: { method: "cash", cardLast4: null },
+  }),
+  receipt(3, {
+    vendor: {
+      name: "Shell",
+      address: null,
+      city: "Clovis, CA",
+      storeNumber: null,
+    },
+    references: [{ label: "Auth code", value: "559301" }],
+    time: "07:05",
+    total: "51.00",
+    payment: { method: "card", cardLast4: "1234" },
+  }),
+];
+
+const heldDocuments: Automations["RunDocument"][] = [
+  receipt(1, {
+    vendor: {
+      name: "Acme Supplies",
+      address: null,
+      city: null,
+      storeNumber: null,
+    },
+    type: "bill",
+    number: "INV-7",
+    numberLabel: "Invoice #",
+    total: "120.00",
+  }),
+  receipt(2, {
+    status: "waiting",
+    statusText: "Waiting for approval: the total can't be read",
+    vendor: {
+      name: "Fresno Feed",
+      address: null,
+      city: null,
+      storeNumber: null,
+    },
+  }),
+];
+
+/** What each Invoice Processing run reported, in order, by step id. */
+function invoiceSteps(runId: string): Automations["RunStep"][] {
+  const reported: (readonly [string, "ok" | "held" | "failed", string])[] =
+    runId === invoiceV2RunId
+      ? [
+          ["receive", "ok", "PDF, 1 page"],
+          ["read-company", "ok", "QuickBooks: Autom8x Test Co"],
+          ["read-preferences", "ok", "Preferences read"],
+          ["find-accounts", "ok", "34 accounts read"],
+          ["extract", "ok", "Read: receipt from Lowe's"],
+          ["check-document", "failed", "Add one document per file."],
+        ]
+      : runId === invoiceHeldRunId
+        ? [
+            ["receive", "ok", "Photo, 1 page"],
+            ["extract", "ok", "Read: 2 documents"],
+            ["check-documents", "ok", "Totals checked"],
+            ["verify-read", "ok", "Read again"],
+            ["decide", "ok", "1 ready, 1 waiting"],
+            ["save-documents", "ok", "1 saved"],
+            ["ask-approval", "held", "Waiting for approval"],
+          ]
+        : runId === invoiceStartedRunId && state.invoiceRunStage < 2
+          ? state.invoiceRunStage === 1
+            ? [["receive", "ok", "Photo, 1 page"]]
+            : []
+          : [
+              ["receive", "ok", "Photo, 1 page"],
+              ["extract", "ok", "Read: 3 receipts"],
+              ["check-documents", "ok", "Totals checked"],
+              ["decide", "ok", "3 ready"],
+              ["save-documents", "ok", "3 saved"],
+            ];
+  return reported.map(([stepId, outcome, summary], index) => ({
+    id: `${runId}-step-${index + 1}`,
+    runId,
+    workspaceId,
+    stepId,
+    outcome,
+    summary,
+    ...(outcome === "held"
+      ? { heldReason: "Document 2: the total can't be read." }
+      : {}),
+    occurredAt: new Date(Date.parse(now) + index * 60_000).toISOString(),
+  }));
+}
+
+/** The documents an Invoice Processing run wrote, on its one-run read. */
+function invoiceDocuments(runId: string): Automations["RunDocument"][] {
+  if (runId === invoiceRunId) return threeReceipts;
+  if (runId === invoiceHeldRunId) return heldDocuments;
+  if (runId === invoiceStartedRunId && state.invoiceRunStage >= 2)
+    return threeReceipts;
+  return [];
+}
+
+/** Its approval, refused (S21: its waiting document reads Not approved). */
+function invoiceApproval(): Automations["Approval"] {
+  return {
+    id: "a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1",
+    runId: invoiceHeldRunId,
+    workspaceId,
+    subscriptionId: invoiceSubscriptionId,
+    stepId: "ask-approval",
+    status: "rejected",
+    reason: "Document 2: the total can't be read.",
+    eligibleRoles: ["owner", "admin"],
+    createdAt: now,
+    expiresAt: now,
+    decidedAt: now,
+    decidedByUserId: userId,
+  };
+}
 
 // One deterministic run by id: the failed one carries the automation's own
 // reason, the succeeded one its summary. Listed by Activity and read by its
 // page, so both handlers describe the same run.
 function fixtureRun(runId: string): Automations["Run"] {
-  if (runId === invoiceRunId || runId === invoiceStartedRunId) {
+  if (runId === invoiceStartedRunId) {
+    const stage = state.invoiceRunStage;
     return {
       id: runId,
       workspaceId,
       subscriptionId: invoiceSubscriptionId,
       templateId: invoiceAutomation.templateId,
-      templateVersion: 2,
-      status: runId === invoiceRunId ? "succeeded" : "pending",
+      templateVersion: 3,
+      status: stage === 0 ? "pending" : stage === 1 ? "running" : "succeeded",
       origin: "manual",
       rootRunId: runId,
       requestId: "fixture-request",
-      ...(runId === invoiceRunId
-        ? { resultSummary: "Saved: Acme Supplies, $120.00." }
-        : {}),
+      ...(stage >= 2 ? { resultSummary: "3 receipts: 3 saved." } : {}),
       startedAt: now,
-      ...(runId === invoiceRunId ? { endedAt: now } : {}),
+      ...(stage >= 2
+        ? { endedAt: new Date(Date.parse(now) + 19_000).toISOString() }
+        : {}),
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+  if (invoiceRunIds.includes(runId)) {
+    const v2 = runId === invoiceV2RunId;
+    const held = runId === invoiceHeldRunId;
+    return {
+      id: runId,
+      workspaceId,
+      subscriptionId: invoiceSubscriptionId,
+      templateId: invoiceAutomation.templateId,
+      templateVersion: v2 ? 2 : 3,
+      status: v2 ? "failed" : held ? "held" : "succeeded",
+      origin: "manual",
+      rootRunId: runId,
+      // The request id the app once titled run 793eef82 by: never shown.
+      requestId: v2
+        ? "1e3231c6-0000-4000-8000-000000000000"
+        : "fixture-request",
+      ...(v2
+        ? { failureReason: "Add one document per file." }
+        : held
+          ? {}
+          : { resultSummary: "3 receipts: 3 saved." }),
+      startedAt: now,
+      endedAt: new Date(Date.parse(now) + 19_000).toISOString(),
       createdAt: now,
       updatedAt: now,
     };
@@ -1027,24 +1401,43 @@ function waitingApproval(): Automations["Approval"] {
 
 /** The platform's tally of the listed runs, as `readRunStats` answers it. */
 function fixtureRunStats(since: string | null): Automations["RunStats"] {
-  const counts = {
-    total: 0,
-    pending: 0,
-    running: 0,
-    held: 0,
-    succeeded: 0,
-    failed: 0,
-    cancelled: 0,
+  const tally = (runIds: readonly string[]) => {
+    const counts = {
+      total: 0,
+      pending: 0,
+      running: 0,
+      held: 0,
+      succeeded: 0,
+      failed: 0,
+      cancelled: 0,
+    };
+    for (const runId of runIds) {
+      const { status } = fixtureRun(runId);
+      counts.total += 1;
+      if (status in counts) counts[status as keyof typeof counts] += 1;
+    }
+    return counts;
   };
-  for (const runId of listedRunIds) {
-    const { status } = fixtureRun(runId);
-    counts.total += 1;
-    if (status in counts) counts[status as keyof typeof counts] += 1;
-  }
+  const counts = tally(listedRunIds);
   return {
     ...(since ? { since } : {}),
     workspace: counts,
-    subscriptions: [{ subscriptionId: manualSubscriptionId, ...counts }],
+    subscriptions: [
+      { subscriptionId: manualSubscriptionId, ...counts },
+      // Invoice Processing's own (Build 21, spec A6: its flow page's
+      // Dashboard), the run started from Step 1 counted as it goes.
+      ...(state.invoiceAdded
+        ? [
+            {
+              subscriptionId: invoiceSubscriptionId,
+              ...tally([
+                ...(state.invoiceRunStarted ? [invoiceStartedRunId] : []),
+                ...invoiceRunIds,
+              ]),
+            },
+          ]
+        : []),
+    ],
   };
 }
 
@@ -1258,22 +1651,6 @@ const server = createServer(
       "/__fixture/draft-needs-connection": () => {
         state.draftNeedsConnection = true;
       },
-      // Backend ADR-0038: every person never asked, and the next answer's
-      // save failing.
-      "/__fixture/ai-reading-unasked": () => {
-        state.aiReading = new Map([
-          [userId, null],
-          [memberUserId, null],
-          [adminUserId, null],
-          [requesterUserId, null],
-        ]);
-      },
-      "/__fixture/ai-reading-declined": () => {
-        state.aiReading.set(userId, "declined");
-      },
-      "/__fixture/ai-reading-refusing": () => {
-        state.aiReadingRefusing = 1;
-      },
       // Backend ADR-0036: the next Add refused, as the platform refuses one.
       "/__fixture/add-not-found": () => {
         state.addRefusal = 404;
@@ -1291,6 +1668,26 @@ const server = createServer(
       },
       "/__fixture/invoice-v1": () => {
         state.invoiceV1 = true;
+      },
+      // Build 21 (spec A6): Invoice Processing not added yet, so its card
+      // offers Add; and the run started from Step 1 going on a step.
+      "/__fixture/invoice-not-added": () => {
+        state.invoiceAdded = false;
+      },
+      // Build 21 (spec A4): Google not connected — and then connected by
+      // someone else, after a page read it.
+      "/__fixture/google-disconnected": () => {
+        state.googleConnected = false;
+      },
+      "/__fixture/google-connected": () => {
+        state.googleConnected = true;
+      },
+      "/__fixture/invoice-run-started": () => {
+        state.invoiceRunStarted = true;
+        state.invoiceRunStage = 0;
+      },
+      "/__fixture/invoice-run-advance": () => {
+        state.invoiceRunStage = Math.min(2, state.invoiceRunStage + 1);
       },
       // The project automation held twice, as production's one duplicate from
       // before one flow per workspace is (the owner's build 12, #9): in the
@@ -1488,9 +1885,8 @@ const server = createServer(
         domainClaims: state.domainClaims,
         // Every webhook secret asked for, with its key (backend §12.1 #240).
         webhookIssues: state.webhookIssues,
-        // Backend ADR-0036–0038: each person's AI answer, the Invoice
-        // Processing flow's settings as saved, every save, and QuickBooks.
-        aiReading: Object.fromEntries(state.aiReading),
+        // Backend ADR-0036, ADR-0037: the Invoice Processing flow's settings
+        // as saved, every save, and QuickBooks.
         invoiceConfig: state.invoiceConfig,
         invoiceSaves: state.invoiceSaves,
         quickbooksConnected: state.quickbooksConnected,
@@ -1740,7 +2136,7 @@ const server = createServer(
         user: {
           ...session.user,
           activeWorkspaceId: state.activeWorkspaceId,
-          aiDocumentReading: aiReadingOf(userId),
+          aiDocumentReading: null,
         },
         workspaces: [workspace, personalWorkspace],
       } satisfies Platform["SessionResponse"];
@@ -1751,7 +2147,7 @@ const server = createServer(
           email: "member@example.test",
           displayName: "Fixture Member",
           activeWorkspaceId: workspaceId,
-          aiDocumentReading: aiReadingOf(memberUserId),
+          aiDocumentReading: null,
         },
         workspaces: [memberWorkspace],
       } satisfies Platform["SessionResponse"];
@@ -1762,7 +2158,7 @@ const server = createServer(
           email: "admin@example.test",
           displayName: "Fixture Admin",
           activeWorkspaceId: workspaceId,
-          aiDocumentReading: aiReadingOf(adminUserId),
+          aiDocumentReading: null,
         },
         workspaces: [adminWorkspace],
       } satisfies Platform["SessionResponse"];
@@ -1772,7 +2168,7 @@ const server = createServer(
         ...requesterSession,
         user: {
           ...requesterSession.user,
-          aiDocumentReading: aiReadingOf(requesterUserId),
+          aiDocumentReading: null,
           ...(state.requesterActiveWorkspaceId
             ? { activeWorkspaceId: state.requesterActiveWorkspaceId }
             : {}),
@@ -1792,35 +2188,6 @@ const server = createServer(
               ? adminSession
               : requesterNow,
       );
-    }
-    // Backend ADR-0038: the session's own person's answer, idempotent by
-    // value — the same answer again keeps when it was made.
-    if (method === "PUT" && pathname === "/v1/session/ai-document-reading") {
-      const body = (await requestJson(request)) as { choice?: unknown };
-      const keys = body && typeof body === "object" ? Object.keys(body) : [];
-      if (
-        keys.join() !== "choice" ||
-        (body.choice !== "allowed" && body.choice !== "declined")
-      ) {
-        return respond(response, 400, problem(400, "Bad Request"));
-      }
-      if (state.aiReadingRefusing > 0) {
-        state.aiReadingRefusing -= 1;
-        return respond(response, 502, problem(502, "Bad Gateway"));
-      }
-      const person =
-        fixtureSession === "owner"
-          ? userId
-          : fixtureSession === "member"
-            ? memberUserId
-            : fixtureSession === "admin"
-              ? adminUserId
-              : requesterUserId;
-      state.aiReading.set(person, body.choice);
-      return respond(response, 200, {
-        aiDocumentReading: body.choice,
-        decidedAt: now,
-      } satisfies Platform["AiDocumentReadingState"]);
     }
     if (method === "PATCH" && pathname === "/v1/session/active-workspace") {
       const body = (await requestJson(request)) as { workspaceId?: string };
@@ -2483,7 +2850,12 @@ const server = createServer(
     }
     if (method === "GET" && pathname === "/v1/connections/providers") {
       return respond(response, 200, {
-        providers: [keyProvider, oauthProvider, quickbooksProvider],
+        providers: [
+          keyProvider,
+          oauthProvider,
+          quickbooksProvider,
+          googleProvider,
+        ],
       } satisfies ConnectionOperations["listConnectionProviders"]["responses"][200]["content"]["application/json"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/connections")) {
@@ -2495,8 +2867,21 @@ const server = createServer(
             : [{ ...oauthConnectionState(), usedByCount: 1 }]),
           ...(state.fixtureConnectionCreated ? [connection] : []),
           ...(state.quickbooksConnected ? [quickbooksConnection()] : []),
+          ...(state.googleConnected ? [googleConnection()] : []),
         ],
       } satisfies ConnectionOperations["listConnections"]["responses"][200]["content"]["application/json"]);
+    }
+    if (
+      method === "DELETE" &&
+      isWorkspacePath(pathname, `/connections/${googleConnectionId}`)
+    ) {
+      if (!state.googleConnected) {
+        return respond(response, 404, problem(404, "Not Found"));
+      }
+      state.googleConnected = false;
+      return respond(response, 200, {
+        connection: { ...googleConnection(), status: "disconnected" },
+      } satisfies ConnectionOperations["disconnectConnection"]["responses"][200]["content"]["application/json"]);
     }
     if (
       method === "DELETE" &&
@@ -2541,6 +2926,23 @@ const server = createServer(
           } satisfies ConnectionOperations["beginConnectionAuthorization"]["responses"][200]["content"]["application/json"]);
         }
         state.quickbooksConnected = true;
+        return respond(response, 200, {
+          outcome: "authorization-required",
+          authorizationUrl:
+            "http://127.0.0.1:3001/connections?status=connected",
+          expiresAt: hostedExpiry,
+        } satisfies ConnectionOperations["beginConnectionAuthorization"]["responses"][200]["content"]["application/json"]);
+      }
+      // Google: reused while connected; otherwise granted at once, as
+      // QuickBooks is.
+      if (body.providerId === googleProvider.providerId) {
+        if (state.googleConnected) {
+          return respond(response, 200, {
+            outcome: "reused",
+            connection: googleConnection(),
+          } satisfies ConnectionOperations["beginConnectionAuthorization"]["responses"][200]["content"]["application/json"]);
+        }
+        state.googleConnected = true;
         return respond(response, 200, {
           outcome: "authorization-required",
           authorizationUrl:
@@ -2654,7 +3056,7 @@ const server = createServer(
           // The newest first, as the platform lists them.
           ...(state.archivableAgain ? [state.archivableAgain] : []),
           ...state.projectAutomationScopes.map(projectAutomationSubscription),
-          invoiceSubscription(),
+          ...(state.invoiceAdded ? [invoiceSubscription()] : []),
           { ...manualSubscription, status: state.manualStatus },
           webhookSubscription(),
           ...(state.archivableArchived ? [] : [archivableSubscription]),
@@ -2724,10 +3126,12 @@ const server = createServer(
         },
       } satisfies AutomationOperations["updateSubscription"]["responses"][200]["content"]["application/json"]);
     }
-    // Invoice Processing's flow (backend ADR-0037): Pause and Turn on, and
-    // its settings — the vendor it chose among them, `none` or QuickBooks —
-    // replaced whole, as the catalog replaces them. A live flow cannot choose
-    // a vendor that is not connected (422 `unmet_connections`).
+    // Invoice Processing's flow (backend ADR-0037, ADR-0040): Pause and Turn
+    // on, and its settings — the vendor its Done step chose, `none` or
+    // QuickBooks, and its approval limit — replaced whole, as the catalog
+    // replaces them; Set up's Turn on sends both in one change. A flow turned
+    // or kept on cannot choose a vendor that is not connected (422
+    // `unmet_connections`).
     if (
       method === "PATCH" &&
       isWorkspacePath(pathname, `/subscriptions/${invoiceSubscriptionId}`)
@@ -2739,46 +3143,37 @@ const server = createServer(
       if (!request.headers["idempotency-key"]) {
         return respond(response, 422, problem(422, "Unprocessable Entity"));
       }
-      if (body.status !== undefined) {
-        if (body.status !== "live" && body.status !== "paused")
-          return respond(response, 422, problem(422, "Unprocessable Entity"));
+      if (
+        body.status !== undefined &&
+        body.status !== "live" &&
+        body.status !== "paused"
+      )
+        return respond(response, 422, problem(422, "Unprocessable Entity"));
+      const config = body.config;
+      if (config !== undefined) {
+        const declared = new Set(
+          invoiceAutomation.setup.map((field) => field.key),
+        );
         if (
-          body.status === "live" &&
-          invoiceSubscription().unmetConnections.length > 0
-        )
+          !config ||
+          Object.keys(config).some((key) => !declared.has(key)) ||
+          (config.vendor !== undefined &&
+            config.vendor !== "none" &&
+            config.vendor !== quickbooksProvider.providerId) ||
+          (config.holdAboveAmount !== undefined &&
+            typeof config.holdAboveAmount !== "number")
+        ) {
           return respond(response, 422, {
             ...problem(422, "Unprocessable Entity"),
-            details: { reason: "unmet_connections" },
+            details: { reason: "invalid_config" },
           } satisfies Platform["ApiProblem"]);
-        state.invoiceStatus = body.status;
-        return respond(response, 200, {
-          subscription: invoiceSubscription(),
-        } satisfies AutomationOperations["updateSubscription"]["responses"][200]["content"]["application/json"]);
+        }
       }
-      const config = body.config;
-      const declared = new Set(
-        invoiceAutomation.setup.map((field) => field.key),
-      );
+      const vendor = (config ?? state.invoiceConfig).vendor;
+      const status = body.status ?? state.invoiceStatus;
       if (
-        !config ||
-        Object.keys(config).some((key) => !declared.has(key)) ||
-        (config.vendor !== undefined &&
-          config.vendor !== "none" &&
-          config.vendor !== quickbooksProvider.providerId) ||
-        (config.holdAboveAmount !== undefined &&
-          typeof config.holdAboveAmount !== "number") ||
-        (config.notifyEmail !== undefined &&
-          (typeof config.notifyEmail !== "string" ||
-            !/^[^@\s]+@[^@\s]+$/u.test(config.notifyEmail)))
-      ) {
-        return respond(response, 422, {
-          ...problem(422, "Unprocessable Entity"),
-          details: { reason: "invalid_config" },
-        } satisfies Platform["ApiProblem"]);
-      }
-      if (
-        state.invoiceStatus === "live" &&
-        config.vendor === quickbooksProvider.providerId &&
+        status === "live" &&
+        vendor === quickbooksProvider.providerId &&
         !state.quickbooksConnected
       ) {
         return respond(response, 422, {
@@ -2786,8 +3181,11 @@ const server = createServer(
           details: { reason: "unmet_connections" },
         } satisfies Platform["ApiProblem"]);
       }
-      state.invoiceConfig = config;
-      state.invoiceSaves.push(config);
+      if (config !== undefined) {
+        state.invoiceConfig = config;
+        state.invoiceSaves.push(config);
+      }
+      if (body.status !== undefined) state.invoiceStatus = body.status;
       return respond(response, 200, {
         subscription: invoiceSubscription(),
       } satisfies AutomationOperations["updateSubscription"]["responses"][200]["content"]["application/json"]);
@@ -3144,6 +3542,19 @@ const server = createServer(
         state.createdProjects.push(made);
         return made.id;
       };
+      // Invoice Processing, added (Build 21; the owner's AM4): a draft with its
+      // defaults, in the Accounting team, whose Set up turns it on.
+      if (
+        body.templateId === invoiceAutomation.templateId &&
+        !state.invoiceAdded
+      ) {
+        state.invoiceAdded = true;
+        state.invoiceStatus = "draft";
+        state.invoiceConfig = {};
+        return respond(response, 200, {
+          subscription: invoiceSubscription(),
+        } satisfies AutomationOperations["createSubscription"]["responses"][200]["content"]["application/json"]);
+      }
       if (body.templateId === projectAutomation.templateId) {
         const scope = categoryTeam(projectAutomation.category);
         if (state.projectAutomationScopes.includes(scope)) {
@@ -3221,6 +3632,8 @@ const server = createServer(
           );
         }
         if (file) file.runId = invoiceStartedRunId;
+        state.invoiceRunStarted = true;
+        state.invoiceRunStage = 0;
         return respond(response, 201, {
           run: fixtureRun(invoiceStartedRunId),
         } satisfies AutomationOperations["createRun"]["responses"][201]["content"]["application/json"]);
@@ -3286,8 +3699,20 @@ const server = createServer(
       }
       // The deterministic runs, so Activity renders rows and the run pages are
       // reached by a person rather than typed — or none, for a new workspace.
+      // One flow's runs when asked for by its subscription (Build 21, spec A6:
+      // a flow page's Dashboard opens Activity for it).
+      const subscriptionId = url.searchParams.get("subscriptionId");
+      const ids =
+        subscriptionId === invoiceSubscriptionId
+          ? [
+              ...(state.invoiceRunStarted ? [invoiceStartedRunId] : []),
+              ...invoiceRunIds,
+            ]
+          : subscriptionId === null || subscriptionId === manualSubscriptionId
+            ? listedRunIds
+            : [];
       return respond(response, 200, {
-        runs: state.runsRead === "empty" ? [] : listedRunIds.map(fixtureRun),
+        runs: state.runsRead === "empty" ? [] : ids.map(fixtureRun),
       } satisfies AutomationOperations["listRuns"]["responses"][200]["content"]["application/json"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/run-stats")) {
@@ -3321,41 +3746,36 @@ const server = createServer(
       const runId = decodeURIComponent(
         pathname.slice(`/v1/workspaces/${workspaceId}/runs/`.length),
       );
-      const run = fixtureRun(runId);
-      const failed = run.status === "failed";
-      // Invoice Processing's run: its reported steps — no step that did not
-      // run is reported — and the details it saved (backend ADR-0037).
-      if (runId === invoiceRunId) {
-        const reported = (
-          [
-            ["receive", "PDF, 2 pages"],
-            ["extract", "Read: Bill from Acme Supplies, $120.00"],
-            ["check-document", "Totals don't add up"],
-            ["verify-read", "Second read matches"],
-            ["save-details", "Saved: Acme Supplies, $120.00"],
-          ] as const
-        ).map(
-          ([stepId, summary], index) =>
-            ({
-              id: `fixture-invoice-step-${index + 1}`,
-              runId,
-              workspaceId,
-              stepId,
-              outcome: "ok",
-              summary,
-              occurredAt: now,
-            }) satisfies Automations["RunStep"],
+      // Build 21 (spec A7, C2): a run's documents as a JSON file, named by
+      // the run's full id.
+      if (runId.endsWith("/documents")) {
+        const documentsOf = runId.slice(0, -"/documents".length);
+        const run = fixtureRun(documentsOf);
+        response.setHeader(
+          "content-disposition",
+          `attachment; filename="run-${run.id}.json"`,
         );
         return respond(response, 200, {
+          runId: run.id,
+          templateId: run.templateId,
+          templateVersion: run.templateVersion,
+          status: run.status,
+          startedAt: run.startedAt ?? null,
+          endedAt: run.endedAt ?? null,
+          documents: invoiceDocuments(documentsOf),
+        } satisfies Automations["RunDocumentsFile"]);
+      }
+      const run = fixtureRun(runId);
+      const failed = run.status === "failed";
+      // Invoice Processing's runs: what each reported — no step that did not
+      // run is reported — and the documents it read (backend ADR-0039).
+      if (runId === invoiceStartedRunId || invoiceRunIds.includes(runId)) {
+        const documents = invoiceDocuments(runId);
+        return respond(response, 200, {
           run,
-          steps: reported,
+          steps: invoiceSteps(runId),
           events: [],
-          details: [
-            { label: "Type", value: "Bill" },
-            { label: "Seller", value: "Acme Supplies" },
-            { label: "Total", value: "$120.00" },
-            { label: "Category", value: "Office supplies" },
-          ],
+          ...(documents.length > 0 ? { documents } : {}),
         } satisfies AutomationOperations["readRun"]["responses"][200]["content"]["application/json"]);
       }
       const steps = [
@@ -3410,7 +3830,7 @@ const server = createServer(
     if (method === "GET" && isWorkspacePath(pathname, "/approvals")) {
       const status = url.searchParams.get("status");
       return respond(response, 200, {
-        approvals: state.approvals.filter(
+        approvals: [...state.approvals, invoiceApproval()].filter(
           (entry) => !status || entry.status === status,
         ),
       } satisfies AutomationOperations["listApprovals"]["responses"][200]["content"]["application/json"]);

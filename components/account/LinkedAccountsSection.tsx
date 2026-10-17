@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import Modal from "@/components/ui/Modal";
+import { ProviderGlyph, isGlyphProvider } from "@/components/ui/ProviderGlyph";
 import {
   loginHref,
   PlatformApiError,
@@ -204,21 +205,20 @@ export default function LinkedAccountsSection() {
     );
   }
 
-  // The lead says what linking does, in the app's words too (the owner's build
-  // 12, #8; register F86): a linked account signs in to this same account, and
-  // one signed in with before it is linked can start a separate account.
+  // One line (Build 21, spec A5; the owner's build 20 item 9: "Why is there a
+  // paragraph. It should be short not an essay"). ~~What linking does, the
+  // same-email join and the credentials sentence~~ (register F86) — linking
+  // still works as it did; the line no longer explains it.
   return (
     <div className="border-t border-[var(--ring)] pt-5">
       <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
         Linked accounts
       </h2>
-      <p className="mt-2 text-sm text-[var(--muted)]">
-        Any account linked here signs you in to this same account, in the app
-        and on the website. Signing in with Google, Microsoft or Apple at the
-        same email address as this account joins this account too. To use one
-        with a different email address, link it before you first sign in with
-        it. Provider credentials are handled by the Autom8x backend and never
-        exposed to this page.
+      <p
+        data-testid="linked-accounts-lead"
+        className="mt-2 text-sm text-[var(--muted)]"
+      >
+        Sign in with any of these.
       </p>
       <FormError message={linkError} className="mt-2" />
       {state.error ? (
@@ -256,15 +256,30 @@ export default function LinkedAccountsSection() {
                     : "cursor-pointer border-[var(--ring)] bg-[var(--card)] transition focus-within:ring-2 focus-within:ring-[var(--accent-strong)] hover:bg-[var(--surface-hover)]"
                 }`}
               >
-                <span className={isLinked ? "min-w-0 opacity-75" : "min-w-0"}>
-                  <span className="block text-sm font-medium text-[var(--text)]">
-                    {label}
-                  </span>
-                  {email ? (
-                    <span className="block truncate text-xs text-[var(--muted)]">
-                      {email}
-                    </span>
+                <span
+                  className={`flex min-w-0 items-center gap-3 ${isLinked ? "opacity-75" : ""}`.trim()}
+                >
+                  {/* The provider's own mark at 24, from the design's sign-in
+                      glyphs (spec A5; the owner's build 20 item 8: "Rather
+                      than keys ok the left as icons i want the logos of the
+                      company's"). */}
+                  {isGlyphProvider(id) ? (
+                    <ProviderGlyph
+                      provider={id}
+                      size={24}
+                      className="shrink-0 text-[var(--text)]"
+                    />
                   ) : null}
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-[var(--text)]">
+                      {label}
+                    </span>
+                    {email ? (
+                      <span className="block truncate text-xs text-[var(--muted)]">
+                        {email}
+                      </span>
+                    ) : null}
+                  </span>
                 </span>
                 {isLinked && isPrimary ? (
                   <span className="text-xs text-[var(--muted)] opacity-75">

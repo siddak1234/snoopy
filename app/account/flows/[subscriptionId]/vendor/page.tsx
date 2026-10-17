@@ -10,26 +10,37 @@ import {
   listConnectionProviders,
   listConnections,
 } from "@/lib/connections";
+import { connectionFor } from "@/lib/connection-rows";
+import {
+  chosenVendor,
+  connectionFields,
+  fieldProviders,
+  flowPath,
+} from "@/lib/flow-steps";
 import {
   administers,
   resolveActiveWorkspaceId,
   roleInWorkspace,
 } from "@/lib/tenancy";
 import SectionCard from "@/components/dashboard/SectionCard";
-import { VendorChoice, type VendorOption } from "./VendorChoice";
+import { BackLink } from "@/components/dashboard/BackLink";
+import type { VendorOption } from "../../VendorRows";
+import { vendorPath } from "../../vendor-path";
+import { VendorChoice } from "./VendorChoice";
 
 /**
- * A flow's Connect vendor page (spec §3.C; backend ADR-0037; the owner's
- * build-19 feedback #1: "There should be a connect vendor button and takes it
- * to a page specific for this flows vendors. If already connected you can
- * choose which vendor or just a none."). Each vendor the flow may use — its
- * optional connections, in the manifest's order — with its logo, and None last;
- * the choice is the flow's `connection` setting, saved here.
+ * Connect vendor — one step's vendor for one flow (the owner's build 19 item
+ * 1; backend ADR-0037, ADR-0040; Build 21's A2), opened from the flow page's
+ * vendor row with `?field=` (the connection setting's key — a flow may choose
+ * one vendor per step); without it, the flow's only one.
  *
- * Connecting is an owner's or an admin's (it changes the account every flow in
- * the workspace acts through): they see the vendor's own connect button, and a
- * member is told who connects it. A vendor not connected is chosen once its
- * connect returns.
+ * **A tap is the choice, saved, and back to the flow** (the owner's build 20
+ * item 2: "When i click one of the choices like none i shouldnt need to press
+ * done or the back arrow. It should just take me back … and be saved"). Each
+ * vendor is the one connection row (spec A4) with the check (24) on the
+ * chosen one. ~~Save, Intuit's Connect button image and "Disconnect from
+ * QuickBooks"~~ until Build 21 — disconnecting is Connections' (the session's
+ * S13).
  */
 
 export const dynamic = "force-dynamic";
@@ -38,7 +49,7 @@ export default async function VendorPage(
   props: PageProps<"/account/flows/[subscriptionId]/vendor">,
 ) {
   const { subscriptionId } = await props.params;
-  const { status } = await props.searchParams;
+  const { status, field: fieldKey } = await props.searchParams;
   const session = await getAppSession();
   const workspaceId = await resolveActiveWorkspaceId(session);
   if (!workspaceId) notFound();
@@ -61,15 +72,17 @@ export default async function VendorPage(
       roleInWorkspace(workspaceId),
     ]);
 
-  // A flow this person can see, that has a vendor to choose; any other id is
-  // the same "not found" a flow that does not exist is.
+  // A flow this person can see, with the choice the link names — or its only
+  // one; any other id is the same "not found" a flow that does not exist is.
   const subscription = subscriptions.subscriptions.find(
     (candidate) =>
       candidate.id === subscriptionId && candidate.status !== "archived",
   );
-  const field = subscription?.setup?.find(
-    (candidate) => candidate.control === "connection",
-  );
+  const fields = connectionFields(subscription?.setup ?? []);
+  const field =
+    typeof fieldKey === "string"
+      ? fields.find((candidate) => candidate.key === fieldKey)
+      : fields[0];
   const entry = catalog.automations.find(
     (candidate) => candidate.templateId === subscription?.templateId,
   );
@@ -78,37 +91,36 @@ export default async function VendorPage(
   const providerById = new Map(
     providers.providers.map((provider) => [provider.providerId, provider]),
   );
-  const options: VendorOption[] = entry.requiredConnections
-    .filter((connection) => connection.optional)
-    .map((connection) => {
-      const provider = providerById.get(connection.providerId);
-      const live = connections.connections.find(
-        (candidate) =>
-          candidate.providerId === connection.providerId &&
-          candidate.status === "connected",
-      );
-      return {
-        providerId: connection.providerId,
-        displayName: provider?.displayName ?? connection.displayName,
-        icon: provider?.icon ?? null,
-        // OAuth only on this page: a pasted key is connected on Connections.
-        connectable: provider?.authType === "oauth2",
-        connectionId: live?.id ?? null,
-      };
-    });
-  const saved = subscription.config[field.key] ?? field.defaultValue ?? "none";
+  const options: VendorOption[] = fieldProviders(
+    field,
+    entry.requiredConnections,
+  ).map((connection) => {
+    const provider = providerById.get(connection.providerId);
+    return {
+      providerId: connection.providerId,
+      displayName: provider?.displayName ?? connection.displayName,
+      icon: provider?.icon ?? null,
+      // OAuth only on this page: a pasted key is connected on Connections.
+      connectable: provider?.authType === "oauth2",
+      connection:
+        connectionFor(connections.connections, connection.providerId) ?? null,
+    };
+  });
 
   return (
     <SectionCard
       title="Connect vendor"
       subheader={`For ${subscription.name ?? entry.name}`}
+      back={<BackLink href={flowPath(subscription.id)} />}
     >
       <VendorChoice
         workspaceId={workspaceId}
         subscriptionId={subscription.id}
-        saved={typeof saved === "string" ? saved : "none"}
+        field={field.key}
+        saved={chosenVendor(field, subscription.config)}
         options={options}
         canManage={administers(role)}
+        returnTo={vendorPath(subscription.id, field.key)}
         callbackStatus={
           status === "connected" || status === "error" ? status : null
         }

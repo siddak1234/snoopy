@@ -105,6 +105,24 @@ export async function platformApiJson<T>(
   return body as T;
 }
 
+/**
+ * A file the platform serves for keeping — a run's documents as JSON (Build
+ * 21, spec A7; backend C2's `readRunDocuments`) — as its own bytes, for the
+ * browser to save. Refused, it throws as `platformApiJson` does.
+ */
+export async function platformApiFile(path: string): Promise<Blob> {
+  const response = await fetch(platformApiPath(path), {
+    credentials: "same-origin",
+  });
+  if (!response.ok) {
+    throw new PlatformApiError(
+      `Platform request failed with status ${response.status}`,
+      response.status,
+    );
+  }
+  return response.blob();
+}
+
 export async function signOutFromPlatform(): Promise<void> {
   const response = await fetch(platformApiPath("/v1/auth/logout"), {
     method: "POST",

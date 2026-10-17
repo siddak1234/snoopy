@@ -5,6 +5,7 @@ import {
   PlatformServerError,
   workspacePath as scope,
 } from "@/lib/platform-server";
+import { formatDateTimeMediumUTC } from "@/lib/date";
 import type {
   components,
   operations,
@@ -324,17 +325,5 @@ export function formatDay(iso: string): string {
   });
 }
 
-/**
- * A timestamp as a person reads it.
- *
- * Fixed locale and UTC on purpose: these screens are server-rendered, and a
- * locale-dependent string differs between the server and the browser, which
- * React reports as a hydration mismatch.
- */
-export function formatWhen(iso: string): string {
-  return new Date(iso).toLocaleString("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "UTC",
-  });
-}
+/** A timestamp as a person reads it (`lib/date.ts`: fixed locale, UTC). */
+export const formatWhen = formatDateTimeMediumUTC;

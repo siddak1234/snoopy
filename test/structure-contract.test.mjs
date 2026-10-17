@@ -340,33 +340,31 @@ test("no dead focus utility — the global :focus-visible rule decides (register
 
 test("one refusal, one alert, in the connections dialogs (register F52)", () => {
   const panel = read("app/account/connections/ConnectionsPanel.tsx");
-  // The panel's alert stands down while any of its dialogs is open …
+  // A connect's answer is said under its own row; each dialog carries its own
+  // alert, and nothing repeats it outside (Build 21: the one connection row).
   assert.match(
     panel,
-    /\{selectedProvider \|\| replacing \|\| disconnecting \? null : \(\s*<FormError message=\{error\} className="mt-4" \/>\s*\)\}/u,
+    /\{failed \? \(\s*<p\s+role="alert"[^>]*>\s*\{rowError\.message\}/u,
   );
-  // … because each dialog carries its own.
-  assert.match(panel, /<FormError message=\{error\} \/>/u);
-  assert.match(
-    panel,
-    /<FormError message=\{replaceError\} className="mt-3" \/>/u,
+  assert.equal(
+    (panel.match(/<FormError message=\{error\} \/>/gu) ?? []).length,
+    1,
   );
   assert.match(
     panel,
     /<FormError message=\{disconnectError\} className="mt-3" \/>/u,
   );
-  // The vendor page's disconnect confirm too.
+  assert.doesNotMatch(panel, /<FormError message=\{error\} className=/u);
+  // The vendor page has one refusal line under its rows, and no dialog.
   const vendor = read(
     "app/account/flows/[subscriptionId]/vendor/VendorChoice.tsx",
   );
-  assert.match(
-    vendor,
-    /\{disconnecting \? null : <FormError message=\{error\} className="mt-4" \/>\}/u,
+  assert.equal(
+    (vendor.match(/<FormError /gu) ?? []).length,
+    1,
+    "the vendor page says a refused save once",
   );
-  assert.match(
-    vendor,
-    /<FormError message=\{disconnectError\} className="mt-3" \/>/u,
-  );
+  assert.doesNotMatch(vendor, /<Modal\b/u);
 });
 
 test("a problem's title is rendered only when it is a non-empty string (register F41)", () => {
@@ -852,21 +850,20 @@ test("signing in from a join link returns to the organization it named", () => {
   );
 });
 
-test("a replace answered as reused says so, rather than failing", () => {
-  const panel = read("app/account/connections/ConnectionsPanel.tsx");
-  const replace = panel.slice(panel.indexOf("const confirmReplace"));
-  assert.match(
-    replace,
-    /if \(result\.ok && result\.alreadyConnectedAs\) \{\s*setReplacing\(null\);/u,
-  );
-  // The account the platform says is connected, not the row's: the platform
-  // never reuses a grant it was asked to replace (backend
-  // apps/connections/src/postgres-attempts.ts), so no fixture gives this answer
-  // and the page's own name for the row could be stale.
-  assert.match(
-    replace,
-    /setNotice\(\s*`\$\{result\.alreadyConnectedAs\} is still connected/u,
-  );
+test("Replace account is off the connection row, and nothing names a connection to replace (Build 21, spec A4)", () => {
+  // The owner's build 20 items 6 and 7: one standard row — mark, name, the
+  // account's email, one button. The platform's replace route stays, unused.
+  for (const path of [
+    "app/account/connections/ConnectionsPanel.tsx",
+    "app/account/connections/actions.ts",
+    "app/account/flows/VendorRows.tsx",
+  ]) {
+    // Code only: the comments may say what was removed.
+    const code = read(path)
+      .replace(/\/\*[\s\S]*?\*\//gu, "")
+      .replace(/^\s*\/\/.*$/gmu, "");
+    assert.doesNotMatch(code, /Replace account|replaceConnectionId/u, path);
+  }
 });
 
 test("the signed-in pages say team and flow, never project or automation (BUILD-PLAN 24.11.11)", () => {

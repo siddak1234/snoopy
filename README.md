@@ -64,14 +64,19 @@ a temporary certificate and scans every authenticated page with axe. Here it
 runs in Chromium and Firefox; CI runs it once per engine, WebKit's leg
 included (register F104). Its tests drive the published operations the website calls — flows and runs, archiving
 a flow and the archived ones, adding a flow (it goes to the team of its
-category, which the platform makes when there is none; a catalog with nothing
-to add), a flow's Connect vendor page and its vendor choice (a flow still on
-an older version with no vendor to choose is sent to Connections instead), the
-vendor's logo in its own clear space, a run's progress by group and its saved
-details, the account's AI consent (the card once, the Settings switch, and
-Start run's gate), a run's file (PUT straight to the fixture's object store,
-across origins), moving a subscription to a newer version, a webhook flow's
-address, connections (each disconnect confirmed first), teams (a team is a
+category, which the platform makes when there is none, and its Set up opens;
+a catalog with nothing to add), a flow's page (its live Dashboard, its Steps
+with the run's fields and Start run in Step 1 and the vendor in its step, its
+Connections, and Edit setup), its Set up (Turn on, or Save), its Connect
+vendor page (a tap saves and goes back; a vendor connected from it comes back
+chosen; a flow still on an older version with no vendor to choose is sent to
+Connections instead), the dashboard's Run a flow (three presses to a started
+run), a run's page (every step from the start, read again while it goes on,
+each document it read on a card of its own, and Download JSON), every run by
+its full id, a run's file (PUT straight to the fixture's object store, across
+origins), moving a subscription to a newer version, a webhook flow's
+address, connections (one row each — mark, name, the account's email or its
+state, one button — each disconnect confirmed first), teams (a team is a
 project in the platform's contract: its members, asking to join and the
 answers), setting up an organization
 (a refused domain claim retried on the organization made), the organization's

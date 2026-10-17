@@ -1,10 +1,6 @@
-import { ProhibitIcon } from "@phosphor-icons/react/dist/ssr/Prohibit";
-import { Button } from "@/components/ui/Button";
 import { FormInput } from "@/components/ui/FormInput";
 import { NumberedStep } from "@/components/ui/NumberedStep";
-import { VendorMark } from "@/components/dashboard/VendorLogo";
 import { RunFileField } from "./RunFileField";
-import type { VendorChoiceRow } from "./vendor-path";
 import type {
   AutomationRunInputField,
   AutomationSetupField,
@@ -20,8 +16,11 @@ import type {
  * `<prefix>:<key>` with its control under `<prefix>-control:<key>`, which is how
  * the server action converts it back to the type the platform checks.
  *
- * A field's title and help line are the manifest's own; nothing here adds one
- * (spec §3.0 rule 5).
+ * A field shows its title and its input — **no help line under it** (Build
+ * 21, spec A6 and B5; the session's S11; the owner's build 20 items 3 and 9:
+ * "What is the gets a short summary even mean", "Why is there a paragraph").
+ * The manifest's `description` stays the manifest's record and is not drawn.
+ * A notification switch's line stays: it says what the switch does.
  */
 
 type ManifestField = AutomationSetupField | AutomationRunInputField;
@@ -38,16 +37,24 @@ export const SECTION_NAME: Record<AutomationSetupField["section"], string> = {
   notifications: "Email",
 };
 
-/** Setup fields, grouped under their manifest section without reordering. */
+/**
+ * Setup fields, grouped under their manifest section without reordering, and
+ * numbered from `firstSection` — Set up's Connect is 1 when it draws one. A
+ * vendor choice (`connection`) is not drawn here: Set up draws its vendors
+ * (`VendorRows`); its value is carried as it is, since a save replaces every
+ * setting — a move keeps the vendor a flow chose.
+ */
 export function SetupFields({
   setup,
   config,
-  vendor = null,
+  firstSection = 1,
+  hideConnections = false,
 }: {
   setup: AutomationSetupField[];
   config: Record<string, unknown>;
-  /** The vendor row; absent where the vendor is not chosen (a move). */
-  vendor?: VendorChoiceRow | null;
+  firstSection?: number;
+  /** Set up carries each vendor choice itself, as the page's choice. */
+  hideConnections?: boolean;
 }) {
   const groups: Array<{
     section: AutomationSetupField["section"];
@@ -58,6 +65,7 @@ export function SetupFields({
   // section, but it does not declare an independent section order, so grouping
   // may never move a field ahead of an earlier one.
   for (const field of setup) {
+    if (field.control === "connection") continue;
     const currentGroup = groups.at(-1);
     if (currentGroup?.section === field.section) {
       currentGroup.fields.push(field);
@@ -66,109 +74,51 @@ export function SetupFields({
     groups.push({ section: field.section, fields: [field] });
   }
 
-  return groups.map(({ section, fields }, groupIndex) => {
-    const name = SECTION_NAME[section];
-    return (
-      <div
-        key={`${section}-${groupIndex}`}
-        role="group"
-        aria-label={name}
-        className="space-y-4"
-      >
-        <NumberedStep index={groupIndex + 1} title={name} />
-        {fields.map((field) =>
-          field.control === "connection" ? (
-            <VendorField
-              key={field.key}
-              field={field}
-              value={config[field.key]}
-              vendor={vendor?.key === field.key ? vendor : null}
-            />
-          ) : (
-            <ManifestFieldInput
-              key={field.key}
-              field={field}
-              value={config[field.key]}
-              prefix="config"
-            />
-          ),
-        )}
-      </div>
-    );
-  });
-}
-
-/**
- * The vendor choice (spec §3.B): the chosen vendor's logo — or its icon and
- * name — or None, with "Not connected" while the chosen vendor still needs
- * connecting, and Connect vendor, which goes to the flow's vendor page, where
- * it is chosen. The value is carried as it is, since a save replaces every
- * setting.
- */
-function VendorField({
-  field,
-  value,
-  vendor,
-}: {
-  field: AutomationSetupField;
-  value: unknown;
-  vendor: VendorChoiceRow | null;
-}) {
-  const chosen =
-    vendor?.providerId ??
-    (typeof value === "string"
-      ? value
-      : typeof field.defaultValue === "string"
-        ? field.defaultValue
-        : "none");
   return (
-    <div>
-      <input
-        type="hidden"
-        name={`config-control:${field.key}`}
-        value="connection"
-      />
-      <input type="hidden" name={`config:${field.key}`} value={chosen} />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          {chosen === "none" ? (
-            <span className="inline-flex items-center gap-3">
-              <ProhibitIcon
-                size={24}
-                aria-hidden
-                className="shrink-0 text-[var(--muted)]"
-              />
-              <span className="text-sm font-medium text-[var(--text)]">
-                None
-              </span>
-            </span>
-          ) : (
-            <VendorMark
-              icon={vendor?.icon}
-              displayName={vendor?.displayName ?? field.title}
-              // Its clear space reaches into the dialog's padding, so the logo
-              // lines up with the section's other fields.
-              logoClassName="-ml-3"
-            />
-          )}
-          {vendor && chosen !== "none" && vendor.connected === false ? (
-            <p className="mt-1 text-xs text-[var(--warning-text)]">
-              Not connected
-            </p>
-          ) : null}
-        </div>
-        {vendor ? (
-          <Button
-            href={vendor.href}
-            variant="secondary"
-            size="sm"
-            prefetch={false}
+    <>
+      {hideConnections
+        ? null
+        : setup
+            .filter((field) => field.control === "connection")
+            .map((field) => {
+              const value = config[field.key] ?? field.defaultValue;
+              return (
+                <span key={field.key} hidden>
+                  <input
+                    type="hidden"
+                    name={`config-control:${field.key}`}
+                    value="connection"
+                  />
+                  <input
+                    type="hidden"
+                    name={`config:${field.key}`}
+                    value={typeof value === "string" && value ? value : "none"}
+                  />
+                </span>
+              );
+            })}
+      {groups.map(({ section, fields }, groupIndex) => {
+        const name = SECTION_NAME[section];
+        return (
+          <div
+            key={`${section}-${groupIndex}`}
+            role="group"
+            aria-label={name}
+            className="space-y-4"
           >
-            Connect vendor
-          </Button>
-        ) : null}
-      </div>
-    </div>
+            <NumberedStep index={groupIndex + firstSection} title={name} />
+            {fields.map((field) => (
+              <ManifestFieldInput
+                key={field.key}
+                field={field}
+                value={config[field.key]}
+                prefix="config"
+              />
+            ))}
+          </div>
+        );
+      })}
+    </>
   );
 }
 
@@ -259,12 +209,7 @@ function ManifestFieldInput({
             defaultChecked={initialValue === true}
             className="mt-1 size-4 rounded border-[var(--color-divider)] accent-[var(--color-accent)]"
           />
-          <span>
-            <span className="font-medium">{field.title}</span>
-            <span className="mt-1 block text-xs text-[var(--muted)]">
-              {field.description}
-            </span>
-          </span>
+          <span className="font-medium">{field.title}</span>
         </label>
         <FieldMetadata field={field} />
       </div>
@@ -297,7 +242,6 @@ function ManifestFieldInput({
             <OptionalMark field={field} />
           </>
         }
-        hint={field.description}
         required={required}
         defaultValue={
           initialValue === undefined || initialValue === null
