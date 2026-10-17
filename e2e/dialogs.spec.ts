@@ -6,16 +6,16 @@ import {
   type Request,
 } from "@playwright/test";
 import {
-  automationCard,
+  FLOWS,
+  connectionRow,
   fixtureControl,
   holdRequest,
   isServerAction,
   presentSession,
-  providerCard,
 } from "./helpers";
 
 /**
- * Every dialog `components/ui/Modal.tsx` serves — seventeen, one row each — held
+ * Every dialog `components/ui/Modal.tsx` serves — thirteen, one row each — held
  * to the same behaviours (filed at Round 15's close; the register's § "The
  * backlog before Round 17"):
  *
@@ -45,7 +45,6 @@ test.beforeEach(async () => {
 
 const busy = "The platform is busy right now. Try again in 30 seconds.";
 const team = "/account/teams/33333333-3333-4333-8333-333333333333";
-const vendorPage = "/account/flows/f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1/vendor";
 
 /** A server action, as its page sends it: a POST to the page's own URL. */
 const actionOn = (path: string) => ({
@@ -104,37 +103,18 @@ const dialogs: Dialog[] = [
     name: "Connect Fixture key provider",
     path: "/account/connections",
     opener: (page) =>
-      providerCard(page, "Fixture key provider").getByRole("button", {
-        name: "Connect",
+      connectionRow(page, "fixture-key").getByRole("button", {
+        name: "Connect Fixture key provider",
       }),
   },
   {
-    name: "Replace Fixture OAuth account?",
-    path: "/account/connections",
-    opener: (page) =>
-      page.locator("main").getByRole("button", { name: "Replace account" }),
-    holds: {
-      ...actionOn("/account/connections"),
-      // Another admin replaced it after the page read it: refused as stale.
-      prepare: () => fixtureControl("oauth-connection-replaced"),
-      send: "Replace account",
-      busy: "Starting…",
-      cancel: "Keep this account",
-      answered: (_, dialog) =>
-        expect(dialog.getByRole("alert")).toHaveText(
-          "This connection changed since the page loaded, so nothing was replaced. Reload the page to see it, then choose again.",
-        ),
-      staysOpen: true,
-    },
-  },
-  {
-    // Disconnect is confirmed first, as in the app (spec §3.I).
+    // Disconnect is confirmed first, as in the app (spec A4).
     name: "Disconnect Fixture OAuth provider?",
     path: "/account/connections",
     opener: (page) =>
       page
         .locator("main")
-        .getByRole("button", { name: "Disconnect", exact: true }),
+        .getByRole("button", { name: "Disconnect Fixture OAuth provider" }),
     holds: {
       ...actionOn("/account/connections"),
       prepare: refusedAsBusy,
@@ -147,17 +127,17 @@ const dialogs: Dialog[] = [
     },
   },
   {
-    // A flow's Connect vendor page: QuickBooks's disconnect, in Intuit's words
-    // (spec §3.C).
-    name: "Disconnect from QuickBooks?",
-    path: vendorPage,
+    // A flow's page: its Connections, the same one row and its Disconnect,
+    // asked first (Build 21, spec A4, A6).
+    name: "Disconnect QuickBooks Online?",
+    path: FLOWS.invoice,
     state: "quickbooks-connected",
     opener: (page) =>
       page
         .locator("main")
-        .getByRole("button", { name: "Disconnect from QuickBooks" }),
+        .getByRole("button", { name: "Disconnect QuickBooks Online" }),
     holds: {
-      ...actionOn(vendorPage),
+      ...actionOn(FLOWS.invoice),
       prepare: refusedAsBusy,
       send: "Disconnect",
       busy: "Disconnecting…",
@@ -168,80 +148,18 @@ const dialogs: Dialog[] = [
     },
   },
   {
-    name: "Set up Manual input automation",
-    path: "/account/flows",
-    opener: (page) =>
-      automationCard(page, "Manual input automation").getByRole("button", {
-        name: "Set up",
-      }),
-  },
-  {
-    name: "Run Manual input automation",
-    path: "/account/flows",
-    opener: (page) =>
-      automationCard(page, "Manual input automation").getByRole("button", {
-        name: "Run",
-        exact: true,
-      }),
-  },
-  {
-    // "AI reads your documents" (backend ADR-0038), asked over the Run window
-    // by its Start run, once a file is chosen, while the account has never
-    // answered — the account area's own card, shown first on the page,
-    // closed (components/account/AiConsentCard.tsx). It closes alone, and
-    // focus goes back to Start run.
-    name: "AI reads your documents",
-    path: "/account/flows",
-    state: "ai-reading-unasked",
-    files: true,
-    before: async (page) => {
-      const card = page.getByRole("dialog", {
-        name: "AI reads your documents",
-      });
-      await expect(card).toBeVisible();
-      await page.keyboard.press("Escape");
-      await expect(card).toHaveCount(0);
-      await automationCard(page, "Manual input automation")
-        .getByRole("button", { name: "Run", exact: true })
-        .click();
-      const run = page.getByRole("dialog", {
-        name: "Run Manual input automation",
-      });
-      await expect(run.getByLabel("Vendor")).toBeFocused();
-      await run.getByLabel("Vendor").fill("Acme Supplies");
-      await run.getByLabel("Amount").fill("120.50");
-      await run.getByLabel("Invoice reference").fill("INV-1001");
-      await run.getByLabel("Invoice file").setInputFiles({
-        name: "invoice.pdf",
-        mimeType: "application/pdf",
-        buffer: Buffer.from("%PDF-1.4 fixture invoice"),
-      });
-      await expect(
-        run.getByText("Ready: invoice.pdf (24 bytes)"),
-      ).toBeVisible();
-    },
-    opener: (page) =>
-      page
-        .getByRole("dialog", { name: "Run Manual input automation" })
-        .getByRole("button", { name: "Start run" }),
-  },
-  {
     name: "Archive Archivable automation?",
-    path: "/account/flows",
+    path: FLOWS.archivable,
     opener: (page) =>
-      automationCard(page, "Archivable automation").getByRole("button", {
-        name: "Archive flow",
-      }),
+      page.locator("main").getByRole("button", { name: "Archive flow" }),
   },
   {
     name: "Move Webhook automation to v2?",
-    path: "/account/flows",
+    path: FLOWS.webhook,
     opener: (page) =>
-      automationCard(page, "Webhook automation").getByRole("button", {
-        name: "Move to v2",
-      }),
+      page.locator("main").getByRole("button", { name: "Move to v2" }),
     holds: {
-      ...actionOn("/account/flows"),
+      ...actionOn(FLOWS.webhook),
       prepare: () => fixtureControl("approval-pending-on-move"),
       send: "Move to v2",
       busy: "Moving…",
@@ -255,17 +173,15 @@ const dialogs: Dialog[] = [
   },
   {
     name: "Webhook address",
-    path: "/account/flows",
+    path: FLOWS.webhook,
     opener: (page) =>
-      automationCard(page, "Webhook automation").getByRole("button", {
-        name: "Webhook address",
-      }),
+      page.locator("main").getByRole("button", { name: "Webhook address" }),
     settled: (dialog) =>
       expect(
         dialog.getByRole("button", { name: "Create address" }),
       ).toBeEnabled(),
     holds: {
-      ...actionOn("/account/flows"),
+      ...actionOn(FLOWS.webhook),
       send: "Create address",
       busy: "Working…",
       cancel: "Close",

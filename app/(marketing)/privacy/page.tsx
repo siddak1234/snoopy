@@ -20,7 +20,7 @@ export default function PrivacyPage() {
           Privacy Policy
         </h1>
         <p className="mt-6 max-w-[56ch] text-base leading-7 text-[color-mix(in_srgb,var(--color-text)_78%,transparent)]">
-          Effective and last updated: October 14, 2026. This policy explains
+          Effective and last updated: October 17, 2026. This policy explains
           what information Autom8x collects, why, and what we do with it. It is
           written to be read; if anything is unclear, contact us at{" "}
           <LegalLink href={`mailto:${LEGAL_EMAIL}`}>{LEGAL_EMAIL}</LegalLink>.
@@ -129,9 +129,10 @@ export default function PrivacyPage() {
         <LegalSection heading="Documents read by AI">
           <p>
             An automation can have an AI model read the file given to its run,
-            and no other file. Invoice Processing does, to read a bill, receipt,
-            credit note or statement before saving its details, recording it in
-            QuickBooks Online, or comparing it with what QuickBooks holds. The
+            and no other file. Invoice Processing does, to read the bills,
+            invoices, receipts, credit notes, statements and other financial
+            documents in it before saving their details, recording them in
+            QuickBooks Online, or comparing them with what QuickBooks holds. The
             platform sends the document, with Autom8x&apos;s fixed instructions
             for reading it, to OpenRouter, which passes the request to the
             provider of an AI model. For Invoice Processing, nothing else from
@@ -144,9 +145,10 @@ export default function PrivacyPage() {
             amount over the flow&apos;s approval limit) does a second model,
             from a different maker, read it again. A model that gives no usable
             answer is replaced by the next one on its list, each request under
-            the rules below. What the run makes of the document is kept with the
-            run&apos;s results, and the details it saved are shown to the
-            members of your workspace.
+            the rules below. What the run makes of each document, including its
+            line items and the store&apos;s location when printed, is kept with
+            the run&apos;s results, shown to the members of your workspace, and
+            can be downloaded as a file.
           </p>
           <p>
             Every request tells OpenRouter to use only endpoints in the United
@@ -246,13 +248,13 @@ export default function PrivacyPage() {
             data is used only to run your workspace&apos;s own automations and
             show you what they did; none of it is sent to an AI model, and it is
             never sold or used for advertising. Autom8x does not process
-            QuickBooks data on Intuit&apos;s behalf. If you give Invoice
-            Processing an address in its &quot;Also email&quot; setting, such as
-            your bookkeeper&apos;s, a short summary of each document it saves,
-            records or compares is emailed there, built from the details read
-            from the document and, when it records the document in QuickBooks or
-            compares it with what QuickBooks holds, from QuickBooks&apos;
-            answer.
+            QuickBooks data on Intuit&apos;s behalf. The results of each Invoice
+            Processing run are emailed to the person who started it or, for a
+            run nobody started, to the workspace&apos;s owners and admins: each
+            document&apos;s type, seller and total and what happened to it,
+            built from the details read from the document and, when it records
+            the document in QuickBooks or compares it with what QuickBooks
+            holds, from QuickBooks&apos; answer.
           </p>
           <p>
             An owner or admin can disconnect QuickBooks at any time on the

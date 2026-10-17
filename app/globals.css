@@ -363,38 +363,6 @@ html[data-theme="light"] .brand-mark {
   filter: invert(1);
 }
 
-/* A vendor's logo (components/dashboard/VendorLogo.tsx) is two of the vendor's
-   own files, never one recoloured: the reversed (white wordmark) one on the
-   dark ground, the preferred (dark wordmark) one on the light ground. Only
-   which one shows changes — never the artwork (Intuit's logo rules). */
-.vendor-logo-light {
-  display: none;
-}
-
-html[data-theme="light"] .vendor-logo-light {
-  display: inline-block;
-}
-
-html[data-theme="light"] .vendor-logo-dark {
-  display: none;
-}
-
-/* The vendor's own connect button: its hover state is the vendor's second
-   file, swapped in on hover and keyboard focus. */
-.vendor-connect .vendor-connect-hover {
-  display: none;
-}
-
-.vendor-connect:hover .vendor-connect-hover,
-.vendor-connect:focus-visible .vendor-connect-hover {
-  display: inline-block;
-}
-
-.vendor-connect:hover .vendor-connect-default,
-.vendor-connect:focus-visible .vendor-connect-default {
-  display: none;
-}
-
 /* ═══════════════════════════════════════════════════════════════════════════
    Components — Nocturne voice on the pre-revamp class names, so the whole
    app (marketing + dashboard) restyles from this one file.

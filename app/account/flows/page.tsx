@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { FlowArrowIcon } from "@phosphor-icons/react/dist/ssr/FlowArrow";
 import { getAppSession } from "@/lib/app-session";
 import {
@@ -10,28 +9,16 @@ import {
   type AutomationCatalogEntry,
   type Subscription,
 } from "@/lib/automations";
-import {
-  emptyConnectionsWhenUnavailable,
-  listConnectionProviders,
-  type ConnectionProvider,
-} from "@/lib/connections";
 import { heldCopy } from "@/lib/held-flow";
 import { flowsOverPlan, overPlanSentence } from "@/lib/plan-limit";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { StatusPill } from "@/components/dashboard/StatusPill";
-import { AutomationActions } from "./AutomationActions";
+import { Button } from "@/components/ui/Button";
+import { flowPath } from "@/lib/flow-steps";
 import { AddAutomation } from "./AddAutomation";
-import { MoveVersionButton } from "./MoveVersionButton";
-import { WebhookAddressButton } from "./WebhookAddressButton";
-import { unmetLines, vendorChoice } from "./vendor-path";
-import {
-  administers,
-  listWorkspaceProjects,
-  resolveActiveWorkspaceId,
-  roleInWorkspace,
-  type Project,
-} from "@/lib/tenancy";
+import { placeOf } from "./place";
+import { listWorkspaceProjects, resolveActiveWorkspaceId } from "@/lib/tenancy";
 
 /**
  * The catalog, and what this workspace has done with it.
@@ -55,6 +42,13 @@ import {
  * it has (register F21), so a duplicate from before is listed, never hidden.
  * Each is visible only to the people who can see its team — the platform
  * filters the list (a team is a project in its contract).
+ *
+ * **A flow is opened, not worked on its card** (Build 21, spec A6; the
+ * owner's AM4: "after that flow page is the run page"): each flow the
+ * workspace holds shows its team, its status and Open — its page, where it is
+ * run, set up again, paused, moved and archived. Add adds the flow and opens
+ * its Set up, once. ~~Run, Set up, Turn on / Pause, Archive flow, the move and
+ * the webhook address on the card~~ until Build 21.
  *
  * Archived flows are read by name (`status=archived`, backend §12.1 #203) and
  * listed last, each with the day it was archived (BUILD-PLAN 24.11.11) and
@@ -80,23 +74,17 @@ export default async function FlowsPage() {
     );
   }
 
-  const [catalog, subscriptions, archived, projects, providers, role] =
-    await Promise.all([
-      emptyWhenUnavailable(() => listAutomations(workspaceId), {
-        automations: [],
-        categories: [],
-      }),
-      emptyWhenUnavailable(() => listSubscriptions(workspaceId), {
-        subscriptions: [],
-      }),
-      emptyWhenUnavailable(() => listArchivedSubscriptions(workspaceId), []),
-      emptyWhenUnavailable(() => listWorkspaceProjects(workspaceId), []),
-      emptyConnectionsWhenUnavailable(listConnectionProviders, {
-        providers: [],
-      }),
-      roleInWorkspace(workspaceId),
-    ]);
-  const canAdminister = administers(role);
+  const [catalog, subscriptions, archived, projects] = await Promise.all([
+    emptyWhenUnavailable(() => listAutomations(workspaceId), {
+      automations: [],
+      categories: [],
+    }),
+    emptyWhenUnavailable(() => listSubscriptions(workspaceId), {
+      subscriptions: [],
+    }),
+    emptyWhenUnavailable(() => listArchivedSubscriptions(workspaceId), []),
+    emptyWhenUnavailable(() => listWorkspaceProjects(workspaceId), []),
+  ]);
   // Over the plan's flow allowance, the whole workspace's (decision 7a3).
   const overPlan = flowsOverPlan(subscriptions.flowAllowance);
 
@@ -149,10 +137,7 @@ export default async function FlowsPage() {
               automation={automation}
               subscriptions={byTemplate.get(automation.templateId) ?? []}
               place={place}
-              providers={providers.providers}
-              canAdminister={canAdminister}
               workspaceId={workspaceId}
-              aiDocumentReading={session?.user.aiDocumentReading}
             />
           ))}
         </div>
@@ -224,46 +209,17 @@ export default async function FlowsPage() {
   );
 }
 
-/**
- * Where a flow is, in words (spec §3.A, §3.D): "Team: {kind}" — a team is its
- * kind (the owner, build 9), and a flow's team is the one of its category
- * (backend ADR-0036), so a team this person cannot list is still named by the
- * category. A flow added to the whole workspace before teams says so.
- */
-function placeOf(
-  projects: Project[],
-  catalog: Map<string, AutomationCatalogEntry>,
-) {
-  const teamKind = new Map(
-    projects.map((project) => [project.id, project.type]),
-  );
-  return (subscription: Subscription) => {
-    if (!subscription.projectId) return "Whole workspace";
-    const kind =
-      teamKind.get(subscription.projectId) ??
-      catalog.get(subscription.templateId)?.category;
-    return kind ? `Team: ${kind}` : "Team";
-  };
-}
-
 function AutomationCard({
   automation,
   subscriptions,
   place,
-  providers,
-  canAdminister,
   workspaceId,
-  aiDocumentReading,
 }: {
   automation: AutomationCatalogEntry;
   subscriptions: Subscription[];
   place: (subscription: Subscription) => string;
-  providers: ConnectionProvider[];
-  canAdminister: boolean;
-  /** The workspace this page shows; every action on the card is refused once it is not active. */
+  /** The workspace this page shows; Add is refused once it is not active. */
   workspaceId: string;
-  /** The account's AI consent, which a run with a file waits for (backend ADR-0038). */
-  aiDocumentReading: "allowed" | "declined" | null | undefined;
 }) {
   // Held anywhere in the workspace, the flow is added once (the owner, build
   // 12's #9): "Added ✓" goes to it, and Add is not drawn.
@@ -276,11 +232,8 @@ function AutomationCard({
           <p className="text-xs tracking-[0.06em] text-[var(--muted)] uppercase">
             {automation.category}
           </p>
-          {/* Where focus goes once a control that leaves the card is done —
-              a move to the newest version takes its own button away. */}
           <h2
             id={`automation-${automation.templateId}-name`}
-            tabIndex={-1}
             className="mt-1 truncate text-base font-medium text-[var(--text)]"
           >
             {automation.name}
@@ -306,7 +259,7 @@ function AutomationCard({
       ) : null}
 
       {subscriptions.map((subscription) => (
-        // Where "Added ✓" below goes: the flow, its controls first after it.
+        // Where "Added ✓" below goes: the flow, its team, status and Open.
         <div
           key={subscription.id}
           id={`flow-${subscription.id}`}
@@ -318,89 +271,17 @@ function AutomationCard({
             <StatusPill status={subscription.status} />
           </div>
 
-          {unmetLines(
-            subscription,
-            automation.requiredConnections,
-            providers,
-          ).map((line) => (
-            <p
-              key={line.providerId}
-              className="text-xs text-[var(--warning-text)]"
+          <div>
+            <Button
+              href={flowPath(subscription.id)}
+              variant="secondary"
+              size="sm"
+              prefetch={false}
+              aria-label={`Open ${automation.name}`}
             >
-              <Link
-                prefetch={false}
-                href={line.href}
-                className="underline underline-offset-2"
-              >
-                {line.text}
-              </Link>
-            </p>
-          ))}
-
-          {/* A subscription runs the version it PINNED (backend ADR-0030), and
-              adding an automation pins the newest. It moves in place (backend
-              §12.1 #126); the catalog does not say what a newer version
-              declares, so the card says only which version runs. */}
-          {subscription.templateVersion < automation.version ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs text-[var(--muted)]">
-                This runs v{subscription.templateVersion}; v{automation.version}{" "}
-                is available.
-              </p>
-              <MoveVersionButton
-                workspaceId={workspaceId}
-                subscriptionId={subscription.id}
-                name={automation.name}
-                from={subscription.templateVersion}
-                to={automation.version}
-                config={subscription.config}
-                // Move goes only to the catalog's newest, so its fields are the target's.
-                targetSetup={automation.setup}
-                focusAfter={`automation-${automation.templateId}-name`}
-              />
-            </div>
-          ) : null}
-
-          {/* Where a vendor sends the events that start it (backend §12.1 #91):
-              only for a webhook-started version, and only for an owner or admin,
-              as the platform allows no one else. */}
-          {subscription.triggerKind === "webhook" && canAdminister ? (
-            <div>
-              <WebhookAddressButton
-                workspaceId={workspaceId}
-                subscriptionId={subscription.id}
-              />
-            </div>
-          ) : null}
-
-          <AutomationActions
-            workspaceId={workspaceId}
-            name={automation.name}
-            team={place(subscription)}
-            available={automation.available}
-            // A run with a file on a flow that reads it with AI waits for the
-            // account's answer (backend ADR-0038). The catalog says it of the
-            // version it lists, the one a flow is added at.
-            usesAi={automation.usesAi === true}
-            aiDocumentReading={aiDocumentReading}
-            // The settings of the version it RUNS, which the platform checks a
-            // save against — not the catalog's newest (backend §12.1 #185).
-            setup={subscription.setup ?? []}
-            vendor={vendorChoice(
-              subscription,
-              automation.requiredConnections,
-              providers,
-            )}
-            subscription={{
-              id: subscription.id,
-              status: subscription.status,
-              canGoLive: subscription.unmetConnections.length === 0,
-              config: subscription.config,
-              ...(subscription.runInput
-                ? { runInput: subscription.runInput }
-                : {}),
-            }}
-          />
+              Open
+            </Button>
+          </div>
         </div>
       ))}
 

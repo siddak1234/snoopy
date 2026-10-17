@@ -14,12 +14,6 @@ export type ConnectionActionResult =
   | { ok: true; authorizationUrl?: string; alreadyConnectedAs?: string }
   | { ok: false; error: string; retryWithSameIntent?: boolean };
 
-// The one 409 authorize publishes: the connection named for replacement is no
-// longer the live one — someone reconnected or replaced it since this page read
-// it — so nothing was started (backend ADR-0019 §4).
-const REPLACEMENT_WAS_STALE =
-  "This connection changed since the page loaded, so nothing was replaced. Reload the page to see it, then choose again.";
-
 // Every action here acts on the workspace the page showed (register F28, F70):
 // after a switch in another tab, Connect would otherwise authorize an account
 // into a workspace the person was not looking at.
@@ -40,8 +34,10 @@ function failure(error: unknown): ConnectionActionResult {
 }
 
 /**
- * Starts a connection, or — with `replaceConnectionId`, the exact id of the live
- * connection — replaces its account (owner or admin; backend ADR-0026).
+ * Starts a connection — Connect, or Reconnect, which keeps the account
+ * (backend ADR-0019 §4) — for an owner or admin. ~~Replace account, with the
+ * exact id of the live connection (backend ADR-0026)~~ is off the row since
+ * Build 21 (spec A4); the platform's route stays, unused.
  *
  * The platform answers one of two outcomes (backend §12.1 #172): a live grant
  * that already holds every permission the provider asks for is `reused`, and no
@@ -52,15 +48,11 @@ function failure(error: unknown): ConnectionActionResult {
 export async function beginConnectionAuthorization(
   shownWorkspaceId: string,
   providerId: string,
-  replaceConnectionId?: string,
 ): Promise<ConnectionActionResult> {
   try {
     const workspaceId = await activeWorkspaceIfShown(shownWorkspaceId);
     if (!workspaceId) return workspaceChanged;
-    const result = await beginAuthorization(workspaceId, {
-      providerId,
-      ...(replaceConnectionId ? { replaceConnectionId } : {}),
-    });
+    const result = await beginAuthorization(workspaceId, { providerId });
     if (result.outcome === "reused") {
       revalidatePath("/account/connections");
       return {
@@ -70,9 +62,6 @@ export async function beginConnectionAuthorization(
     }
     return { ok: true, authorizationUrl: result.authorizationUrl };
   } catch (error) {
-    if (error instanceof PlatformServerError && error.status === 409) {
-      return { ok: false, error: REPLACEMENT_WAS_STALE };
-    }
     return failure(error);
   }
 }

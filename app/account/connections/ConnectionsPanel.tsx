@@ -8,16 +8,24 @@ import {
   type FormEvent,
 } from "react";
 import { useRouter } from "next/navigation";
-import { StatusPill } from "@/components/dashboard/StatusPill";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import { FormInput } from "@/components/ui/FormInput";
 import Modal from "@/components/ui/Modal";
 import {
-  VendorConnectButton,
-  VendorLogo,
-} from "@/components/dashboard/VendorLogo";
-import { DISCONNECT_BODY, brandLogo, disconnectTitle } from "@/lib/brand-logos";
+  ConnectionMark,
+  ConnectionRow,
+} from "@/components/dashboard/ConnectionRow";
+import {
+  CONNECTIONS_MANAGED_BY,
+  DISCONNECT_LABEL,
+  connectionAction,
+  connectionFor,
+  connectionLine,
+  connectionState,
+  disconnectBody,
+  disconnectTitle,
+} from "@/lib/connection-rows";
 import type { Connection, ConnectionProvider } from "@/lib/connections";
 import {
   beginConnectionAuthorization,
@@ -28,6 +36,7 @@ import {
   PENDING_CONNECT,
   rememberConnect,
   takeConnectReturn,
+  withCallbackStatus,
 } from "./pending-connect";
 
 function pendingConnect(): string | null {
@@ -41,22 +50,26 @@ function pendingConnect(): string | null {
 const noSubscription = () => () => {};
 
 /**
+ * The connections a page lists, each the one row (Build 21, spec A4; the
+ * owner's build 20 items 6 and 7): Connections, and a flow page's Connections
+ * — one row for every provider, its mark at 24, its name, the account's email
+ * or its state under it, and for an owner or admin one button of ours:
+ * Connect, Reconnect or Disconnect. ~~What connecting it lets flows do, "Used
+ * by N live flows", Available connections, Intuit's Connect button image,
+ * "Disconnect from QuickBooks" and Replace account~~ until Build 21 (the
+ * platform's replace route stays, unused; the owner's ~04:15Z: "we will list
+ * on apples app store not intuits. so we do not need that").
+ *
  * `canManage` is the page's reading of the platform's rule: connecting or
- * disconnecting supersedes the account every automation in the workspace acts
- * through, so it is an owner's or an admin's (`assertMayManageConnections`). A
- * member sees what is connected and is told who can change it (register F8);
- * the server refuses them either way.
+ * disconnecting supersedes the account every flow in the workspace acts
+ * through, so it is an owner's or an admin's. A member sees the rows and is
+ * told who can change them (register F8); the server refuses them either way.
  *
- * Reconnect keeps the account: the platform re-asks consent only when the grant
- * lacks something or needs repair, and completion must return the same account
- * (backend ADR-0019 §4). **Replace account** is the other intent — a different
- * account for every automation that uses this connection — so it is its own
- * control, confirmed first, and it names the exact connection it replaces
- * (backend 22.5.3, ADR-0026).
- *
- * **Disconnect** ends the connection every flow in the workspace acts through
- * (the contract's own words), so it is confirmed first, as in the app — in the
- * vendor's words where it has them: "Disconnect from QuickBooks?" (spec §3.I).
+ * Connect and Reconnect go through the provider at once — Reconnect keeps the
+ * account (backend ADR-0019 §4) — and a key provider's opens its key form. A
+ * connect started on a flow's page (`returnTo`) comes back to it. **Disconnect
+ * asks first**, saying what it stops: "{n} live flows use it. They stop until
+ * you connect it again."
  */
 export function ConnectionsPanel({
   connections,
@@ -64,29 +77,40 @@ export function ConnectionsPanel({
   canManage,
   callbackStatus,
   workspaceId,
+  returnTo,
 }: {
   connections: Connection[];
+  /** The providers to list, in order: every one on Connections, a flow's own on its page. */
   providers: ConnectionProvider[];
   canManage: boolean;
+  /** Back from a vendor's sign-in, as the platform's callback said it ended. */
   callbackStatus: "connected" | "error" | null;
   /** The workspace this page shows; every action is refused once it is not active. */
   workspaceId: string;
+  /** Where a connect started here comes back to: a flow's page. */
+  returnTo?: string;
 }) {
   const router = useRouter();
   const [selectedProvider, setSelectedProvider] =
     useState<ConnectionProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // A connect's answer, under its row.
+  const [rowError, setRowError] = useState<{
+    providerId: string;
+    message: string;
+  } | null>(null);
   const [retryWithSameIntent, setRetryWithSameIntent] = useState(false);
   const [connectionIntentKey, setConnectionIntentKey] = useState<string | null>(
     null,
   );
   const [pending, startTransition] = useTransition();
-  // The connection whose disconnect is being confirmed, and its refusal.
-  const [disconnecting, setDisconnecting] = useState<Connection | null>(null);
+  const [busyProvider, setBusyProvider] = useState<string | null>(null);
+  // The provider whose disconnect is being confirmed, and its refusal.
+  const [disconnecting, setDisconnecting] = useState<ConnectionProvider | null>(
+    null,
+  );
   const [disconnectError, setDisconnectError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [replacing, setReplacing] = useState<Connection | null>(null);
-  const [replaceError, setReplaceError] = useState<string | null>(null);
   // Read in the browser only: the server cannot know, so the unfinished-connect
   // banner is drawn once, in its final words, rather than announced as one
   // sentence and changed to another on hydration.
@@ -96,12 +120,12 @@ export function ConnectionsPanel({
     () => undefined,
   );
 
-  // A connect started on a flow's vendor page goes back there once the
-  // vendor's sign-in has landed here (spec §3.C), with how it ended.
+  // A connect started on a flow's page goes back there once the vendor's
+  // sign-in has landed here, with how it ended (spec A2).
   useEffect(() => {
     if (!callbackStatus) return;
     const back = takeConnectReturn();
-    if (back) router.replace(`${back}?status=${callbackStatus}`);
+    if (back) router.replace(withCallbackStatus(back, callbackStatus));
   }, [callbackStatus, router]);
 
   const close = () => {
@@ -111,9 +135,47 @@ export function ConnectionsPanel({
     setConnectionIntentKey(null);
   };
 
-  const connect = (provider: ConnectionProvider) => {
+  const connectionOf = (providerId: string) =>
+    connectionFor(connections, providerId);
+
+  const authorize = (provider: ConnectionProvider) => {
+    setBusyProvider(provider.providerId);
+    startTransition(async () => {
+      const result = await beginConnectionAuthorization(
+        workspaceId,
+        provider.providerId,
+      );
+      if (result.ok && result.alreadyConnectedAs) {
+        setBusyProvider(null);
+        setNotice(
+          `${provider.displayName} is already connected as ${result.alreadyConnectedAs}, with everything it needs — there is nothing to authorize.`,
+        );
+        router.refresh();
+        return;
+      }
+      if (!result.ok || !result.authorizationUrl) {
+        setBusyProvider(null);
+        setRowError({
+          providerId: provider.providerId,
+          message: result.ok ? "Could not start the connection" : result.error,
+        });
+        return;
+      }
+      rememberConnect(provider.providerId, returnTo);
+      window.location.assign(result.authorizationUrl);
+    });
+  };
+
+  /** The row's one button. What the last one came back with goes as the next is pressed. */
+  const press = (provider: ConnectionProvider) => {
     setError(null);
+    setRowError(null);
     setNotice(null);
+    if (connectionState(connectionOf(provider.providerId)) === "connected") {
+      setDisconnectError(null);
+      setDisconnecting(provider);
+      return;
+    }
     if (provider.authType === "api-key") {
       // This is intentionally browser-memory only: it identifies one explicit
       // connect intent, but neither it nor any credential is persisted.
@@ -122,60 +184,7 @@ export function ConnectionsPanel({
       setSelectedProvider(provider);
       return;
     }
-    startTransition(async () => {
-      const result = await beginConnectionAuthorization(
-        workspaceId,
-        provider.providerId,
-      );
-      if (result.ok && result.alreadyConnectedAs) {
-        setNotice(
-          `${provider.displayName} is already connected as ${result.alreadyConnectedAs}, with everything it needs — there is nothing to authorize.`,
-        );
-        router.refresh();
-        return;
-      }
-      if (!result.ok || !result.authorizationUrl) {
-        setError(result.ok ? "Could not start the connection" : result.error);
-        return;
-      }
-      rememberConnect(provider.providerId);
-      window.location.assign(result.authorizationUrl);
-    });
-  };
-
-  const closeReplace = () => {
-    if (pending) return;
-    setReplacing(null);
-    setReplaceError(null);
-  };
-
-  const confirmReplace = (connection: Connection) => {
-    setReplaceError(null);
-    startTransition(async () => {
-      const result = await beginConnectionAuthorization(
-        workspaceId,
-        connection.providerId,
-        connection.id,
-      );
-      // The contract's answer is a union; the platform does not reuse a grant
-      // it was asked to replace, but a reused answer is still an answer.
-      if (result.ok && result.alreadyConnectedAs) {
-        setReplacing(null);
-        setNotice(
-          `${result.alreadyConnectedAs} is still connected — there was nothing to replace.`,
-        );
-        router.refresh();
-        return;
-      }
-      if (!result.ok || !result.authorizationUrl) {
-        setReplaceError(
-          result.ok ? "Could not start the replacement" : result.error,
-        );
-        return;
-      }
-      rememberConnect(connection.providerId);
-      window.location.assign(result.authorizationUrl);
-    });
+    authorize(provider);
   };
 
   const submitKey = (formData: FormData) => {
@@ -206,7 +215,9 @@ export function ConnectionsPanel({
     setDisconnectError(null);
   };
 
-  const confirmDisconnect = (connection: Connection) => {
+  const confirmDisconnect = (provider: ConnectionProvider) => {
+    const connection = connectionOf(provider.providerId);
+    if (!connection) return;
     setDisconnectError(null);
     startTransition(async () => {
       const result = await disconnectConnection(workspaceId, connection.id);
@@ -219,37 +230,15 @@ export function ConnectionsPanel({
     });
   };
 
-  // A live connection for a provider is one already `connected`. It changes both
-  // what the callback-error banner should say and what the provider button offers.
-  const connectedProviderIds = new Set(
-    connections
-      .filter((connection) => connection.status === "connected")
-      .map((connection) => connection.providerId),
-  );
   // Still active only when the provider the connect left for has a live
   // connection — never because some other provider does (register F100).
   const stillActive =
-    typeof returnedFor === "string" && connectedProviderIds.has(returnedFor);
-  // A connection that needs reauthorization is still this workspace's
-  // connection: Reconnect is what repairs it (backend §12.1 #175).
-  const reconnectableProviderIds = new Set(
-    connections
-      .filter(
-        (connection) =>
-          connection.status === "connected" ||
-          connection.status === "reauthorization-required",
-      )
-      .map((connection) => connection.providerId),
-  );
-  // Only an OAuth connection has an account to replace through consent; a
-  // pasted key is replaced by pasting another.
-  const providerNamed = new Map(
-    providers.map((provider) => [provider.providerId, provider]),
-  );
-  const replaceable = (connection: Connection) =>
-    canManage &&
-    connection.status !== "disconnected" &&
-    providerNamed.get(connection.providerId)?.authType === "oauth2";
+    typeof returnedFor === "string" &&
+    connections.some(
+      (connection) =>
+        connection.providerId === returnedFor &&
+        connection.status === "connected",
+    );
 
   return (
     <div className="py-5 first:pt-0">
@@ -271,158 +260,73 @@ export function ConnectionsPanel({
         </p>
       ) : null}
 
-      <div className="flex flex-col gap-3">
-        {connections.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">
-            No external accounts are connected yet.
-          </p>
-        ) : (
-          connections.map((connection) => {
-            const provider = providerNamed.get(connection.providerId);
-            const logo = brandLogo(provider?.icon);
+      {providers.length === 0 ? (
+        <p className="text-sm text-[var(--muted)]">
+          No connection providers are available in this environment.
+        </p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-[var(--ring)]">
+          {providers.map((provider) => {
+            const connection = connectionOf(provider.providerId);
+            const state = connectionState(connection);
+            const line = connectionLine(connection);
+            const action = connectionAction(state);
+            const failed = rowError?.providerId === provider.providerId;
             return (
-              <div
-                key={connection.id}
-                className="flex flex-col gap-4 py-1 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {/* The vendor's own logo, where it has one (spec §3.I),
-                      in its own clear space; its left padding sits in the
-                      card's, so the logo lines up with the words below. */}
-                    {logo ? <VendorLogo logo={logo} className="-ml-3" /> : null}
-                    <p className="font-medium text-[var(--text)]">
-                      {connection.externalAccount.displayName}
-                    </p>
-                    <StatusPill status={connection.status} />
-                  </div>
-                  {/* `usedByCount` is live subscriptions only — a draft is being
-                    set up, not running — so the label says "live" to match.
-                    The vendor by its name, never its id; a logo says it. */}
-                  <p className="mt-1 text-sm text-[var(--muted)]">
-                    {provider && !logo ? `${provider.displayName} · ` : ""}
-                    Used by {connection.usedByCount} live{" "}
-                    {connection.usedByCount === 1 ? "flow" : "flows"}
-                  </p>
-                  {connection.errorCode ? (
-                    <p className="mt-1 text-xs text-[var(--warning-text)]">
-                      This connection needs attention before it can be used.
-                    </p>
-                  ) : null}
-                </div>
-                {canManage ? (
-                  <div className="flex flex-wrap gap-2">
-                    {replaceable(connection) ? (
+              <li key={provider.providerId}>
+                <ConnectionRow
+                  testId={`connection-${provider.providerId}`}
+                  mark={<ConnectionMark icon={provider.icon} />}
+                  name={provider.displayName}
+                  line={line.text}
+                  lineTone={line.tone}
+                  right={
+                    !canManage ? null : action === DISCONNECT_LABEL ? (
+                      // Red: it ends the connection every flow here acts
+                      // through (the owner's build 12, #5).
                       <Button
+                        type="button"
+                        variant="danger"
+                        size="sm"
+                        disabled={pending}
+                        aria-label={`Disconnect ${provider.displayName}`}
+                        onClick={() => press(provider)}
+                      >
+                        Disconnect
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
                         variant="secondary"
                         size="sm"
                         disabled={pending}
-                        onClick={() => {
-                          setError(null);
-                          setNotice(null);
-                          setReplacing(connection);
-                        }}
+                        aria-label={`${action} ${provider.displayName}`}
+                        onClick={() => press(provider)}
                       >
-                        Replace account
+                        {busyProvider === provider.providerId && pending
+                          ? "Working…"
+                          : action}
                       </Button>
-                    ) : null}
-                    {/* Red: it ends the connection every flow here acts
-                      through (the owner's build 12, #5). */}
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      disabled={pending}
-                      onClick={() => {
-                        setError(null);
-                        setNotice(null);
-                        setDisconnecting(connection);
-                      }}
-                    >
-                      {logo ? logo.disconnectLabel : "Disconnect"}
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      <div className="mt-5 border-t border-[var(--ring)] pt-5">
-        <p className="text-sm font-medium text-[var(--text)]">
-          Available connections
-        </p>
-        {canManage ? null : (
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            Only an owner or admin of this workspace can connect or disconnect
-            an account.
-          </p>
-        )}
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {providers.map((provider) => {
-            const logo = brandLogo(provider.icon);
-            return (
-              <div
-                key={provider.providerId}
-                className="bubble flex flex-col gap-3 p-4"
-              >
-                <div>
-                  {/* A vendor's own logo carries its name (spec §3.I). Its
-                    clear space reaches into the card's padding above and to
-                    the left, so it lines up with a name in the next card. */}
-                  {logo ? (
-                    <VendorLogo logo={logo} className="-mt-3 -ml-3" />
-                  ) : (
-                    <p className="font-medium text-[var(--text)]">
-                      {provider.displayName}
-                    </p>
-                  )}
-                  <p className="mt-1 text-sm text-[var(--muted)]">
-                    {provider.description}
-                  </p>
-                </div>
-                {/* A vendor with its own connect button: shown until it is
-                  connected, then hidden — its disconnect is on the account's
-                  row above (Intuit's technical requirement 1.1). */}
-                {canManage ? (
-                  logo ? (
-                    connectedProviderIds.has(provider.providerId) ? null : (
-                      <VendorConnectButton
-                        logo={logo}
-                        disabled={pending}
-                        onClick={() => connect(provider)}
-                      />
                     )
-                  ) : (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      disabled={pending}
-                      onClick={() => connect(provider)}
-                    >
-                      {pending
-                        ? "Connecting…"
-                        : reconnectableProviderIds.has(provider.providerId)
-                          ? "Reconnect"
-                          : "Connect"}
-                    </Button>
-                  )
+                  }
+                />
+                {failed ? (
+                  <p
+                    role="alert"
+                    className="pb-3 text-xs text-[var(--error-text)]"
+                  >
+                    {rowError.message}
+                  </p>
                 ) : null}
-              </div>
+              </li>
             );
           })}
-        </div>
-        {providers.length === 0 ? (
-          <p className="mt-4 text-sm text-[var(--muted)]">
-            No connection providers are available in this environment.
-          </p>
-        ) : null}
-      </div>
-
-      {/* One refusal, one alert (register F52): while a dialog is open its own
-          alert carries the answer, so the panel's does not repeat it. */}
-      {selectedProvider || replacing || disconnecting ? null : (
-        <FormError message={error} className="mt-4" />
+        </ul>
+      )}
+      {canManage || providers.length === 0 ? null : (
+        <p className="mt-3 text-sm text-[var(--muted)]">
+          {CONNECTIONS_MANAGED_BY}
+        </p>
       )}
 
       {disconnecting ? (
@@ -438,17 +342,15 @@ export function ConnectionsPanel({
             id="disconnect-connection-title"
             className="text-xl font-semibold text-[var(--text)]"
           >
-            {disconnectTitle(
-              providerNamed.get(disconnecting.providerId)?.icon,
-              providerNamed.get(disconnecting.providerId)?.displayName ??
-                disconnecting.externalAccount.displayName,
-            )}
+            {disconnectTitle(disconnecting.displayName)}
           </h2>
           <p
             id="disconnect-connection-description"
             className="mt-1 text-sm text-[var(--muted)]"
           >
-            {DISCONNECT_BODY}
+            {disconnectBody(
+              connectionOf(disconnecting.providerId)?.usedByCount ?? 0,
+            )}
           </p>
           <FormError message={disconnectError} className="mt-3" />
           <div className="mt-6 flex flex-wrap gap-2">
@@ -467,52 +369,6 @@ export function ConnectionsPanel({
               disabled={pending}
             >
               {pending ? "Disconnecting…" : "Disconnect"}
-            </Button>
-          </div>
-        </Modal>
-      ) : null}
-
-      {replacing ? (
-        <Modal
-          onClose={closeReplace}
-          bubble
-          ariaLabelledBy="replace-account-title"
-          ariaDescribedBy="replace-account-description"
-          zIndex={100}
-        >
-          <h2
-            id="replace-account-title"
-            className="text-xl font-semibold text-[var(--text)]"
-          >
-            Replace {replacing.externalAccount.displayName}?
-          </h2>
-          <p
-            id="replace-account-description"
-            className="mt-1 text-sm text-[var(--muted)]"
-          >
-            You will sign in to{" "}
-            {providerNamed.get(replacing.providerId)?.displayName ??
-              replacing.providerId}{" "}
-            with the account every flow that uses this connection should act as
-            from now on. {replacing.externalAccount.displayName} stays connected
-            until that sign-in completes.
-          </p>
-          <FormError message={replaceError} className="mt-3" />
-          <div className="mt-6 flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={closeReplace}
-              disabled={pending}
-            >
-              Keep this account
-            </Button>
-            <Button
-              type="button"
-              onClick={() => confirmReplace(replacing)}
-              disabled={pending}
-            >
-              {pending ? "Starting…" : "Replace account"}
             </Button>
           </div>
         </Modal>
