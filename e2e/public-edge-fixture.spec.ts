@@ -2059,7 +2059,7 @@ test("Invoice Processing: its card says its category, Included and its team; Add
   for (const number of ["01", "02"]) {
     await expect(main.getByText(number, { exact: true })).toBeVisible();
   }
-  const vendors = main.getByRole("radiogroup", { name: "Vendor" });
+  const vendors = main.getByRole("radiogroup", { name: "Integration" });
   await expect(vendors.getByRole("radio")).toHaveCount(2);
   await expect(vendors.getByRole("radio", { name: "None" })).toHaveAttribute(
     "aria-checked",
@@ -2104,7 +2104,7 @@ test("Connect integration: step 2's integration row opens the step's vendors by 
   await expect(vendorRow).toContainText("None");
   await expect(vendorRow).toContainText("Save the details only.");
   // Named by its vendor, and its line said too — to a screen reader as well.
-  await expect(vendorRow).toHaveAccessibleName("None: change the vendor");
+  await expect(vendorRow).toHaveAccessibleName("None: change the integration");
   await expect(vendorRow).toHaveAccessibleDescription("Save the details only.");
   await vendorRow.click();
   await expect(page).toHaveURL(

@@ -199,7 +199,7 @@ export function SetupForm({
                 </p>
               ) : null}
               <VendorRows
-                label={vendorFields.length > 1 ? field.title : "Vendor"}
+                label={field.title}
                 options={field.options}
                 chosen={choiceOf(field)}
                 canManage={canManage}

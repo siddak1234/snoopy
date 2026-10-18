@@ -213,7 +213,7 @@ export default async function FlowPage(
         prefetch={false}
         href={vendorPath(subscription.id, key)}
         data-testid={`flow-vendor-${key}`}
-        aria-label={`${none ? "None" : nameOf(chosen)}: change the vendor`}
+        aria-label={`${none ? "None" : nameOf(chosen)}: change the integration`}
         // Its state — Connected, Not connected, or None's line — said too.
         aria-describedby={`flow-vendor-${key}-line`}
         className={`${CONNECTION_ROW} rounded-[var(--radius-md)] px-2 transition hover:bg-[var(--surface-hover)]`}

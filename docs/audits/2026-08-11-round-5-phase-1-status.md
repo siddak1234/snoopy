@@ -3837,3 +3837,13 @@ the fixture), `test:browser:fixtures` 520 passed, 260 in each of Chromium and Fi
 (the keyboard journey in each), none failed; `npm audit --omit=dev --audit-level=high` found 0
 vulnerabilities. WebKit runs in GitHub CI (register F104). This paragraph was added after that run;
 the change audit's gates then ran again on the committed tree.
+
+### After the reviews, one word for one thing (web) — 2026-10-18
+
+The session, after both client reviews (its S34, beside S21's "Connect integration"): the integration
+row on a flow's page is read aloud "{name}: change the integration", and Set up's integration choices
+are named by the field's own title ("Integration" in v4) rather than a fixed "Vendor" — the app draws
+`field.title` there already. The fixture journeys read those names (`public-edge-fixture.spec.ts`).
+An archived flow is not drawn by this page at all (`page.tsx:147-151`), so the app's other S34 change
+(no steps on an older archived flow) has nothing to change here. The gate and the change audit ran
+again on this tree.
