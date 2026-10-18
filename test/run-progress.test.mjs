@@ -419,9 +419,239 @@ test("the time a step was done, its duration and its result line, in the app's w
   assert.equal(runResultLine({ id: "r", status: "running" }, []), null);
 });
 
+// Invoice Processing v4 (snoopy-automations manifests/invoice-processing.v4.json;
+// spec §3): v3's 22 steps in five groups — receive in Upload invoice; extract,
+// check-documents and verify-read in AI processing; the other 18 in step 4 —
+// the connect group a setting step, the email group the platform's.
+const V4_GROUP = (id) =>
+  id === "receive"
+    ? "upload"
+    : ["extract", "check-documents", "verify-read"].includes(id)
+      ? "process"
+      : "record";
+const V4 = {
+  groups: [
+    { id: "upload", title: "Upload invoice" },
+    { id: "connect", title: "Connect integration" },
+    { id: "process", title: "AI processing" },
+    { id: "record", title: "Details saved" },
+    { id: "email", title: "Email sent", platform: "email" },
+  ],
+  pipeline: V3.pipeline.map((declared) => ({
+    ...declared,
+    group: V4_GROUP(declared.id),
+  })),
+};
+// The flow as its run's page read it: QuickBooks chosen (spec §4's fixtures).
+const quickbooksFlow = {
+  titles: { record: "QuickBooks updated" },
+  settings: { connect: "QuickBooks Online" },
+};
+const v4Rows = (reported, run, email, flow = quickbooksFlow) =>
+  trackerRows(reported, V4.pipeline, V4.groups, run, timeOfDay, V4.pipeline, {
+    flow,
+    email,
+  });
+const words = (rows) => rows.map((row) => `${row.title}  ${row.sub}`);
+const ran = (...ids) =>
+  ids.map((stepId, n) => ({
+    stepId,
+    outcome: "ok",
+    summary: `${stepId} said this`,
+    occurredAt: `2026-10-17T14:3${n}:00.000Z`,
+  }));
+
+test("a v4 run running: 1 Done · its time, 2 the integration chosen, 3 Working…, 4 and 5 Waiting — step 4 titled by the flow's choice (spec §4; S23, S24)", () => {
+  const rows = v4Rows(ran("receive"), { status: "running" });
+  assert.deepEqual(words(rows), [
+    "1 · Upload invoice  Done · 2:30 PM",
+    "2 · Connect integration  QuickBooks Online",
+    "3 · AI processing  Working…",
+    "4 · QuickBooks updated  Waiting",
+    "5 · Email sent  Waiting",
+  ]);
+  assert.deepEqual(
+    rows.map((row) => row.state),
+    ["done", "done", "working", "waiting", "waiting"],
+  );
+  assert.equal(stepsDone(rows), "2 / 5");
+  // A setting step is done from the start: before anything is reported too.
+  const pending = v4Rows([], { status: "pending" });
+  assert.equal(pending[1].state, "done");
+  assert.equal(stepsDone(pending), "1 / 5");
+});
+
+test("a v4 run's email, by the run's status and RunDetail.email: Sending… while owed, Sent · its time, Not sent, Stopped once cancelled — and Steps done with it (S24)", () => {
+  const succeeded = ran(
+    "receive",
+    "extract",
+    "check-documents",
+    "decide",
+    "save-documents",
+  );
+  const owed = v4Rows(
+    succeeded,
+    { status: "succeeded" },
+    { status: "waiting", sentAt: null },
+  );
+  assert.deepEqual([owed[4].sub, owed[4].state], ["Sending…", "working"]);
+  assert.equal(stepsDone(owed), "4 / 5");
+  // No email from the platform reads as owed.
+  assert.equal(
+    v4Rows(succeeded, { status: "succeeded" }, undefined)[4].sub,
+    "Sending…",
+  );
+  const sent = v4Rows(
+    succeeded,
+    { status: "succeeded" },
+    { status: "sent", sentAt: "2026-10-17T14:34:09.000Z" },
+  );
+  assert.deepEqual([sent[4].sub, sent[4].state], ["Sent · 2:34 PM", "done"]);
+  assert.equal(stepsDone(sent), "5 / 5");
+  const notSent = v4Rows(
+    succeeded,
+    { status: "failed" },
+    { status: "not_sent", sentAt: null },
+  );
+  assert.deepEqual([notSent[4].sub, notSent[4].state], ["Not sent", "skipped"]);
+  // Cancelled: Stopped, whatever the email says; running: Waiting.
+  const cancelled = v4Rows(
+    ran("receive"),
+    { status: "cancelled" },
+    { status: "not_sent", sentAt: null },
+  );
+  assert.deepEqual(
+    [cancelled[4].sub, cancelled[4].state],
+    ["Stopped", "stopped"],
+  );
+  assert.equal(
+    v4Rows(
+      ran("receive"),
+      { status: "running" },
+      {
+        status: "sent",
+        sentAt: "2026-10-17T14:34:09.000Z",
+      },
+    )[4].sub,
+    "Waiting",
+  );
+});
+
+test("a held v4 run: step 4 waits for approval and says why, step 5 by its email — sent for the approval's (S24)", () => {
+  const rows = v4Rows(
+    [
+      ...ran("receive", "extract", "decide"),
+      {
+        stepId: "ask-approval",
+        outcome: "held",
+        summary: "held said",
+        heldReason: "Document 2: the total can't be read.",
+        occurredAt: "2026-10-17T14:35:00.000Z",
+      },
+    ],
+    { status: "held" },
+    { status: "sent", sentAt: "2026-10-17T14:35:30.000Z" },
+  );
+  assert.deepEqual(words(rows).slice(3), [
+    "4 · QuickBooks updated  Waiting for approval: Document 2: the total can't be read.",
+    "5 · Email sent  Sent · 2:35 PM",
+  ]);
+  assert.equal(
+    v4Rows(ran("receive", "decide"), { status: "held" }, undefined)[4].sub,
+    "Sending…",
+  );
+});
+
+test("None: step 2 says None, step 4 Details saved; a flow that could not be read — step 2 Done, step 4 its own title (S23; the app's M6)", () => {
+  const none = v4Rows(ran("receive"), { status: "running" }, undefined, {
+    titles: { record: "Details saved" },
+    settings: { connect: "None" },
+  });
+  assert.equal(none[1].sub, "None");
+  assert.equal(none[3].title, "4 · Details saved");
+  // The default flow is QuickBooks', so an unread one is passed as none at all.
+  const unread = trackerRows(
+    ran("receive"),
+    V4.pipeline,
+    V4.groups,
+    { status: "running" },
+    timeOfDay,
+    V4.pipeline,
+    {},
+  );
+  assert.deepEqual(
+    [unread[1].sub, unread[1].state, unread[3].title],
+    ["Done", "done", "4 · Details saved"],
+  );
+});
+
+test("a v3 run — v3's step ids, every one still declared — is drawn by v4's five steps; a run that reported a step v4 does not declare by what it reported (S25)", () => {
+  const v3Run = v4Rows(
+    ran(
+      "receive",
+      "extract",
+      "check-documents",
+      "verify-read",
+      "decide",
+      "save-documents",
+    ),
+    { status: "succeeded" },
+    { status: "sent", sentAt: "2026-10-17T14:40:00.000Z" },
+  );
+  assert.deepEqual(
+    v3Run.map((row) => row.title),
+    [
+      "1 · Upload invoice",
+      "2 · Connect integration",
+      "3 · AI processing",
+      "4 · QuickBooks updated",
+      "5 · Email sent",
+    ],
+  );
+  const older = v4Rows(ran("receive", "check-document"), { status: "failed" });
+  assert.deepEqual(
+    older.map((row) => row.title),
+    ["1 · Document received", "2 · Step 2"],
+  );
+});
+
+test("a platform step this build does not know: its title, no line, no state — and not counted in Steps done (the app's M7)", () => {
+  const rows = trackerRows(
+    ran("receive"),
+    V4.pipeline,
+    [
+      ...V4.groups.slice(0, 4),
+      { id: "sms", title: "Text sent", platform: "sms" },
+    ],
+    { status: "succeeded" },
+    timeOfDay,
+    V4.pipeline,
+    { flow: quickbooksFlow },
+  );
+  assert.deepEqual(
+    [rows[4].title, rows[4].state, rows[4].sub],
+    ["5 · Text sent", "unknown", ""],
+  );
+  assert.equal(stepsDone(rows), "4 / 4");
+});
+
 test("the run page draws the tracker's rows and words alone — never a step's summary, never its id — and reads the run again while it goes on", () => {
   const live = read("app/account/runs/[runId]/RunLive.tsx");
   assert.match(live, /const tracker = trackerRows\(/u);
+  // The catalog's steps for any run — no version gate (S25) — with the flow
+  // as read now and the run's email (S23, S24).
+  assert.doesNotMatch(live, /templateVersion|declaredFor/u);
+  assert.match(
+    live,
+    /trackerRows\(\s*steps,\s*flow\?\.pipeline,\s*flow\?\.groups,\s*run,\s*undefined,\s*flow\?\.pipeline,\s*\{ flow: flow\?\.tracker, email: detail\.email \},\s*\);/u,
+  );
+  const page = read("app/account/runs/[runId]/page.tsx");
+  assert.match(page, /stepTitle\(group, setup, subscription\.config\)/u);
+  assert.match(page, /const line = settingLine\(/u);
+  assert.match(
+    page,
+    /return live \?\? own\(await listArchivedSubscriptions\(workspaceId\)\);/u,
+  );
   assert.match(live, /\{row\.title\}/u);
   assert.match(live, /\{row\.sub\}/u);
   assert.doesNotMatch(live, /\.summary\b|\.stepId\b|heldReason/u);

@@ -11,7 +11,7 @@
  * - Where a connect started on a flow's own pages (Build 21, spec A2, A6; the
  *   owner's build 20 item 2: "If i need to connect then after i click and
  *   connection happens then it shoukd take me back"): the flow page, its Set
- *   up, or its Connect vendor page for one step's choice (`?field=`). The
+ *   up, or its Connect integration page for one step's choice (`?field=`). The
  *   callback lands on Connections, which goes back there.
  *
  * No React and no `@/` import here: the unit test loads this file as it is.

@@ -29,7 +29,7 @@ const noSubscription = () => () => {};
 export const VENDOR_SAVE_FAILED = "Could not save. Try again.";
 
 /**
- * Connect vendor's rows, saved at the tap (spec A2): a connected vendor or
+ * Connect integration's rows, saved at the tap (spec A2): a connected vendor or
  * None → the flow's choice for this step is saved → back to the flow's page;
  * the choice it holds already → straight back. A vendor not connected, for an
  * owner or admin, goes to its sign-in, and back here connected it is saved and
@@ -129,7 +129,7 @@ export function VendorChoice({
         </p>
       ) : null}
       <VendorRows
-        label="Connect vendor"
+        label="Connect integration"
         options={options}
         chosen={saved}
         canManage={canManage}

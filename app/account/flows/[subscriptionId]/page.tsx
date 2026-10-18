@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CaretRightIcon } from "@phosphor-icons/react/dist/ssr/CaretRight";
+import { EnvelopeSimpleIcon } from "@phosphor-icons/react/dist/ssr/EnvelopeSimple";
 import { getAppSession } from "@/lib/app-session";
 import {
   emptyWhenUnavailable,
   listAutomations,
   listSubscriptions,
+  readFlowEmailRecipients,
   readRunStats,
   type AutomationSetupField,
+  type FlowEmailRecipients,
 } from "@/lib/automations";
 import {
   emptyConnectionsWhenUnavailable,
@@ -15,15 +18,20 @@ import {
   listConnections,
 } from "@/lib/connections";
 import { connectionFor, connectionState } from "@/lib/connection-rows";
+import { EMAIL_UNAVAILABLE, emailPath, recipientsLine } from "@/lib/flow-email";
 import {
   NONE,
+  NONE_LABEL,
   chosenVendor,
   connectionFields,
-  flowPath,
   flowStepPlan,
   setupPath,
 } from "@/lib/flow-steps";
-import { newIdempotencyKey } from "@/lib/platform-server";
+import {
+  PlatformNotConfiguredError,
+  PlatformServerError,
+  newIdempotencyKey,
+} from "@/lib/platform-server";
 import {
   administers,
   listWorkspaceProjects,
@@ -36,10 +44,10 @@ import {
   CONNECTION_ROW,
   ConnectionMark,
   ConnectionRowBody,
+  GlyphMark,
   NoneMark,
 } from "@/components/dashboard/ConnectionRow";
 import { StatusPill } from "@/components/dashboard/StatusPill";
-import { ConnectionsPanel } from "@/app/account/connections/ConnectionsPanel";
 import { AutomationActions } from "../AutomationActions";
 import { FlowDashboard } from "../FlowDashboard";
 import { RunStart } from "../RunStart";
@@ -49,27 +57,53 @@ import { owedLines, vendorPath } from "../vendor-path";
 /**
  * A flow's page — the run page for a flow (Build 21, spec A6; the owner's AM4
  * of 2026-10-15: "set up page is initial, after that flow page is the run
- * page … when a user clicks a flow it shows basically steps to run now in the
- * way i described in feedback"). The TEST VERSION of his order (D3: "lets test
- * this flow page order first then we can agree if it should be the standard"),
- * top to bottom — the app's flow page on the website (the session's S23):
+ * page"), with Build 22's steps (P1–P4; the owner's build 21 items 5–7) — the
+ * app's flow page on the website (D5, the session's suggestion the owner
+ * approved 21:12Z). Top to bottom:
  *
  * 1. its name, its status and its team — no description (the session's S24);
  * 2. **Dashboard** — Runs, Successes, Failures, live (`FlowDashboard`);
- * 3. **Steps** — numbered, one per group (or step); Step 1 holds the document
- *    and Start run (Turn on while it is off) and what the flow is owed; the
- *    step that writes to a vendor shows the vendor chosen: its mark, its name,
- *    "Connected" or "Not connected" — the whole row opens Connect vendor
- *    (~~"Connect vendor", drawn whatever the connection's state~~, the owner's
- *    build 20 items 4–5). Settings are edited on Set up, through Edit setup,
- *    as in the app (its M3);
- * 4. **Connections** — every account the flow uses, the one connection row;
- * 5. at the bottom: Pause, the move to a newer version, **Edit setup**, the
- *    webhook address, Archive.
+ * 3. **Steps** — numbered, titles only (the session's S20): "1 · Upload
+ *    invoice" holds the document and Start run (Turn on while it is off) and
+ *    what the flow is owed; "2 · Connect integration" holds the integration
+ *    row — its mark, its name, "Connected" or "Not connected", or None — which
+ *    opens the choices; "3 · AI processing"; "4 · QuickBooks updated" or
+ *    "Details saved", by the flow's choice, nothing under it; "5 · Email
+ *    sent", the first address and how many more, which opens who gets the
+ *    email (`flowStepPlan`'s kinds, backend ADR-0041). Settings are edited on
+ *    Set up, through Edit setup, as in the app (its M3);
+ * 4. at the bottom: Pause, **Edit setup**, the webhook address, Archive.
  *
- * Opened from its card on Flows (Open) and from the dashboard's Run a flow
- * (A9), which lands on Step 1 (`#run`).
+ * ~~Connections~~ ("Remove the connections in the bottom as well") and ~~the
+ * move to a newer version~~ ("I also dont want a move to vx number in the
+ * flows. The user always gets the latest version") until Build 22 (the
+ * owner's build 21 item 7): the platform moves every flow to the newest
+ * version (backend ADR-0041), and Disconnect stays on Connections.
+ *
+ * Opened from its card on Flows (Open).
  */
+
+/**
+ * Step 5's addresses (Build 22, the session's S22): who gets this flow's run
+ * emails, read on the server each time the page is drawn — so a change made on
+ * the email page shows on return. A read that fails costs the row its address
+ * ("Unavailable"), never the page.
+ */
+async function readRecipients(
+  workspaceId: string,
+  subscriptionId: string,
+): Promise<FlowEmailRecipients | null> {
+  try {
+    return await readFlowEmailRecipients(workspaceId, subscriptionId);
+  } catch (error) {
+    if (
+      error instanceof PlatformServerError ||
+      error instanceof PlatformNotConfiguredError
+    )
+      return null;
+    throw error;
+  }
+}
 
 export const dynamic = "force-dynamic";
 
@@ -77,7 +111,6 @@ export default async function FlowPage(
   props: PageProps<"/account/flows/[subscriptionId]">,
 ) {
   const { subscriptionId } = await props.params;
-  const { status: callback } = await props.searchParams;
   const session = await getAppSession();
   const workspaceId = await resolveActiveWorkspaceId(session);
   if (!workspaceId) notFound();
@@ -90,6 +123,7 @@ export default async function FlowPage(
     connections,
     projects,
     role,
+    recipients,
   ] = await Promise.all([
     emptyWhenUnavailable(() => listSubscriptions(workspaceId), {
       subscriptions: [],
@@ -107,6 +141,7 @@ export default async function FlowPage(
     }),
     emptyWhenUnavailable(() => listWorkspaceProjects(workspaceId), []),
     roleInWorkspace(workspaceId),
+    readRecipients(workspaceId, subscriptionId),
   ]);
 
   // A flow this person can see and has not archived; any other id is the same
@@ -136,7 +171,7 @@ export default async function FlowPage(
 
   // Each step's vendor choice (backend ADR-0040), from the version the flow
   // RUNS — none when it declares none — never the catalog's newer one
-  // (backend §12.1 #185), as its Set up and its Connect vendor page read it:
+  // (backend §12.1 #185), as its Set up and its Connect integration page read it:
   // a row drawn from the catalog's would open a vendor page that is not found.
   const setup: AutomationSetupField[] = subscription.setup ?? [];
   const vendorFields = connectionFields(setup);
@@ -153,16 +188,22 @@ export default async function FlowPage(
     connected,
   );
   // STEPS by the catalog's groups only for the version they were declared
-  // for; a flow on another version gets its steps by title.
+  // for; a flow on another version gets its steps by title. Since Build 22
+  // every flow is moved to the newest version (backend ADR-0041), so the two
+  // differ only for a flow the platform could not move (the app's M5).
   const plan = flowStepPlan(
     entry?.pipeline,
     entry?.version === subscription.templateVersion ? entry.groups : undefined,
-    vendorFields,
+    setup,
+    subscription.config,
   );
 
-  /** The vendor a step writes to: its mark, its name, its state — the whole row opens Connect vendor (A3). */
+  /** A setting step's integration: its mark, its name, its state — the whole row opens the choices (A3). */
   const vendorRow = (key: string) => {
-    const field = vendorFields.find((candidate) => candidate.key === key)!;
+    const field = vendorFields.find((candidate) => candidate.key === key);
+    // A setting step's other fields (an amount, a text) are edited on Set up,
+    // not drawn here (the app's M1).
+    if (!field) return null;
     const chosen = chosenVendor(field, subscription.config);
     const none = chosen === NONE;
     const isConnected = !none && connected(chosen);
@@ -172,7 +213,7 @@ export default async function FlowPage(
         prefetch={false}
         href={vendorPath(subscription.id, key)}
         data-testid={`flow-vendor-${key}`}
-        aria-label={`${none ? "None" : nameOf(chosen)}: change the vendor`}
+        aria-label={`${none ? "None" : nameOf(chosen)}: change the integration`}
         // Its state — Connected, Not connected, or None's line — said too.
         aria-describedby={`flow-vendor-${key}-line`}
         className={`${CONNECTION_ROW} rounded-[var(--radius-md)] px-2 transition hover:bg-[var(--surface-hover)]`}
@@ -185,7 +226,7 @@ export default async function FlowPage(
               <ConnectionMark icon={providerById.get(chosen)?.icon} />
             )
           }
-          name={none ? "None" : nameOf(chosen)}
+          name={none ? NONE_LABEL : nameOf(chosen)}
           line={
             none
               ? "Save the details only."
@@ -234,18 +275,33 @@ export default async function FlowPage(
     </div>
   );
 
-  // Connections: every account the flow uses, in the manifest's order — then
-  // any the platform says it is owed that the catalog does not name. One this
-  // deployment does not list is named in Step 1 only.
-  const used = [
-    ...new Set([
-      ...declared.map((connection) => connection.providerId),
-      ...subscription.unmetConnections,
-    ]),
-  ].flatMap((providerId) => {
-    const provider = providerById.get(providerId);
-    return provider ? [provider] : [];
-  });
+  // Step 5: who gets the run's email — the first address listed and how many
+  // more (the session's S22), a press from the page that changes it.
+  // Unreadable, "Unavailable", and it still opens.
+  const emailLine = recipients
+    ? recipientsLine(recipients)
+    : { first: EMAIL_UNAVAILABLE, more: null };
+  const emailRow = (
+    <Link
+      prefetch={false}
+      href={emailPath(subscription.id)}
+      data-testid="flow-email"
+      className={`${CONNECTION_ROW} mt-2 rounded-[var(--radius-md)] px-2 transition hover:bg-[var(--surface-hover)]`}
+    >
+      <ConnectionRowBody
+        mark={<GlyphMark icon={EnvelopeSimpleIcon} />}
+        name={emailLine.first}
+        line={emailLine.more}
+        right={
+          <CaretRightIcon
+            aria-hidden
+            size={16}
+            className="shrink-0 text-[var(--muted)]"
+          />
+        }
+      />
+    </Link>
+  );
   const counts =
     stats?.subscriptions.find(
       (candidate) => candidate.subscriptionId === subscription.id,
@@ -291,58 +347,28 @@ export default async function FlowPage(
             This flow is not responding, so it cannot run yet.
           </p>
         ) : null}
-        {plan.rows.length === 0 ? stepOne : null}
+        {plan.length === 0 ? stepOne : null}
         <ol className="mt-3 flex flex-col divide-y divide-[var(--ring)]">
-          {plan.rows.map((row) => (
+          {plan.map((row) => (
             <li
               key={row.id}
               data-testid={`flow-step-${row.id}`}
               className="flex flex-col py-3"
             >
+              {/* The step's title only — no line under it (the session's
+                  S20; P2: "After step 4 i dont want to see quickbooks"). */}
               <p className="text-sm font-medium text-[var(--text)]">
                 {row.label}
               </p>
-              <p className="text-xs text-[var(--muted)]">{row.sub}</p>
               {row.input ? stepOne : null}
-              {row.vendorFields.length > 0 ? (
-                <div className="mt-2">{row.vendorFields.map(vendorRow)}</div>
+              {row.kind === "setting" && row.fields.length > 0 ? (
+                <div className="mt-2">{row.fields.map(vendorRow)}</div>
               ) : null}
+              {row.kind === "email" ? emailRow : null}
             </li>
           ))}
         </ol>
-        {/* A vendor choice its version places in no step (v2, from before
-            `group`): under the steps. */}
-        {plan.unplaced.length > 0 ? (
-          <div className="mt-2 border-t border-[var(--ring)] pt-2">
-            {plan.unplaced.map(vendorRow)}
-          </div>
-        ) : null}
       </section>
-
-      {used.length > 0 ? (
-        <section aria-labelledby="flow-connections-title" className="py-5">
-          <h2
-            id="flow-connections-title"
-            className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
-          >
-            Connections
-          </h2>
-          <div className="mt-1">
-            <ConnectionsPanel
-              workspaceId={workspaceId}
-              connections={connections.connections}
-              providers={used}
-              canManage={canManage}
-              callbackStatus={
-                callback === "connected" || callback === "error"
-                  ? callback
-                  : null
-              }
-              returnTo={flowPath(subscription.id)}
-            />
-          </div>
-        </section>
-      ) : null}
 
       <div className="py-5">
         <AutomationActions
@@ -354,16 +380,6 @@ export default async function FlowPage(
           setupHref={
             (subscription.setup ?? []).length > 0 || declared.length > 0
               ? setupPath(subscription.id)
-              : null
-          }
-          newer={
-            entry && subscription.templateVersion < entry.version
-              ? {
-                  from: subscription.templateVersion,
-                  to: entry.version,
-                  config: subscription.config,
-                  targetSetup: entry.setup,
-                }
               : null
           }
           webhook={subscription.triggerKind === "webhook" && canManage}

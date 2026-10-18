@@ -128,9 +128,9 @@ test("Connections goes back to the page the connect started on, with how the sig
   );
 });
 
-test("Connect vendor: a tap saves and goes back to the flow — no Done, no Save, no Intuit button, no Disconnect (spec A2; the session's S13)", () => {
+test("Connect integration (~~Connect vendor~~ until Build 22, the session's S21): a tap saves and goes back to the flow — no Done, no Save, no Intuit button, no Disconnect (spec A2; the session's S13)", () => {
   const page = read("app/account/flows/[subscriptionId]/vendor/page.tsx");
-  assert.match(page, /title="Connect vendor"/u);
+  assert.match(page, /title="Connect integration"/u);
   assert.match(
     page,
     /subheader=\{`For \$\{subscription\.name \?\? entry\.name\}`\}/u,

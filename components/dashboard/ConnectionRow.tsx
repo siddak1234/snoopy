@@ -15,9 +15,10 @@ import { brandMark } from "@/lib/brand-logos";
  * every provider (`CONNECTION_ROW`). The app's `components/connection-row.tsx`
  * on the website.
  *
- * Used on Connections, on a flow page's Connections and vendor row, on Set up
- * and on Connect vendor — where the whole row is the control, so its body
- * (`ConnectionRowBody`) sits inside the caller's own label or link.
+ * Used on Connections, on a flow page's integration and email rows, on Set up,
+ * on Connect integration — where the whole row is the control, so its body
+ * (`ConnectionRowBody`) sits inside the caller's own label or link — and on a
+ * flow's email page (Build 22). ~~A flow page's Connections~~ until Build 22.
  */
 
 /** The row's box: the same least height, gap and padding for every provider. */
@@ -68,15 +69,21 @@ export function ConnectionMark({ icon }: { icon: string | null | undefined }) {
   );
 }
 
+/**
+ * A glyph in the mark's 24 × 24 place, in the link colour: None's Prohibit,
+ * and since Build 22 the flow page's email row (EnvelopeSimple) and the email
+ * page's people (UserCircle) — so those rows line up with every connection
+ * row (the app's `GlyphMark`).
+ */
+export function GlyphMark({ icon: Glyph }: { icon: typeof ProhibitIcon }) {
+  return (
+    <Glyph aria-hidden size={24} className="shrink-0 text-[var(--link)]" />
+  );
+}
+
 /** None (no vendor): its mark, the Prohibit glyph at 24. */
 export function NoneMark() {
-  return (
-    <ProhibitIcon
-      aria-hidden
-      size={24}
-      className="shrink-0 text-[var(--link)]"
-    />
-  );
+  return <GlyphMark icon={ProhibitIcon} />;
 }
 
 export type ConnectionLineTone = "muted" | "ok" | "warn" | "err";

@@ -1,12 +1,12 @@
 /**
- * A flow page's STEPS and its vendor choices (Build 21, spec A6 — the TEST
- * VERSION of the owner's order, D3: "lets test this flow page order first then
- * we can agree if it should be the standard. it should be easy for a user to
- * run something"; his build 20 item 12: "steps, then in there we have upload
- * photo. Then show the rest of the steps. Then in one of the steps where data
- * is uploaded to quickbooks it shows connected to quickbooks"), and Home's
- * Run a flow (A9). The same rules as the app's (snoopy-mobile
- * `lib/view/pipeline.ts`, `components/setup-field.tsx`, `lib/view/home.ts`).
+ * A flow page's STEPS and its vendor choices (Build 21, spec A6; Build 22,
+ * P1–P4 — the owner's build 21 items 5–7: "1. Upooad Invoice / 2. Connect
+ * integration … / 3. Then something about AI Processing / 4. Quickbooks
+ * updated / 5. Email sent"), a run page's titles and setting lines (S23), and
+ * the dashboard's Today (W1). The same rules as the app's (snoopy-mobile
+ * `lib/view/pipeline.ts`, `lib/view/runs.ts`, `components/setup-field.tsx`).
+ * ~~Home's Run a flow (A9)~~ until Build 22 (the owner's build 21 item 1:
+ * "Remove run a flow section").
  *
  * Pure, and loaded by its unit test as it is: no React and no `@/` import.
  */
@@ -68,8 +68,8 @@ export function fieldProviders<
 
 /** The vendor a connection field holds: its value, else its default, else None. */
 export function chosenVendor(
-  field: Field,
-  config: Record<string, unknown> | undefined,
+  field: { key: string; defaultValue?: unknown },
+  config: Readonly<Record<string, unknown>> | undefined,
 ): string {
   const value = config?.[field.key] ?? field.defaultValue;
   return typeof value === "string" && value !== "" ? value : NONE;
@@ -79,82 +79,153 @@ type DeclaredStep = {
   id: string;
   kicker?: string;
   title: string;
-  description: string;
   group?: string;
 };
-type StepGroup = { id: string; title: string; description: string };
 
-/** One row of a flow page's STEPS: "1 · Received", and what happens in it. */
-export type FlowStepRow = { id: string; label: string; sub: string };
+/** What a step's title is read from: its id and title, and since Build 22 its title by connection and its platform. */
+export type StepHeading = {
+  id: string;
+  title: string;
+  titleByConnection?: {
+    field: string;
+    titles: readonly { providerId: string; title: string }[];
+  };
+  platform?: string;
+};
+
+/** No integration chosen: the integration row's name, and a run's step 2 line then (the session's S23). */
+export const NONE_LABEL = "None";
 
 /**
- * STEPS' rows: numbered, the number in the label — one per group where the
- * manifest declares them, else one per step — each with what it does under
- * it. No kickers, no step cards.
+ * A step's title (Build 22; backend ADR-0041): its `titleByConnection` entry
+ * for the provider its connection setting holds now, else its own title —
+ * Invoice Processing v4's step 4 is "QuickBooks updated" while QuickBooks is
+ * chosen and "Details saved" with None (the session's D3, approved by the
+ * owner 21:12Z). With the flow's settings unknown (`config` absent) it is the
+ * step's own title.
  */
-export function flowStepRows(
-  steps: readonly DeclaredStep[] | undefined,
-  groups: readonly StepGroup[] | undefined,
-): FlowStepRow[] {
-  if (groups && groups.length > 0) {
-    return groups.map((group, index) => ({
-      id: group.id,
-      label: `${index + 1} · ${group.title}`,
-      sub: group.description,
-    }));
-  }
-  return (steps ?? []).map((step, index) => ({
-    id: step.id,
-    label: `${index + 1} · ${step.title}`,
-    sub: step.description,
-  }));
+export function stepTitle(
+  group: StepHeading,
+  setup: readonly Pick<Field, "key" | "defaultValue">[],
+  config: Readonly<Record<string, unknown>> | undefined,
+): string {
+  const byConnection = group.titleByConnection;
+  if (!byConnection || !config) return group.title;
+  const chosen = chosenVendor(
+    setup.find((field) => field.key === byConnection.field) ?? {
+      key: byConnection.field,
+    },
+    config,
+  );
+  return (
+    byConnection.titles.find((entry) => entry.providerId === chosen)?.title ??
+    group.title
+  );
 }
 
 /**
- * STEPS with what each holds:
+ * What one row of a flow page's STEPS holds (Build 22, spec §4's generic
+ * rules, the same in both clients; backend ADR-0041):
  *
- * - `input` — the row that receives the run's input: the trigger's group (the
- *   pipeline's TRIGGER step, else its first), or, without groups, the first
- *   step. Step 1 holds the document and Start run.
- * - `vendorFields` — each step's vendor choice, by the `group` its connection
- *   field names (backend ADR-0040; Invoice Processing v3's `vendor` names
- *   "done"). A field that names no row here — a version from before `group`
- *   (v2) — is `unplaced`: the page draws it under the steps.
+ * - `steps` — a group pipeline steps name (or, without groups, one step):
+ *   nothing under its title but Step 1's controls on the row that takes the
+ *   run's input;
+ * - `setting` — a group no pipeline step names and with no `platform`: the
+ *   setup fields that name it (Invoice Processing v4's "Connect integration",
+ *   its `vendor` field drawn as the integration row);
+ * - `email` — the platform's own email step (`platform: email`): who gets it;
+ * - `platform` — a `platform` this build does not know: its title only.
  */
-export type FlowStepPlan = FlowStepRow & {
+export type FlowStepKind = "steps" | "setting" | "email" | "platform";
+
+/** One row of a flow page's STEPS: "1 · Upload invoice" — titles only since Build 22 (the session's S20). */
+export type FlowStepRow = {
+  id: string;
+  label: string;
+  kind: FlowStepKind;
+  /** The row that takes the run's input: Step 1's document and Start run. */
   input: boolean;
-  vendorFields: string[];
+  /** A setting step's fields, by key, in the manifest's order. */
+  fields: string[];
 };
 
+/**
+ * A flow page's STEPS (Build 22, P1): numbered rows, one per visible group
+ * where the manifest declares them, else one per step, each its title only.
+ *
+ * The input row is the trigger's group (the pipeline's TRIGGER step, else its
+ * first), or without groups the first step. A setup field with no `group` is
+ * not drawn here — it is on Set up (spec §4). ~~A field naming no step drawn
+ * under the steps (`unplaced`), and each group's description under its
+ * title~~ until Build 22.
+ */
 export function flowStepPlan(
   steps: readonly DeclaredStep[] | undefined,
-  groups: readonly StepGroup[] | undefined,
-  vendorFields: readonly { key: string; group?: string }[],
-): { rows: FlowStepPlan[]; unplaced: string[] } {
-  const rows = flowStepRows(steps, groups);
-  const grouped = Boolean(groups && groups.length > 0);
+  groups: readonly StepHeading[] | undefined,
+  setup: readonly Pick<Field, "key" | "defaultValue" | "group">[],
+  config: Readonly<Record<string, unknown>> | undefined,
+): FlowStepRow[] {
+  if (!groups || groups.length === 0) {
+    return (steps ?? []).map((step, index) => ({
+      id: step.id,
+      label: `${index + 1} · ${step.title}`,
+      kind: "steps",
+      input: index === 0,
+      fields: [],
+    }));
+  }
+  const named = new Set(
+    (steps ?? []).flatMap((step) => (step.group ? [step.group] : [])),
+  );
   const trigger =
     (steps ?? []).find((step) => step.kicker === "TRIGGER") ?? steps?.[0];
-  const inputId = grouped
-    ? (groups!.find((group) => group.id === trigger?.group)?.id ??
-      groups![0]?.id)
-    : rows[0]?.id;
-  const ids = new Set(grouped ? rows.map((row) => row.id) : []);
-  const placed = new Map<string, string[]>();
-  const unplaced: string[] = [];
-  for (const field of vendorFields) {
-    if (field.group && ids.has(field.group))
-      placed.set(field.group, [...(placed.get(field.group) ?? []), field.key]);
-    else unplaced.push(field.key);
-  }
-  return {
-    rows: rows.map((row) => ({
-      ...row,
-      input: row.id === inputId,
-      vendorFields: placed.get(row.id) ?? [],
-    })),
-    unplaced,
-  };
+  const inputId =
+    groups.find((group) => group.id === trigger?.group)?.id ?? groups[0]!.id;
+  return groups.map((group, index) => {
+    const kind: FlowStepKind =
+      group.platform !== undefined
+        ? group.platform === "email"
+          ? "email"
+          : "platform"
+        : named.has(group.id)
+          ? "steps"
+          : "setting";
+    return {
+      id: group.id,
+      label: `${index + 1} · ${stepTitle(group, setup, config)}`,
+      kind,
+      input: group.id === inputId,
+      fields:
+        kind === "setting"
+          ? setup
+              .filter((field) => field.group === group.id)
+              .map((field) => field.key)
+          : [],
+    };
+  });
+}
+
+/**
+ * A setting step's line on a run's page (Build 22; the session's S23): the
+ * integration each of its connection fields holds now — its name, or "None" —
+ * a run's own choice not being recorded (backend §12.1 #290). `null` for a
+ * setting step with no connection field, which then says "Done".
+ */
+export function settingLine(
+  groupId: string,
+  setup: readonly Pick<Field, "key" | "control" | "defaultValue" | "group">[],
+  config: Readonly<Record<string, unknown>>,
+  providerName: (providerId: string) => string,
+): string | null {
+  const names = setup
+    .filter(
+      (field) => field.group === groupId && field.control === "connection",
+    )
+    .map((field) => {
+      const chosen = chosenVendor(field, config);
+      return chosen === NONE ? NONE_LABEL : providerName(chosen);
+    });
+  return names.length > 0 ? names.join(", ") : null;
 }
 
 /** Step 1's line for a vendor chosen and not connected (spec A6). */
@@ -167,71 +238,60 @@ export function connectFirst(displayNames: string): string {
   return `Connect ${displayNames} first.`;
 }
 
-/** One row of Home's Run a flow: a live flow, its name, its icon name and its team. */
-export type QuickRunRow = {
-  id: string;
-  name: string;
-  icon: string | null;
-  team: string;
-};
-
 /**
- * Home's Run a flow (Build 21, spec A9; the owner's "when a user wants to run a
- * random flow. they shouldnt have to do a bunch of work in the app"; the
- * session's S16): every live flow, each opening its flow page at Step 1, which
- * holds the document and Start run — three presses from Home to a started
- * run. Empty, the section is not drawn.
+ * The first instant of today where the browser is (Build 22, W1; the session's
+ * S27): the dashboard's Today tiles count from it, as the app's TODAY counts
+ * from its own `localMidnight()` — "today" is a local idea.
  */
-export function quickRunRows(
-  subscriptions:
-    | readonly {
-        id: string;
-        templateId: string;
-        name?: string | null;
-        status: string;
-        projectId?: string | null;
-      }[]
-    | null,
-  catalog: readonly { templateId: string; name: string; icon?: string }[],
-  team: (subscription: {
-    templateId: string;
-    projectId?: string | null;
-  }) => string,
-): QuickRunRow[] {
-  if (subscriptions === null) return [];
-  const entries = new Map(catalog.map((entry) => [entry.templateId, entry]));
-  return subscriptions
-    .filter((subscription) => subscription.status === "live")
-    .map((subscription) => {
-      const entry = entries.get(subscription.templateId);
-      return {
-        id: subscription.id,
-        name: subscription.name ?? entry?.name ?? subscription.templateId,
-        icon: entry?.icon ?? null,
-        team: team(subscription),
-      };
-    });
+export function localMidnight(now: Date): string {
+  const midnight = new Date(now);
+  midnight.setHours(0, 0, 0, 0);
+  return midnight.toISOString();
+}
+
+/** Where a Today tile goes: Activity from that instant, for its outcome (Runs: every outcome). */
+export function todayHref(
+  since: string,
+  outcome?: "succeeded" | "failed",
+): string {
+  return `/account/runs?${outcome ? `status=${outcome}&` : ""}since=${encodeURIComponent(since)}`;
 }
 
 const FLOW_ID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
+/** An instant as the platform writes one: an ISO 8601 date and time, with its zone. */
+const INSTANT =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/u;
+
 /**
- * What Activity is filtered by, from its address (spec A6; the session's W2):
- * a flow's Dashboard opens it for that flow (`?flow=`) and an outcome
- * (`&status=succeeded` or `failed`). Only a flow id shaped as one — a UUID,
- * as the platform's `subscriptionId` is — is sent on to the platform, which
- * refuses any other (400) and would take the page with it; anything else in
- * the address is read as no filter at all.
+ * What Activity is filtered by, from its address (spec A6; the session's W2;
+ * Build 22's W1): a flow's Dashboard opens it for that flow (`?flow=`) and an
+ * outcome (`&status=succeeded` or `failed`), and the dashboard's Today tiles
+ * from the browser's midnight (`&since=`). Only a flow id shaped as one — a
+ * UUID, as the platform's `subscriptionId` is — is sent on to the platform,
+ * which refuses any other (400) and would take the page with it; only a
+ * `since` that is an instant is kept; anything else in the address is read as
+ * no filter at all.
  */
 export function activityFilter(
   flow: unknown,
   status: unknown,
-): { flowId?: string; outcome?: "succeeded" | "failed" } {
+  since?: unknown,
+): {
+  flowId?: string;
+  outcome?: "succeeded" | "failed";
+  since?: string;
+} {
   return {
     ...(typeof flow === "string" && FLOW_ID.test(flow) ? { flowId: flow } : {}),
     ...(status === "succeeded" || status === "failed"
       ? { outcome: status }
+      : {}),
+    ...(typeof since === "string" &&
+    INSTANT.test(since) &&
+    !Number.isNaN(Date.parse(since))
+      ? { since }
       : {}),
   };
 }

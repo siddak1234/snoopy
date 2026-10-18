@@ -8,16 +8,12 @@ import { SlidersHorizontalIcon } from "@phosphor-icons/react/dist/ssr/SlidersHor
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import Modal from "@/components/ui/Modal";
-import type {
-  AutomationSetupField,
-  SubscriptionStatus,
-} from "@/lib/automations";
+import type { SubscriptionStatus } from "@/lib/automations";
 import {
   archiveSubscription,
   setSubscriptionStatus,
   type ActionResult,
 } from "./actions";
-import { MoveVersionButton } from "./MoveVersionButton";
 import { WebhookAddressButton } from "./WebhookAddressButton";
 
 /** The row at the bottom of a flow's page that opens Set up again (the owner's AM4). */
@@ -30,8 +26,6 @@ export const EDIT_SETUP = "Edit setup";
  *
  * - **Pause** while it is on — while it is off, Turn on is Step 1's alone,
  *   never two Turn on buttons (the app's M4);
- * - **Move to vN** when the catalog has a newer version than the one pinned
- *   (backend §12.1 #126);
  * - **Edit setup** when the version it runs declares settings or accounts: Set
  *   up again, the same page Add opened (~~Set up, a dialog on the card~~ until
  *   Build 21);
@@ -39,6 +33,11 @@ export const EDIT_SETUP = "Edit setup";
  * - **Archive flow**, last and in red: the platform's one-way `archived`,
  *   behind its confirmation — it stops, moves to Archived flows, keeps its runs
  *   in Activity, and can be unarchived later (the owner's build 12, #4, #5).
+ *
+ * ~~The move to the catalog's newest version, while it was newer than the one
+ * pinned (backend §12.1 #126)~~ until Build 22 (the owner's build 21 item 7: "I also
+ * dont want a move to vx number in the flows. The user always gets the latest
+ * version"): the platform moves every flow to the newest (backend ADR-0041).
  *
  * A client component only because it holds pending state and the last refusal;
  * the work happens in server actions. A refusal is shown rather than
@@ -49,7 +48,6 @@ export function AutomationActions({
   name,
   subscription,
   setupHref,
-  newer,
   webhook,
 }: {
   /** The workspace this page shows; every action is refused once it is not active. */
@@ -58,13 +56,6 @@ export function AutomationActions({
   subscription: { id: string; status: SubscriptionStatus };
   /** Set up for this flow, when its version declares anything to set up. */
   setupHref: string | null;
-  /** The catalog's newer version, to move to, and what the flow holds now. */
-  newer: {
-    from: number;
-    to: number;
-    config: Record<string, unknown>;
-    targetSetup: AutomationSetupField[];
-  } | null;
   /** A webhook-started version, for an owner or admin. */
   webhook: boolean;
 }) {
@@ -120,29 +111,6 @@ export function AutomationActions({
           >
             {pending ? "Working…" : "Pause"}
           </Button>
-        </div>
-      ) : null}
-
-      {/* A subscription runs the version it PINNED (backend ADR-0030), and
-          adding a flow pins the newest. It moves in place (backend §12.1
-          #126); the catalog does not say what a newer version declares, so
-          the page says only which version runs. */}
-      {newer ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-xs text-[var(--muted)]">
-            This runs v{newer.from}; v{newer.to} is available.
-          </p>
-          <MoveVersionButton
-            workspaceId={workspaceId}
-            subscriptionId={subscription.id}
-            name={name}
-            from={newer.from}
-            to={newer.to}
-            config={newer.config}
-            // Move goes only to the catalog's newest, so its fields are the target's.
-            targetSetup={newer.targetSetup}
-            focusAfter="flow-steps-title"
-          />
         </div>
       ) : null}
 

@@ -467,8 +467,8 @@ test("no server action acts on the workspace active NOW rather than the one its 
       /data\.append\("workspaceId", workspaceId\)/u,
     ],
     [
-      "app/account/flows/MoveVersionButton.tsx",
-      /data\.append\("workspaceId", workspaceId\)/u,
+      "app/account/flows/[subscriptionId]/email/EmailRecipientsForm.tsx",
+      /data\.set\("workspaceId", workspaceId\)/u,
     ],
     [
       "app/account/approvals/ApprovalDecision.tsx",

@@ -219,11 +219,6 @@ function initialState() {
       string,
       { filename: string; sizeBytes: number; runId?: string }
     >(),
-    // Backend §12.1 #126: the version the webhook automation's subscription
-    // pins, and whether an approval, or a run, still waits on it.
-    webhookVersion: 1,
-    approvalPendingOnMove: false,
-    runsInFlightOnMove: false,
     // Backend §12.1 #91: the address once issued, and how many secrets so far.
     webhookSecrets: 0,
     // Backend §12.1 #240: every issue asked for, with the key it carried and
@@ -265,7 +260,6 @@ function initialState() {
     // The surfaces the change audit of 97021f9 probed and no test asserted
     // (register § Round 15): the refusals each operation names, answered as
     // the contract answers them, and what the object store saw arrive.
-    moveRefusal: null as { status: number; reason: string } | null,
     webhookReadRefusal: null as number | null,
     webhookIssueRefusal: null as string | null,
     // Whether the platform has a public origin to put in an address, and what
@@ -344,6 +338,14 @@ function initialState() {
     // three receipts; and whether one was started.
     invoiceRunStage: 0,
     invoiceRunStarted: false,
+    // Build 22 (spec §4, P5; backend ADR-0041): the Invoice Processing flow's
+    // extra email addresses — reserved example addresses, never a real one in
+    // this public repository — every list an owner or admin saved, and
+    // whether the platform fails the read of who gets the email, or its save.
+    emailExtra: ["ap@example.com"] as string[],
+    emailSaves: [] as string[][],
+    emailRecipientsFailing: false,
+    emailRecipientsRefusing: false,
   };
 }
 let state = initialState();
@@ -562,8 +564,9 @@ const teamDraftAutomation = {
 } satisfies Automations["AutomationCatalogEntry"];
 
 // Started by a vendor's webhook, and the catalog's newest is v2 while the
-// subscription still pins v1: the card offers Move (backend §12.1 #126) and,
-// to an owner or admin, the webhook address (§12.1 #91).
+// subscription still runs v1 — a flow the platform could not move (backend
+// ADR-0041's `notMoved`): its page offers no move (Build 22, P4) and, to an
+// owner or admin, the webhook address (§12.1 #91).
 const webhookAutomation = {
   ...automation("fixture-webhook", "Webhook automation"),
   version: 2,
@@ -627,11 +630,15 @@ function googleConnection(): Connections["Connection"] {
   };
 }
 
-// Invoice Processing v3, as its manifest declares it (snoopy-automations
-// manifests/invoice-processing.v3.json; Build 21, spec §3.1–§3.2 with the
-// owner's AM3: no "Send results to"): the vendor choice names QuickBooks and
-// the Done step (`providers`, `group`, backend ADR-0040), the Approval limit
-// the Checked step, four groups, and its 22 steps in their groups' order.
+// Invoice Processing v4, as its manifest declares it (snoopy-automations
+// manifests/invoice-processing.v4.json; Build 22, spec §3): v3's 22 steps in
+// five groups — receive in Upload invoice; extract, check-documents and
+// verify-read in AI processing; the other 18 in step 4, "Details saved" or,
+// with QuickBooks chosen, "QuickBooks updated" (`titleByConnection`) — the
+// vendor choice, titled Integration, naming the Connect integration step,
+// which no pipeline step names (a setting step, backend ADR-0041), and the
+// platform's Email sent last (`platform: email`); the Approval limit in no
+// group (Set up only).
 const invoiceStep = (
   id: string,
   kicker: "TRIGGER" | "AI STEP" | "ACTION",
@@ -641,7 +648,7 @@ const invoiceStep = (
 ) => ({ id, kicker, group, title, description });
 const invoiceAutomation = {
   templateId: "fixture-invoice",
-  version: 3,
+  version: 4,
   name: "Invoice Processing",
   description:
     "Reads bills and receipts, then saves the details or records them in QuickBooks.",
@@ -663,13 +670,13 @@ const invoiceAutomation = {
     {
       section: "connections",
       key: "vendor",
-      title: "Vendor",
+      title: "Integration",
       description: "Where the details go.",
       control: "connection",
       defaultValue: "none",
       required: false,
       providers: [quickbooksProvider.providerId],
-      group: "done",
+      group: "connect",
     },
     {
       section: "rules",
@@ -679,179 +686,197 @@ const invoiceAutomation = {
       control: "money",
       defaultValue: 500,
       required: false,
-      group: "checked",
     },
   ],
   groups: [
-    { id: "received", title: "Received", description: "Add a PDF or photo." },
     {
-      id: "read",
-      title: "Read",
-      description: "AI reads each bill or receipt.",
+      id: "upload",
+      title: "Upload invoice",
+      description: "Add a PDF or photo.",
     },
     {
-      id: "checked",
-      title: "Checked",
-      description: "Totals and duplicates are checked.",
+      id: "connect",
+      title: "Connect integration",
+      description: "QuickBooks, or None.",
     },
     {
-      id: "done",
-      title: "Done",
+      id: "process",
+      title: "AI processing",
+      description: "AI reads and checks each document.",
+    },
+    {
+      id: "record",
+      title: "Details saved",
       description: "Saved, or recorded in QuickBooks.",
+      titleByConnection: {
+        field: "vendor",
+        titles: [
+          {
+            providerId: quickbooksProvider.providerId,
+            title: "QuickBooks updated",
+          },
+        ],
+      },
+    },
+    {
+      id: "email",
+      title: "Email sent",
+      description: "The results are emailed.",
+      platform: "email",
     },
   ],
   pipeline: [
     invoiceStep(
       "receive",
       "TRIGGER",
-      "received",
+      "upload",
       "Document received",
       "A PDF or photo arrives.",
     ),
     invoiceStep(
       "extract",
       "AI STEP",
-      "read",
+      "process",
       "Documents read",
       "AI reads each document.",
     ),
     invoiceStep(
       "check-documents",
       "ACTION",
-      "read",
+      "process",
       "Documents checked",
       "Checks totals and dates.",
     ),
     invoiceStep(
       "verify-read",
       "AI STEP",
-      "read",
+      "process",
       "Read again",
       "Only when something looks wrong.",
     ),
     invoiceStep(
       "read-company",
       "ACTION",
-      "checked",
+      "record",
       "QuickBooks checked",
       "Checks QuickBooks is connected.",
     ),
     invoiceStep(
       "read-preferences",
       "ACTION",
-      "checked",
+      "record",
       "QuickBooks settings read",
       "Reads currency and closed dates.",
     ),
     invoiceStep(
       "find-accounts",
       "ACTION",
-      "checked",
+      "record",
       "Accounts read",
       "Reads your accounts from QuickBooks.",
     ),
     invoiceStep(
       "find-vendors",
       "ACTION",
-      "checked",
+      "record",
       "Vendors looked up",
       "Finds each vendor in QuickBooks.",
     ),
     invoiceStep(
       "find-names",
       "ACTION",
-      "checked",
+      "record",
       "Names checked",
       "QuickBooks allows each name once.",
     ),
     invoiceStep(
       "find-duplicates",
       "ACTION",
-      "checked",
+      "record",
       "Duplicates checked",
       "Looks for the same number or amount.",
     ),
     invoiceStep(
       "find-related",
       "ACTION",
-      "checked",
+      "record",
       "Related records looked up",
       "Looks for a bill it pays.",
     ),
     invoiceStep(
       "decide",
       "ACTION",
-      "checked",
+      "record",
       "Ready to record?",
       "Records each one, or waits for approval.",
     ),
     invoiceStep(
       "create-vendors",
       "ACTION",
-      "done",
+      "record",
       "Vendors added",
       "Adds new vendors.",
     ),
     invoiceStep(
       "create-records",
       "ACTION",
-      "done",
+      "record",
       "Recorded in QuickBooks",
       "Creates bills and expenses.",
     ),
     invoiceStep(
       "save-documents",
       "ACTION",
-      "done",
+      "record",
       "Details saved",
       "Saves the details for your team.",
     ),
     invoiceStep(
       "ask-approval",
       "ACTION",
-      "done",
+      "record",
       "Needs your approval",
       "Waits for your approval.",
     ),
     invoiceStep(
       "confirm-company",
       "ACTION",
-      "done",
+      "record",
       "Company checked again",
       "After approval.",
     ),
     invoiceStep(
       "confirm-vendors",
       "ACTION",
-      "done",
+      "record",
       "Vendors checked again",
       "After approval.",
     ),
     invoiceStep(
       "create-approved-vendors",
       "ACTION",
-      "done",
+      "record",
       "Approved vendors added",
       "After approval.",
     ),
     invoiceStep(
       "confirm-no-duplicates",
       "ACTION",
-      "done",
+      "record",
       "Duplicates checked again",
       "After approval.",
     ),
     invoiceStep(
       "create-approved-records",
       "ACTION",
-      "done",
+      "record",
       "Approved documents recorded",
       "After approval.",
     ),
     invoiceStep(
       "save-approved",
       "ACTION",
-      "done",
+      "record",
       "Approved details saved",
       "After approval.",
     ),
@@ -866,7 +891,7 @@ const accountingTeamId = "acacacac-acac-4cac-8cac-acacacacacac";
 function invoiceSubscription(): Automations["Subscription"] {
   if (state.invoiceV1) {
     return {
-      ...invoiceV3Subscription(),
+      ...invoiceV4Subscription(),
       templateVersion: 1,
       config: { defaultCategory: "Office supplies" },
       // v1 required QuickBooks; it declared no vendor setting.
@@ -885,16 +910,17 @@ function invoiceSubscription(): Automations["Subscription"] {
       ],
     };
   }
-  return invoiceV3Subscription();
+  return invoiceV4Subscription();
 }
 
-function invoiceV3Subscription(): Automations["Subscription"] {
+// On v4, the newest: the platform moves every flow there (backend ADR-0041).
+function invoiceV4Subscription(): Automations["Subscription"] {
   const vendor = state.invoiceConfig.vendor;
   return {
     id: invoiceSubscriptionId,
     workspaceId,
     templateId: invoiceAutomation.templateId,
-    templateVersion: 3,
+    templateVersion: 4,
     name: "Invoice Processing",
     status: state.invoiceStatus,
     config: state.invoiceConfig,
@@ -944,11 +970,11 @@ function webhookSubscription(): Automations["Subscription"] {
     ...manualSubscription,
     id: webhookSubscriptionId,
     templateId: webhookAutomation.templateId,
-    templateVersion: state.webhookVersion,
+    templateVersion: 1,
     triggerKind: "webhook",
     runInput: undefined,
     // The pinned version's settings (backend §12.1 #185): v1 declares none.
-    setup: state.webhookVersion === 2 ? webhookAutomation.setup : undefined,
+    setup: undefined,
   };
 }
 
@@ -1272,6 +1298,23 @@ function invoiceDocuments(runId: string): Automations["RunDocument"][] {
   return [];
 }
 
+/**
+ * Whether each Invoice Processing run's email went out (Build 22, P5c;
+ * `RunDetail.email`): the finished run's and the held run's sent; run
+ * 793eef82, from before, none; the run started from Step 1 owed once it ends,
+ * then sent (stage 3).
+ */
+function invoiceEmail(runId: string): Automations["RunEmailState"] {
+  const at = (seconds: number) =>
+    new Date(Date.parse(now) + seconds * 1000).toISOString();
+  if (runId === invoiceRunId) return { status: "sent", sentAt: at(21) };
+  if (runId === invoiceHeldRunId) return { status: "sent", sentAt: at(390) };
+  if (runId === invoiceV2RunId) return { status: "not_sent", sentAt: null };
+  return state.invoiceRunStage >= 3
+    ? { status: "sent", sentAt: at(154) }
+    : { status: "waiting", sentAt: null };
+}
+
 /** Its approval, refused (S21: its waiting document reads Not approved). */
 function invoiceApproval(): Automations["Approval"] {
   return {
@@ -1301,7 +1344,7 @@ function fixtureRun(runId: string): Automations["Run"] {
       workspaceId,
       subscriptionId: invoiceSubscriptionId,
       templateId: invoiceAutomation.templateId,
-      templateVersion: 3,
+      templateVersion: 4,
       status: stage === 0 ? "pending" : stage === 1 ? "running" : "succeeded",
       origin: "manual",
       rootRunId: runId,
@@ -1686,8 +1729,26 @@ const server = createServer(
         state.invoiceRunStarted = true;
         state.invoiceRunStage = 0;
       },
+      // Stage 3: ended, and its email sent (Build 22, P5c).
       "/__fixture/invoice-run-advance": () => {
-        state.invoiceRunStage = Math.min(2, state.invoiceRunStage + 1);
+        state.invoiceRunStage = Math.min(3, state.invoiceRunStage + 1);
+      },
+      // Build 22 (spec §4, P5): who gets the email — its read failing, its
+      // save refused, its extra addresses at the limit or none.
+      "/__fixture/email-recipients-failing": () => {
+        state.emailRecipientsFailing = true;
+      },
+      "/__fixture/email-recipients-refusing": () => {
+        state.emailRecipientsRefusing = true;
+      },
+      "/__fixture/email-recipients-full": () => {
+        state.emailExtra = Array.from(
+          { length: 10 },
+          (_, index) => `person${index + 1}@example.com`,
+        );
+      },
+      "/__fixture/email-recipients-none": () => {
+        state.emailExtra = [];
       },
       // The project automation held twice, as production's one duplicate from
       // before one flow per workspace is (the owner's build 12, #9): in the
@@ -1740,13 +1801,6 @@ const server = createServer(
       // The change audit of 97021f9's surfaces (register § Round 15). Each
       // refusal holds until the fixture is reset, before every test — another
       // control does not clear it (register F71).
-      // Backend §12.1 #126: a move refused with a reason — 409 or 422.
-      "/__fixture/move-refused": () => {
-        const status = Number(url.searchParams.get("status"));
-        const reason = url.searchParams.get("reason");
-        if ((status !== 409 && status !== 422) || !reason) return false;
-        state.moveRefusal = { status, reason };
-      },
       // Backend §12.1 #91: the address's read refused (403) or failed (503).
       "/__fixture/webhook-read-refused": () => {
         const status = Number(url.searchParams.get("status"));
@@ -1890,6 +1944,8 @@ const server = createServer(
         invoiceConfig: state.invoiceConfig,
         invoiceSaves: state.invoiceSaves,
         quickbooksConnected: state.quickbooksConnected,
+        // Build 22: every list of extra email addresses saved, in order.
+        emailSaves: state.emailSaves,
       });
     }
     if (
@@ -1988,22 +2044,6 @@ const server = createServer(
       return response.end(
         JSON.stringify({ format: "autom8x.workspace-export.v1" }),
       );
-    }
-    if (
-      request.method === "POST" &&
-      url.pathname === "/__fixture/approval-pending-on-move"
-    ) {
-      state.approvalPendingOnMove = true;
-      response.writeHead(204, { "cache-control": "no-store" });
-      return response.end();
-    }
-    if (
-      request.method === "POST" &&
-      url.pathname === "/__fixture/runs-in-flight-on-move"
-    ) {
-      state.runsInFlightOnMove = true;
-      response.writeHead(204, { "cache-control": "no-store" });
-      return response.end();
     }
     if (
       request.method === "POST" &&
@@ -3070,6 +3110,22 @@ const server = createServer(
         ...(state.overPlan ? { flowAllowance: { allowed: 2, live: 4 } } : {}),
       } satisfies AutomationOperations["listSubscriptions"]["responses"][200]["content"]["application/json"]);
     }
+    // Build 22 (P4; backend ADR-0041): no client chooses a version — a flow's
+    // update naming one is refused, as the Edge refuses it, naming the field
+    // (the session's S37).
+    if (
+      method === "PATCH" &&
+      /^\/v1\/workspaces\/[^/]+\/subscriptions\/[^/]+$/u.test(pathname) &&
+      "templateVersion" in (await requestJson(request))
+    ) {
+      return respond(
+        response,
+        400,
+        problem(400, "templateVersion is not an accepted field", {
+          field: "templateVersion",
+        }),
+      );
+    }
     if (
       method === "PATCH" &&
       isWorkspacePath(pathname, `/subscriptions/${manualSubscriptionId}`)
@@ -3190,61 +3246,101 @@ const server = createServer(
         subscription: invoiceSubscription(),
       } satisfies AutomationOperations["updateSubscription"]["responses"][200]["content"]["application/json"]);
     }
-    // Backend §12.1 #126: a move to v2, refused while an approval waits.
+    // Build 22 (spec §4, P5; backend ADR-0041): who gets a flow's run email —
+    // the workspace's owners and admins, as its members list reads them,
+    // owners first, and the flow's extra addresses; any member may read it,
+    // an owner or admin replaces the extra ones, the whole list, each checked
+    // and each address once without case, at most 10 (the platform's rules,
+    // its words for a refusal and `details.field`, the session's S36).
+    const recipientsOf =
+      /^\/v1\/workspaces\/([^/]+)\/subscriptions\/([^/]+)\/email-recipients$/u.exec(
+        pathname,
+      );
     if (
-      method === "PATCH" &&
-      isWorkspacePath(pathname, `/subscriptions/${webhookSubscriptionId}`)
+      recipientsOf &&
+      recipientsOf[1] === workspaceId &&
+      (method === "GET" || method === "PUT")
     ) {
-      const body = (await requestJson(request)) as {
-        templateVersion?: number;
-        config?: Json;
-      };
-      if (body.templateVersion !== 2 || !request.headers["idempotency-key"]) {
+      const flowId = recipientsOf[2];
+      const known = [
+        invoiceSubscriptionId,
+        manualSubscriptionId,
+        webhookSubscriptionId,
+        archivableSubscriptionId,
+        projectDraftSubscription.id,
+      ];
+      if (!known.includes(flowId))
+        return respond(response, 404, problem(404, "Not Found"));
+      const answer = (): Automations["FlowEmailRecipients"] => ({
+        subscriptionId: flowId,
+        people: (["owner", "admin"] as const).flatMap((role) =>
+          organizationMembers
+            .filter((member) => member.role === role)
+            .map((member) => ({
+              email: member.email,
+              displayName: member.displayName,
+              role,
+            })),
+        ),
+        extra: flowId === invoiceSubscriptionId ? state.emailExtra : [],
+        canEdit: administering,
+      });
+      if (method === "GET") {
+        if (state.emailRecipientsFailing)
+          return respond(response, 503, problem(503, "Service Unavailable"));
+        return respond(response, 200, answer());
+      }
+      if (!administering)
         return respond(
           response,
-          422,
-          problem(422, "Undeclared fixture subscription update"),
+          403,
+          problem(403, "Forbidden", { requiredRole: "admin" }),
         );
-      }
-      // The move with v2's settings, in one change (backend §12.1 #185): held to
-      // v2's one field, as the platform holds the pair to the version it moves to.
-      if (body.config !== undefined) {
-        const config = body.config as Record<string, unknown> | null;
+      if (state.emailRecipientsRefusing)
+        return respond(response, 503, problem(503, "Service Unavailable"));
+      const body = (await requestJson(request)) as { extra?: unknown };
+      const extra = body.extra;
+      if (!Array.isArray(extra) || Object.keys(body).join() !== "extra")
+        return respond(
+          response,
+          400,
+          problem(400, "extra must be an array of email addresses", {
+            field: "extra",
+          }),
+        );
+      if (extra.length > 10)
+        return respond(
+          response,
+          400,
+          problem(400, "extra must hold at most 10 addresses", {
+            field: "extra",
+          }),
+        );
+      const address =
+        /^[^\s@<>,;"()[\]\\]{1,64}@([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$/u;
+      const kept: string[] = [];
+      for (const [index, entry] of extra.entries()) {
+        const trimmed = typeof entry === "string" ? entry.trim() : "";
         if (
-          !config ||
-          Object.keys(config).join() !== "toleranceSeconds" ||
-          typeof config.toleranceSeconds !== "number"
-        ) {
-          return respond(response, 422, refusal(422, "invalid_config"));
-        }
-        state.webhookVersion = 2;
-        state.moveRefusal = null;
-        return respond(response, 200, {
-          subscription: { ...webhookSubscription(), config: config as Json },
-        } satisfies AutomationOperations["updateSubscription"]["responses"][200]["content"]["application/json"]);
+          trimmed.length < 3 ||
+          trimmed.length > 254 ||
+          !address.test(trimmed)
+        )
+          return respond(
+            response,
+            400,
+            problem(400, `extra[${index}] must be an email address`, {
+              field: `extra[${index}]`,
+            }),
+          );
+        if (
+          !kept.some((listed) => listed.toLowerCase() === trimmed.toLowerCase())
+        )
+          kept.push(trimmed);
       }
-      if (state.approvalPendingOnMove) {
-        return respond(response, 409, {
-          ...problem(409, "Conflict"),
-          details: { reason: "approvals_pending" },
-        } satisfies Platform["ApiProblem"]);
-      }
-      if (state.moveRefusal) {
-        const { status, reason } = state.moveRefusal;
-        return respond(response, status, refusal(status, reason));
-      }
-      // The Edge refuses a move while a run of the subscription is pending or
-      // running, whose callbacks the move would break (backend 23.6.3).
-      if (state.runsInFlightOnMove) {
-        return respond(response, 409, {
-          ...problem(409, "Conflict"),
-          details: { reason: "runs_in_flight" },
-        } satisfies Platform["ApiProblem"]);
-      }
-      state.webhookVersion = 2;
-      return respond(response, 200, {
-        subscription: webhookSubscription(),
-      } satisfies AutomationOperations["updateSubscription"]["responses"][200]["content"]["application/json"]);
+      state.emailExtra = kept;
+      state.emailSaves.push(kept);
+      return respond(response, 200, answer());
     }
     // Backend §12.1 #91: the address, for an owner or admin only; the secret
     // only in an issue's answer.
@@ -3776,6 +3872,7 @@ const server = createServer(
           steps: invoiceSteps(runId),
           events: [],
           ...(documents.length > 0 ? { documents } : {}),
+          email: invoiceEmail(runId),
         } satisfies AutomationOperations["readRun"]["responses"][200]["content"]["application/json"]);
       }
       const steps = [

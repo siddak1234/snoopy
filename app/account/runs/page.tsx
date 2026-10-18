@@ -28,7 +28,10 @@ import { resolveActiveWorkspaceId } from "@/lib/tenancy";
  *
  * A flow page's Dashboard opens this list for one flow (`?flow=`), and for its
  * successes or failures (`&status=`), as the app's Activity is filtered (spec
- * A6); the subheader says which.
+ * A6); the dashboard's Today tiles open it from the browser's midnight
+ * (`&since=`, Build 22's W1; the session's S27), keeping the runs made since —
+ * "Today", or "Today · Successes" / "Today · Failures". The subheader says
+ * which.
  */
 
 export const dynamic = "force-dynamic";
@@ -37,10 +40,10 @@ export const dynamic = "force-dynamic";
 const OUTCOMES = { succeeded: "Successes", failed: "Failures" } as const;
 
 export default async function RunsPage(props: PageProps<"/account/runs">) {
-  const { flow, status } = await props.searchParams;
+  const { flow, status, since: from } = await props.searchParams;
   const session = await getAppSession();
   const workspaceId = await resolveActiveWorkspaceId(session);
-  const { flowId, outcome } = activityFilter(flow, status);
+  const { flowId, outcome, since } = activityFilter(flow, status, from);
 
   if (!workspaceId) {
     return (
@@ -67,9 +70,11 @@ export default async function RunsPage(props: PageProps<"/account/runs">) {
     catalog.automations.map((entry) => [entry.templateId, entry.name]),
   );
   const runs = {
-    runs: outcome
-      ? listed.runs.filter((run) => run.status === outcome)
-      : listed.runs,
+    runs: listed.runs.filter(
+      (run) =>
+        (!outcome || run.status === outcome) &&
+        (!since || Date.parse(run.createdAt) >= Date.parse(since)),
+    ),
   };
   // One flow's runs: its name, and the outcome its tile opened.
   const shown = subscriptions.subscriptions.find(
@@ -80,8 +85,9 @@ export default async function RunsPage(props: PageProps<"/account/runs">) {
       nameFor.get(shown?.templateId ?? listed.runs[0]?.templateId ?? "") ??
       "One flow")
     : null;
-  const subheader = flowName
-    ? [flowName, outcome ? OUTCOMES[outcome] : null].filter(Boolean).join(" · ")
+  const scope = flowName ?? (since ? "Today" : null);
+  const subheader = scope
+    ? [scope, outcome ? OUTCOMES[outcome] : null].filter(Boolean).join(" · ")
     : "Every run in this workspace";
 
   return (

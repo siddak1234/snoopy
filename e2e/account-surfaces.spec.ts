@@ -42,13 +42,6 @@ const joinLink = "/onboarding/join-org?w=11111111-1111-4111-8111-111111111111";
 const workspaceChanged =
   "The active workspace changed in another tab. Reload this page before continuing.";
 
-// The dashboard's figure beside a term.
-function figure(page: Page, term: string) {
-  return page
-    .locator("dt", { hasText: term })
-    .locator("xpath=following-sibling::dd[1]");
-}
-
 // Each approval's status at the platform: a decision leaves the page.
 async function approvalStatuses() {
   return (await fixtureRead<{ approvalStatuses: string[] }>("counts"))
@@ -90,9 +83,10 @@ test("2 — recent activity says when it could not be read, and says when there 
   await expect(
     page.getByText("Recent activity could not be read just now."),
   ).toBeVisible();
-  // One read failing takes nothing else with it.
-  // Its flows: four, and Invoice Processing's.
-  await expect(figure(page, "Flows")).toHaveText("5");
+  // One read failing takes nothing else with it: Today's tiles, and Add a
+  // flow and Flows (Build 22, W1).
+  await expect(page.getByTestId("today-stat-Runs")).toHaveText("3");
+  await expect(page.getByTestId("home-quick-actions")).toBeVisible();
   await fixtureControl("reset");
   await fixtureControl("runs-empty");
   await page.reload();
@@ -270,7 +264,8 @@ test.describe("on a small screen", () => {
       ["/account/runs/fixture-run-ok", "Run"],
       [FLOWS.manual, "Flow"],
       [`${FLOWS.manual}/setup`, "Set up"],
-      [`${FLOWS.invoice}/vendor?field=vendor`, "Connect vendor"],
+      [`${FLOWS.invoice}/vendor?field=vendor`, "Connect integration"],
+      [`${FLOWS.invoice}/email`, "Who gets the email"],
     ] as const) {
       await page.goto(path);
       await expect(header.getByText(title, { exact: true })).toBeVisible();
@@ -1102,16 +1097,17 @@ test("every flow control on a page whose workspace another tab switched away is 
   await expect(page).toHaveURL(new RegExp(`${FLOWS.manual}$`, "u"));
   await switchInAnotherTab(page, /Fixture Organization/);
 
-  // The webhook flow's page: the move.
-  await page.goto(FLOWS.webhook);
+  // Invoice Processing's email page: Add and a remove (Build 22, P5).
+  await page.goto(`${FLOWS.invoice}/email`);
   await switchInAnotherTab(page, /Fixture Personal/);
-  await main.getByRole("button", { name: "Move to v2" }).click();
-  const move = page.getByRole("dialog", {
-    name: "Move Webhook automation to v2?",
-  });
-  await move.getByRole("button", { name: "Move to v2" }).click();
-  await expect(move.getByRole("alert")).toHaveText(workspaceChanged);
-  await move.getByRole("button", { name: "Cancel" }).click();
+  const also = main.getByTestId("email-also");
+  await also
+    .getByRole("textbox", { name: "Email address" })
+    .fill("bookkeeper@example.com");
+  await also.getByRole("button", { name: "Add" }).click();
+  await expect(also.getByRole("alert")).toHaveText(workspaceChanged);
+  await also.getByRole("button", { name: "Remove ap@example.com" }).click();
+  await expect(also.getByRole("alert")).toHaveText(workspaceChanged);
   await switchInAnotherTab(page, /Fixture Organization/);
 
   // The archivable flow's page: Archive.
@@ -1132,8 +1128,10 @@ test("every flow control on a page whose workspace another tab switched away is 
   await expect(project.getByRole("button", { name: "Add" })).toBeVisible();
   await page.goto(FLOWS.manual);
   await expect(main.getByText(/^live$/i)).toBeVisible();
-  await page.goto(FLOWS.webhook);
-  await expect(main).toContainText("This runs v1; v2 is available.");
+  await page.goto(`${FLOWS.invoice}/email`);
+  await expect(
+    main.getByTestId("email-also").locator("[data-connection-row]"),
+  ).toHaveText(["ap@example.com"]);
   await page.goto(FLOWS.archivable);
   await expect(
     main.getByRole("button", { name: "Archive flow" }),

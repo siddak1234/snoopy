@@ -13,7 +13,7 @@
  * No React and no `@/` import here: the unit test loads this file as it is.
  */
 
-/** A flow's Connect vendor page for one step's choice (spec A2). */
+/** A flow's Connect integration page for one step's choice (spec A2). */
 export function vendorPath(subscriptionId: string, field?: string): string {
   const path = `/account/flows/${encodeURIComponent(subscriptionId)}/vendor`;
   return field ? `${path}?field=${encodeURIComponent(field)}` : path;

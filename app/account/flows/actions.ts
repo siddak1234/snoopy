@@ -8,12 +8,15 @@ import {
   createSubscription,
   decideApproval as decideWorkspaceApproval,
   listSubscriptions,
+  updateFlowEmailRecipients,
   updateSubscription,
   type CreateRunRequest,
   type CreateSubscriptionRequest,
   type DecideApprovalRequest,
+  type FlowEmailRecipients,
   type UpdateSubscriptionRequest,
 } from "@/lib/automations";
+import { EMAIL_SAVE_FAILED } from "@/lib/flow-email";
 import { heldCopy } from "@/lib/held-flow";
 import { overPlanRefusal } from "@/lib/plan-limit";
 import { subscriptionEntitlementState } from "@/lib/subscription-entitlements";
@@ -23,8 +26,8 @@ import { activeWorkspaceIfShown, WORKSPACE_CHANGED } from "@/lib/tenancy";
  * Mutations on the automation surface.
  *
  * **Flows is revalidated with every page under it** (`"layout"`): a flow's
- * own page, its Set up and its Connect vendor page show what the mutation
- * changed as well as the list does (Build 21, spec A6).
+ * own page, its Set up, its Connect integration page and its email page show
+ * what the mutation changed as well as the list does (Build 21, spec A6).
  *
  * **A path is revalidated only when the mutation succeeded.** Revalidating after a
  * refusal re-renders the page, and under a platform that is refusing requests
@@ -54,9 +57,6 @@ export type ActionResult =
         | "plan-limit"
         | "entitlements-unavailable"
         | "file-unavailable"
-        // A move refused because the settings do not fit the version it goes
-        // to: answered with that version's fields (backend §12.1 #185).
-        | "settings-misfit"
         // A save that chose a vendor the workspace has not connected, on a
         // live flow (backend ADR-0037): said with the vendor's name.
         | "vendor-not-connected";
@@ -280,6 +280,41 @@ export async function saveVendorChoice(
   }
 }
 
+/**
+ * The email page's save (Build 22, P5; spec §4; the session's S30): the flow's
+ * extra addresses, the whole list as the page sends it (`extra`, once each, in
+ * order) — the platform replaces it whole, checks each address, and answers
+ * who gets the email now, which the page then shows. Owner or admin only, as
+ * the platform allows. Any refusal or failure says "Could not save. Try
+ * again." and the page keeps its list; a workspace switched away in another
+ * tab is said as it is everywhere.
+ */
+export async function saveEmailRecipients(
+  formData: FormData,
+): Promise<
+  { ok: true; recipients: FlowEmailRecipients } | { ok: false; error: string }
+> {
+  const subscriptionId = String(formData.get("subscriptionId") ?? "");
+  const extra = formData.getAll("extra");
+  if (!subscriptionId || extra.some((entry) => typeof entry !== "string"))
+    return { ok: false, error: EMAIL_SAVE_FAILED };
+  try {
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+    const recipients = await updateFlowEmailRecipients(
+      workspaceId,
+      subscriptionId,
+      { extra: extra as string[] },
+    );
+    revalidatePath("/account/flows", "layout");
+    return { ok: true, recipients };
+  } catch (error) {
+    if (error instanceof PlatformServerError)
+      return { ok: false, error: EMAIL_SAVE_FAILED };
+    throw error;
+  }
+}
+
 const SAVE_REFUSED = "Could not save. Try again.";
 const TURN_ON_REFUSED = "Could not turn it on. Try again.";
 
@@ -441,105 +476,6 @@ export async function archiveSubscription(
     revalidatePath("/account/billing");
   }
   return result;
-}
-
-/**
- * The refusals a move can meet that a person can act on (backend §12.1 #126),
- * in words. Anything else is the platform's own message.
- */
-const MOVE_REFUSALS: Record<string, string> = {
-  approvals_pending:
-    "An approval for this flow is still waiting. Decide it first, then move.",
-  runs_in_flight:
-    "A run of this flow is still going. Wait for it to finish, then move.",
-  version_unavailable: "That version is no longer available.",
-  subscription_archived: "An archived flow cannot move.",
-  // Answered with that version's fields in the move dialog (backend §12.1
-  // #185): Set up draws the version the flow runs, so it could not fix this.
-  invalid_config:
-    "Its settings do not fit that version. Set them for it to move.",
-  unmet_connections:
-    "That version needs an account this workspace has not connected. Connect it first, or pause the flow and move.",
-  setup_incomplete:
-    "That version needs a setting this flow does not have yet. Pause it, move, then finish Set up.",
-};
-
-/** Moves a subscription to another version of its automation (backend §12.1 #126). */
-export async function moveSubscriptionVersion(
-  formData: FormData,
-): Promise<ActionResult> {
-  const subscriptionId = String(formData.get("subscriptionId") ?? "");
-  const templateVersion = Number(formData.get("templateVersion"));
-  if (
-    !subscriptionId ||
-    !Number.isInteger(templateVersion) ||
-    templateVersion < 1
-  ) {
-    return { ok: false, error: "Choose a version to move to." };
-  }
-  try {
-    const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
-    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
-    await updateSubscription(
-      workspaceId,
-      subscriptionId,
-      { templateVersion },
-      "version",
-    );
-    revalidatePath("/account/flows", "layout");
-    return { ok: true };
-  } catch (error) {
-    if (!(error instanceof PlatformServerError)) throw error;
-    const reason = error.details?.reason;
-    const known =
-      typeof reason === "string" ? MOVE_REFUSALS[reason] : undefined;
-    return {
-      ok: false,
-      error: known ?? error.message,
-      ...(reason === "invalid_config"
-        ? { state: "settings-misfit" as const }
-        : {}),
-    };
-  }
-}
-
-/**
- * Moves a subscription with the settings of the version it moves to, in one
- * change (backend §12.1 #185): a plain move refused `invalid_config` is
- * answered with that version's fields, and the platform checks the pair against
- * it. Set up cannot do it — it draws the version the flow runs.
- */
-export async function moveWithConfiguration(
-  formData: FormData,
-): Promise<ActionResult> {
-  const subscriptionId = String(formData.get("subscriptionId") ?? "");
-  const templateVersion = Number(formData.get("templateVersion"));
-  if (
-    !subscriptionId ||
-    !Number.isInteger(templateVersion) ||
-    templateVersion < 1
-  ) {
-    return { ok: false, error: "Choose a version to move to." };
-  }
-  const config = declaredValues(formData, "config");
-  try {
-    const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
-    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
-    await updateSubscription(
-      workspaceId,
-      subscriptionId,
-      { config, templateVersion },
-      "version",
-    );
-    revalidatePath("/account/flows", "layout");
-    return { ok: true };
-  } catch (error) {
-    if (!(error instanceof PlatformServerError)) throw error;
-    const reason = error.details?.reason;
-    const known =
-      typeof reason === "string" ? MOVE_REFUSALS[reason] : undefined;
-    return { ok: false, error: known ?? error.message };
-  }
 }
 
 export async function setSubscriptionStatus(
