@@ -26,8 +26,9 @@ suite covers is README "Verification" ([README.md](../README.md)).
 - `npm run test:browser:fixtures` (`scripts/run-browser-fixtures.mjs`): builds
   against the loopback HTTPS fixture Edge (`e2e/fixtures/public-edge.ts`), signs
   in with a cookie-only session and scans every signed-in page with axe.
-- A new fixture spec joins the runner's list in `scripts/run-browser-fixtures.mjs`
-  and README's spec count; `test/verify-gate.test.mjs` checks the list.
+- A new fixture spec joins the runner's list in `scripts/run-browser-fixtures.mjs`,
+  that list's copy in `test/verify-gate.test.mjs` (which fails until both
+  agree) and README's spec count.
 
 ## Writing a fixture spec
 

@@ -48,8 +48,10 @@ such as `test/build22-screens.test.mjs`, and `e2e/account-surfaces.spec.ts`.
 4. Linked from the side menu: add its link and its small-screen title to
    `components/dashboard/DashboardNav.tsx` (register F56).
 5. The spec: add `e2e/$SLUG.spec.ts` to the fixture list in
-   `scripts/run-browser-fixtures.mjs`; if the fixture Edge
-   (`e2e/fixtures/public-edge.ts`) does not serve the operation yet, add it there.
+   `scripts/run-browser-fixtures.mjs` and to that list's copy in
+   `test/verify-gate.test.mjs`, which fails until both agree; if the fixture
+   Edge (`e2e/fixtures/public-edge.ts`) does not serve the operation yet, add
+   it there.
 6. Check the plain-words rule and mobile parity with `templates/checklist.md`.
 7. Docs, in the same commit: README's spec count and fixture paragraph, and
    `docs/ARCHITECTURE.md` or `README.md` for the page (docs-map rule `app`).
@@ -59,8 +61,12 @@ such as `test/build22-screens.test.mjs`, and `e2e/account-surfaces.spec.ts`.
    npm run map
    npm run format
    git status --short        # stage only this page's files, by name
+   # ALSO: each of these that steps 4, 5 and 7 changed, space-separated:
+   # components/dashboard/DashboardNav.tsx e2e/fixtures/public-edge.ts docs/ARCHITECTURE.md
    git add "app$ROUTE/page.tsx" "test/$SLUG.test.mjs" "e2e/$SLUG.spec.ts" \
-     scripts/run-browser-fixtures.mjs docs/MAP.md README.md && git commit
+     scripts/run-browser-fixtures.mjs test/verify-gate.test.mjs docs/MAP.md \
+     README.md $ALSO && git commit
+   git status --short        # nothing of this page's left behind
    npm run verify
    ```
 
@@ -76,7 +82,8 @@ such as `test/build22-screens.test.mjs`, and `e2e/account-surfaces.spec.ts`.
 ## Output
 
 `app/<route>/page.tsx`, `test/<slug>.test.mjs`, `e2e/<slug>.spec.ts`, the
-fixture list, `docs/MAP.md`, and the checklist ticked in the pull request body.
+fixture list and its copy, `docs/MAP.md`, and the checklist ticked in the pull
+request body.
 Each test is shown to fail when the line it guards is broken.
 
 ## The docs-map rule

@@ -118,4 +118,11 @@ test("npm runs the kit's docs check and map, and CI's gates job runs both on the
   assert.match(job, /^ {10}fetch-depth: 0$/mu);
   assert.match(job, /^ {6}- run: npm run check:docs$/mu);
   assert.match(job, /^ {6}- run: npm run map -- --check$/mu);
+  // The workflow's header says its jobs run the same under either trigger;
+  // DOCS_BASE reads the event's base branch, so the header names it.
+  const header = read(".github/workflows/ci.yml").split(/^on:$/mu)[0];
+  assert.match(
+    header,
+    /read nothing event-specific[^.]*but for the gates job's DOCS_BASE/u,
+  );
 });

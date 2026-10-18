@@ -30,8 +30,9 @@ Copy into the pull request body and tick each line with its evidence.
 
 - [ ] `test/<slug>.test.mjs` passes, and fails when the line it guards is broken.
 - [ ] `e2e/<slug>.spec.ts` runs in the fixture suite (in the list in
-      `scripts/run-browser-fixtures.mjs`) and its axe scan passes; the fixture
-      Edge (`e2e/fixtures/public-edge.ts`) serves the operation the page reads.
+      `scripts/run-browser-fixtures.mjs` and its copy in
+      `test/verify-gate.test.mjs`) and its axe scan passes; the fixture Edge
+      (`e2e/fixtures/public-edge.ts`) serves the operation the page reads.
 
 ## Docs and gates
 
