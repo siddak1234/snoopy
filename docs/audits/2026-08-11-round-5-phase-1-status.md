@@ -3847,3 +3847,9 @@ are named by the field's own title ("Integration" in v4) rather than a fixed "Ve
 An archived flow is not drawn by this page at all (`page.tsx:147-151`), so the app's other S34 change
 (no steps on an older archived flow) has nothing to change here. The gate and the change audit ran
 again on this tree.
+
+The privacy page is dated **October 18, 2026**, the day this branch merges (the session's S28): its
+email sentence changed in this branch, so the date it carried from Build 21 (October 17) became
+untrue. Both `/privacy` baselines were re-recorded (`b22-web-tools/repin.sh`: each old baseline
+failed first, then all six marketing pages passed — darwin on this Mac, linux in CI's pinned
+Playwright image), and `build21-screens` reads the new date.

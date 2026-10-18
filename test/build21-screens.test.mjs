@@ -89,7 +89,7 @@ function privacyText() {
 test("the privacy page says what v3 does — every financial document in a file, each one's details kept and downloadable, the results emailed to the owners and admins, the person who started the run and the flow's other addresses (Build 22, D1) — and no longer what it does not", () => {
   const text = privacyText();
   for (const said of [
-    "Effective and last updated: October 17, 2026.",
+    "Effective and last updated: October 18, 2026.",
     "Invoice Processing does, to read the bills, invoices, receipts, credit notes, statements and other financial documents in it before saving their details, recording them in QuickBooks Online, or comparing them with what QuickBooks holds.",
     // The spec's sentence, word for word.
     "What the run makes of each document, including its line items and the store's location when printed, is kept with the run's results, shown to the members of your workspace, and can be downloaded as a file.",
