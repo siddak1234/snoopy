@@ -538,3 +538,49 @@ test("the audit runs from a path with a space, and reads the documents and the f
     rmSync(planted, { recursive: true, force: true });
   }
 });
+
+test("the audit reads every CLAUDE.md, the agents' and skills' documents under .claude/, and the generated map", () => {
+  // The router and folder CLAUDE.md files, the agents, the skills and their
+  // templates are documents an agent follows; a path one names is checked.
+  planted((folder) => {
+    plant(folder, {
+      "lib/present.ts": code,
+      "CLAUDE.md": "@AGENTS.md\n",
+      "AGENTS.md": "Names `lib/present.ts` and `lib/gone-a.ts`.\n",
+      "app/CLAUDE.md": "Names `lib/gone-b.ts`.\n",
+      ".claude/agents/explorer.md":
+        "---\nname: explorer\n---\n\nNames `lib/gone-c.ts`.\n",
+      ".claude/skills/new-page/SKILL.md": "Names `lib/gone-d.ts`.\n",
+      ".claude/skills/new-page/templates/checklist.md":
+        "Names `lib/gone-e.ts`.\n",
+      "docs/MAP.md": "- [lib/gone-f.ts](../lib/gone-f.ts)\n",
+    });
+    const { status, output } = audit(folder);
+    assert.equal(status, 1, output);
+    assert.deepEqual(lines(output, "missing"), [
+      "missing\t.claude/agents/explorer.md:5\tlib/gone-c.ts",
+      "missing\t.claude/skills/new-page/SKILL.md:1\tlib/gone-d.ts",
+      "missing\t.claude/skills/new-page/templates/checklist.md:1\tlib/gone-e.ts",
+      "missing\tAGENTS.md:1\tlib/gone-a.ts",
+      "missing\tapp/CLAUDE.md:1\tlib/gone-b.ts",
+      "missing\tdocs/MAP.md:1\t../lib/gone-f.ts",
+    ]);
+  });
+  // And here: each of these documents names a file, and the audit read it.
+  const { output } = audit(root, ["--all"]);
+  for (const doc of [
+    "AGENTS.md",
+    "app/CLAUDE.md",
+    "e2e/CLAUDE.md",
+    ".claude/agents/explorer.md",
+    ".claude/skills/new-page/SKILL.md",
+    ".claude/skills/new-page/templates/checklist.md",
+    "docs/MAP.md",
+  ]) {
+    assert.match(
+      output,
+      new RegExp(`^found\\t${doc.replace(/[.]/gu, "\\.")}:`, "mu"),
+      `${doc} was not read`,
+    );
+  }
+});

@@ -1,0 +1,31 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { test } from "node:test";
+
+/**
+ * __Title__ (`app__route__/page.tsx`): __purpose__ It reads the platform only
+ * through lib/platform-server.ts, renders with the dashboard's parts, and shows
+ * the one empty row when there is nothing to list.
+ */
+
+const root = resolve(import.meta.dirname, "..");
+const page = readFileSync(join(root, "app__route__/page.tsx"), "utf8");
+/** The page's code alone: what its comments say is not what it does. */
+const code = page
+  .replace(/\/\*[\s\S]*?\*\//gu, "")
+  .replace(/^\s*\/\/.*$/gmu, "");
+
+test("__Title__ reads the platform through lib/platform-server.ts, never a fetch of its own (AGENTS.md rule 4)", () => {
+  assert.match(code, /from "@\/lib\/platform-server"/u);
+  assert.doesNotMatch(code, /\bfetch\(/u);
+});
+
+test("__Title__ renders with the dashboard's parts and their one empty row (AGENTS.md rule 2; register F29)", () => {
+  assert.match(code, /<SectionCard\b/u);
+  assert.match(code, /<EmptyRow\b/u);
+});
+
+test("__Title__ is read per request, so a build with no backend never prerenders it (register F62)", () => {
+  assert.match(code, /export const dynamic = "force-dynamic"/u);
+});

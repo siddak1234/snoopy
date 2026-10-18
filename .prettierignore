@@ -7,6 +7,11 @@ next-env.d.ts
 # Generated
 package-lock.json
 
+# The common kit, byte-identical in all four repositories (the engineering
+# standard's §0, linked from AGENTS.md): formatting a copy would make it drift
+.claude/hooks/
+scripts/kit/
+
 # Prose is written, not formatted
 docs/
 *.md

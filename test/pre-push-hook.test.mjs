@@ -1,6 +1,6 @@
 // The native pre-push gate, tested hermetically against throwaway repos —
 // driven exactly as git drives it: remote name + url as args, ref lines on
-// stdin. The six fast gates are the fixture's stubs: each notes that it ran,
+// stdin. The fast gates are the fixture's stubs: each notes that it ran,
 // and exits as the test says.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -19,16 +19,20 @@ import { test } from "node:test";
 const hook = resolve(import.meta.dirname, "../scripts/githooks/pre-push");
 const SNOOPY_URL = "https://github.com/siddak1234/snoopy.git";
 const ZERO = "0000000000000000000000000000000000000000";
-// verify's first six, in its order (README "Verification"), read from the
-// change audit's list rather than restated here.
-const FAST_GATES = [
+// verify's gates before its first build, in its order (README
+// "Verification"), less the map's staleness check, which test:contracts runs
+// (test/kit-repo.test.mjs) — read from the change audit's list rather than
+// restated here.
+const AUDIT_GATES = [
   ...readFileSync(
     resolve(import.meta.dirname, "../scripts/audit/run-gates.mjs"),
     "utf8",
   ).matchAll(/name: "([^"]+)"/gu),
-]
-  .map((match) => match[1])
-  .slice(0, 6);
+].map((match) => match[1]);
+const FAST_GATES = AUDIT_GATES.slice(
+  0,
+  AUDIT_GATES.indexOf("build:no-backend"),
+).filter((gate) => gate !== "map");
 const CONTRACTS = [
   "docs/openapi.yaml",
   "docs/openapi/automations.yaml",
@@ -41,8 +45,8 @@ function git(cwd, ...args) {
   return run.stdout.trim();
 }
 
-// A repository whose six gates are stubs — each writes `ran-<gate>` and exits
-// red or green as asked — with the sibling checkout the sixth reads planted
+// A repository whose fast gates are stubs — each writes `ran-<gate>` and exits
+// red or green as asked — with the sibling checkout the last reads planted
 // beside it, or not.
 function makeRepo({ red = [], sibling = true, recordGitDir = false } = {}) {
   const base = mkdtempSync(join(tmpdir(), "pre-push-"));
@@ -137,7 +141,7 @@ test("native pre-push gate", (t) => {
 
   const blocked = runHook(repo, SNOOPY_URL, refLine);
   assert.equal(blocked.exit, 1, "an unaudited tree is blocked");
-  assert.match(blocked.stderr, /the six fast gates are green/);
+  assert.match(blocked.stderr, /the fast gates are green/);
   assert.match(blocked.stderr, /no change-audit PASS marker/);
   assert.deepEqual(ran(repo), FAST_GATES, "the gates ran first, in order");
   for (const gate of ran(repo))
@@ -147,7 +151,7 @@ test("native pre-push gate", (t) => {
   const passed = runHook(repo, SNOOPY_URL, refLine);
   assert.equal(passed.exit, 0, "a marked tree passes");
   assert.deepEqual(ran(repo), FAST_GATES, "every fast gate ran, in order");
-  assert.match(passed.stderr, /the six fast gates are green/);
+  assert.match(passed.stderr, /the fast gates are green/);
   assert.ok(
     !existsSync(join(repo, ".autom8x")),
     "the hook writes no facts file",
@@ -170,9 +174,10 @@ test("native pre-push gate", (t) => {
   assert.deepEqual(ran(repo), [], "and runs no gate: nothing new ships");
 });
 
-test("the fast gates are verify's first six, run in its order and stopped at the first red, which is named with the bypass (register F93)", (t) => {
+test("the fast gates are verify's seven before its builds (all but the map's check), run in its order and stopped at the first red, which is named with the bypass (register F93)", (t) => {
   assert.deepEqual(FAST_GATES, [
     "format:check",
+    "check:docs",
     "lint",
     "typecheck",
     "audit:boundaries",
@@ -183,6 +188,13 @@ test("the fast gates are verify's first six, run in its order and stopped at the
     readFileSync(hook, "utf8"),
     new RegExp(`^for gate in ${FAST_GATES.join(" ")}; do$`, "mu"),
     "the hook's list is verify's",
+  );
+  // The count lives in one place, README "Verification"; the hook and
+  // AGENTS.md link to it.
+  assert.match(
+    readFileSync(resolve(import.meta.dirname, "../README.md"), "utf8"),
+    /the seven fast gates/u,
+    "README counts the hook's gates",
   );
   // Nothing slow, and nothing written: CI runs the builds and the browser
   // suites; only a whole green verify emits facts, only record-pass a marker.
@@ -209,7 +221,7 @@ test("the fast gates are verify's first six, run in its order and stopped at the
   assert.match(refused.stderr, /git push --no-verify/);
   assert.deepEqual(
     ran(repo),
-    FAST_GATES.slice(0, 3),
+    FAST_GATES.slice(0, FAST_GATES.indexOf("typecheck") + 1),
     "the gates after the red one did not run",
   );
   assert.ok(!existsSync(join(repo, ".autom8x")));
@@ -230,7 +242,7 @@ test("a sibling checkout that is absent skips verify:platform-contracts out loud
     passed.stderr,
     /verify:platform-contracts skipped — sibling checkout not present/,
   );
-  assert.deepEqual(ran(repo), FAST_GATES.slice(0, 5));
+  assert.deepEqual(ran(repo), FAST_GATES.slice(0, -1));
 });
 
 test("a push from a linked worktree runs the gates without git's repository variables, so the gates' own git calls cannot touch this repository", (t) => {

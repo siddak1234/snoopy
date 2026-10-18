@@ -1,27 +1,18 @@
 # Repository structure
 
-```text
-snoopy/
-├── app/                  Next.js routes, pages, server actions
-├── components/           Nocturne UI (`ui/`) and dashboard presentation
-├── hooks/                Client hooks (the browser's session read)
-├── lib/                  Platform façades, generated contracts, session mapping
-├── e2e/                  Browser, accessibility, and local Edge fixture tests
-├── test/                 Contract and structure tests (`npm run test:contracts`)
-├── scripts/              `npm run verify`, contract generation, boundary audit,
-│                         the documents' file references, repository facts;
-│                         `audit/` is the change audit's gate
-│                         runner, marker writer and their shared preflight;
-│                         `githooks/` and `hooks/` enforce its marker on push
-├── docs/                 Website architecture and the audit register
-├── .claude/              The change-auditor agent, `/audit-change`, its hook
-├── .github/              CI and the pull-request template
-├── Dockerfile            Standalone non-root website image
-├── compose.yml           Web service on the external platform network
-├── proxy.ts              Backend-session route protection
-├── instrumentation.ts    Start-up check: production refuses a missing or bad origin
-└── next.config.ts        Backend-origin validation and same-origin rewrite
-```
+The folders, routes, scripts, specs and records are listed in the generated
+[MAP.md](MAP.md) (`npm run map`). This page keeps why each part is where it is.
+The tree it held before: [REPO-STRUCTURE.archive.md](REPO-STRUCTURE.archive.md).
+
+| Part | Why it is here |
+| --- | --- |
+| `app/`, `components/` | Routes, pages and server actions; Nocturne UI (`ui/`) and dashboard presentation ([app/CLAUDE.md](../app/CLAUDE.md)) |
+| `hooks/`, `lib/` | The browser's session read; platform façades, generated contracts, session mapping |
+| `e2e/`, `test/` | Browser, accessibility and local Edge fixture tests ([e2e/CLAUDE.md](../e2e/CLAUDE.md)); contract and structure tests (`npm run test:contracts`) |
+| `scripts/` | `npm run verify` and its gates; `audit/` is the change audit's runner, marker writer and shared preflight; `githooks/` and `hooks/` enforce its marker on push; `kit/` is the common kit's docs check and map |
+| `.claude/` | The agents, skills and hooks (AGENTS.md "Where to look") |
+| `proxy.ts`, `instrumentation.ts`, `next.config.ts` | Backend-session route protection; the start-up check (production refuses a missing or bad origin); backend-origin validation and the same-origin rewrite |
+| `Dockerfile`, `compose.yml` | The standalone non-root image; the web service on the platform's external network |
 
 | Change | Location / rule |
 | --- | --- |

@@ -1,9 +1,9 @@
 // The website's whole offline gate in one command — `npm run verify` — so
 // "green" means the same list every time rather than whichever commands a
 // session remembered (backend §12.2 #68; BUILD-PLAN 20.4.1). It runs the gates
-// scripts/audit/run-gates.mjs runs, in the same order — format:check and
-// verify:platform-contracts among them (register F15) — and ends by emitting
-// this repository's facts file (scripts/repo-facts.mjs).
+// scripts/audit/run-gates.mjs runs, in the same order — format:check, the docs
+// check, the map's and verify:platform-contracts among them (register F15) —
+// and ends by emitting this repository's facts file (scripts/repo-facts.mjs).
 //
 // Deliberately separate from run-gates.mjs: that runner is the change audit's —
 // it needs origin/main, exits 0 without running a gate when HEAD equals the
@@ -52,6 +52,10 @@ await preflight({ root, fail });
 const siblingPresent = contractInputs.every((path) => existsSync(path));
 const gates = [
   { name: "format:check" },
+  // D, docs always updated (AGENTS.md): each changed area's doc changed with
+  // it (docs/docs-map.json), and docs/MAP.md regenerated from the tree.
+  { name: "check:docs" },
+  { name: "map", args: ["--", "--check"] },
   { name: "lint" },
   { name: "typecheck" },
   { name: "audit:boundaries" },
@@ -95,7 +99,7 @@ for (const gate of gates) {
     continue;
   }
   const begun = Date.now();
-  const run = spawnSync("npm", ["run", gate.name], {
+  const run = spawnSync("npm", ["run", gate.name, ...(gate.args ?? [])], {
     cwd: root,
     stdio: "inherit",
     env: { ...process.env, ...(gate.env ?? {}) },
