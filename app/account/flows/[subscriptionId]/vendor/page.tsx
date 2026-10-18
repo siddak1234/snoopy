@@ -29,10 +29,14 @@ import { vendorPath } from "../../vendor-path";
 import { VendorChoice } from "./VendorChoice";
 
 /**
- * Connect vendor — one step's vendor for one flow (the owner's build 19 item
- * 1; backend ADR-0037, ADR-0040; Build 21's A2), opened from the flow page's
- * vendor row with `?field=` (the connection setting's key — a flow may choose
- * one vendor per step); without it, the flow's only one.
+ * Connect integration (Build 22; ~~Connect vendor~~ until then) — one step's
+ * vendor for one flow (the owner's build 19 item 1; backend ADR-0037,
+ * ADR-0040; Build 21's A2), opened from the flow page's integration row with
+ * `?field=` (the connection setting's key — a flow may choose one vendor per
+ * step); without it, the flow's only one. Titled as the flow page's step 2
+ * (the session's S21: one word for one thing; the owner's build 21 item 5:
+ * "2. Connect integration … if i click that button it should take me to the
+ * choices I have like none or quickbooks").
  *
  * **A tap is the choice, saved, and back to the flow** (the owner's build 20
  * item 2: "When i click one of the choices like none i shouldnt need to press
@@ -109,7 +113,7 @@ export default async function VendorPage(
 
   return (
     <SectionCard
-      title="Connect vendor"
+      title="Connect integration"
       subheader={`For ${subscription.name ?? entry.name}`}
       back={<BackLink href={flowPath(subscription.id)} />}
     >

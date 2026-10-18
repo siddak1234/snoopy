@@ -40,7 +40,7 @@ export const VENDOR_SAVING = "Saving…";
  * None. Each row is the one connection row (spec A4) — the vendor's mark, its
  * name, the account's email or its state under it — and **the whole row is
  * the control**; a check (24) marks the chosen one, in place of a button.
- * Drawn on Connect vendor, where a tap is saved at once, and on Set up, where
+ * Drawn on Connect integration, where a tap is saved at once, and on Set up, where
  * a tap is the choice its Turn on or Save sends (the owner's AM4: "set up
  * should be made simple. vendor connections can be specific but everything is
  * there"). The app's `components/flows/vendor-choice.tsx` on the website.
@@ -63,7 +63,7 @@ export function VendorRows({
   returnTo,
   onChoose,
 }: {
-  /** The group's name, for a screen reader: "Connect vendor", or the step's choice on Set up. */
+  /** The group's name, for a screen reader: "Connect integration", or the step's choice on Set up. */
   label: string;
   options: VendorOption[];
   /** The vendor chosen now, or `none`. */

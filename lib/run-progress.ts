@@ -3,10 +3,12 @@
  * item 10: "It shoukd show all the steps and a live tracker of which ones are
  * done. Not random like this where it adds to the list. We have pre
  * determined steps and it should ahow where we are"): every declared row from
- * the start, each with where the run is — "1 · Received  Done · 2:32 PM",
- * "2 · Read  Working…", "3 · Checked  Waiting". One row per declared group, in
- * the groups' order (backend ADR-0037), or one per declared step for a
- * version without groups. **Never a step's own summary and never a step id**
+ * the start, each with where the run is — "1 · Upload invoice  Done · 2:32
+ * PM", "3 · AI processing  Working…", "4 · QuickBooks updated  Waiting". One
+ * row per declared group, in the groups' order (backend ADR-0037), or one per
+ * declared step for a version without groups; since Build 22 (backend
+ * ADR-0041) a group no pipeline step names is a setting step or the
+ * platform's email. **Never a step's own summary and never a step id**
  * (B6; item 11's "What is the checked issue?" over "34 accounts read" under
  * Received). The same rules, words and tests as the app's `toTracker`
  * (snoopy-mobile `lib/view/runs.ts`), so both clients say the same thing.
@@ -26,10 +28,13 @@ export type ProgressStep = {
 
 export type DeclaredStep = { id: string; title: string; group?: string };
 
-export type ProgressManifest = {
-  version: number;
-  pipeline: readonly DeclaredStep[];
-  groups?: readonly { id: string; title: string }[];
+/** A visible step: its id, its title and, for the platform's own step, its `platform` (backend ADR-0041). */
+export type ProgressGroup = { id: string; title: string; platform?: string };
+
+/** Whether a run's email went out (`RunDetail.email`, backend ADR-0041). */
+export type RunEmailState = {
+  status: "waiting" | "sent" | "not_sent";
+  sentAt: string | null;
 };
 
 type RunStatus =
@@ -42,9 +47,20 @@ export type RunState = {
   failureReason?: string;
 };
 
-/** A step's, or a group's, place in the run (the session's S14). */
+/**
+ * A step's, or a group's, place in the run (the session's S14). `unknown` is a
+ * platform step this build does not know (backend ADR-0041: "a client draws a
+ * value it does not know as a step with no state").
+ */
 export type TrackerState =
-  "waiting" | "working" | "done" | "held" | "failed" | "skipped" | "stopped";
+  | "waiting"
+  | "working"
+  | "done"
+  | "held"
+  | "failed"
+  | "skipped"
+  | "stopped"
+  | "unknown";
 
 /** One row of a run's STEPS: "2 · Read" and its state in words. */
 export type TrackerRow = {
@@ -66,6 +82,13 @@ export const WAITING_FOR_APPROVAL = "Waiting for approval.";
 export function stepHeld(reason: string | undefined): string {
   return reason ? `Waiting for approval: ${reason}` : "Waiting for approval";
 }
+
+/** A run's step 5, the platform's email (Build 22; the session's S24): its line per state, the app's words. */
+export const EMAIL_SENDING = "Sending…";
+export function emailSent(time: string): string {
+  return `Sent · ${time}`;
+}
+export const EMAIL_NOT_SENT = "Not sent";
 
 /** How long a run's page waits, while the run has not ended, before it reads the run again (spec A7). */
 export const RUN_REREAD_MS = 2_000;
@@ -186,19 +209,79 @@ function trackerSub(
 }
 
 /**
- * The rows. `declared` and `groups` are the catalog's, passed only for a run
- * of the version they were declared for; a run of another version — whose
- * steps the catalog no longer declares — is drawn as the steps it reported,
- * each titled from the catalog where it still names it (`titles`), else
- * "Step {n}", and "Working…" while it goes on.
+ * What a run's page knows of its flow, beside the run (Build 22; the session's
+ * S23), as its server read it: each step's title as the flow's connection
+ * choice names it NOW (`stepTitle`, "QuickBooks updated"), and each setting
+ * step's line — the integration chosen, or "None" (`settingLine`) — a run's
+ * own choice not being recorded (backend §12.1 #290). Absent when the flow
+ * could not be read: each step its own title, a setting step "Done" (the app's
+ * M6).
+ */
+export type TrackerFlow = {
+  titles: Readonly<Record<string, string>>;
+  settings: Readonly<Record<string, string>>;
+};
+
+const doneRow = (key: string, title: string, sub: string): TrackerRow => ({
+  key,
+  title,
+  state: "done",
+  sub,
+});
+
+/**
+ * The platform's email step (Build 22, the session's S24; backend ADR-0041),
+ * from the run's status and its `email`: Waiting while the run goes on;
+ * "Sending…" once it ended or held and the email is owed — and with no `email`
+ * from the platform; "Sent · {time}"; "Not sent"; Stopped for a cancelled run.
+ */
+function emailRow(
+  key: string,
+  title: string,
+  run: RunState,
+  email: RunEmailState | undefined,
+  clock: (iso: string) => string,
+): TrackerRow {
+  const at = (state: TrackerState, sub: string): TrackerRow => ({
+    key,
+    title,
+    state,
+    sub,
+  });
+  if (run.status === "cancelled") return at("stopped", STEP_STOPPED);
+  if (run.status === "pending" || run.status === "running")
+    return at("waiting", STEP_WAITING);
+  if (email?.status === "sent")
+    return at(
+      "done",
+      email.sentAt ? emailSent(clock(email.sentAt)) : STEP_DONE,
+    );
+  if (email?.status === "not_sent") return at("skipped", EMAIL_NOT_SENT);
+  return at("working", EMAIL_SENDING);
+}
+
+/**
+ * The rows. `declared` and `groups` are the catalog's — the newest version's
+ * — passed for any run (Build 22, the session's S25): a run whose every
+ * reported step they still declare is drawn by them (a v3 run by v4's five
+ * steps). A run that reported a step they no longer declare is drawn as the
+ * steps it reported, each titled from the catalog where it still names it
+ * (`titles`), else "Step {n}", and "Working…" while it goes on. ~~Only a run
+ * of the catalog's own version drawn by its groups~~ until Build 22.
+ *
+ * Since Build 22 a group no pipeline step names is a setting step — done from
+ * the start, its line the integration chosen — or, with `platform: email`, the
+ * run's email (`emailRow`); an unknown `platform` is its title and no state.
  */
 export function trackerRows(
   steps: readonly ProgressStep[],
   declared: readonly DeclaredStep[] | undefined,
-  groups: readonly { id: string; title: string }[] | undefined,
+  groups: readonly ProgressGroup[] | undefined,
   run: RunState,
   clock: (iso: string) => string = timeOfDay,
   titles: readonly { id: string; title: string }[] | undefined = declared,
+  /** The flow as read now, and the run's email (Build 22). */
+  context: { flow?: TrackerFlow; email?: RunEmailState } = {},
 ): TrackerRow[] {
   const known = new Set((declared ?? []).map((step) => step.id));
   const covered =
@@ -216,15 +299,30 @@ export function trackerRows(
     return { key, title, state, sub: trackerSub(state, reported, run, clock) };
   };
   if (groups && groups.length > 0) {
-    return groups.map((group, position) =>
-      row(
-        `group:${group.id}`,
-        `${position + 1} · ${group.title}`,
+    const named = new Set(
+      pipeline.flatMap((step) => (step.group ? [step.group] : [])),
+    );
+    return groups.map((group, position) => {
+      const key = `group:${group.id}`;
+      const title = `${position + 1} · ${context.flow?.titles[group.id] ?? group.title}`;
+      if (group.platform === "email")
+        return emailRow(key, title, run, context.email, clock);
+      if (group.platform !== undefined)
+        return { key, title, state: "unknown", sub: "" };
+      if (!named.has(group.id))
+        return doneRow(
+          key,
+          title,
+          context.flow?.settings[group.id] ?? STEP_DONE,
+        );
+      return row(
+        key,
+        title,
         pipeline.flatMap((step, index) =>
           step.group === group.id ? [index] : [],
         ),
-      ),
-    );
+      );
+    });
   }
   return pipeline.map((step, index) =>
     row(`step:${step.id}`, `${index + 1} · ${step.title}`, [index]),
@@ -272,10 +370,14 @@ export const EMPTY = "—";
 
 /**
  * Steps done: the rows done or skipped over every row (spec A7; S14), so a run
- * at its start reads "0 / 4" and never "1 / 1" (the owner's build 20 item 10).
+ * at its start reads "0 / 5" and never "1 / 1" (the owner's build 20 item 10).
+ * A step with no state (a platform step this build does not know) is not
+ * counted (the app's M7).
  */
 export function stepsDone(rows: readonly TrackerRow[]): string {
-  const counted = rows.filter((row) => row.key !== "working");
+  const counted = rows.filter(
+    (row) => row.key !== "working" && row.state !== "unknown",
+  );
   const done = counted.filter(
     (row) => row.state === "done" || row.state === "skipped",
   ).length;

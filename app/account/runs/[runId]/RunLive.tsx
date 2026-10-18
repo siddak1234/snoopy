@@ -37,6 +37,8 @@ import {
   stepsDone,
   trackerRows,
   type DeclaredStep,
+  type ProgressGroup,
+  type TrackerFlow,
   type TrackerRow,
   type TrackerState,
 } from "@/lib/run-progress";
@@ -51,12 +53,16 @@ const ORIGIN_LABEL: Record<RunOrigin, string> = {
   "retry-continuation": "After retry",
 };
 
-/** The flow a run belongs to, as the catalog lists it — its name, steps and groups. */
+/**
+ * The flow a run belongs to, as the catalog lists it — its name, steps and
+ * groups, the newest version's — and, when the flow could be read, its step
+ * titles and setting lines as its settings make them now (Build 22, S23).
+ */
 export type RunFlow = {
   name: string;
-  version: number;
   pipeline: DeclaredStep[];
-  groups?: { id: string; title: string }[];
+  groups?: ProgressGroup[];
+  tracker?: TrackerFlow;
 } | null;
 
 /**
@@ -116,17 +122,21 @@ export function RunLive({
     };
   }, [going, reads, workspaceId, run.id]);
 
-  // Every step from the start (spec A7; S14): by the flow's groups where its
-  // manifest declares them — the catalog's, only for a run of the version
-  // they were declared for; a run of another version by the steps it reported.
-  const declaredFor = flow !== null && flow.version === run.templateVersion;
+  // Every step from the start (spec A7; S14): by the catalog's groups, the
+  // newest version's, for any run whose every reported step they still
+  // declare (Build 22, the session's S25: a v3 run is drawn by v4's five
+  // steps); a run that reported a step they no longer declare is drawn by the
+  // steps it reported. ~~Only a run of the catalog's own version drawn by its
+  // groups~~ until Build 22. Step 2 says the flow's integration, step 4's title
+  // follows it, step 5 is the run's email.
   const tracker = trackerRows(
     steps,
-    declaredFor ? flow.pipeline : undefined,
-    declaredFor ? flow.groups : undefined,
+    flow?.pipeline,
+    flow?.groups,
     run,
     undefined,
     flow?.pipeline,
+    { flow: flow?.tracker, email: detail.email },
   );
   const decided = heldDecision(run, approvals);
   const cards = toDocumentCards(
@@ -351,20 +361,25 @@ const STATE_LOOK: Record<
   failed: { Icon: WarningCircleIcon, tone: "text-[var(--error-text)]" },
   skipped: { Icon: MinusCircleIcon, tone: "text-[var(--muted)]" },
   stopped: { Icon: MinusCircleIcon, tone: "text-[var(--muted)]" },
+  // A platform step this build does not know: no state (backend ADR-0041).
+  unknown: { Icon: CircleDashedIcon, tone: "text-[var(--muted)]" },
 };
 
 /**
- * One row of Steps: "2 · Read", its state's icon (24) and its state in words
- * — Waiting, Working…, Done and when, Waiting for approval and why, the run's
- * failure, Skipped or Stopped — never a step's own summary and never a step id
- * (B6).
+ * One row of Steps: "3 · AI processing", its state's icon (24) and its state
+ * in words — Waiting, Working…, Done and when, Waiting for approval and why,
+ * the run's failure, Skipped or Stopped; a setting step's integration; the
+ * email's Sending…, Sent and when, or Not sent — never a step's own summary
+ * and never a step id (B6). A platform step this build does not know has no
+ * state, so no line.
  */
 function TrackerItem({ row }: { row: TrackerRow }) {
   const { Icon, tone } = STATE_LOOK[row.state];
   const quiet =
     row.state === "waiting" ||
     row.state === "skipped" ||
-    row.state === "stopped";
+    row.state === "stopped" ||
+    row.state === "unknown";
   return (
     <li
       data-testid={`run-step-${row.key}`}
@@ -378,11 +393,13 @@ function TrackerItem({ row }: { row: TrackerRow }) {
         >
           {row.title}
         </p>
-        <p
-          className={`text-sm ${row.state === "waiting" || quiet ? "text-[var(--muted)]" : tone}`}
-        >
-          {row.sub}
-        </p>
+        {row.sub ? (
+          <p
+            className={`text-sm ${row.state === "waiting" || quiet ? "text-[var(--muted)]" : tone}`}
+          >
+            {row.sub}
+          </p>
+        ) : null}
       </div>
     </li>
   );

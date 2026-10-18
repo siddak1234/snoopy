@@ -2351,7 +2351,7 @@ read against that commit. Each item below is the narrowest reading of its box's 
   appear unlabelled.
 - **Backend §12.1 #239, read: no words.** Catalog now drops the settings a flow carried when it
   moves to a version that declares none, so the plain move (`templateVersion` alone,
-  `moveSubscriptionVersion`) succeeds there. `app/account/flows/MoveVersionButton.tsx:93` still
+  `moveSubscriptionVersion`) succeeds there. ~~`app/account/flows/MoveVersionButton.tsx:93`~~ (gone with the move in Build 22) still
   offers "Set them for vN" only for `invalid_config` against a version that declares fields
   (`targetSetup.length > 0`), unchanged since `7accdba`. Its sentence "Its settings carry over and
   are checked against vN first" is unchanged too, as 25.2.12 records ("both clients need no
@@ -3615,3 +3615,241 @@ The gate: `npm run verify` on the review's tree, Node 22.23.2, default `TMPDIR`,
 (`test:contracts` 271 of 271; `test:browser` 34 passed; `test:browser:fixtures` 524 passed, 262
 in each of Chromium and Firefox, 2 skipped, none failed). This paragraph was added after that
 run; `format:check` and the document check ran again on the commit.
+
+## Round 17 — Build 22's screens: the dashboard as the app's Home, a flow's five steps, who gets the email, and no move to another version (backend BUILD-PLAN 25.4.58–25.4.59) — 2026-10-17
+
+A re-entry on the owner's seven TestFlight items on build 21 (2026-10-17 14:30–14:39Z, read through
+the ASC API, each with its screenshot looked at) and his **"continue and complete. parallel if you
+can"** (21:12Z), which approved the plan given with it — H1–H4 · F1–F3 · P1–P5 · W1–W3 — and **the
+session's suggestions D1–D6** shown beside it. D1–D6 are the session's, approved by the owner,
+never his own words: D1 the workspace's owners and admins and the person who started a run always
+get its email, and the step 5 screen adds more addresses; D2 step 3 is "AI processing"; D3 step 4
+is "Details saved" with None, "QuickBooks updated" otherwise; D4 "overflow" is OVERVIEW; D5 the
+website gets W1 and W2, matching the app; D6 the approvals banner stays, right after Today. The same
+behaviour and words as the app (`snoopy-mobile` `round-17/b22-screens` `32de6cf`; the owner's
+"mobile = web parity"), ported module by module. The contract is the round's (`b22-contract`:
+`automations.yaml` `8f780521…`, `openapi.yaml` `52a5ca8d…`, `connections.yaml` `bf50b980…`
+unchanged — no client version move, `…/subscriptions/{id}/email-recipients`,
+`AutomationStepGroup.titleByConnection` and `.platform`, `RunDetail.email`); it is regenerated from
+backend `main` once the release is read back (the spec's release sheet, #10), and until then the
+Deployed contract job is red by design (it reads production, and was not run).
+
+The owner's words this answers (verbatim):
+
+- Item 1, Home: "Remove run a flow section. We did not add thus. / Remove overflow, it should be the
+  3 icons for today with the run types / Then add a flow and flow buttons / Then recent runs. / I
+  dont want want flows integrations, connect integrations, view teams, or run a flow. / Recent runs
+  is fine" → **W1** (D5), `app/account/page.tsx`: Today's three tiles — Runs, Successes, Failures —
+  counted by the platform from the browser's midnight (`app/account/TodayTiles.tsx`,
+  `run-stats?since=`), each opening Activity from it (`?status=…&since=`); the approvals banner
+  while something waits, in the app's words (D6); Add a flow and Flows, both to Flows; Recent runs,
+  four, and See all. With no flow ever, the app's first run — "Nothing automated. Yet." and its one
+  Add a flow — takes the place of the buttons and the runs. ~~Run a flow, Quick actions (Browse
+  flows, View teams, Connect integration), the Workspace overview (D4) and Get started~~, with the
+  reads only they used (subscriptions, this month's tally, connections, teams). Activity
+  (`app/account/runs/page.tsx`) keeps the runs made since a `since` that is an instant, said
+  "Today", or "Today · Successes" / "Today · Failures".
+- Items 5–7, the flow page: "Step 1 is upload invoice. / Why do we have so many steps the user
+  doesnt care about. It should be / 1. Upooad Invoice / 2. Connect integration - shows either none
+  or quickbooks or any other integration like quickbooks. It should show the integration type, then
+  if i click that button it should take me to the choices I have like none or quickbooks. / 3. Then
+  something about AI Processing / 4. Quickbooks updated / 5. Email sent- this should show the email
+  the automation sends to. … When i select this step it should take me to the page where i can edit
+  in a screen the email it should send to. / We need ti discuss where the email goes. It should go
+  to the owner/admin and the person that uploaded the document." / "Im on v3 now. But make sure it
+  still has the steps the way i described in my comments" / "After step 4 i dont want to see
+  quickbooks, remember i integrated it into the step. Remove the connections in the bottom as well .
+  I also dont want a move to vx number in the flows. The user always gets the latest version. They
+  dont get to oick when to update" → **W2** (D5), `app/account/flows/[subscriptionId]/page.tsx`
+  and `lib/flow-steps.ts`'s `flowStepPlan`, the app's kinds: the five steps of Invoice Processing
+  v4's groups, titles only (S20) — "1 · Upload invoice" holding the document and Start run, "2 ·
+  Connect integration" holding the integration row (a setting step, backend ADR-0041), "3 · AI
+  processing" (D2), "4 · QuickBooks updated" or "4 · Details saved" by the flow's choice
+  (`titleByConnection`, D3) with nothing under it, "5 · Email sent" with the first address and "and
+  {n} more", or "Unavailable" when it cannot be read (S22), opening who gets the email. No
+  Connections (Disconnect stays on Connections). No move to another version: ~~`MoveVersionButton.tsx`~~,
+  ~~`moveSubscriptionVersion`~~ and ~~`moveWithConfiguration`~~ with their refusals, the page's
+  `newer` and the "version" intent are gone, and no request writes `templateVersion`. The choices
+  page is "Connect integration" (S21; ~~Connect vendor~~), its rows unchanged. **P5's page**, Who
+  gets the email (`app/account/flows/[subscriptionId]/email/page.tsx`, its client form
+  `EmailRecipientsForm.tsx`, D1): Always — the owners, the admins, "The person who starts the run"
+  — and Also send to, each add and each remove saved at once through `saveEmailRecipients` beside
+  `saveVendorChoice` (S30), "Already on the list." / "Enter an email address." before anything is
+  sent, "You can add up to 10." at ten (S13), and for a member "Ask an owner or admin to change
+  this." (S12); `lib/flow-email.ts` restates the contract's `FlowEmailAddress` pattern, which the
+  generated types drop, and its test holds the two to the same answers. **The run page**
+  (`app/account/runs/[runId]/RunLive.tsx`, `lib/run-progress.ts`): a setting step done from the
+  start, its line the integration chosen now or None (S23); step 4's title by the flow's choice;
+  step 5 from `RunDetail.email` — Waiting, "Sending…", "Sent · {time}", "Not sent", Stopped (S24);
+  the catalog's steps for any run whose every reported step they declare, so a v3 run shows v4's
+  five (S25; ~~the version gate~~).
+- **W3**: no team pills on any website page — the scope is the workspace switcher alone; F1–F3
+  are the app's.
+- **The privacy page** — only what D1 made untrue (S28): "The results of each Invoice Processing run
+  are emailed to the workspace's owners and admins, to the person who started it, and to any other
+  address an owner or admin adds to the flow: …", the rest of the sentence unchanged; dated October
+  17, 2026, the day it was built (re-dated, and its baselines re-pinned, if it merges later).
+
+**The session's choices** (none is the owner's; listed for him with the checklist). From the spec,
+as built: S12, S13, S20, S21, S22, S23, S24, S25, S27, S28, S30; and the app's M1, M2, M5, M6, M7
+and M8, which the website follows for parity. This lane's own:
+
+| # | Choice |
+| --- | --- |
+| W12 | Today's tiles say the em dash until the browser's read answers; ~~"Unavailable", in the small size, in each tile when it fails~~ — since the review, "Unavailable" once, in the tiles' place (W21); their links carry `since` once the read has settled (the server that draws the page cannot know the browser's midnight). |
+| W13 | Recent runs with none says the website's "No activity yet." (the app's "No runs in this team yet." is a team's, and the website has no team scope, W3); ~~"Add a flow to see its runs here."~~ — Add a flow is just above it. |
+| W14 | Activity takes `since` only as an ISO 8601 instant with its zone; with a flow too, the flow's name heads the subheader. |
+| W15 | The email page reads on the server; a flow this person cannot see, an archived one or a 404 from the platform is the same "not found" any other id is, and any other refusal goes to the account area's error page with Try again — the website's existing error state. |
+| W16 | The flow page reads who gets the email for every flow it draws, as the app reads it for every live flow; the step 5 row is a link named by its own words (the address, "and {n} more"). |
+| W17 | The address field is `type="email"` (the design system's `FormInput` since the review, W22) in a form with the browser's own check off (`noValidate`), so the page's words say what is wrong; it is named "Email address", its placeholder's words; Add carries the plus (20); each remove is a 40-px round button with the X (20), named "Remove {address}"; a save whose action never answers says "Could not save. Try again." too. |
+| W18 | The run page reads the flow's live row, then the archived list only when the run's flow is not live; the step titles and setting lines are made on the server (`stepTitle`, `settingLine`) and passed with the run's flow (`RunFlow.tracker`). "Sending…" stays until the page is read again — it reads again only while the run is pending or running, as the app's does. |
+| W19 | The small-screen header names the email page "Who gets the email" and the choices page "Connect integration". |
+| W20 | The fixture's people are its members' reserved addresses (`owner@example.test`, `admin@example.test`) and its one extra `ap@example.com`; its update of a flow refuses `templateVersion` (400, `details.field`) as the Edge does (the backend lane's S37), and its webhook flow, on v1 while the catalog is on v2, is the flow the platform could not move. |
+
+**Tests.** `test/flow-steps.test.mjs` (the five steps for QuickBooks and None, the generic kinds, a
+step's title, a setting step's line, Today's midnight and links, Activity's `since`, the flow page's
+and the dashboard's order and what they no longer hold), `test/flow-email.test.mjs` (new: the
+address check against the contract's pattern, Add's refusals, step 5's row, the email page's rules
+and words), `test/run-progress.test.mjs` (v4's tracker: running, owed, sent, not sent, cancelled,
+held, None, unread, a v3 run, an unknown platform), `test/build22-screens.test.mjs` (new: no move
+and no version written anywhere, one name for the choices page, no team pills), and the existing
+`build21-screens`, `automation-contract`, `tenancy-contract` and `vendor-page` tests moved to the
+new rules. The fixture (`e2e/fixtures/public-edge.ts`) serves Invoice Processing v4, the flow on v4,
+`RunDetail.email` for its runs and `…/email-recipients` (GET for anyone, PUT for an owner or admin,
+the platform's checks); its move route and controls are gone. Fixture tests: the dashboard's order,
+its absent words and its tiles' `since` links, the banner after Today, a workspace with no flow,
+Activity from a Today tile; the flow page's exact steps for None and for QuickBooks, nothing under
+step 4, no Connections, no move on an older or the newest version, step 5's address and its
+Unavailable; Who gets the email for an owner (add, the flow page counting it), its refusals, a
+remove with "Removing…", a failed save, the limit, a member; the run page's five steps, its
+integration, its email from Waiting to Sending… to Sent; and the switched-workspace refusals for
+the email page's add and remove. ~~The seven move tests~~, ~~Run a flow's~~, and the two dialog rows
+of ~~the move~~ and ~~the flow page's Disconnect~~ are gone with what they held.
+
+**Guards proved to bite.** Thirty runs of one script (the session's `b22-web-tools/bites/bite.py`,
+its logs beside it), Node 22.23.2, each on the final tree: one exact edit, the guarding test run —
+with `node --test`, or alone in Chromium against the fixture for the last three — red (a test
+failed), the file restored from its saved copy — its sha256 equal every time — and the test run
+again, green (it passed).
+
+| Guard | Broken by | What failed |
+| --- | --- | --- |
+| P1 · step 4 titled by the connection chosen | always the step's own title (`lib/flow-steps.ts`) | `flow-steps` "Steps on a v4 QuickBooks flow" |
+| P1 · a group no step names is a setting step | drawn as a step with work (`lib/flow-steps.ts`) | `flow-steps` "Steps on a v4 QuickBooks flow" |
+| P1 · `platform: email` is the email row | read as an unknown platform (`lib/flow-steps.ts`) | `flow-steps` "Steps on a v4 QuickBooks flow" |
+| S20/P2 · titles only, nothing under a step | a line drawn under each title (the flow page) | `flow-steps` "the flow page reads top to bottom" |
+| P3 · no Connections on the flow page | `ConnectionsPanel` back on the page | `flow-steps` "the flow page reads top to bottom" |
+| P4 · no "Move to v" anywhere | "Move to v2" by Pause (`AutomationActions.tsx`) | `build22-screens` "no move to another version anywhere" |
+| P4 · no request writes `templateVersion` | `templateVersion: 4` sent with Turn on (`actions.ts`) | `build22-screens` "no move to another version anywhere" |
+| S21 · the choices page is Connect integration | titled "Choose integration" (its page) | `build22-screens` "one name for the choices page" |
+| S22 · step 5: the first address and "and {n} more" | "and {all} more" (`lib/flow-email.ts`) | `flow-email` "step 5's row" |
+| S22 · step 5 unread says Unavailable | the em dash for a failed read (the flow page) | `flow-steps` "the flow page reads top to bottom" |
+| S30 · Already on the list, without case | compared with case (`lib/flow-email.ts`) | `flow-email` "Add is refused before anything is sent" |
+| S30 · Enter an email address. | any text taken as an address (`lib/flow-email.ts`) | `flow-email` "Add is refused before anything is sent" |
+| S13 · You can add up to 10. | the limit 11 (`lib/flow-email.ts`) | `flow-email` "the email page's words" |
+| S12 · a member: no remove, no field | the field drawn for anyone (`EmailRecipientsForm.tsx`) | `flow-email` "the email page: Always then Also send to" |
+| S30 · a remove sends the list without it | the list sent as it was (`EmailRecipientsForm.tsx`) | `flow-email` "the email page: Always then Also send to" |
+| S24 · Sending… while the email is owed | Waiting for an owed email (`lib/run-progress.ts`) | `run-progress` "a v4 run's email" |
+| S24 · a cancelled run's email: Stopped | a cancelled run's email by its state (`lib/run-progress.ts`) | `run-progress` "a v4 run's email" |
+| S23 · a setting step says the integration | always "Done" (`lib/run-progress.ts`) | `run-progress` "a v4 run running" |
+| S25 · no version gate on the run page | the groups only for a run of one version (`RunLive.tsx`) | `run-progress` "the run page draws the tracker's rows" |
+| M7 · a step with no state is not counted | counted (`lib/run-progress.ts`) | `run-progress` "a platform step this build does not know" |
+| W1/D6 · the banner only while something waits | drawn at 0 (`app/account/page.tsx`) | `flow-steps` "the dashboard reads top to bottom" |
+| W1 · no View teams on the dashboard | a View teams link beside Add a flow | `flow-steps` "the dashboard reads top to bottom" |
+| W1 · Today from the browser's own midnight | UTC's midnight (`lib/flow-steps.ts`) | `flow-steps` "Today: from the browser's own midnight" |
+| W1 · Activity keeps the runs made since | the runs made before (`app/account/runs/page.tsx`) | `flow-steps` "Activity from the dashboard's Today" |
+| W1 · a `since` that is no instant filters nothing | any date taken (`lib/flow-steps.ts`) | `flow-steps` "Activity from the dashboard's Today" |
+| S28 · the privacy sentence for D1 | "any other address" made "any address" | `build21-screens` "the privacy page says what v3 does" |
+| W3 · no team pills | "All teams" in a runtime file | `build22-screens` "no team pills on any website page" |
+| P2 · nothing between step 4's title and step 5 (fixture) | the email row under every step with work (the flow page) | Chromium: "the page reads top to bottom — Dashboard, then Steps exactly…" |
+| W1 · each Today tile to Activity for its outcome (fixture) | every tile to every outcome (`TodayTiles.tsx`) | Chromium: "the dashboard reads top to bottom — Today's three tiles…" |
+| S30 · a remove says Removing… while it waits (fixture) | no line while it waits (`EmailRecipientsForm.tsx`) | Chromium: "a remove saves the list without it at once…" |
+
+**The privacy baselines.** The page's text changed, so `privacy-darwin.png` and
+`privacy-linux.png` were re-recorded — darwin on this Mac's Chromium against a production build
+(1440 × 6785, was 1440 × 6761), linux in CI's pinned Playwright image with Node 22.23.2 (1440 ×
+6785), its `npm ci` inside the container's own filesystem; each first failed on its old baseline,
+then all six marketing pages passed.
+
+**The gate.** `npm run verify` on this change, on the owner's Mac, Node 22.23.2, default `TMPDIR`,
+`SNOOPY_BACKEND_ROOT` at the round's `b22-contract`, under the gate lock: every gate exited 0 —
+`format:check`, `lint`, `typecheck`, `audit:boundaries`, `test:contracts` (288 of 288),
+`verify:platform-contracts`, `build:no-backend`, `probe:no-backend`, `build`, `test:browser` (21 s:
+34 passed, 518 skipped for want of the fixture, none failed) and `test:browser:fixtures` (530 s: 518
+passed, 259 in each of Chromium and Firefox, and 2 skipped, the keyboard journey in each; none
+failed) — and the facts file was written; `npm audit --omit=dev --audit-level=high` found 0
+vulnerabilities. WebKit did not run here; it runs in GitHub CI (register F104). This paragraph and
+the two above were added after that run; `format:check` and the document check ran again on the
+commit. The Deployed contract check was not run (it reads production): it is red by design until the
+release serves the round's contract.
+
+**Found, not changed here** (words outside the spec, left as they are): Set up names the
+integration's choices "Vendor" to a screen reader (`app/account/flows/[subscriptionId]/setup/SetupForm.tsx`,
+`vendorFields.length > 1 ? field.title : "Vendor"`) while v4 titles the field "Integration"; and the
+flow page's integration row is named "{vendor}: change the vendor". Both are for the next round's
+words.
+
+### The review of Build 22's screens (web) — 2026-10-18
+
+An independent single pass over `round-17/b22-screens` at `0e15368` against the spec's W1–W3, P1–P5
+and run-page rules, the owner's seven items and their screenshots (`fb01`–`fb07`), and the app's
+final branch (`snoopy-mobile` `88d33ca`, its review included). Correctness, the server action's
+authorization and checks, accessibility, and the guards' bites. Nothing blocking: the words, the
+order, the five steps, step 4's title, the email page's rules and the run page's email states are
+the spec's and the app's; `saveEmailRecipients` sends only the workspace shown and active, and the
+platform decides who may write (403 for a member) and checks every address (the Edge's
+`flowEmailProblem`, S36). Three findings, each fixed and bitten:
+
+| # | Severity | Finding | Fixed |
+| --- | --- | --- | --- |
+| R1 | should-fix | Who gets the email dropped the keyboard's place: the field and the buttons are disabled while a save waits, and a remove takes its row's button with it, so after an Add (Enter in the field) or a remove focus fell to the page — where the website's other removable rows hand it on (`components/dashboard/ConfirmRemoveButton.tsx`, `focusAfter`). | A write's end gives focus that fell to the page to the address field, or — at ten, where the field gives way — to Also send to's heading (`EmailRecipientsForm.tsx`, W22). |
+| R2 | should-fix | The address field re-wrote `components/ui/FormInput`'s classes by hand (AGENTS rule 2), at 14 px, which a phone's browser zooms into on focus. | The field is `FormInput` (16 px), in a row aligned at its foot with Add (W22). |
+| R3 | should-fix | Today's tiles said "Unavailable" in each tile when the read failed, where the app's TODAY says it once in their place (its G6; D5's parity), and three one-word figures sit in a third of a phone's card each. | "Unavailable" once, in the tiles' place (`TodayTiles.tsx`, W21). |
+
+Seen and left (nits, no change): the flow page asks who gets the email before it knows the id is a
+flow this person can see — a refused read only says "Unavailable", and the page is then "not
+found"; Activity's Today keeps the platform's last 100 runs, as its outcome filter does; the run
+page's "Sending…" stays until the page is read again (W18, the app's rule); a flow the platform
+could not move is drawn by its steps' titles (the app's M5).
+
+| # | Choice (the review's; session's choices, none is the owner's) |
+| --- | --- |
+| W21 | Today's unreadable figures say "Unavailable" once, in a card in the tiles' place, not a link — the app's G6. |
+| W22 | Who gets the email hands focus back after each save only when it fell to the page: to the address field, else Also send to's heading (now focusable, `tabIndex={-1}`); a focus the person moved elsewhere meanwhile is left where it is. The field is `FormInput`. |
+
+**Guards proved to bite** (the session's `b22-web-review/bite.py`, its logs beside it; one exact
+edit, red, the file restored from its saved copy with its sha256 equal, green):
+
+| Guard | Broken by | What failed |
+| --- | --- | --- |
+| R1 · focus handed back after a save | the focus call removed (`EmailRecipientsForm.tsx`) | `flow-email` "the email page's field is the design system's FormInput…"; Chromium: "by keyboard, an add and a remove each hand focus back to the address field…" |
+| R2 · the field is `FormInput` | a raw `<input>` in its place | `flow-email` "the email page's field is the design system's FormInput…" |
+| R3 · "Unavailable" once, in the tiles' place | the tiles drawn for a failed read (`TodayTiles.tsx`) | `flow-steps` "the dashboard reads top to bottom…"; Chromium: "a figure the platform cannot answer reads Unavailable — once…" |
+
+The two Chromium bites were broken together, in their two files, and run as one fixture run, each
+test failing on its own break; green in the whole gate that followed.
+
+`test/automation-contract.test.mjs`'s register F54 test reads the tiles' value line as it now is
+("—" until the read answers, never 0). **The gate**: `npm run verify` on the review's tree, Node
+22.23.2, default `TMPDIR`, `SNOOPY_BACKEND_ROOT` at the round's `b22-contract`, under the gate lock:
+every gate exited 0 — `test:contracts` 289 of 289, `test:browser` 34 passed (520 skipped for want of
+the fixture), `test:browser:fixtures` 520 passed, 260 in each of Chromium and Firefox, 2 skipped
+(the keyboard journey in each), none failed; `npm audit --omit=dev --audit-level=high` found 0
+vulnerabilities. WebKit runs in GitHub CI (register F104). This paragraph was added after that run;
+the change audit's gates then ran again on the committed tree.
+
+### After the reviews, one word for one thing (web) — 2026-10-18
+
+The session, after both client reviews (its S34, beside S21's "Connect integration"): the integration
+row on a flow's page is read aloud "{name}: change the integration", and Set up's integration choices
+are named by the field's own title ("Integration" in v4) rather than a fixed "Vendor" — the app draws
+`field.title` there already. The fixture journeys read those names (`public-edge-fixture.spec.ts`).
+An archived flow is not drawn by this page at all (`page.tsx:147-151`), so the app's other S34 change
+(no steps on an older archived flow) has nothing to change here. The gate and the change audit ran
+again on this tree.
+
+The privacy page is dated **October 18, 2026**, the day this branch merges (the session's S28): its
+email sentence changed in this branch, so the date it carried from Build 21 (October 17) became
+untrue. Both `/privacy` baselines were re-recorded (the session's repin script: each old baseline
+failed first, then all six marketing pages passed — darwin on this Mac, linux in CI's pinned
+Playwright image), and `build21-screens` reads the new date.

@@ -20,7 +20,7 @@ export default function PrivacyPage() {
           Privacy Policy
         </h1>
         <p className="mt-6 max-w-[56ch] text-base leading-7 text-[color-mix(in_srgb,var(--color-text)_78%,transparent)]">
-          Effective and last updated: October 17, 2026. This policy explains
+          Effective and last updated: October 18, 2026. This policy explains
           what information Autom8x collects, why, and what we do with it. It is
           written to be read; if anything is unclear, contact us at{" "}
           <LegalLink href={`mailto:${LEGAL_EMAIL}`}>{LEGAL_EMAIL}</LegalLink>.
@@ -249,12 +249,13 @@ export default function PrivacyPage() {
             show you what they did; none of it is sent to an AI model, and it is
             never sold or used for advertising. Autom8x does not process
             QuickBooks data on Intuit&apos;s behalf. The results of each Invoice
-            Processing run are emailed to the person who started it or, for a
-            run nobody started, to the workspace&apos;s owners and admins: each
-            document&apos;s type, seller and total and what happened to it,
-            built from the details read from the document and, when it records
-            the document in QuickBooks or compares it with what QuickBooks
-            holds, from QuickBooks&apos; answer.
+            Processing run are emailed to the workspace&apos;s owners and
+            admins, to the person who started it, and to any other address an
+            owner or admin adds to the flow: each document&apos;s type, seller
+            and total and what happened to it, built from the details read from
+            the document and, when it records the document in QuickBooks or
+            compares it with what QuickBooks holds, from QuickBooks&apos;
+            answer.
           </p>
           <p>
             An owner or admin can disconnect QuickBooks at any time on the

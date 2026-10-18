@@ -76,6 +76,9 @@ export type OpenUploadRequest =
 export type CompleteUploadResponse =
   operations["completeUpload"]["responses"][200]["content"]["application/json"];
 export type RunStatusCounts = components["schemas"]["RunStatusCounts"];
+export type FlowEmailRecipients = components["schemas"]["FlowEmailRecipients"];
+export type UpdateFlowEmailRecipientsRequest =
+  operations["updateFlowEmailRecipients"]["requestBody"]["content"]["application/json"];
 
 export function listAutomations(
   workspaceId: string,
@@ -176,11 +179,18 @@ export function createSubscription(
   );
 }
 
+/**
+ * A flow's settings, status or archive. No version is ever sent (Build 22, P4;
+ * backend ADR-0041): every flow runs its automation's newest version, and the
+ * platform moves it there — "The user always gets the latest version. They
+ * dont get to oick when to update" (the owner, build 21 item 7). ~~The
+ * "version" intent~~ until Build 22.
+ */
 export function updateSubscription(
   workspaceId: string,
   subscriptionId: string,
   body: UpdateSubscriptionRequest,
-  intent: "subscription-config" | "status" | "archive" | "version",
+  intent: "subscription-config" | "status" | "archive",
 ): Promise<UpdateSubscriptionResponse> {
   return platformServerJson<UpdateSubscriptionResponse>(
     `${scope(workspaceId)}/subscriptions/${encodeURIComponent(subscriptionId)}`,
@@ -231,6 +241,38 @@ export function issueWebhookEndpoint(
   return platformServerJson<IssuedWebhookEndpoint>(
     `${scope(workspaceId)}/subscriptions/${encodeURIComponent(subscriptionId)}/webhook`,
     { method: "POST", idempotencyKey },
+  );
+}
+
+/**
+ * Who a flow's run emails go to (Build 22, P5; backend ADR-0041): the
+ * workspace's owners and admins (`people`, owners first), the person who
+ * starts each run, and the flow's extra addresses (`extra`). Any member who
+ * can see the flow may read it; `canEdit` says whether this person may change
+ * `extra`.
+ */
+export function readFlowEmailRecipients(
+  workspaceId: string,
+  subscriptionId: string,
+): Promise<FlowEmailRecipients> {
+  return platformServerJson<FlowEmailRecipients>(
+    `${scope(workspaceId)}/subscriptions/${encodeURIComponent(subscriptionId)}/email-recipients`,
+  );
+}
+
+/**
+ * Replaces a flow's extra addresses with `extra`, the whole list — so a repeat
+ * changes nothing, and the platform takes no `Idempotency-Key` here. Owner or
+ * admin only (a member is refused 403).
+ */
+export function updateFlowEmailRecipients(
+  workspaceId: string,
+  subscriptionId: string,
+  body: UpdateFlowEmailRecipientsRequest,
+): Promise<FlowEmailRecipients> {
+  return platformServerJson<FlowEmailRecipients>(
+    `${scope(workspaceId)}/subscriptions/${encodeURIComponent(subscriptionId)}/email-recipients`,
+    { method: "PUT", body: JSON.stringify(body) },
   );
 }
 
