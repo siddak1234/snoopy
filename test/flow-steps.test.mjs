@@ -371,6 +371,13 @@ test("the dashboard reads top to bottom: Today, the approvals banner while somet
     today,
     /todayHref\(since, "outcome" in tile \? tile\.outcome : undefined\)/u,
   );
+  // Unreadable, "Unavailable" once in the tiles' place, as the app's TODAY
+  // (its G6) — never in each tile (the Build 22 review).
+  assert.match(
+    today,
+    /if \(stats === "unavailable"\)\s*return \(\s*<p\s+data-testid="home-stats-unavailable"[\s\S]*?\{TODAY_UNAVAILABLE\}\s*<\/p>/u,
+  );
+  assert.equal(today.match(/TODAY_UNAVAILABLE/gu)?.length, 2);
 });
 
 test("the Dashboard is live: read again every 5 s while a run of the flow is pending or running, and each time the page is shown again (spec A6; S30)", () => {

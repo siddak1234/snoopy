@@ -181,3 +181,25 @@ test("the email page: Always then Also send to; for an owner or admin a remove p
     /platformServerJson<FlowEmailRecipients>\(\s*`\$\{scope\(workspaceId\)\}\/subscriptions\/\$\{encodeURIComponent\(subscriptionId\)\}\/email-recipients`,\s*\{ method: "PUT", body: JSON\.stringify\(body\) \},\s*\);/u,
   );
 });
+
+test("the email page's field is the design system's FormInput (AGENTS rule 2; 16 px, so a phone's browser does not zoom into it), and a write's end hands the focus it dropped to that field — or, at ten, to Also send to's heading — as the website's removable rows do (the Build 22 review)", () => {
+  const form = read(
+    "app/account/flows/[subscriptionId]/email/EmailRecipientsForm.tsx",
+  );
+  assert.match(
+    form,
+    /import \{ FormInput \} from "@\/components\/ui\/FormInput";/u,
+  );
+  assert.match(form, /<FormInput\s+ref=\{fieldRef\}/u);
+  assert.doesNotMatch(form, /<input\b/u);
+  assert.match(
+    form,
+    /if \(active && active !== document\.body\) return;\s*\(fieldRef\.current \?\? headingRef\.current\)\?\.focus\(\);/u,
+  );
+  assert.match(form, /ref=\{headingRef\}\s*tabIndex=\{-1\}/u);
+  // Both writes end by handing focus back.
+  assert.equal(
+    form.match(/setSettled\(\(count\) => count \+ 1\);/gu)?.length,
+    2,
+  );
+});

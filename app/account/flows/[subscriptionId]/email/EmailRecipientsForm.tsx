@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { EnvelopeSimpleIcon } from "@phosphor-icons/react/dist/ssr/EnvelopeSimple";
 import { PlusIcon } from "@phosphor-icons/react/dist/ssr/Plus";
 import { UserCircleIcon } from "@phosphor-icons/react/dist/ssr/UserCircle";
@@ -12,6 +12,7 @@ import {
 } from "@/components/dashboard/ConnectionRow";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
+import { FormInput } from "@/components/ui/FormInput";
 import type { FlowEmailRecipients } from "@/lib/automations";
 import {
   EMAIL_ADD,
@@ -48,6 +49,13 @@ const HEADING =
  * write at a time; typing clears the line; the field clears after a saved add
  * (the app's M8). A member sees the lists and "Ask an owner or admin to
  * change this." — no remove, no field (the session's S12).
+ *
+ * **A write's end hands focus back** (the Build 22 review): the field and the
+ * buttons are disabled while one waits, and a remove takes its row's button
+ * with it, so focus that fell to the page goes to the address field — or, at
+ * ten, where the field gives way, to Also send to's heading — as the
+ * website's other removable rows hand it on (`ConfirmRemoveButton`'s
+ * `focusAfter`). The field is the design system's (`FormInput`).
  */
 export function EmailRecipientsForm({
   workspaceId,
@@ -73,6 +81,16 @@ export function EmailRecipientsForm({
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const fieldRef = useRef<HTMLInputElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  // Counts the writes that ended; each one hands back focus the page dropped.
+  const [settled, setSettled] = useState(0);
+  useEffect(() => {
+    if (settled === 0) return;
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    (fieldRef.current ?? headingRef.current)?.focus();
+  }, [settled]);
 
   const recipients = answered ?? initial;
   const { people, extra, canEdit } = recipients;
@@ -111,6 +129,7 @@ export function EmailRecipientsForm({
     save([...extra, draft.trim()], (saved) => {
       if (saved) setDraft("");
       setAdding(false);
+      setSettled((count) => count + 1);
     });
   };
 
@@ -120,7 +139,10 @@ export function EmailRecipientsForm({
     setError(null);
     save(
       extra.filter((listed) => listed !== address),
-      () => setRemoving(null),
+      () => {
+        setRemoving(null);
+        setSettled((count) => count + 1);
+      },
     );
   };
 
@@ -156,7 +178,12 @@ export function EmailRecipientsForm({
         data-testid="email-also"
         className="pt-5"
       >
-        <h2 id="email-also-title" className={HEADING}>
+        <h2
+          id="email-also-title"
+          ref={headingRef}
+          tabIndex={-1}
+          className={HEADING}
+        >
           {EMAIL_ALSO_LABEL}
         </h2>
         <ul className="mt-1 flex flex-col divide-y divide-[var(--ring)]">
@@ -208,24 +235,26 @@ export function EmailRecipientsForm({
                 event.preventDefault();
                 add();
               }}
-              className="mt-2 flex items-center gap-2"
+              className="mt-2 flex items-end gap-2"
             >
-              <input
-                type="email"
-                name="address"
-                value={draft}
-                onChange={(event) => {
-                  setDraft(event.target.value);
-                  setError(null);
-                }}
-                aria-label={EMAIL_PLACEHOLDER}
-                placeholder={EMAIL_PLACEHOLDER}
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                disabled={adding}
-                className="min-w-0 flex-1 rounded-[var(--radius-md)] border border-[var(--color-divider)] bg-[var(--color-surface)] px-4 py-2.5 text-sm text-[var(--text)] caret-[var(--color-accent)] transition placeholder:text-[var(--muted)] hover:border-[color-mix(in_srgb,var(--color-text)_45%,transparent)] focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none disabled:opacity-60"
-              />
+              <div className="min-w-0 flex-1">
+                <FormInput
+                  ref={fieldRef}
+                  type="email"
+                  name="address"
+                  value={draft}
+                  onChange={(event) => {
+                    setDraft(event.target.value);
+                    setError(null);
+                  }}
+                  aria-label={EMAIL_PLACEHOLDER}
+                  placeholder={EMAIL_PLACEHOLDER}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  disabled={adding}
+                />
+              </div>
               <Button
                 type="submit"
                 variant="primary"

@@ -32,8 +32,10 @@ export const TODAY_UNAVAILABLE = "Unavailable";
  * "today" is a local idea, so it is read here, in the browser, through
  * `/api/platform`), each opening Activity from that midnight for its outcome.
  * The flow page's Dashboard tiles' look (`FlowDashboard`). Until the read
- * answers each says the em dash; a read that fails says "Unavailable", and the
- * rest of the dashboard still shows.
+ * answers each says the em dash; a read that fails says "Unavailable" once,
+ * in the tiles' place — as the app's TODAY does (its G6; D5's parity), not in
+ * each of three tiles a third of a phone's card wide (the Build 22 review) —
+ * and the rest of the dashboard still shows.
  */
 export function TodayTiles({ workspaceId }: { workspaceId: string }) {
   const [since, setSince] = useState<string | null>(null);
@@ -63,16 +65,21 @@ export function TodayTiles({ workspaceId }: { workspaceId: string }) {
     };
   }, [workspaceId]);
 
+  if (stats === "unavailable")
+    return (
+      <p
+        data-testid="home-stats-unavailable"
+        className="mt-3 rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--muted)]"
+      >
+        {TODAY_UNAVAILABLE}
+      </p>
+    );
+
   return (
     <div data-testid="home-stats" className="mt-3 grid grid-cols-3 gap-3">
       {TILES.map((tile) => {
-        const value =
-          stats === "unavailable"
-            ? TODAY_UNAVAILABLE
-            : stats === null
-              ? "—"
-              : String(stats[tile.count]);
-        const quiet = stats === null || stats === "unavailable";
+        const value = stats === null ? "—" : String(stats[tile.count]);
+        const quiet = stats === null;
         return (
           <Link
             key={tile.label}
@@ -87,7 +94,7 @@ export function TodayTiles({ workspaceId }: { workspaceId: string }) {
           >
             <span
               data-testid={`today-stat-${tile.label}`}
-              className={`${stats === "unavailable" ? "text-sm" : "text-2xl"} font-medium ${quiet ? "text-[var(--muted)]" : tile.tone || "text-[var(--text)]"}`}
+              className={`text-2xl font-medium ${quiet ? "text-[var(--muted)]" : tile.tone || "text-[var(--text)]"}`}
             >
               {value}
             </span>

@@ -2330,6 +2330,46 @@ test("a save the platform refuses or fails says Could not save. Try again. under
   expect(await emailSaves()).toEqual([]);
 });
 
+test("by keyboard, an add and a remove each hand focus back to the address field — never dropped with the button or the row they took — and the tenth add, where the field gives way, to Also send to's heading (the Build 22 review)", async ({
+  page,
+}) => {
+  await page.goto(emailPage);
+  const also = page.getByTestId("email-also");
+  const field = also.getByRole("textbox", { name: "Email address" });
+  await field.fill("bookkeeper@example.com");
+  await field.press("Enter");
+  await expect(
+    also.getByTestId("email-extra-bookkeeper@example.com"),
+  ).toBeVisible();
+  await expect(field).toHaveValue("");
+  await expect(field).toBeFocused();
+  const remove = also.getByRole("button", { name: "Remove ap@example.com" });
+  await remove.focus();
+  await remove.press("Enter");
+  await expect(also.getByTestId("email-extra-ap@example.com")).toHaveCount(0);
+  await expect(field).toBeFocused();
+  expect(await emailSaves()).toEqual([
+    ["ap@example.com", "bookkeeper@example.com"],
+    ["bookkeeper@example.com"],
+  ]);
+  // From ten, a remove gives the field back, and the add that fills the list
+  // again leaves no field: focus goes to the section's heading.
+  await fixtureControl("email-recipients-full");
+  await page.reload();
+  const tenth = also.getByRole("button", {
+    name: "Remove person10@example.com",
+  });
+  await tenth.focus();
+  await tenth.press("Enter");
+  await expect(field).toBeFocused();
+  await field.fill("person10@example.com");
+  await field.press("Enter");
+  await expect(also.getByTestId("email-limit")).toBeVisible();
+  await expect(
+    also.getByRole("heading", { name: "Also send to" }),
+  ).toBeFocused();
+});
+
 test("at ten extra addresses the field gives way to You can add up to 10. (S13)", async ({
   page,
 }) => {
@@ -3004,15 +3044,19 @@ test("a running run is cancelled from its page, confirmed first, and then reads 
   await expect(page.getByRole("button", { name: "Cancel run" })).toHaveCount(0);
 });
 
-test("a figure the platform cannot answer reads Unavailable, and the rest of the dashboard still shows", async ({
+test("a figure the platform cannot answer reads Unavailable — once, in Today's tiles' place, as the app's TODAY says it, and within a phone's width — and the rest of the dashboard still shows (D5; the Build 22 review)", async ({
   page,
 }) => {
   await fixtureControl("run-stats-failing");
+  await page.setViewportSize({ width: 320, height: 800 });
   await page.goto("/account");
-  for (const label of ["Runs", "Successes", "Failures"])
-    await expect(page.getByTestId(`today-stat-${label}`)).toHaveText(
-      "Unavailable",
-    );
+  const unavailable = page.getByTestId("home-stats-unavailable");
+  await expect(unavailable).toHaveText("Unavailable");
+  await expect(page.getByTestId("home-stats")).toHaveCount(0);
+  await expect(page.getByText("Unavailable", { exact: true })).toHaveCount(1);
+  expect(
+    await unavailable.evaluate((line) => line.scrollWidth - line.clientWidth),
+  ).toBe(0);
   await expect(page.getByTestId("home-quick-actions")).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Run of Manual input automation, running" }),

@@ -810,7 +810,10 @@ test("the account home shows the workspace's own numbers, not fixed zeros (regis
     today,
     /platformApiJson<RunStats>\(\s*`\/v1\/workspaces\/\$\{encodeURIComponent\(workspaceId\)\}\/run-stats\?since=\$\{encodeURIComponent\(midnight\)\}`,/u,
   );
-  assert.match(today, /: stats === null\s*\?\s*"—"/u);
+  assert.match(
+    today,
+    /const value = stats === null \? "—" : String\(stats\[tile\.count\]\);/u,
+  );
   assert.match(client, /\/run-stats\$\{query\}/u);
   assert.doesNotMatch(
     home,

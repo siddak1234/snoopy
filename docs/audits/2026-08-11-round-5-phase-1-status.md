@@ -3696,12 +3696,12 @@ and M8, which the website follows for parity. This lane's own:
 
 | # | Choice |
 | --- | --- |
-| W12 | Today's tiles say the em dash until the browser's read answers and "Unavailable", in the small size, when it fails; their links carry `since` once the read has settled (the server that draws the page cannot know the browser's midnight). |
+| W12 | Today's tiles say the em dash until the browser's read answers; ~~"Unavailable", in the small size, in each tile when it fails~~ — since the review, "Unavailable" once, in the tiles' place (W21); their links carry `since` once the read has settled (the server that draws the page cannot know the browser's midnight). |
 | W13 | Recent runs with none says the website's "No activity yet." (the app's "No runs in this team yet." is a team's, and the website has no team scope, W3); ~~"Add a flow to see its runs here."~~ — Add a flow is just above it. |
 | W14 | Activity takes `since` only as an ISO 8601 instant with its zone; with a flow too, the flow's name heads the subheader. |
 | W15 | The email page reads on the server; a flow this person cannot see, an archived one or a 404 from the platform is the same "not found" any other id is, and any other refusal goes to the account area's error page with Try again — the website's existing error state. |
 | W16 | The flow page reads who gets the email for every flow it draws, as the app reads it for every live flow; the step 5 row is a link named by its own words (the address, "and {n} more"). |
-| W17 | The address field is `type="email"` in a form with the browser's own check off (`noValidate`), so the page's words say what is wrong; it is named "Email address", its placeholder's words; Add carries the plus (20); each remove is a 40-px round button with the X (20), named "Remove {address}"; a save whose action never answers says "Could not save. Try again." too. |
+| W17 | The address field is `type="email"` (the design system's `FormInput` since the review, W22) in a form with the browser's own check off (`noValidate`), so the page's words say what is wrong; it is named "Email address", its placeholder's words; Add carries the plus (20); each remove is a 40-px round button with the X (20), named "Remove {address}"; a save whose action never answers says "Could not save. Try again." too. |
 | W18 | The run page reads the flow's live row, then the archived list only when the run's flow is not live; the step titles and setting lines are made on the server (`stepTitle`, `settingLine`) and passed with the run's flow (`RunFlow.tracker`). "Sending…" stays until the page is read again — it reads again only while the run is pending or running, as the app's does. |
 | W19 | The small-screen header names the email page "Who gets the email" and the choices page "Connect integration". |
 | W20 | The fixture's people are its members' reserved addresses (`owner@example.test`, `admin@example.test`) and its one extra `ap@example.com`; its update of a flow refuses `templateVersion` (400, `details.field`) as the Edge does (the backend lane's S37), and its webhook flow, on v1 while the catalog is on v2, is the flow the platform could not move. |
@@ -3788,3 +3788,52 @@ integration's choices "Vendor" to a screen reader (`app/account/flows/[subscript
 `vendorFields.length > 1 ? field.title : "Vendor"`) while v4 titles the field "Integration"; and the
 flow page's integration row is named "{vendor}: change the vendor". Both are for the next round's
 words.
+
+### The review of Build 22's screens (web) — 2026-10-18
+
+An independent single pass over `round-17/b22-screens` at `0e15368` against the spec's W1–W3, P1–P5
+and run-page rules, the owner's seven items and their screenshots (`fb01`–`fb07`), and the app's
+final branch (`snoopy-mobile` `88d33ca`, its review included). Correctness, the server action's
+authorization and checks, accessibility, and the guards' bites. Nothing blocking: the words, the
+order, the five steps, step 4's title, the email page's rules and the run page's email states are
+the spec's and the app's; `saveEmailRecipients` sends only the workspace shown and active, and the
+platform decides who may write (403 for a member) and checks every address (the Edge's
+`flowEmailProblem`, S36). Three findings, each fixed and bitten:
+
+| # | Severity | Finding | Fixed |
+| --- | --- | --- | --- |
+| R1 | should-fix | Who gets the email dropped the keyboard's place: the field and the buttons are disabled while a save waits, and a remove takes its row's button with it, so after an Add (Enter in the field) or a remove focus fell to the page — where the website's other removable rows hand it on (`components/dashboard/ConfirmRemoveButton.tsx`, `focusAfter`). | A write's end gives focus that fell to the page to the address field, or — at ten, where the field gives way — to Also send to's heading (`EmailRecipientsForm.tsx`, W22). |
+| R2 | should-fix | The address field re-wrote `components/ui/FormInput`'s classes by hand (AGENTS rule 2), at 14 px, which a phone's browser zooms into on focus. | The field is `FormInput` (16 px), in a row aligned at its foot with Add (W22). |
+| R3 | should-fix | Today's tiles said "Unavailable" in each tile when the read failed, where the app's TODAY says it once in their place (its G6; D5's parity), and three one-word figures sit in a third of a phone's card each. | "Unavailable" once, in the tiles' place (`TodayTiles.tsx`, W21). |
+
+Seen and left (nits, no change): the flow page asks who gets the email before it knows the id is a
+flow this person can see — a refused read only says "Unavailable", and the page is then "not
+found"; Activity's Today keeps the platform's last 100 runs, as its outcome filter does; the run
+page's "Sending…" stays until the page is read again (W18, the app's rule); a flow the platform
+could not move is drawn by its steps' titles (the app's M5).
+
+| # | Choice (the review's; session's choices, none is the owner's) |
+| --- | --- |
+| W21 | Today's unreadable figures say "Unavailable" once, in a card in the tiles' place, not a link — the app's G6. |
+| W22 | Who gets the email hands focus back after each save only when it fell to the page: to the address field, else Also send to's heading (now focusable, `tabIndex={-1}`); a focus the person moved elsewhere meanwhile is left where it is. The field is `FormInput`. |
+
+**Guards proved to bite** (the session's `b22-web-review/bite.py`, its logs beside it; one exact
+edit, red, the file restored from its saved copy with its sha256 equal, green):
+
+| Guard | Broken by | What failed |
+| --- | --- | --- |
+| R1 · focus handed back after a save | the focus call removed (`EmailRecipientsForm.tsx`) | `flow-email` "the email page's field is the design system's FormInput…"; Chromium: "by keyboard, an add and a remove each hand focus back to the address field…" |
+| R2 · the field is `FormInput` | a raw `<input>` in its place | `flow-email` "the email page's field is the design system's FormInput…" |
+| R3 · "Unavailable" once, in the tiles' place | the tiles drawn for a failed read (`TodayTiles.tsx`) | `flow-steps` "the dashboard reads top to bottom…"; Chromium: "a figure the platform cannot answer reads Unavailable — once…" |
+
+The two Chromium bites were broken together, in their two files, and run as one fixture run, each
+test failing on its own break; green in the whole gate that followed.
+
+`test/automation-contract.test.mjs`'s register F54 test reads the tiles' value line as it now is
+("—" until the read answers, never 0). **The gate**: `npm run verify` on the review's tree, Node
+22.23.2, default `TMPDIR`, `SNOOPY_BACKEND_ROOT` at the round's `b22-contract`, under the gate lock:
+every gate exited 0 — `test:contracts` 289 of 289, `test:browser` 34 passed (520 skipped for want of
+the fixture), `test:browser:fixtures` 520 passed, 260 in each of Chromium and Firefox, 2 skipped
+(the keyboard journey in each), none failed; `npm audit --omit=dev --audit-level=high` found 0
+vulnerabilities. WebKit runs in GitHub CI (register F104). This paragraph was added after that run;
+the change audit's gates then ran again on the committed tree.
