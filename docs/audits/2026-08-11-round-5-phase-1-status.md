@@ -3850,6 +3850,6 @@ again on this tree.
 
 The privacy page is dated **October 18, 2026**, the day this branch merges (the session's S28): its
 email sentence changed in this branch, so the date it carried from Build 21 (October 17) became
-untrue. Both `/privacy` baselines were re-recorded (`b22-web-tools/repin.sh`: each old baseline
+untrue. Both `/privacy` baselines were re-recorded (the session's repin script: each old baseline
 failed first, then all six marketing pages passed — darwin on this Mac, linux in CI's pinned
 Playwright image), and `build21-screens` reads the new date.
