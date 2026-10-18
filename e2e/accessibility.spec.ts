@@ -18,13 +18,14 @@ const publicRoutes = [
   "/terms",
 ] as const;
 
-// Every page behind sign-in (register F37) — seventeen, found by
+// Every page behind sign-in (register F37) — eighteen, found by
 // `find app/account app/onboarding -name page.tsx` — with the run page read
 // twice: a run that saved details, and one of three receipts (Build 21). The
 // ones with an id read the fixture's team, runs and flow — its page, its Set
-// up and its Connect vendor — and the onboarding pages are read as the
-// fixture's requester (a person with no organization): those exist only
-// against the fixture, so they are scanned only there.
+// up, its Connect integration and who gets its email (Build 22) — and the
+// onboarding pages are read as the fixture's requester (a person with no
+// organization): those exist only against the fixture, so they are scanned
+// only there.
 const authenticatedRoutes: ReadonlyArray<{
   path: string;
   fixture?: { session?: "requester" };
@@ -43,8 +44,9 @@ const authenticatedRoutes: ReadonlyArray<{
   { path: "/account/runs/fixture-run-ok", fixture: {} },
   // A run of three receipts, each on its own card (Build 21, spec A7).
   { path: "/account/runs/fixture-run-invoice", fixture: {} },
-  // Invoice Processing's own pages (Build 21, spec A2, A6; the owner's AM4):
-  // its page, its Set up, and its Connect vendor page for its Done step.
+  // Invoice Processing's own pages (Build 21, spec A2, A6; the owner's AM4;
+  // Build 22, P1–P5): its page, its Set up, its Connect integration page for
+  // its step 2, and who gets its email.
   {
     path: "/account/flows/f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1",
     fixture: {},
@@ -55,6 +57,10 @@ const authenticatedRoutes: ReadonlyArray<{
   },
   {
     path: "/account/flows/f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1/vendor?field=vendor",
+    fixture: {},
+  },
+  {
+    path: "/account/flows/f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1/email",
     fixture: {},
   },
   { path: "/account/settings" },

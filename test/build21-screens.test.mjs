@@ -7,7 +7,9 @@ import { test } from "node:test";
  * Build 21's website guards that are not one module's (spec A1, A3, A8 and the
  * privacy page; the owner's build 20 items and AM1–AM8): no AI consent
  * anywhere, the sign-in line unchanged, no "Connect vendor" button, no request
- * id shown, and the privacy page saying only what v3 changed.
+ * id shown, and the privacy page saying only what v3 changed — and since
+ * Build 22, who gets a run's email (D1). Build 22's own are in
+ * `build22-screens.test.mjs`.
  */
 
 const root = resolve(import.meta.dirname, "..");
@@ -60,13 +62,9 @@ test('"Connect vendor ›" is gone, and no page draws a "Connect vendor" button 
   for (const path of runtimeFiles()) {
     const source = read(path);
     assert.doesNotMatch(source, /Connect vendor ›/u, path);
-    // The vendor page keeps its title, "Connect vendor"; nothing else says it.
-    if (
-      path !== "app/account/flows/[subscriptionId]/vendor/page.tsx" &&
-      path !== "app/account/flows/[subscriptionId]/vendor/VendorChoice.tsx"
-    ) {
-      assert.doesNotMatch(source, />\s*Connect vendor\s*</u, path);
-    }
+    // Since Build 22 the vendor page is "Connect integration" too (S21), so
+    // nothing says it (build22-screens holds every form of it).
+    assert.doesNotMatch(source, />\s*Connect vendor\s*</u, path);
   }
 });
 
@@ -88,15 +86,16 @@ function privacyText() {
     .replace(/\s+/gu, " ");
 }
 
-test("the privacy page says what v3 does — every financial document in a file, each one's details kept and downloadable, the results emailed to the person who started the run — and no longer what it does not", () => {
+test("the privacy page says what v3 does — every financial document in a file, each one's details kept and downloadable, the results emailed to the owners and admins, the person who started the run and the flow's other addresses (Build 22, D1) — and no longer what it does not", () => {
   const text = privacyText();
   for (const said of [
     "Effective and last updated: October 17, 2026.",
     "Invoice Processing does, to read the bills, invoices, receipts, credit notes, statements and other financial documents in it before saving their details, recording them in QuickBooks Online, or comparing them with what QuickBooks holds.",
     // The spec's sentence, word for word.
     "What the run makes of each document, including its line items and the store's location when printed, is kept with the run's results, shown to the members of your workspace, and can be downloaded as a file.",
-    // The owner's AM3: "email to the person who made the run, or the admin".
-    "The results of each Invoice Processing run are emailed to the person who started it or, for a run nobody started, to the workspace's owners and admins: each document's type, seller and total and what happened to it, built from the details read from the document and, when it records the document in QuickBooks or compares it with what QuickBooks holds, from QuickBooks' answer.",
+    // Build 22 (spec §4, S28): who gets it since D1 — the session's
+    // suggestion the owner approved, replacing AM3 — the rest unchanged.
+    "The results of each Invoice Processing run are emailed to the workspace's owners and admins, to the person who started it, and to any other address an owner or admin adds to the flow: each document's type, seller and total and what happened to it, built from the details read from the document and, when it records the document in QuickBooks or compares it with what QuickBooks holds, from QuickBooks' answer.",
   ]) {
     assert.ok(text.includes(said), said);
   }
@@ -108,6 +107,8 @@ test("the privacy page says what v3 does — every financial document in a file,
     "Also email",
     "Send results to",
     "bookkeeper",
+    // AM3's sentence, untrue since D1.
+    "to the person who started it or, for a run nobody started",
   ]) {
     assert.ok(!text.includes(gone), gone);
   }

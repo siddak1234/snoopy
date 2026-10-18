@@ -127,49 +127,10 @@ const dialogs: Dialog[] = [
     },
   },
   {
-    // A flow's page: its Connections, the same one row and its Disconnect,
-    // asked first (Build 21, spec A4, A6).
-    name: "Disconnect QuickBooks Online?",
-    path: FLOWS.invoice,
-    state: "quickbooks-connected",
-    opener: (page) =>
-      page
-        .locator("main")
-        .getByRole("button", { name: "Disconnect QuickBooks Online" }),
-    holds: {
-      ...actionOn(FLOWS.invoice),
-      prepare: refusedAsBusy,
-      send: "Disconnect",
-      busy: "Disconnecting…",
-      cancel: "Cancel",
-      answered: (_, dialog) =>
-        expect(dialog.getByRole("alert")).toHaveText(busy),
-      staysOpen: true,
-    },
-  },
-  {
     name: "Archive Archivable automation?",
     path: FLOWS.archivable,
     opener: (page) =>
       page.locator("main").getByRole("button", { name: "Archive flow" }),
-  },
-  {
-    name: "Move Webhook automation to v2?",
-    path: FLOWS.webhook,
-    opener: (page) =>
-      page.locator("main").getByRole("button", { name: "Move to v2" }),
-    holds: {
-      ...actionOn(FLOWS.webhook),
-      prepare: () => fixtureControl("approval-pending-on-move"),
-      send: "Move to v2",
-      busy: "Moving…",
-      cancel: "Cancel",
-      answered: (_, dialog) =>
-        expect(dialog.getByRole("alert")).toHaveText(
-          "An approval for this flow is still waiting. Decide it first, then move.",
-        ),
-      staysOpen: true,
-    },
   },
   {
     name: "Webhook address",

@@ -154,14 +154,14 @@ test("the setup UI is generated from the pinned version's metadata (backend §12
   // One renderer for both manifest declarations — setup and run input (backend
   // ADR-0030) — in ManifestFields.tsx. Set up draws the version the
   // subscription PINS, which the platform checks a save against, not the
-  // catalog's newest (§12.1 #185) — and the move dialog draws the newest's,
-  // which is where a move goes.
+  // catalog's newest (§12.1 #185). ~~The move dialog drew the newest's~~
+  // until Build 22: no client moves a flow (backend ADR-0041).
   assert.match(
     setupPage,
     /const setup: AutomationSetupField\[\] = subscription\.setup \?\? \[\];/,
   );
   assert.doesNotMatch(setupPage, /setup=\{entry\.setup\}/);
-  assert.match(flowPage, /targetSetup: entry\.setup/);
+  assert.doesNotMatch(flowPage, /targetSetup|entry\.setup/);
   assert.doesNotMatch(setupForm, /SETUP_SECTIONS/);
   assert.match(setupForm, /<SetupFields\s+setup=\{setup\}/);
   assert.match(fields, /for \(const field of setup\)/);
@@ -798,11 +798,19 @@ test("the account home shows the workspace's own numbers, not fixed zeros (regis
     resolve(import.meta.dirname, "../app/account/page.tsx"),
     "utf8",
   );
-  assert.doesNotMatch(home, /<dd className="text-\[var\(--text\)\]">0<\/dd>/u);
-  assert.match(
-    home,
-    /readRunStats\(workspaceId, startOfMonthUtc\(new Date\(\)\)\)/u,
+  const today = readFileSync(
+    resolve(import.meta.dirname, "../app/account/TodayTiles.tsx"),
+    "utf8",
   );
+  assert.doesNotMatch(home, /<dd className="text-\[var\(--text\)\]">0<\/dd>/u);
+  // Today's counts are the platform's tally from the browser's midnight
+  // (Build 22, W1), read in the browser; "—" until it answers, never 0.
+  assert.match(home, /<TodayTiles workspaceId=\{home\.workspaceId\} \/>/u);
+  assert.match(
+    today,
+    /platformApiJson<RunStats>\(\s*`\/v1\/workspaces\/\$\{encodeURIComponent\(workspaceId\)\}\/run-stats\?since=\$\{encodeURIComponent\(midnight\)\}`,/u,
+  );
+  assert.match(today, /: stats === null\s*\?\s*"—"/u);
   assert.match(client, /\/run-stats\$\{query\}/u);
   assert.doesNotMatch(
     home,
@@ -944,22 +952,38 @@ test("a run refused for its file says so and empties the file field to choose ag
   }
 });
 
-test("a subscription moves to the newest version in place, and each refusal the platform names is said in words (backend §12.1 #126)", () => {
-  assert.match(
+test("no client moves a flow: the update sends no version and names no move refusal, and the platform's update names none of the move's reasons any more (Build 22, P4; backend ADR-0041; the owner's build 21 item 7)", () => {
+  assert.doesNotMatch(
     actions,
-    /await updateSubscription\(\s*workspaceId,\s*subscriptionId,\s*\{ templateVersion \},\s*"version",\s*\);\s*revalidatePath\("\/account\/flows", "layout"\);/u,
+    /templateVersion|moveSubscriptionVersion|moveWithConfiguration|MOVE_REFUSALS|settings-misfit/u,
   );
-  assert.match(
-    flowPage,
-    /entry && subscription\.templateVersion < entry\.version\s*\?\s*\{\s*from: subscription\.templateVersion,\s*to: entry\.version,/u,
+  assert.doesNotMatch(flowPage, /newer=|templateVersion < entry\.version/u);
+  assert.doesNotMatch(actionsUi, /\bnewer\s*[=:?]|MoveVersionButton/u);
+  assert.equal(
+    existsSync(
+      resolve(
+        import.meta.dirname,
+        "../app/account/flows/MoveVersionButton.tsx",
+      ),
+    ),
+    false,
   );
-  assert.match(actionsUi, /\{newer \? \([\s\S]*?<MoveVersionButton/u);
   assert.doesNotMatch(actionsUi, /archive it and add it again/u);
   if (available) {
-    assert.deepEqual(
-      refusalKeys(actions, "MOVE_REFUSALS"),
-      specReasons("updateSubscription"),
+    // The refusals an update names now are Set up's, said by its own words.
+    const reasons = specReasons("updateSubscription");
+    for (const gone of [
+      "approvals_pending",
+      "runs_in_flight",
+      "version_unavailable",
+    ])
+      assert.ok(!reasons.includes(gone), gone);
+    // And the contract takes no version on an update.
+    const update = spec.slice(
+      spec.indexOf("operationId: updateSubscription\n"),
     );
+    const body = update.slice(0, update.search(/\n {6}responses:/u));
+    assert.doesNotMatch(body, /templateVersion:/u);
   }
 });
 

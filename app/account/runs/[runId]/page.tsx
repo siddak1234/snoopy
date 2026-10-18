@@ -3,10 +3,17 @@ import { getAppSession } from "@/lib/app-session";
 import {
   emptyWhenUnavailable,
   listApprovals,
+  listArchivedSubscriptions,
   listAutomations,
+  listSubscriptions,
   readRun,
+  type Subscription,
 } from "@/lib/automations";
-import { PlatformServerError } from "@/lib/platform-server";
+import { settingLine, stepTitle } from "@/lib/flow-steps";
+import {
+  PlatformNotConfiguredError,
+  PlatformServerError,
+} from "@/lib/platform-server";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 import { RunLive, type RunFlow } from "./RunLive";
 
@@ -21,9 +28,36 @@ import { RunLive, type RunFlow } from "./RunLive";
  * screen joins the catalog), so its name, steps' titles and groups come from
  * there. A held run's approval is read too: a waiting document whose approval
  * was refused or ran out says "Not approved" (S21).
+ *
+ * And its flow, as it is now (Build 22, the session's S23): a setting step's
+ * line — the integration the flow has chosen — and a title by connection
+ * ("QuickBooks updated") follow the flow's settings, since a run does not
+ * record its own choice (backend §12.1 #290). The live list first, the
+ * archived one only when the run's flow is not in it (the app's M6); a flow
+ * that cannot be read costs those two their words, never the page.
  */
 
 export const dynamic = "force-dynamic";
+
+/** The run's flow as the platform lists it now, or `undefined` when it cannot be read or is gone. */
+async function readFlow(
+  workspaceId: string,
+  subscriptionId: string,
+): Promise<Subscription | undefined> {
+  const own = (rows: readonly Subscription[]) =>
+    rows.find((row) => row.id === subscriptionId);
+  try {
+    const live = own((await listSubscriptions(workspaceId)).subscriptions);
+    return live ?? own(await listArchivedSubscriptions(workspaceId));
+  } catch (error) {
+    if (
+      error instanceof PlatformServerError ||
+      error instanceof PlatformNotConfiguredError
+    )
+      return undefined;
+    throw error;
+  }
+}
 
 export default async function RunDetailPage(
   props: PageProps<"/account/runs/[runId]">,
@@ -47,7 +81,7 @@ export default async function RunDetailPage(
     throw error;
   }
 
-  const [catalog, approvals] = await Promise.all([
+  const [catalog, approvals, subscription] = await Promise.all([
     emptyWhenUnavailable(() => listAutomations(workspaceId), {
       automations: [],
       categories: [],
@@ -57,14 +91,19 @@ export default async function RunDetailPage(
           approvals: [],
         })
       : { approvals: [] },
+    readFlow(workspaceId, detail.run.subscriptionId),
   ]);
   const entry = catalog.automations.find(
     (candidate) => candidate.templateId === detail.run.templateId,
   );
+  const setup = subscription?.setup ?? entry?.setup ?? [];
+  const providerName = (providerId: string) =>
+    entry?.requiredConnections.find(
+      (connection) => connection.providerId === providerId,
+    )?.displayName ?? providerId;
   const flow: RunFlow = entry
     ? {
         name: entry.name,
-        version: entry.version,
         pipeline: entry.pipeline.map((step) => ({
           id: step.id,
           title: step.title,
@@ -75,7 +114,33 @@ export default async function RunDetailPage(
               groups: entry.groups.map((group) => ({
                 id: group.id,
                 title: group.title,
+                ...(group.platform !== undefined
+                  ? { platform: group.platform }
+                  : {}),
               })),
+            }
+          : {}),
+        ...(subscription && entry.groups
+          ? {
+              tracker: {
+                titles: Object.fromEntries(
+                  entry.groups.map((group) => [
+                    group.id,
+                    stepTitle(group, setup, subscription.config),
+                  ]),
+                ),
+                settings: Object.fromEntries(
+                  entry.groups.flatMap((group) => {
+                    const line = settingLine(
+                      group.id,
+                      setup,
+                      subscription.config,
+                      providerName,
+                    );
+                    return line === null ? [] : [[group.id, line]];
+                  }),
+                ),
+              },
             }
           : {}),
       }
