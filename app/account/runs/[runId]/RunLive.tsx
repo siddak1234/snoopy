@@ -352,10 +352,16 @@ function Tile({ label, value }: { label: string; value: string }) {
 
 const STATE_LOOK: Record<
   TrackerState,
-  { Icon: typeof CheckCircleIcon; tone: string }
+  { Icon: typeof CheckCircleIcon; tone: string; motion?: string }
 > = {
   waiting: { Icon: CircleDashedIcon, tone: "text-[var(--muted)]" },
-  working: { Icon: CircleNotchIcon, tone: "text-[var(--link)]" },
+  // The running step's icon spins; with reduced motion it stays still (Build
+  // 23's A4, the app's rule). Only this state moves.
+  working: {
+    Icon: CircleNotchIcon,
+    tone: "text-[var(--link)]",
+    motion: "motion-safe:animate-spin",
+  },
   done: { Icon: CheckCircleIcon, tone: "text-[var(--success-text)]" },
   held: { Icon: HandPalmIcon, tone: "text-[var(--warning-text)]" },
   failed: { Icon: WarningCircleIcon, tone: "text-[var(--error-text)]" },
@@ -367,14 +373,15 @@ const STATE_LOOK: Record<
 
 /**
  * One row of Steps: "3 · AI processing", its state's icon (24) and its state
- * in words — Waiting, Working…, Done and when, Waiting for approval and why,
- * the run's failure, Skipped or Stopped; a setting step's integration; the
- * email's Sending…, Sent and when, or Not sent — never a step's own summary
+ * in words — Waiting, Working… (its icon spinning), Done and when, Waiting for
+ * approval and why, the run's failure, Skipped or Stopped; a setting step's
+ * integration; step 5's Email sent and when, Sending email… or Done (Build
+ * 23's A7, `lib/run-progress.ts`) — never a step's own summary
  * and never a step id (B6). A platform step this build does not know has no
  * state, so no line.
  */
 function TrackerItem({ row }: { row: TrackerRow }) {
-  const { Icon, tone } = STATE_LOOK[row.state];
+  const { Icon, tone, motion } = STATE_LOOK[row.state];
   const quiet =
     row.state === "waiting" ||
     row.state === "skipped" ||
@@ -386,7 +393,11 @@ function TrackerItem({ row }: { row: TrackerRow }) {
       data-state={row.state}
       className="flex items-start gap-3"
     >
-      <Icon size={24} aria-hidden className={`mt-0.5 shrink-0 ${tone}`} />
+      <Icon
+        size={24}
+        aria-hidden
+        className={`mt-0.5 shrink-0 ${tone}${motion ? ` ${motion}` : ""}`}
+      />
       <div className="flex min-w-0 flex-col gap-0.5">
         <p
           className={`text-sm font-medium ${quiet ? "text-[var(--muted)]" : "text-[var(--text)]"}`}
@@ -417,7 +428,7 @@ const CHIP_TONE: Record<DocumentCardView["tone"], string> = {
  * where; when; the numbers that match it to its record (AM7); each line with
  * "{quantity} × {unit price}" under it; the totals; how it was paid; the
  * result line; then the automation's own detail lines. The app's
- * `components/runs/document-card.tsx` on the website.
+ * `snoopy-mobile/components/runs/document-card.tsx` on the website.
  */
 function DocumentCard({ card }: { card: DocumentCardView }) {
   const pairs = (rows: DocumentRowView[], prefix: string) =>

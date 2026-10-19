@@ -60,7 +60,7 @@ export default async function AccountSettingsPage() {
             <span className="font-mono font-medium text-[var(--text)]">
               {domain}
             </span>
-            . Set up an organization workspace to collaborate with your team.
+            . Set up an organization workspace to collaborate with your company.
           </p>
           <div className="mt-4">
             <SetupOrgForm domain={domain} />

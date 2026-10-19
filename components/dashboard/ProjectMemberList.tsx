@@ -148,7 +148,7 @@ function MemberRowItem({
   }
 
   async function handleRemove() {
-    if (!confirm(`Remove ${m.name || m.email} from this team?`)) return;
+    if (!confirm(`Remove ${m.name || m.email} from this department?`)) return;
     setBusy(true);
     setError(null);
     const result = await removeMemberFromProjectAction(projectId, m.userId);
@@ -163,7 +163,7 @@ function MemberRowItem({
   async function handleLeave() {
     if (
       !confirm(
-        "Leave this team? You will lose access to its flows immediately.",
+        "Leave this department? You will lose access to its flows immediately.",
       )
     )
       return;

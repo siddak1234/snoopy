@@ -56,7 +56,9 @@ typed, credential-free fixtures rather than storing local resource settings.
 
 What each round changed is recorded in the backend-owned BUILD-PLAN; this
 repository's findings and their dispositions are the register in
-`docs/audits/2026-08-11-round-5-phase-1-status.md`.
+`docs/audits/2026-08-11-round-5-phase-1-status.md`. A screen or control the
+app has and this website does not is a parity finding there (Build 23: F105,
+Activity's time range and outcome pickers).
 
 ## Verification
 

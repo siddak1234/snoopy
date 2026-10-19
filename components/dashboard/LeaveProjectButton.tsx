@@ -61,7 +61,7 @@ export function LeaveProjectButton({
         disabled={pending}
         className="shrink-0 rounded-lg px-2 py-1.5 text-sm font-medium text-[var(--error-text)] transition hover:bg-[var(--error-bg)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
       >
-        {pending ? "Leaving…" : "Leave team"}
+        {pending ? "Leaving…" : "Leave department"}
       </button>
 
       {open ? (
@@ -83,8 +83,8 @@ export function LeaveProjectButton({
             id="leave-project-desc"
             className="mt-1 text-sm text-[var(--muted)]"
           >
-            You will be removed from this team and stop seeing its flows. To
-            confirm, type{" "}
+            You will be removed from this department and stop seeing its flows.
+            To confirm, type{" "}
             <span className="font-semibold text-[var(--text)]">DELETE</span>.
           </p>
 
@@ -120,7 +120,7 @@ export function LeaveProjectButton({
                 disabled={!canConfirm || pending}
                 className="btn-danger inline-flex px-5 disabled:pointer-events-none disabled:opacity-50"
               >
-                {pending ? "Leaving…" : "Leave team"}
+                {pending ? "Leaving…" : "Leave department"}
               </button>
             </div>
           </div>

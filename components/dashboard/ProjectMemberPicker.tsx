@@ -91,12 +91,12 @@ export function ProjectMemberPicker({
             Add members
           </h3>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            Pick people in this organization to add to the team.
+            Pick people in this organization to add to the department.
           </p>
 
           {available.length === 0 ? (
             <p className="mt-4 text-sm text-[var(--muted)]">
-              Everyone in this organization is already on the team.
+              Everyone in this organization is already in the department.
             </p>
           ) : (
             <ul className="mt-4 max-h-80 divide-y divide-[var(--ring)] overflow-y-auto">

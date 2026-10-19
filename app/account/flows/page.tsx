@@ -60,7 +60,7 @@ import { listWorkspaceProjects, resolveActiveWorkspaceId } from "@/lib/tenancy";
 export const dynamic = "force-dynamic";
 
 /** The card's subtitle (spec §3.A). */
-const SUBTITLE = "Ready-made flows for your teams.";
+const SUBTITLE = "Ready-made flows for your departments.";
 
 export default async function FlowsPage() {
   const session = await getAppSession();

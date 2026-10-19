@@ -572,3 +572,19 @@ test("Verified domains only: its refusals in words, on the published operation, 
   const page = readFileSync("app/account/organization/page.tsx", "utf8");
   assert.match(page, /initialOn=\{workspace\.domainOnly === true\}/u);
 });
+
+test("the workspace switcher's menu stays anchored under its button and scrolls when the list is long (Build 23's A2)", () => {
+  const switcher = readFileSync(
+    "components/dashboard/WorkspaceSwitcher.tsx",
+    "utf8",
+  );
+  const menu = switcher.slice(switcher.indexOf('id="workspace-switcher-menu"'));
+  const classes = menu.match(/className="([^"]+)"/u)?.[1].split(" ") ?? [];
+  for (const name of [
+    "absolute",
+    "top-full",
+    "max-h-[min(22rem,70vh)]",
+    "overflow-y-auto",
+  ])
+    assert.ok(classes.includes(name), `the menu carries ${name}`);
+});

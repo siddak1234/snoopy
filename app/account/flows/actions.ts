@@ -59,7 +59,10 @@ export type ActionResult =
         | "file-unavailable"
         // A save that chose a vendor the workspace has not connected, on a
         // live flow (backend ADR-0037): said with the vendor's name.
-        | "vendor-not-connected";
+        | "vendor-not-connected"
+        // A change only an owner or admin may make, refused: said in the
+        // platform's words (Build 23's B3).
+        | "forbidden";
     };
 
 /** The workspace the page showed, which the form sends (register F28). */
@@ -338,6 +341,10 @@ async function saveConfig(
     if (!(error instanceof PlatformServerError)) throw error;
     if (error.status === 422 && error.details?.reason === "unmet_connections")
       return { ok: false, error: SAVE_REFUSED, state: "vendor-not-connected" };
+    // A member's change, refused (Build 23's B3): in the platform's words,
+    // "Only an owner or admin can change a flow's integration."
+    if (error.status === 403)
+      return { ok: false, error: error.message, state: "forbidden" };
     return { ok: false, error: SAVE_REFUSED };
   }
 }
