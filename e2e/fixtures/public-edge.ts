@@ -324,6 +324,9 @@ function initialState() {
     invoiceConfig: { vendor: "none", holdAboveAmount: 500 } as Json,
     invoiceSaves: [] as Json[],
     quickbooksConnected: false,
+    // Build 23 (B3): a change of the flow's integration refused as a
+    // member's is — 403 `integration_requires_admin`, the Edge's "Forbidden".
+    vendorChangeRefused: false,
     // The flow still on v1 (Bills & Receipts, which the catalog now names
     // Invoice Processing): its pinned version declares no vendor setting and
     // cannot run without QuickBooks, though the catalog's v3 makes it optional.
@@ -1705,6 +1708,9 @@ const server = createServer(
       // paused, so a vendor it is not connected to can be chosen.
       "/__fixture/quickbooks-connected": () => {
         state.quickbooksConnected = true;
+      },
+      "/__fixture/vendor-change-refused": () => {
+        state.vendorChangeRefused = true;
       },
       "/__fixture/invoice-paused": () => {
         state.invoiceStatus = "paused";
@@ -3225,6 +3231,20 @@ const server = createServer(
           } satisfies Platform["ApiProblem"]);
         }
       }
+      if (
+        state.vendorChangeRefused &&
+        config?.vendor !== undefined &&
+        config.vendor !== state.invoiceConfig.vendor
+      ) {
+        return respond(response, 403, {
+          ...problem(403, "Forbidden"),
+          detail: "Access is forbidden",
+          details: {
+            reason: "integration_requires_admin",
+            requiredRole: "admin",
+          },
+        } satisfies Platform["ApiProblem"]);
+      }
       const vendor = (config ?? state.invoiceConfig).vendor;
       const status = body.status ?? state.invoiceStatus;
       if (
@@ -4126,7 +4146,7 @@ const server = createServer(
         );
       }
       // Deleted: the Edge clears the session cookies with its 200
-      // (`apps/api/src/app.ts`, the `/v1/account` handler), so the browser is
+      // (`snoopy-backend/apps/api/src/app.ts`, the `/v1/account` handler), so the browser is
       // signed out by the deletion itself, not only by the courtesy logout
       // after it (register F34).
       response.writeHead(200, {

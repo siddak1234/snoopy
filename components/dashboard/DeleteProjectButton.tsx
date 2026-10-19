@@ -22,7 +22,7 @@ export function DeleteProjectButton({
       !confirm(
         // What actually happens: archiving leaves the team's flows running. The
         // platform never "reattached" anything, as this once promised.
-        `Delete "${projectName}"? It leaves every team list. Its flows keep running until you archive them in Flows.`,
+        `Delete "${projectName}"? It leaves every department list. Its flows keep running until you archive them in Flows.`,
       )
     )
       return;
@@ -47,7 +47,7 @@ export function DeleteProjectButton({
       type="button"
       onClick={handleClick}
       disabled={pending}
-      aria-label={`Delete team ${projectName}`}
+      aria-label={`Delete department ${projectName}`}
       className="shrink-0 rounded-lg px-2 py-1.5 text-sm font-medium text-[var(--error-text)] transition hover:bg-[var(--error-bg)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] disabled:opacity-50"
     >
       {pending ? "Deleting…" : "Delete"}

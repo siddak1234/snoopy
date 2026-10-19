@@ -21,7 +21,7 @@ import {
  * done … We have pre determined steps and it should ahow where we are"): every
  * declared row from the start, each with where the run is — never a step's own
  * summary, never a step id (B6). The same tables as the app's
- * (snoopy-mobile `__tests__/build21-views.test.ts`), from the same shared
+ * (`snoopy-mobile/__tests__/build21-views.test.ts`), from the same shared
  * fixtures: run 793eef82 as it ran, a v3 run of three receipts, a held run, a
  * continuation, a failed run.
  */
@@ -481,7 +481,7 @@ test("a v4 run running: 1 Done · its time, 2 the integration chosen, 3 Working�
   assert.equal(stepsDone(pending), "1 / 5");
 });
 
-test("a v4 run's email, by the run's status and RunDetail.email: Sending… while owed, Sent · its time, Not sent, Stopped once cancelled — and Steps done with it (S24)", () => {
+test("a v4 run's step 5 (Build 23's A7): Waiting while it goes on or is held, Failed, Stopped; once it succeeded done — Email sent · its time, Sending email… while owed, Done when not sent — and Steps done counts it only on success", () => {
   const succeeded = ran(
     "receive",
     "extract",
@@ -489,31 +489,42 @@ test("a v4 run's email, by the run's status and RunDetail.email: Sending… whil
     "decide",
     "save-documents",
   );
+  const sent = v4Rows(
+    succeeded,
+    { status: "succeeded" },
+    { status: "sent", sentAt: "2026-10-17T15:22:09.000Z" },
+  );
+  assert.deepEqual(
+    [sent[4].sub, sent[4].state],
+    ["Email sent · 3:22 PM", "done"],
+  );
+  assert.equal(stepsDone(sent), "5 / 5");
   const owed = v4Rows(
     succeeded,
     { status: "succeeded" },
     { status: "waiting", sentAt: null },
   );
-  assert.deepEqual([owed[4].sub, owed[4].state], ["Sending…", "working"]);
-  assert.equal(stepsDone(owed), "4 / 5");
+  assert.deepEqual([owed[4].sub, owed[4].state], ["Sending email…", "done"]);
+  assert.equal(stepsDone(owed), "5 / 5");
   // No email from the platform reads as owed.
   assert.equal(
     v4Rows(succeeded, { status: "succeeded" }, undefined)[4].sub,
-    "Sending…",
+    "Sending email…",
   );
-  const sent = v4Rows(
-    succeeded,
-    { status: "succeeded" },
-    { status: "sent", sentAt: "2026-10-17T14:34:09.000Z" },
-  );
-  assert.deepEqual([sent[4].sub, sent[4].state], ["Sent · 2:34 PM", "done"]);
-  assert.equal(stepsDone(sent), "5 / 5");
   const notSent = v4Rows(
     succeeded,
-    { status: "failed" },
+    { status: "succeeded" },
     { status: "not_sent", sentAt: null },
   );
-  assert.deepEqual([notSent[4].sub, notSent[4].state], ["Not sent", "skipped"]);
+  assert.deepEqual([notSent[4].sub, notSent[4].state], ["Done", "done"]);
+  // Failed: Failed, whatever the email says, and not counted.
+  const failed = v4Rows(
+    succeeded,
+    { status: "failed", failureReason: "The vendor refused it." },
+    { status: "not_sent", sentAt: null },
+  );
+  assert.deepEqual([failed[4].sub, failed[4].state], ["Failed", "failed"]);
+  assert.notEqual(stepsDone(failed).split(" / ")[0], "5");
   // Cancelled: Stopped, whatever the email says; running: Waiting.
   const cancelled = v4Rows(
     ran("receive"),
@@ -535,9 +546,25 @@ test("a v4 run's email, by the run's status and RunDetail.email: Sending… whil
     )[4].sub,
     "Waiting",
   );
+  // A v5 flow's step 5 is titled "Run completed": the same rules.
+  const v5 = trackerRows(
+    succeeded,
+    V4.pipeline,
+    V4.groups.map((group) =>
+      group.platform === "email" ? { ...group, title: "Run completed" } : group,
+    ),
+    { status: "succeeded" },
+    timeOfDay,
+    V4.pipeline,
+    {
+      flow: quickbooksFlow,
+      email: { status: "sent", sentAt: "2026-10-17T15:22:09.000Z" },
+    },
+  );
+  assert.equal(words(v5)[4], "5 · Run completed  Email sent · 3:22 PM");
 });
 
-test("a held v4 run: step 4 waits for approval and says why, step 5 by its email — sent for the approval's (S24)", () => {
+test("a held v4 run: step 4 waits for approval and says why, step 5 Waiting — an approval email never checks it (Build 23's A7)", () => {
   const rows = v4Rows(
     [
       ...ran("receive", "extract", "decide"),
@@ -554,11 +581,12 @@ test("a held v4 run: step 4 waits for approval and says why, step 5 by its email
   );
   assert.deepEqual(words(rows).slice(3), [
     "4 · QuickBooks updated  Waiting for approval: Document 2: the total can't be read.",
-    "5 · Email sent  Sent · 2:35 PM",
+    "5 · Email sent  Waiting",
   ]);
+  assert.equal(rows[4].state, "waiting");
   assert.equal(
     v4Rows(ran("receive", "decide"), { status: "held" }, undefined)[4].sub,
-    "Sending…",
+    "Waiting",
   );
 });
 
@@ -673,5 +701,27 @@ test("the run page draws the tracker's rows and words alone — never a step's s
   assert.ok(
     live.indexOf('label: "Run ID", value: run.id') > 0,
     "the facts end with the full Run ID",
+  );
+});
+
+test("the running step's icon spins, still under reduced motion, and no other state's does (Build 23's A4)", () => {
+  const live = read("app/account/runs/[runId]/RunLive.tsx");
+  const look = live.slice(
+    live.indexOf("const STATE_LOOK"),
+    live.indexOf("function TrackerItem"),
+  );
+  const entries = look.split(/\n {2}(?=[a-z]+: \{)/u).slice(1);
+  const spinning = entries
+    .filter((entry) => entry.includes("animate-spin"))
+    .map((entry) => entry.split(":")[0]);
+  assert.deepEqual(spinning, ["working"]);
+  assert.match(look, /motion: "motion-safe:animate-spin"/u);
+  assert.match(
+    live,
+    /const \{ Icon, tone, motion \} = STATE_LOOK\[row\.state\]/u,
+  );
+  assert.match(
+    live,
+    /className=\{`mt-0\.5 shrink-0 \$\{tone\}\$\{motion \? ` \$\{motion\}` : ""\}`\}/u,
   );
 });

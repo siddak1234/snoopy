@@ -16,6 +16,7 @@ import {
   type FlowEmailRecipients,
   type UpdateSubscriptionRequest,
 } from "@/lib/automations";
+import { VENDOR_MEMBER_NOTE } from "@/lib/connection-rows";
 import { EMAIL_SAVE_FAILED } from "@/lib/flow-email";
 import { heldCopy } from "@/lib/held-flow";
 import { overPlanRefusal } from "@/lib/plan-limit";
@@ -59,7 +60,10 @@ export type ActionResult =
         | "file-unavailable"
         // A save that chose a vendor the workspace has not connected, on a
         // live flow (backend ADR-0037): said with the vendor's name.
-        | "vendor-not-connected";
+        | "vendor-not-connected"
+        // A change only an owner or admin may make, refused: said in the
+        // platform's words (Build 23's B3).
+        | "forbidden";
     };
 
 /** The workspace the page showed, which the form sends (register F28). */
@@ -338,6 +342,15 @@ async function saveConfig(
     if (!(error instanceof PlatformServerError)) throw error;
     if (error.status === 422 && error.details?.reason === "unmet_connections")
       return { ok: false, error: SAVE_REFUSED, state: "vendor-not-connected" };
+    // A member's change, refused (Build 23's B3): the platform's 403 names
+    // only its reason (the Edge's title is "Forbidden"), so it is said in the
+    // clients' own words, the same as the member's note. Any other 403 is
+    // the plain refusal.
+    if (
+      error.status === 403 &&
+      error.details?.reason === "integration_requires_admin"
+    )
+      return { ok: false, error: VENDOR_MEMBER_NOTE, state: "forbidden" };
     return { ok: false, error: SAVE_REFUSED };
   }
 }

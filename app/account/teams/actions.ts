@@ -39,8 +39,8 @@ function platformMessage(error: unknown, fallback: string): string {
 function accessMessage(error: unknown, fallback: string): string {
   if (error instanceof PlatformServerError) {
     if (error.status === 409)
-      return "This team or your request changed. Reload to see where it stands.";
-    if (error.status === 404) return "That team is not available to you.";
+      return "This department or your request changed. Reload to see where it stands.";
+    if (error.status === 404) return "That department is not available to you.";
     return error.message;
   }
   return fallback;
@@ -62,7 +62,10 @@ async function workspaceTheyAreIn(workspaceId: string) {
 async function projectContext(projectId: string) {
   const context = await findAccessibleProject(projectId);
   if (!context)
-    throw new PlatformServerError("The requested team is unavailable.", 404);
+    throw new PlatformServerError(
+      "The requested department is unavailable.",
+      404,
+    );
   return context;
 }
 
@@ -79,7 +82,7 @@ export async function deleteProjectAction(
   } catch (error) {
     return {
       ok: false,
-      error: platformMessage(error, "The team could not be deleted."),
+      error: platformMessage(error, "The department could not be deleted."),
     };
   }
 }
@@ -98,7 +101,7 @@ export async function leaveProjectAction(
   } catch (error) {
     return {
       ok: false,
-      error: platformMessage(error, "You could not leave this team."),
+      error: platformMessage(error, "You could not leave this department."),
     };
   }
 }

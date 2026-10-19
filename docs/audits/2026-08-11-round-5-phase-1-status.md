@@ -3853,3 +3853,41 @@ email sentence changed in this branch, so the date it carried from Build 21 (Oct
 untrue. Both `/privacy` baselines were re-recorded (the session's repin script: each old baseline
 failed first, then all six marketing pages passed — darwin on this Mac, linux in CI's pinned
 Playwright image), and `build21-screens` reads the new date.
+
+## Round 17 — Build 23 (web): a member reads the integration, the running step spins, step 5 says the run completed, Department, and the switcher scrolls — 2026-10-19
+
+The web half of Build 23, with the same words and rules as the app:
+
+- **A2** The workspace switcher's menu scrolls when the list is long (`max-h-[min(22rem,70vh)]`,
+  `overflow-y-auto`); its anchor under the button, keyboard, Escape and outside click are unchanged
+  (`tenancy-contract`).
+- **A4** On a run's page the running step's icon spins (`motion-safe:animate-spin`, still under
+  reduced motion); no other state moves (`run-progress`, the started-run fixture journey).
+- **A7** Step 5, the platform's email ("Email sent" in v4, "Run completed" in v5): Waiting while the
+  run goes on **or is held** (an approval's email no longer checks it), Failed, Stopped; once the run
+  succeeded, done — "Email sent · {time}", "Sending email…" while owed, or "Done" when none was sent
+  (the session's S12). ~~"Sending…", "Sent · {time}", "Not sent"~~ until Build 23. Steps done counts
+  step 5 only on success (`run-progress`, the fixture journeys).
+- **B1** Every word a person reads on the signed-in pages and onboarding says department, never team:
+  Departments, Department: {kind}, Leave department, Delete department, "in a department". Routes
+  (`/account/teams`), files, identifiers and API fields keep their names. `structure-contract` adds
+  `teams?` to its retired words and now reads `app/onboarding` too. The privacy page and every
+  marketing page are unchanged (the session's S14).
+- **B3** A member sees a flow's integration and never changes it: on Connect integration and Set up
+  no row is a choice — None and a connected vendor too (`aria-disabled`, no tap) — and the list ends
+  "Only an owner or admin can change the integration."; a vendor not connected still says "Ask an
+  owner or admin to connect it.". A vendor save the platform refuses with 403
+  `integration_requires_admin` says "Only an owner or admin can change the integration."
+  (`saveConfig`'s `forbidden`; the Edge's title is only "Forbidden"); any other 403 says "Could not
+  save. Try again.". Connections already shows a member the rows and no button
+  (`ConnectionsPanel.tsx`'s `canManage`); unchanged.
+- **A5** The email links' fallback (`/runs/<id>`, `/approvals/<id>`, through Caddy's redirect and
+  `next.config.ts`'s rewrites) is unchanged.
+
+- **F105** (new, parity): the app's Activity has a time range and an outcome picker; this website's
+  Activity (`app/account/runs/page.tsx`) filters only by the URL the flow Dashboard's tiles open. The
+  task asked for drop-downs "where they exist", so none is added this round. Open: add both pickers
+  to the website's Activity in a later round, or record the owner's decision that the web keeps the
+  tiles' links alone.
+
+F105 is the last number.

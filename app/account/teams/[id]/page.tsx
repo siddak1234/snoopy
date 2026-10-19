@@ -89,7 +89,7 @@ export default async function TeamDetailPage({
         workspace.type === "personal" ? "Personal" : workspace.name,
         onTeam
           ? `You are its ${project.viewerRole}`
-          : "You see every team as an organization admin",
+          : "You see every department as an organization admin",
       ].join(" · ")}
       primaryAction={
         canManage && organization ? (
@@ -106,7 +106,7 @@ export default async function TeamDetailPage({
             href="/account/teams"
             className="btn-secondary inline-flex !min-h-0 !px-4 !py-1.5 text-sm"
           >
-            Back to teams
+            Back to departments
           </Link>
           {owner ? (
             <DeleteProjectButton

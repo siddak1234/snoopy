@@ -566,7 +566,7 @@ test("a flow is added with no team: the platform puts it in the team of its cate
   // workspace.
   assert.match(
     read("app/account/flows/place.ts"),
-    /if \(!subscription\.projectId\) return "Whole workspace";\s*const kind =\s*teamKind\.get\(subscription\.projectId\) \?\?\s*catalog\.get\(subscription\.templateId\)\?\.category;\s*return kind \? `Team: \$\{kind\}` : "Team";/u,
+    /if \(!subscription\.projectId\) return "Whole workspace";\s*const kind =\s*teamKind\.get\(subscription\.projectId\) \?\?\s*catalog\.get\(subscription\.templateId\)\?\.category;\s*return kind \? `Department: \$\{kind\}` : "Department";/u,
   );
   // The removed words (spec §3.A): no source file says them.
   const removed =
