@@ -907,6 +907,14 @@ test("16 — Cancel on a run another tab already stopped says so", async ({
   page,
   context,
 }) => {
+  // This tab stays as it was first drawn, as a tab left open does: its own
+  // re-read every 2 s (RunLive) would learn of the other tab's cancel and take
+  // Cancel away before the click below — a race WebKit lost twice on PR #55.
+  // A failed re-read leaves the page as it was; the cancel itself is not a read.
+  await page.route(
+    /\/api\/platform\/v1\/workspaces\/[^/]+\/runs\/fixture-run-running$/,
+    (route) => route.abort(),
+  );
   await page.goto("/account/runs/fixture-run-running");
   const other = await context.newPage();
   try {
