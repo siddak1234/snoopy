@@ -13,6 +13,7 @@ import {
   connectionLine,
   connectionState,
   type RowConnection,
+  VENDOR_MEMBER_NOTE,
 } from "@/lib/connection-rows";
 import { NONE } from "@/lib/flow-steps";
 import { beginConnectionAuthorization } from "@/app/account/connections/actions";
@@ -31,9 +32,6 @@ export type VendorOption = {
 };
 
 export const VENDOR_ASK_ADMIN = "Ask an owner or admin to connect it.";
-/** Under a member's list: they see the integration, never change it (Build 23's B3). */
-export const VENDOR_MEMBER_NOTE =
-  "Only an owner or admin can change the integration.";
 export const VENDOR_NONE_SUB = "Save the details only.";
 export const VENDOR_SAVING = "Saving…";
 

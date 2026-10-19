@@ -3876,8 +3876,10 @@ The web half of Build 23, with the same words and rules as the app:
 - **B3** A member sees a flow's integration and never changes it: on Connect integration and Set up
   no row is a choice — None and a connected vendor too (`aria-disabled`, no tap) — and the list ends
   "Only an owner or admin can change the integration."; a vendor not connected still says "Ask an
-  owner or admin to connect it.". A vendor save the platform refuses with 403 says the platform's
-  words (`saveConfig`'s `forbidden`). Connections already shows a member the rows and no button
+  owner or admin to connect it.". A vendor save the platform refuses with 403
+  `integration_requires_admin` says "Only an owner or admin can change the integration."
+  (`saveConfig`'s `forbidden`; the Edge's title is only "Forbidden"); any other 403 says "Could not
+  save. Try again.". Connections already shows a member the rows and no button
   (`ConnectionsPanel.tsx`'s `canManage`); unchanged.
 - **A5** The email links' fallback (`/runs/<id>`, `/approvals/<id>`, through Caddy's redirect and
   `next.config.ts`'s rewrites) is unchanged.

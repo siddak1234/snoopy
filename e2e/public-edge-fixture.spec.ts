@@ -2207,6 +2207,31 @@ test("a member on the Connect integration page sees the integration and never ch
   );
 });
 
+test("a change of the integration the platform refuses as a member's (403 integration_requires_admin) says who can, saves nothing and stays on the page (Build 23's B3)", async ({
+  page,
+}) => {
+  await fixtureControl("quickbooks-connected");
+  await fixtureControl("vendor-change-refused");
+  const saves = async () =>
+    (await fixtureRead<{ invoiceSaves: unknown[] }>("counts")).invoiceSaves
+      .length;
+  const before = await saves();
+  await page.goto(`${vendorPage}?field=vendor`);
+  const main = page.locator("main");
+  await main.getByRole("radio", { name: "QuickBooks Online" }).click();
+  await expect(main.getByRole("alert")).toHaveText(
+    "Only an owner or admin can change the integration.",
+  );
+  await expect(page).toHaveURL(
+    new RegExp(`${vendorPage}\\?field=vendor$`, "u"),
+  );
+  expect(await saves()).toBe(before);
+  expect(await invoiceSettings()).toEqual({
+    vendor: "none",
+    holdAboveAmount: 500,
+  });
+});
+
 // Build 22 (spec §4, P1 and P5; the owner's build 21 item 5: "When i select
 // this step it should take me to the page where i can edit in a screen the
 // email it should send to"): Who gets the email, a flow's run emails. The
@@ -3959,7 +3984,7 @@ test("no one creates a team: Teams, its empty screen and the dashboard offer no 
     await presentSession(page, session);
     await page.goto("/account/teams");
     await expect(page.getByRole("link", { name: /general/ })).toBeVisible();
-    await expect(main).not.toContainText("Create a team");
+    await expect(main).not.toContainText(/Create a (team|department)/u);
   }
   // With no team at all: the empty screen, and nothing to create.
   await fixtureControl("org-without-projects");
@@ -3973,7 +3998,7 @@ test("no one creates a team: Teams, its empty screen and the dashboard offer no 
   await expect(main.getByRole("button")).toHaveCount(0);
   await expectNoAxeViolations(page);
   await page.goto("/account");
-  await expect(main).not.toContainText("Create a team");
+  await expect(main).not.toContainText(/Create a (team|department)/u);
   expect(await createdTeams()).toEqual([]);
 });
 
@@ -3986,9 +4011,9 @@ test('the dashboard lists no teams — Teams stay on their own page (the owner\'
   await expect(
     main.getByRole("heading", { name: "Departments", exact: true }),
   ).toHaveCount(0);
-  await expect(main.getByRole("link", { name: "View all teams" })).toHaveCount(
-    0,
-  );
+  await expect(
+    main.getByRole("link", { name: /View all (teams|departments)/u }),
+  ).toHaveCount(0);
   await expect(main.getByRole("link", { name: /general/ })).toHaveCount(0);
 });
 

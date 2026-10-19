@@ -404,11 +404,15 @@ test("the flow page draws the owed lines in Step 1, and its vendor row goes to t
   assert.match(page, /\{owed\.map\(\(line\) => \(/u);
 });
 
-test("a member sees the integration and never changes it: no row is a choice — None and a connected vendor too — and the list says who can; an owner's rows are unchanged; a refused change says the platform's words (Build 23's B3)", () => {
+test("a member sees the integration and never changes it: no row is a choice — None and a connected vendor too — and the list says who can; an owner's rows are unchanged; a refused change says who can (Build 23's B3)", () => {
   const rows = read("app/account/flows/VendorRows.tsx");
   assert.match(
-    rows,
+    read("lib/connection-rows.ts"),
     /export const VENDOR_MEMBER_NOTE =\s*"Only an owner or admin can change the integration\.";/u,
+  );
+  assert.match(
+    rows,
+    /\bVENDOR_MEMBER_NOTE,\s*\} from "@\/lib\/connection-rows";/u,
   );
   assert.match(rows, /const tappable = canManage;/u);
   assert.match(rows, /if \(busy \|\| !canManage\) return;/u);
@@ -433,12 +437,15 @@ test("a member sees the integration and never changes it: no row is a choice —
     rows,
     /!connected && !canManage\s*\?\s*\{ text: VENDOR_ASK_ADMIN/u,
   );
-  // The platform's 403 for the vendor save, in its own words.
+  // The platform's 403 `integration_requires_admin` for the vendor save: the
+  // Edge's title is "Forbidden", so the save says the note's words; any other
+  // 403 is the plain refusal.
   const actions = read("app/account/flows/actions.ts");
   assert.match(
     actions,
-    /if \(error\.status === 403\)\s*return \{ ok: false, error: error\.message, state: "forbidden" \};/u,
+    /if \(\s*error\.status === 403 &&\s*error\.details\?\.reason === "integration_requires_admin"\s*\)\s*return \{ ok: false, error: VENDOR_MEMBER_NOTE, state: "forbidden" \};\s*return \{ ok: false, error: SAVE_REFUSED \};/u,
   );
+  assert.doesNotMatch(actions, /error: error\.message, state: "forbidden"/u);
   const choice = read(
     "app/account/flows/[subscriptionId]/vendor/VendorChoice.tsx",
   );

@@ -6,7 +6,8 @@
  * ~04:15Z: "we will list on apples app store not intuits. so we do not need
  * that"): the vendor's mark at 24 · its name · under it the account's email,
  * else its state · on the right one button of ours. The same rules and words
- * as the app's (snoopy-mobile `lib/view/catalog.ts`, `lib/content/screen-states.ts`).
+ * as the app's (`snoopy-mobile/lib/view/catalog.ts`,
+ * `snoopy-mobile/lib/content/screen-states.ts`).
  *
  * Used by Connections, a flow page's Connections and vendor row, Set up and
  * the vendor page. Pure, and loaded by its unit test as it is: no React and no
@@ -24,6 +25,14 @@ export const DISCONNECTING_LABEL = "Disconnecting…";
 /** Only an owner or admin connects or disconnects (the platform's rule). */
 export const CONNECTIONS_MANAGED_BY =
   "Only an owner or admin of this workspace can connect or disconnect an account.";
+
+/**
+ * Under a member's vendor list, and the words for the platform's 403
+ * `integration_requires_admin` on a vendor save: a member sees the
+ * integration, never changes it (Build 23's B3; byte-equal to the app's).
+ */
+export const VENDOR_MEMBER_NOTE =
+  "Only an owner or admin can change the integration.";
 
 /** A connection as far as the row reads it (`Connection`, `lib/connections.ts`). */
 export type RowConnection = {
