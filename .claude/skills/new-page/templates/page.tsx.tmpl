@@ -1,0 +1,50 @@
+import { EmptyRow } from "@/components/dashboard/EmptyRow";
+import SectionCard from "@/components/dashboard/SectionCard";
+import { getAppSession } from "@/lib/app-session";
+import type { operations } from "@/lib/generated/platform-contracts/__contract__";
+import { platformServerJson, workspacePath } from "@/lib/platform-server";
+import { resolveActiveWorkspaceId } from "@/lib/tenancy";
+
+type __Name__Response =
+  operations["__operationId__"]["responses"][200]["content"]["application/json"];
+
+// Read per request: the platform read sends the session's cookies, and a build
+// with no backend (a Vercel preview) must never prerender it (register F62).
+export const dynamic = "force-dynamic";
+
+/**
+ * __Title__: __purpose__
+ */
+export default async function __Name__Page() {
+  const session = await getAppSession();
+  const workspaceId = await resolveActiveWorkspaceId(session);
+
+  if (!workspaceId) {
+    return (
+      <SectionCard title="__Title__">
+        <EmptyRow text="No workspace is active yet." />
+      </SectionCard>
+    );
+  }
+
+  const response = await platformServerJson<__Name__Response>(
+    `${workspacePath(workspaceId)}__apiPath__`,
+  );
+  const items = response.__listKey__;
+
+  return (
+    <SectionCard title="__Title__">
+      {items.length === 0 ? (
+        <EmptyRow text="__emptyText__" />
+      ) : (
+        <ul className="divide-y divide-[var(--ring)]">
+          {items.map((item) => (
+            <li key={item.id} className="py-3 text-sm text-[var(--text)]">
+              {item.__itemLabel__}
+            </li>
+          ))}
+        </ul>
+      )}
+    </SectionCard>
+  );
+}

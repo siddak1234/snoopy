@@ -3,7 +3,9 @@ name: CI
 # Every pull request, and main only through main.yml, which calls this whole
 # workflow when a push to main is not the tree its pull request's all-green
 # already proved (register F92). The jobs read nothing event-specific, so they
-# run the same under either trigger.
+# run the same under either trigger, but for the gates job's DOCS_BASE: the
+# pull request's base branch, and main when called from main.yml, where the
+# docs check's range is then empty.
 on:
   pull_request:
   workflow_call:
@@ -25,10 +27,15 @@ jobs:
   gates:
     name: Architecture gates
     runs-on: ubuntu-24.04
+    env:
+      # The docs check reads the pull request's commits since its base
+      # (README "Verification"); on main, called by main.yml, the range is empty.
+      DOCS_BASE: origin/${{ github.base_ref || 'main' }}
     steps:
       - uses: actions/checkout@v7
         # The document check believes a struck path only when a commit once
-        # added it; a one-commit clone has no history to show.
+        # added it, and the docs check reads every commit since the base; a
+        # one-commit clone has no history to show.
         with:
           fetch-depth: 0
       - uses: actions/setup-node@v7
@@ -36,6 +43,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Fails when a changed area's doc did not change with it, a fact is
+      # restated outside its home, or a changed doc names a missing file
+      # (docs/docs-map.json).
+      - run: npm run check:docs
+      # Fails when docs/MAP.md is not what `npm run map` builds from the tree.
+      - run: npm run map -- --check
       # Fails if a browser secret, storage, manual-login, or direct-database
       # path returns.
       - run: npm run audit:boundaries

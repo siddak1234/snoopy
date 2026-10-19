@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "repo": "snoopy",
+  "generated": [
+    "docs/MAP.md",
+    "lib/generated/platform-contracts/automations.d.ts",
+    "lib/generated/platform-contracts/connections.d.ts",
+    "lib/generated/platform-contracts/platform.d.ts"
+  ],
+  "ignore": ["lib/generated/**", "**/CLAUDE.md"],
+  "unmapped": {
+    "public": "static assets: images and icons the pages serve",
+    "test": "contract and structure assertions; each test names what it guards",
+    "docs": "the documents themselves, which the rules point at",
+    "test-results": "Playwright's output, gitignored",
+    ".next": "the build's output, gitignored",
+    ".autom8x": "the repo-facts JSON npm run verify writes (generated, gitignored)"
+  },
+  "rules": [
+    {
+      "id": "app",
+      "code": [
+        "app/**",
+        "components/**",
+        "hooks/**",
+        "proxy.ts",
+        "instrumentation.ts",
+        "next.config.ts"
+      ],
+      "docs": ["docs/ARCHITECTURE.md", "README.md"],
+      "need": "any"
+    },
+    {
+      "id": "lib",
+      "code": ["lib/**"],
+      "docs": ["docs/ARCHITECTURE.md"],
+      "need": "any"
+    },
+    {
+      "id": "verification",
+      "code": ["e2e/**", "playwright.config.ts", "scripts/**", ".github/**"],
+      "docs": ["README.md", "CONTRIBUTING.md"],
+      "need": "any"
+    },
+    {
+      "id": "claude",
+      "code": [".claude/**"],
+      "docs": ["AGENTS.md"],
+      "need": "any"
+    }
+  ],
+  "facts": [
+    {
+      "key": "fast-gates",
+      "home": "README.md",
+      "pattern": "\\b(?:five|six|seven|eight|nine) fast gates\\b"
+    },
+    {
+      "key": "contract-inputs",
+      "home": "docs/ARCHITECTURE.md",
+      "pattern": "\\b(?:two|three|four|five) (?:published )?(?:OpenAPI )?(?:contracts|inputs)\\b"
+    },
+    {
+      "key": "fixture-specs",
+      "home": "README.md",
+      "pattern": "\\b(?:[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even) specs\\b"
+    }
+  ],
+  "records": {
+    "current": [],
+    "archive": [
+      "AGENTS.archive.md",
+      "docs/REPO-STRUCTURE.archive.md",
+      "docs/audits/2026-08-06-backend-boundary-cutover.md",
+      "docs/audits/2026-08-11-round-5-phase-1-status.md"
+    ]
+  },
+  "map": {
+    "kind": "next-route",
+    "readFirst": [
+      "AGENTS.md",
+      "snoopy-backend/docs/platform/ENGINEERING-STANDARD.md",
+      "docs/ARCHITECTURE.md",
+      "README.md"
+    ],
+    "folders": [],
+    "lists": [
+      { "title": "Pages and API routes", "as": "next-route", "glob": "app/**" },
+      { "title": "lib", "as": "header-line", "glob": "lib/*.ts" },
+      { "title": "e2e specs", "as": "header-line", "glob": "e2e/*.spec.ts" },
+      { "title": "Scripts", "as": "header-line", "glob": "scripts/**/*.mjs" },
+      { "title": "Git hooks", "as": "header-line", "glob": "scripts/githooks/*" },
+      { "title": "Tests", "as": "test-prefixes", "glob": "test/*.test.mjs" }
+    ]
+  }
+}

@@ -36,6 +36,8 @@ const DURATION_FLOORS = {
 };
 const FULL_GATES = [
   "format:check",
+  "check:docs",
+  "map",
   "lint",
   "typecheck",
   "audit:boundaries",
@@ -47,7 +49,13 @@ const FULL_GATES = [
   "test:browser",
   "test:browser:fixtures",
 ];
-const DOCS_GATES = ["lint", "format:check", "doc-references"];
+const DOCS_GATES = [
+  "lint",
+  "format:check",
+  "doc-references",
+  "check:docs",
+  "map",
+];
 
 function git(...args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();

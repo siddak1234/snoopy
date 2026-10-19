@@ -1,9 +1,13 @@
-import { defineConfig } from "eslint/config";
+import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import prettier from "eslint-config-prettier";
 
 const eslintConfig = defineConfig([
+  // The common kit is byte-identical in all four repositories and checked by
+  // its own tests (scripts/kit/kit.test.mjs); a lint fix to one copy would
+  // make it drift, so neither folder is linted here.
+  globalIgnores([".claude/hooks/", "scripts/kit/"]),
   ...nextVitals,
   ...nextTs,
   prettier,

@@ -32,6 +32,7 @@
 !.claude/settings.json
 !.claude/agents/
 !.claude/skills/
+!.claude/hooks/
 
 # macOS/iCloud Finder conflict copies ("file 2.tsx", and extensionless
 # "pre-push 2") — never commit these
