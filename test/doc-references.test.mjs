@@ -4,6 +4,7 @@ import {
   copyFileSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -566,8 +567,14 @@ test("the audit reads every CLAUDE.md, the agents' and skills' documents under .
       "missing\tdocs/MAP.md:1\t../lib/gone-f.ts",
     ]);
   });
-  // And here: each of these documents names a file, and the audit read it.
+  // And here: each of these documents names a file, and the audit read it —
+  // the whole report, through to its summary line.
   const { output } = audit(root, ["--all"]);
+  assert.match(
+    output,
+    /^doc references: \d+ — found \d+/mu,
+    "the report ends before its summary",
+  );
   for (const doc of [
     "AGENTS.md",
     "app/CLAUDE.md",
@@ -583,4 +590,12 @@ test("the audit reads every CLAUDE.md, the agents' and skills' documents under .
       `${doc} was not read`,
     );
   }
+});
+
+test("the audit sets its exit code and never calls process.exit(), so a pipe gets every line", () => {
+  // An exit drops what stdout has not yet written to a pipe: main's Smoke job
+  // read this audit's report cut short, at a different line on each attempt.
+  const source = readFileSync(script, "utf8");
+  assert.doesNotMatch(source, /process\.exit\(/u);
+  assert.match(source, /process\.exitCode = /u);
 });

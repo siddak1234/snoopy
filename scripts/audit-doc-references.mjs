@@ -364,5 +364,8 @@ if (
   console.log(
     `doc references: ${references.length} — found ${count("found")}, struck ${count("struck")}, not checked ${count("not checked")}, missing ${count("missing")}`,
   );
-  process.exit(count("missing") > 0 ? 1 : 0);
+  // The exit code, never an explicit exit: one drops what stdout has not yet
+  // written to a pipe, and main's Smoke job read this report cut short at a
+  // different line on each attempt, its summary missing (run 39288703076).
+  process.exitCode = count("missing") > 0 ? 1 : 0;
 }
