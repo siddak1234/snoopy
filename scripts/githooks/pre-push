@@ -1,11 +1,11 @@
 #!/bin/sh
 # Native pre-push gate: every push of this repository — from any tool or
-# terminal — runs the six fast gates `npm run verify` begins with (register
-# F93), so a push that would turn CI red is refused here, in about half a
-# minute, instead of costing a run; and then requires a PASS marker from
-# /audit-change for the exact tree being pushed. Installed via
-# `npm run hooks:install` (bash scripts/install-git-hooks.sh: git config
-# core.hooksPath scripts/githooks). Deliberate bypass: --no-verify.
+# terminal — runs the fast gates `npm run verify` begins with (register F93;
+# README "Verification" counts them), so a push that would turn CI red is
+# refused here, in about half a minute, instead of costing a run; and then
+# requires a PASS marker from /audit-change for the exact tree being pushed.
+# Installed via `npm run hooks:install` (bash scripts/install-git-hooks.sh:
+# git config core.hooksPath scripts/githooks). Deliberate bypass: --no-verify.
 #
 # git calls this with: $1=remote name, $2=remote url, and stdin lines of
 # "<local_ref> <local_sha> <remote_ref> <remote_sha>".
@@ -37,12 +37,14 @@ done
 
 [ -n "$gated" ] || exit 0
 
-# The six fast gates, in verify's order (README "Verification"), on the working
+# The fast gates, in verify's order (README "Verification"), on the working
 # tree, stopped at the first red — what is wrong in the tree, before what is
 # missing from the process. CI is the authority: the slow gates — the builds,
 # the browser suites — are its, and this hook never runs them. It writes no
 # facts file and no marker: only a whole green `npm run verify` emits facts,
-# and only scripts/audit/record-pass.mjs writes a marker.
+# and only scripts/audit/record-pass.mjs writes a marker. Verify's map gate
+# (`npm run map -- --check`) is not run twice: test:contracts asserts the map
+# is current (test/kit-repo.test.mjs).
 cd "$(git rev-parse --show-toplevel)" || exit 1
 # A push from a linked worktree (or with --git-dir) exports GIT_DIR and its
 # siblings to this hook. The gates' tests run git in throwaway repositories,
@@ -62,7 +64,7 @@ done
 output="$(mktemp)" || exit 1
 trap 'rm -f "$output"' EXIT
 started="$(date +%s)"
-for gate in format:check lint typecheck audit:boundaries test:contracts verify:platform-contracts; do
+for gate in format:check check:docs lint typecheck audit:boundaries test:contracts verify:platform-contracts; do
   if [ "$gate" = "verify:platform-contracts" ] && [ "$sibling_present" = 0 ]; then
     echo "pre-push: $gate skipped — sibling checkout not present at $backend_root; accepted dependency (§12.2 #78)." >&2
     continue
@@ -76,7 +78,7 @@ for gate in format:check lint typecheck audit:boundaries test:contracts verify:p
     exit 1
   fi
 done
-echo "pre-push: the six fast gates are green ($(( $(date +%s) - started ))s); CI runs the rest." >&2
+echo "pre-push: the fast gates are green ($(( $(date +%s) - started ))s); CI runs the rest." >&2
 
 # The change-audit marker, for each tree pushed (AGENTS.md rule 8).
 for entry in $gated; do

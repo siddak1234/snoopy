@@ -306,6 +306,42 @@ test("the change audit runs verify's gates, in verify's order, and the marker re
   );
 });
 
+test("D: verify and both change-audit tiers run the docs check and the map's staleness check, right after format:check in verify's order", () => {
+  // docs/docs-map.json says which doc each area's change must update, and
+  // docs/MAP.md is generated from the tree (AGENTS.md "Docs always updated").
+  const verifyGates = gateNames(
+    verify,
+    "const gates = [",
+    "console.log(`verify: node",
+  );
+  assert.deepEqual(verifyGates.slice(0, 3), [
+    "format:check",
+    "check:docs",
+    "map",
+  ]);
+  assert.match(verify, /name: "map", args: \["--", "--check"\]/u);
+  assert.match(
+    verify,
+    /\["run", gate\.name, \.\.\.\(gate\.args \?\? \[\]\)\]/u,
+  );
+  for (const [from, to] of [
+    ["const fullGates = [", "const docsGates = ["],
+    ["const docsGates = [", "const gates = mode"],
+  ]) {
+    const block = runGates.slice(runGates.indexOf(from), runGates.indexOf(to));
+    assert.match(
+      block,
+      /name: "check:docs", command: \["npm", "run", "check:docs"\]/u,
+      `${from} runs no docs check`,
+    );
+    assert.match(
+      block,
+      /name: "map", command: \["npm", "run", "map", "--", "--check"\]/u,
+      `${from} runs no map check`,
+    );
+  }
+});
+
 test("a docs-only change audit runs the gates its marker requires, the document check among them (register F66)", () => {
   // run-gates.mjs runs `docsGates` for a docs-only change; record-pass.mjs
   // refuses a docs-only PASS without every one of DOCS_GATES. Two lists apart

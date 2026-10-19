@@ -34,8 +34,11 @@ to this repository or to `.env.local`.
 npm run verify
 ```
 
-One command, the whole offline gate, in this order: `format:check`, `lint`,
-`typecheck`, `audit:boundaries`, `test:contracts`, `verify:platform-contracts`
+One command, the whole offline gate, in this order: `format:check`,
+`check:docs` (each changed area's doc changed with it, each fact in its one
+place, and every file a changed doc names exists: `docs/docs-map.json`),
+`map -- --check` (`docs/MAP.md` is what `npm run map` builds from the tree),
+`lint`, `typecheck`, `audit:boundaries`, `test:contracts`, `verify:platform-contracts`
 (skipped out loud when `../snoopy-backend` is not checked out beside this
 repository), `build:no-backend` (the site with no backend, as a Vercel preview
 builds it), `probe:no-backend` (that build served as a preview serves it: the
@@ -122,7 +125,9 @@ secret provisioning belongs to the deployment configuration round, not here.
 | `npm run build` | Production build |
 | `npm run build:no-backend` | The build a Vercel preview makes: no `BACKEND_API_ORIGIN` |
 | `npm run probe:no-backend` | Serve that build as a preview does, and check what a visitor gets |
-| `npm run test:contracts` | Public-contract and boundary behavior tests |
+| `npm run test:contracts` | Public-contract and boundary behavior tests, and the common kit's own (`scripts/kit/kit.test.mjs`) |
+| `npm run check:docs` | Each changed area's doc changed with it, and each fact in one place (`docs/docs-map.json`) |
+| `npm run map` | Rebuild `docs/MAP.md` from the tree; `-- --check` fails when it is stale |
 | `npm run generate:platform-contracts` | Regenerate the typed client from `../snoopy-backend`'s published contracts |
 | `npm run verify:platform-contracts` | Report a generated type that differs from its contract; changes nothing |
 | `npm run audit:boundaries` | Reject browser secrets, direct DB access, manual fetches, and raw hex colours |
@@ -136,5 +141,8 @@ smoke (lint, format, typecheck, the contract tests) when the merged commit's
 tree is the one its pull request's all-green passed, and the whole suite
 otherwise. `npm run hooks:install` arms the pre-push hook
 (`scripts/githooks/pre-push`), which requires the change-audit marker and runs
-the six fast gates `npm run verify` begins with (see "Verification"; ~30 s) before a push leaves; CI is the authority for
-the rest.
+the seven fast gates `npm run verify` begins with (see "Verification"; ~30 s):
+every gate before its builds but the map's check, which `test:contracts` makes
+too (`test/kit-repo.test.mjs`). CI is the authority for the rest; its
+Architecture gates job runs `check:docs` and the map's check on the pull
+request's commits.

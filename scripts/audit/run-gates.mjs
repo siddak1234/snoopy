@@ -103,6 +103,8 @@ async function runGates() {
   // rather than skipping.
   const fullGates = [
     { name: "format:check", command: ["npm", "run", "format:check"] },
+    { name: "check:docs", command: ["npm", "run", "check:docs"] },
+    { name: "map", command: ["npm", "run", "map", "--", "--check"] },
     { name: "lint", command: ["npm", "run", "lint"] },
     { name: "typecheck", command: ["npm", "run", "typecheck"] },
     { name: "audit:boundaries", command: ["npm", "run", "audit:boundaries"] },
@@ -138,7 +140,9 @@ async function runGates() {
     },
   ];
   // A docs-only change is exactly the change that can name a file that does
-  // not exist, so the document check is one of its gates.
+  // not exist, so the document check is one of its gates — and the docs
+  // check and the map's, since a doc can break a docs-map rule or a fact's
+  // one place, and a new doc changes docs/MAP.md.
   const docsGates = [
     { name: "lint", command: ["npm", "run", "lint"] },
     { name: "format:check", command: ["npm", "run", "format:check"] },
@@ -146,6 +150,8 @@ async function runGates() {
       name: "doc-references",
       command: ["node", "scripts/audit-doc-references.mjs"],
     },
+    { name: "check:docs", command: ["npm", "run", "check:docs"] },
+    { name: "map", command: ["npm", "run", "map", "--", "--check"] },
   ];
   const gates = mode === "docs-only" ? docsGates : fullGates;
 

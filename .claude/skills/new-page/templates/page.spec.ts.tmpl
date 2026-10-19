@@ -1,0 +1,26 @@
+import { expect, test } from "@playwright/test";
+import { expectNoAxeViolations, fixtureControl } from "./helpers";
+
+/**
+ * __Title__ (__route__) against the loopback fixture Edge, reset before each
+ * test, as the other fixture specs run: what a person sees there, and WCAG 2.2
+ * AA on it.
+ */
+
+test.use({ storageState: process.env.PLAYWRIGHT_AUTH_STORAGE_STATE });
+test.skip(
+  process.env.E2E_PUBLIC_EDGE_FIXTURE !== "1",
+  "requires the local public Edge fixture",
+);
+
+test.beforeEach(async () => {
+  await fixtureControl("reset");
+});
+
+test("__Title__ shows its title and passes axe", async ({ page }) => {
+  await page.goto("__route__");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "__Title__" }),
+  ).toBeVisible();
+  await expectNoAxeViolations(page);
+});
