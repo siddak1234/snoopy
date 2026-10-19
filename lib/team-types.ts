@@ -2,7 +2,8 @@ import type { components } from "@/lib/generated/platform-contracts/automations"
 
 /**
  * The team kinds (the owner, build 7: "project types should just be teams or
- * departments" — the list confirmed 2026-10-02; BUILD-PLAN 24.11.11). They are
+ * departments" — the list confirmed 2026-10-02; BUILD-PLAN 24.11.11), which a
+ * person reads as departments (Build 23's B1; the code keeps `team`). They are
  * also the catalog's categories (backend ADR-0036): a flow goes to the team of
  * its category, which the platform makes when it is first needed — no one picks
  * a team or creates one (the owner, 2026-10-14). A team is its kind (the owner,

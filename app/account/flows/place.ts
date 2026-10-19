@@ -2,7 +2,8 @@ import type { AutomationCatalogEntry, Subscription } from "@/lib/automations";
 import type { Project } from "@/lib/tenancy";
 
 /**
- * Where a flow is, in words (spec §3.A, §3.D): "Team: {kind}" — a team is its
+ * Where a flow is, in words (spec §3.A, §3.D): "Department: {kind}" (~~"Team:
+ * {kind}"~~ until Build 23's B1) — a team is its
  * kind (the owner, build 9), and a flow's team is the one of its category
  * (backend ADR-0036), so a team this person cannot list is still named by the
  * category. A flow added to the whole workspace before teams says so. Said on
@@ -24,6 +25,6 @@ export function placeOf(
     const kind =
       teamKind.get(subscription.projectId) ??
       catalog.get(subscription.templateId)?.category;
-    return kind ? `Team: ${kind}` : "Team";
+    return kind ? `Department: ${kind}` : "Department";
   };
 }

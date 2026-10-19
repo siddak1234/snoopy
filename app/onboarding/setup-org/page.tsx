@@ -25,8 +25,8 @@ export default async function SetupOrgPage() {
           <span className="font-mono font-medium text-[var(--text)]">
             {domain}
           </span>
-          . Create an organization workspace for your team, or continue with a
-          personal account.
+          . Create an organization workspace for your company, or continue with
+          a personal account.
         </p>
 
         <SetupOrgForm domain={domain} />

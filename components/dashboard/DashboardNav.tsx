@@ -10,7 +10,7 @@ export const dashboardNavItems = [
   { href: "/account/connections", label: "Connections" },
   { href: "/account/runs", label: "Activity" },
   { href: "/account/approvals", label: "Approvals" },
-  { href: "/account/teams", label: "Teams" },
+  { href: "/account/teams", label: "Departments" },
   { href: "/account/billing", label: "Billing" },
   { href: "/account/settings", label: "Settings" },
   { href: "/account/support", label: "Support" },
@@ -21,8 +21,9 @@ const navLinkClass =
 
 /**
  * The Organization link shows only where its page renders: for an
- * organization's owners and admins (register F55). Teams is for everyone — a
- * person's own workspace holds teams too (BUILD-PLAN 24.11.11).
+ * organization's owners and admins (register F55). Departments (~~Teams~~ until
+ * Build 23's B1) is for everyone — a person's own workspace holds them too
+ * (BUILD-PLAN 24.11.11).
  */
 type OrganizationLinks = { showOrgSettings?: boolean };
 
@@ -101,7 +102,7 @@ const pathToTitle: Record<string, string> = {
   "/account/connections": "Connections",
   "/account/runs": "Activity",
   "/account/approvals": "Approvals",
-  "/account/teams": "Teams",
+  "/account/teams": "Departments",
   "/account/billing": "Billing",
   "/account/settings": "Settings",
   "/account/support": "Support",
@@ -113,7 +114,7 @@ function getPageTitle(pathname: string): string {
   // pages — its page, its Set up, its Connect integration (Build 21, spec A6;
   // ~~Connect vendor~~ until Build 22) and who gets its email (Build 22).
   if (pathname.startsWith("/account/runs/")) return "Run";
-  if (pathname.startsWith("/account/teams/")) return "Team";
+  if (pathname.startsWith("/account/teams/")) return "Department";
   if (pathname.startsWith("/account/flows/")) {
     if (pathname.endsWith("/setup")) return "Set up";
     if (pathname.endsWith("/vendor")) return "Connect integration";

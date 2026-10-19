@@ -23,7 +23,7 @@ export default function SectionCard({
 }) {
   const defaultSubheader: Record<string, string> = {
     Dashboard: "Your workspace",
-    Teams: "Your teams",
+    Departments: "Your departments",
     "Workflow Design": "Design and manage workflows",
     Billing: "Billing and subscription",
     Settings: "Account and workspace settings",

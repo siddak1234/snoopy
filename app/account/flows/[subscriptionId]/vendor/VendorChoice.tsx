@@ -89,7 +89,9 @@ export function VendorChoice({
       const result = await saveVendorChoice(data);
       if (!result.ok) {
         setSaving(null);
-        setError(VENDOR_SAVE_FAILED);
+        setError(
+          result.state === "forbidden" ? result.error : VENDOR_SAVE_FAILED,
+        );
         return;
       }
       router.push(flowPath(subscriptionId));

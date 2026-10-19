@@ -11,7 +11,7 @@
  * platform's email. **Never a step's own summary and never a step id**
  * (B6; item 11's "What is the checked issue?" over "34 accounts read" under
  * Received). The same rules, words and tests as the app's `toTracker`
- * (snoopy-mobile `lib/view/runs.ts`), so both clients say the same thing.
+ * (`snoopy-mobile/lib/view/runs.ts`), so both clients say the same thing.
  * ~~One row per group that had a reported step, under it that step's
  * summary~~ until Build 21.
  *
@@ -83,12 +83,16 @@ export function stepHeld(reason: string | undefined): string {
   return reason ? `Waiting for approval: ${reason}` : "Waiting for approval";
 }
 
-/** A run's step 5, the platform's email (Build 22; the session's S24): its line per state, the app's words. */
-export const EMAIL_SENDING = "Sending…";
-export function emailSent(time: string): string {
-  return `Sent · ${time}`;
+/**
+ * A run's step 5, the platform's email (Build 22; Build 23's A7, "Run
+ * completed"): its line once the run succeeded, the app's words. A run that
+ * succeeded without sending says Done (S12). ~~"Sending…", "Sent · {time}",
+ * "Not sent"~~ until Build 23.
+ */
+export const EMAIL_OWED = "Sending email…";
+export function emailSentLine(time: string): string {
+  return `Email sent · ${time}`;
 }
-export const EMAIL_NOT_SENT = "Not sent";
 
 /** How long a run's page waits, while the run has not ended, before it reads the run again (spec A7). */
 export const RUN_REREAD_MS = 2_000;
@@ -230,10 +234,12 @@ const doneRow = (key: string, title: string, sub: string): TrackerRow => ({
 });
 
 /**
- * The platform's email step (Build 22, the session's S24; backend ADR-0041),
- * from the run's status and its `email`: Waiting while the run goes on;
- * "Sending…" once it ended or held and the email is owed — and with no `email`
- * from the platform; "Sent · {time}"; "Not sent"; Stopped for a cancelled run.
+ * The platform's email step (Build 22; backend ADR-0041), titled "Email sent"
+ * (v4) or "Run completed" (v5), from the run's status and its `email` (Build
+ * 23's A7): Waiting while the run goes on or is held (an approval email never
+ * checks it); Failed; Stopped for a cancelled run; once it succeeded, done:
+ * "Email sent · {time}", "Sending email…" while the email is owed (and with no
+ * `email` from the platform), or Done when none was sent.
  */
 function emailRow(
   key: string,
@@ -249,15 +255,15 @@ function emailRow(
     sub,
   });
   if (run.status === "cancelled") return at("stopped", STEP_STOPPED);
-  if (run.status === "pending" || run.status === "running")
-    return at("waiting", STEP_WAITING);
+  if (run.status === "failed") return at("failed", STEP_FAILED);
+  if (run.status !== "succeeded") return at("waiting", STEP_WAITING);
   if (email?.status === "sent")
     return at(
       "done",
-      email.sentAt ? emailSent(clock(email.sentAt)) : STEP_DONE,
+      email.sentAt ? emailSentLine(clock(email.sentAt)) : STEP_DONE,
     );
-  if (email?.status === "not_sent") return at("skipped", EMAIL_NOT_SENT);
-  return at("working", EMAIL_SENDING);
+  if (email?.status === "not_sent") return at("done", STEP_DONE);
+  return at("done", EMAIL_OWED);
 }
 
 /**

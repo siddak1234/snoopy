@@ -248,14 +248,14 @@ const dialogs: Dialog[] = [
     path: team,
     session: "member",
     opener: (page) =>
-      page.locator("main").getByRole("button", { name: "Leave team" }),
+      page.locator("main").getByRole("button", { name: "Leave department" }),
     holds: {
       ...actionOn(team),
       prepare: async (page, dialog) => {
         await dialog.getByLabel("Confirmation").fill("DELETE");
         await refusedAsBusy(page);
       },
-      send: "Leave team",
+      send: "Leave department",
       busy: "Leaving…",
       cancel: "Cancel",
       answered: (_, dialog) =>

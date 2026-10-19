@@ -13,6 +13,7 @@ import {
   connectionLine,
   connectionState,
   type RowConnection,
+  VENDOR_MEMBER_NOTE,
 } from "@/lib/connection-rows";
 import { NONE } from "@/lib/flow-steps";
 import { beginConnectionAuthorization } from "@/app/account/connections/actions";
@@ -43,15 +44,19 @@ export const VENDOR_SAVING = "Saving…";
  * Drawn on Connect integration, where a tap is saved at once, and on Set up, where
  * a tap is the choice its Turn on or Save sends (the owner's AM4: "set up
  * should be made simple. vendor connections can be specific but everything is
- * there"). The app's `components/flows/vendor-choice.tsx` on the website.
+ * there"). The app's `snoopy-mobile/components/flows/vendor-choice.tsx` on the website.
  *
- * A tap on a connected vendor or None is the choice (`onChoose`). A vendor not
- * connected is connected first, for an owner or admin, through the vendor's
+ * For an owner or admin, a tap on a connected vendor or None is the choice
+ * (`onChoose`). A vendor not connected is connected first through the vendor's
  * sign-in — the browser comes back to `returnTo`, where it is chosen (the
  * owner's build 20 item 2: "If i need to connect then after i click and
  * connection happens then it shoukd take me back"); one that takes a pasted
- * key is connected where its key is pasted, Connections. For a member a vendor
- * not connected is no choice: "Ask an owner or admin to connect it."
+ * key is connected where its key is pasted, Connections. A member sees the
+ * integration and never changes it (Build 23's B3; the platform refuses a
+ * member's change): no row is a choice — None and a connected vendor too —
+ * a vendor not connected says "Ask an owner or admin to connect it.", and
+ * under the list "Only an owner or admin can change the integration."
+ * ~~A member could choose a connected vendor or None~~ until Build 23.
  */
 export function VendorRows({
   label,
@@ -114,7 +119,7 @@ export function VendorRows({
   };
 
   const tap = (option: VendorOption | null) => {
-    if (busy) return;
+    if (busy || !canManage) return;
     setRowError(null);
     if (!option) {
       onChoose(NONE);
@@ -124,7 +129,6 @@ export function VendorRows({
       onChoose(option.providerId);
       return;
     }
-    if (!canManage) return;
     if (!option.connectable) {
       router.push("/account/connections");
       return;
@@ -142,8 +146,8 @@ export function VendorRows({
         const connection = option.connection ?? undefined;
         const connected = connectionState(connection) === "connected";
         const isChosen = chosen === option.providerId;
-        // Connected, or connectable by this person: the row is the choice.
-        const tappable = connected || canManage;
+        // An owner or admin's row is the choice; a member's never is.
+        const tappable = canManage;
         const line =
           busy === option.providerId
             ? { text: VENDOR_SAVING, tone: "muted" as const }
@@ -161,7 +165,8 @@ export function VendorRows({
               disabled={
                 !tappable || (busy !== null && busy !== option.providerId)
               }
-              onClick={() => tap(option)}
+              aria-disabled={!tappable || undefined}
+              onClick={tappable ? () => tap(option) : undefined}
               data-testid={`vendor-${option.providerId}`}
               className={`${CONNECTION_ROW} rounded-[var(--radius-md)] px-2 transition enabled:cursor-pointer enabled:hover:bg-[var(--surface-hover)]`}
             >
@@ -191,8 +196,9 @@ export function VendorRows({
         aria-checked={chosen === NONE}
         aria-label="None"
         aria-describedby={lineId(NONE)}
-        disabled={busy !== null && busy !== NONE}
-        onClick={() => tap(null)}
+        disabled={!canManage || (busy !== null && busy !== NONE)}
+        aria-disabled={!canManage || undefined}
+        onClick={canManage ? () => tap(null) : undefined}
         data-testid="vendor-none"
         className={`${CONNECTION_ROW} rounded-[var(--radius-md)] px-2 transition enabled:cursor-pointer enabled:hover:bg-[var(--surface-hover)]`}
       >
@@ -204,6 +210,14 @@ export function VendorRows({
           right={<ChoiceMark chosen={chosen === NONE} />}
         />
       </button>
+      {canManage ? null : (
+        <p
+          data-testid="vendor-member-note"
+          className="px-2 pt-3 text-xs text-[var(--muted)]"
+        >
+          {VENDOR_MEMBER_NOTE}
+        </p>
+      )}
     </div>
   );
 }

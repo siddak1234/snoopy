@@ -143,7 +143,7 @@ export function WorkspaceSwitcher({
           onKeyDown={onMenuKeyDown}
           role="dialog"
           aria-label="Switch workspace"
-          className="absolute top-full right-0 z-50 mt-2 min-w-[14rem] rounded-[var(--radius-lg)] border border-[var(--ring)] bg-[var(--surface)] p-2 shadow-[var(--shadow-md)]"
+          className="absolute top-full right-0 z-50 mt-2 max-h-[min(22rem,70vh)] min-w-[14rem] overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--ring)] bg-[var(--surface)] p-2 shadow-[var(--shadow-md)]"
         >
           <div className="flex flex-col gap-0.5 py-1">
             {workspaces.map((workspace) => {

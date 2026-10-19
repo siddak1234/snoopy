@@ -66,7 +66,7 @@ starts (the preflight binds each one; `lsof` cannot see a renamed `next-server`)
 a temporary certificate and scans every authenticated page with axe. Here it
 runs in Chromium and Firefox; CI runs it once per engine, WebKit's leg
 included (register F104). Its tests drive the published operations the website calls — flows and runs, archiving
-a flow and the archived ones, adding a flow (it goes to the team of its
+a flow and the archived ones, adding a flow (it goes to the department of its
 category, which the platform makes when there is none, and its Set up opens;
 a catalog with nothing to add), the dashboard (Today's three tiles, counted
 from the browser's midnight and each opening Activity from it; the approvals
@@ -76,17 +76,19 @@ Steps — titles only, Step 1 holding the run's fields and Start run, step 2 its
 integration, step 4 titled by the flow's choice, step 5 who gets the email —
 and Edit setup; no Connections and no move to another version), its Set up
 (Turn on, or Save), its Connect integration page (a tap saves and goes back; a
-vendor connected from it comes back chosen; a flow still on an older version
+vendor connected from it comes back chosen; a member sees the integration and
+no row is a choice; a flow still on an older version
 with no vendor to choose is sent to Connections instead), who gets its email
 (an owner or admin adds and removes addresses, each saved at once, at most
 ten; a member reads them), a run's page (every step from the start — its
-integration and its email among them — read again while it goes on, each
+integration and its email among them, the running one spinning — read again
+while it goes on, each
 document it read on a card of its own, and Download JSON), every run by its
 full id, a run's file (PUT straight to the fixture's object store, across
 origins), a webhook flow's address, connections (one row each — mark, name, the account's email or its
-state, one button — each disconnect confirmed first), teams (a team is a
-project in the platform's contract: its members, asking to join and the
-answers), setting up an organization
+state, one button — each disconnect confirmed first), departments (a
+department is a project in the platform's contract: its members, asking to
+join and the answers), setting up an organization
 (a refused domain claim retried on the organization made), the organization's
 join link,
 unlinking a sign-in account (each refusal, and a platform with no unlink yet),

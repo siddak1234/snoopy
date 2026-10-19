@@ -67,7 +67,7 @@ test("a whole page with nothing on it is the app's empty screen, and a section s
   // With one: the icon, decorative, then the title, its line and the action.
   assert.match(row, /<span\s+aria-hidden/u);
   for (const [page, title] of [
-    ["app/account/teams/page.tsx", "No teams yet"],
+    ["app/account/teams/page.tsx", "No departments yet"],
     ["app/account/runs/page.tsx", "No activity yet"],
     ["app/account/approvals/page.tsx", "Nothing needs review"],
     // The catalog with nothing to add (the owner's build 10).
@@ -216,7 +216,7 @@ test("every action that removes or ends something is red, on its page and in its
     ],
     [
       "components/dashboard/LeaveProjectButton.tsx",
-      "Leave team",
+      "Leave department",
       ["text", "danger"],
     ],
     ["components/dashboard/DeleteProjectButton.tsx", "Delete", ["text"]],
@@ -866,17 +866,20 @@ test("Replace account is off the connection row, and nothing names a connection 
   }
 });
 
-test("the signed-in pages say team and flow, never project or automation (BUILD-PLAN 24.11.11)", () => {
-  // The owner's words: a team is what the platform's contract calls a project,
-  // and "Flows will be the name we use from now on". The code keeps the
-  // contract's names; copy is what a person reads, found by parsing — JSX text,
-  // and a string or template's text that holds a space or begins with a
+test("the signed-in pages and onboarding say department and flow, never team, project or automation (BUILD-PLAN 24.11.11; Build 23's B1)", () => {
+  // The owner's words: a department is what the platform's contract calls a
+  // project — ~~a team~~ until Build 23 — and "Flows will be the name we use
+  // from now on". The code keeps the contract's names and the routes
+  // (`/account/teams`); copy is what a person reads, found by parsing — JSX
+  // text, and a string or template's text that holds a space or begins with a
   // capital. An identifier, a path, a key and an import are never copy.
-  const retired = /\b(projects?|automations?)\b/iu;
+  const retired = /\b(projects?|automations?|teams?)\b/iu;
   const found = [];
   for (const path of [
     ...sources("app/account"),
+    ...sources("app/onboarding"),
     ...sources("components/dashboard"),
+    "lib/team-types.ts",
   ]) {
     const source = ts.createSourceFile(
       path,

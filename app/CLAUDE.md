@@ -44,8 +44,9 @@ starts from `/new-page` ([skill](../.claude/skills/new-page/SKILL.md)).
 4. No jargon, and no explanations on the page.
 5. Where a person follows steps, number them (`NumberedStep`).
 
-Signed-in copy says team and flow, never project or automation (BUILD-PLAN
-24.11.11; `test/structure-contract.test.mjs` parses it).
+Signed-in and onboarding copy says department and flow, never team, project
+or automation (BUILD-PLAN 24.11.11, Build 23's B1; routes and identifiers keep
+`team`; `test/structure-contract.test.mjs` parses it).
 
 ## Parity with the app
 

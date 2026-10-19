@@ -200,7 +200,7 @@ test("4, 20 — the sidebar's Teams link opens Teams in any workspace; Organizat
   const nav = page.getByRole("complementary", {
     name: "Dashboard navigation",
   });
-  await nav.getByRole("link", { name: "Teams" }).click();
+  await nav.getByRole("link", { name: "Departments" }).click();
   await expect(page).toHaveURL(/\/account\/teams$/);
   await expect(page.getByRole("link", { name: /general/ })).toBeVisible();
   const trigger = page.getByRole("button", { name: "Switch workspace" });
@@ -230,7 +230,7 @@ test("4, 20 — the sidebar's Teams link opens Teams in any workspace; Organizat
   await page.goto("/account");
   // A personal workspace holds teams too; the organization page is an
   // organization's.
-  await expect(nav.getByRole("link", { name: "Teams" })).toHaveCount(1);
+  await expect(nav.getByRole("link", { name: "Departments" })).toHaveCount(1);
   await expect(nav.getByRole("link", { name: "Organization" })).toHaveCount(0);
   await page.goto("/account/teams");
   // Every team the person is on, in every workspace, whichever is active.
@@ -255,12 +255,12 @@ test.describe("on a small screen", () => {
       ["/account/connections", "Connections"],
       ["/account/runs", "Activity"],
       ["/account/approvals", "Approvals"],
-      ["/account/teams", "Teams"],
+      ["/account/teams", "Departments"],
       ["/account/billing", "Billing"],
       ["/account/settings", "Settings"],
       ["/account/support", "Support"],
       ["/account/organization", "Organization"],
-      [organizationProject, "Team"],
+      [organizationProject, "Department"],
       ["/account/runs/fixture-run-ok", "Run"],
       [FLOWS.manual, "Flow"],
       [`${FLOWS.manual}/setup`, "Set up"],
@@ -286,7 +286,7 @@ test.describe("on a small screen", () => {
     await page.getByRole("button", { name: "Open menu" }).click();
     await page
       .getByRole("dialog", { name: "Dashboard navigation" })
-      .getByRole("link", { name: "Teams" })
+      .getByRole("link", { name: "Departments" })
       .click();
     await expect(page).toHaveURL(/\/account\/teams$/);
   });
@@ -657,15 +657,15 @@ test("11 — every action that removes or ends something wears the error tokens,
   // takes no colour.
   await page.goto(organizationProject);
   await expectErrorText(
-    page.getByRole("button", { name: "Delete team general" }),
+    page.getByRole("button", { name: "Delete department general" }),
     tokens,
-    "Delete team, on its page",
+    "Delete department, on its page",
   );
   await page.goto("/account/teams");
   await expectErrorText(
-    page.getByRole("button", { name: "Delete team general" }),
+    page.getByRole("button", { name: "Delete department general" }),
     tokens,
-    "Delete team, in Teams",
+    "Delete department, in Departments",
   );
 
   await page.goto("/account/organization");
@@ -689,7 +689,7 @@ test("11 — every action that removes or ends something wears the error tokens,
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
-test("11 — a member's Leave team, the Leave on their own row, and the Leave team that confirms it wear the error tokens (the owner's build 12, #5)", async ({
+test("11 — a member's Leave department, the Leave on their own row, and the Leave department that confirms it wear the error tokens (the owner's build 12, #5)", async ({
   page,
 }) => {
   await presentSession(page, "member");
@@ -697,17 +697,17 @@ test("11 — a member's Leave team, the Leave on their own row, and the Leave te
   const tokens = await resolvedTokens(page);
   const leave = page
     .locator("main")
-    .getByRole("button", { name: "Leave team" });
+    .getByRole("button", { name: "Leave department" });
   const own = page
     .locator("main li")
     .filter({ hasText: "(you)" })
     .getByRole("button", { name: "Leave", exact: true });
-  await expectErrorText(leave, tokens, "Leave team");
+  await expectErrorText(leave, tokens, "Leave department");
   await expectErrorText(own, tokens, "Leave, on their own row");
   // Hovered, still red, on the error tint — never the neutral hover that
   // greyed them, a dark system theme's included (this suite's scheme).
   for (const [control, name] of [
-    [leave, "Leave team, hovered"],
+    [leave, "Leave department, hovered"],
     [own, "Leave, on their own row, hovered"],
   ] as const) {
     await control.hover();
@@ -725,9 +725,9 @@ test("11 — a member's Leave team, the Leave on their own row, and the Leave te
   // Typed, so the confirm is read enabled.
   await dialog.getByLabel("Confirmation").fill("DELETE");
   await expectDanger(
-    dialog.getByRole("button", { name: "Leave team" }),
+    dialog.getByRole("button", { name: "Leave department" }),
     tokens,
-    "Leave team, confirming",
+    "Leave department, confirming",
   );
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -889,7 +889,7 @@ test("the platform's email links open their pages: a run's, and the decisions wa
   page,
 }) => {
   // `PRODUCT_ORIGIN/runs/<id>` and `/approvals/<id>`, as the backend's notifier
-  // builds them (`apps/runs/src/notifications.ts`); both answered 404.
+  // builds them (`snoopy-backend/apps/runs/src/notifications.ts`); both answered 404.
   await page.goto("/runs/fixture-run-ok");
   await expect(page).toHaveURL(/\/account\/runs\/fixture-run-ok$/);
   await expect(page.locator("main")).toContainText(
@@ -1027,7 +1027,7 @@ test("20 — the Teams pages: an unknown team is not found, and a team's page go
   );
   expect(unknown?.status()).toBe(404);
   await page.goto(organizationProject);
-  await page.getByRole("link", { name: "Back to teams" }).click();
+  await page.getByRole("link", { name: "Back to departments" }).click();
   await expect(page).toHaveURL(/\/account\/teams$/);
 });
 

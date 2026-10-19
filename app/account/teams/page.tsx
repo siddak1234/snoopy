@@ -61,18 +61,18 @@ export default async function AccountTeamsPage() {
 
   return (
     <SectionCard
-      title="Teams"
+      title="Departments"
       subheader={
         organizations > 1
-          ? "Your teams across all organizations"
-          : "Your teams, and the ones you can ask to join"
+          ? "Your departments across all organizations"
+          : "Your departments, and the ones you can ask to join"
       }
     >
       {shown.length === 0 ? (
         <EmptyRow
           icon={<UsersThreeIcon size={32} />}
-          title="No teams yet"
-          text="A team has its own flows and its own people."
+          title="No departments yet"
+          text="A department has its own flows and its own people."
         />
       ) : (
         shown.map(({ workspace, mine, askable }, index) => {
@@ -92,7 +92,7 @@ export default async function AccountTeamsPage() {
               <div className="mt-3">
                 {mine.length === 0 ? (
                   <p className="text-sm text-[var(--muted)]">
-                    You are not on a team here yet.
+                    You are not in a department here yet.
                   </p>
                 ) : (
                   <ProjectList projects={mine} />
