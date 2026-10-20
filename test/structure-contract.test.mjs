@@ -243,6 +243,9 @@ test("every action that removes or ends something is red, on its page and in its
     ["components/dashboard/AccountTopBar.tsx", "Sign out", ["danger"]],
     ["components/marketing/MarketingNav.tsx", "Sign out", ["text"]],
     ["components/navigation/MobileNavMenu.tsx", "Sign out", ["text"]],
+    // An approval's Deny (Build 24, P6): the danger variant, the owner's
+    // call for the Approve and Deny pair — ~~Reject, secondary~~ until then.
+    ["app/account/approvals/ApprovalDecision.tsx", "Deny", ["danger"]],
   ]) {
     const found = named(path, words);
     assert.deepEqual(
@@ -264,7 +267,6 @@ test("every action that removes or ends something is red, on its page and in its
 test("what can be undone keeps its colour: Pause, Reject, Deny and Cancel request stay as they were, and Withdraw's confirm is the accent (the owner's build 12, #5)", () => {
   for (const [path, words, variant, className] of [
     ["app/account/flows/AutomationActions.tsx", "Pause", "secondary", null],
-    ["app/account/approvals/ApprovalDecision.tsx", "Reject", "secondary", null],
     [
       "components/dashboard/OrgJoinRequestList.tsx",
       "Reject",

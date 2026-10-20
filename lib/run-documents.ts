@@ -1,3 +1,4 @@
+import type { components } from "@/lib/generated/platform-contracts/automations";
 /**
  * A run's documents, as the run page's Documents cards draw them (Build 21,
  * spec A7; backend ADR-0039 — `RunDocument`, the one shape at every hop). The
@@ -9,12 +10,13 @@
  * output. thats how we know which bill is what from records."
  *
  * Every value is the automation's, as printed; nothing is computed or rounded.
- * The same rules and words as the app's `lib/view/documents.ts`
- * (snoopy-mobile), so a document reads the same in both clients: money drawn
+ * The same rules and words as the app's `snoopy-mobile/lib/view/documents.ts`,
+ * so a document reads the same in both clients: money drawn
  * by hand from the decimal string — "$17.19" in US dollars or when the
  * document names no currency, at least two decimals and every digit printed
  * ("$3.459"), else the amount and its code ("17.19 CAD"), as the results email
- * writes a total (spec C3).
+ * writes a total (spec C3). And the run package's words and rules, the
+ * documents as one PDF and one workbook (Build 24, P12).
  *
  * Pure, and loaded by its unit test as it is: no React and no `@/` import.
  */
@@ -74,7 +76,15 @@ export type RunDocument = {
     recordId: string;
   } | null;
   details: readonly { label: string; value: string }[];
+  /** The uploaded file it came from (Invoice Processing v6; optional). */
+  source?: { file: string; pages?: readonly number[] };
 };
+
+/** `RunFile` as the contract publishes it: one file uploaded for the job — what a document's Format is read from. */
+export type RunFile = Pick<
+  components["schemas"]["RunFile"],
+  "id" | "contentType" | "format"
+>;
 
 const MONTHS = [
   "Jan",
@@ -145,9 +155,31 @@ const STATUS_TONES: Record<RunDocument["status"], DocumentTone> = {
 /** Said under a document's lines when it has more than were read. */
 export const DOCUMENT_MORE_LINES = "More lines on the document.";
 
-/** "Document 1 of 3" (the owner's ~04:05Z: "a json out that clearly seperates accordingly"). */
+/**
+ * "Invoice 1 of 3" — the closed row's heading (Build 24, P10; the owner's
+ * build 23 words), whatever the document's type; the type is the body's first
+ * row. ~~"Document 1 of 3"~~ until Build 24.
+ */
 export function documentOf(index: number, count: number): string {
-  return `Document ${index} of ${count}`;
+  return `Invoice ${index} of ${count}`;
+}
+
+/**
+ * A document's Format: its own file's (`source.file`), else the job's only
+ * file's, else none — the row is then left out (Build 24, P10). The word is the
+ * platform's (`RunFile.format`: PDF, JPEG, PNG or HEIC, else the subtype in
+ * capitals), shown as given: one source for both clients, no mapping here.
+ */
+export function formatFor(
+  document: Pick<RunDocument, "source">,
+  files: readonly RunFile[] | undefined,
+): string | null {
+  const list = files ?? [];
+  const own = document.source
+    ? list.find((file) => file.id === document.source!.file)
+    : undefined;
+  const file = own ?? (list.length === 1 ? list[0] : undefined);
+  return file ? file.format : null;
 }
 
 function grouped(digits: string): string {
@@ -198,12 +230,20 @@ export type DocumentLineView = {
 };
 export type DocumentRowView = { label: string; value: string; strong?: true };
 
-/** One document's card. */
+/** One document's card: a closed row that opens in place (Build 24, P10). */
 export type DocumentCardView = {
   index: number;
   heading: string;
   chip: string;
   tone: DocumentTone;
+  /**
+   * The closed row's second line, `{vendor} · {total}` — the parts printed
+   * (the session's S9: three rows each "Invoice n of 3" are otherwise found
+   * only by opening each).
+   */
+  glance: string | null;
+  /** The body's first rows: Document type, then Format when it is known. */
+  facts: DocumentRowView[];
   /** `{Type} · {vendor}`, or the type alone when no seller was read. */
   title: string;
   /** `{address}, {city} · Store {number}` — the parts printed. */
@@ -224,16 +264,18 @@ export type DocumentCardView = {
 };
 
 /**
- * A document's card (spec A7): "Document 1 of 3" and its chip; the type and
- * seller; where; when; its numbers; each line — description, amount, and
- * "{quantity} × {unit price}" under it when both were printed; the totals; how
- * it was paid ("Card ending 4417", none when not shown); what happened to it;
- * then the automation's own detail lines.
+ * A document's card (spec A7; Build 24, P10): closed, "Invoice 1 of 3", its
+ * chip and `{vendor} · {total}`; open, its Document type and Format, then the
+ * type and seller; where; when; its numbers; each line — description, amount,
+ * and "{quantity} × {unit price}" under it when both were printed; the totals;
+ * how it was paid ("Card ending 4417", none when not shown); what happened to
+ * it; then the automation's own detail lines.
  */
 export function toDocumentCard(
   document: RunDocument,
   count: number,
   approval?: "rejected" | "expired" | null,
+  files?: readonly RunFile[],
 ): DocumentCardView {
   const money = (value: string | null) =>
     documentMoney(value, document.currency);
@@ -290,11 +332,20 @@ export function toDocumentCard(
   rows.push({ label: "Result", value: document.statusText });
   for (const detail of document.details)
     rows.push({ label: detail.label, value: detail.value });
+  const format = formatFor(document, files);
+  const glance = [document.vendor.name, money(document.total)]
+    .filter(Boolean)
+    .join(" · ");
   return {
     index: document.index,
     heading: documentOf(document.index, count),
     chip: notApproved ? "Not approved" : STATUS_CHIPS[document.status],
     tone: notApproved ? "muted" : STATUS_TONES[document.status],
+    glance: glance || null,
+    facts: [
+      { label: "Document type", value: type },
+      ...(format ? [{ label: "Format", value: format }] : []),
+    ],
     title: document.vendor.name ? `${type} · ${document.vendor.name}` : type,
     location: location || null,
     when: when || null,
@@ -315,26 +366,78 @@ export function toDocumentCard(
   };
 }
 
-/** Every document's card, in the file's order. */
+/** Every document's card, in the file's order; `files` are the job's uploads (`RunDetail.files`). */
 export function toDocumentCards(
   documents: readonly RunDocument[] | undefined,
   approval?: "rejected" | "expired" | null,
+  files?: readonly RunFile[],
 ): DocumentCardView[] {
   const list = [...(documents ?? [])].sort((a, b) => a.index - b.index);
   return list.map((document) =>
-    toDocumentCard(document, list.length, approval),
+    toDocumentCard(document, list.length, approval, files),
+  );
+}
+
+/*
+ * The run package (Build 24, P12; backend ADR-0045): the job's documents as
+ * the A8X PDF and an Excel workbook, which the platform builds and answers
+ * behind a short-lived signed link — never the bytes. ~~Download JSON~~ until
+ * Build 24: the package's two files replace it.
+ */
+
+/** The run page's way to the package page, and the two downloads (the app's words). */
+export const VIEW_PACKAGE = "View package";
+export const DOWNLOAD_PDF = "Download PDF";
+export const DOWNLOAD_EXCEL = "Download Excel";
+export const DOWNLOAD_FAILED = "Could not download. Try again.";
+/** The package page of a job the platform cannot package yet (no documents, or still going). */
+export const PACKAGE_UNAVAILABLE = "This run has no package yet.";
+
+/**
+ * The largest package file shown inline: the platform's own bound, 25 MiB —
+ * the file store's ceiling, past which `createRunPackageFile` answers 422
+ * `package_too_large` — so no file the platform built is refused here.
+ */
+export const RUN_PACKAGE_MAXIMUM_BYTES = 25 * 1024 * 1024;
+
+/** The longest `retry-after` a package request waits out before asking once more. */
+const PACKAGE_LONGEST_WAIT_SECONDS = 10;
+
+/**
+ * How long to wait before asking once more for a package the platform is too
+ * busy to build (503 `package_busy`): its `retry-after` (2 s when it names
+ * none), or `null` — not waited out, said at once — when that is over 10 s.
+ */
+export function packageRetryWaitMs(
+  retryAfterSeconds: number | undefined,
+): number | null {
+  if (retryAfterSeconds === undefined) return 2_000;
+  return retryAfterSeconds <= PACKAGE_LONGEST_WAIT_SECONDS
+    ? retryAfterSeconds * 1_000
+    : null;
+}
+
+/**
+ * Whether the platform packages a job now: it has documents and has ended or
+ * is held (`createRunPackageFile` answers 409 otherwise).
+ */
+export function packageAvailable(
+  status: string,
+  documents: readonly unknown[] | undefined,
+): boolean {
+  return (
+    (documents?.length ?? 0) > 0 && status !== "pending" && status !== "running"
   );
 }
 
 /**
- * The JSON file's name: `run-{the full run id}.json` (the owner's AM2:
- * "runs should have the full ID"; ~~the first eight~~ of the spec's S4) — the
- * name the platform's own `Content-Disposition` gives it.
+ * The package page's frame: the site's own route, which asks the platform for
+ * the PDF in this zone and hands it on inline (`…/package/file`).
  */
-export function documentsFileName(runId: string): string {
-  return `run-${runId}.json`;
+export function packageFileHref(
+  runId: string,
+  timeZone: string | null,
+): string {
+  const zone = timeZone ? `?timeZone=${encodeURIComponent(timeZone)}` : "";
+  return `/account/runs/${encodeURIComponent(runId)}/package/file${zone}`;
 }
-
-/** Download JSON (spec A7; the session's S25). */
-export const DOWNLOAD_JSON = "Download JSON";
-export const DOWNLOAD_FAILED = "Could not download. Try again.";

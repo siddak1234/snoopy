@@ -26,7 +26,11 @@ export class PlatformServerError extends Error {
     public readonly code?: string,
     /** Public, structured details. Callers must whitelist what they render. */
     public readonly details?: Record<string, unknown>,
-    /** From a 429's `retry-after`: how long the platform asked to be left. */
+    /**
+     * From a 429's or a 503's `retry-after`: how long the platform asked to be
+     * left (a 503 names one while it builds others' run packages, backend
+     * ADR-0045).
+     */
     public readonly retryAfterSeconds?: number,
   ) {
     super(message);
@@ -86,7 +90,11 @@ export function workspacePath(workspaceId: string): string {
 
 export async function platformServerJson<T>(
   path: string,
-  init?: RequestInit & { idempotencyKey?: string },
+  init?: RequestInit & {
+    idempotencyKey?: string;
+    /** How long this one call may take; every other call keeps the default. */
+    timeoutMs?: number;
+  },
 ): Promise<T> {
   // The request's cookies first: reading them makes the page dynamic, so no page
   // is prerendered around a platform read. A site with no backend (a Vercel
@@ -103,7 +111,7 @@ export async function platformServerJson<T>(
   const headerStore = await headers();
   const requestOrigin =
     headerStore.get("origin") ?? `https://${headerStore.get("host")}`;
-  const { idempotencyKey, ...request } = init ?? {};
+  const { idempotencyKey, timeoutMs, ...request } = init ?? {};
 
   let response: Response;
   try {
@@ -119,7 +127,7 @@ export async function platformServerJson<T>(
       // Session-scoped data. Caching it would show one workspace another's
       // catalog state, which is the one mistake this layer must not make.
       cache: "no-store",
-      signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs ?? DEFAULT_TIMEOUT_MS),
     });
   } catch {
     throw new PlatformServerError("The platform is unreachable", 502);
@@ -143,9 +151,72 @@ export async function platformServerJson<T>(
       response.status,
       problem.code,
       problem.details,
+      response.status === 503
+        ? retryAfterSeconds(response.headers.get("retry-after"))
+        : undefined,
     );
   }
   return body as T;
+}
+
+/** How long a signed file may take to arrive whole: a run package, up to its bound, on a slow link. */
+const SIGNED_FILE_TIMEOUT_MS = 60_000;
+
+/**
+ * A file the platform signed a short-lived link to, read here on the server
+ * and handed on as it arrives — a run package's PDF shown inline (Build 24,
+ * P12; backend ADR-0045: the platform answers a link, never the bytes). Only
+ * an `https:` link, no redirect, no cookie (none is held here), and nothing
+ * over `maximumBytes`: refused by its declared length before a byte is read,
+ * and cut off if more than that arrives anyway.
+ */
+export async function platformSignedFile(
+  url: string,
+  maximumBytes: number,
+): Promise<{ stream: ReadableStream<Uint8Array>; length: number | null }> {
+  let link: URL;
+  try {
+    link = new URL(url);
+  } catch {
+    throw new PlatformServerError("The file's link cannot be used.", 502);
+  }
+  if (link.protocol !== "https:")
+    throw new PlatformServerError("The file's link cannot be used.", 502);
+  let response: Response;
+  try {
+    response = await fetch(link, {
+      cache: "no-store",
+      redirect: "error",
+      signal: AbortSignal.timeout(SIGNED_FILE_TIMEOUT_MS),
+    });
+  } catch {
+    throw new PlatformServerError("The file is unreachable", 502);
+  }
+  if (!response.ok || !response.body) {
+    await response.body?.cancel();
+    throw new PlatformServerError("The file could not be read.", 502);
+  }
+  const declared = response.headers.get("content-length");
+  const length =
+    declared !== null && /^\d{1,15}$/u.test(declared) ? Number(declared) : null;
+  if (length !== null && length > maximumBytes) {
+    await response.body.cancel();
+    throw new PlatformServerError("The file is too large to show.", 413);
+  }
+  let arrived = 0;
+  const stream = response.body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        arrived += chunk.byteLength;
+        if (arrived > maximumBytes)
+          controller.error(
+            new PlatformServerError("The file is too large to show.", 413),
+          );
+        else controller.enqueue(chunk);
+      },
+    }),
+  );
+  return { stream, length };
 }
 
 /**

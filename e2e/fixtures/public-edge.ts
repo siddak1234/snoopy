@@ -349,6 +349,18 @@ function initialState() {
     emailSaves: [] as string[][],
     emailRecipientsFailing: false,
     emailRecipientsRefusing: false,
+    // Build 24 (P12; backend ADR-0045): every package file asked for — the
+    // job, the format, the zone and whether it carried a key; how many of the
+    // next asks the platform is too busy for (503 `package_busy`); and a
+    // signed file that declares itself over the website's bound.
+    packageFiles: [] as {
+      runId: string;
+      format: string;
+      timeZone: string | null;
+      keyed: boolean;
+    }[],
+    packageBusy: 0,
+    packageFileOversized: false,
   };
 }
 let state = initialState();
@@ -1220,8 +1232,37 @@ const threeReceipts: Automations["RunDocument"][] = [
   }),
 ];
 
+// The files each job was given (Build 24, P10; `RunDetail.files`): one photo
+// of three receipts; and the held job's two, each of its documents naming its
+// own (Invoice Processing v6's `source`). Made-up names and sizes.
+const receiptsPhoto: Automations["RunFile"] = {
+  id: "f0f0f0f0-0000-4000-8000-000000000001",
+  filename: "receipts.jpg",
+  contentType: "image/jpeg",
+  format: "JPEG",
+  sizeBytes: 482_113,
+  pages: 1,
+};
+const heldBill: Automations["RunFile"] = {
+  id: "f0f0f0f0-0000-4000-8000-000000000002",
+  filename: "acme-bill.pdf",
+  contentType: "application/pdf",
+  format: "PDF",
+  sizeBytes: 91_204,
+  pages: 2,
+};
+const heldPhoto: Automations["RunFile"] = {
+  id: "f0f0f0f0-0000-4000-8000-000000000003",
+  filename: "feed-receipt.png",
+  contentType: "image/png",
+  format: "PNG",
+  sizeBytes: 230_871,
+  pages: 1,
+};
+
 const heldDocuments: Automations["RunDocument"][] = [
   receipt(1, {
+    source: { file: heldBill.id, pages: [1, 2] },
     vendor: {
       name: "Acme Supplies",
       address: null,
@@ -1234,6 +1275,7 @@ const heldDocuments: Automations["RunDocument"][] = [
     total: "120.00",
   }),
   receipt(2, {
+    source: { file: heldPhoto.id },
     status: "waiting",
     statusText: "Waiting for approval: the total can't be read",
     vendor: {
@@ -1266,6 +1308,11 @@ function invoiceSteps(runId: string): Automations["RunStep"][] {
             ["decide", "ok", "1 ready, 1 waiting"],
             ["save-documents", "ok", "1 saved"],
             ["ask-approval", "held", "Waiting for approval"],
+            // Approved, the job goes on under its own id (backend ADR-0044):
+            // its next step joins the same timeline.
+            ...(invoiceApprovalNow().status === "approved"
+              ? ([["confirm-company", "ok", "Company checked again"]] as const)
+              : []),
           ]
         : runId === invoiceStartedRunId && state.invoiceRunStage < 2
           ? state.invoiceRunStage === 1
@@ -1290,6 +1337,11 @@ function invoiceSteps(runId: string): Automations["RunStep"][] {
       : {}),
     occurredAt: new Date(Date.parse(now) + index * 60_000).toISOString(),
   }));
+}
+
+/** The files an Invoice Processing job was given, on its one-run read. */
+function invoiceFiles(runId: string): Automations["RunFile"][] {
+  return runId === invoiceHeldRunId ? [heldBill, heldPhoto] : [receiptsPhoto];
 }
 
 /** The documents an Invoice Processing run wrote, on its one-run read. */
@@ -1318,10 +1370,12 @@ function invoiceEmail(runId: string): Automations["RunEmailState"] {
     : { status: "waiting", sentAt: null };
 }
 
+const invoiceApprovalId = "a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1";
+
 /** Its approval, refused (S21: its waiting document reads Not approved). */
 function invoiceApproval(): Automations["Approval"] {
   return {
-    id: "a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1",
+    id: invoiceApprovalId,
     runId: invoiceHeldRunId,
     workspaceId,
     subscriptionId: invoiceSubscriptionId,
@@ -1334,6 +1388,29 @@ function invoiceApproval(): Automations["Approval"] {
     decidedAt: now,
     decidedByUserId: userId,
   };
+}
+
+/**
+ * The held job's approval still waiting (Build 24, P6): Approve and Deny in
+ * its step 4 and on Approvals; a decision is kept in `state.approvals`.
+ */
+function pendingInvoiceApproval(): Automations["Approval"] {
+  const asked = invoiceApproval();
+  delete asked.decidedAt;
+  delete asked.decidedByUserId;
+  return {
+    ...asked,
+    status: "pending",
+    expiresAt: new Date(Date.now() + 24 * 3_600_000).toISOString(),
+  };
+}
+
+/** The held job's approval as the platform holds it now: waiting or decided, else refused. */
+function invoiceApprovalNow(): Automations["Approval"] {
+  return (
+    state.approvals.find((entry) => entry.id === invoiceApprovalId) ??
+    invoiceApproval()
+  );
 }
 
 // One deterministic run by id: the failed one carries the automation's own
@@ -1363,14 +1440,23 @@ function fixtureRun(runId: string): Automations["Run"] {
   }
   if (invoiceRunIds.includes(runId)) {
     const v2 = runId === invoiceV2RunId;
-    const held = runId === invoiceHeldRunId;
+    // Approved, the held job runs on under the same id (backend ADR-0044).
+    const continued =
+      runId === invoiceHeldRunId && invoiceApprovalNow().status === "approved";
+    const held = runId === invoiceHeldRunId && !continued;
     return {
       id: runId,
       workspaceId,
       subscriptionId: invoiceSubscriptionId,
       templateId: invoiceAutomation.templateId,
       templateVersion: v2 ? 2 : 3,
-      status: v2 ? "failed" : held ? "held" : "succeeded",
+      status: v2
+        ? "failed"
+        : held
+          ? "held"
+          : continued
+            ? "running"
+            : "succeeded",
       origin: "manual",
       rootRunId: runId,
       // The request id the app once titled run 793eef82 by: never shown.
@@ -1379,11 +1465,13 @@ function fixtureRun(runId: string): Automations["Run"] {
         : "fixture-request",
       ...(v2
         ? { failureReason: "Add one document per file." }
-        : held
+        : held || continued
           ? {}
           : { resultSummary: "3 receipts: 3 saved." }),
       startedAt: now,
-      endedAt: new Date(Date.parse(now) + 19_000).toISOString(),
+      ...(continued
+        ? {}
+        : { endedAt: new Date(Date.parse(now) + 19_000).toISOString() }),
       createdAt: now,
       updatedAt: now,
     };
@@ -1443,6 +1531,39 @@ function waitingApproval(): Automations["Approval"] {
     createdAt: now,
     expiresAt: new Date(Date.now() + 24 * 3_600_000).toISOString(),
   };
+}
+
+/**
+ * A made-up run package PDF (Build 24, P12): one Letter page that names the
+ * job — a real PDF, built here with its cross-reference table, so a browser
+ * can show it. Never the owner's sample package.
+ */
+function fixturePdf(runId: string): Buffer {
+  const text = `BT /F1 18 Tf 72 720 Td (Fixture run package ${runId.replace(/[()\\]/gu, "")}) Tj ET`;
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+    `<< /Length ${text.length} >>\nstream\n${text}\nendstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  objects.forEach((object, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const table = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const offset of offsets)
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${table}\n%%EOF\n`;
+  return Buffer.from(pdf, "latin1");
+}
+
+/** Made-up workbook bytes: a ZIP's signature and a line, never opened by a test. */
+function fixtureWorkbook(): Buffer {
+  return Buffer.from("PK\u0003\u0004 fixture run package workbook", "latin1");
 }
 
 /** The platform's tally of the listed runs, as `readRunStats` answers it. */
@@ -1681,6 +1802,25 @@ const server = createServer(
       },
       "/__fixture/approval-waiting": () => {
         state.approvals = [waitingApproval()];
+      },
+      // Build 24 (P12): the platform busy building others' packages — for the
+      // next ask, or the next two — and a signed file over the site's bound.
+      "/__fixture/package-busy": () => {
+        state.packageBusy = 1;
+      },
+      "/__fixture/package-busy-twice": () => {
+        state.packageBusy = 2;
+      },
+      "/__fixture/package-file-oversized": () => {
+        state.packageFileOversized = true;
+      },
+      // Build 24 (P6, P7): the held Invoice Processing job's approval waits
+      // too — beside any other that waits.
+      "/__fixture/invoice-approval-pending": () => {
+        state.approvals = [
+          ...state.approvals.filter((entry) => entry.id !== invoiceApprovalId),
+          pendingInvoiceApproval(),
+        ];
       },
       "/__fixture/billing-not-configured": () => {
         state.billingNotConfigured = true;
@@ -1922,6 +2062,8 @@ const server = createServer(
         // Each approval's status: a decision leaves the page, and which it was
         // is read here.
         approvalStatuses: state.approvals.map((entry) => entry.status),
+        // Every run package file asked for (Build 24, P12).
+        packageFiles: state.packageFiles,
         // Every checkout asked for: a refused one leaves no plan behind.
         checkoutAttempts: state.checkoutAttempts,
         // Every team a test created — where, and the name and kind it was
@@ -2040,6 +2182,37 @@ const server = createServer(
         "cache-control": "no-store",
       });
       return response.end(JSON.stringify([...state.files.values()]));
+    }
+    // Build 24 (P12; backend ADR-0045): the file a run package's signed link
+    // names — an attachment, as every signed link is; a made-up one-page PDF,
+    // or made-up workbook bytes. Over the site's bound, it says so in its
+    // length and is cut off.
+    if (
+      request.method === "GET" &&
+      url.pathname === "/__fixture/package-file"
+    ) {
+      const runId = url.searchParams.get("run") ?? "";
+      const format = url.searchParams.get("format") === "xlsx" ? "xlsx" : "pdf";
+      const bytes = format === "pdf" ? fixturePdf(runId) : fixtureWorkbook();
+      const headers = {
+        "content-type": "application/octet-stream",
+        "content-disposition": `attachment; filename="run-${runId}.${format}"`,
+        "cache-control": "no-store",
+      };
+      if (state.packageFileOversized) {
+        response.writeHead(200, {
+          ...headers,
+          "content-length": String(25 * 1024 * 1024 + 1),
+        });
+        response.write(bytes);
+        setTimeout(() => response.destroy(), 500);
+        return;
+      }
+      response.writeHead(200, {
+        ...headers,
+        "content-length": String(bytes.byteLength),
+      });
+      return response.end(bytes);
     }
     // Backend §12.1 #39: the staged file a complete export's link names.
     if (request.method === "GET" && url.pathname === "/__fixture/export-file") {
@@ -3841,6 +4014,68 @@ const server = createServer(
         fixtureRunStats(url.searchParams.get("since")),
       );
     }
+    // Build 24 (P12; backend ADR-0045): a job's package as a PDF or an Excel
+    // file, behind a signed link to the fixture's store — never the bytes.
+    // 409 while it has no documents or goes on; 503 `package_busy`, with its
+    // wait, while the fixture says so.
+    const packageAsked = new RegExp(
+      `^/v1/workspaces/${workspaceId}/runs/([^/]+)/package$`,
+      "u",
+    ).exec(pathname);
+    if (method === "POST" && packageAsked) {
+      const runId = decodeURIComponent(packageAsked[1] ?? "");
+      const body = (await requestJson(request)) as {
+        format?: string;
+        timeZone?: string;
+      };
+      const keyed = Boolean(request.headers["idempotency-key"]);
+      if (!keyed || (body.format !== "pdf" && body.format !== "xlsx")) {
+        return respond(response, 400, problem(400, "Bad Request"));
+      }
+      state.packageFiles.push({
+        runId,
+        format: body.format,
+        timeZone: body.timeZone ?? null,
+        keyed,
+      });
+      if (state.packageBusy > 0) {
+        state.packageBusy -= 1;
+        response.setHeader("retry-after", "1");
+        return respond(
+          response,
+          503,
+          problem(503, "Service Unavailable", { reason: "package_busy" }),
+        );
+      }
+      const run = fixtureRun(runId);
+      const documents = invoiceDocuments(runId);
+      if (
+        documents.length === 0 ||
+        run.status === "pending" ||
+        run.status === "running"
+      ) {
+        return respond(
+          response,
+          409,
+          problem(409, "Conflict", {
+            reason: documents.length === 0 ? "no_documents" : "job_in_progress",
+          }),
+        );
+      }
+      const bytes =
+        body.format === "pdf" ? fixturePdf(run.id) : fixtureWorkbook();
+      return respond(response, 200, {
+        format: body.format,
+        filename: `run-${run.id}.${body.format}`,
+        contentType:
+          body.format === "pdf"
+            ? "application/pdf"
+            : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        sizeBytes: bytes.byteLength,
+        downloadUrl: `https://127.0.0.1:${port}/__fixture/package-file?run=${encodeURIComponent(run.id)}&format=${body.format}`,
+        expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+      } satisfies Automations["RunPackageFile"]);
+    }
     if (
       method === "POST" &&
       isWorkspacePath(pathname, `/runs/${runningRunId}/cancel`)
@@ -3892,6 +4127,7 @@ const server = createServer(
           steps: invoiceSteps(runId),
           events: [],
           ...(documents.length > 0 ? { documents } : {}),
+          files: invoiceFiles(runId),
           email: invoiceEmail(runId),
         } satisfies AutomationOperations["readRun"]["responses"][200]["content"]["application/json"]);
       }
@@ -3947,9 +4183,12 @@ const server = createServer(
     if (method === "GET" && isWorkspacePath(pathname, "/approvals")) {
       const status = url.searchParams.get("status");
       return respond(response, 200, {
-        approvals: [...state.approvals, invoiceApproval()].filter(
-          (entry) => !status || entry.status === status,
-        ),
+        approvals: [
+          ...state.approvals,
+          ...(state.approvals.some((entry) => entry.id === invoiceApprovalId)
+            ? []
+            : [invoiceApproval()]),
+        ].filter((entry) => !status || entry.status === status),
       } satisfies AutomationOperations["listApprovals"]["responses"][200]["content"]["application/json"]);
     }
     if (

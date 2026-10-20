@@ -45,9 +45,11 @@ const STATUS_TONE: Record<string, Tone> = {
   failed: "error",
   cancelled: "neutral",
 
-  // Approval — runs.approvals.status
+  // Approval — runs.approvals.status, and `denied`: how a row that is leaving
+  // Approvals says `rejected` (Build 24, the session's S6: Deny and Denied).
   approved: "success",
   rejected: "error",
+  denied: "error",
   expired: "neutral",
 
   // Project — the tenancy vocabulary
