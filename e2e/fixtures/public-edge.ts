@@ -1803,8 +1803,6 @@ const server = createServer(
       "/__fixture/approval-waiting": () => {
         state.approvals = [waitingApproval()];
       },
-      // Build 24 (P6, P7): the held Invoice Processing job's approval waits
-      // too — beside any other that waits.
       // Build 24 (P12): the platform busy building others' packages — for the
       // next ask, or the next two — and a signed file over the site's bound.
       "/__fixture/package-busy": () => {
@@ -1816,6 +1814,8 @@ const server = createServer(
       "/__fixture/package-file-oversized": () => {
         state.packageFileOversized = true;
       },
+      // Build 24 (P6, P7): the held Invoice Processing job's approval waits
+      // too — beside any other that waits.
       "/__fixture/invoice-approval-pending": () => {
         state.approvals = [
           ...state.approvals.filter((entry) => entry.id !== invoiceApprovalId),

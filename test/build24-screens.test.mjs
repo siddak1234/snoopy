@@ -78,15 +78,22 @@ test("a held step offers the decision: RunLive's held row renders ApprovalDecisi
   );
   assert.match(
     live,
-    /<TrackerItem key=\{row\.key\} row=\{row\}>\s*(?:\{\s*\}\s*)?\{row\.state === "held" &&\s*decided === "pending" &&\s*decision\?\.approval\.status === "pending" \? \(\s*decision\.canDecide \? \(\s*<ApprovalDecision/u,
+    /<TrackerItem key=\{row\.key\} row=\{row\}>\s*(?:\{\s*\}\s*)?\{row\.state === "held" &&\s*decided === "pending" &&\s*decision\?\.approval\.status === "pending" \? \(\s*<ApprovalDecision\s+approvalId=\{decision\.approval\.id\}\s+canDecide=\{decision\.canDecide\}\s+eligibleRoles=\{decision\.approval\.eligibleRoles\}/u,
   );
   assert.match(
     live,
     /onDecision=\{\(_, state\) => \{\s*if \(state === "saved"\) router\.refresh\(\);\s*\}\}/u,
   );
-  assert.match(
-    live,
-    /Only \{decision\.approval\.eligibleRoles\.join\(" or "\)\} can\s+decide this\./u,
+  // Who may decide is said in ONE place, the decision component (review fix 3).
+  assert.doesNotMatch(live, /can\s+decide this/u);
+  const decisionComponent = code(
+    read("app/account/approvals/ApprovalDecision.tsx"),
+  );
+  assert.equal(
+    decisionComponent.match(
+      /Only \{eligibleRoles\.join\(" or "\)\} can decide this\./gu,
+    )?.length,
+    1,
   );
   const page = code(read("app/account/runs/[runId]/page.tsx"));
   assert.match(
@@ -231,12 +238,20 @@ test("the package's inline route: the PDF asked for through lib/platform-server,
   // The PDF's own headers, in the one answer that carries it.
   assert.match(
     route,
-    /return new Response\(pdf\.stream, \{\s*headers: \{\s*"content-type": "application\/pdf",\s*"content-disposition": `inline; filename="\$\{runId\}-package\.pdf"`,\s*"cache-control": "private, no-store",\s*"x-content-type-options": "nosniff",\s*"content-security-policy": "frame-ancestors 'self'",/u,
+    /return new Response\(pdf\.stream, \{\s*headers: \{\s*"content-type": "application\/pdf",\s*(?:\/\/[^\n]*\n\s*)*"content-disposition": `inline; filename="\$\{safeFilename\(file\.filename\)\}"`,\s*"cache-control": "private, no-store",\s*"x-content-type-options": "nosniff",\s*"content-security-policy": "frame-ancestors 'self'",/u,
   );
   assert.match(
     route,
-    /if \(fetchSite && fetchSite !== "same-origin" && fetchSite !== "none"\)\s*return said\(403,/u,
+    /if \(fetchSite !== "same-origin" && fetchSite !== "none"\)\s*return said\(403,/u,
   );
+  // Long enough for the platform's build, and stated (review fix 5).
+  assert.match(route, /export const maxDuration = 60;/u);
+  const automations = code(read("lib/automations.ts"));
+  assert.match(
+    automations,
+    /export const RUN_PACKAGE_REQUEST_TIMEOUT_MS = 30_000;/u,
+  );
+  assert.match(automations, /timeoutMs: RUN_PACKAGE_REQUEST_TIMEOUT_MS,/u);
   assert.match(
     route,
     /if \(error\.status === 409\) return said\(409, PACKAGE_UNAVAILABLE\);/u,

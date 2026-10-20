@@ -1049,14 +1049,14 @@ test("P6 — a held job's step 4 offers Approve and Deny, Deny red; Approving…
   expect(await approvalStatuses()).toEqual(["approved"]);
 });
 
-test("P6 — Deny in step 4: the step says Denied, the result Denied., its waiting document Not approved (S6)", async ({
+test("P6 — Deny in step 4: the step says Denied, the result Denied, its waiting document Not approved (S6)", async ({
   page,
 }) => {
   await fixtureControl("invoice-approval-pending");
   await page.goto(heldJob);
   await heldStep(page).getByRole("button", { name: "Deny" }).click();
   const main = page.locator("main");
-  await expect(main.getByTestId("run-result")).toHaveText("Denied.");
+  await expect(main.getByTestId("run-result")).toHaveText("Denied");
   await expect(heldStep(page)).toHaveAttribute("data-state", "held");
   await expect(heldStep(page).locator("p").nth(1)).toHaveText("Denied");
   await expect(heldStep(page).getByRole("button")).toHaveCount(0);
@@ -1246,11 +1246,15 @@ test.describe("the run package", () => {
       .analyze();
     expect(results.violations).toEqual([]);
     // The frame's route: the PDF inline, never cached, framed by this site.
-    const answer = await page.request.get(inline);
+    // The frame's request says it is this site's (`sec-fetch-site`), as every
+    // current browser's does.
+    const sameSite = { headers: { "sec-fetch-site": "same-origin" } };
+    const answer = await page.request.get(inline, sameSite);
     expect(answer.status()).toBe(200);
     expect(answer.headers()["content-type"]).toBe("application/pdf");
+    // The platform's name for the file, the job's own id.
     expect(answer.headers()["content-disposition"]).toBe(
-      'inline; filename="fixture-run-invoice-package.pdf"',
+      'inline; filename="run-fixture-run-invoice.pdf"',
     );
     expect(answer.headers()["cache-control"]).toBe("private, no-store");
     expect(answer.headers()["content-security-policy"]).toBe(
@@ -1272,6 +1276,8 @@ test.describe("the run package", () => {
       headers: { "sec-fetch-site": "cross-site" },
     });
     expect(crossSite.status()).toBe(403);
+    // And one that does not say where it came from.
+    expect((await page.request.get(inline)).status()).toBe(403);
   });
 
   test("P12 — a job with no package yet says so, with the way back; its route answers 409; a signed file over the bound is refused", async ({
@@ -1287,11 +1293,14 @@ test.describe("the run package", () => {
     );
     const none = await page.request.get(
       "/account/runs/fixture-run-running/package/file",
+      { headers: { "sec-fetch-site": "same-origin" } },
     );
     expect(none.status()).toBe(409);
     expect(await none.text()).toBe("This run has no package yet.");
     await fixtureControl("package-file-oversized");
-    const oversized = await page.request.get(inline);
+    const oversized = await page.request.get(inline, {
+      headers: { "sec-fetch-site": "same-origin" },
+    });
     expect(oversized.status()).toBe(413);
     expect(oversized.headers()["content-type"]).not.toBe("application/pdf");
   });

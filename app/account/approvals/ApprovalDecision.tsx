@@ -31,11 +31,14 @@ export type DecisionState = "sending" | "saved" | "refused";
 export function ApprovalDecision({
   approvalId,
   canDecide,
+  eligibleRoles,
   workspaceId,
   onDecision,
 }: {
   approvalId: string;
   canDecide: boolean;
+  /** Who may decide, as the approval says; named, in place of the buttons, to one who may not. */
+  eligibleRoles: readonly string[];
   /** The workspace this page shows. */
   workspaceId: string;
   /** Told as the decision is sent, and again once it is saved or refused. */
@@ -60,7 +63,14 @@ export function ApprovalDecision({
     });
   };
 
-  if (!canDecide) return null;
+  // One place for the line a person who may not decide reads — Approvals' row and the run's step 4.
+  if (!canDecide) {
+    return (
+      <p className="text-xs text-[var(--muted)]">
+        Only {eligibleRoles.join(" or ")} can decide this.
+      </p>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -220,6 +230,7 @@ export function ApprovalQueue({
               <ApprovalDecision
                 approvalId={approval.id}
                 canDecide={canDecide}
+                eligibleRoles={approval.eligibleRoles}
                 workspaceId={workspaceId}
                 onDecision={onDecision(approval.id)}
               />
@@ -238,12 +249,6 @@ export function ApprovalQueue({
                 {runLabel(approval.runId)}
               </span>
             </div>
-
-            {!canDecide ? (
-              <p className="text-xs text-[var(--muted)]">
-                Only {approval.eligibleRoles.join(" or ")} can decide this.
-              </p>
-            ) : null}
           </div>
         </div>
       </div>

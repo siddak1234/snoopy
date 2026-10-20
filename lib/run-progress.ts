@@ -452,7 +452,8 @@ type ApprovalOf = { runId: string; status: string; createdAt?: string };
  * A job's newest approval, by when it was asked (Build 24, P9): a job is its
  * first run (backend ADR-0044), so every approval it ever asked names that
  * one id, and the one asked last is the one that counts. Of two asked at the
- * same moment, the one listed last.
+ * same moment, the one listed first — the platform lists newest first — as the
+ * app's `jobApproval` picks.
  */
 export function newestApproval<T extends ApprovalOf>(
   runId: string,
@@ -464,7 +465,7 @@ export function newestApproval<T extends ApprovalOf>(
     .filter((candidate) => candidate.runId === runId)
     .reduce<T | undefined>(
       (newest, candidate) =>
-        !newest || asked(candidate) >= asked(newest) ? candidate : newest,
+        !newest || asked(candidate) > asked(newest) ? candidate : newest,
       undefined,
     );
 }
@@ -487,7 +488,7 @@ const HELD_DECISION_LINE: Record<HeldDecision, string> = {
   // The job goes on under its own id (ADR-0044): ~~"Approved — continued in
   // a new run"~~ until Build 24.
   approved: "Approved",
-  rejected: "Denied.",
+  rejected: "Denied",
   closed: "No longer awaiting approval",
   unknown: "Held for review",
 };

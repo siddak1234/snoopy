@@ -28,9 +28,21 @@ import { resolveActiveWorkspaceId } from "@/lib/tenancy";
  */
 
 export const dynamic = "force-dynamic";
+/**
+ * The package's ask (up to 30 s, `RUN_PACKAGE_REQUEST_TIMEOUT_MS`), one wait
+ * when the platform is busy, and the file handed on: stated, not left to the
+ * host's default.
+ */
+export const maxDuration = 60;
 
 /** A run id as the platform mints them, or a fixture's: safe in a header. */
 const RUN_ID = /^[A-Za-z0-9-]{1,64}$/u;
+/** A filename safe in a header: the platform's, every other character made a dash. */
+function safeFilename(name: string): string {
+  const kept = name.replace(/[^A-Za-z0-9._-]/gu, "-").slice(0, 100);
+  return /\.pdf$/u.test(kept) ? kept : "package.pdf";
+}
+
 /** An IANA zone's spelling; the platform reads any other as UTC. */
 const TIME_ZONE = /^[A-Za-z0-9_+\-/]{1,64}$/u;
 
@@ -73,9 +85,12 @@ export async function GET(
 ) {
   const { runId } = await context.params;
   if (!RUN_ID.test(runId)) return said(404, "Not found.");
-  // Only this site's pages, or the person opening it themselves.
+  // Only this site's pages, or the person opening it themselves — and a
+  // request that does not say (every current browser does) is refused too:
+  // `siteOrigin` vouches for this site to the platform, so it must not answer
+  // a request it cannot place.
   const fetchSite = request.headers.get("sec-fetch-site");
-  if (fetchSite && fetchSite !== "same-origin" && fetchSite !== "none")
+  if (fetchSite !== "same-origin" && fetchSite !== "none")
     return said(403, "Open the package from its run.");
   const zone = request.nextUrl.searchParams.get("timeZone");
   const body = {
@@ -110,7 +125,9 @@ export async function GET(
     return new Response(pdf.stream, {
       headers: {
         "content-type": "application/pdf",
-        "content-disposition": `inline; filename="${runId}-package.pdf"`,
+        // The platform's name for the file: the job's own id (ADR-0044),
+        // never the one this address used.
+        "content-disposition": `inline; filename="${safeFilename(file.filename)}"`,
         "cache-control": "private, no-store",
         "x-content-type-options": "nosniff",
         "content-security-policy": "frame-ancestors 'self'",

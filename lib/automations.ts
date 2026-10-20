@@ -333,6 +333,13 @@ export function cancelRun(
  * template and time zone. `origin` is the site's own, for a call a page did
  * not make as a form (the package's inline route).
  */
+/**
+ * How long asking for a package may take: the platform builds one for at most
+ * 20 s (backend ADR-0045, its build worker's limit), plus its queue — longer
+ * than every other call's 10 s, which cut a heavy package off in the frame.
+ */
+export const RUN_PACKAGE_REQUEST_TIMEOUT_MS = 30_000;
+
 export function createRunPackageFile(
   workspaceId: string,
   runId: string,
@@ -345,6 +352,7 @@ export function createRunPackageFile(
       method: "POST",
       body: JSON.stringify(body),
       idempotencyKey: newIdempotencyKey(`run-package-${body.format}`),
+      timeoutMs: RUN_PACKAGE_REQUEST_TIMEOUT_MS,
       ...(origin ? { headers: { origin } } : {}),
     },
   );

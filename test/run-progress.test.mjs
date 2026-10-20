@@ -427,7 +427,7 @@ test("the time a step was done, its duration and its result line, in the app's w
     /continued in a new run/u,
   );
   // Denied (Build 24, P6; the session's S6: the owner's word), ~~Rejected~~.
-  assert.equal(runResultLine(held, approval("rejected")), "Denied.");
+  assert.equal(runResultLine(held, approval("rejected")), "Denied");
   assert.equal(
     runResultLine(held, approval("expired")),
     "No longer awaiting approval",
@@ -677,7 +677,7 @@ test("a job's newest approval decides — by when it was asked, whatever the lis
   assert.equal(heldDecision(job, [...approvals].reverse()), "pending");
   assert.equal(
     runResultLine(job, [asked("pending", 5), asked("rejected", 50)]),
-    "Denied.",
+    "Denied",
   );
   // Another job's approval is never this one's.
   assert.equal(
@@ -689,6 +689,12 @@ test("a job's newest approval decides — by when it was asked, whatever the lis
     undefined,
   );
   assert.equal(heldDecision(job, []), "unknown");
+  // Two asked at the same moment: the one listed first — the platform lists
+  // newest first, and the app's jobApproval picks it too.
+  assert.equal(
+    heldDecision(job, [asked("approved", 30), asked("pending", 30)]),
+    "approved",
+  );
 });
 
 test("a job whose steps 1–5 come in one list draws 5 done — the held step among them, done once the job went on; while it goes on after its approval, step 4 is working (Build 24, P9; ADR-0044)", () => {

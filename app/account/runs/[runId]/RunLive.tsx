@@ -229,25 +229,19 @@ export function RunLive({
           {tracker.map((row) => (
             <TrackerItem key={row.key} row={row}>
               {/* The decision where the job waits (Build 24, P6): one press,
-                  then the page is drawn again — running on, or Denied. */}
+                  then the page is drawn again — running on, or Denied */}
               {row.state === "held" &&
               decided === "pending" &&
               decision?.approval.status === "pending" ? (
-                decision.canDecide ? (
-                  <ApprovalDecision
-                    approvalId={decision.approval.id}
-                    canDecide
-                    workspaceId={workspaceId}
-                    onDecision={(_, state) => {
-                      if (state === "saved") router.refresh();
-                    }}
-                  />
-                ) : (
-                  <p className="text-xs text-[var(--muted)]">
-                    Only {decision.approval.eligibleRoles.join(" or ")} can
-                    decide this.
-                  </p>
-                )
+                <ApprovalDecision
+                  approvalId={decision.approval.id}
+                  canDecide={decision.canDecide}
+                  eligibleRoles={decision.approval.eligibleRoles}
+                  workspaceId={workspaceId}
+                  onDecision={(_, state) => {
+                    if (state === "saved") router.refresh();
+                  }}
+                />
               ) : null}
             </TrackerItem>
           ))}

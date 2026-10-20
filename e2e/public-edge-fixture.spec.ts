@@ -2735,7 +2735,7 @@ test("a held run's document whose approval was refused reads Not approved, and t
 }) => {
   await page.goto("/account/runs/fixture-run-invoice-held");
   const main = page.locator("main");
-  await expect(main.getByTestId("run-result")).toHaveText("Denied.");
+  await expect(main.getByTestId("run-result")).toHaveText("Denied");
   await expect(main.getByTestId("document-1-chip")).toHaveText("Saved");
   await expect(main.getByTestId("document-2-chip")).toHaveText("Not approved");
   const record = main.getByTestId("run-step-group:record");

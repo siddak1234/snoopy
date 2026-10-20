@@ -90,7 +90,11 @@ export function workspacePath(workspaceId: string): string {
 
 export async function platformServerJson<T>(
   path: string,
-  init?: RequestInit & { idempotencyKey?: string },
+  init?: RequestInit & {
+    idempotencyKey?: string;
+    /** How long this one call may take; every other call keeps the default. */
+    timeoutMs?: number;
+  },
 ): Promise<T> {
   // The request's cookies first: reading them makes the page dynamic, so no page
   // is prerendered around a platform read. A site with no backend (a Vercel
@@ -107,7 +111,7 @@ export async function platformServerJson<T>(
   const headerStore = await headers();
   const requestOrigin =
     headerStore.get("origin") ?? `https://${headerStore.get("host")}`;
-  const { idempotencyKey, ...request } = init ?? {};
+  const { idempotencyKey, timeoutMs, ...request } = init ?? {};
 
   let response: Response;
   try {
@@ -123,7 +127,7 @@ export async function platformServerJson<T>(
       // Session-scoped data. Caching it would show one workspace another's
       // catalog state, which is the one mistake this layer must not make.
       cache: "no-store",
-      signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs ?? DEFAULT_TIMEOUT_MS),
     });
   } catch {
     throw new PlatformServerError("The platform is unreachable", 502);
