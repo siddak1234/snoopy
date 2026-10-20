@@ -131,11 +131,29 @@ for (const [name, run, reported, states] of [
     steps(["receive", "ok"]),
     ["done", "stopped", "stopped", "stopped"],
   ],
+  // A job is its first run (Build 24, P9; backend ADR-0044): held, approved
+  // and done, its whole timeline in one list — the held step done once it
+  // went on. ~~A continuation's groups before its first step done~~.
   [
-    "a continuation: the groups before its first step done",
+    "a job approved and done: its whole timeline, one list",
+    { status: "succeeded" },
+    steps(
+      ["receive", "ok"],
+      ["extract", "ok"],
+      ["check-documents", "ok"],
+      ["decide", "ok"],
+      ["ask-approval", "held"],
+      ["confirm-company", "ok"],
+      ["create-approved-records", "ok"],
+    ),
+    ["done", "done", "done", "done"],
+  ],
+  // Its continuation's steps alone are no longer a job's whole story.
+  [
+    "only a continuation's steps: what they say, and no more",
     { status: "succeeded", origin: "approval-continuation" },
     steps(["confirm-company", "ok"], ["create-approved-records", "ok"]),
-    ["done", "done", "done", "done"],
+    ["skipped", "skipped", "skipped", "done"],
   ],
 ]) {
   test(`the tracker, every group from the start: ${name}`, () => {
@@ -401,9 +419,12 @@ test("the time a step was done, its duration and its result line, in the app's w
     runResultLine(held, approval("pending")),
     "Waiting for approval.",
   );
-  assert.equal(
-    runResultLine(held, approval("approved")),
-    "Approved — continued in a new run",
+  // The job goes on under its own id (ADR-0044): ~~"Approved — continued in
+  // a new run"~~ until Build 24.
+  assert.equal(runResultLine(held, approval("approved")), "Approved");
+  assert.doesNotMatch(
+    read("lib/run-progress.ts").replace(/~~[\s\S]*?~~/gu, ""),
+    /continued in a new run/u,
   );
   // Denied (Build 24, P6; the session's S6: the owner's word), ~~Rejected~~.
   assert.equal(runResultLine(held, approval("rejected")), "Denied.");
@@ -668,6 +689,49 @@ test("a job's newest approval decides — by when it was asked, whatever the lis
     undefined,
   );
   assert.equal(heldDecision(job, []), "unknown");
+});
+
+test("a job whose steps 1–5 come in one list draws 5 done — the held step among them, done once the job went on; while it goes on after its approval, step 4 is working (Build 24, P9; ADR-0044)", () => {
+  const timeline = [
+    ...ran("receive", "extract", "decide"),
+    {
+      stepId: "ask-approval",
+      outcome: "held",
+      summary: "held said",
+      heldReason: "Document 2: the total can't be read.",
+      occurredAt: "2026-10-17T14:35:00.000Z",
+    },
+    {
+      stepId: "confirm-company",
+      outcome: "ok",
+      summary: "said",
+      occurredAt: "2026-10-17T14:50:00.000Z",
+    },
+  ];
+  const done = v4Rows(
+    [
+      ...timeline,
+      {
+        stepId: "save-approved",
+        outcome: "ok",
+        summary: "said",
+        occurredAt: "2026-10-17T14:51:00.000Z",
+      },
+    ],
+    { status: "succeeded", origin: "manual" },
+    { status: "sent", sentAt: "2026-10-17T14:52:00.000Z" },
+  );
+  assert.deepEqual(
+    done.map((row) => row.state),
+    ["done", "done", "done", "done", "done"],
+  );
+  assert.equal(stepsDone(done), "5 / 5");
+  assert.equal(done[3].sub, "Done · 2:51 PM");
+  const going = v4Rows(timeline, { status: "running" });
+  assert.equal(going[3].state, "working");
+  // Still held: held, and why.
+  const held = v4Rows(timeline.slice(0, 4), { status: "held" });
+  assert.equal(held[3].state, "held");
 });
 
 test("None: step 2 says None, step 4 Details saved; a flow that could not be read — step 2 Done, step 4 its own title (S23; the app's M6)", () => {

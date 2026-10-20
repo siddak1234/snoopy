@@ -40,10 +40,9 @@ export type RunEmailState = {
 type RunStatus =
   "pending" | "running" | "held" | "succeeded" | "failed" | "cancelled";
 
-/** What the tracker needs of the run. */
+/** What the tracker needs of the run — a job's, read whole (backend ADR-0044). */
 export type RunState = {
   status: RunStatus;
-  origin?: string;
   failureReason?: string;
 };
 
@@ -111,7 +110,8 @@ const at = (iso: string) => Date.parse(iso);
  * Each declared step's state, from what the run reported (spec A7; S14). Per
  * step, in the pipeline's order:
  *
- * - reported `ok`, or `failed` without failing the run → done; `held` → held;
+ * - reported `ok`, or `failed` without failing the run → done; `held` → held
+ *   while the job is held, done once it went on (approved);
  *   `failed`, the run failed, and it is the step reported last → failed;
  * - not reported, before the furthest step reported → skipped (it was not
  *   needed: None's QuickBooks lookups, a second read nobody needed);
@@ -119,8 +119,10 @@ const at = (iso: string) => Date.parse(iso);
  *   rest waiting; waiting while the run is held; skipped once it succeeded;
  *   stopped once it failed or was cancelled.
  *
- * A continuation (`approval-continuation`) did its first steps in the run it
- * continues: every step before its first reported one is done.
+ * A job is its first run (Build 24, P9; backend ADR-0044): its steps come in
+ * one list, the held run's and the ones after its approval alike, all under
+ * the job's id. ~~A continuation's steps before its first reported one
+ * done~~ until Build 24: no continuation is read on its own any more.
  */
 export function stepStates(
   pipeline: readonly { id: string }[],
@@ -141,14 +143,13 @@ export function stepStates(
     order.has(id) ? [order.get(id)!] : [],
   );
   const furthest = reported.length > 0 ? Math.max(...reported) : -1;
-  const first = reported.length > 0 ? Math.min(...reported) : -1;
   const lastId = ordered[ordered.length - 1]?.stepId;
   const going = run.status === "pending" || run.status === "running";
-  const continued = run.origin === "approval-continuation";
   return pipeline.map((declared, index) => {
     const step = latest.get(declared.id);
     if (step) {
-      if (step.outcome === "held") return { state: "held", step };
+      if (step.outcome === "held")
+        return { state: run.status === "held" ? "held" : "done", step };
       if (
         step.outcome === "failed" &&
         run.status === "failed" &&
@@ -157,7 +158,6 @@ export function stepStates(
         return { state: "failed", step };
       return { state: "done", step };
     }
-    if (continued && index < first) return { state: "done" };
     if (index < furthest) return { state: "skipped" };
     if (going) return { state: index === furthest + 1 ? "working" : "waiting" };
     if (run.status === "held") return { state: "waiting" };
@@ -375,7 +375,11 @@ function reportedRows(
       run.status === "failed" &&
       index === ordered.length - 1;
     const state: TrackerState =
-      step.outcome === "held" ? "held" : failedRun ? "failed" : "done";
+      step.outcome === "held" && run.status === "held"
+        ? "held"
+        : failedRun
+          ? "failed"
+          : "done";
     return {
       key: `reported:${index}:${step.stepId}`,
       title: `${index + 1} · ${titles.get(step.stepId) ?? `Step ${index + 1}`}`,
@@ -480,7 +484,9 @@ export function heldDecision(
 
 const HELD_DECISION_LINE: Record<HeldDecision, string> = {
   pending: "Waiting for approval",
-  approved: "Approved — continued in a new run",
+  // The job goes on under its own id (ADR-0044): ~~"Approved — continued in
+  // a new run"~~ until Build 24.
+  approved: "Approved",
   rejected: "Denied.",
   closed: "No longer awaiting approval",
   unknown: "Held for review",

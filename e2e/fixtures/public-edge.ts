@@ -1220,8 +1220,37 @@ const threeReceipts: Automations["RunDocument"][] = [
   }),
 ];
 
+// The files each job was given (Build 24, P10; `RunDetail.files`): one photo
+// of three receipts; and the held job's two, each of its documents naming its
+// own (Invoice Processing v6's `source`). Made-up names and sizes.
+const receiptsPhoto: Automations["RunFile"] = {
+  id: "f0f0f0f0-0000-4000-8000-000000000001",
+  filename: "receipts.jpg",
+  contentType: "image/jpeg",
+  format: "JPEG",
+  sizeBytes: 482_113,
+  pages: 1,
+};
+const heldBill: Automations["RunFile"] = {
+  id: "f0f0f0f0-0000-4000-8000-000000000002",
+  filename: "acme-bill.pdf",
+  contentType: "application/pdf",
+  format: "PDF",
+  sizeBytes: 91_204,
+  pages: 2,
+};
+const heldPhoto: Automations["RunFile"] = {
+  id: "f0f0f0f0-0000-4000-8000-000000000003",
+  filename: "feed-receipt.png",
+  contentType: "image/png",
+  format: "PNG",
+  sizeBytes: 230_871,
+  pages: 1,
+};
+
 const heldDocuments: Automations["RunDocument"][] = [
   receipt(1, {
+    source: { file: heldBill.id, pages: [1, 2] },
     vendor: {
       name: "Acme Supplies",
       address: null,
@@ -1234,6 +1263,7 @@ const heldDocuments: Automations["RunDocument"][] = [
     total: "120.00",
   }),
   receipt(2, {
+    source: { file: heldPhoto.id },
     status: "waiting",
     statusText: "Waiting for approval: the total can't be read",
     vendor: {
@@ -1295,6 +1325,11 @@ function invoiceSteps(runId: string): Automations["RunStep"][] {
       : {}),
     occurredAt: new Date(Date.parse(now) + index * 60_000).toISOString(),
   }));
+}
+
+/** The files an Invoice Processing job was given, on its one-run read. */
+function invoiceFiles(runId: string): Automations["RunFile"][] {
+  return runId === invoiceHeldRunId ? [heldBill, heldPhoto] : [receiptsPhoto];
 }
 
 /** The documents an Invoice Processing run wrote, on its one-run read. */
@@ -3941,6 +3976,7 @@ const server = createServer(
           steps: invoiceSteps(runId),
           events: [],
           ...(documents.length > 0 ? { documents } : {}),
+          files: invoiceFiles(runId),
           email: invoiceEmail(runId),
         } satisfies AutomationOperations["readRun"]["responses"][200]["content"]["application/json"]);
       }

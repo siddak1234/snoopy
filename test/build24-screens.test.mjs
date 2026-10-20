@@ -153,3 +153,33 @@ test("Approvals: a decided row fades and folds in 220 ms (none under reduced mot
   assert.match(page, /<ApprovalQueue/u);
   assert.match(page, /title="Nothing needs review"/u);
 });
+
+test("one entry per job, by the job's id: no after-approval row on Activity, and no link to the run that was held — a job is its first run (P9; backend ADR-0044)", () => {
+  const list = code(read("app/account/runs/page.tsx"));
+  assert.doesNotMatch(list, /after approval|approval-continuation/iu);
+  const live = code(read(LIVE));
+  assert.doesNotMatch(live, /continuesRunId|the run that was held/u);
+  assert.doesNotMatch(
+    code(read("lib/run-progress.ts")),
+    /approval-continuation|continued in a new run/u,
+  );
+});
+
+test("each document is a closed row that opens in place: <details> never drawn open, its <summary> the heading, {vendor} · {total} and the chip; the body starts with Document type and Format, given the job's files (P10)", () => {
+  const live = code(read(LIVE));
+  const card = live.slice(live.indexOf("function DocumentCard"));
+  assert.match(
+    card,
+    /<details\s+data-testid=\{`document-\$\{card\.index\}`\}/u,
+  );
+  assert.doesNotMatch(card, /<details[^>]*\sopen\b/u);
+  assert.match(
+    card,
+    /<summary[\s\S]*?\{card\.heading\}[\s\S]*?\{card\.glance\}[\s\S]*?\{card\.chip\}[\s\S]*?<\/summary>/u,
+  );
+  assert.match(
+    card,
+    /<\/summary>\s*<div[^>]*>\s*<dl[^>]*>\{pairs\(card\.facts, "fact"\)\}<\/dl>/u,
+  );
+  assert.match(live, /toDocumentCards\([\s\S]*?detail\.files,\s*\)/u);
+});

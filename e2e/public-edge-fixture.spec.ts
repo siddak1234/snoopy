@@ -2599,10 +2599,27 @@ test("a finished run of three receipts: its full id, every step done, each recei
   ]) {
     await expect(main).not.toContainText(gone);
   }
-  const cards = main.getByRole("article");
+  // Each a closed row that opens in place (Build 24, P10): "Invoice n of 3",
+  // its chip and {vendor} · {total} (S9); open, it starts with its Document
+  // type and Format — the job's one photo, JPEG. Each opens on its own.
+  const cards = main.locator("details[data-testid^='document-']");
   await expect(cards).toHaveCount(3);
-  await expect(cards.nth(0)).toHaveAccessibleName("Document 1 of 3");
+  for (const card of await cards.all())
+    await expect(card).not.toHaveAttribute("open");
+  await expect(cards.nth(0).locator("summary")).toContainText("Invoice 1 of 3");
+  await expect(main.getByTestId("document-1-glance")).toHaveText(
+    "Lowe's · $17.19",
+  );
   await expect(main.getByTestId("document-1-chip")).toHaveText("Saved");
+  await expect(main.getByTestId("document-2-line-1")).toBeHidden();
+  await cards.nth(1).locator("summary").click();
+  await expect(cards.nth(1)).toHaveAttribute("open");
+  await expect(cards.nth(0)).not.toHaveAttribute("open");
+  await expect(cards.nth(2)).not.toHaveAttribute("open");
+  await expect(main.getByTestId("document-2-line-1")).toBeVisible();
+  await expect(main.getByTestId("document-1-line-1")).toBeHidden();
+  await expect(cards.nth(1)).toContainText("Document typeReceipt");
+  await expect(cards.nth(1)).toContainText("FormatJPEG");
   for (const words of [
     "Receipt · Lowe's",
     "2150 W Shaw Ave, Fresno, CA 93711 · Store 1234",
@@ -2739,6 +2756,10 @@ test("a held run's document whose approval was refused reads Not approved, and t
   await expect(record).toHaveAttribute("data-state", "held");
   await expect(record).toContainText("Denied");
   await expect(record).not.toContainText("Waiting for approval");
+  // Each document's Format is its own file's (Invoice Processing v6's
+  // `source`; Build 24, P10).
+  await expect(main.getByTestId("document-1")).toContainText("FormatPDF");
+  await expect(main.getByTestId("document-2")).toContainText("FormatPNG");
   // Step 5 waits: the approval's email never checks it (Build 23's A7).
   const email = main.getByTestId("run-step-group:email");
   await expect(email).toHaveAttribute("data-state", "waiting");
@@ -2868,7 +2889,9 @@ test.describe("Invoice Processing's page, Step 1 to its run (spec A6, A7; Build 
     await expect(rows.nth(4)).toHaveAttribute("data-state", "done");
     await expect(rows.nth(4)).toContainText("Sending email…");
     await expect(main.getByTestId("run-tile-Steps done")).toHaveText("5 / 5");
-    await expect(main.getByRole("article")).toHaveCount(3);
+    await expect(main.locator("details[data-testid^='document-']")).toHaveCount(
+      3,
+    );
     await expect(main.getByRole("button", { name: "Cancel run" })).toHaveCount(
       0,
     );

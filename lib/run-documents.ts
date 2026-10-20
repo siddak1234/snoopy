@@ -9,8 +9,8 @@
  * output. thats how we know which bill is what from records."
  *
  * Every value is the automation's, as printed; nothing is computed or rounded.
- * The same rules and words as the app's `lib/view/documents.ts`
- * (snoopy-mobile), so a document reads the same in both clients: money drawn
+ * The same rules and words as the app's `snoopy-mobile/lib/view/documents.ts`,
+ * so a document reads the same in both clients: money drawn
  * by hand from the decimal string — "$17.19" in US dollars or when the
  * document names no currency, at least two decimals and every digit printed
  * ("$3.459"), else the amount and its code ("17.19 CAD"), as the results email
@@ -74,7 +74,12 @@ export type RunDocument = {
     recordId: string;
   } | null;
   details: readonly { label: string; value: string }[];
+  /** The uploaded file it came from (Invoice Processing v6; optional). */
+  source?: { file: string; pages?: readonly number[] };
 };
+
+/** `RunFile` as the contract publishes it: one file uploaded for the job — what a document's Format is read from. */
+export type RunFile = { id: string; contentType: string };
 
 const MONTHS = [
   "Jan",
@@ -145,9 +150,47 @@ const STATUS_TONES: Record<RunDocument["status"], DocumentTone> = {
 /** Said under a document's lines when it has more than were read. */
 export const DOCUMENT_MORE_LINES = "More lines on the document.";
 
-/** "Document 1 of 3" (the owner's ~04:05Z: "a json out that clearly seperates accordingly"). */
+/**
+ * "Invoice 1 of 3" — the closed row's heading (Build 24, P10; the owner's
+ * build 23 words), whatever the document's type; the type is the body's first
+ * row. ~~"Document 1 of 3"~~ until Build 24.
+ */
 export function documentOf(index: number, count: number): string {
-  return `Document ${index} of ${count}`;
+  return `Invoice ${index} of ${count}`;
+}
+
+/** The formats said by name; any other is its content type's subtype in capitals. */
+const FORMAT_WORDS: Readonly<Record<string, string>> = {
+  "application/pdf": "PDF",
+  "image/jpeg": "JPEG",
+  "image/png": "PNG",
+  "image/heic": "HEIC",
+};
+
+/**
+ * A file's format in a word (Build 24, P10): PDF, JPEG, PNG, HEIC, else the
+ * content type's subtype in capitals ("image/webp" → "WEBP"); parameters and
+ * case are not part of it.
+ */
+export function formatLabel(contentType: string): string {
+  const type = contentType.split(";")[0]!.trim().toLowerCase();
+  return FORMAT_WORDS[type] ?? (type.split("/")[1] ?? type).toUpperCase();
+}
+
+/**
+ * A document's Format: its own file's (`source.file`), else the job's only
+ * file's, else none — the row is then left out (Build 24, P10).
+ */
+export function formatFor(
+  document: Pick<RunDocument, "source">,
+  files: readonly RunFile[] | undefined,
+): string | null {
+  const list = files ?? [];
+  const own = document.source
+    ? list.find((file) => file.id === document.source!.file)
+    : undefined;
+  const file = own ?? (list.length === 1 ? list[0] : undefined);
+  return file ? formatLabel(file.contentType) : null;
 }
 
 function grouped(digits: string): string {
@@ -198,12 +241,20 @@ export type DocumentLineView = {
 };
 export type DocumentRowView = { label: string; value: string; strong?: true };
 
-/** One document's card. */
+/** One document's card: a closed row that opens in place (Build 24, P10). */
 export type DocumentCardView = {
   index: number;
   heading: string;
   chip: string;
   tone: DocumentTone;
+  /**
+   * The closed row's second line, `{vendor} · {total}` — the parts printed
+   * (the session's S9: three rows each "Invoice n of 3" are otherwise found
+   * only by opening each).
+   */
+  glance: string | null;
+  /** The body's first rows: Document type, then Format when it is known. */
+  facts: DocumentRowView[];
   /** `{Type} · {vendor}`, or the type alone when no seller was read. */
   title: string;
   /** `{address}, {city} · Store {number}` — the parts printed. */
@@ -224,16 +275,18 @@ export type DocumentCardView = {
 };
 
 /**
- * A document's card (spec A7): "Document 1 of 3" and its chip; the type and
- * seller; where; when; its numbers; each line — description, amount, and
- * "{quantity} × {unit price}" under it when both were printed; the totals; how
- * it was paid ("Card ending 4417", none when not shown); what happened to it;
- * then the automation's own detail lines.
+ * A document's card (spec A7; Build 24, P10): closed, "Invoice 1 of 3", its
+ * chip and `{vendor} · {total}`; open, its Document type and Format, then the
+ * type and seller; where; when; its numbers; each line — description, amount,
+ * and "{quantity} × {unit price}" under it when both were printed; the totals;
+ * how it was paid ("Card ending 4417", none when not shown); what happened to
+ * it; then the automation's own detail lines.
  */
 export function toDocumentCard(
   document: RunDocument,
   count: number,
   approval?: "rejected" | "expired" | null,
+  files?: readonly RunFile[],
 ): DocumentCardView {
   const money = (value: string | null) =>
     documentMoney(value, document.currency);
@@ -290,11 +343,20 @@ export function toDocumentCard(
   rows.push({ label: "Result", value: document.statusText });
   for (const detail of document.details)
     rows.push({ label: detail.label, value: detail.value });
+  const format = formatFor(document, files);
+  const glance = [document.vendor.name, money(document.total)]
+    .filter(Boolean)
+    .join(" · ");
   return {
     index: document.index,
     heading: documentOf(document.index, count),
     chip: notApproved ? "Not approved" : STATUS_CHIPS[document.status],
     tone: notApproved ? "muted" : STATUS_TONES[document.status],
+    glance: glance || null,
+    facts: [
+      { label: "Document type", value: type },
+      ...(format ? [{ label: "Format", value: format }] : []),
+    ],
     title: document.vendor.name ? `${type} · ${document.vendor.name}` : type,
     location: location || null,
     when: when || null,
@@ -315,14 +377,15 @@ export function toDocumentCard(
   };
 }
 
-/** Every document's card, in the file's order. */
+/** Every document's card, in the file's order; `files` are the job's uploads (`RunDetail.files`). */
 export function toDocumentCards(
   documents: readonly RunDocument[] | undefined,
   approval?: "rejected" | "expired" | null,
+  files?: readonly RunFile[],
 ): DocumentCardView[] {
   const list = [...(documents ?? [])].sort((a, b) => a.index - b.index);
   return list.map((document) =>
-    toDocumentCard(document, list.length, approval),
+    toDocumentCard(document, list.length, approval, files),
   );
 }
 

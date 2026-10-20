@@ -9,6 +9,8 @@ import {
   documentMoney,
   documentTime,
   documentsFileName,
+  formatFor,
+  formatLabel,
   toDocumentCard,
   toDocumentCards,
 } from "../lib/run-documents.ts";
@@ -19,7 +21,7 @@ import {
  * get a json out that clearly seperates accordingly … cu price, location, and
  * more should be there", and AM7: "ensure invoice number, bill number, or
  * another standard practice from vendors is part of the json schema output").
- * The same tables as the app's (snoopy-mobile `__tests__/build21-views.test.ts`),
+ * The same tables as the app's (`snoopy-mobile/__tests__/build21-views.test.ts`),
  * so a document reads the same in both clients.
  */
 
@@ -172,7 +174,7 @@ test('every line: its description, its amount, and "{quantity} × {unit price}" 
     { description: "—", amount: null, each: null },
   ]);
   assert.equal(card.moreLines, true);
-  assert.equal(card.heading, "Document 1 of 2");
+  assert.equal(card.heading, "Invoice 1 of 2");
 });
 
 test("the rows: totals, the discount as taken off, how it was paid, the result, then the automation's own lines", () => {
@@ -287,17 +289,113 @@ test("every type in words, the seller beside it, its place by the parts printed"
   assert.equal(toDocumentCard(doc(), 1).when, "Oct 14, 2026 · 2:32 PM");
 });
 
-test('cards come in the file\'s order, each "Document i of n"', () => {
+test('cards come in the file\'s order, each "Invoice i of n" whatever its type — ~~"Document i of n"~~ until Build 24 (P10)', () => {
   const cards = toDocumentCards([
     doc({ index: 3 }),
-    doc({ index: 1 }),
+    doc({ index: 1, type: "bill" }),
     doc({ index: 2 }),
   ]);
   assert.deepEqual(
     cards.map((card) => card.heading),
-    ["Document 1 of 3", "Document 2 of 3", "Document 3 of 3"],
+    ["Invoice 1 of 3", "Invoice 2 of 3", "Invoice 3 of 3"],
   );
+  assert.equal(cards[1].heading, "Invoice 2 of 3");
   assert.deepEqual(toDocumentCards(undefined), []);
+});
+
+test("a file's format in a word: PDF, JPEG, PNG, HEIC, else the subtype in capitals — parameters and case aside (P10)", () => {
+  assert.deepEqual(
+    [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/heic",
+      "IMAGE/JPEG",
+      "application/pdf; charset=binary",
+      "image/webp",
+      "image/tiff",
+      "text/csv",
+      "octet",
+    ].map(formatLabel),
+    [
+      "PDF",
+      "JPEG",
+      "PNG",
+      "HEIC",
+      "JPEG",
+      "PDF",
+      "WEBP",
+      "TIFF",
+      "CSV",
+      "OCTET",
+    ],
+  );
+});
+
+test("a document's Format: its own file's (source.file), else the job's only file's, else none (P10)", () => {
+  const pdf = { id: "f-pdf", contentType: "application/pdf" };
+  const png = { id: "f-png", contentType: "image/png" };
+  // Its own file, among two.
+  assert.equal(formatFor({ source: { file: "f-png" } }, [pdf, png]), "PNG");
+  assert.equal(
+    formatFor({ source: { file: "f-pdf", pages: [1, 2] } }, [pdf, png]),
+    "PDF",
+  );
+  // No source (v5): the job's only file.
+  assert.equal(formatFor({}, [png]), "PNG");
+  // A source the job's files do not hold, and one file: that one.
+  assert.equal(formatFor({ source: { file: "gone" } }, [pdf]), "PDF");
+  // None to tell by: two files and no source, or no files at all.
+  assert.equal(formatFor({}, [pdf, png]), null);
+  assert.equal(formatFor({ source: { file: "gone" } }, [pdf, png]), null);
+  assert.equal(formatFor({}, undefined), null);
+  assert.equal(formatFor({}, []), null);
+});
+
+test("closed, a card says its heading, its chip and {vendor} · {total} (S9); open, it starts with Document type and Format — the row left out when the format is not known (P10)", () => {
+  const files = [{ id: "f-1", contentType: "image/jpeg" }];
+  const card = toDocumentCard(doc(), 3, null, files);
+  assert.equal(card.glance, "Lowe's · $17.19");
+  assert.deepEqual(card.facts, [
+    { label: "Document type", value: "Receipt" },
+    { label: "Format", value: "JPEG" },
+  ]);
+  assert.deepEqual(toDocumentCard(doc({ type: "bill" }), 1).facts, [
+    { label: "Document type", value: "Bill" },
+  ]);
+  assert.equal(
+    toDocumentCard(
+      doc({
+        vendor: { name: null, address: null, city: null, storeNumber: null },
+      }),
+      1,
+    ).glance,
+    "$17.19",
+  );
+  assert.equal(
+    toDocumentCard(doc({ total: null, vendor: { ...doc().vendor } }), 1).glance,
+    "Lowe's",
+  );
+  assert.equal(
+    toDocumentCard(
+      doc({
+        total: null,
+        vendor: { name: null, address: null, city: null, storeNumber: null },
+      }),
+      1,
+    ).glance,
+    null,
+  );
+  // Every card is given the job's files.
+  assert.deepEqual(
+    toDocumentCards([doc({ index: 1 }), doc({ index: 2 })], null, files).map(
+      (each) => each.facts.at(-1),
+    ),
+    [
+      { label: "Format", value: "JPEG" },
+      { label: "Format", value: "JPEG" },
+    ],
+  );
 });
 
 test("Download JSON: the platform's file, saved as run-{the full id}.json, through /api/platform; a refusal said in the session's words", () => {

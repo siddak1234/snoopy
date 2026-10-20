@@ -45,6 +45,15 @@ provider asks for is reused without consent, and the page says so.
 
 ## Runs and approvals
 
+A job is its first run (backend ADR-0044): the platform lists each job once,
+by that run's id, and reads any id in a job as the whole job — every step,
+the held run's and the ones after its approval, in one timeline. So the run
+page draws a held step done once the job went on, and nothing here links one
+run of a job to another. The job's newest approval, by when it was asked, is
+the one a page says or offers. Each document is a closed row, "Invoice 1 of
+3" with `{vendor} · {total}`, that opens on its own; its Format is read from
+the job's uploaded files (`RunDetail.files`): its own file, else the only one.
+
 A held job is decided where it waits: step 4 of its run page offers the one
 Approve and Deny pair (`app/account/approvals/ApprovalDecision.tsx`, Deny the
 danger variant) to a role the job's newest approval names, and says who can

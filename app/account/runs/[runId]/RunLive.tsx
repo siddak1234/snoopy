@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { CaretDownIcon } from "@phosphor-icons/react/dist/ssr/CaretDown";
 import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { CircleDashedIcon } from "@phosphor-icons/react/dist/ssr/CircleDashed";
 import { CircleNotchIcon } from "@phosphor-icons/react/dist/ssr/CircleNotch";
@@ -160,6 +160,7 @@ export function RunLive({
       : decided === "closed"
         ? "expired"
         : null,
+    detail.files,
   );
   const result = runResultLine(run, approvals);
   const facts = [
@@ -227,21 +228,6 @@ export function RunLive({
           />
           <Tile label="Steps done" value={stepsDone(tracker)} />
         </dl>
-        {/* A continuation belongs to the run it continues. The link is how a
-            person follows the chain rather than reading two unrelated runs. */}
-        {run.continuesRunId ? (
-          <p className="mt-4 text-sm text-[var(--muted)]">
-            Continues{" "}
-            <Link
-              prefetch={false}
-              href={`/account/runs/${run.continuesRunId}`}
-              className="text-[var(--accent)] underline underline-offset-2"
-            >
-              the run that was held
-            </Link>
-            .
-          </p>
-        ) : null}
       </div>
 
       <section aria-labelledby="run-steps-title" className="py-5">
@@ -467,10 +453,12 @@ const CHIP_TONE: Record<DocumentCardView["tone"], string> = {
 
 /**
  * One document a run read, on its own card (Build 21, spec A7; backend
- * ADR-0039): "Document 1 of 3" and what happened to it; the type and seller;
- * where; when; the numbers that match it to its record (AM7); each line with
- * "{quantity} × {unit price}" under it; the totals; how it was paid; the
- * result line; then the automation's own detail lines. The app's
+ * ADR-0039), closed until it is opened (Build 24, P10): "Invoice 1 of 3", what
+ * happened to it and `{vendor} · {total}` (S9); open, its Document type and
+ * Format, then the type and seller; where; when; the numbers that match it to
+ * its record (AM7); each line with "{quantity} × {unit price}" under it; the
+ * totals; how it was paid; the result line; then the automation's own detail
+ * lines. Each opens on its own. The app's
  * `snoopy-mobile/components/runs/document-card.tsx` on the website.
  */
 function DocumentCard({ card }: { card: DocumentCardView }) {
@@ -489,61 +477,86 @@ function DocumentCard({ card }: { card: DocumentCardView }) {
       </div>
     ));
   return (
-    <article
+    <details
       data-testid={`document-${card.index}`}
-      aria-label={card.heading}
-      className="rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)] px-4 py-4"
+      className="group rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)]"
     >
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-medium text-[var(--muted)]">
-          {card.heading}
-        </p>
-        <span
-          data-testid={`document-${card.index}-chip`}
-          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${CHIP_TONE[card.tone]}`}
-        >
-          {card.chip}
-        </span>
-      </div>
-      <p className="mt-1 text-sm font-medium text-[var(--text)]">
-        {card.title}
-      </p>
-      {card.location ? (
-        <p className="text-xs text-[var(--muted)]">{card.location}</p>
-      ) : null}
-      {card.when ? (
-        <p className="text-xs text-[var(--muted)]">{card.when}</p>
-      ) : null}
-      {card.ids.length > 0 ? (
-        <dl className="mt-3 flex flex-col gap-1.5">{pairs(card.ids, "id")}</dl>
-      ) : null}
-      {card.lines.length > 0 || card.moreLines ? (
-        <div className="mt-3 flex flex-col gap-1.5 border-t border-[var(--ring)] pt-3">
-          {card.lines.map((line, index) => (
-            <div
-              key={`line-${index}`}
-              data-testid={`document-${card.index}-line-${index + 1}`}
-              className="flex items-start justify-between gap-4"
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-[var(--radius-md)] px-4 py-4 [&::-webkit-details-marker]:hidden">
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-sm font-medium text-[var(--text)]">
+            {card.heading}
+          </span>
+          {card.glance ? (
+            <span
+              data-testid={`document-${card.index}-glance`}
+              className="text-xs break-words text-[var(--muted)]"
             >
-              <div className="min-w-0">
-                <p className="text-sm text-[var(--text)]">{line.description}</p>
-                {line.each ? (
-                  <p className="text-xs text-[var(--muted)]">{line.each}</p>
+              {card.glance}
+            </span>
+          ) : null}
+        </span>
+        <span className="flex shrink-0 items-center gap-2">
+          <span
+            data-testid={`document-${card.index}-chip`}
+            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${CHIP_TONE[card.tone]}`}
+          >
+            {card.chip}
+          </span>
+          <CaretDownIcon
+            size={20}
+            aria-hidden
+            className="text-[var(--muted)] transition-transform group-open:rotate-180 motion-reduce:transition-none"
+          />
+        </span>
+      </summary>
+      <div className="border-t border-[var(--ring)] px-4 pt-3 pb-4">
+        <dl className="flex flex-col gap-1.5">{pairs(card.facts, "fact")}</dl>
+        <p className="mt-3 text-sm font-medium text-[var(--text)]">
+          {card.title}
+        </p>
+        {card.location ? (
+          <p className="text-xs text-[var(--muted)]">{card.location}</p>
+        ) : null}
+        {card.when ? (
+          <p className="text-xs text-[var(--muted)]">{card.when}</p>
+        ) : null}
+        {card.ids.length > 0 ? (
+          <dl className="mt-3 flex flex-col gap-1.5">
+            {pairs(card.ids, "id")}
+          </dl>
+        ) : null}
+        {card.lines.length > 0 || card.moreLines ? (
+          <div className="mt-3 flex flex-col gap-1.5 border-t border-[var(--ring)] pt-3">
+            {card.lines.map((line, index) => (
+              <div
+                key={`line-${index}`}
+                data-testid={`document-${card.index}-line-${index + 1}`}
+                className="flex items-start justify-between gap-4"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm text-[var(--text)]">
+                    {line.description}
+                  </p>
+                  {line.each ? (
+                    <p className="text-xs text-[var(--muted)]">{line.each}</p>
+                  ) : null}
+                </div>
+                {line.amount ? (
+                  <p className="text-sm text-[var(--text)]">{line.amount}</p>
                 ) : null}
               </div>
-              {line.amount ? (
-                <p className="text-sm text-[var(--text)]">{line.amount}</p>
-              ) : null}
-            </div>
-          ))}
-          {card.moreLines ? (
-            <p className="text-xs text-[var(--muted)]">{DOCUMENT_MORE_LINES}</p>
-          ) : null}
-        </div>
-      ) : null}
-      <dl className="mt-3 flex flex-col gap-1.5 border-t border-[var(--ring)] pt-3">
-        {pairs(card.rows, "row")}
-      </dl>
-    </article>
+            ))}
+            {card.moreLines ? (
+              <p className="text-xs text-[var(--muted)]">
+                {DOCUMENT_MORE_LINES}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        <dl className="mt-3 flex flex-col gap-1.5 border-t border-[var(--ring)] pt-3">
+          {pairs(card.rows, "row")}
+        </dl>
+      </div>
+    </details>
   );
 }
