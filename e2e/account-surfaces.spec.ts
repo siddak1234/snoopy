@@ -13,6 +13,7 @@ import {
   fixtureControl,
   fixtureRead,
   holdRequest,
+  isServerAction,
   observe,
   presentSession,
   settledAnimations,
@@ -787,13 +788,8 @@ test("11 — what can be undone is not red: Pause, Deny, Reject, Cancel request 
     "Reject, a request to join",
   );
 
-  await fixtureControl("approval-waiting");
-  await page.goto("/account/approvals");
-  await expectNotRed(
-    page.getByRole("button", { name: "Reject" }),
-    tokens,
-    "Reject, an approval",
-  );
+  // An approval's Deny is red since Build 24 (P6): the danger variant, the
+  // owner's call for that pair — its test is with Approvals below.
 
   await presentSession(page, "member");
   await page.goto("/account/teams");
@@ -996,22 +992,148 @@ test("17 — Approvals: nothing waiting, a decision by an eligible role, and non
   await page.reload();
   await expectNoAxeViolations(page);
   await page.getByRole("button", { name: "Approve" }).click();
-  await expect(
-    page.locator("main").getByRole("heading", { name: "Nothing needs review" }),
-  ).toBeVisible();
+  // The last row leaving goes to Activity (Build 24, P7).
+  await expect(page).toHaveURL(/\/account\/runs$/u);
+  expect(await approvalStatuses()).toEqual(["approved"]);
 });
 
-test("17 — Reject is recorded as rejected, and nothing waits", async ({
+test("17 — Deny is recorded as rejected, and the last row leaving goes to Activity (Build 24, P7; S6)", async ({
   page,
 }) => {
   await fixtureControl("approval-waiting");
   await page.goto("/account/approvals");
-  await page.getByRole("button", { name: "Reject" }).click();
-  await expect(
-    page.locator("main").getByRole("heading", { name: "Nothing needs review" }),
-  ).toBeVisible();
+  await page.getByRole("button", { name: "Deny" }).click();
+  await expect(page).toHaveURL(/\/account\/runs$/u);
   await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
   expect(await approvalStatuses()).toEqual(["rejected"]);
+});
+
+// The held Invoice Processing job, and its step 4 — where it waits.
+const heldJob = "/account/runs/fixture-run-invoice-held";
+const heldStep = (page: Page) =>
+  page.locator("main").getByTestId("run-step-group:record");
+const approvalRows = (page: Page) =>
+  page.locator('[data-testid^="approval-row-"]');
+
+test("P6 — a held job's step 4 offers Approve and Deny, Deny red; Approving… while it saves, then the page is drawn again: the job runs on under its id", async ({
+  page,
+}) => {
+  await fixtureControl("invoice-approval-pending");
+  await page.goto(heldJob);
+  const step = heldStep(page);
+  await expect(step).toHaveAttribute("data-state", "held");
+  await expect(step).toContainText(
+    "Waiting for approval: Document 2: the total can't be read.",
+  );
+  const approve = step.getByRole("button", { name: "Approve" });
+  const deny = step.getByRole("button", { name: "Deny" });
+  await expect(approve).toBeVisible();
+  await expect(deny).toHaveClass(/(?:^|\s)btn-danger(?:\s|$)/u);
+  await expectDanger(deny, await resolvedTokens(page), "Deny, a held job's");
+  // Only step 4 offers it.
+  await expect(
+    page.locator("main").getByRole("button", { name: "Approve" }),
+  ).toHaveCount(1);
+  await expectNoAxeViolations(page);
+  const held = await holdRequest(page, `**${heldJob}`, isServerAction);
+  await approve.click();
+  await held.arrived;
+  await expect(step.getByRole("button", { name: "Approving…" })).toBeDisabled();
+  await expect(deny).toBeDisabled();
+  held.release();
+  await expect(page.locator("main").getByText(/^running$/iu)).toBeVisible();
+  await expect(step).toHaveAttribute("data-state", "working");
+  await expect(step.getByRole("button")).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp(`${heldJob}$`, "u"));
+  expect(await approvalStatuses()).toEqual(["approved"]);
+});
+
+test("P6 — Deny in step 4: the step says Denied, the result Denied., its waiting document Not approved (S6)", async ({
+  page,
+}) => {
+  await fixtureControl("invoice-approval-pending");
+  await page.goto(heldJob);
+  await heldStep(page).getByRole("button", { name: "Deny" }).click();
+  const main = page.locator("main");
+  await expect(main.getByTestId("run-result")).toHaveText("Denied.");
+  await expect(heldStep(page)).toHaveAttribute("data-state", "held");
+  await expect(heldStep(page).locator("p").nth(1)).toHaveText("Denied");
+  await expect(heldStep(page).getByRole("button")).toHaveCount(0);
+  await expect(main.getByTestId("document-2-chip")).toHaveText("Not approved");
+  expect(await approvalStatuses()).toEqual(["rejected"]);
+});
+
+test("P6 — a member is told who can decide, and offered no button", async ({
+  page,
+}) => {
+  await fixtureControl("invoice-approval-pending");
+  await presentSession(page, "member");
+  await page.goto(heldJob);
+  await expect(heldStep(page)).toContainText(
+    "Only owner or admin can decide this.",
+  );
+  await expect(heldStep(page).getByRole("button")).toHaveCount(0);
+});
+
+test("P7 — a decided row fades and folds away, its pill never Pending beside a decision; the other stays; the last one leaving goes to Activity", async ({
+  page,
+}) => {
+  await fixtureControl("approval-waiting");
+  await fixtureControl("invoice-approval-pending");
+  await page.goto("/account/approvals");
+  const rows = approvalRows(page);
+  await expect(rows).toHaveCount(2);
+  // Every pill a leaving row shows, as it shows it.
+  await page.evaluate(() => {
+    const seen: string[] = [];
+    Object.assign(window, { leavingPills: seen });
+    new MutationObserver(() => {
+      for (const row of document.querySelectorAll("[data-leaving]"))
+        seen.push(
+          row.querySelector('[data-testid^="approval-pill-"]')?.textContent ??
+            "",
+        );
+    }).observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      characterData: true,
+    });
+  });
+  const first = rows.first();
+  // It folds, and fades, in the same 220 ms.
+  expect(
+    await first.evaluate((row) => getComputedStyle(row).transitionDuration),
+  ).toBe("0.22s");
+  await first.getByRole("button", { name: "Approve" }).click();
+  await expect(rows).toHaveCount(1);
+  const pills = await page.evaluate(
+    () => (window as unknown as { leavingPills: string[] }).leavingPills,
+  );
+  expect(pills.length).toBeGreaterThan(0);
+  expect(new Set(pills)).toEqual(new Set(["approved"]));
+  await expect(page).toHaveURL(/\/account\/approvals$/u);
+  await rows.first().getByRole("button", { name: "Deny" }).click();
+  await expect(page).toHaveURL(/\/account\/runs$/u);
+  expect(await approvalStatuses()).toEqual(["approved", "rejected"]);
+});
+
+test("P7 — under reduced motion a decided row leaves at once, with no fade", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await fixtureControl("approval-waiting");
+  await fixtureControl("invoice-approval-pending");
+  await page.goto("/account/approvals");
+  const rows = approvalRows(page);
+  await expect(rows).toHaveCount(2);
+  expect(
+    await rows
+      .first()
+      .evaluate((row) => getComputedStyle(row).transitionDuration),
+  ).toBe("0s");
+  await rows.first().getByRole("button", { name: "Approve" }).click();
+  await expect(rows).toHaveCount(1);
 });
 
 test("18 — billing with no provider configured (503) is said to be unavailable, and offers nothing", async ({
@@ -1194,21 +1316,21 @@ test("an approval decided on a page whose workspace another tab switched away is
   await expect(page.getByRole("button", { name: "Approve" })).toBeVisible();
 });
 
-test("a rejection on a page whose workspace another tab switched away is refused, and still waits (register F70)", async ({
+test("a denial on a page whose workspace another tab switched away is refused, and still waits (register F70)", async ({
   page,
 }) => {
   await fixtureControl("approval-waiting");
   await page.goto("/account/approvals");
-  await expect(page.getByRole("button", { name: "Reject" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Deny" })).toBeVisible();
   await switchInAnotherTab(page, /Fixture Personal/);
-  await page.getByRole("button", { name: "Reject" }).click();
+  await page.getByRole("button", { name: "Deny" }).click();
   await expect(page.locator("main").getByRole("alert")).toHaveText(
     workspaceChanged,
   );
   expect(await approvalStatuses()).toEqual(["pending"]);
   await switchInAnotherTab(page, /Fixture Organization/);
   await page.reload();
-  await expect(page.getByRole("button", { name: "Reject" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Deny" })).toBeVisible();
 });
 
 test("a connection started or removed on a page whose workspace another tab switched away is refused, and nothing is connected or removed (register F70)", async ({

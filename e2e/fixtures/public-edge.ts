@@ -1266,6 +1266,11 @@ function invoiceSteps(runId: string): Automations["RunStep"][] {
             ["decide", "ok", "1 ready, 1 waiting"],
             ["save-documents", "ok", "1 saved"],
             ["ask-approval", "held", "Waiting for approval"],
+            // Approved, the job goes on under its own id (backend ADR-0044):
+            // its next step joins the same timeline.
+            ...(invoiceApprovalNow().status === "approved"
+              ? ([["confirm-company", "ok", "Company checked again"]] as const)
+              : []),
           ]
         : runId === invoiceStartedRunId && state.invoiceRunStage < 2
           ? state.invoiceRunStage === 1
@@ -1318,10 +1323,12 @@ function invoiceEmail(runId: string): Automations["RunEmailState"] {
     : { status: "waiting", sentAt: null };
 }
 
+const invoiceApprovalId = "a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1";
+
 /** Its approval, refused (S21: its waiting document reads Not approved). */
 function invoiceApproval(): Automations["Approval"] {
   return {
-    id: "a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1",
+    id: invoiceApprovalId,
     runId: invoiceHeldRunId,
     workspaceId,
     subscriptionId: invoiceSubscriptionId,
@@ -1334,6 +1341,29 @@ function invoiceApproval(): Automations["Approval"] {
     decidedAt: now,
     decidedByUserId: userId,
   };
+}
+
+/**
+ * The held job's approval still waiting (Build 24, P6): Approve and Deny in
+ * its step 4 and on Approvals; a decision is kept in `state.approvals`.
+ */
+function pendingInvoiceApproval(): Automations["Approval"] {
+  const asked = invoiceApproval();
+  delete asked.decidedAt;
+  delete asked.decidedByUserId;
+  return {
+    ...asked,
+    status: "pending",
+    expiresAt: new Date(Date.now() + 24 * 3_600_000).toISOString(),
+  };
+}
+
+/** The held job's approval as the platform holds it now: waiting or decided, else refused. */
+function invoiceApprovalNow(): Automations["Approval"] {
+  return (
+    state.approvals.find((entry) => entry.id === invoiceApprovalId) ??
+    invoiceApproval()
+  );
 }
 
 // One deterministic run by id: the failed one carries the automation's own
@@ -1363,14 +1393,23 @@ function fixtureRun(runId: string): Automations["Run"] {
   }
   if (invoiceRunIds.includes(runId)) {
     const v2 = runId === invoiceV2RunId;
-    const held = runId === invoiceHeldRunId;
+    // Approved, the held job runs on under the same id (backend ADR-0044).
+    const continued =
+      runId === invoiceHeldRunId && invoiceApprovalNow().status === "approved";
+    const held = runId === invoiceHeldRunId && !continued;
     return {
       id: runId,
       workspaceId,
       subscriptionId: invoiceSubscriptionId,
       templateId: invoiceAutomation.templateId,
       templateVersion: v2 ? 2 : 3,
-      status: v2 ? "failed" : held ? "held" : "succeeded",
+      status: v2
+        ? "failed"
+        : held
+          ? "held"
+          : continued
+            ? "running"
+            : "succeeded",
       origin: "manual",
       rootRunId: runId,
       // The request id the app once titled run 793eef82 by: never shown.
@@ -1379,11 +1418,13 @@ function fixtureRun(runId: string): Automations["Run"] {
         : "fixture-request",
       ...(v2
         ? { failureReason: "Add one document per file." }
-        : held
+        : held || continued
           ? {}
           : { resultSummary: "3 receipts: 3 saved." }),
       startedAt: now,
-      endedAt: new Date(Date.parse(now) + 19_000).toISOString(),
+      ...(continued
+        ? {}
+        : { endedAt: new Date(Date.parse(now) + 19_000).toISOString() }),
       createdAt: now,
       updatedAt: now,
     };
@@ -1681,6 +1722,14 @@ const server = createServer(
       },
       "/__fixture/approval-waiting": () => {
         state.approvals = [waitingApproval()];
+      },
+      // Build 24 (P6, P7): the held Invoice Processing job's approval waits
+      // too — beside any other that waits.
+      "/__fixture/invoice-approval-pending": () => {
+        state.approvals = [
+          ...state.approvals.filter((entry) => entry.id !== invoiceApprovalId),
+          pendingInvoiceApproval(),
+        ];
       },
       "/__fixture/billing-not-configured": () => {
         state.billingNotConfigured = true;
@@ -3947,9 +3996,12 @@ const server = createServer(
     if (method === "GET" && isWorkspacePath(pathname, "/approvals")) {
       const status = url.searchParams.get("status");
       return respond(response, 200, {
-        approvals: [...state.approvals, invoiceApproval()].filter(
-          (entry) => !status || entry.status === status,
-        ),
+        approvals: [
+          ...state.approvals,
+          ...(state.approvals.some((entry) => entry.id === invoiceApprovalId)
+            ? []
+            : [invoiceApproval()]),
+        ].filter((entry) => !status || entry.status === status),
       } satisfies AutomationOperations["listApprovals"]["responses"][200]["content"]["application/json"]);
     }
     if (

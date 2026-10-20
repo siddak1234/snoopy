@@ -14,8 +14,9 @@ import {
   PlatformNotConfiguredError,
   PlatformServerError,
 } from "@/lib/platform-server";
-import { resolveActiveWorkspaceId } from "@/lib/tenancy";
-import { RunLive, type RunFlow } from "./RunLive";
+import { newestApproval } from "@/lib/run-progress";
+import { resolveActiveWorkspaceId, roleInWorkspace } from "@/lib/tenancy";
+import { RunLive, type RunDecision, type RunFlow } from "./RunLive";
 
 /**
  * One run (Build 21, spec A7): named by its FULL id (A8; the owner's D4 and
@@ -26,8 +27,10 @@ import { RunLive, type RunFlow } from "./RunLive";
  * its manifest declares — and not `events`, which is the platform's own record
  * of state transitions. The run names no flow (`Run.templateId`'s own words: a
  * screen joins the catalog), so its name, steps' titles and groups come from
- * there. A held run's approval is read too: a waiting document whose approval
- * was refused or ran out says "Not approved" (S21).
+ * there. A held run's approvals are read too: a waiting document whose
+ * approval was refused or ran out says "Not approved" (S21), and while its
+ * newest waits, step 4 offers Approve and Deny to a role it names (Build 24,
+ * P6; the role read as Approvals reads it).
  *
  * And its flow, as it is now (Build 22, the session's S23): a setting step's
  * line — the integration the flow has chosen — and a title by connection
@@ -81,18 +84,33 @@ export default async function RunDetailPage(
     throw error;
   }
 
-  const [catalog, approvals, subscription] = await Promise.all([
+  const held = detail.run.status === "held";
+  const [catalog, approvals, subscription, role] = await Promise.all([
     emptyWhenUnavailable(() => listAutomations(workspaceId), {
       automations: [],
       categories: [],
     }),
-    detail.run.status === "held"
+    held
       ? emptyWhenUnavailable(() => listApprovals(workspaceId), {
           approvals: [],
         })
       : { approvals: [] },
     readFlow(workspaceId, detail.run.subscriptionId),
+    held ? roleInWorkspace(workspaceId) : undefined,
   ]);
+  const jobApprovals = approvals.approvals.filter(
+    (approval) => approval.runId === detail.run.id,
+  );
+  const waiting = newestApproval(detail.run.id, jobApprovals);
+  // Whether this person may decide is the approval's own answer; the server
+  // checks it again and refuses with 403.
+  const decision: RunDecision =
+    waiting?.status === "pending"
+      ? {
+          approval: waiting,
+          canDecide: Boolean(role && waiting.eligibleRoles.includes(role)),
+        }
+      : null;
   const entry = catalog.automations.find(
     (candidate) => candidate.templateId === detail.run.templateId,
   );
@@ -151,9 +169,8 @@ export default async function RunDetailPage(
       workspaceId={workspaceId}
       initial={detail}
       flow={flow}
-      approvals={approvals.approvals.filter(
-        (approval) => approval.runId === detail.run.id,
-      )}
+      approvals={jobApprovals}
+      decision={decision}
     />
   );
 }

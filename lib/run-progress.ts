@@ -78,6 +78,8 @@ export const STEP_SKIPPED = "Skipped";
 export const STEP_STOPPED = "Stopped";
 export const STEP_FAILED = "Failed";
 export const WAITING_FOR_APPROVAL = "Waiting for approval.";
+/** A held step whose approval was denied (Build 24, P6; the session's S6). */
+export const STEP_DENIED = "Denied";
 
 export function stepHeld(reason: string | undefined): string {
   return reason ? `Waiting for approval: ${reason}` : "Waiting for approval";
@@ -190,12 +192,17 @@ export function timeOfDay(iso: string): string {
   return `${hours % 12 || 12}:${minutes} ${hours < 12 ? "AM" : "PM"}`;
 }
 
-/** What a row says of its state — never a step's own summary, never a step id. */
+/**
+ * What a row says of its state — never a step's own summary, never a step id.
+ * A held step says why it waits until its approval is denied, then "Denied"
+ * (Build 24, P6).
+ */
 function trackerSub(
   state: TrackerState,
   steps: readonly ProgressStep[],
   run: RunState,
   clock: (iso: string) => string,
+  decision?: HeldDecision | null,
 ): string {
   if (state === "working") return WORKING;
   if (state === "waiting") return STEP_WAITING;
@@ -203,7 +210,9 @@ function trackerSub(
   if (state === "stopped") return STEP_STOPPED;
   if (state === "failed") return run.failureReason ?? STEP_FAILED;
   if (state === "held")
-    return stepHeld(steps.find((step) => step.outcome === "held")?.heldReason);
+    return decision === "rejected"
+      ? STEP_DENIED
+      : stepHeld(steps.find((step) => step.outcome === "held")?.heldReason);
   const last = steps.reduce<ProgressStep | undefined>(
     (latest, step) =>
       !latest || at(step.occurredAt) >= at(latest.occurredAt) ? step : latest,
@@ -286,15 +295,23 @@ export function trackerRows(
   run: RunState,
   clock: (iso: string) => string = timeOfDay,
   titles: readonly { id: string; title: string }[] | undefined = declared,
-  /** The flow as read now, and the run's email (Build 22). */
-  context: { flow?: TrackerFlow; email?: RunEmailState } = {},
+  /**
+   * The flow as read now, the run's email (Build 22), and what became of a
+   * held job's approval (`heldDecision`, Build 24).
+   */
+  context: {
+    flow?: TrackerFlow;
+    email?: RunEmailState;
+    decision?: HeldDecision | null;
+  } = {},
 ): TrackerRow[] {
   const known = new Set((declared ?? []).map((step) => step.id));
   const covered =
     declared !== undefined &&
     declared.length > 0 &&
     steps.every((step) => known.has(step.stepId));
-  if (!covered) return reportedRows(steps, titles, run, clock);
+  if (!covered)
+    return reportedRows(steps, titles, run, clock, context.decision);
   const pipeline = declared;
   const states = stepStates(pipeline, steps, run);
   const row = (key: string, title: string, members: number[]): TrackerRow => {
@@ -302,7 +319,12 @@ export function trackerRows(
     const reported = members.flatMap((index) =>
       states[index]!.step ? [states[index]!.step!] : [],
     );
-    return { key, title, state, sub: trackerSub(state, reported, run, clock) };
+    return {
+      key,
+      title,
+      state,
+      sub: trackerSub(state, reported, run, clock, context.decision),
+    };
   };
   if (groups && groups.length > 0) {
     const named = new Set(
@@ -341,6 +363,7 @@ function reportedRows(
   declared: readonly { id: string; title: string }[] | undefined,
   run: RunState,
   clock: (iso: string) => string,
+  decision?: HeldDecision | null,
 ): TrackerRow[] {
   const titles = new Map((declared ?? []).map((step) => [step.id, step.title]));
   const ordered = [...steps].sort(
@@ -357,7 +380,7 @@ function reportedRows(
       key: `reported:${index}:${step.stepId}`,
       title: `${index + 1} · ${titles.get(step.stepId) ?? `Step ${index + 1}`}`,
       state,
-      sub: trackerSub(state, [step], run, clock),
+      sub: trackerSub(state, [step], run, clock, decision),
     };
   });
   if (run.status === "pending" || run.status === "running") {
@@ -418,12 +441,36 @@ export function runLabel(id: string): string {
 export type HeldDecision =
   "pending" | "approved" | "rejected" | "closed" | "unknown";
 
+/** What a client needs of an approval to know which is a job's newest. */
+type ApprovalOf = { runId: string; status: string; createdAt?: string };
+
+/**
+ * A job's newest approval, by when it was asked (Build 24, P9): a job is its
+ * first run (backend ADR-0044), so every approval it ever asked names that
+ * one id, and the one asked last is the one that counts. Of two asked at the
+ * same moment, the one listed last.
+ */
+export function newestApproval<T extends ApprovalOf>(
+  runId: string,
+  approvals: readonly T[],
+): T | undefined {
+  const asked = (approval: T) =>
+    approval.createdAt ? at(approval.createdAt) : Number.NEGATIVE_INFINITY;
+  return approvals
+    .filter((candidate) => candidate.runId === runId)
+    .reduce<T | undefined>(
+      (newest, candidate) =>
+        !newest || asked(candidate) >= asked(newest) ? candidate : newest,
+      undefined,
+    );
+}
+
 export function heldDecision(
   run: { id: string; status: RunStatus },
-  approvals: readonly { runId: string; status: string }[],
+  approvals: readonly ApprovalOf[],
 ): HeldDecision | null {
   if (run.status !== "held") return null;
-  const approval = approvals.find((candidate) => candidate.runId === run.id);
+  const approval = newestApproval(run.id, approvals);
   if (!approval) return "unknown";
   if (approval.status === "pending") return "pending";
   if (approval.status === "approved") return "approved";
@@ -434,7 +481,7 @@ export function heldDecision(
 const HELD_DECISION_LINE: Record<HeldDecision, string> = {
   pending: "Waiting for approval",
   approved: "Approved — continued in a new run",
-  rejected: "Rejected",
+  rejected: "Denied.",
   closed: "No longer awaiting approval",
   unknown: "Held for review",
 };
@@ -451,7 +498,7 @@ export function runResultLine(
     resultSummary?: string;
     failureReason?: string;
   },
-  approvals: readonly { runId: string; status: string }[],
+  approvals: readonly ApprovalOf[],
 ): string | null {
   if (run.status === "succeeded") return run.resultSummary ?? null;
   if (run.status === "failed") return run.failureReason ?? null;

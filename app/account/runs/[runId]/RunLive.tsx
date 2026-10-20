@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { CircleDashedIcon } from "@phosphor-icons/react/dist/ssr/CircleDashed";
 import { CircleNotchIcon } from "@phosphor-icons/react/dist/ssr/CircleNotch";
@@ -15,6 +16,7 @@ import { BackLink } from "@/components/dashboard/BackLink";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
+import { ApprovalDecision } from "@/app/account/approvals/ApprovalDecision";
 import type { Approval, RunDetail, RunOrigin } from "@/lib/automations";
 import { formatDateTimeMediumUTC as formatWhen } from "@/lib/date";
 import { flowPath } from "@/lib/flow-steps";
@@ -66,27 +68,39 @@ export type RunFlow = {
 } | null;
 
 /**
+ * A held job's approval while it waits, and whether this person may decide it
+ * — the approval's eligible roles against their role, as Approvals reads it.
+ */
+export type RunDecision = { approval: Approval; canDecide: boolean } | null;
+
+/**
  * One run, live (Build 21, spec A7; the owner's build 20 item 10: "It shoukd
  * show all the steps and a live tracker of which ones are done"): its full id
  * and status; how it went; Duration and Steps done; every step from the start,
- * each where the run is; each document it read on a card of its own, with
+ * each where the run is — a held step with Approve and Deny under it (Build 24,
+ * P6); each document it read on a card of its own, with
  * Download JSON; the facts; Cancel run while it goes on, and View flow. Read
  * again every 2 s while the run is pending or running (`RUN_REREAD_MS`),
  * through `/api/platform`, one read at a time; the page as the server drew it
- * comes back whenever it is drawn again (a cancel revalidates it).
+ * comes back whenever it is drawn again (a cancel or a decision revalidates
+ * it).
  */
 export function RunLive({
   workspaceId,
   initial,
   flow,
   approvals,
+  decision,
 }: {
   workspaceId: string;
   initial: RunDetail;
   flow: RunFlow;
-  /** A held run's approval, read once: what became of it. */
+  /** A held job's approvals, read once: what became of them. */
   approvals: Approval[];
+  /** Its approval while it waits: step 4's Approve and Deny. */
+  decision: RunDecision;
 }) {
+  const router = useRouter();
   const [detail, setDetail] = useState(initial);
   const [drawn, setDrawn] = useState(initial);
   // The server drew the page again (a cancel, a refresh): its answer wins.
@@ -129,6 +143,7 @@ export function RunLive({
   // steps it reported. ~~Only a run of the catalog's own version drawn by its
   // groups~~ until Build 22. Step 2 says the flow's integration, step 4's title
   // follows it, step 5 is the run's email.
+  const decided = heldDecision(run, approvals);
   const tracker = trackerRows(
     steps,
     flow?.pipeline,
@@ -136,9 +151,8 @@ export function RunLive({
     run,
     undefined,
     flow?.pipeline,
-    { flow: flow?.tracker, email: detail.email },
+    { flow: flow?.tracker, email: detail.email, decision: decided },
   );
-  const decided = heldDecision(run, approvals);
   const cards = toDocumentCards(
     documents,
     decided === "rejected"
@@ -239,7 +253,29 @@ export function RunLive({
         </h2>
         <ol data-testid="run-steps" className="mt-4 flex flex-col gap-4">
           {tracker.map((row) => (
-            <TrackerItem key={row.key} row={row} />
+            <TrackerItem key={row.key} row={row}>
+              {/* The decision where the job waits (Build 24, P6): one press,
+                  then the page is drawn again — running on, or Denied. */}
+              {row.state === "held" &&
+              decided === "pending" &&
+              decision?.approval.status === "pending" ? (
+                decision.canDecide ? (
+                  <ApprovalDecision
+                    approvalId={decision.approval.id}
+                    canDecide
+                    workspaceId={workspaceId}
+                    onDecision={(_, state) => {
+                      if (state === "saved") router.refresh();
+                    }}
+                  />
+                ) : (
+                  <p className="text-xs text-[var(--muted)]">
+                    Only {decision.approval.eligibleRoles.join(" or ")} can
+                    decide this.
+                  </p>
+                )
+              ) : null}
+            </TrackerItem>
           ))}
         </ol>
       </section>
@@ -374,13 +410,19 @@ const STATE_LOOK: Record<
 /**
  * One row of Steps: "3 · AI processing", its state's icon (24) and its state
  * in words — Waiting, Working… (its icon spinning), Done and when, Waiting for
- * approval and why, the run's failure, Skipped or Stopped; a setting step's
- * integration; step 5's Email sent and when, Sending email… or Done (Build
- * 23's A7, `lib/run-progress.ts`) — never a step's own summary
+ * approval and why, Denied, the run's failure, Skipped or Stopped; a setting
+ * step's integration; step 5's Email sent and when, Sending email… or Done
+ * (Build 23's A7, `lib/run-progress.ts`) — never a step's own summary
  * and never a step id (B6). A platform step this build does not know has no
- * state, so no line.
+ * state, so no line. Under it, what the row offers: a held step's decision.
  */
-function TrackerItem({ row }: { row: TrackerRow }) {
+function TrackerItem({
+  row,
+  children,
+}: {
+  row: TrackerRow;
+  children?: ReactNode;
+}) {
   const { Icon, tone, motion } = STATE_LOOK[row.state];
   const quiet =
     row.state === "waiting" ||
@@ -411,6 +453,7 @@ function TrackerItem({ row }: { row: TrackerRow }) {
             {row.sub}
           </p>
         ) : null}
+        {children ? <div className="mt-2">{children}</div> : null}
       </div>
     </li>
   );

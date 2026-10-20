@@ -43,6 +43,16 @@ separate, confirmed owner-or-admin intent that names the exact connection it
 replaces (backend ADR-0019 §4, ADR-0026). A grant that already holds what the
 provider asks for is reused without consent, and the page says so.
 
+## Runs and approvals
+
+A held job is decided where it waits: step 4 of its run page offers the one
+Approve and Deny pair (`app/account/approvals/ApprovalDecision.tsx`, Deny the
+danger variant) to a role the job's newest approval names, and says who can
+otherwise; a decision draws the run page again (the action revalidates it by
+the job id the platform answers with). On Approvals a decided row fades and
+folds away, its pill saying the decision, and the last one leaving goes to
+Activity; under reduced motion it leaves at once.
+
 ## Container and operations
 
 The Docker image uses Next standalone output and the non-root `nextjs` user.

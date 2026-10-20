@@ -2727,19 +2727,18 @@ test("on a phone, a run's page is no wider than the screen: its title, the full 
   ).toBeLessThanOrEqual(0);
 });
 
-test("a held run's document whose approval was refused reads Not approved, and the run its decision; the group it waits in says why (spec A7; S21)", async ({
+test("a held run's document whose approval was refused reads Not approved, and the run its decision; the group it waited in says Denied (spec A7; S21; Build 24's P6, S6)", async ({
   page,
 }) => {
   await page.goto("/account/runs/fixture-run-invoice-held");
   const main = page.locator("main");
-  await expect(main.getByTestId("run-result")).toHaveText("Rejected");
+  await expect(main.getByTestId("run-result")).toHaveText("Denied.");
   await expect(main.getByTestId("document-1-chip")).toHaveText("Saved");
   await expect(main.getByTestId("document-2-chip")).toHaveText("Not approved");
   const record = main.getByTestId("run-step-group:record");
   await expect(record).toHaveAttribute("data-state", "held");
-  await expect(record).toContainText(
-    "Waiting for approval: Document 2: the total can't be read.",
-  );
+  await expect(record).toContainText("Denied");
+  await expect(record).not.toContainText("Waiting for approval");
   // Step 5 waits: the approval's email never checks it (Build 23's A7).
   const email = main.getByTestId("run-step-group:email");
   await expect(email).toHaveAttribute("data-state", "waiting");
