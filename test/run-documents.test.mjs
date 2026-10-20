@@ -13,7 +13,6 @@ import {
   documentMoney,
   documentTime,
   formatFor,
-  formatLabel,
   packageAvailable,
   packageFileHref,
   packageRetryWaitMs,
@@ -309,38 +308,9 @@ test('cards come in the file\'s order, each "Invoice i of n" whatever its type �
   assert.deepEqual(toDocumentCards(undefined), []);
 });
 
-test("a file's format in a word: PDF, JPEG, PNG, HEIC, else the subtype in capitals — parameters and case aside (P10)", () => {
-  assert.deepEqual(
-    [
-      "application/pdf",
-      "image/jpeg",
-      "image/png",
-      "image/heic",
-      "IMAGE/JPEG",
-      "application/pdf; charset=binary",
-      "image/webp",
-      "image/tiff",
-      "text/csv",
-      "octet",
-    ].map(formatLabel),
-    [
-      "PDF",
-      "JPEG",
-      "PNG",
-      "HEIC",
-      "JPEG",
-      "PDF",
-      "WEBP",
-      "TIFF",
-      "CSV",
-      "OCTET",
-    ],
-  );
-});
-
 test("a document's Format: its own file's (source.file), else the job's only file's, else none (P10)", () => {
-  const pdf = { id: "f-pdf", contentType: "application/pdf" };
-  const png = { id: "f-png", contentType: "image/png" };
+  const pdf = { id: "f-pdf", contentType: "application/pdf", format: "PDF" };
+  const png = { id: "f-png", contentType: "image/png", format: "PNG" };
   // Its own file, among two.
   assert.equal(formatFor({ source: { file: "f-png" } }, [pdf, png]), "PNG");
   assert.equal(
@@ -356,10 +326,17 @@ test("a document's Format: its own file's (source.file), else the job's only fil
   assert.equal(formatFor({ source: { file: "gone" } }, [pdf, png]), null);
   assert.equal(formatFor({}, undefined), null);
   assert.equal(formatFor({}, []), null);
+  // The platform's word, as given — never this site's reading of the type.
+  const webp = {
+    id: "f-webp",
+    contentType: "application/octet-stream",
+    format: "WEBP",
+  };
+  assert.equal(formatFor({ source: { file: "f-webp" } }, [webp]), "WEBP");
 });
 
 test("closed, a card says its heading, its chip and {vendor} · {total} (S9); open, it starts with Document type and Format — the row left out when the format is not known (P10)", () => {
-  const files = [{ id: "f-1", contentType: "image/jpeg" }];
+  const files = [{ id: "f-1", contentType: "image/jpeg", format: "JPEG" }];
   const card = toDocumentCard(doc(), 3, null, files);
   assert.equal(card.glance, "Lowe's · $17.19");
   assert.deepEqual(card.facts, [

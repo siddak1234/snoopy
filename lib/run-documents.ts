@@ -1,3 +1,4 @@
+import type { components } from "@/lib/generated/platform-contracts/automations";
 /**
  * A run's documents, as the run page's Documents cards draw them (Build 21,
  * spec A7; backend ADR-0039 — `RunDocument`, the one shape at every hop). The
@@ -80,7 +81,10 @@ export type RunDocument = {
 };
 
 /** `RunFile` as the contract publishes it: one file uploaded for the job — what a document's Format is read from. */
-export type RunFile = { id: string; contentType: string };
+export type RunFile = Pick<
+  components["schemas"]["RunFile"],
+  "id" | "contentType" | "format"
+>;
 
 const MONTHS = [
   "Jan",
@@ -160,27 +164,11 @@ export function documentOf(index: number, count: number): string {
   return `Invoice ${index} of ${count}`;
 }
 
-/** The formats said by name; any other is its content type's subtype in capitals. */
-const FORMAT_WORDS: Readonly<Record<string, string>> = {
-  "application/pdf": "PDF",
-  "image/jpeg": "JPEG",
-  "image/png": "PNG",
-  "image/heic": "HEIC",
-};
-
-/**
- * A file's format in a word (Build 24, P10): PDF, JPEG, PNG, HEIC, else the
- * content type's subtype in capitals ("image/webp" → "WEBP"); parameters and
- * case are not part of it.
- */
-export function formatLabel(contentType: string): string {
-  const type = contentType.split(";")[0]!.trim().toLowerCase();
-  return FORMAT_WORDS[type] ?? (type.split("/")[1] ?? type).toUpperCase();
-}
-
 /**
  * A document's Format: its own file's (`source.file`), else the job's only
- * file's, else none — the row is then left out (Build 24, P10).
+ * file's, else none — the row is then left out (Build 24, P10). The word is the
+ * platform's (`RunFile.format`: PDF, JPEG, PNG or HEIC, else the subtype in
+ * capitals), shown as given: one source for both clients, no mapping here.
  */
 export function formatFor(
   document: Pick<RunDocument, "source">,
@@ -191,7 +179,7 @@ export function formatFor(
     ? list.find((file) => file.id === document.source!.file)
     : undefined;
   const file = own ?? (list.length === 1 ? list[0] : undefined);
-  return file ? formatLabel(file.contentType) : null;
+  return file ? file.format : null;
 }
 
 function grouped(digits: string): string {

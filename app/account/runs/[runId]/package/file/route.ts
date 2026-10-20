@@ -46,7 +46,7 @@ function safeFilename(name: string): string {
 /** An IANA zone's spelling; the platform reads any other as UTC. */
 const TIME_ZONE = /^[A-Za-z0-9_+\-/]{1,64}$/u;
 
-const COULD_NOT_SHOW = "Could not show the package. Try again.";
+const COULD_NOT_SHOW = "Could not open the package. Try again.";
 
 function said(status: number, words: string): Response {
   return new Response(words, {
