@@ -6,6 +6,7 @@ import {
   EMPTY,
   groupState,
   heldDecision,
+  newestApproval,
   runDuration,
   runLabel,
   runResultLine,
@@ -130,11 +131,29 @@ for (const [name, run, reported, states] of [
     steps(["receive", "ok"]),
     ["done", "stopped", "stopped", "stopped"],
   ],
+  // A job is its first run (Build 24, P9; backend ADR-0044): held, approved
+  // and done, its whole timeline in one list — the held step done once it
+  // went on. ~~A continuation's groups before its first step done~~.
   [
-    "a continuation: the groups before its first step done",
+    "a job approved and done: its whole timeline, one list",
+    { status: "succeeded" },
+    steps(
+      ["receive", "ok"],
+      ["extract", "ok"],
+      ["check-documents", "ok"],
+      ["decide", "ok"],
+      ["ask-approval", "held"],
+      ["confirm-company", "ok"],
+      ["create-approved-records", "ok"],
+    ),
+    ["done", "done", "done", "done"],
+  ],
+  // Its continuation's steps alone are no longer a job's whole story.
+  [
+    "only a continuation's steps: what they say, and no more",
     { status: "succeeded", origin: "approval-continuation" },
     steps(["confirm-company", "ok"], ["create-approved-records", "ok"]),
-    ["done", "done", "done", "done"],
+    ["skipped", "skipped", "skipped", "done"],
   ],
 ]) {
   test(`the tracker, every group from the start: ${name}`, () => {
@@ -357,7 +376,8 @@ test("a run is named by its FULL id — never the request id, never the first ei
     "app/account/runs/[runId]/RunLive.tsx",
     "app/account/runs/page.tsx",
     "app/account/page.tsx",
-    "app/account/approvals/page.tsx",
+    // Approvals' rows (Build 24, P7: they leave as they are decided).
+    "app/account/approvals/ApprovalDecision.tsx",
   ]) {
     assert.match(read(path), /runLabel\(/u, path);
   }
@@ -367,6 +387,7 @@ test("a run is named by its FULL id — never the request id, never the first ei
     "app/account/runs/page.tsx",
     "app/account/page.tsx",
     "app/account/approvals/page.tsx",
+    "app/account/approvals/ApprovalDecision.tsx",
   ]) {
     const source = read(path);
     assert.doesNotMatch(source, /\.requestId|slice\(0, 8\)/u, path);
@@ -398,11 +419,15 @@ test("the time a step was done, its duration and its result line, in the app's w
     runResultLine(held, approval("pending")),
     "Waiting for approval.",
   );
-  assert.equal(
-    runResultLine(held, approval("approved")),
-    "Approved — continued in a new run",
+  // The job goes on under its own id (ADR-0044): ~~"Approved — continued in
+  // a new run"~~ until Build 24.
+  assert.equal(runResultLine(held, approval("approved")), "Approved");
+  assert.doesNotMatch(
+    read("lib/run-progress.ts").replace(/~~[\s\S]*?~~/gu, ""),
+    /continued in a new run/u,
   );
-  assert.equal(runResultLine(held, approval("rejected")), "Rejected");
+  // Denied (Build 24, P6; the session's S6: the owner's word), ~~Rejected~~.
+  assert.equal(runResultLine(held, approval("rejected")), "Denied");
   assert.equal(
     runResultLine(held, approval("expired")),
     "No longer awaiting approval",
@@ -590,6 +615,131 @@ test("a held v4 run: step 4 waits for approval and says why, step 5 Waiting — 
   );
 });
 
+test("a held job's step 4 says why it waits until its approval is denied, then Denied — the run as reported, and drawn by what it reported too (Build 24, P6; S6)", () => {
+  const reported = [
+    ...ran("receive", "extract", "decide"),
+    {
+      stepId: "ask-approval",
+      outcome: "held",
+      summary: "held said",
+      heldReason: "Document 2: the total can't be read.",
+      occurredAt: "2026-10-17T14:35:00.000Z",
+    },
+  ];
+  const rows = (decision) =>
+    trackerRows(
+      reported,
+      V4.pipeline,
+      V4.groups,
+      { status: "held" },
+      timeOfDay,
+      V4.pipeline,
+      { flow: quickbooksFlow, decision },
+    );
+  assert.equal(
+    rows("pending")[3].sub,
+    "Waiting for approval: Document 2: the total can't be read.",
+  );
+  assert.deepEqual(
+    [rows("rejected")[3].state, rows("rejected")[3].sub],
+    ["held", "Denied"],
+  );
+  assert.equal(
+    rows(null)[3].sub,
+    "Waiting for approval: Document 2: the total can't be read.",
+  );
+  // A run of another version, drawn by what it reported, says it too.
+  const older = trackerRows(
+    [
+      ...ran("receive", "check-document"),
+      { ...reported[3], stepId: "ask-approval" },
+    ],
+    V4.pipeline,
+    V4.groups,
+    { status: "held" },
+    timeOfDay,
+    V4.pipeline,
+    { decision: "rejected" },
+  );
+  assert.equal(older.at(-1).sub, "Denied");
+});
+
+test("a job's newest approval decides — by when it was asked, whatever the list's order; the job is its first run, so every approval names its id (Build 24, P9; backend ADR-0044)", () => {
+  const job = { id: "job-1", status: "held" };
+  const asked = (status, minute, runId = "job-1") => ({
+    runId,
+    status,
+    createdAt: `2026-10-17T14:${String(minute).padStart(2, "0")}:00.000Z`,
+  });
+  // Approved once, held again later: the second approval is the one waiting.
+  const approvals = [asked("approved", 10), asked("pending", 40)];
+  assert.equal(heldDecision(job, approvals), "pending");
+  assert.equal(heldDecision(job, [...approvals].reverse()), "pending");
+  assert.equal(
+    runResultLine(job, [asked("pending", 5), asked("rejected", 50)]),
+    "Denied",
+  );
+  // Another job's approval is never this one's.
+  assert.equal(
+    heldDecision(job, [asked("rejected", 59, "job-2"), asked("pending", 1)]),
+    "pending",
+  );
+  assert.equal(
+    newestApproval("job-1", [asked("pending", 1, "job-2")]),
+    undefined,
+  );
+  assert.equal(heldDecision(job, []), "unknown");
+  // Two asked at the same moment: the one listed first — the platform lists
+  // newest first, and the app's jobApproval picks it too.
+  assert.equal(
+    heldDecision(job, [asked("approved", 30), asked("pending", 30)]),
+    "approved",
+  );
+});
+
+test("a job whose steps 1–5 come in one list draws 5 done — the held step among them, done once the job went on; while it goes on after its approval, step 4 is working (Build 24, P9; ADR-0044)", () => {
+  const timeline = [
+    ...ran("receive", "extract", "decide"),
+    {
+      stepId: "ask-approval",
+      outcome: "held",
+      summary: "held said",
+      heldReason: "Document 2: the total can't be read.",
+      occurredAt: "2026-10-17T14:35:00.000Z",
+    },
+    {
+      stepId: "confirm-company",
+      outcome: "ok",
+      summary: "said",
+      occurredAt: "2026-10-17T14:50:00.000Z",
+    },
+  ];
+  const done = v4Rows(
+    [
+      ...timeline,
+      {
+        stepId: "save-approved",
+        outcome: "ok",
+        summary: "said",
+        occurredAt: "2026-10-17T14:51:00.000Z",
+      },
+    ],
+    { status: "succeeded", origin: "manual" },
+    { status: "sent", sentAt: "2026-10-17T14:52:00.000Z" },
+  );
+  assert.deepEqual(
+    done.map((row) => row.state),
+    ["done", "done", "done", "done", "done"],
+  );
+  assert.equal(stepsDone(done), "5 / 5");
+  assert.equal(done[3].sub, "Done · 2:51 PM");
+  const going = v4Rows(timeline, { status: "running" });
+  assert.equal(going[3].state, "working");
+  // Still held: held, and why.
+  const held = v4Rows(timeline.slice(0, 4), { status: "held" });
+  assert.equal(held[3].state, "held");
+});
+
 test("None: step 2 says None, step 4 Details saved; a flow that could not be read — step 2 Done, step 4 its own title (S23; the app's M6)", () => {
   const none = v4Rows(ran("receive"), { status: "running" }, undefined, {
     titles: { record: "Details saved" },
@@ -671,7 +821,7 @@ test("the run page draws the tracker's rows and words alone — never a step's s
   assert.doesNotMatch(live, /templateVersion|declaredFor/u);
   assert.match(
     live,
-    /trackerRows\(\s*steps,\s*flow\?\.pipeline,\s*flow\?\.groups,\s*run,\s*undefined,\s*flow\?\.pipeline,\s*\{ flow: flow\?\.tracker, email: detail\.email \},\s*\);/u,
+    /trackerRows\(\s*steps,\s*flow\?\.pipeline,\s*flow\?\.groups,\s*run,\s*undefined,\s*flow\?\.pipeline,\s*\{ flow: flow\?\.tracker, email: detail\.email, decision: decided \},\s*\);/u,
   );
   const page = read("app/account/runs/[runId]/page.tsx");
   assert.match(page, /stepTitle\(group, setup, subscription\.config\)/u);

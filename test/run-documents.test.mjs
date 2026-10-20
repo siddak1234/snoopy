@@ -3,12 +3,19 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 import {
+  DOWNLOAD_EXCEL,
   DOWNLOAD_FAILED,
-  DOWNLOAD_JSON,
+  DOWNLOAD_PDF,
+  PACKAGE_UNAVAILABLE,
+  RUN_PACKAGE_MAXIMUM_BYTES,
+  VIEW_PACKAGE,
   documentDate,
   documentMoney,
   documentTime,
-  documentsFileName,
+  formatFor,
+  packageAvailable,
+  packageFileHref,
+  packageRetryWaitMs,
   toDocumentCard,
   toDocumentCards,
 } from "../lib/run-documents.ts";
@@ -19,7 +26,7 @@ import {
  * get a json out that clearly seperates accordingly … cu price, location, and
  * more should be there", and AM7: "ensure invoice number, bill number, or
  * another standard practice from vendors is part of the json schema output").
- * The same tables as the app's (snoopy-mobile `__tests__/build21-views.test.ts`),
+ * The same tables as the app's (`snoopy-mobile/__tests__/build21-views.test.ts`),
  * so a document reads the same in both clients.
  */
 
@@ -172,7 +179,7 @@ test('every line: its description, its amount, and "{quantity} × {unit price}" 
     { description: "—", amount: null, each: null },
   ]);
   assert.equal(card.moreLines, true);
-  assert.equal(card.heading, "Document 1 of 2");
+  assert.equal(card.heading, "Invoice 1 of 2");
 });
 
 test("the rows: totals, the discount as taken off, how it was paid, the result, then the automation's own lines", () => {
@@ -287,36 +294,153 @@ test("every type in words, the seller beside it, its place by the parts printed"
   assert.equal(toDocumentCard(doc(), 1).when, "Oct 14, 2026 · 2:32 PM");
 });
 
-test('cards come in the file\'s order, each "Document i of n"', () => {
+test('cards come in the file\'s order, each "Invoice i of n" whatever its type — ~~"Document i of n"~~ until Build 24 (P10)', () => {
   const cards = toDocumentCards([
     doc({ index: 3 }),
-    doc({ index: 1 }),
+    doc({ index: 1, type: "bill" }),
     doc({ index: 2 }),
   ]);
   assert.deepEqual(
     cards.map((card) => card.heading),
-    ["Document 1 of 3", "Document 2 of 3", "Document 3 of 3"],
+    ["Invoice 1 of 3", "Invoice 2 of 3", "Invoice 3 of 3"],
   );
+  assert.equal(cards[1].heading, "Invoice 2 of 3");
   assert.deepEqual(toDocumentCards(undefined), []);
 });
 
-test("Download JSON: the platform's file, saved as run-{the full id}.json, through /api/platform; a refusal said in the session's words", () => {
-  const id = "793eef82-102d-81be-a2d3-9e8d4e2b2c36";
-  assert.equal(documentsFileName(id), `run-${id}.json`);
-  assert.equal(DOWNLOAD_JSON, "Download JSON");
+test("a document's Format: its own file's (source.file), else the job's only file's, else none (P10)", () => {
+  const pdf = { id: "f-pdf", contentType: "application/pdf", format: "PDF" };
+  const png = { id: "f-png", contentType: "image/png", format: "PNG" };
+  // Its own file, among two.
+  assert.equal(formatFor({ source: { file: "f-png" } }, [pdf, png]), "PNG");
+  assert.equal(
+    formatFor({ source: { file: "f-pdf", pages: [1, 2] } }, [pdf, png]),
+    "PDF",
+  );
+  // No source (v5): the job's only file.
+  assert.equal(formatFor({}, [png]), "PNG");
+  // A source the job's files do not hold, and one file: that one.
+  assert.equal(formatFor({ source: { file: "gone" } }, [pdf]), "PDF");
+  // None to tell by: two files and no source, or no files at all.
+  assert.equal(formatFor({}, [pdf, png]), null);
+  assert.equal(formatFor({ source: { file: "gone" } }, [pdf, png]), null);
+  assert.equal(formatFor({}, undefined), null);
+  assert.equal(formatFor({}, []), null);
+  // The platform's word, as given — never this site's reading of the type.
+  const webp = {
+    id: "f-webp",
+    contentType: "application/octet-stream",
+    format: "WEBP",
+  };
+  assert.equal(formatFor({ source: { file: "f-webp" } }, [webp]), "WEBP");
+});
+
+test("closed, a card says its heading, its chip and {vendor} · {total} (S9); open, it starts with Document type and Format — the row left out when the format is not known (P10)", () => {
+  const files = [{ id: "f-1", contentType: "image/jpeg", format: "JPEG" }];
+  const card = toDocumentCard(doc(), 3, null, files);
+  assert.equal(card.glance, "Lowe's · $17.19");
+  assert.deepEqual(card.facts, [
+    { label: "Document type", value: "Receipt" },
+    { label: "Format", value: "JPEG" },
+  ]);
+  assert.deepEqual(toDocumentCard(doc({ type: "bill" }), 1).facts, [
+    { label: "Document type", value: "Bill" },
+  ]);
+  assert.equal(
+    toDocumentCard(
+      doc({
+        vendor: { name: null, address: null, city: null, storeNumber: null },
+      }),
+      1,
+    ).glance,
+    "$17.19",
+  );
+  assert.equal(
+    toDocumentCard(doc({ total: null, vendor: { ...doc().vendor } }), 1).glance,
+    "Lowe's",
+  );
+  assert.equal(
+    toDocumentCard(
+      doc({
+        total: null,
+        vendor: { name: null, address: null, city: null, storeNumber: null },
+      }),
+      1,
+    ).glance,
+    null,
+  );
+  // Every card is given the job's files.
+  assert.deepEqual(
+    toDocumentCards([doc({ index: 1 }), doc({ index: 2 })], null, files).map(
+      (each) => each.facts.at(-1),
+    ),
+    [
+      { label: "Format", value: "JPEG" },
+      { label: "Format", value: "JPEG" },
+    ],
+  );
+});
+
+test("the run package's words, the app's (Build 24, P12; ~~Download JSON~~ until then); offered once the job has documents and has ended or is held", () => {
+  assert.equal(VIEW_PACKAGE, "View package");
+  assert.equal(DOWNLOAD_PDF, "Download PDF");
+  assert.equal(DOWNLOAD_EXCEL, "Download Excel");
   assert.equal(DOWNLOAD_FAILED, "Could not download. Try again.");
+  assert.equal(PACKAGE_UNAVAILABLE, "This run has no package yet.");
+  const documents = [doc()];
+  assert.equal(packageAvailable("succeeded", documents), true);
+  assert.equal(packageAvailable("held", documents), true);
+  assert.equal(packageAvailable("failed", documents), true);
+  assert.equal(packageAvailable("running", documents), false);
+  assert.equal(packageAvailable("pending", documents), false);
+  assert.equal(packageAvailable("succeeded", []), false);
+  assert.equal(packageAvailable("succeeded", undefined), false);
+});
+
+test("the platform busy building others: asked once more after its retry-after (2 s when none, not past 10 s); the frame's route by the job's id and the browser's zone; the platform's 32 MB bound, as MiB (P12)", () => {
+  assert.deepEqual([undefined, 0, 1, 5, 10, 11, 300].map(packageRetryWaitMs), [
+    2_000,
+    0,
+    1_000,
+    5_000,
+    10_000,
+    null,
+    null,
+  ]);
+  assert.equal(
+    packageFileHref("fixture-run-invoice", "America/Chicago"),
+    "/account/runs/fixture-run-invoice/package/file?timeZone=America%2FChicago",
+  );
+  assert.equal(
+    packageFileHref("a b", null),
+    "/account/runs/a%20b/package/file",
+  );
+  assert.equal(RUN_PACKAGE_MAXIMUM_BYTES, 26_214_400);
+});
+
+test("Download PDF and Download Excel: the platform's link, asked through /api/platform in the browser's zone with a key, then followed — a busy platform asked once more, a refusal said; never a hand-written fetch, and Download JSON gone (P12)", () => {
   const live = read("app/account/runs/[runId]/RunLive.tsx");
   assert.match(
     live,
-    /platformApiFile\(\s*`\/v1\/workspaces\/\$\{encodeURIComponent\(workspaceId\)\}\/runs\/\$\{encodeURIComponent\(run\.id\)\}\/documents`,?\s*\)/u,
+    /platformApiJson<RunPackageFile>\(\s*`\/v1\/workspaces\/\$\{encodeURIComponent\(workspaceId\)\}\/runs\/\$\{encodeURIComponent\(runId\)\}\/package`,\s*\{\s*method: "POST",\s*headers: \{\s*"content-type": "application\/json",\s*"idempotency-key": `run-package-\$\{format\}-\$\{crypto\.randomUUID\(\)\}`,/u,
   );
-  assert.match(live, /anchor\.download = documentsFileName\(run\.id\);/u);
-  assert.match(live, /setDownloadError\(DOWNLOAD_FAILED\);/u);
-  // Offered only when the run has documents.
+  assert.match(live, /\.\.\.\(zone \? \{ timeZone: zone \} : \{\}\)/u);
+  assert.match(live, /window\.location\.assign\(file\.downloadUrl\);/u);
   assert.match(
     live,
-    /\{cards\.length > 0 \? \(\s*<Button[\s\S]*?\{DOWNLOAD_JSON\}/u,
+    /error instanceof PlatformApiError && error\.status === 503\s*\? packageRetryWaitMs\(error\.retryAfterSeconds\)\s*: null;\s*if \(wait === null\) throw error;\s*await new Promise\(\(resolve\) => setTimeout\(resolve, wait\)\);\s*return ask\(\);/u,
   );
-  // Through the browser's one path to the platform, never a hand-written fetch.
+  assert.match(live, /setError\(DOWNLOAD_FAILED\);/u);
+  // Offered once the job can be packaged, with View package on the run page.
+  assert.match(
+    live,
+    /\{packageAvailable\(run\.status, documents\) \? \(\s*<PackageActions workspaceId=\{workspaceId\} runId=\{run\.id\} view \/>/u,
+  );
+  // Gone, but in the struck-through history of its comments.
+  assert.doesNotMatch(
+    live.replace(/~~[\s\S]*?~~/gu, ""),
+    /Download JSON|DOWNLOAD_JSON|documentsFileName/u,
+  );
   assert.doesNotMatch(live, /\bfetch\(/u);
+  assert.doesNotMatch(read("lib/platform-api.ts"), /platformApiFile/u);
 });

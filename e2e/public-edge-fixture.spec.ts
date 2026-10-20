@@ -2556,7 +2556,7 @@ test("a flow still on v1, whose QuickBooks the catalog's newer version makes opt
   expect(response?.status()).toBe(404);
 });
 
-test("a finished run of three receipts: its full id, every step done, each receipt on its own card — seller, place, numbers, lines, totals — and Download JSON gives the platform's file by that id (spec A7, A8; the owner's ~04:05Z and AM7)", async ({
+test("a finished run of three receipts: its full id, every step done, each receipt on its own card — seller, place, numbers, lines, totals — and the package's buttons, no Download JSON (spec A7, A8; the owner's ~04:05Z and AM7; Build 24's P12)", async ({
   page,
 }) => {
   await page.goto("/account/runs/fixture-run-invoice");
@@ -2599,10 +2599,27 @@ test("a finished run of three receipts: its full id, every step done, each recei
   ]) {
     await expect(main).not.toContainText(gone);
   }
-  const cards = main.getByRole("article");
+  // Each a closed row that opens in place (Build 24, P10): "Invoice n of 3",
+  // its chip and {vendor} · {total} (S9); open, it starts with its Document
+  // type and Format — the job's one photo, JPEG. Each opens on its own.
+  const cards = main.locator("details[data-testid^='document-']");
   await expect(cards).toHaveCount(3);
-  await expect(cards.nth(0)).toHaveAccessibleName("Document 1 of 3");
+  for (const card of await cards.all())
+    await expect(card).not.toHaveAttribute("open");
+  await expect(cards.nth(0).locator("summary")).toContainText("Invoice 1 of 3");
+  await expect(main.getByTestId("document-1-glance")).toHaveText(
+    "Lowe's · $17.19",
+  );
   await expect(main.getByTestId("document-1-chip")).toHaveText("Saved");
+  await expect(main.getByTestId("document-2-line-1")).toBeHidden();
+  await cards.nth(1).locator("summary").click();
+  await expect(cards.nth(1)).toHaveAttribute("open");
+  await expect(cards.nth(0)).not.toHaveAttribute("open");
+  await expect(cards.nth(2)).not.toHaveAttribute("open");
+  await expect(main.getByTestId("document-2-line-1")).toBeVisible();
+  await expect(main.getByTestId("document-1-line-1")).toBeHidden();
+  await expect(cards.nth(1)).toContainText("Document typeReceipt");
+  await expect(cards.nth(1)).toContainText("FormatJPEG");
   for (const words of [
     "Receipt · Lowe's",
     "2150 W Shaw Ave, Fresno, CA 93711 · Store 1234",
@@ -2648,32 +2665,18 @@ test("a finished run of three receipts: its full id, every step done, each recei
     FLOWS.invoice,
   );
   await expectNoAxeViolations(page);
-  const [download] = await Promise.all([
-    page.waitForEvent("download"),
-    main.getByRole("button", { name: "Download JSON" }).click(),
-  ]);
-  expect(download.suggestedFilename()).toBe("run-fixture-run-invoice.json");
-  const file = JSON.parse(
-    await new Promise<string>((resolve, reject) => {
-      download
-        .createReadStream()
-        .then((stream) => {
-          const chunks: Buffer[] = [];
-          stream.on("data", (chunk: Buffer) => chunks.push(chunk));
-          stream.on("end", () =>
-            resolve(Buffer.concat(chunks).toString("utf8")),
-          );
-          stream.on("error", reject);
-        })
-        .catch(reject);
-    }),
+  // The package's three (Build 24, P12; their own test is in
+  // account-surfaces.spec.ts): ~~Download JSON~~ until Build 24.
+  await expect(main.getByRole("link", { name: "View package" })).toBeVisible();
+  await expect(
+    main.getByRole("button", { name: "Download PDF" }),
+  ).toBeVisible();
+  await expect(
+    main.getByRole("button", { name: "Download Excel" }),
+  ).toBeVisible();
+  await expect(main.getByRole("button", { name: "Download JSON" })).toHaveCount(
+    0,
   );
-  expect(file.runId).toBe("fixture-run-invoice");
-  expect(
-    file.documents.map(
-      (document: { vendor: { name: string } }) => document.vendor.name,
-    ),
-  ).toEqual(["Lowe's", "The Home Depot", "Shell"]);
 });
 
 test("a run is named by its full id, never its request id; a run of an older version is drawn by what it reported — never '34 accounts read' — its failure on its last step (spec A7, A8; run 793eef82 as it ran)", async ({
@@ -2727,19 +2730,22 @@ test("on a phone, a run's page is no wider than the screen: its title, the full 
   ).toBeLessThanOrEqual(0);
 });
 
-test("a held run's document whose approval was refused reads Not approved, and the run its decision; the group it waits in says why (spec A7; S21)", async ({
+test("a held run's document whose approval was refused reads Not approved, and the run its decision; the group it waited in says Denied (spec A7; S21; Build 24's P6, S6)", async ({
   page,
 }) => {
   await page.goto("/account/runs/fixture-run-invoice-held");
   const main = page.locator("main");
-  await expect(main.getByTestId("run-result")).toHaveText("Rejected");
+  await expect(main.getByTestId("run-result")).toHaveText("Denied");
   await expect(main.getByTestId("document-1-chip")).toHaveText("Saved");
   await expect(main.getByTestId("document-2-chip")).toHaveText("Not approved");
   const record = main.getByTestId("run-step-group:record");
   await expect(record).toHaveAttribute("data-state", "held");
-  await expect(record).toContainText(
-    "Waiting for approval: Document 2: the total can't be read.",
-  );
+  await expect(record).toContainText("Denied");
+  await expect(record).not.toContainText("Waiting for approval");
+  // Each document's Format is its own file's (Invoice Processing v6's
+  // `source`; Build 24, P10).
+  await expect(main.getByTestId("document-1")).toContainText("FormatPDF");
+  await expect(main.getByTestId("document-2")).toContainText("FormatPNG");
   // Step 5 waits: the approval's email never checks it (Build 23's A7).
   const email = main.getByTestId("run-step-group:email");
   await expect(email).toHaveAttribute("data-state", "waiting");
@@ -2869,12 +2875,14 @@ test.describe("Invoice Processing's page, Step 1 to its run (spec A6, A7; Build 
     await expect(rows.nth(4)).toHaveAttribute("data-state", "done");
     await expect(rows.nth(4)).toContainText("Sending email…");
     await expect(main.getByTestId("run-tile-Steps done")).toHaveText("5 / 5");
-    await expect(main.getByRole("article")).toHaveCount(3);
+    await expect(main.locator("details[data-testid^='document-']")).toHaveCount(
+      3,
+    );
     await expect(main.getByRole("button", { name: "Cancel run" })).toHaveCount(
       0,
     );
     await expect(
-      main.getByRole("button", { name: "Download JSON" }),
+      main.getByRole("button", { name: "Download PDF" }),
     ).toBeVisible();
     // Its email sent: read again, Email sent and when, every step done.
     await fixtureControl("invoice-run-advance");

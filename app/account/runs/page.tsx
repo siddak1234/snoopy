@@ -17,7 +17,10 @@ import { runLabel } from "@/lib/run-progress";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 
 /**
- * Activity — every run this workspace has had.
+ * Activity — every job this workspace has had, one entry each, by the job's
+ * id: a job is its first run, and an approval continues it under that id
+ * (Build 24, P9; backend ADR-0044) — ~~an "after approval" row of its own~~
+ * until Build 24.
  *
  * A run carries `templateId` and no display name, deliberately: a finished run
  * must not be relabelled by a later manifest. So the name is joined from the
@@ -131,16 +134,9 @@ function RunRow({ run, name }: { run: Run; name: string }) {
       aria-label={`Run of ${name}, ${run.status}`}
     >
       <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="truncate text-sm font-medium text-[var(--text)]">
-            {name}
-          </p>
-          {/* A continuation is part of the run above it, not a separate piece of
-              work. Saying so is why rootRunId exists. */}
-          {run.origin === "approval-continuation" ? (
-            <span className="text-xs text-[var(--muted)]">after approval</span>
-          ) : null}
-        </div>
+        <p className="truncate text-sm font-medium text-[var(--text)]">
+          {name}
+        </p>
         <p className="mt-0.5 text-xs break-all text-[var(--muted)]">
           {formatWhen(run.createdAt)} · {runLabel(run.id)}
         </p>

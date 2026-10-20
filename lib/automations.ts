@@ -14,7 +14,7 @@ import type {
 /**
  * The automation surface, as the website consumes it.
  *
- * Response models are generated from `docs/openapi/automations.yaml`. The
+ * Response models are generated from `snoopy-backend/docs/openapi/automations.yaml`. The
  * contract test remains a UI-consumption check: it proves that each field the
  * page reads is part of the published response rather than merely a type alias.
  *
@@ -77,6 +77,10 @@ export type CompleteUploadResponse =
   operations["completeUpload"]["responses"][200]["content"]["application/json"];
 export type RunStatusCounts = components["schemas"]["RunStatusCounts"];
 export type FlowEmailRecipients = components["schemas"]["FlowEmailRecipients"];
+export type RunFile = components["schemas"]["RunFile"];
+export type RunPackageFile = components["schemas"]["RunPackageFile"];
+export type CreateRunPackageFileRequest =
+  operations["createRunPackageFile"]["requestBody"]["content"]["application/json"];
 export type UpdateFlowEmailRecipientsRequest =
   operations["updateFlowEmailRecipients"]["requestBody"]["content"]["application/json"];
 
@@ -320,6 +324,37 @@ export function cancelRun(
   return platformServerJson<CancelRunResponse>(
     `${scope(workspaceId)}/runs/${encodeURIComponent(runId)}/cancel`,
     { method: "POST", idempotencyKey: newIdempotencyKey("cancel") },
+  );
+}
+
+/**
+ * A job's run package as a file behind a short-lived signed link (Build 24,
+ * P12; backend ADR-0045) — built, or the one built for the same job state,
+ * template and time zone. `origin` is the site's own, for a call a page did
+ * not make as a form (the package's inline route).
+ */
+/**
+ * How long asking for a package may take: the platform builds one for at most
+ * 20 s (backend ADR-0045, its build worker's limit), plus its queue — longer
+ * than every other call's 10 s, which cut a heavy package off in the frame.
+ */
+export const RUN_PACKAGE_REQUEST_TIMEOUT_MS = 30_000;
+
+export function createRunPackageFile(
+  workspaceId: string,
+  runId: string,
+  body: CreateRunPackageFileRequest,
+  origin?: string,
+): Promise<RunPackageFile> {
+  return platformServerJson<RunPackageFile>(
+    `${scope(workspaceId)}/runs/${encodeURIComponent(runId)}/package`,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+      idempotencyKey: newIdempotencyKey(`run-package-${body.format}`),
+      timeoutMs: RUN_PACKAGE_REQUEST_TIMEOUT_MS,
+      ...(origin ? { headers: { origin } } : {}),
+    },
   );
 }
 

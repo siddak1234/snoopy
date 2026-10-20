@@ -1,3 +1,4 @@
+import { AxeBuilder } from "@axe-core/playwright";
 import {
   expect,
   test,
@@ -13,6 +14,7 @@ import {
   fixtureControl,
   fixtureRead,
   holdRequest,
+  isServerAction,
   observe,
   presentSession,
   settledAnimations,
@@ -787,13 +789,8 @@ test("11 — what can be undone is not red: Pause, Deny, Reject, Cancel request 
     "Reject, a request to join",
   );
 
-  await fixtureControl("approval-waiting");
-  await page.goto("/account/approvals");
-  await expectNotRed(
-    page.getByRole("button", { name: "Reject" }),
-    tokens,
-    "Reject, an approval",
-  );
+  // An approval's Deny is red since Build 24 (P6): the danger variant, the
+  // owner's call for that pair — its test is with Approvals below.
 
   await presentSession(page, "member");
   await page.goto("/account/teams");
@@ -996,22 +993,335 @@ test("17 — Approvals: nothing waiting, a decision by an eligible role, and non
   await page.reload();
   await expectNoAxeViolations(page);
   await page.getByRole("button", { name: "Approve" }).click();
-  await expect(
-    page.locator("main").getByRole("heading", { name: "Nothing needs review" }),
-  ).toBeVisible();
+  // The last row leaving goes to Activity (Build 24, P7).
+  await expect(page).toHaveURL(/\/account\/runs$/u);
+  expect(await approvalStatuses()).toEqual(["approved"]);
 });
 
-test("17 — Reject is recorded as rejected, and nothing waits", async ({
+test("17 — Deny is recorded as rejected, and the last row leaving goes to Activity (Build 24, P7; S6)", async ({
   page,
 }) => {
   await fixtureControl("approval-waiting");
   await page.goto("/account/approvals");
-  await page.getByRole("button", { name: "Reject" }).click();
-  await expect(
-    page.locator("main").getByRole("heading", { name: "Nothing needs review" }),
-  ).toBeVisible();
+  await page.getByRole("button", { name: "Deny" }).click();
+  await expect(page).toHaveURL(/\/account\/runs$/u);
   await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
   expect(await approvalStatuses()).toEqual(["rejected"]);
+});
+
+// The held Invoice Processing job, and its step 4 — where it waits.
+const heldJob = "/account/runs/fixture-run-invoice-held";
+const heldStep = (page: Page) =>
+  page.locator("main").getByTestId("run-step-group:record");
+const approvalRows = (page: Page) =>
+  page.locator('[data-testid^="approval-row-"]');
+
+test("P6 — a held job's step 4 offers Approve and Deny, Deny red; Approving… while it saves, then the page is drawn again: the job runs on under its id", async ({
+  page,
+}) => {
+  await fixtureControl("invoice-approval-pending");
+  await page.goto(heldJob);
+  const step = heldStep(page);
+  await expect(step).toHaveAttribute("data-state", "held");
+  await expect(step).toContainText(
+    "Waiting for approval: Document 2: the total can't be read.",
+  );
+  const approve = step.getByRole("button", { name: "Approve" });
+  const deny = step.getByRole("button", { name: "Deny" });
+  await expect(approve).toBeVisible();
+  await expect(deny).toHaveClass(/(?:^|\s)btn-danger(?:\s|$)/u);
+  await expectDanger(deny, await resolvedTokens(page), "Deny, a held job's");
+  // Only step 4 offers it.
+  await expect(
+    page.locator("main").getByRole("button", { name: "Approve" }),
+  ).toHaveCount(1);
+  await expectNoAxeViolations(page);
+  const held = await holdRequest(page, `**${heldJob}`, isServerAction);
+  await approve.click();
+  await held.arrived;
+  await expect(step.getByRole("button", { name: "Approving…" })).toBeDisabled();
+  await expect(deny).toBeDisabled();
+  held.release();
+  await expect(page.locator("main").getByText(/^running$/iu)).toBeVisible();
+  await expect(step).toHaveAttribute("data-state", "working");
+  await expect(step.getByRole("button")).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp(`${heldJob}$`, "u"));
+  expect(await approvalStatuses()).toEqual(["approved"]);
+});
+
+test("P6 — Deny in step 4: the step says Denied, the result Denied, its waiting document Not approved (S6)", async ({
+  page,
+}) => {
+  await fixtureControl("invoice-approval-pending");
+  await page.goto(heldJob);
+  await heldStep(page).getByRole("button", { name: "Deny" }).click();
+  const main = page.locator("main");
+  await expect(main.getByTestId("run-result")).toHaveText("Denied");
+  await expect(heldStep(page)).toHaveAttribute("data-state", "held");
+  await expect(heldStep(page).locator("p").nth(1)).toHaveText("Denied");
+  await expect(heldStep(page).getByRole("button")).toHaveCount(0);
+  await expect(main.getByTestId("document-2-chip")).toHaveText("Not approved");
+  expect(await approvalStatuses()).toEqual(["rejected"]);
+});
+
+test("P6 — a member is told who can decide, and offered no button", async ({
+  page,
+}) => {
+  await fixtureControl("invoice-approval-pending");
+  await presentSession(page, "member");
+  await page.goto(heldJob);
+  await expect(heldStep(page)).toContainText(
+    "Only owner or admin can decide this.",
+  );
+  await expect(heldStep(page).getByRole("button")).toHaveCount(0);
+});
+
+test("P7 — a decided row fades and folds away, its pill never Pending beside a decision; the other stays; the last one leaving goes to Activity", async ({
+  page,
+}) => {
+  await fixtureControl("approval-waiting");
+  await fixtureControl("invoice-approval-pending");
+  await page.goto("/account/approvals");
+  const rows = approvalRows(page);
+  await expect(rows).toHaveCount(2);
+  // Every pill a leaving row shows, as it shows it.
+  await page.evaluate(() => {
+    const seen: string[] = [];
+    Object.assign(window, { leavingPills: seen });
+    new MutationObserver(() => {
+      for (const row of document.querySelectorAll("[data-leaving]"))
+        seen.push(
+          row.querySelector('[data-testid^="approval-pill-"]')?.textContent ??
+            "",
+        );
+    }).observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      characterData: true,
+    });
+  });
+  const first = rows.first();
+  // It folds, and fades, in the same 220 ms.
+  expect(
+    await first.evaluate((row) => getComputedStyle(row).transitionDuration),
+  ).toBe("0.22s");
+  await first.getByRole("button", { name: "Approve" }).click();
+  await expect(rows).toHaveCount(1);
+  const pills = await page.evaluate(
+    () => (window as unknown as { leavingPills: string[] }).leavingPills,
+  );
+  expect(pills.length).toBeGreaterThan(0);
+  expect(new Set(pills)).toEqual(new Set(["approved"]));
+  await expect(page).toHaveURL(/\/account\/approvals$/u);
+  await rows.first().getByRole("button", { name: "Deny" }).click();
+  await expect(page).toHaveURL(/\/account\/runs$/u);
+  expect(await approvalStatuses()).toEqual(["approved", "rejected"]);
+});
+
+// Build 24 (P12; backend ADR-0045): the run package — its buttons on a
+// finished job's page, its page with the PDF itself, and the site's inline
+// route. In one zone, so the zone each file is asked in is known; the signed
+// link is the fixture's own HTTPS store, as the complete export's is.
+test.describe("the run package", () => {
+  test.use({ timezoneId: "America/Chicago", ignoreHTTPSErrors: true });
+  const job = "/account/runs/fixture-run-invoice";
+  const packagePage = `${job}/package`;
+  const inline = `${packagePage}/file?timeZone=America%2FChicago`;
+  const signedLink = (format: string) =>
+    `https://127.0.0.1:3443/__fixture/package-file?run=fixture-run-invoice&format=${format}`;
+  const packageFiles = async () =>
+    (
+      await fixtureRead<{
+        packageFiles: {
+          runId: string;
+          format: string;
+          timeZone: string | null;
+          keyed: boolean;
+        }[];
+      }>("counts")
+    ).packageFiles;
+
+  test("P12 — a finished job offers View package, Download PDF and Download Excel — no Download JSON; each download asks in the browser's zone, with a key, and goes to its signed link", async ({
+    page,
+  }) => {
+    await page.goto(job);
+    const main = page.locator("main");
+    await expect(
+      main.getByRole("button", { name: "Download JSON" }),
+    ).toHaveCount(0);
+    await expect(
+      main.getByRole("link", { name: "View package" }),
+    ).toHaveAttribute("href", packagePage);
+    for (const [name, format] of [
+      ["Download PDF", "pdf"],
+      ["Download Excel", "xlsx"],
+    ] as const) {
+      const [download] = await Promise.all([
+        page.waitForEvent("download"),
+        main.getByRole("button", { name }).click(),
+      ]);
+      expect(download.url()).toBe(signedLink(format));
+      expect(download.suggestedFilename()).toBe(
+        `run-fixture-run-invoice.${format}`,
+      );
+      // Nothing was left: the signed link saved the file.
+      await expect(page).toHaveURL(new RegExp(`${job}$`, "u"));
+    }
+    expect(await packageFiles()).toEqual([
+      {
+        runId: "fixture-run-invoice",
+        format: "pdf",
+        timeZone: "America/Chicago",
+        keyed: true,
+      },
+      {
+        runId: "fixture-run-invoice",
+        format: "xlsx",
+        timeZone: "America/Chicago",
+        keyed: true,
+      },
+    ]);
+    // Not while a job goes on: nothing to package yet.
+    await page.goto("/account/runs/fixture-run-running");
+    await expect(
+      page.locator("main").getByRole("button", { name: "Download PDF" }),
+    ).toHaveCount(0);
+  });
+
+  test("P12 — the platform busy building others: asked once more after its wait, then said", async ({
+    page,
+  }) => {
+    await fixtureControl("package-busy");
+    await page.goto(job);
+    const main = page.locator("main");
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      main.getByRole("button", { name: "Download PDF" }).click(),
+    ]);
+    expect(download.url()).toBe(signedLink("pdf"));
+    expect((await packageFiles()).length).toBe(2);
+    await fixtureControl("package-busy-twice");
+    await main.getByRole("button", { name: "Download PDF" }).click();
+    await expect(main.getByRole("alert")).toHaveText(
+      "Could not download. Try again.",
+    );
+    expect((await packageFiles()).length).toBe(4);
+  });
+
+  test("P12 — View package opens the package page: the PDF itself in a frame of the site's inline route, Download PDF and Download Excel, Back to the run; axe clean", async ({
+    page,
+  }) => {
+    await page.goto(job);
+    await page
+      .locator("main")
+      .getByRole("link", { name: "View package" })
+      .click();
+    await expect(page).toHaveURL(new RegExp(`${packagePage}$`, "u"));
+    const main = page.locator("main");
+    await expect(main.getByRole("heading", { level: 1 })).toHaveText(
+      "Run package",
+    );
+    await expect(main).toContainText("Run fixture-run-invoice");
+    const frame = main.locator('iframe[title="Run package"]');
+    await expect(frame).toHaveAttribute("src", inline);
+    await expect(
+      main.getByRole("button", { name: "Download PDF" }),
+    ).toBeVisible();
+    await expect(
+      main.getByRole("button", { name: "Download Excel" }),
+    ).toBeVisible();
+    await expect(main.getByRole("link", { name: "View package" })).toHaveCount(
+      0,
+    );
+    await expect(main.getByRole("link", { name: "Back" })).toHaveAttribute(
+      "href",
+      job,
+    );
+    // The page's own markup; the frame holds a PDF, not this site's page.
+    await expect(page).toHaveTitle(/\S/u);
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+      .exclude('iframe[title="Run package"]')
+      .analyze();
+    expect(results.violations).toEqual([]);
+    // The frame's route: the PDF inline, never cached, framed by this site.
+    // The frame's request says it is this site's (`sec-fetch-site`), as every
+    // current browser's does.
+    const sameSite = { headers: { "sec-fetch-site": "same-origin" } };
+    const answer = await page.request.get(inline, sameSite);
+    expect(answer.status()).toBe(200);
+    expect(answer.headers()["content-type"]).toBe("application/pdf");
+    // The platform's name for the file, the job's own id.
+    expect(answer.headers()["content-disposition"]).toBe(
+      'inline; filename="run-fixture-run-invoice.pdf"',
+    );
+    expect(answer.headers()["cache-control"]).toBe("private, no-store");
+    expect(answer.headers()["content-security-policy"]).toBe(
+      "frame-ancestors 'self'",
+    );
+    expect((await answer.body()).subarray(0, 5).toString("latin1")).toBe(
+      "%PDF-",
+    );
+    expect(
+      (await packageFiles()).filter((asked) => asked.format === "pdf").at(-1),
+    ).toEqual({
+      runId: "fixture-run-invoice",
+      format: "pdf",
+      timeZone: "America/Chicago",
+      keyed: true,
+    });
+    // A request another site started is refused.
+    const crossSite = await page.request.get(inline, {
+      headers: { "sec-fetch-site": "cross-site" },
+    });
+    expect(crossSite.status()).toBe(403);
+    // And one that does not say where it came from.
+    expect((await page.request.get(inline)).status()).toBe(403);
+  });
+
+  test("P12 — a job with no package yet says so, with the way back; its route answers 409; a signed file over the bound is refused", async ({
+    page,
+  }) => {
+    await page.goto("/account/runs/fixture-run-running/package");
+    const main = page.locator("main");
+    await expect(main).toContainText("This run has no package yet.");
+    await expect(main.locator("iframe")).toHaveCount(0);
+    await expect(main.getByRole("link", { name: "Back" })).toHaveAttribute(
+      "href",
+      "/account/runs/fixture-run-running",
+    );
+    const none = await page.request.get(
+      "/account/runs/fixture-run-running/package/file",
+      { headers: { "sec-fetch-site": "same-origin" } },
+    );
+    expect(none.status()).toBe(409);
+    expect(await none.text()).toBe("This run has no package yet.");
+    await fixtureControl("package-file-oversized");
+    const oversized = await page.request.get(inline, {
+      headers: { "sec-fetch-site": "same-origin" },
+    });
+    expect(oversized.status()).toBe(413);
+    expect(oversized.headers()["content-type"]).not.toBe("application/pdf");
+  });
+});
+
+test("P7 — under reduced motion a decided row leaves at once, with no fade", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await fixtureControl("approval-waiting");
+  await fixtureControl("invoice-approval-pending");
+  await page.goto("/account/approvals");
+  const rows = approvalRows(page);
+  await expect(rows).toHaveCount(2);
+  expect(
+    await rows
+      .first()
+      .evaluate((row) => getComputedStyle(row).transitionDuration),
+  ).toBe("0s");
+  await rows.first().getByRole("button", { name: "Approve" }).click();
+  await expect(rows).toHaveCount(1);
 });
 
 test("18 — billing with no provider configured (503) is said to be unavailable, and offers nothing", async ({
@@ -1194,21 +1504,21 @@ test("an approval decided on a page whose workspace another tab switched away is
   await expect(page.getByRole("button", { name: "Approve" })).toBeVisible();
 });
 
-test("a rejection on a page whose workspace another tab switched away is refused, and still waits (register F70)", async ({
+test("a denial on a page whose workspace another tab switched away is refused, and still waits (register F70)", async ({
   page,
 }) => {
   await fixtureControl("approval-waiting");
   await page.goto("/account/approvals");
-  await expect(page.getByRole("button", { name: "Reject" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Deny" })).toBeVisible();
   await switchInAnotherTab(page, /Fixture Personal/);
-  await page.getByRole("button", { name: "Reject" }).click();
+  await page.getByRole("button", { name: "Deny" }).click();
   await expect(page.locator("main").getByRole("alert")).toHaveText(
     workspaceChanged,
   );
   expect(await approvalStatuses()).toEqual(["pending"]);
   await switchInAnotherTab(page, /Fixture Organization/);
   await page.reload();
-  await expect(page.getByRole("button", { name: "Reject" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Deny" })).toBeVisible();
 });
 
 test("a connection started or removed on a page whose workspace another tab switched away is refused, and nothing is connected or removed (register F70)", async ({

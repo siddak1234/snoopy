@@ -518,12 +518,18 @@ export async function decideApproval(
   }
 
   const body: DecideApprovalRequest = { decision };
-  const result = await attempt(formData, (workspaceId) =>
-    decideWorkspaceApproval(workspaceId, approvalId, body),
-  );
+  // The job the decision answers, by the platform's own word: its run page is
+  // drawn again too, where step 4 offered the decision (Build 24, P6). The
+  // approval names the job's id (backend ADR-0044).
+  let runId: string | undefined;
+  const result = await attempt(formData, async (workspaceId) => {
+    runId = (await decideWorkspaceApproval(workspaceId, approvalId, body))
+      .approval.runId;
+  });
   if (result.ok) {
     revalidatePath("/account/approvals");
     revalidatePath("/account/runs");
+    if (runId) revalidatePath(`/account/runs/${encodeURIComponent(runId)}`);
   }
   return result;
 }

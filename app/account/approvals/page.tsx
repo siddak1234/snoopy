@@ -1,24 +1,18 @@
-import Link from "next/link";
 import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { getAppSession } from "@/lib/app-session";
 import { resolveActiveWorkspaceId, roleInWorkspace } from "@/lib/tenancy";
-import {
-  emptyWhenUnavailable,
-  listApprovals,
-  type Approval,
-} from "@/lib/automations";
+import { emptyWhenUnavailable, listApprovals } from "@/lib/automations";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
-import { StatusPill } from "@/components/dashboard/StatusPill";
-import { runLabel } from "@/lib/run-progress";
-import { ApprovalDecision } from "./ApprovalDecision";
+import { ApprovalQueue } from "./ApprovalDecision";
 
 /**
- * Approvals — the runs waiting on a person.
+ * Approvals — the jobs waiting on a person.
  *
- * A held run has already ENDED. Deciding does not resume it; approving mints a
- * continuation that carries the automation's state back. That is why this screen
- * links to the held run rather than pretending the work is still in flight.
+ * Each row links to its job by the job's id: approving continues the job under
+ * that same id (backend ADR-0044), so the run page it opens is the work going
+ * on. A decided row fades and leaves, and the last one leaving goes to
+ * Activity (Build 24, P7; `ApprovalQueue`).
  */
 
 export const dynamic = "force-dynamic";
@@ -43,81 +37,27 @@ export default async function ApprovalsPage() {
 
   return (
     <SectionCard title="Approvals" subheader="Runs waiting on a decision">
-      {pending.approvals.length === 0 ? (
-        // The whole page is empty: the app's empty screen (the owner, build 9).
-        <EmptyRow
-          icon={<CheckCircleIcon size={32} />}
-          title="Nothing needs review"
-          text="When an agent pauses for a human decision, it waits for you here."
-        />
-      ) : (
-        pending.approvals.map((approval) => (
-          <ApprovalRow
-            key={approval.id}
-            approval={approval}
-            // Whether this person may decide is the approval's own answer. The
-            // server checks it again and refuses with 403 — this only avoids
-            // offering a button that is certain to be refused.
-            canDecide={Boolean(role && approval.eligibleRoles.includes(role))}
-            workspaceId={workspaceId}
+      <ApprovalQueue
+        workspaceId={workspaceId}
+        rows={pending.approvals.map((approval) => ({
+          approval,
+          // Whether this person may decide is the approval's own answer. The
+          // server checks it again and refuses with 403 — this only avoids
+          // offering a button that is certain to be refused.
+          canDecide: Boolean(role && approval.eligibleRoles.includes(role)),
+          expires: formatExpiry(approval.expiresAt),
+        }))}
+        // Arriving with nothing waiting, the whole page is empty: the app's
+        // empty screen (the owner, build 9).
+        empty={
+          <EmptyRow
+            icon={<CheckCircleIcon size={32} />}
+            title="Nothing needs review"
+            text="When an agent pauses for a human decision, it waits for you here."
           />
-        ))
-      )}
+        }
+      />
     </SectionCard>
-  );
-}
-
-function ApprovalRow({
-  approval,
-  canDecide,
-  workspaceId,
-}: {
-  approval: Approval;
-  canDecide: boolean;
-  /** The workspace this page shows; a decision is refused once it is not active. */
-  workspaceId: string;
-}) {
-  return (
-    <div className="flex flex-col gap-3 py-5 first:pt-0">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm text-[var(--text)]">{approval.reason}</p>
-          <p className="mt-1 text-xs text-[var(--muted)]">
-            Held at “{approval.stepId}” · expires{" "}
-            {formatExpiry(approval.expiresAt)}
-          </p>
-        </div>
-        <StatusPill status={approval.status} />
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <ApprovalDecision
-          approvalId={approval.id}
-          canDecide={canDecide}
-          workspaceId={workspaceId}
-        />
-        <Link
-          href={`/account/runs/${approval.runId}`}
-          prefetch={false}
-          className="text-xs text-[var(--accent)] underline underline-offset-2"
-        >
-          View the run
-        </Link>
-        {/* The run it holds, by its full id (Build 21, spec A8; the owner's D4 and AM2). */}
-        <span
-          data-testid={`approval-run-${approval.id}`}
-          className="text-xs break-all text-[var(--muted)]"
-        >
-          {runLabel(approval.runId)}
-        </span>
-      </div>
-
-      {!canDecide ? (
-        <p className="text-xs text-[var(--muted)]">
-          Only {approval.eligibleRoles.join(" or ")} can decide this.
-        </p>
-      ) : null}
-    </div>
   );
 }
 

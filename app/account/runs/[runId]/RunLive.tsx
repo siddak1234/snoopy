@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import {
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
+import { useRouter } from "next/navigation";
+import { CaretDownIcon } from "@phosphor-icons/react/dist/ssr/CaretDown";
 import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { CircleDashedIcon } from "@phosphor-icons/react/dist/ssr/CircleDashed";
 import { CircleNotchIcon } from "@phosphor-icons/react/dist/ssr/CircleNotch";
 import { DownloadSimpleIcon } from "@phosphor-icons/react/dist/ssr/DownloadSimple";
+import { FileTextIcon } from "@phosphor-icons/react/dist/ssr/FileText";
 import { FlowArrowIcon } from "@phosphor-icons/react/dist/ssr/FlowArrow";
 import { HandPalmIcon } from "@phosphor-icons/react/dist/ssr/HandPalm";
 import { MinusCircleIcon } from "@phosphor-icons/react/dist/ssr/MinusCircle";
@@ -15,15 +22,26 @@ import { BackLink } from "@/components/dashboard/BackLink";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
-import type { Approval, RunDetail, RunOrigin } from "@/lib/automations";
+import { ApprovalDecision } from "@/app/account/approvals/ApprovalDecision";
+import type {
+  Approval,
+  CreateRunPackageFileRequest,
+  RunDetail,
+  RunOrigin,
+  RunPackageFile,
+} from "@/lib/automations";
 import { formatDateTimeMediumUTC as formatWhen } from "@/lib/date";
 import { flowPath } from "@/lib/flow-steps";
-import { platformApiFile, platformApiJson } from "@/lib/platform-api";
+import { PlatformApiError, platformApiJson } from "@/lib/platform-api";
 import {
   DOCUMENT_MORE_LINES,
+  DOWNLOAD_EXCEL,
   DOWNLOAD_FAILED,
-  DOWNLOAD_JSON,
-  documentsFileName,
+  DOWNLOAD_PDF,
+  VIEW_PACKAGE,
+  packageAvailable,
+  packageFileHref,
+  packageRetryWaitMs,
   toDocumentCards,
   type DocumentCardView,
   type DocumentRowView,
@@ -66,27 +84,41 @@ export type RunFlow = {
 } | null;
 
 /**
+ * A held job's approval while it waits, and whether this person may decide it
+ * — the approval's eligible roles against their role, as Approvals reads it.
+ */
+export type RunDecision = { approval: Approval; canDecide: boolean } | null;
+
+/**
  * One run, live (Build 21, spec A7; the owner's build 20 item 10: "It shoukd
  * show all the steps and a live tracker of which ones are done"): its full id
  * and status; how it went; Duration and Steps done; every step from the start,
- * each where the run is; each document it read on a card of its own, with
- * Download JSON; the facts; Cancel run while it goes on, and View flow. Read
+ * each where the run is — a held step with Approve and Deny under it (Build 24,
+ * P6); each document it read on a card of its own; the facts; View package,
+ * Download PDF and Download Excel once the job can be packaged (Build 24,
+ * P12; ~~Download JSON~~ until then); Cancel run while it goes on, and View
+ * flow. Read
  * again every 2 s while the run is pending or running (`RUN_REREAD_MS`),
  * through `/api/platform`, one read at a time; the page as the server drew it
- * comes back whenever it is drawn again (a cancel revalidates it).
+ * comes back whenever it is drawn again (a cancel or a decision revalidates
+ * it).
  */
 export function RunLive({
   workspaceId,
   initial,
   flow,
   approvals,
+  decision,
 }: {
   workspaceId: string;
   initial: RunDetail;
   flow: RunFlow;
-  /** A held run's approval, read once: what became of it. */
+  /** A held job's approvals, read once: what became of them. */
   approvals: Approval[];
+  /** Its approval while it waits: step 4's Approve and Deny. */
+  decision: RunDecision;
 }) {
+  const router = useRouter();
   const [detail, setDetail] = useState(initial);
   const [drawn, setDrawn] = useState(initial);
   // The server drew the page again (a cancel, a refresh): its answer wins.
@@ -95,8 +127,6 @@ export function RunLive({
     setDetail(initial);
   }
   const [reads, setReads] = useState(0);
-  const [downloading, setDownloading] = useState(false);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
   const { run, steps, details, documents } = detail;
   const going = run.status === "pending" || run.status === "running";
 
@@ -129,6 +159,7 @@ export function RunLive({
   // steps it reported. ~~Only a run of the catalog's own version drawn by its
   // groups~~ until Build 22. Step 2 says the flow's integration, step 4's title
   // follows it, step 5 is the run's email.
+  const decided = heldDecision(run, approvals);
   const tracker = trackerRows(
     steps,
     flow?.pipeline,
@@ -136,9 +167,8 @@ export function RunLive({
     run,
     undefined,
     flow?.pipeline,
-    { flow: flow?.tracker, email: detail.email },
+    { flow: flow?.tracker, email: detail.email, decision: decided },
   );
-  const decided = heldDecision(run, approvals);
   const cards = toDocumentCards(
     documents,
     decided === "rejected"
@@ -146,6 +176,7 @@ export function RunLive({
       : decided === "closed"
         ? "expired"
         : null,
+    detail.files,
   );
   const result = runResultLine(run, approvals);
   const facts = [
@@ -157,34 +188,6 @@ export function RunLive({
     { label: "Trigger", value: ORIGIN_LABEL[run.origin] },
     { label: "Run ID", value: run.id },
   ];
-
-  /**
-   * Download JSON (spec A7, C2; the session's S25): the run's documents as the
-   * platform serves them for keeping (`readRunDocuments`), read at the press,
-   * saved by the browser as `run-{full id}.json`.
-   */
-  const download = async () => {
-    if (downloading) return;
-    setDownloading(true);
-    setDownloadError(null);
-    try {
-      const file = await platformApiFile(
-        `/v1/workspaces/${encodeURIComponent(workspaceId)}/runs/${encodeURIComponent(run.id)}/documents`,
-      );
-      const href = URL.createObjectURL(file);
-      const anchor = document.createElement("a");
-      anchor.href = href;
-      anchor.download = documentsFileName(run.id);
-      document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-      setTimeout(() => URL.revokeObjectURL(href), 0);
-    } catch {
-      setDownloadError(DOWNLOAD_FAILED);
-    } finally {
-      setDownloading(false);
-    }
-  };
 
   return (
     <SectionCard
@@ -213,21 +216,6 @@ export function RunLive({
           />
           <Tile label="Steps done" value={stepsDone(tracker)} />
         </dl>
-        {/* A continuation belongs to the run it continues. The link is how a
-            person follows the chain rather than reading two unrelated runs. */}
-        {run.continuesRunId ? (
-          <p className="mt-4 text-sm text-[var(--muted)]">
-            Continues{" "}
-            <Link
-              prefetch={false}
-              href={`/account/runs/${run.continuesRunId}`}
-              className="text-[var(--accent)] underline underline-offset-2"
-            >
-              the run that was held
-            </Link>
-            .
-          </p>
-        ) : null}
       </div>
 
       <section aria-labelledby="run-steps-title" className="py-5">
@@ -239,7 +227,23 @@ export function RunLive({
         </h2>
         <ol data-testid="run-steps" className="mt-4 flex flex-col gap-4">
           {tracker.map((row) => (
-            <TrackerItem key={row.key} row={row} />
+            <TrackerItem key={row.key} row={row}>
+              {/* The decision where the job waits (Build 24, P6): one press,
+                  then the page is drawn again — running on, or Denied */}
+              {row.state === "held" &&
+              decided === "pending" &&
+              decision?.approval.status === "pending" ? (
+                <ApprovalDecision
+                  approvalId={decision.approval.id}
+                  canDecide={decision.canDecide}
+                  eligibleRoles={decision.approval.eligibleRoles}
+                  workspaceId={workspaceId}
+                  onDecision={(_, state) => {
+                    if (state === "saved") router.refresh();
+                  }}
+                />
+              ) : null}
+            </TrackerItem>
           ))}
         </ol>
       </section>
@@ -296,17 +300,8 @@ export function RunLive({
           ))}
         </dl>
         <div className="mt-5 flex flex-wrap items-center gap-2">
-          {cards.length > 0 ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={downloading}
-              onClick={() => void download()}
-              className="inline-flex items-center gap-2"
-            >
-              <DownloadSimpleIcon size={20} aria-hidden />
-              {DOWNLOAD_JSON}
-            </Button>
+          {packageAvailable(run.status, documents) ? (
+            <PackageActions workspaceId={workspaceId} runId={run.id} view />
           ) : null}
           {/* Only the two states the platform cancels; any other answers 404. */}
           {going ? (
@@ -323,9 +318,156 @@ export function RunLive({
             View flow
           </Button>
         </div>
-        <FormError message={downloadError} className="mt-2" />
       </div>
     </SectionCard>
+  );
+}
+
+type PackageFormat = CreateRunPackageFileRequest["format"];
+
+/** The browser's IANA zone, for the times a package file prints; "" when it names none. */
+function browserTimeZone(): string {
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return zone && zone.length <= 64 ? zone : "";
+}
+
+/**
+ * A job's package file behind its signed link (Build 24, P12; backend
+ * `createRunPackageFile`), asked through `/api/platform` in the browser's
+ * zone. Each request carries its own key — a replay could only answer the
+ * same link, and a fresh one never meets a refusal kept under the last. The
+ * platform busy building others (503) is asked once more after its
+ * `retry-after`; then the refusal is the caller's.
+ */
+async function createPackageFile(
+  workspaceId: string,
+  runId: string,
+  format: PackageFormat,
+): Promise<RunPackageFile> {
+  const zone = browserTimeZone();
+  const body: CreateRunPackageFileRequest = {
+    format,
+    ...(zone ? { timeZone: zone } : {}),
+  };
+  const ask = () =>
+    platformApiJson<RunPackageFile>(
+      `/v1/workspaces/${encodeURIComponent(workspaceId)}/runs/${encodeURIComponent(runId)}/package`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": `run-package-${format}-${crypto.randomUUID()}`,
+        },
+        body: JSON.stringify(body),
+      },
+    );
+  try {
+    return await ask();
+  } catch (error) {
+    const wait =
+      error instanceof PlatformApiError && error.status === 503
+        ? packageRetryWaitMs(error.retryAfterSeconds)
+        : null;
+    if (wait === null) throw error;
+    await new Promise((resolve) => setTimeout(resolve, wait));
+    return ask();
+  }
+}
+
+/**
+ * The run package's buttons (Build 24, P12; the owner's build 23 words): View
+ * package — on the run page — and Download PDF and Download Excel, on both. A
+ * download goes to the file's signed link, which saves it (an attachment; no
+ * page is left and nothing crosses origins); a refusal is said under the row.
+ */
+export function PackageActions({
+  workspaceId,
+  runId,
+  view,
+}: {
+  workspaceId: string;
+  runId: string;
+  /** Whether to offer View package too: the run page's row. */
+  view: boolean;
+}) {
+  const [busy, setBusy] = useState<PackageFormat | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const download = async (format: PackageFormat) => {
+    if (busy) return;
+    setBusy(format);
+    setError(null);
+    try {
+      const file = await createPackageFile(workspaceId, runId, format);
+      window.location.assign(file.downloadUrl);
+    } catch {
+      setError(DOWNLOAD_FAILED);
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <>
+      {view ? (
+        <Button
+          href={`/account/runs/${encodeURIComponent(runId)}/package`}
+          variant="secondary"
+          size="sm"
+          prefetch={false}
+          className="inline-flex items-center gap-2"
+        >
+          <FileTextIcon size={20} aria-hidden />
+          {VIEW_PACKAGE}
+        </Button>
+      ) : null}
+      <Button
+        variant="secondary"
+        size="sm"
+        disabled={busy !== null}
+        onClick={() => void download("pdf")}
+        className="inline-flex items-center gap-2"
+      >
+        <DownloadSimpleIcon size={20} aria-hidden />
+        {DOWNLOAD_PDF}
+      </Button>
+      <Button
+        variant="secondary"
+        size="sm"
+        disabled={busy !== null}
+        onClick={() => void download("xlsx")}
+        className="inline-flex items-center gap-2"
+      >
+        <DownloadSimpleIcon size={20} aria-hidden />
+        {DOWNLOAD_EXCEL}
+      </Button>
+      <FormError message={error} className="order-last basis-full" />
+    </>
+  );
+}
+
+const noSubscription = () => () => {};
+
+/**
+ * The package page's PDF (Build 24, P12; the owner's build 23 words: the page
+ * shows the package): the site's own route, in a frame the page's height. The
+ * frame waits for the browser's zone — the server has none of the person's —
+ * so the PDF prints their times, and a Download PDF after it is the same file.
+ */
+export function PackageFrame({ runId }: { runId: string }) {
+  const zone = useSyncExternalStore(
+    noSubscription,
+    browserTimeZone,
+    () => null,
+  );
+  const frame =
+    "block h-[calc(100dvh-16rem)] min-h-[28rem] w-full rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)]";
+  return zone === null ? (
+    <div aria-hidden className={frame} />
+  ) : (
+    <iframe
+      title="Run package"
+      src={packageFileHref(runId, zone || null)}
+      className={frame}
+    />
   );
 }
 
@@ -374,13 +516,19 @@ const STATE_LOOK: Record<
 /**
  * One row of Steps: "3 · AI processing", its state's icon (24) and its state
  * in words — Waiting, Working… (its icon spinning), Done and when, Waiting for
- * approval and why, the run's failure, Skipped or Stopped; a setting step's
- * integration; step 5's Email sent and when, Sending email… or Done (Build
- * 23's A7, `lib/run-progress.ts`) — never a step's own summary
+ * approval and why, Denied, the run's failure, Skipped or Stopped; a setting
+ * step's integration; step 5's Email sent and when, Sending email… or Done
+ * (Build 23's A7, `lib/run-progress.ts`) — never a step's own summary
  * and never a step id (B6). A platform step this build does not know has no
- * state, so no line.
+ * state, so no line. Under it, what the row offers: a held step's decision.
  */
-function TrackerItem({ row }: { row: TrackerRow }) {
+function TrackerItem({
+  row,
+  children,
+}: {
+  row: TrackerRow;
+  children?: ReactNode;
+}) {
   const { Icon, tone, motion } = STATE_LOOK[row.state];
   const quiet =
     row.state === "waiting" ||
@@ -411,6 +559,7 @@ function TrackerItem({ row }: { row: TrackerRow }) {
             {row.sub}
           </p>
         ) : null}
+        {children ? <div className="mt-2">{children}</div> : null}
       </div>
     </li>
   );
@@ -424,10 +573,12 @@ const CHIP_TONE: Record<DocumentCardView["tone"], string> = {
 
 /**
  * One document a run read, on its own card (Build 21, spec A7; backend
- * ADR-0039): "Document 1 of 3" and what happened to it; the type and seller;
- * where; when; the numbers that match it to its record (AM7); each line with
- * "{quantity} × {unit price}" under it; the totals; how it was paid; the
- * result line; then the automation's own detail lines. The app's
+ * ADR-0039), closed until it is opened (Build 24, P10): "Invoice 1 of 3", what
+ * happened to it and `{vendor} · {total}` (S9); open, its Document type and
+ * Format, then the type and seller; where; when; the numbers that match it to
+ * its record (AM7); each line with "{quantity} × {unit price}" under it; the
+ * totals; how it was paid; the result line; then the automation's own detail
+ * lines. Each opens on its own. The app's
  * `snoopy-mobile/components/runs/document-card.tsx` on the website.
  */
 function DocumentCard({ card }: { card: DocumentCardView }) {
@@ -446,61 +597,86 @@ function DocumentCard({ card }: { card: DocumentCardView }) {
       </div>
     ));
   return (
-    <article
+    <details
       data-testid={`document-${card.index}`}
-      aria-label={card.heading}
-      className="rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)] px-4 py-4"
+      className="group rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)]"
     >
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-medium text-[var(--muted)]">
-          {card.heading}
-        </p>
-        <span
-          data-testid={`document-${card.index}-chip`}
-          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${CHIP_TONE[card.tone]}`}
-        >
-          {card.chip}
-        </span>
-      </div>
-      <p className="mt-1 text-sm font-medium text-[var(--text)]">
-        {card.title}
-      </p>
-      {card.location ? (
-        <p className="text-xs text-[var(--muted)]">{card.location}</p>
-      ) : null}
-      {card.when ? (
-        <p className="text-xs text-[var(--muted)]">{card.when}</p>
-      ) : null}
-      {card.ids.length > 0 ? (
-        <dl className="mt-3 flex flex-col gap-1.5">{pairs(card.ids, "id")}</dl>
-      ) : null}
-      {card.lines.length > 0 || card.moreLines ? (
-        <div className="mt-3 flex flex-col gap-1.5 border-t border-[var(--ring)] pt-3">
-          {card.lines.map((line, index) => (
-            <div
-              key={`line-${index}`}
-              data-testid={`document-${card.index}-line-${index + 1}`}
-              className="flex items-start justify-between gap-4"
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-[var(--radius-md)] px-4 py-4 [&::-webkit-details-marker]:hidden">
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-sm font-medium text-[var(--text)]">
+            {card.heading}
+          </span>
+          {card.glance ? (
+            <span
+              data-testid={`document-${card.index}-glance`}
+              className="text-xs break-words text-[var(--muted)]"
             >
-              <div className="min-w-0">
-                <p className="text-sm text-[var(--text)]">{line.description}</p>
-                {line.each ? (
-                  <p className="text-xs text-[var(--muted)]">{line.each}</p>
+              {card.glance}
+            </span>
+          ) : null}
+        </span>
+        <span className="flex shrink-0 items-center gap-2">
+          <span
+            data-testid={`document-${card.index}-chip`}
+            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${CHIP_TONE[card.tone]}`}
+          >
+            {card.chip}
+          </span>
+          <CaretDownIcon
+            size={20}
+            aria-hidden
+            className="text-[var(--muted)] transition-transform group-open:rotate-180 motion-reduce:transition-none"
+          />
+        </span>
+      </summary>
+      <div className="border-t border-[var(--ring)] px-4 pt-3 pb-4">
+        <dl className="flex flex-col gap-1.5">{pairs(card.facts, "fact")}</dl>
+        <p className="mt-3 text-sm font-medium text-[var(--text)]">
+          {card.title}
+        </p>
+        {card.location ? (
+          <p className="text-xs text-[var(--muted)]">{card.location}</p>
+        ) : null}
+        {card.when ? (
+          <p className="text-xs text-[var(--muted)]">{card.when}</p>
+        ) : null}
+        {card.ids.length > 0 ? (
+          <dl className="mt-3 flex flex-col gap-1.5">
+            {pairs(card.ids, "id")}
+          </dl>
+        ) : null}
+        {card.lines.length > 0 || card.moreLines ? (
+          <div className="mt-3 flex flex-col gap-1.5 border-t border-[var(--ring)] pt-3">
+            {card.lines.map((line, index) => (
+              <div
+                key={`line-${index}`}
+                data-testid={`document-${card.index}-line-${index + 1}`}
+                className="flex items-start justify-between gap-4"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm text-[var(--text)]">
+                    {line.description}
+                  </p>
+                  {line.each ? (
+                    <p className="text-xs text-[var(--muted)]">{line.each}</p>
+                  ) : null}
+                </div>
+                {line.amount ? (
+                  <p className="text-sm text-[var(--text)]">{line.amount}</p>
                 ) : null}
               </div>
-              {line.amount ? (
-                <p className="text-sm text-[var(--text)]">{line.amount}</p>
-              ) : null}
-            </div>
-          ))}
-          {card.moreLines ? (
-            <p className="text-xs text-[var(--muted)]">{DOCUMENT_MORE_LINES}</p>
-          ) : null}
-        </div>
-      ) : null}
-      <dl className="mt-3 flex flex-col gap-1.5 border-t border-[var(--ring)] pt-3">
-        {pairs(card.rows, "row")}
-      </dl>
-    </article>
+            ))}
+            {card.moreLines ? (
+              <p className="text-xs text-[var(--muted)]">
+                {DOCUMENT_MORE_LINES}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        <dl className="mt-3 flex flex-col gap-1.5 border-t border-[var(--ring)] pt-3">
+          {pairs(card.rows, "row")}
+        </dl>
+      </div>
+    </details>
   );
 }

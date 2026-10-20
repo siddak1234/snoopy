@@ -40,10 +40,9 @@ export type RunEmailState = {
 type RunStatus =
   "pending" | "running" | "held" | "succeeded" | "failed" | "cancelled";
 
-/** What the tracker needs of the run. */
+/** What the tracker needs of the run — a job's, read whole (backend ADR-0044). */
 export type RunState = {
   status: RunStatus;
-  origin?: string;
   failureReason?: string;
 };
 
@@ -78,6 +77,8 @@ export const STEP_SKIPPED = "Skipped";
 export const STEP_STOPPED = "Stopped";
 export const STEP_FAILED = "Failed";
 export const WAITING_FOR_APPROVAL = "Waiting for approval.";
+/** A held step whose approval was denied (Build 24, P6; the session's S6). */
+export const STEP_DENIED = "Denied";
 
 export function stepHeld(reason: string | undefined): string {
   return reason ? `Waiting for approval: ${reason}` : "Waiting for approval";
@@ -109,7 +110,8 @@ const at = (iso: string) => Date.parse(iso);
  * Each declared step's state, from what the run reported (spec A7; S14). Per
  * step, in the pipeline's order:
  *
- * - reported `ok`, or `failed` without failing the run → done; `held` → held;
+ * - reported `ok`, or `failed` without failing the run → done; `held` → held
+ *   while the job is held, done once it went on (approved);
  *   `failed`, the run failed, and it is the step reported last → failed;
  * - not reported, before the furthest step reported → skipped (it was not
  *   needed: None's QuickBooks lookups, a second read nobody needed);
@@ -117,8 +119,10 @@ const at = (iso: string) => Date.parse(iso);
  *   rest waiting; waiting while the run is held; skipped once it succeeded;
  *   stopped once it failed or was cancelled.
  *
- * A continuation (`approval-continuation`) did its first steps in the run it
- * continues: every step before its first reported one is done.
+ * A job is its first run (Build 24, P9; backend ADR-0044): its steps come in
+ * one list, the held run's and the ones after its approval alike, all under
+ * the job's id. ~~A continuation's steps before its first reported one
+ * done~~ until Build 24: no continuation is read on its own any more.
  */
 export function stepStates(
   pipeline: readonly { id: string }[],
@@ -139,14 +143,13 @@ export function stepStates(
     order.has(id) ? [order.get(id)!] : [],
   );
   const furthest = reported.length > 0 ? Math.max(...reported) : -1;
-  const first = reported.length > 0 ? Math.min(...reported) : -1;
   const lastId = ordered[ordered.length - 1]?.stepId;
   const going = run.status === "pending" || run.status === "running";
-  const continued = run.origin === "approval-continuation";
   return pipeline.map((declared, index) => {
     const step = latest.get(declared.id);
     if (step) {
-      if (step.outcome === "held") return { state: "held", step };
+      if (step.outcome === "held")
+        return { state: run.status === "held" ? "held" : "done", step };
       if (
         step.outcome === "failed" &&
         run.status === "failed" &&
@@ -155,7 +158,6 @@ export function stepStates(
         return { state: "failed", step };
       return { state: "done", step };
     }
-    if (continued && index < first) return { state: "done" };
     if (index < furthest) return { state: "skipped" };
     if (going) return { state: index === furthest + 1 ? "working" : "waiting" };
     if (run.status === "held") return { state: "waiting" };
@@ -190,12 +192,17 @@ export function timeOfDay(iso: string): string {
   return `${hours % 12 || 12}:${minutes} ${hours < 12 ? "AM" : "PM"}`;
 }
 
-/** What a row says of its state — never a step's own summary, never a step id. */
+/**
+ * What a row says of its state — never a step's own summary, never a step id.
+ * A held step says why it waits until its approval is denied, then "Denied"
+ * (Build 24, P6).
+ */
 function trackerSub(
   state: TrackerState,
   steps: readonly ProgressStep[],
   run: RunState,
   clock: (iso: string) => string,
+  decision?: HeldDecision | null,
 ): string {
   if (state === "working") return WORKING;
   if (state === "waiting") return STEP_WAITING;
@@ -203,7 +210,9 @@ function trackerSub(
   if (state === "stopped") return STEP_STOPPED;
   if (state === "failed") return run.failureReason ?? STEP_FAILED;
   if (state === "held")
-    return stepHeld(steps.find((step) => step.outcome === "held")?.heldReason);
+    return decision === "rejected"
+      ? STEP_DENIED
+      : stepHeld(steps.find((step) => step.outcome === "held")?.heldReason);
   const last = steps.reduce<ProgressStep | undefined>(
     (latest, step) =>
       !latest || at(step.occurredAt) >= at(latest.occurredAt) ? step : latest,
@@ -286,15 +295,23 @@ export function trackerRows(
   run: RunState,
   clock: (iso: string) => string = timeOfDay,
   titles: readonly { id: string; title: string }[] | undefined = declared,
-  /** The flow as read now, and the run's email (Build 22). */
-  context: { flow?: TrackerFlow; email?: RunEmailState } = {},
+  /**
+   * The flow as read now, the run's email (Build 22), and what became of a
+   * held job's approval (`heldDecision`, Build 24).
+   */
+  context: {
+    flow?: TrackerFlow;
+    email?: RunEmailState;
+    decision?: HeldDecision | null;
+  } = {},
 ): TrackerRow[] {
   const known = new Set((declared ?? []).map((step) => step.id));
   const covered =
     declared !== undefined &&
     declared.length > 0 &&
     steps.every((step) => known.has(step.stepId));
-  if (!covered) return reportedRows(steps, titles, run, clock);
+  if (!covered)
+    return reportedRows(steps, titles, run, clock, context.decision);
   const pipeline = declared;
   const states = stepStates(pipeline, steps, run);
   const row = (key: string, title: string, members: number[]): TrackerRow => {
@@ -302,7 +319,12 @@ export function trackerRows(
     const reported = members.flatMap((index) =>
       states[index]!.step ? [states[index]!.step!] : [],
     );
-    return { key, title, state, sub: trackerSub(state, reported, run, clock) };
+    return {
+      key,
+      title,
+      state,
+      sub: trackerSub(state, reported, run, clock, context.decision),
+    };
   };
   if (groups && groups.length > 0) {
     const named = new Set(
@@ -341,6 +363,7 @@ function reportedRows(
   declared: readonly { id: string; title: string }[] | undefined,
   run: RunState,
   clock: (iso: string) => string,
+  decision?: HeldDecision | null,
 ): TrackerRow[] {
   const titles = new Map((declared ?? []).map((step) => [step.id, step.title]));
   const ordered = [...steps].sort(
@@ -352,12 +375,16 @@ function reportedRows(
       run.status === "failed" &&
       index === ordered.length - 1;
     const state: TrackerState =
-      step.outcome === "held" ? "held" : failedRun ? "failed" : "done";
+      step.outcome === "held" && run.status === "held"
+        ? "held"
+        : failedRun
+          ? "failed"
+          : "done";
     return {
       key: `reported:${index}:${step.stepId}`,
       title: `${index + 1} · ${titles.get(step.stepId) ?? `Step ${index + 1}`}`,
       state,
-      sub: trackerSub(state, [step], run, clock),
+      sub: trackerSub(state, [step], run, clock, decision),
     };
   });
   if (run.status === "pending" || run.status === "running") {
@@ -418,12 +445,37 @@ export function runLabel(id: string): string {
 export type HeldDecision =
   "pending" | "approved" | "rejected" | "closed" | "unknown";
 
+/** What a client needs of an approval to know which is a job's newest. */
+type ApprovalOf = { runId: string; status: string; createdAt?: string };
+
+/**
+ * A job's newest approval, by when it was asked (Build 24, P9): a job is its
+ * first run (backend ADR-0044), so every approval it ever asked names that
+ * one id, and the one asked last is the one that counts. Of two asked at the
+ * same moment, the one listed first — the platform lists newest first — as the
+ * app's `jobApproval` picks.
+ */
+export function newestApproval<T extends ApprovalOf>(
+  runId: string,
+  approvals: readonly T[],
+): T | undefined {
+  const asked = (approval: T) =>
+    approval.createdAt ? at(approval.createdAt) : Number.NEGATIVE_INFINITY;
+  return approvals
+    .filter((candidate) => candidate.runId === runId)
+    .reduce<T | undefined>(
+      (newest, candidate) =>
+        !newest || asked(candidate) > asked(newest) ? candidate : newest,
+      undefined,
+    );
+}
+
 export function heldDecision(
   run: { id: string; status: RunStatus },
-  approvals: readonly { runId: string; status: string }[],
+  approvals: readonly ApprovalOf[],
 ): HeldDecision | null {
   if (run.status !== "held") return null;
-  const approval = approvals.find((candidate) => candidate.runId === run.id);
+  const approval = newestApproval(run.id, approvals);
   if (!approval) return "unknown";
   if (approval.status === "pending") return "pending";
   if (approval.status === "approved") return "approved";
@@ -433,8 +485,10 @@ export function heldDecision(
 
 const HELD_DECISION_LINE: Record<HeldDecision, string> = {
   pending: "Waiting for approval",
-  approved: "Approved — continued in a new run",
-  rejected: "Rejected",
+  // The job goes on under its own id (ADR-0044): ~~"Approved — continued in
+  // a new run"~~ until Build 24.
+  approved: "Approved",
+  rejected: "Denied",
   closed: "No longer awaiting approval",
   unknown: "Held for review",
 };
@@ -451,7 +505,7 @@ export function runResultLine(
     resultSummary?: string;
     failureReason?: string;
   },
-  approvals: readonly { runId: string; status: string }[],
+  approvals: readonly ApprovalOf[],
 ): string | null {
   if (run.status === "succeeded") return run.resultSummary ?? null;
   if (run.status === "failed") return run.failureReason ?? null;

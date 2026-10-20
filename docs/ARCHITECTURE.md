@@ -43,6 +43,42 @@ separate, confirmed owner-or-admin intent that names the exact connection it
 replaces (backend ADR-0019 §4, ADR-0026). A grant that already holds what the
 provider asks for is reused without consent, and the page says so.
 
+## Runs and approvals
+
+A job is its first run (backend ADR-0044): the platform lists each job once,
+by that run's id, and reads any id in a job as the whole job — every step,
+the held run's and the ones after its approval, in one timeline. So the run
+page draws a held step done once the job went on, and nothing here links one
+run of a job to another. The job's newest approval, by when it was asked, is
+the one a page says or offers. Each document is a closed row, "Invoice 1 of
+3" with `{vendor} · {total}`, that opens on its own; its Format is read from
+the job's uploaded files (`RunDetail.files`): its own file, else the only one.
+
+A held job is decided where it waits: step 4 of its run page offers the one
+Approve and Deny pair (`app/account/approvals/ApprovalDecision.tsx`, Deny the
+danger variant) to a role the job's newest approval names, and says who can
+otherwise; a decision draws the run page again (the action revalidates it by
+the job id the platform answers with). On Approvals a decided row fades and
+folds away, its pill saying the decision, and the last one leaving goes to
+Activity; under reduced motion it leaves at once.
+
+A job that has documents and has ended or is held has a run package (backend
+ADR-0045): View package, Download PDF and Download Excel replace Download
+JSON. A download asks the platform for the file through `/api/platform` in the
+browser's zone and goes to the signed link it answers — an attachment, so the
+browser saves it and nothing crosses origins; a platform busy building others
+(503) is asked once more after its `retry-after`. The package page,
+`/account/runs/[runId]/package`, shows the PDF itself: the platform's links are
+attachments only, so the site's own route (`app/account/runs/[runId]/package/file/route.ts`, server
+only) asks for the PDF, reads the signed link on the server
+(`platformSignedFile` in `lib/platform-server.ts`) and answers it
+`application/pdf` and `inline`, never cached, framed by this site alone, and
+nothing over the platform's 25 MiB bound. That route's call to the platform is
+a mutation a GET makes, so it refuses a request another site started, or one
+that does not say where it came from (`Sec-Fetch-Site`), and names this site's
+origin as the page that asked does. Its ask may take 30 s (the platform builds
+for at most 20 s), and the route states `maxDuration = 60`.
+
 ## Container and operations
 
 The Docker image uses Next standalone output and the non-root `nextjs` user.
