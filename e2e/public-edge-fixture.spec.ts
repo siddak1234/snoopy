@@ -2556,7 +2556,7 @@ test("a flow still on v1, whose QuickBooks the catalog's newer version makes opt
   expect(response?.status()).toBe(404);
 });
 
-test("a finished run of three receipts: its full id, every step done, each receipt on its own card — seller, place, numbers, lines, totals — and Download JSON gives the platform's file by that id (spec A7, A8; the owner's ~04:05Z and AM7)", async ({
+test("a finished run of three receipts: its full id, every step done, each receipt on its own card — seller, place, numbers, lines, totals — and the package's buttons, no Download JSON (spec A7, A8; the owner's ~04:05Z and AM7; Build 24's P12)", async ({
   page,
 }) => {
   await page.goto("/account/runs/fixture-run-invoice");
@@ -2665,32 +2665,18 @@ test("a finished run of three receipts: its full id, every step done, each recei
     FLOWS.invoice,
   );
   await expectNoAxeViolations(page);
-  const [download] = await Promise.all([
-    page.waitForEvent("download"),
-    main.getByRole("button", { name: "Download JSON" }).click(),
-  ]);
-  expect(download.suggestedFilename()).toBe("run-fixture-run-invoice.json");
-  const file = JSON.parse(
-    await new Promise<string>((resolve, reject) => {
-      download
-        .createReadStream()
-        .then((stream) => {
-          const chunks: Buffer[] = [];
-          stream.on("data", (chunk: Buffer) => chunks.push(chunk));
-          stream.on("end", () =>
-            resolve(Buffer.concat(chunks).toString("utf8")),
-          );
-          stream.on("error", reject);
-        })
-        .catch(reject);
-    }),
+  // The package's three (Build 24, P12; their own test is in
+  // account-surfaces.spec.ts): ~~Download JSON~~ until Build 24.
+  await expect(main.getByRole("link", { name: "View package" })).toBeVisible();
+  await expect(
+    main.getByRole("button", { name: "Download PDF" }),
+  ).toBeVisible();
+  await expect(
+    main.getByRole("button", { name: "Download Excel" }),
+  ).toBeVisible();
+  await expect(main.getByRole("button", { name: "Download JSON" })).toHaveCount(
+    0,
   );
-  expect(file.runId).toBe("fixture-run-invoice");
-  expect(
-    file.documents.map(
-      (document: { vendor: { name: string } }) => document.vendor.name,
-    ),
-  ).toEqual(["Lowe's", "The Home Depot", "Shell"]);
 });
 
 test("a run is named by its full id, never its request id; a run of an older version is drawn by what it reported — never '34 accounts read' — its failure on its last step (spec A7, A8; run 793eef82 as it ran)", async ({
@@ -2896,7 +2882,7 @@ test.describe("Invoice Processing's page, Step 1 to its run (spec A6, A7; Build 
       0,
     );
     await expect(
-      main.getByRole("button", { name: "Download JSON" }),
+      main.getByRole("button", { name: "Download PDF" }),
     ).toBeVisible();
     // Its email sent: read again, Email sent and when, every step done.
     await fixtureControl("invoice-run-advance");

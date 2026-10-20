@@ -42,7 +42,11 @@ export class PlatformApiError extends Error {
   public constructor(
     message: string,
     public readonly status: number,
-    /** From a 429's `retry-after`: how long the platform asked to be left. */
+    /**
+     * From a 429's or a 503's `retry-after`: how long the platform asked to be
+     * left (a 503 names one while it builds others' run packages, backend
+     * ADR-0045).
+     */
     public readonly retryAfterSeconds?: number,
     /**
      * The problem's public, structured `details` — an unlink's refusal names its
@@ -100,27 +104,13 @@ export async function platformApiJson<T>(
       !Array.isArray(body.details)
         ? (body.details as Record<string, unknown>)
         : undefined;
-    throw new PlatformApiError(title, response.status, undefined, details);
+    const wait =
+      response.status === 503
+        ? retryAfterSeconds(response.headers.get("retry-after"))
+        : undefined;
+    throw new PlatformApiError(title, response.status, wait, details);
   }
   return body as T;
-}
-
-/**
- * A file the platform serves for keeping — a run's documents as JSON (Build
- * 21, spec A7; backend C2's `readRunDocuments`) — as its own bytes, for the
- * browser to save. Refused, it throws as `platformApiJson` does.
- */
-export async function platformApiFile(path: string): Promise<Blob> {
-  const response = await fetch(platformApiPath(path), {
-    credentials: "same-origin",
-  });
-  if (!response.ok) {
-    throw new PlatformApiError(
-      `Platform request failed with status ${response.status}`,
-      response.status,
-    );
-  }
-  return response.blob();
 }
 
 export async function signOutFromPlatform(): Promise<void> {

@@ -183,3 +183,77 @@ test("each document is a closed row that opens in place: <details> never drawn o
   );
   assert.match(live, /toDocumentCards\([\s\S]*?detail\.files,\s*\)/u);
 });
+
+const PACKAGE_PAGE = "app/account/runs/[runId]/package/page.tsx";
+const PACKAGE_ROUTE = "app/account/runs/[runId]/package/file/route.ts";
+
+test("the package page shows the PDF itself: a frame the page's height of the site's inline route, titled Run package, with Download PDF and Download Excel; a job with no package yet says so (P12; the owner's word over S16)", () => {
+  const page = code(read(PACKAGE_PAGE));
+  assert.match(page, /title="Run package"/u);
+  assert.match(
+    page,
+    /ready \? \(\s*<PackageActions workspaceId=\{workspaceId\} runId=\{job\} view=\{false\} \/>/u,
+  );
+  assert.match(page, /<PackageFrame runId=\{job\} \/>/u);
+  assert.match(page, /<EmptyRow text=\{PACKAGE_UNAVAILABLE\} \/>/u);
+  assert.match(
+    page,
+    /back=\{<BackLink href=\{`\/account\/runs\/\$\{encodeURIComponent\(job\)\}`\} \/>\}/u,
+  );
+  const live = code(read(LIVE));
+  assert.match(
+    live,
+    /<iframe\s+title="Run package"\s+src=\{packageFileHref\(runId, zone \|\| null\)\}/u,
+  );
+  // The frame waits for the browser's zone: the server draws none.
+  assert.match(
+    live,
+    /useSyncExternalStore\(\s*noSubscription,\s*browserTimeZone,\s*\(\) => null,?\s*\)/u,
+  );
+});
+
+test("the package's inline route: the PDF asked for through lib/platform-server, its signed link read on the server, handed on inline — application/pdf, never cached, framed by this site alone — and nothing over the platform's bound; a request another site started refused (P12)", () => {
+  const route = code(read(PACKAGE_ROUTE));
+  assert.doesNotMatch(route, /\bfetch\(/u);
+  assert.match(
+    route,
+    /createRunPackageFile\(workspaceId, runId, body, origin\)/u,
+  );
+  assert.match(route, /format: "pdf" as const/u);
+  assert.match(
+    route,
+    /if \(file\.format !== "pdf" \|\| file\.sizeBytes > RUN_PACKAGE_MAXIMUM_BYTES\)\s*return said\(413, COULD_NOT_SHOW\);/u,
+  );
+  assert.match(
+    route,
+    /platformSignedFile\(\s*file\.downloadUrl,\s*RUN_PACKAGE_MAXIMUM_BYTES,?\s*\)/u,
+  );
+  // The PDF's own headers, in the one answer that carries it.
+  assert.match(
+    route,
+    /return new Response\(pdf\.stream, \{\s*headers: \{\s*"content-type": "application\/pdf",\s*"content-disposition": `inline; filename="\$\{runId\}-package\.pdf"`,\s*"cache-control": "private, no-store",\s*"x-content-type-options": "nosniff",\s*"content-security-policy": "frame-ancestors 'self'",/u,
+  );
+  assert.match(
+    route,
+    /if \(fetchSite && fetchSite !== "same-origin" && fetchSite !== "none"\)\s*return said\(403,/u,
+  );
+  assert.match(
+    route,
+    /if \(error\.status === 409\) return said\(409, PACKAGE_UNAVAILABLE\);/u,
+  );
+  const server = code(read("lib/platform-server.ts"));
+  const signed = server.slice(
+    server.indexOf("export async function platformSignedFile"),
+    server.indexOf("export async function platformPublicJson"),
+  );
+  assert.match(signed, /if \(link\.protocol !== "https:"\)/u);
+  assert.match(signed, /redirect: "error"/u);
+  assert.match(
+    signed,
+    /if \(length !== null && length > maximumBytes\) \{\s*await response\.body\.cancel\(\);/u,
+  );
+  assert.match(
+    signed,
+    /arrived \+= chunk\.byteLength;\s*if \(arrived > maximumBytes\)\s*controller\.error\(/u,
+  );
+});

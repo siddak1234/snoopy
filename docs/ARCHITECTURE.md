@@ -62,6 +62,21 @@ the job id the platform answers with). On Approvals a decided row fades and
 folds away, its pill saying the decision, and the last one leaving goes to
 Activity; under reduced motion it leaves at once.
 
+A job that has documents and has ended or is held has a run package (backend
+ADR-0045): View package, Download PDF and Download Excel replace Download
+JSON. A download asks the platform for the file through `/api/platform` in the
+browser's zone and goes to the signed link it answers — an attachment, so the
+browser saves it and nothing crosses origins; a platform busy building others
+(503) is asked once more after its `retry-after`. The package page,
+`/account/runs/[runId]/package`, shows the PDF itself: the platform's links are
+attachments only, so the site's own route (`app/account/runs/[runId]/package/file/route.ts`, server
+only) asks for the PDF, reads the signed link on the server
+(`platformSignedFile` in `lib/platform-server.ts`) and answers it
+`application/pdf` and `inline`, never cached, framed by this site alone, and
+nothing over the platform's 32 MB bound. That route's call to the platform is
+a mutation a GET makes, so it refuses a request another site started
+(`Sec-Fetch-Site`) and names this site's origin as the page that asked does.
+
 ## Container and operations
 
 The Docker image uses Next standalone output and the non-root `nextjs` user.

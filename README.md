@@ -84,7 +84,10 @@ ten; a member reads them), a run's page (every step from the start — its
 integration and its email among them, the running one spinning — read again
 while it goes on, a held job's step 4 with Approve and Deny, each
 document it read a closed row of its own that opens in place — "Invoice 1 of
-3", its Document type and Format — and Download JSON), Approvals (a
+3", its Document type and Format — and View package, Download PDF and
+Download Excel, each download to the platform's signed link), the run
+package's page (the PDF itself, in a frame of the site's inline route that
+answers it `application/pdf` inline; a job with no package yet), Approvals (a
 decided row leaves, and the last one goes to Activity), every run by its
 full id, a run's file (PUT straight to the fixture's object store, across
 origins), a webhook flow's address, connections (one row each — mark, name, the account's email or its

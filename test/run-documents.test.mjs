@@ -3,14 +3,20 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 import {
+  DOWNLOAD_EXCEL,
   DOWNLOAD_FAILED,
-  DOWNLOAD_JSON,
+  DOWNLOAD_PDF,
+  PACKAGE_UNAVAILABLE,
+  RUN_PACKAGE_MAXIMUM_BYTES,
+  VIEW_PACKAGE,
   documentDate,
   documentMoney,
   documentTime,
-  documentsFileName,
   formatFor,
   formatLabel,
+  packageAvailable,
+  packageFileHref,
+  packageRetryWaitMs,
   toDocumentCard,
   toDocumentCards,
 } from "../lib/run-documents.ts";
@@ -398,23 +404,66 @@ test("closed, a card says its heading, its chip and {vendor} · {total} (S9); op
   );
 });
 
-test("Download JSON: the platform's file, saved as run-{the full id}.json, through /api/platform; a refusal said in the session's words", () => {
-  const id = "793eef82-102d-81be-a2d3-9e8d4e2b2c36";
-  assert.equal(documentsFileName(id), `run-${id}.json`);
-  assert.equal(DOWNLOAD_JSON, "Download JSON");
+test("the run package's words, the app's (Build 24, P12; ~~Download JSON~~ until then); offered once the job has documents and has ended or is held", () => {
+  assert.equal(VIEW_PACKAGE, "View package");
+  assert.equal(DOWNLOAD_PDF, "Download PDF");
+  assert.equal(DOWNLOAD_EXCEL, "Download Excel");
   assert.equal(DOWNLOAD_FAILED, "Could not download. Try again.");
+  assert.equal(PACKAGE_UNAVAILABLE, "This run has no package yet.");
+  const documents = [doc()];
+  assert.equal(packageAvailable("succeeded", documents), true);
+  assert.equal(packageAvailable("held", documents), true);
+  assert.equal(packageAvailable("failed", documents), true);
+  assert.equal(packageAvailable("running", documents), false);
+  assert.equal(packageAvailable("pending", documents), false);
+  assert.equal(packageAvailable("succeeded", []), false);
+  assert.equal(packageAvailable("succeeded", undefined), false);
+});
+
+test("the platform busy building others: asked once more after its retry-after (2 s when none, not past 10 s); the frame's route by the job's id and the browser's zone; the platform's 32 MB bound, as MiB (P12)", () => {
+  assert.deepEqual([undefined, 0, 1, 5, 10, 11, 300].map(packageRetryWaitMs), [
+    2_000,
+    0,
+    1_000,
+    5_000,
+    10_000,
+    null,
+    null,
+  ]);
+  assert.equal(
+    packageFileHref("fixture-run-invoice", "America/Chicago"),
+    "/account/runs/fixture-run-invoice/package/file?timeZone=America%2FChicago",
+  );
+  assert.equal(
+    packageFileHref("a b", null),
+    "/account/runs/a%20b/package/file",
+  );
+  assert.equal(RUN_PACKAGE_MAXIMUM_BYTES, 33_554_432);
+});
+
+test("Download PDF and Download Excel: the platform's link, asked through /api/platform in the browser's zone with a key, then followed — a busy platform asked once more, a refusal said; never a hand-written fetch, and Download JSON gone (P12)", () => {
   const live = read("app/account/runs/[runId]/RunLive.tsx");
   assert.match(
     live,
-    /platformApiFile\(\s*`\/v1\/workspaces\/\$\{encodeURIComponent\(workspaceId\)\}\/runs\/\$\{encodeURIComponent\(run\.id\)\}\/documents`,?\s*\)/u,
+    /platformApiJson<RunPackageFile>\(\s*`\/v1\/workspaces\/\$\{encodeURIComponent\(workspaceId\)\}\/runs\/\$\{encodeURIComponent\(runId\)\}\/package`,\s*\{\s*method: "POST",\s*headers: \{\s*"content-type": "application\/json",\s*"idempotency-key": `run-package-\$\{format\}-\$\{crypto\.randomUUID\(\)\}`,/u,
   );
-  assert.match(live, /anchor\.download = documentsFileName\(run\.id\);/u);
-  assert.match(live, /setDownloadError\(DOWNLOAD_FAILED\);/u);
-  // Offered only when the run has documents.
+  assert.match(live, /\.\.\.\(zone \? \{ timeZone: zone \} : \{\}\)/u);
+  assert.match(live, /window\.location\.assign\(file\.downloadUrl\);/u);
   assert.match(
     live,
-    /\{cards\.length > 0 \? \(\s*<Button[\s\S]*?\{DOWNLOAD_JSON\}/u,
+    /error instanceof PlatformApiError && error\.status === 503\s*\? packageRetryWaitMs\(error\.retryAfterSeconds\)\s*: null;\s*if \(wait === null\) throw error;\s*await new Promise\(\(resolve\) => setTimeout\(resolve, wait\)\);\s*return ask\(\);/u,
   );
-  // Through the browser's one path to the platform, never a hand-written fetch.
+  assert.match(live, /setError\(DOWNLOAD_FAILED\);/u);
+  // Offered once the job can be packaged, with View package on the run page.
+  assert.match(
+    live,
+    /\{packageAvailable\(run\.status, documents\) \? \(\s*<PackageActions workspaceId=\{workspaceId\} runId=\{run\.id\} view \/>/u,
+  );
+  // Gone, but in the struck-through history of its comments.
+  assert.doesNotMatch(
+    live.replace(/~~[\s\S]*?~~/gu, ""),
+    /Download JSON|DOWNLOAD_JSON|documentsFileName/u,
+  );
   assert.doesNotMatch(live, /\bfetch\(/u);
+  assert.doesNotMatch(read("lib/platform-api.ts"), /platformApiFile/u);
 });

@@ -21,7 +21,8 @@ import { RunLive, type RunDecision, type RunFlow } from "./RunLive";
 /**
  * One run (Build 21, spec A7): named by its FULL id (A8; the owner's D4 and
  * AM2), every step from the start with where the run is, each document it read
- * and Download JSON — drawn here once, then kept live by `RunLive`.
+ * and the run package's buttons (Build 24, P12; ~~Download JSON~~ until then)
+ * — drawn here once, then kept live by `RunLive`.
  *
  * The screen renders `steps` — what the automation reported against the steps
  * its manifest declares — and not `events`, which is the platform's own record

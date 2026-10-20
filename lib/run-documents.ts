@@ -14,7 +14,8 @@
  * by hand from the decimal string — "$17.19" in US dollars or when the
  * document names no currency, at least two decimals and every digit printed
  * ("$3.459"), else the amount and its code ("17.19 CAD"), as the results email
- * writes a total (spec C3).
+ * writes a total (spec C3). And the run package's words and rules, the
+ * documents as one PDF and one workbook (Build 24, P12).
  *
  * Pure, and loaded by its unit test as it is: no React and no `@/` import.
  */
@@ -389,15 +390,66 @@ export function toDocumentCards(
   );
 }
 
-/**
- * The JSON file's name: `run-{the full run id}.json` (the owner's AM2:
- * "runs should have the full ID"; ~~the first eight~~ of the spec's S4) — the
- * name the platform's own `Content-Disposition` gives it.
+/*
+ * The run package (Build 24, P12; backend ADR-0045): the job's documents as
+ * the A8X PDF and an Excel workbook, which the platform builds and answers
+ * behind a short-lived signed link — never the bytes. ~~Download JSON~~ until
+ * Build 24: the package's two files replace it.
  */
-export function documentsFileName(runId: string): string {
-  return `run-${runId}.json`;
+
+/** The run page's way to the package page, and the two downloads (the app's words). */
+export const VIEW_PACKAGE = "View package";
+export const DOWNLOAD_PDF = "Download PDF";
+export const DOWNLOAD_EXCEL = "Download Excel";
+export const DOWNLOAD_FAILED = "Could not download. Try again.";
+/** The package page of a job the platform cannot package yet (no documents, or still going). */
+export const PACKAGE_UNAVAILABLE = "This run has no package yet.";
+
+/**
+ * The largest package file shown inline: the platform's own bound, 32 MB
+ * (`createRunPackageFile` answers 422 past it), read as MiB — the larger — so
+ * no file the platform built is refused here.
+ */
+export const RUN_PACKAGE_MAXIMUM_BYTES = 32 * 1024 * 1024;
+
+/** The longest `retry-after` a package request waits out before asking once more. */
+const PACKAGE_LONGEST_WAIT_SECONDS = 10;
+
+/**
+ * How long to wait before asking once more for a package the platform is too
+ * busy to build (503 `package_busy`): its `retry-after` (2 s when it names
+ * none), or `null` — not waited out, said at once — when that is over 10 s.
+ */
+export function packageRetryWaitMs(
+  retryAfterSeconds: number | undefined,
+): number | null {
+  if (retryAfterSeconds === undefined) return 2_000;
+  return retryAfterSeconds <= PACKAGE_LONGEST_WAIT_SECONDS
+    ? retryAfterSeconds * 1_000
+    : null;
 }
 
-/** Download JSON (spec A7; the session's S25). */
-export const DOWNLOAD_JSON = "Download JSON";
-export const DOWNLOAD_FAILED = "Could not download. Try again.";
+/**
+ * Whether the platform packages a job now: it has documents and has ended or
+ * is held (`createRunPackageFile` answers 409 otherwise).
+ */
+export function packageAvailable(
+  status: string,
+  documents: readonly unknown[] | undefined,
+): boolean {
+  return (
+    (documents?.length ?? 0) > 0 && status !== "pending" && status !== "running"
+  );
+}
+
+/**
+ * The package page's frame: the site's own route, which asks the platform for
+ * the PDF in this zone and hands it on inline (`…/package/file`).
+ */
+export function packageFileHref(
+  runId: string,
+  timeZone: string | null,
+): string {
+  const zone = timeZone ? `?timeZone=${encodeURIComponent(timeZone)}` : "";
+  return `/account/runs/${encodeURIComponent(runId)}/package/file${zone}`;
+}

@@ -1,3 +1,4 @@
+import { AxeBuilder } from "@axe-core/playwright";
 import {
   expect,
   test,
@@ -1116,6 +1117,184 @@ test("P7 — a decided row fades and folds away, its pill never Pending beside a
   await rows.first().getByRole("button", { name: "Deny" }).click();
   await expect(page).toHaveURL(/\/account\/runs$/u);
   expect(await approvalStatuses()).toEqual(["approved", "rejected"]);
+});
+
+// Build 24 (P12; backend ADR-0045): the run package — its buttons on a
+// finished job's page, its page with the PDF itself, and the site's inline
+// route. In one zone, so the zone each file is asked in is known; the signed
+// link is the fixture's own HTTPS store, as the complete export's is.
+test.describe("the run package", () => {
+  test.use({ timezoneId: "America/Chicago", ignoreHTTPSErrors: true });
+  const job = "/account/runs/fixture-run-invoice";
+  const packagePage = `${job}/package`;
+  const inline = `${packagePage}/file?timeZone=America%2FChicago`;
+  const signedLink = (format: string) =>
+    `https://127.0.0.1:3443/__fixture/package-file?run=fixture-run-invoice&format=${format}`;
+  const packageFiles = async () =>
+    (
+      await fixtureRead<{
+        packageFiles: {
+          runId: string;
+          format: string;
+          timeZone: string | null;
+          keyed: boolean;
+        }[];
+      }>("counts")
+    ).packageFiles;
+
+  test("P12 — a finished job offers View package, Download PDF and Download Excel — no Download JSON; each download asks in the browser's zone, with a key, and goes to its signed link", async ({
+    page,
+  }) => {
+    await page.goto(job);
+    const main = page.locator("main");
+    await expect(
+      main.getByRole("button", { name: "Download JSON" }),
+    ).toHaveCount(0);
+    await expect(
+      main.getByRole("link", { name: "View package" }),
+    ).toHaveAttribute("href", packagePage);
+    for (const [name, format] of [
+      ["Download PDF", "pdf"],
+      ["Download Excel", "xlsx"],
+    ] as const) {
+      const [download] = await Promise.all([
+        page.waitForEvent("download"),
+        main.getByRole("button", { name }).click(),
+      ]);
+      expect(download.url()).toBe(signedLink(format));
+      expect(download.suggestedFilename()).toBe(
+        `run-fixture-run-invoice.${format}`,
+      );
+      // Nothing was left: the signed link saved the file.
+      await expect(page).toHaveURL(new RegExp(`${job}$`, "u"));
+    }
+    expect(await packageFiles()).toEqual([
+      {
+        runId: "fixture-run-invoice",
+        format: "pdf",
+        timeZone: "America/Chicago",
+        keyed: true,
+      },
+      {
+        runId: "fixture-run-invoice",
+        format: "xlsx",
+        timeZone: "America/Chicago",
+        keyed: true,
+      },
+    ]);
+    // Not while a job goes on: nothing to package yet.
+    await page.goto("/account/runs/fixture-run-running");
+    await expect(
+      page.locator("main").getByRole("button", { name: "Download PDF" }),
+    ).toHaveCount(0);
+  });
+
+  test("P12 — the platform busy building others: asked once more after its wait, then said", async ({
+    page,
+  }) => {
+    await fixtureControl("package-busy");
+    await page.goto(job);
+    const main = page.locator("main");
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      main.getByRole("button", { name: "Download PDF" }).click(),
+    ]);
+    expect(download.url()).toBe(signedLink("pdf"));
+    expect((await packageFiles()).length).toBe(2);
+    await fixtureControl("package-busy-twice");
+    await main.getByRole("button", { name: "Download PDF" }).click();
+    await expect(main.getByRole("alert")).toHaveText(
+      "Could not download. Try again.",
+    );
+    expect((await packageFiles()).length).toBe(4);
+  });
+
+  test("P12 — View package opens the package page: the PDF itself in a frame of the site's inline route, Download PDF and Download Excel, Back to the run; axe clean", async ({
+    page,
+  }) => {
+    await page.goto(job);
+    await page
+      .locator("main")
+      .getByRole("link", { name: "View package" })
+      .click();
+    await expect(page).toHaveURL(new RegExp(`${packagePage}$`, "u"));
+    const main = page.locator("main");
+    await expect(main.getByRole("heading", { level: 1 })).toHaveText(
+      "Run package",
+    );
+    await expect(main).toContainText("Run fixture-run-invoice");
+    const frame = main.locator('iframe[title="Run package"]');
+    await expect(frame).toHaveAttribute("src", inline);
+    await expect(
+      main.getByRole("button", { name: "Download PDF" }),
+    ).toBeVisible();
+    await expect(
+      main.getByRole("button", { name: "Download Excel" }),
+    ).toBeVisible();
+    await expect(main.getByRole("link", { name: "View package" })).toHaveCount(
+      0,
+    );
+    await expect(main.getByRole("link", { name: "Back" })).toHaveAttribute(
+      "href",
+      job,
+    );
+    // The page's own markup; the frame holds a PDF, not this site's page.
+    await expect(page).toHaveTitle(/\S/u);
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+      .exclude('iframe[title="Run package"]')
+      .analyze();
+    expect(results.violations).toEqual([]);
+    // The frame's route: the PDF inline, never cached, framed by this site.
+    const answer = await page.request.get(inline);
+    expect(answer.status()).toBe(200);
+    expect(answer.headers()["content-type"]).toBe("application/pdf");
+    expect(answer.headers()["content-disposition"]).toBe(
+      'inline; filename="fixture-run-invoice-package.pdf"',
+    );
+    expect(answer.headers()["cache-control"]).toBe("private, no-store");
+    expect(answer.headers()["content-security-policy"]).toBe(
+      "frame-ancestors 'self'",
+    );
+    expect((await answer.body()).subarray(0, 5).toString("latin1")).toBe(
+      "%PDF-",
+    );
+    expect(
+      (await packageFiles()).filter((asked) => asked.format === "pdf").at(-1),
+    ).toEqual({
+      runId: "fixture-run-invoice",
+      format: "pdf",
+      timeZone: "America/Chicago",
+      keyed: true,
+    });
+    // A request another site started is refused.
+    const crossSite = await page.request.get(inline, {
+      headers: { "sec-fetch-site": "cross-site" },
+    });
+    expect(crossSite.status()).toBe(403);
+  });
+
+  test("P12 — a job with no package yet says so, with the way back; its route answers 409; a signed file over the bound is refused", async ({
+    page,
+  }) => {
+    await page.goto("/account/runs/fixture-run-running/package");
+    const main = page.locator("main");
+    await expect(main).toContainText("This run has no package yet.");
+    await expect(main.locator("iframe")).toHaveCount(0);
+    await expect(main.getByRole("link", { name: "Back" })).toHaveAttribute(
+      "href",
+      "/account/runs/fixture-run-running",
+    );
+    const none = await page.request.get(
+      "/account/runs/fixture-run-running/package/file",
+    );
+    expect(none.status()).toBe(409);
+    expect(await none.text()).toBe("This run has no package yet.");
+    await fixtureControl("package-file-oversized");
+    const oversized = await page.request.get(inline);
+    expect(oversized.status()).toBe(413);
+    expect(oversized.headers()["content-type"]).not.toBe("application/pdf");
+  });
 });
 
 test("P7 — under reduced motion a decided row leaves at once, with no fade", async ({
