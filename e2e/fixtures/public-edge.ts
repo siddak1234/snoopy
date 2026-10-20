@@ -2202,7 +2202,7 @@ const server = createServer(
       if (state.packageFileOversized) {
         response.writeHead(200, {
           ...headers,
-          "content-length": String(32 * 1024 * 1024 + 1),
+          "content-length": String(25 * 1024 * 1024 + 1),
         });
         response.write(bytes);
         setTimeout(() => response.destroy(), 500);

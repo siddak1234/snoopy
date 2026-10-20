@@ -406,11 +406,11 @@ export const DOWNLOAD_FAILED = "Could not download. Try again.";
 export const PACKAGE_UNAVAILABLE = "This run has no package yet.";
 
 /**
- * The largest package file shown inline: the platform's own bound, 32 MB
- * (`createRunPackageFile` answers 422 past it), read as MiB — the larger — so
- * no file the platform built is refused here.
+ * The largest package file shown inline: the platform's own bound, 25 MiB —
+ * the file store's ceiling, past which `createRunPackageFile` answers 422
+ * `package_too_large` — so no file the platform built is refused here.
  */
-export const RUN_PACKAGE_MAXIMUM_BYTES = 32 * 1024 * 1024;
+export const RUN_PACKAGE_MAXIMUM_BYTES = 25 * 1024 * 1024;
 
 /** The longest `retry-after` a package request waits out before asking once more. */
 const PACKAGE_LONGEST_WAIT_SECONDS = 10;

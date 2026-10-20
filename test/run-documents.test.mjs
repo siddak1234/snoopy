@@ -438,7 +438,7 @@ test("the platform busy building others: asked once more after its retry-after (
     packageFileHref("a b", null),
     "/account/runs/a%20b/package/file",
   );
-  assert.equal(RUN_PACKAGE_MAXIMUM_BYTES, 33_554_432);
+  assert.equal(RUN_PACKAGE_MAXIMUM_BYTES, 26_214_400);
 });
 
 test("Download PDF and Download Excel: the platform's link, asked through /api/platform in the browser's zone with a key, then followed — a busy platform asked once more, a refusal said; never a hand-written fetch, and Download JSON gone (P12)", () => {

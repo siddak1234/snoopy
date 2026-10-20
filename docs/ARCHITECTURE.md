@@ -73,9 +73,11 @@ attachments only, so the site's own route (`app/account/runs/[runId]/package/fil
 only) asks for the PDF, reads the signed link on the server
 (`platformSignedFile` in `lib/platform-server.ts`) and answers it
 `application/pdf` and `inline`, never cached, framed by this site alone, and
-nothing over the platform's 32 MB bound. That route's call to the platform is
-a mutation a GET makes, so it refuses a request another site started
-(`Sec-Fetch-Site`) and names this site's origin as the page that asked does.
+nothing over the platform's 25 MiB bound. That route's call to the platform is
+a mutation a GET makes, so it refuses a request another site started, or one
+that does not say where it came from (`Sec-Fetch-Site`), and names this site's
+origin as the page that asked does. Its ask may take 30 s (the platform builds
+for at most 20 s), and the route states `maxDuration = 60`.
 
 ## Container and operations
 
