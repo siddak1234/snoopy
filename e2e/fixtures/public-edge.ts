@@ -367,6 +367,12 @@ function initialState() {
     heldJobLive: null as "running" | "held" | null,
     heldApprovalHiddenReads: 0,
     approvalListReads: 0,
+    // Build 25's audit: the next read of the approvals list refused (503), and
+    // every one refused; the workspace's flows, or the catalog, unreadable.
+    approvalListFailing: 0,
+    approvalListRefused: 0,
+    subscriptionsFailing: false,
+    catalogFailing: false,
     // Build 25 (the review's R5c 2): signed links answered with another
     // scheme than https — the package's and the complete export's.
     signedLinkScheme: null as "http" | "javascript" | null,
@@ -1874,10 +1880,17 @@ const server = createServer(
         if (scheme !== "http" && scheme !== "javascript") return false;
         state.signedLinkScheme = scheme;
       },
-      // Build 25 (the review's R5c 3): Invoice Processing just added, a draft
-      // its Set up turns on, its settings as they were.
-      "/__fixture/invoice-draft": () => {
-        state.invoiceStatus = "draft";
+      // Build 25's audit: one read of the approvals list refused, as a busy
+      // platform refuses one (a run page's re-read meets it), and the flows
+      // or the catalog that an Approvals row's headline joins, unreadable.
+      "/__fixture/approvals-failing-once": () => {
+        state.approvalListFailing = 1;
+      },
+      "/__fixture/subscriptions-failing": () => {
+        state.subscriptionsFailing = true;
+      },
+      "/__fixture/catalog-failing": () => {
+        state.catalogFailing = true;
       },
       "/__fixture/billing-not-configured": () => {
         state.billingNotConfigured = true;
@@ -2121,8 +2134,10 @@ const server = createServer(
         approvalStatuses: state.approvals.map((entry) => entry.status),
         // Every run package file asked for (Build 24, P12).
         packageFiles: state.packageFiles,
-        // Every read of the approvals list (Build 25, R5c 1).
+        // Every read of the approvals list (Build 25, R5c 1), and every one
+        // refused (Build 25's audit).
         approvalListReads: state.approvalListReads,
+        approvalListRefused: state.approvalListRefused,
         // Every checkout asked for: a refused one leaves no plan behind.
         checkoutAttempts: state.checkoutAttempts,
         // Every team a test created — where, and the name and kind it was
@@ -3313,7 +3328,17 @@ const server = createServer(
       } satisfies ConnectionOperations["connectProviderWithKey"]["responses"][201]["content"]["application/json"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/automations")) {
+      if (state.catalogFailing)
+        return respond(response, 503, problem(503, "Service Unavailable"));
       return respond(response, 200, fixtureCatalog());
+    }
+    if (
+      method === "GET" &&
+      isWorkspacePath(pathname, "/subscriptions") &&
+      url.searchParams.get("status") !== "archived" &&
+      state.subscriptionsFailing
+    ) {
+      return respond(response, 503, problem(503, "Service Unavailable"));
     }
     if (method === "GET" && isWorkspacePath(pathname, "/subscriptions")) {
       // Backend §12.1 #203: the archived ones, asked for by name.
@@ -4246,6 +4271,11 @@ const server = createServer(
     if (method === "GET" && isWorkspacePath(pathname, "/approvals")) {
       const status = url.searchParams.get("status");
       state.approvalListReads += 1;
+      if (state.approvalListFailing > 0) {
+        state.approvalListFailing -= 1;
+        state.approvalListRefused += 1;
+        return respond(response, 503, problem(503, "Service Unavailable"));
+      }
       // The held job asked nothing while it goes on, and its approval is not
       // listed yet on a read the test left it off (R5c 1).
       const unlisted =

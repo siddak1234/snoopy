@@ -2,6 +2,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 import {
   expect,
   test,
+  type Download,
   type Locator,
   type Page,
   type Request,
@@ -1015,6 +1016,10 @@ const heldStep = (page: Page) =>
   page.locator("main").getByTestId("run-step-group:record");
 const approvalRows = (page: Page) =>
   page.locator('[data-testid^="approval-row-"]');
+// Every read of the approvals list the fixture answered (Build 25, R5c 1).
+const approvalListReads = async () =>
+  (await fixtureRead<{ approvalListReads: number }>("counts"))
+    .approvalListReads;
 
 test("P6 — a held job's step 4 offers Approve and Deny, Deny red; Approving… while it saves, then the page is drawn again: the job runs on under its id", async ({
   page,
@@ -1087,10 +1092,7 @@ test("R5c 1 — a job that reaches its approval while its page is open offers Ap
   await expect(step.getByRole("button")).toHaveCount(0);
   // A reload from here on would lose this mark.
   await page.evaluate(() => Object.assign(window, { sameDocument: true }));
-  const listReads = async () =>
-    (await fixtureRead<{ approvalListReads: number }>("counts"))
-      .approvalListReads;
-  const before = await listReads();
+  const before = await approvalListReads();
   // It holds, and the first read of the list after does not list its
   // approval yet.
   await fixtureControl("held-job-holds");
@@ -1109,7 +1111,108 @@ test("R5c 1 — a job that reaches its approval while its page is open offers Ap
       () => (window as unknown as { sameDocument?: boolean }).sameDocument,
     ),
   ).toBe(true);
-  expect((await listReads()) - before).toBeGreaterThanOrEqual(2);
+  const listed = await approvalListReads();
+  expect(listed - before).toBeGreaterThanOrEqual(2);
+  // Listed: the job is not read again for it (Build 25's audit).
+  await page.waitForTimeout(6_000);
+  expect(await approvalListReads()).toBe(listed);
+});
+
+test("R5c 1 — a held job whose approval is never listed is read again for it at most ten times, then no more, and offers no button (Build 25's audit)", async ({
+  page,
+}) => {
+  test.setTimeout(75_000);
+  await fixtureControl("held-job-holds?hidden=100000");
+  const before = await approvalListReads();
+  await page.goto(heldJob);
+  const step = heldStep(page);
+  await expect(step).toHaveAttribute("data-state", "held");
+  // The read that drew the page, then HELD_APPROVAL_REREADS (10) more, each
+  // 2 s after the last.
+  await expect.poll(approvalListReads, { timeout: 45_000 }).toBe(before + 11);
+  await page.waitForTimeout(6_000);
+  expect(await approvalListReads()).toBe(before + 11);
+  await expect(step.getByRole("button")).toHaveCount(0);
+});
+
+test("R5c 1 — a held job that goes on while its approval is read for is not read again for it (Build 25's audit)", async ({
+  page,
+}) => {
+  await fixtureControl("held-job-holds?hidden=100000");
+  const before = await approvalListReads();
+  await page.goto(heldJob);
+  await expect
+    .poll(approvalListReads, { timeout: 15_000 })
+    .toBeGreaterThanOrEqual(before + 3);
+  await fixtureControl("held-job-running");
+  await expect(page.locator("main").getByText(/^running$/iu)).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(heldStep(page)).toHaveAttribute("data-state", "working");
+  const at = await approvalListReads();
+  await page.waitForTimeout(6_000);
+  expect(await approvalListReads()).toBe(at);
+});
+
+test("a held job's approvals re-read that fails costs only that read: the run page stays, and the next read offers Approve and Deny in step 4 (Build 25's audit)", async ({
+  page,
+}) => {
+  // The read that draws the page does not list the approval yet; the first
+  // re-read is refused (503), and the next one lists it.
+  await fixtureControl("held-job-holds?hidden=1");
+  await page.goto(heldJob);
+  const step = heldStep(page);
+  await expect(step).toHaveAttribute("data-state", "held");
+  await page.evaluate(() => Object.assign(window, { sameDocument: true }));
+  await fixtureControl("approvals-failing-once");
+  await expect(step.getByRole("button", { name: "Approve" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(step.getByRole("button", { name: "Deny" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "The platform could not answer just now",
+    }),
+  ).toHaveCount(0);
+  expect(
+    (await fixtureRead<{ approvalListRefused: number }>("counts"))
+      .approvalListRefused,
+  ).toBe(1);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { sameDocument?: boolean }).sameDocument,
+    ),
+  ).toBe(true);
+});
+
+test("an Approvals row whose flows or catalog cannot be read loses those words, never the page or its buttons (Build 25's audit; the review's R5c 6)", async ({
+  page,
+}) => {
+  const title = page.getByTestId(
+    "approval-title-a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1",
+  );
+  const main = page.locator("main");
+  const drawn = async (headline: RegExp) => {
+    await page.goto("/account/approvals");
+    await expect(approvalRows(page)).toHaveCount(2);
+    await expect(title).toHaveText(headline);
+    await expect(main.getByRole("button", { name: "Approve" })).toHaveCount(2);
+    await expect(main).not.toContainText("ask-approval");
+  };
+  await fixtureControl("approval-waiting");
+  await fixtureControl("invoice-approval-pending");
+  // The catalog unread: the flow's template id stands for its name.
+  await fixtureControl("catalog-failing");
+  await drawn(/^fixture-invoice · expires in \d+[hd]$/u);
+  // The flows unread too: nothing to join the approval to.
+  await fixtureControl("subscriptions-failing");
+  await drawn(/^— · expires in \d+[hd]$/u);
+  // The flows alone.
+  await fixtureControl("reset");
+  await fixtureControl("approval-waiting");
+  await fixtureControl("invoice-approval-pending");
+  await fixtureControl("subscriptions-failing");
+  await drawn(/^— · expires in \d+[hd]$/u);
 });
 
 test("P7 — a decided row fades and folds away, its pill never Pending beside a decision; the other stays; the last one leaving goes to Activity", async ({
@@ -1371,6 +1474,70 @@ test.describe("the run package", () => {
     });
     expect(oversized.status()).toBe(413);
     expect(oversized.headers()["content-type"]).not.toBe("application/pdf");
+  });
+
+  test("the package page's Download PDF and Download Excel go to the https signed link, and never to one that is not https (Build 25's audit; the review's R5c 2)", async ({
+    page,
+  }) => {
+    // Only the platform's signed links count: a headless browser may save the
+    // page's own PDF frame, the inline route, as a download too.
+    const fromSignedLink = (download: Download) =>
+      download.url().startsWith("https://127.0.0.1:3443/");
+    const main = page.locator("main");
+    await page.goto(packagePage);
+    for (const [name, format] of [
+      ["Download PDF", "pdf"],
+      ["Download Excel", "xlsx"],
+    ] as const) {
+      const [download] = await Promise.all([
+        page.waitForEvent("download", { predicate: fromSignedLink }),
+        main.getByRole("button", { name }).click(),
+      ]);
+      expect(download.url()).toBe(signedLink(format));
+      await expect(page).toHaveURL(new RegExp(`${packagePage}$`, "u"));
+    }
+    let downloads = 0;
+    page.on("download", (download) => {
+      if (fromSignedLink(download)) downloads += 1;
+    });
+    for (const scheme of ["http", "javascript"]) {
+      await fixtureControl(`signed-link-scheme?scheme=${scheme}`);
+      for (const name of ["Download PDF", "Download Excel"]) {
+        await page.goto(packagePage);
+        const title = await page.title();
+        await main.getByRole("button", { name }).click();
+        await expect(
+          main.getByRole("alert").filter({ hasText: "Could not download" }),
+        ).toHaveText("Could not download. Try again.");
+        await expect(main.getByRole("button", { name })).toBeEnabled();
+        await expect(page).toHaveURL(new RegExp(`${packagePage}$`, "u"));
+        expect(await page.title()).toBe(title);
+      }
+    }
+    expect(downloads).toBe(0);
+  });
+
+  test("the package page's route asks a platform busy building others once more after its wait, and says it could not open the package when busy twice (Build 25's audit; the review's R5c 5)", async ({
+    page,
+  }) => {
+    const sameSite = { headers: { "sec-fetch-site": "same-origin" } };
+    await fixtureControl("package-busy");
+    const before = (await packageFiles()).length;
+    const answer = await page.request.get(inline, sameSite);
+    expect(answer.status()).toBe(200);
+    expect(answer.headers()["content-type"]).toBe("application/pdf");
+    expect((await answer.body()).subarray(0, 5).toString("latin1")).toBe(
+      "%PDF-",
+    );
+    // Once busy, once more.
+    expect((await packageFiles()).length - before).toBe(2);
+    await fixtureControl("package-busy-twice");
+    const again = (await packageFiles()).length;
+    const refused = await page.request.get(inline, sameSite);
+    expect(refused.status()).toBe(502);
+    expect(await refused.text()).toBe("Could not open the package. Try again.");
+    // Never a third time.
+    expect((await packageFiles()).length - again).toBe(2);
   });
 });
 
@@ -1670,6 +1837,36 @@ test("a provider connected on a page whose workspace another tab switched away i
   await expect(connect).toBeVisible();
 });
 
+test("a vendor connected from a flow step's rows on a page whose workspace another tab switched away is refused under its row, saves nothing and asks no consent (Build 25's audit; the review's R5c 5)", async ({
+  page,
+}) => {
+  const consent = observe(
+    page,
+    (request) =>
+      request.url().includes("/connections?status=") ||
+      request.url().startsWith("https://oauth.invalid/"),
+  );
+  const invoiceSettings = async () =>
+    (await fixtureRead<{ invoiceConfig: Record<string, unknown> }>("counts"))
+      .invoiceConfig;
+  const before = await invoiceSettings();
+  const vendorPage = `${FLOWS.invoice}/vendor?field=vendor`;
+  await page.goto(vendorPage);
+  const main = page.locator("main");
+  const quickbooks = main.getByRole("radio", { name: "QuickBooks Online" });
+  await expect(quickbooks).toBeEnabled();
+  await switchInAnotherTab(page, /Fixture Personal/);
+  await quickbooks.click();
+  await expect(main.getByRole("alert")).toHaveText(workspaceChanged);
+  await expect(page).toHaveURL(
+    new RegExp(`${FLOWS.invoice}/vendor\\?field=vendor$`, "u"),
+  );
+  await expect(quickbooks).toBeEnabled();
+  expect(consent).toEqual([]);
+  expect(await invoiceSettings()).toEqual(before);
+  await switchInAnotherTab(page, /Fixture Organization/);
+});
+
 test("22 — a page outside the account area that cannot load says so, and Try again loads it once it can", async ({
   page,
 }) => {
@@ -1724,5 +1921,88 @@ test("26 — each account page reads the workspace list once, counted at the pla
       workspaceListReads: number;
     }>("counts");
     expect(workspaceListReads, path).toBe(1);
+  }
+});
+
+// The grey a mark is drawn in, from a screenshot of it: of the greys that each
+// cover at least 2% of its box, the darkest — on the light ground, the mark's
+// own colour, its anti-aliased edge and the ground lighter. Decoded on a blank
+// page of the same browser, where no policy of the site's applies.
+async function darkestGrey(page: Page, element: Locator): Promise<number> {
+  const png = (await element.screenshot()).toString("base64");
+  const blank = await page.context().newPage();
+  try {
+    return await blank.evaluate(async (data) => {
+      const image = new Image();
+      image.src = `data:image/png;base64,${data}`;
+      await image.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("no 2d context");
+      context.drawImage(image, 0, 0);
+      const pixels = context.getImageData(0, 0, image.width, image.height).data;
+      const counts = new Map<number, number>();
+      for (let index = 0; index < pixels.length; index += 4) {
+        const [red, green, blue] = [
+          pixels[index],
+          pixels[index + 1],
+          pixels[index + 2],
+        ];
+        if (Math.abs(red - green) > 2 || Math.abs(green - blue) > 2) continue;
+        counts.set(red, (counts.get(red) ?? 0) + 1);
+      }
+      const total = pixels.length / 4;
+      const greys = [...counts]
+        .filter(([, count]) => count / total >= 0.02)
+        .map(([grey]) => grey);
+      return greys.length > 0 ? Math.min(...greys) : -1;
+    }, png);
+  } finally {
+    await blank.close();
+  }
+}
+
+test("on the light ground the A8X mark is the design's near-black #212121 — its white artwork inverted at .87 — on the site and in the account (Build 25's audit)", async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem("theme", "light"));
+  for (const path of ["/", "/account"]) {
+    await page.goto(path);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    const mark = page.locator(".brand-mark").first();
+    await expect(mark).toBeVisible();
+    await expect
+      .poll(() =>
+        mark.evaluate(
+          (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
+        ),
+      )
+      .toBe(true);
+    // A stored theme fades each colour in: the mark's and its ground's
+    // finite animations are let finish first, so it is read settled.
+    await mark.evaluate((element) => {
+      const animations: Animation[] = [];
+      for (let node: Element | null = element; node; node = node.parentElement)
+        animations.push(
+          ...node
+            .getAnimations()
+            .filter(
+              (animation) =>
+                animation.effect?.getTiming().iterations !==
+                Number.POSITIVE_INFINITY,
+            ),
+        );
+      return Promise.all(
+        animations.map((animation) => animation.finished.catch(() => null)),
+      );
+    });
+    const grey = await darkestGrey(page, mark);
+    // 255 × (1 − 0.87) = 33 = 0x21; invert(1) draws 0, invert(0.78) 0x38.
+    expect(
+      Math.abs(grey - 0x21),
+      `${path}: drawn in grey ${grey}`,
+    ).toBeLessThanOrEqual(4);
   }
 });

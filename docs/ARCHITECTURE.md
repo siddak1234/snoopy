@@ -64,15 +64,18 @@ Approve and Deny pair (`app/account/approvals/ApprovalDecision.tsx`, Deny the
 danger variant) to a role the job's newest approval names, and says who can
 otherwise; a decision draws the run page again (the action revalidates it by
 the job id the platform answers with). A run can turn held while its page is
-open, or the page can read it before its approval is listed. Then the server
-draws the page again, which reads the approvals, every 2 s, one read at a time
-and at most ten times, until the approval is listed or the run leaves held
-(`rereadForApproval` in `lib/run-progress.ts`). So Approve and Deny appear
-with no reload. A job whose approval is listed is not read again for it. On
-Approvals each row names its flow and the step it waits at, "{flow} · {step
-title}" (`approvalTitle`), never the step id. A decided row fades and folds
-away, its pill saying the decision, and the last one leaving goes to
-Activity; under reduced motion it leaves at once.
+open, or the page can read it before its approval is listed. Then the browser
+reads the job and its approvals again through `/api/platform`, every 2 s, one
+read at a time and at most ten times, until the approval is listed or the run
+leaves held (`rereadForApproval` in `lib/run-progress.ts`), and works out step
+4's pair from what it read (`waitingDecision`). So Approve and Deny appear
+with no reload. A read that fails costs only itself: the page stays as it
+was, as the app's does. A job whose approval is listed is not read again for
+it. On Approvals each row names its flow and the step it waits at, "{flow} ·
+{step title}" (`approvalTitle`), never the step id; when the flows or the
+catalog cannot be read, the row loses those words and keeps its buttons. A
+decided row fades and folds away, its pill saying the decision, and the last
+one leaving goes to Activity; under reduced motion it leaves at once.
 
 A job that has documents and has ended or is held has a run package (backend
 ADR-0045): View package, Download PDF and Download Excel replace Download

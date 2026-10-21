@@ -484,6 +484,30 @@ export function heldDecision(
 }
 
 /**
+ * A held job's approval while it waits, and whether this person may decide it
+ * (Build 24, P6): the job's newest approval when it is pending, and its
+ * eligible roles against their role, as Approvals reads it. The server checks
+ * it again and refuses with 403. `null` when nothing of the job waits. The run
+ * page works it out in the browser, so an approval its re-reads list (R5c 1)
+ * offers Approve and Deny with no reload.
+ */
+export function waitingDecision<
+  T extends ApprovalOf & { eligibleRoles: readonly string[] },
+>(
+  runId: string,
+  approvals: readonly T[],
+  role: string | undefined,
+): { approval: T; canDecide: boolean } | null {
+  const waiting = newestApproval(runId, approvals);
+  return waiting?.status === "pending"
+    ? {
+        approval: waiting,
+        canDecide: Boolean(role && waiting.eligibleRoles.includes(role)),
+      }
+    : null;
+}
+
+/**
  * How many times a held run's page reads it again for its approval: 10, each
  * `RUN_REREAD_MS` after the last one settled, about 20 s. Then it stops, so a
  * job whose approval is never listed is not read for ever. The app's

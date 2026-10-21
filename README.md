@@ -75,24 +75,29 @@ workspace with no flow yet), a flow's page (its live Dashboard, its five
 Steps — titles only, Step 1 holding the run's fields and Start run, step 2 its
 integration, step 4 titled by the flow's choice, step 5 who gets the email —
 and Edit setup; no Connections and no move to another version), its Set up
-(Turn on, or Save; a member makes a newly added flow's first choice there, and
-on a flow already on sees it read-only), its Connect integration page (a tap
-saves and goes back; a vendor connected from it comes back chosen; a member
-sees the integration and no row is a choice; a flow still on an older version
+(Turn on, or Save; a member makes a newly added flow's first choice there, a
+connected vendor or None, and on a flow already on sees it read-only), its
+Connect integration page (a tap saves and goes back; a vendor connected from
+it comes back chosen, one connected meanwhile is reused, and a refused
+connect is said under its row; a member sees the integration and no row is a
+choice; a flow still on an older version
 with no vendor to choose is sent to Connections instead), who gets its email
 (an owner or admin adds and removes addresses, each saved at once, at most
 ten; a member reads them), a run's page (every step from the start — its
 integration and its email among them, the running one spinning — read again
 while it goes on, a held job's step 4 with Approve and Deny, appearing with no
-reload when the job reaches it while its page is open, each
-document it read a closed row of its own that opens in place — "Invoice 1 of
+reload when the job reaches it while its page is open — read again at most
+ten times, never once listed or gone on, a failed read keeping the page —
+each document it read a closed row of its own that opens in place — "Invoice 1 of
 3", its Document type and Format — and View package, Download PDF and
 Download Excel, each download to the platform's signed link, an https one
 only), the run
 package's page (the PDF itself, in a frame of the site's inline route that
-answers it `application/pdf` inline; a job with no package yet), Approvals (each
-row its flow and step; a decided row leaves, and the last one goes to
-Activity), every run by its
+answers it `application/pdf` inline, a busy platform asked once more; its
+downloads, an https link only; a job with no package yet), Approvals (each
+row its flow and step, fewer words when those cannot be read; a decided row
+leaves, and the last one goes to Activity), the A8X mark's near-black #212121
+on the light ground, every run by its
 full id, a run's file (PUT straight to the fixture's object store, across
 origins), a webhook flow's address, connections (one row each — mark, name, the account's email or its
 state, one button — each disconnect confirmed first), departments (a

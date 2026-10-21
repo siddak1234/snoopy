@@ -2243,6 +2243,71 @@ test("a member who adds a flow makes its first integration choice on its Set up 
   );
 });
 
+test("a member on a newly added flow's Set up is offered no vendor that is not connected — its row says who connects it, and a tap goes nowhere — and None is theirs to choose and turn on with (Build 25's audit; the review's R5c 3)", async ({
+  page,
+}) => {
+  const left = observe(
+    page,
+    (request) =>
+      request.isNavigationRequest() &&
+      /\/connections(?:\?|$)|^https:\/\/oauth\.invalid\//u.test(request.url()),
+  );
+  await fixtureControl("invoice-not-added");
+  await presentSession(page, "member");
+  await page.goto("/account/flows");
+  await automationCard(page, "Invoice Processing")
+    .getByRole("button", { name: "Add" })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
+  const main = page.locator("main");
+  const quickbooks = main.getByRole("radio", { name: "QuickBooks Online" });
+  const none = main.getByRole("radio", { name: "None" });
+  await expect(quickbooks).toBeDisabled();
+  await expect(quickbooks).toHaveAccessibleDescription(
+    "Ask an owner or admin to connect it.",
+  );
+  await expect(none).toBeEnabled();
+  await expect(main.getByTestId("vendor-member-note")).toHaveCount(0);
+  // A tap on it, forced past its disabled state, chooses nothing and stays.
+  await quickbooks.click({ force: true });
+  await expect(quickbooks).toHaveAttribute("aria-checked", "false");
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
+  await none.click();
+  await expect(none).toHaveAttribute("aria-checked", "true");
+  await main.getByRole("button", { name: "Turn on" }).click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
+  expect(await invoiceSettings()).toEqual({
+    vendor: "none",
+    holdAboveAmount: 500,
+  });
+  expect(left).toEqual([]);
+});
+
+test("a vendor connected since its Connect integration page was read is reused at the tap — chosen, saved and back to the flow — with no consent asked (Build 25's audit; the review's R5c 5)", async ({
+  page,
+}) => {
+  const consent = observe(
+    page,
+    (request) =>
+      request.url().includes("/connections?status=") ||
+      request.url().startsWith("https://oauth.invalid/"),
+  );
+  await page.goto(`${vendorPage}?field=vendor`);
+  const main = page.locator("main");
+  const quickbooks = main.getByRole("radio", { name: "QuickBooks Online" });
+  await expect(quickbooks).toBeEnabled();
+  await expect(quickbooks).toHaveAccessibleDescription("Not connected");
+  // Another admin connects it meanwhile; the platform reuses that grant.
+  await fixtureControl("quickbooks-connected");
+  await quickbooks.click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
+  expect(await invoiceSettings()).toEqual({
+    vendor: "quickbooks",
+    holdAboveAmount: 500,
+  });
+  expect(consent).toEqual([]);
+});
+
 test("a change of the integration the platform refuses as a member's (403 integration_requires_admin) says who can, saves nothing and stays on the page (Build 23's B3)", async ({
   page,
 }) => {

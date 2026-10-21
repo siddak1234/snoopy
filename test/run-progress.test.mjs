@@ -17,6 +17,7 @@ import {
   stepsDone,
   timeOfDay,
   trackerRows,
+  waitingDecision,
 } from "../lib/run-progress.ts";
 
 /**
@@ -736,6 +737,56 @@ test("a held run with no approval of its job listed is read again for it, at mos
       false,
       status,
     );
+});
+
+test("step 4's decision: the job's newest approval while it waits, offered to a role it names; nothing once it is decided or none is listed (Build 24, P6; worked out in the browser since Build 25's audit)", () => {
+  const asked = (id, status, createdAt, runId = "job-1") => ({
+    id,
+    runId,
+    status,
+    createdAt,
+    eligibleRoles: ["owner", "admin"],
+  });
+  const older = asked("a-1", "rejected", "2026-10-17T14:00:00.000Z");
+  const newer = asked("a-2", "pending", "2026-10-17T14:10:00.000Z");
+  assert.deepEqual(waitingDecision("job-1", [newer, older], "owner"), {
+    approval: newer,
+    canDecide: true,
+  });
+  assert.deepEqual(waitingDecision("job-1", [older, newer], "admin"), {
+    approval: newer,
+    canDecide: true,
+  });
+  // A role it does not name, or none read: told who can, offered no button.
+  for (const role of ["member", undefined])
+    assert.deepEqual(waitingDecision("job-1", [newer], role), {
+      approval: newer,
+      canDecide: false,
+    });
+  // Its newest decided, none listed, or only another job's: nothing to offer.
+  assert.equal(
+    waitingDecision(
+      "job-1",
+      [
+        asked("a-1", "pending", "2026-10-17T14:00:00.000Z"),
+        {
+          ...newer,
+          status: "approved",
+        },
+      ],
+      "owner",
+    ),
+    null,
+  );
+  assert.equal(waitingDecision("job-1", [], "owner"), null);
+  assert.equal(
+    waitingDecision(
+      "job-1",
+      [asked("a-3", "pending", "2026-10-17T14:20:00.000Z", "job-2")],
+      "owner",
+    ),
+    null,
+  );
 });
 
 test("an approval's headline: '{flow} · {step title}' through the flow's template and the catalog; the flow's name when the step is gone, its template id when the entry is, — when the flow is; never the step id (Build 25, the review's R5c 6; the app's approvalTitle)", () => {
