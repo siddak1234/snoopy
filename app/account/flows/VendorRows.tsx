@@ -16,8 +16,7 @@ import {
   VENDOR_MEMBER_NOTE,
 } from "@/lib/connection-rows";
 import { NONE } from "@/lib/flow-steps";
-import { beginConnectionAuthorization } from "@/app/account/connections/actions";
-import { rememberConnect } from "@/app/account/connections/pending-connect";
+import { startConnect } from "@/app/account/connections/start-connect";
 
 /** One vendor a step may use: an optional connection its field names. */
 export type VendorOption = {
@@ -46,23 +45,30 @@ export const VENDOR_SAVING = "Saving…";
  * should be made simple. vendor connections can be specific but everything is
  * there"). The app's `snoopy-mobile/components/flows/vendor-choice.tsx` on the website.
  *
- * For an owner or admin, a tap on a connected vendor or None is the choice
- * (`onChoose`). A vendor not connected is connected first through the vendor's
+ * A tap on a connected vendor or None is the choice (`onChoose`). For an owner
+ * or admin, a vendor not connected is connected first through the vendor's
  * sign-in — the browser comes back to `returnTo`, where it is chosen (the
  * owner's build 20 item 2: "If i need to connect then after i click and
  * connection happens then it shoukd take me back"); one that takes a pasted
- * key is connected where its key is pasted, Connections. A member sees the
- * integration and never changes it (Build 23's B3; the platform refuses a
- * member's change): no row is a choice — None and a connected vendor too —
- * a vendor not connected says "Ask an owner or admin to connect it.", and
- * under the list "Only an owner or admin can change the integration."
- * ~~A member could choose a connected vendor or None~~ until Build 23.
+ * key is connected where its key is pasted, Connections. For a member a
+ * vendor not connected is no choice: "Ask an owner or admin to connect it."
+ *
+ * `readOnly` is a member who may not change the integration (Build 23's B3;
+ * backend ADR-0043, the platform refuses a member's change): no row is a
+ * choice, None and a connected vendor too, and under the list "Only an owner
+ * or admin can change the integration." Connect integration passes it for a
+ * member, and Set up for a member changing a flow already on. A new flow's Set
+ * up stays a member's to choose (ADR-0043 §2: a flow with no stored choice
+ * takes a member's first one, None or a vendor), as the app's Set up does
+ * (Build 25, the review's R5c 3). ~~Every row read-only for a member, a new
+ * flow's Set up too~~ until Build 25.
  */
 export function VendorRows({
   label,
   options,
   chosen,
   canManage,
+  readOnly,
   workspaceId,
   saving,
   returnTo,
@@ -74,6 +80,8 @@ export function VendorRows({
   /** The vendor chosen now, or `none`. */
   chosen: string;
   canManage: boolean;
+  /** A member who may not change the integration: every row inert, and the line that says so. */
+  readOnly: boolean;
   /** The workspace this page shows; a connect is refused once it is not active. */
   workspaceId: string;
   /** The choice being saved: its row says "Saving…" and the rest wait. */
@@ -83,7 +91,7 @@ export function VendorRows({
   onChoose: (choice: string) => void;
 }) {
   const router = useRouter();
-  const [connecting, startConnect] = useTransition();
+  const [connecting, startConnecting] = useTransition();
   const [connectingFor, setConnectingFor] = useState<string | null>(null);
   const [rowError, setRowError] = useState<{
     providerId: string;
@@ -97,29 +105,23 @@ export function VendorRows({
 
   const connect = (option: VendorOption) => {
     setConnectingFor(option.providerId);
-    startConnect(async () => {
-      const result = await beginConnectionAuthorization(
+    startConnecting(async () => {
+      const started = await startConnect(
         workspaceId,
         option.providerId,
+        returnTo,
       );
-      if (result.ok && result.alreadyConnectedAs) {
-        onChoose(option.providerId);
-        return;
-      }
-      if (!result.ok || !result.authorizationUrl) {
+      if (started.status === "already") onChoose(option.providerId);
+      if (started.status === "refused")
         setRowError({
           providerId: option.providerId,
-          message: result.ok ? "Could not start the connection" : result.error,
+          message: started.message,
         });
-        return;
-      }
-      rememberConnect(option.providerId, returnTo);
-      window.location.assign(result.authorizationUrl);
     });
   };
 
   const tap = (option: VendorOption | null) => {
-    if (busy || !canManage) return;
+    if (busy || readOnly) return;
     setRowError(null);
     if (!option) {
       onChoose(NONE);
@@ -129,6 +131,7 @@ export function VendorRows({
       onChoose(option.providerId);
       return;
     }
+    if (!canManage) return;
     if (!option.connectable) {
       router.push("/account/connections");
       return;
@@ -146,8 +149,9 @@ export function VendorRows({
         const connection = option.connection ?? undefined;
         const connected = connectionState(connection) === "connected";
         const isChosen = chosen === option.providerId;
-        // An owner or admin's row is the choice; a member's never is.
-        const tappable = canManage;
+        // Connected, or connectable by this person: the row is the choice —
+        // never when read-only.
+        const tappable = !readOnly && (connected || canManage);
         const line =
           busy === option.providerId
             ? { text: VENDOR_SAVING, tone: "muted" as const }
@@ -196,9 +200,9 @@ export function VendorRows({
         aria-checked={chosen === NONE}
         aria-label="None"
         aria-describedby={lineId(NONE)}
-        disabled={!canManage || (busy !== null && busy !== NONE)}
-        aria-disabled={!canManage || undefined}
-        onClick={canManage ? () => tap(null) : undefined}
+        disabled={readOnly || (busy !== null && busy !== NONE)}
+        aria-disabled={readOnly || undefined}
+        onClick={readOnly ? undefined : () => tap(null)}
         data-testid="vendor-none"
         className={`${CONNECTION_ROW} rounded-[var(--radius-md)] px-2 transition enabled:cursor-pointer enabled:hover:bg-[var(--surface-hover)]`}
       >
@@ -210,14 +214,14 @@ export function VendorRows({
           right={<ChoiceMark chosen={chosen === NONE} />}
         />
       </button>
-      {canManage ? null : (
+      {readOnly ? (
         <p
           data-testid="vendor-member-note"
           className="px-2 pt-3 text-xs text-[var(--muted)]"
         >
           {VENDOR_MEMBER_NOTE}
         </p>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   PACKAGE_UNAVAILABLE,
   RUN_PACKAGE_MAXIMUM_BYTES,
   VIEW_PACKAGE,
+  askPackageOnceMore,
   documentDate,
   documentMoney,
   documentTime,
@@ -418,6 +419,57 @@ test("the platform busy building others: asked once more after its retry-after (
   assert.equal(RUN_PACKAGE_MAXIMUM_BYTES, 26_214_400);
 });
 
+test("a package request is asked once more after a 503's wait — 2 s when it names none, never past 10 s — and busy again, any other refusal, or no status at all is the caller's (Build 25, the review's R5c 5: the one helper both askers use)", async () => {
+  const busy = (retryAfterSeconds) =>
+    Object.assign(new Error("busy"), { status: 503, retryAfterSeconds });
+  const refusal = (error) =>
+    error instanceof Error && "status" in error ? error : null;
+  const asker = (...answers) => {
+    const asked = [];
+    const ask = async () => {
+      const answer = answers[asked.length];
+      asked.push(answer);
+      if (answer instanceof Error) throw answer;
+      return answer;
+    };
+    return { ask, asked };
+  };
+  const slept = [];
+  const sleep = async (ms) => {
+    slept.push(ms);
+  };
+  // Busy once, naming 3 s: waited, asked again, answered.
+  let made = asker(busy(3), "file");
+  assert.equal(await askPackageOnceMore(made.ask, refusal, sleep), "file");
+  assert.equal(made.asked.length, 2);
+  // Busy naming no wait: 2 s.
+  made = asker(busy(undefined), "file");
+  assert.equal(await askPackageOnceMore(made.ask, refusal, sleep), "file");
+  assert.deepEqual(slept, [3_000, 2_000]);
+  // Busy again: the second refusal is the caller's — asked twice, no more.
+  const again = busy(1);
+  made = asker(busy(1), again, "never");
+  await assert.rejects(
+    askPackageOnceMore(made.ask, refusal, sleep),
+    (error) => error === again,
+  );
+  assert.equal(made.asked.length, 2);
+  // A wait over 10 s, another status, or an error with none: said at once.
+  for (const error of [
+    busy(11),
+    Object.assign(new Error("gone"), { status: 409 }),
+    new Error("offline"),
+  ]) {
+    made = asker(error, "never");
+    await assert.rejects(
+      askPackageOnceMore(made.ask, refusal, sleep),
+      (thrown) => thrown === error,
+    );
+    assert.equal(made.asked.length, 1);
+  }
+  assert.deepEqual(slept, [3_000, 2_000, 1_000]);
+});
+
 test("Download PDF and Download Excel: the platform's link, asked through /api/platform in the browser's zone with a key, then followed — a busy platform asked once more, a refusal said; never a hand-written fetch, and Download JSON gone (P12)", () => {
   const live = read("app/account/runs/[runId]/RunLive.tsx");
   assert.match(
@@ -425,11 +477,27 @@ test("Download PDF and Download Excel: the platform's link, asked through /api/p
     /platformApiJson<RunPackageFile>\(\s*`\/v1\/workspaces\/\$\{encodeURIComponent\(workspaceId\)\}\/runs\/\$\{encodeURIComponent\(runId\)\}\/package`,\s*\{\s*method: "POST",\s*headers: \{\s*"content-type": "application\/json",\s*"idempotency-key": `run-package-\$\{format\}-\$\{crypto\.randomUUID\(\)\}`,/u,
   );
   assert.match(live, /\.\.\.\(zone \? \{ timeZone: zone \} : \{\}\)/u);
-  assert.match(live, /window\.location\.assign\(file\.downloadUrl\);/u);
+  // Followed only when https (Build 25, the review's R5c 2).
   assert.match(
     live,
-    /error instanceof PlatformApiError && error\.status === 503\s*\? packageRetryWaitMs\(error\.retryAfterSeconds\)\s*: null;\s*if \(wait === null\) throw error;\s*await new Promise\(\(resolve\) => setTimeout\(resolve, wait\)\);\s*return ask\(\);/u,
+    /if \(!followSignedLink\(file\.downloadUrl\)\) setError\(DOWNLOAD_FAILED\);/u,
   );
+  assert.doesNotMatch(live, /window\.location\.assign/u);
+  // The one retry, the route's too (Build 25, the review's R5c 5).
+  assert.match(
+    live,
+    /\(error\) => \(error instanceof PlatformApiError \? error : null\),/u,
+  );
+  assert.match(
+    read("app/account/runs/[runId]/package/file/route.ts"),
+    /const file = await askPackageOnceMore\(\s*\(\) => createRunPackageFile\(workspaceId, runId, body, origin\),\s*\(error\) => \(error instanceof PlatformServerError \? error : null\),\s*\);/u,
+  );
+  for (const asker of [
+    live,
+    read("app/account/runs/[runId]/package/file/route.ts"),
+  ]) {
+    assert.doesNotMatch(asker, /packageRetryWaitMs|setTimeout\(resolve/u);
+  }
   assert.match(live, /setError\(DOWNLOAD_FAILED\);/u);
   // Offered once the job can be packaged, with View package on the run page.
   assert.match(

@@ -357,10 +357,13 @@ html[data-theme="light"] .lighten {
   mix-blend-mode: normal;
 }
 
-/* The official mark (public/a8x-mark.png) is white artwork on transparency —
-   invert it on the light ground, per the design pages. */
+/* The official mark (public/a8x-mark.png) is pure white artwork on
+   transparency — on the light ground the design inverts it at .87
+   (Screen.dc.html's `.thm-light .brand{filter:invert(.87)}`): 255 × 0.13 = 33,
+   #212121, the near-black both clients draw, the app's `brandTint` on light
+   (the owner's build 24 item 2; ~~invert(1), pure black~~ until build 25). */
 html[data-theme="light"] .brand-mark {
-  filter: invert(1);
+  filter: invert(0.87);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

@@ -4,16 +4,20 @@ import { resolve } from "node:path";
 import { test } from "node:test";
 import {
   EMPTY,
+  HELD_APPROVAL_REREADS,
+  approvalTitle,
   groupState,
   heldDecision,
   newestApproval,
   runDuration,
   runLabel,
+  rereadForApproval,
   runResultLine,
   stepStates,
   stepsDone,
   timeOfDay,
   trackerRows,
+  waitingDecision,
 } from "../lib/run-progress.ts";
 
 /**
@@ -695,6 +699,127 @@ test("a job's newest approval decides — by when it was asked, whatever the lis
     heldDecision(job, [asked("approved", 30), asked("pending", 30)]),
     "approved",
   );
+});
+
+test("a held run with no approval of its job listed is read again for it, at most 10 times; one whose approval is listed — waiting or decided — or that is not held, never (Build 25, the review's R5c 1; the app's rereadForApproval)", () => {
+  const held = { id: "job-1", status: "held" };
+  const asked = (status, runId = "job-1") => ({
+    runId,
+    status,
+    createdAt: "2026-10-17T14:10:00.000Z",
+  });
+  assert.equal(HELD_APPROVAL_REREADS, 10);
+  // None listed yet — it turned held while the page was open — or only
+  // another job's: read again, up to the bound.
+  for (const approvals of [[], [asked("pending", "job-2")]]) {
+    for (let reads = 0; reads < 10; reads += 1)
+      assert.equal(
+        rereadForApproval(held, approvals, reads),
+        true,
+        String(reads),
+      );
+    assert.equal(rereadForApproval(held, approvals, 10), false);
+    assert.equal(rereadForApproval(held, approvals, 11), false);
+  }
+  // Its approval listed, whatever became of it: no more reads for it.
+  for (const status of ["pending", "approved", "rejected", "expired"])
+    assert.equal(rereadForApproval(held, [asked(status)], 0), false, status);
+  // Not held: never.
+  for (const status of [
+    "pending",
+    "running",
+    "succeeded",
+    "failed",
+    "cancelled",
+  ])
+    assert.equal(
+      rereadForApproval({ id: "job-1", status }, [], 0),
+      false,
+      status,
+    );
+});
+
+test("step 4's decision: the job's newest approval while it waits, offered to a role it names; nothing once it is decided or none is listed (Build 24, P6; worked out in the browser since Build 25's audit)", () => {
+  const asked = (id, status, createdAt, runId = "job-1") => ({
+    id,
+    runId,
+    status,
+    createdAt,
+    eligibleRoles: ["owner", "admin"],
+  });
+  const older = asked("a-1", "rejected", "2026-10-17T14:00:00.000Z");
+  const newer = asked("a-2", "pending", "2026-10-17T14:10:00.000Z");
+  assert.deepEqual(waitingDecision("job-1", [newer, older], "owner"), {
+    approval: newer,
+    canDecide: true,
+  });
+  assert.deepEqual(waitingDecision("job-1", [older, newer], "admin"), {
+    approval: newer,
+    canDecide: true,
+  });
+  // A role it does not name, or none read: told who can, offered no button.
+  for (const role of ["member", undefined])
+    assert.deepEqual(waitingDecision("job-1", [newer], role), {
+      approval: newer,
+      canDecide: false,
+    });
+  // Its newest decided, none listed, or only another job's: nothing to offer.
+  assert.equal(
+    waitingDecision(
+      "job-1",
+      [
+        asked("a-1", "pending", "2026-10-17T14:00:00.000Z"),
+        {
+          ...newer,
+          status: "approved",
+        },
+      ],
+      "owner",
+    ),
+    null,
+  );
+  assert.equal(waitingDecision("job-1", [], "owner"), null);
+  assert.equal(
+    waitingDecision(
+      "job-1",
+      [asked("a-3", "pending", "2026-10-17T14:20:00.000Z", "job-2")],
+      "owner",
+    ),
+    null,
+  );
+});
+
+test("an approval's headline: '{flow} · {step title}' through the flow's template and the catalog; the flow's name when the step is gone, its template id when the entry is, — when the flow is; never the step id (Build 25, the review's R5c 6; the app's approvalTitle)", () => {
+  const approval = { subscriptionId: "sub-1", stepId: "ask-approval" };
+  const flows = [
+    { id: "sub-0", templateId: "other" },
+    { id: "sub-1", templateId: "invoice-processing" },
+  ];
+  const catalog = [
+    {
+      templateId: "invoice-processing",
+      name: "Invoice Processing",
+      pipeline: [
+        { id: "save-documents", title: "Details saved" },
+        { id: "ask-approval", title: "Needs your approval" },
+      ],
+    },
+  ];
+  assert.equal(
+    approvalTitle(approval, flows, catalog),
+    "Invoice Processing · Needs your approval",
+  );
+  assert.equal(
+    approvalTitle({ ...approval, stepId: "gone" }, flows, catalog),
+    "Invoice Processing",
+  );
+  assert.equal(
+    approvalTitle(approval, flows, [{ ...catalog[0], pipeline: undefined }]),
+    "Invoice Processing",
+  );
+  assert.equal(approvalTitle(approval, flows, []), "invoice-processing");
+  assert.equal(approvalTitle(approval, [], catalog), EMPTY);
+  assert.equal(EMPTY, "—");
 });
 
 test("a job whose steps 1–5 come in one list draws 5 done — the held step among them, done once the job went on; while it goes on after its approval, step 4 is working (Build 24, P9; ADR-0044)", () => {
