@@ -2207,6 +2207,107 @@ test("a member on the Connect integration page sees the integration and never ch
   );
 });
 
+test("a member who adds a flow makes its first integration choice on its Set up — a connected vendor, or None — and on a flow already on its rows are read-only (backend ADR-0043 §2; the app's Set up; Build 25, the review's R5c 3)", async ({
+  page,
+}) => {
+  await fixtureControl("quickbooks-connected");
+  await fixtureControl("invoice-not-added");
+  await presentSession(page, "member");
+  await page.goto("/account/flows");
+  await automationCard(page, "Invoice Processing")
+    .getByRole("button", { name: "Add" })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
+  const main = page.locator("main");
+  const quickbooks = main.getByRole("radio", { name: "QuickBooks Online" });
+  const none = main.getByRole("radio", { name: "None" });
+  await expect(quickbooks).toBeEnabled();
+  await expect(none).toBeEnabled();
+  await expect(main.getByTestId("vendor-member-note")).toHaveCount(0);
+  await quickbooks.click();
+  await expect(quickbooks).toHaveAttribute("aria-checked", "true");
+  await expect(none).toHaveAttribute("aria-checked", "false");
+  await main.getByRole("button", { name: "Turn on" }).click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
+  expect(await invoiceSettings()).toEqual({
+    vendor: "quickbooks",
+    holdAboveAmount: 500,
+  });
+  // On now: the member's Set up shows the integration and changes nothing.
+  await page.goto(`${FLOWS.invoice}/setup`);
+  await expect(quickbooks).toHaveAttribute("aria-checked", "true");
+  await expect(quickbooks).toBeDisabled();
+  await expect(none).toBeDisabled();
+  await expect(main.getByTestId("vendor-member-note")).toHaveText(
+    "Only an owner or admin can change the integration.",
+  );
+});
+
+test("a member on a newly added flow's Set up is offered no vendor that is not connected — its row says who connects it, and a tap goes nowhere — and None is theirs to choose and turn on with (Build 25's audit; the review's R5c 3)", async ({
+  page,
+}) => {
+  const left = observe(
+    page,
+    (request) =>
+      request.isNavigationRequest() &&
+      /\/connections(?:\?|$)|^https:\/\/oauth\.invalid\//u.test(request.url()),
+  );
+  await fixtureControl("invoice-not-added");
+  await presentSession(page, "member");
+  await page.goto("/account/flows");
+  await automationCard(page, "Invoice Processing")
+    .getByRole("button", { name: "Add" })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
+  const main = page.locator("main");
+  const quickbooks = main.getByRole("radio", { name: "QuickBooks Online" });
+  const none = main.getByRole("radio", { name: "None" });
+  await expect(quickbooks).toBeDisabled();
+  await expect(quickbooks).toHaveAccessibleDescription(
+    "Ask an owner or admin to connect it.",
+  );
+  await expect(none).toBeEnabled();
+  await expect(main.getByTestId("vendor-member-note")).toHaveCount(0);
+  // A tap on it, forced past its disabled state, chooses nothing and stays.
+  await quickbooks.click({ force: true });
+  await expect(quickbooks).toHaveAttribute("aria-checked", "false");
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
+  await none.click();
+  await expect(none).toHaveAttribute("aria-checked", "true");
+  await main.getByRole("button", { name: "Turn on" }).click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
+  expect(await invoiceSettings()).toEqual({
+    vendor: "none",
+    holdAboveAmount: 500,
+  });
+  expect(left).toEqual([]);
+});
+
+test("a vendor connected since its Connect integration page was read is reused at the tap — chosen, saved and back to the flow — with no consent asked (Build 25's audit; the review's R5c 5)", async ({
+  page,
+}) => {
+  const consent = observe(
+    page,
+    (request) =>
+      request.url().includes("/connections?status=") ||
+      request.url().startsWith("https://oauth.invalid/"),
+  );
+  await page.goto(`${vendorPage}?field=vendor`);
+  const main = page.locator("main");
+  const quickbooks = main.getByRole("radio", { name: "QuickBooks Online" });
+  await expect(quickbooks).toBeEnabled();
+  await expect(quickbooks).toHaveAccessibleDescription("Not connected");
+  // Another admin connects it meanwhile; the platform reuses that grant.
+  await fixtureControl("quickbooks-connected");
+  await quickbooks.click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
+  expect(await invoiceSettings()).toEqual({
+    vendor: "quickbooks",
+    holdAboveAmount: 500,
+  });
+  expect(consent).toEqual([]);
+});
+
 test("a change of the integration the platform refuses as a member's (403 integration_requires_admin) says who can, saves nothing and stays on the page (Build 23's B3)", async ({
   page,
 }) => {
@@ -3554,6 +3655,30 @@ test.describe("the complete export (backend §12.1 #39)", () => {
     expect(file.suggestedFilename()).toBe("workspace-export.json");
     // The third read's link — asked for at the click, not kept from the second.
     expect(new URL(file.url()).searchParams.get("read")).toBe("3");
+  });
+
+  test("a link that is not https is never followed: Download file says it could not download, and the page stays (Build 25, the review's R5c 2)", async ({
+    page,
+  }) => {
+    let downloads = 0;
+    page.on("download", () => (downloads += 1));
+    for (const scheme of ["http", "javascript"]) {
+      await fixtureControl("reset");
+      await fixtureControl(`signed-link-scheme?scheme=${scheme}`);
+      await page.goto("/account/settings");
+      const title = await page.title();
+      await page.getByRole("button", { name: "Export everything" }).click();
+      await expect(
+        page.getByText("Ready. The file holds the whole workspace."),
+      ).toBeVisible({ timeout: 15_000 });
+      await page.getByRole("button", { name: "Download file" }).click();
+      await expect(
+        page.getByRole("alert").filter({ hasText: "Could not download" }),
+      ).toHaveText("Could not download. Try again.");
+      await expect(page).toHaveURL(/\/account\/settings$/u);
+      expect(await page.title()).toBe(title);
+    }
+    expect(downloads).toBe(0);
   });
 
   test("an export that failed says why, or that it could not be made, and Export everything is offered again", async ({

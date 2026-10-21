@@ -26,6 +26,7 @@ import { ApprovalDecision } from "@/app/account/approvals/ApprovalDecision";
 import type {
   Approval,
   CreateRunPackageFileRequest,
+  ListApprovalsResponse,
   RunDetail,
   RunOrigin,
   RunPackageFile,
@@ -39,9 +40,9 @@ import {
   DOWNLOAD_FAILED,
   DOWNLOAD_PDF,
   VIEW_PACKAGE,
+  askPackageOnceMore,
   packageAvailable,
   packageFileHref,
-  packageRetryWaitMs,
   toDocumentCards,
   type DocumentCardView,
   type DocumentRowView,
@@ -49,17 +50,21 @@ import {
 import {
   RUN_REREAD_MS,
   heldDecision,
+  rereadForApproval,
   runDuration,
   runLabel,
   runResultLine,
   stepsDone,
   trackerRows,
+  waitingDecision,
   type DeclaredStep,
   type ProgressGroup,
   type TrackerFlow,
   type TrackerRow,
   type TrackerState,
 } from "@/lib/run-progress";
+import { followSignedLink } from "@/lib/signed-link";
+import type { WorkspaceRole } from "@/lib/tenancy";
 import { CancelRunButton } from "./CancelRunButton";
 
 // Every origin the contract names, so a run says how it started. A new origin
@@ -84,12 +89,6 @@ export type RunFlow = {
 } | null;
 
 /**
- * A held job's approval while it waits, and whether this person may decide it
- * — the approval's eligible roles against their role, as Approvals reads it.
- */
-export type RunDecision = { approval: Approval; canDecide: boolean } | null;
-
-/**
  * One run, live (Build 21, spec A7; the owner's build 20 item 10: "It shoukd
  * show all the steps and a live tracker of which ones are done"): its full id
  * and status; how it went; Duration and Steps done; every step from the start,
@@ -101,30 +100,40 @@ export type RunDecision = { approval: Approval; canDecide: boolean } | null;
  * again every 2 s while the run is pending or running (`RUN_REREAD_MS`),
  * through `/api/platform`, one read at a time; the page as the server drew it
  * comes back whenever it is drawn again (a cancel or a decision revalidates
- * it).
+ * it). A run held with no approval of its job listed yet (it turned held while
+ * the page was open, or was read before its approval was) has the job and its
+ * approvals read again here, in the browser, every 2 s, one at a time and at
+ * most `HELD_APPROVAL_REREADS` times, until the approval is listed or the run
+ * leaves held (`rereadForApproval`; Build 25, the review's R5c 1). So Approve
+ * and Deny appear in step 4 with no reload. A read that fails costs only
+ * itself: the page stays as it was, as the app's does. ~~The server drew the
+ * page again for each re-read~~ until Build 25's audit: one failed read put
+ * the account's error page in its place.
  */
 export function RunLive({
   workspaceId,
   initial,
   flow,
   approvals,
-  decision,
+  role,
 }: {
   workspaceId: string;
   initial: RunDetail;
   flow: RunFlow;
-  /** A held job's approvals, read once: what became of them. */
+  /** A held job's approvals as the server read them: what became of them. */
   approvals: Approval[];
-  /** Its approval while it waits: step 4's Approve and Deny. */
-  decision: RunDecision;
+  /** This person's role in the workspace: whether step 4 offers Approve and Deny. */
+  role: WorkspaceRole | undefined;
 }) {
   const router = useRouter();
   const [detail, setDetail] = useState(initial);
+  const [listed, setListed] = useState(approvals);
   const [drawn, setDrawn] = useState(initial);
   // The server drew the page again (a cancel, a refresh): its answer wins.
   if (drawn !== initial) {
     setDrawn(initial);
     setDetail(initial);
+    setListed(approvals);
   }
   const [reads, setReads] = useState(0);
   const { run, steps, details, documents } = detail;
@@ -152,6 +161,39 @@ export function RunLive({
     };
   }, [going, reads, workspaceId, run.id]);
 
+  // Held, with its approval not listed yet: the job and its approvals read
+  // again in the browser, until the approval is there or the job goes on (R5c
+  // 1). Each read that fails leaves its part of the page as it was.
+  const [approvalReads, setApprovalReads] = useState(0);
+  const owed = rereadForApproval(run, listed, approvalReads);
+  useEffect(() => {
+    if (!owed) return;
+    let live = true;
+    const scope = `/v1/workspaces/${encodeURIComponent(workspaceId)}`;
+    const timer = setTimeout(() => {
+      void Promise.allSettled([
+        platformApiJson<RunDetail>(
+          `${scope}/runs/${encodeURIComponent(run.id)}`,
+        ),
+        platformApiJson<ListApprovalsResponse>(`${scope}/approvals`),
+      ]).then(([job, list]) => {
+        if (!live) return;
+        if (job.status === "fulfilled") setDetail(job.value);
+        if (list.status === "fulfilled")
+          setListed(
+            list.value.approvals.filter(
+              (approval) => approval.runId === run.id,
+            ),
+          );
+        setApprovalReads((count) => count + 1);
+      });
+    }, RUN_REREAD_MS);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [owed, approvalReads, workspaceId, run.id]);
+
   // Every step from the start (spec A7; S14): by the catalog's groups, the
   // newest version's, for any run whose every reported step they still
   // declare (Build 22, the session's S25: a v3 run is drawn by v4's five
@@ -159,7 +201,9 @@ export function RunLive({
   // steps it reported. ~~Only a run of the catalog's own version drawn by its
   // groups~~ until Build 22. Step 2 says the flow's integration, step 4's title
   // follows it, step 5 is the run's email.
-  const decided = heldDecision(run, approvals);
+  const decided = heldDecision(run, listed);
+  // Its approval while it waits, and whether this person may decide it.
+  const decision = waitingDecision(run.id, listed, role);
   const tracker = trackerRows(
     steps,
     flow?.pipeline,
@@ -178,7 +222,7 @@ export function RunLive({
         : null,
     detail.files,
   );
-  const result = runResultLine(run, approvals);
+  const result = runResultLine(run, listed);
   const facts = [
     {
       label: "Started",
@@ -337,9 +381,9 @@ function browserTimeZone(): string {
  * zone. Each request carries its own key — a replay could only answer the
  * same link, and a fresh one never meets a refusal kept under the last. The
  * platform busy building others (503) is asked once more after its
- * `retry-after`; then the refusal is the caller's.
+ * `retry-after` (`askPackageOnceMore`); then the refusal is the caller's.
  */
-async function createPackageFile(
+function createPackageFile(
   workspaceId: string,
   runId: string,
   format: PackageFormat,
@@ -349,36 +393,30 @@ async function createPackageFile(
     format,
     ...(zone ? { timeZone: zone } : {}),
   };
-  const ask = () =>
-    platformApiJson<RunPackageFile>(
-      `/v1/workspaces/${encodeURIComponent(workspaceId)}/runs/${encodeURIComponent(runId)}/package`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "idempotency-key": `run-package-${format}-${crypto.randomUUID()}`,
+  return askPackageOnceMore(
+    () =>
+      platformApiJson<RunPackageFile>(
+        `/v1/workspaces/${encodeURIComponent(workspaceId)}/runs/${encodeURIComponent(runId)}/package`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "idempotency-key": `run-package-${format}-${crypto.randomUUID()}`,
+          },
+          body: JSON.stringify(body),
         },
-        body: JSON.stringify(body),
-      },
-    );
-  try {
-    return await ask();
-  } catch (error) {
-    const wait =
-      error instanceof PlatformApiError && error.status === 503
-        ? packageRetryWaitMs(error.retryAfterSeconds)
-        : null;
-    if (wait === null) throw error;
-    await new Promise((resolve) => setTimeout(resolve, wait));
-    return ask();
-  }
+      ),
+    (error) => (error instanceof PlatformApiError ? error : null),
+  );
 }
 
 /**
  * The run package's buttons (Build 24, P12; the owner's build 23 words): View
  * package — on the run page — and Download PDF and Download Excel, on both. A
  * download goes to the file's signed link, which saves it (an attachment; no
- * page is left and nothing crosses origins); a refusal is said under the row.
+ * page is left and nothing crosses origins); a refusal is said under the row,
+ * and so is a link that is not https, which is never followed
+ * (`followSignedLink`; Build 25, the review's R5c 2).
  */
 export function PackageActions({
   workspaceId,
@@ -398,7 +436,7 @@ export function PackageActions({
     setError(null);
     try {
       const file = await createPackageFile(workspaceId, runId, format);
-      window.location.assign(file.downloadUrl);
+      if (!followSignedLink(file.downloadUrl)) setError(DOWNLOAD_FAILED);
     } catch {
       setError(DOWNLOAD_FAILED);
     } finally {

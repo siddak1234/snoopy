@@ -14,9 +14,8 @@ import {
   PlatformNotConfiguredError,
   PlatformServerError,
 } from "@/lib/platform-server";
-import { newestApproval } from "@/lib/run-progress";
 import { resolveActiveWorkspaceId, roleInWorkspace } from "@/lib/tenancy";
-import { RunLive, type RunDecision, type RunFlow } from "./RunLive";
+import { RunLive, type RunFlow } from "./RunLive";
 
 /**
  * One run (Build 21, spec A7): named by its FULL id (A8; the owner's D4 and
@@ -31,7 +30,10 @@ import { RunLive, type RunDecision, type RunFlow } from "./RunLive";
  * there. A held run's approvals are read too: a waiting document whose
  * approval was refused or ran out says "Not approved" (S21), and while its
  * newest waits, step 4 offers Approve and Deny to a role it names (Build 24,
- * P6; the role read as Approvals reads it).
+ * P6; the role read as Approvals reads it, from the workspace list the layout
+ * read already). The role goes with every run, held or not: a run that turns
+ * held while its page is open has its approvals read again in the browser
+ * (`RunLive`), and step 4 offers the pair from there.
  *
  * And its flow, as it is now (Build 22, the session's S23): a setting step's
  * line — the integration the flow has chosen — and a title by connection
@@ -97,21 +99,11 @@ export default async function RunDetailPage(
         })
       : { approvals: [] },
     readFlow(workspaceId, detail.run.subscriptionId),
-    held ? roleInWorkspace(workspaceId) : undefined,
+    roleInWorkspace(workspaceId),
   ]);
   const jobApprovals = approvals.approvals.filter(
     (approval) => approval.runId === detail.run.id,
   );
-  const waiting = newestApproval(detail.run.id, jobApprovals);
-  // Whether this person may decide is the approval's own answer; the server
-  // checks it again and refuses with 403.
-  const decision: RunDecision =
-    waiting?.status === "pending"
-      ? {
-          approval: waiting,
-          canDecide: Boolean(role && waiting.eligibleRoles.includes(role)),
-        }
-      : null;
   const entry = catalog.automations.find(
     (candidate) => candidate.templateId === detail.run.templateId,
   );
@@ -171,7 +163,7 @@ export default async function RunDetailPage(
       initial={detail}
       flow={flow}
       approvals={jobApprovals}
-      decision={decision}
+      role={role}
     />
   );
 }

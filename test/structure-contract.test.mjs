@@ -868,14 +868,14 @@ test("Replace account is off the connection row, and nothing names a connection 
   }
 });
 
-test("the signed-in pages and onboarding say department and flow, never team, project or automation (BUILD-PLAN 24.11.11; Build 23's B1)", () => {
+test("the signed-in pages and onboarding say department and flow, never team, project, automation, solution or pipeline (BUILD-PLAN 24.11.11; Build 23's B1; 25.4.24's spec words since build 25)", () => {
   // The owner's words: a department is what the platform's contract calls a
   // project — ~~a team~~ until Build 23 — and "Flows will be the name we use
   // from now on". The code keeps the contract's names and the routes
   // (`/account/teams`); copy is what a person reads, found by parsing — JSX
   // text, and a string or template's text that holds a space or begins with a
   // capital. An identifier, a path, a key and an import are never copy.
-  const retired = /\b(projects?|automations?|teams?)\b/iu;
+  const retired = /\b(projects?|automations?|teams?|solutions?|pipelines?)\b/iu;
   const found = [];
   for (const path of [
     ...sources("app/account"),

@@ -483,6 +483,90 @@ export function heldDecision(
   return "closed";
 }
 
+/**
+ * A held job's approval while it waits, and whether this person may decide it
+ * (Build 24, P6): the job's newest approval when it is pending, and its
+ * eligible roles against their role, as Approvals reads it. The server checks
+ * it again and refuses with 403. `null` when nothing of the job waits. The run
+ * page works it out in the browser, so an approval its re-reads list (R5c 1)
+ * offers Approve and Deny with no reload.
+ */
+export function waitingDecision<
+  T extends ApprovalOf & { eligibleRoles: readonly string[] },
+>(
+  runId: string,
+  approvals: readonly T[],
+  role: string | undefined,
+): { approval: T; canDecide: boolean } | null {
+  const waiting = newestApproval(runId, approvals);
+  return waiting?.status === "pending"
+    ? {
+        approval: waiting,
+        canDecide: Boolean(role && waiting.eligibleRoles.includes(role)),
+      }
+    : null;
+}
+
+/**
+ * How many times a held run's page reads it again for its approval: 10, each
+ * `RUN_REREAD_MS` after the last one settled, about 20 s. Then it stops, so a
+ * job whose approval is never listed is not read for ever. The app's
+ * `HELD_APPROVAL_REREADS`.
+ */
+export const HELD_APPROVAL_REREADS = 10;
+
+/**
+ * Whether a held run's page reads it again for its approval (Build 25, the
+ * review's R5c 1): the run is held, no approval of the job is listed yet, and
+ * fewer than `HELD_APPROVAL_REREADS` such reads were made. That is a run that
+ * turned held while its page was open, or one read before its approval was.
+ * Once the approval is listed, step 4 offers Approve and Deny with no reload. A
+ * job whose newest approval is listed, waiting or decided, is not read again
+ * for it, and neither is a run that left held. The app's `rereadForApproval`,
+ * rule for rule.
+ */
+export function rereadForApproval(
+  run: { id: string; status: RunStatus },
+  approvals: readonly ApprovalOf[],
+  reads: number,
+): boolean {
+  return (
+    heldDecision(run, approvals) === "unknown" && reads < HELD_APPROVAL_REREADS
+  );
+}
+
+/**
+ * An approval's headline on Approvals (Build 25, the review's R5c 6):
+ * "{flow} · {step title}". The approval names its flow (`subscriptionId`) and
+ * the step it waits at, so its template is found among the workspace's flows
+ * and the step's title in the catalog's entry. A hop that misses never blanks
+ * the row: the step gone, the flow's name alone; the entry gone, its template
+ * id; the flow gone, `EMPTY`. Never the step id. The app's `approvalTitle`, rule
+ * for rule. ~~Held at “{stepId}”~~ until Build 25.
+ */
+export function approvalTitle(
+  approval: { subscriptionId: string; stepId: string },
+  flows: readonly { id: string; templateId: string }[],
+  catalog: readonly {
+    templateId: string;
+    name: string;
+    pipeline?: readonly { id: string; title: string }[];
+  }[],
+): string {
+  const templateId = flows.find(
+    (flow) => flow.id === approval.subscriptionId,
+  )?.templateId;
+  if (!templateId) return EMPTY;
+  const entry = catalog.find(
+    (candidate) => candidate.templateId === templateId,
+  );
+  if (!entry) return templateId;
+  const step = entry.pipeline?.find(
+    (candidate) => candidate.id === approval.stepId,
+  );
+  return step ? `${entry.name} · ${step.title}` : entry.name;
+}
+
 const HELD_DECISION_LINE: Record<HeldDecision, string> = {
   pending: "Waiting for approval",
   // The job goes on under its own id (ADR-0044): ~~"Approved — continued in

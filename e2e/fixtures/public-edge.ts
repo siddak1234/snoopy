@@ -361,6 +361,21 @@ function initialState() {
     }[],
     packageBusy: 0,
     packageFileOversized: false,
+    // Build 25 (the review's R5c 1): the held Invoice Processing job going on
+    // while its page is open, then held; its approval left off the next reads
+    // of the approvals list; and every read of that list.
+    heldJobLive: null as "running" | "held" | null,
+    heldApprovalHiddenReads: 0,
+    approvalListReads: 0,
+    // Build 25's audit: the next read of the approvals list refused (503), and
+    // every one refused; the workspace's flows, or the catalog, unreadable.
+    approvalListFailing: 0,
+    approvalListRefused: 0,
+    subscriptionsFailing: false,
+    catalogFailing: false,
+    // Build 25 (the review's R5c 2): signed links answered with another
+    // scheme than https — the package's and the complete export's.
+    signedLinkScheme: null as "http" | "javascript" | null,
   };
 }
 let state = initialState();
@@ -1307,7 +1322,10 @@ function invoiceSteps(runId: string): Automations["RunStep"][] {
             ["verify-read", "ok", "Read again"],
             ["decide", "ok", "1 ready, 1 waiting"],
             ["save-documents", "ok", "1 saved"],
-            ["ask-approval", "held", "Waiting for approval"],
+            // Still going while its page is open (R5c 1): not held yet.
+            ...(state.heldJobLive === "running"
+              ? []
+              : ([["ask-approval", "held", "Waiting for approval"]] as const)),
             // Approved, the job goes on under its own id (backend ADR-0044):
             // its next step joins the same timeline.
             ...(invoiceApprovalNow().status === "approved"
@@ -1440,9 +1458,12 @@ function fixtureRun(runId: string): Automations["Run"] {
   }
   if (invoiceRunIds.includes(runId)) {
     const v2 = runId === invoiceV2RunId;
-    // Approved, the held job runs on under the same id (backend ADR-0044).
+    // Approved, the held job runs on under the same id (backend ADR-0044);
+    // and it runs while its page is open, before it holds (R5c 1).
     const continued =
-      runId === invoiceHeldRunId && invoiceApprovalNow().status === "approved";
+      runId === invoiceHeldRunId &&
+      (invoiceApprovalNow().status === "approved" ||
+        state.heldJobLive === "running");
     const held = runId === invoiceHeldRunId && !continued;
     return {
       id: runId,
@@ -1725,6 +1746,19 @@ function projectRoleOf(
   return null;
 }
 
+/**
+ * A signed link as the fixture answers it: its own HTTPS store, or, when a
+ * test says so (R5c 2), the same address over `http:`, or a `javascript:`
+ * one that marks the page it ran in.
+ */
+function signedLink(https: string): string {
+  if (state.signedLinkScheme === "http")
+    return https.replace(/^https:/u, "http:");
+  if (state.signedLinkScheme === "javascript")
+    return "javascript:document.title='followed'";
+  return https;
+}
+
 function respond(
   response: import("node:http").ServerResponse,
   status: number,
@@ -1821,6 +1855,42 @@ const server = createServer(
           ...state.approvals.filter((entry) => entry.id !== invoiceApprovalId),
           pendingInvoiceApproval(),
         ];
+      },
+      // Build 25 (the review's R5c 1): the held job still going, no approval
+      // asked yet — then held, its approval waiting but left off the next
+      // `hidden` reads of the list (1 unless named), as a list read just
+      // before the approval was made.
+      "/__fixture/held-job-running": () => {
+        state.heldJobLive = "running";
+      },
+      "/__fixture/held-job-holds": () => {
+        const hidden = Number(url.searchParams.get("hidden") ?? "1");
+        if (!Number.isSafeInteger(hidden) || hidden < 0) return false;
+        state.heldJobLive = "held";
+        state.heldApprovalHiddenReads = hidden;
+        state.approvals = [
+          ...state.approvals.filter((entry) => entry.id !== invoiceApprovalId),
+          pendingInvoiceApproval(),
+        ];
+      },
+      // Build 25 (the review's R5c 2): the package's and the complete
+      // export's signed links answered as `http:` or `javascript:`.
+      "/__fixture/signed-link-scheme": () => {
+        const scheme = url.searchParams.get("scheme");
+        if (scheme !== "http" && scheme !== "javascript") return false;
+        state.signedLinkScheme = scheme;
+      },
+      // Build 25's audit: one read of the approvals list refused, as a busy
+      // platform refuses one (a run page's re-read meets it), and the flows
+      // or the catalog that an Approvals row's headline joins, unreadable.
+      "/__fixture/approvals-failing-once": () => {
+        state.approvalListFailing = 1;
+      },
+      "/__fixture/subscriptions-failing": () => {
+        state.subscriptionsFailing = true;
+      },
+      "/__fixture/catalog-failing": () => {
+        state.catalogFailing = true;
       },
       "/__fixture/billing-not-configured": () => {
         state.billingNotConfigured = true;
@@ -2064,6 +2134,10 @@ const server = createServer(
         approvalStatuses: state.approvals.map((entry) => entry.status),
         // Every run package file asked for (Build 24, P12).
         packageFiles: state.packageFiles,
+        // Every read of the approvals list (Build 25, R5c 1), and every one
+        // refused (Build 25's audit).
+        approvalListReads: state.approvalListReads,
+        approvalListRefused: state.approvalListRefused,
         // Every checkout asked for: a refused one leaves no plan behind.
         checkoutAttempts: state.checkoutAttempts,
         // Every team a test created — where, and the name and kind it was
@@ -3254,7 +3328,17 @@ const server = createServer(
       } satisfies ConnectionOperations["connectProviderWithKey"]["responses"][201]["content"]["application/json"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/automations")) {
+      if (state.catalogFailing)
+        return respond(response, 503, problem(503, "Service Unavailable"));
       return respond(response, 200, fixtureCatalog());
+    }
+    if (
+      method === "GET" &&
+      isWorkspacePath(pathname, "/subscriptions") &&
+      url.searchParams.get("status") !== "archived" &&
+      state.subscriptionsFailing
+    ) {
+      return respond(response, 503, problem(503, "Service Unavailable"));
     }
     if (method === "GET" && isWorkspacePath(pathname, "/subscriptions")) {
       // Backend §12.1 #203: the archived ones, asked for by name.
@@ -3768,7 +3852,9 @@ const server = createServer(
                   artifactId: exportJobId,
                   filename: "workspace-export-2026-08-12.json",
                   sizeBytes: 52,
-                  downloadUrl: `https://127.0.0.1:${port}/__fixture/export-file?read=${state.exportJobReads}`,
+                  downloadUrl: signedLink(
+                    `https://127.0.0.1:${port}/__fixture/export-file?read=${state.exportJobReads}`,
+                  ),
                   expiresAt: now,
                 },
               },
@@ -4072,7 +4158,9 @@ const server = createServer(
             ? "application/pdf"
             : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         sizeBytes: bytes.byteLength,
-        downloadUrl: `https://127.0.0.1:${port}/__fixture/package-file?run=${encodeURIComponent(run.id)}&format=${body.format}`,
+        downloadUrl: signedLink(
+          `https://127.0.0.1:${port}/__fixture/package-file?run=${encodeURIComponent(run.id)}&format=${body.format}`,
+        ),
         expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
       } satisfies Automations["RunPackageFile"]);
     }
@@ -4182,13 +4270,26 @@ const server = createServer(
     }
     if (method === "GET" && isWorkspacePath(pathname, "/approvals")) {
       const status = url.searchParams.get("status");
+      state.approvalListReads += 1;
+      if (state.approvalListFailing > 0) {
+        state.approvalListFailing -= 1;
+        state.approvalListRefused += 1;
+        return respond(response, 503, problem(503, "Service Unavailable"));
+      }
+      // The held job asked nothing while it goes on, and its approval is not
+      // listed yet on a read the test left it off (R5c 1).
+      const unlisted =
+        state.heldJobLive === "running" || state.heldApprovalHiddenReads > 0;
+      if (state.heldApprovalHiddenReads > 0) state.heldApprovalHiddenReads -= 1;
       return respond(response, 200, {
         approvals: [
           ...state.approvals,
           ...(state.approvals.some((entry) => entry.id === invoiceApprovalId)
             ? []
             : [invoiceApproval()]),
-        ].filter((entry) => !status || entry.status === status),
+        ]
+          .filter((entry) => !(unlisted && entry.id === invoiceApprovalId))
+          .filter((entry) => !status || entry.status === status),
       } satisfies AutomationOperations["listApprovals"]["responses"][200]["content"]["application/json"]);
     }
     if (

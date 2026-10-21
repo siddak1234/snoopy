@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import type { WorkspaceExportJob } from "@/lib/exports";
+import { DOWNLOAD_FAILED } from "@/lib/run-documents";
+import { followSignedLink } from "@/lib/signed-link";
 import { readCompleteExport, startCompleteExport } from "./export-actions";
 
 /** How often a running export is asked about. */
@@ -31,7 +33,8 @@ const FAILURES: Record<string, string> = {
  * signed for minutes. So the link is asked for again at the moment of the
  * download rather than kept from when the file became ready: one fetched
  * earlier may have expired by the time it is clicked. The file itself is kept
- * for a day.
+ * for a day. A link that is not https is never followed, and the page says it
+ * could not download (`followSignedLink`; Build 25, the review's R5c 2).
  *
  * `workspaceId` is the workspace the page shows: every call is refused once
  * another tab has made a different one active (register F28).
@@ -107,7 +110,8 @@ export function CompleteExportSection({
         return;
       }
       setJob(result.job);
-      if (result.job.file) window.location.assign(result.job.file.downloadUrl);
+      if (result.job.file && !followSignedLink(result.job.file.downloadUrl))
+        setError(DOWNLOAD_FAILED);
     });
   };
 

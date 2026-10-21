@@ -135,6 +135,7 @@ export function VendorChoice({
         options={options}
         chosen={saved}
         canManage={canManage}
+        readOnly={!canManage}
         workspaceId={workspaceId}
         saving={saving}
         returnTo={returnTo}

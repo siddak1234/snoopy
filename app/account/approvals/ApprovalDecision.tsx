@@ -108,6 +108,8 @@ export type ApprovalRowView = {
   canDecide: boolean;
   /** How long is left, in words, drawn by the server ("in 23h"). */
   expires: string;
+  /** "{flow} · {step title}", joined by the server (`approvalTitle`); never the step id. */
+  title: string;
 };
 
 /** How long a decided row takes to fade and fold away (the app's 220 ms). */
@@ -195,7 +197,7 @@ export function ApprovalQueue({
 
   if (shown.length === 0) return left > 0 ? null : empty;
 
-  return shown.map(({ approval, canDecide, expires }) => {
+  return shown.map(({ approval, canDecide, expires, title }) => {
     const decision = decided[approval.id] ?? null;
     return (
       <div
@@ -211,8 +213,11 @@ export function ApprovalQueue({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm text-[var(--text)]">{approval.reason}</p>
-                <p className="mt-1 text-xs text-[var(--muted)]">
-                  Held at “{approval.stepId}” · expires {expires}
+                <p
+                  data-testid={`approval-title-${approval.id}`}
+                  className="mt-1 text-xs text-[var(--muted)]"
+                >
+                  {title} · expires {expires}
                 </p>
               </div>
               <span data-testid={`approval-pill-${approval.id}`}>

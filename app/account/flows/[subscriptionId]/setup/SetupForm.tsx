@@ -203,6 +203,9 @@ export function SetupForm({
                 options={field.options}
                 chosen={choiceOf(field)}
                 canManage={canManage}
+                // A member changes no flow already on; a new flow's first
+                // choice is theirs (ADR-0043 §2; the app's Set up).
+                readOnly={!canManage && !turnOn}
                 workspaceId={workspaceId}
                 saving={null}
                 returnTo={returnTo}

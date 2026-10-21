@@ -123,8 +123,10 @@ test("the complete export is started once, followed, and its link asked for agai
   // one kept from when the file became ready.
   assert.match(
     complete,
-    /const download = \(\) => \{[\s\S]*?const result = await readCompleteExport\(workspaceId, job\.id\);[\s\S]*?window\.location\.assign\(result\.job\.file\.downloadUrl\)/u,
+    /const download = \(\) => \{[\s\S]*?const result = await readCompleteExport\(workspaceId, job\.id\);[\s\S]*?if \(result\.job\.file && !followSignedLink\(result\.job\.file\.downloadUrl\)\)\s*setError\(DOWNLOAD_FAILED\);/u,
   );
+  // An https link only (Build 25, the review's R5c 2): never assigned directly.
+  assert.doesNotMatch(complete, /window\.location\.assign/u);
   assert.doesNotMatch(
     complete,
     /(?<!result\.)job\.file\.downloadUrl|localStorage|sessionStorage/u,

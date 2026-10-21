@@ -328,18 +328,18 @@ export function cancelRun(
 }
 
 /**
- * A job's run package as a file behind a short-lived signed link (Build 24,
- * P12; backend ADR-0045) — built, or the one built for the same job state,
- * template and time zone. `origin` is the site's own, for a call a page did
- * not make as a form (the package's inline route).
- */
-/**
  * How long asking for a package may take: the platform builds one for at most
  * 20 s (backend ADR-0045, its build worker's limit), plus its queue — longer
  * than every other call's 10 s, which cut a heavy package off in the frame.
  */
 export const RUN_PACKAGE_REQUEST_TIMEOUT_MS = 30_000;
 
+/**
+ * A job's run package as a file behind a short-lived signed link (Build 24,
+ * P12; backend ADR-0045) — built, or the one built for the same job state,
+ * template and time zone. `origin` is the site's own, for a call a page did
+ * not make as a form (the package's inline route).
+ */
 export function createRunPackageFile(
   workspaceId: string,
   runId: string,

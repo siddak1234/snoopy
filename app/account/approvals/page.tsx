@@ -1,7 +1,17 @@
 import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { getAppSession } from "@/lib/app-session";
 import { resolveActiveWorkspaceId, roleInWorkspace } from "@/lib/tenancy";
-import { emptyWhenUnavailable, listApprovals } from "@/lib/automations";
+import {
+  emptyWhenUnavailable,
+  listApprovals,
+  listAutomations,
+  listSubscriptions,
+} from "@/lib/automations";
+import {
+  PlatformNotConfiguredError,
+  PlatformServerError,
+} from "@/lib/platform-server";
+import { approvalTitle } from "@/lib/run-progress";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { ApprovalQueue } from "./ApprovalDecision";
@@ -12,7 +22,11 @@ import { ApprovalQueue } from "./ApprovalDecision";
  * Each row links to its job by the job's id: approving continues the job under
  * that same id (backend ADR-0044), so the run page it opens is the work going
  * on. A decided row fades and leaves, and the last one leaving goes to
- * Activity (Build 24, P7; `ApprovalQueue`).
+ * Activity (Build 24, P7; `ApprovalQueue`). Each row names its flow and the
+ * step it waits at, "{flow} · {step title}", joined from the workspace's flows
+ * and the catalog as the app joins them (`approvalTitle`; Build 25, the
+ * review's R5c 6). A list that cannot be read costs the row those words, never
+ * the page.
  */
 
 export const dynamic = "force-dynamic";
@@ -30,10 +44,13 @@ export default async function ApprovalsPage() {
     );
   }
 
-  const pending = await emptyWhenUnavailable(
-    () => listApprovals(workspaceId, "pending"),
-    { approvals: [] },
-  );
+  const [pending, flows, catalog] = await Promise.all([
+    emptyWhenUnavailable(() => listApprovals(workspaceId, "pending"), {
+      approvals: [],
+    }),
+    orNone(() => listSubscriptions(workspaceId)),
+    orNone(() => listAutomations(workspaceId)),
+  ]);
 
   return (
     <SectionCard title="Approvals" subheader="Runs waiting on a decision">
@@ -46,6 +63,11 @@ export default async function ApprovalsPage() {
           // offering a button that is certain to be refused.
           canDecide: Boolean(role && approval.eligibleRoles.includes(role)),
           expires: formatExpiry(approval.expiresAt),
+          title: approvalTitle(
+            approval,
+            flows?.subscriptions ?? [],
+            catalog?.automations ?? [],
+          ),
         }))}
         // Arriving with nothing waiting, the whole page is empty: the app's
         // empty screen (the owner, build 9).
@@ -59,6 +81,20 @@ export default async function ApprovalsPage() {
       />
     </SectionCard>
   );
+}
+
+/** A read only a row's headline needs: unread, it is `null`. */
+async function orNone<T>(read: () => Promise<T>): Promise<T | null> {
+  try {
+    return await read();
+  } catch (error) {
+    if (
+      error instanceof PlatformServerError ||
+      error instanceof PlatformNotConfiguredError
+    )
+      return null;
+    throw error;
+  }
 }
 
 /**

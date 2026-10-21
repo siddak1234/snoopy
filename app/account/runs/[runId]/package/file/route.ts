@@ -9,7 +9,7 @@ import {
 import {
   PACKAGE_UNAVAILABLE,
   RUN_PACKAGE_MAXIMUM_BYTES,
-  packageRetryWaitMs,
+  askPackageOnceMore,
 } from "@/lib/run-documents";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 
@@ -102,20 +102,11 @@ export async function GET(
     const workspaceId = await resolveActiveWorkspaceId(await getAppSession());
     if (!workspaceId) return said(404, "Not found.");
     const origin = siteOrigin(request);
-    const ask = () => createRunPackageFile(workspaceId, runId, body, origin);
-    let file;
-    try {
-      file = await ask();
-    } catch (error) {
-      // Busy building others' packages: asked once more after its wait.
-      const wait =
-        error instanceof PlatformServerError && error.status === 503
-          ? packageRetryWaitMs(error.retryAfterSeconds)
-          : null;
-      if (wait === null) throw error;
-      await new Promise((resolve) => setTimeout(resolve, wait));
-      file = await ask();
-    }
+    // Busy building others' packages: asked once more after its wait.
+    const file = await askPackageOnceMore(
+      () => createRunPackageFile(workspaceId, runId, body, origin),
+      (error) => (error instanceof PlatformServerError ? error : null),
+    );
     if (file.format !== "pdf" || file.sizeBytes > RUN_PACKAGE_MAXIMUM_BYTES)
       return said(413, COULD_NOT_SHOW);
     const pdf = await platformSignedFile(

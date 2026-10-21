@@ -418,6 +418,37 @@ export function packageRetryWaitMs(
 }
 
 /**
+ * A package request as both its askers make it: the run page's downloads,
+ * through `/api/platform`, and the package page's route, on the server. A
+ * platform busy building others (503) is asked once more after
+ * `packageRetryWaitMs`. Busy again, a wait over 10 s, or any other refusal is
+ * thrown to the caller. `refusal` reads a thrown error's status and
+ * `retry-after` from each asker's own error class, else `null`. The app's
+ * `requestRunPackageFile`. `sleep` is for tests.
+ */
+export async function askPackageOnceMore<T>(
+  ask: () => Promise<T>,
+  refusal: (
+    error: unknown,
+  ) => { status: number; retryAfterSeconds?: number } | null,
+  sleep: (ms: number) => Promise<void> = (ms) =>
+    new Promise((resolve) => setTimeout(resolve, ms)),
+): Promise<T> {
+  try {
+    return await ask();
+  } catch (error) {
+    const refused = refusal(error);
+    const wait =
+      refused?.status === 503
+        ? packageRetryWaitMs(refused.retryAfterSeconds)
+        : null;
+    if (wait === null) throw error;
+    await sleep(wait);
+    return ask();
+  }
+}
+
+/**
  * Whether the platform packages a job now: it has documents and has ended or
  * is held (`createRunPackageFile` answers 409 otherwise).
  */

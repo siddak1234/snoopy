@@ -95,16 +95,18 @@ test("a held step offers the decision: RunLive's held row renders ApprovalDecisi
     )?.length,
     1,
   );
+  // The job's newest approval and this person's role, worked out where the
+  // re-reads land, in the browser (Build 25's audit; waitingDecision's own
+  // test holds the rule), and the role read with every run: one that turns
+  // held while its page is open is offered the pair from there.
+  assert.match(
+    live,
+    /const decision = waitingDecision\(run\.id, listed, role\);/u,
+  );
   const page = code(read("app/account/runs/[runId]/page.tsx"));
-  assert.match(
-    page,
-    /const waiting = newestApproval\(detail\.run\.id, jobApprovals\);/u,
-  );
-  assert.match(
-    page,
-    /canDecide: Boolean\(role && waiting\.eligibleRoles\.includes\(role\)\)/u,
-  );
-  assert.match(page, /held \? roleInWorkspace\(workspaceId\) : undefined/u);
+  assert.match(page, /\n\s*roleInWorkspace\(workspaceId\),\n/u);
+  assert.match(page, /role=\{role\}/u);
+  assert.doesNotMatch(page, /held \? roleInWorkspace/u);
 });
 
 test("a decision draws the job's run page again, by the id the platform answers with (P6; backend ADR-0044)", () => {
