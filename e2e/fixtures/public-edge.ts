@@ -684,6 +684,8 @@ const invoiceAutomation = {
     "Reads bills and receipts, then saves the details or records them in QuickBooks.",
   category: "Accounting",
   icon: "Receipt",
+  // Its words for its documents, as its manifest declares them from v7 (backend BUILD-PLAN 27.2.1).
+  documentWords: { singular: "Invoice", plural: "Invoices" },
   monthlyPriceUsd: 0,
   subscribed: true,
   available: true,

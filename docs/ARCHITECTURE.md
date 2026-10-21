@@ -55,8 +55,11 @@ by that run's id, and reads any id in a job as the whole job — every step,
 the held run's and the ones after its approval, in one timeline. So the run
 page draws a held step done once the job went on, and nothing here links one
 run of a job to another. The job's newest approval, by when it was asked, is
-the one a page says or offers. Each document is a closed row, "Invoice 1 of
-3" with `{vendor} · {total}`, that opens on its own; its Format is read from
+the one a page says or offers. Each document is a closed row headed in its
+flow's word — the catalog entry's `documentWords`, "Invoice 1 of 3" for Invoice
+Processing, else "Document 1 of 3" (backend BUILD-PLAN 27.5.1) — with
+`{vendor} · {total}`, that opens on its own; no page holds code for one flow
+(`test/no-flow-code.test.mjs`); its Format is read from
 the job's uploaded files (`RunDetail.files`): its own file, else the only one.
 
 A held job is decided where it waits: step 4 of its run page offers the one

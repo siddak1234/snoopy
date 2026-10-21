@@ -88,8 +88,9 @@ integration and its email among them, the running one spinning — read again
 while it goes on, a held job's step 4 with Approve and Deny, appearing with no
 reload when the job reaches it while its page is open — read again at most
 ten times, never once listed or gone on, a failed read keeping the page —
-each document it read a closed row of its own that opens in place — "Invoice 1 of
-3", its Document type and Format — and View package, Download PDF and
+each document it read a closed row of its own that opens in place — headed in its
+flow's word ("Invoice 1 of 3" for Invoice Processing, "Document 1 of 3" for a flow
+that names none; the catalog's `documentWords`), its Document type and Format — and View package, Download PDF and
 Download Excel, each download to the platform's signed link, an https one
 only), the run
 package's page (the PDF itself, in a frame of the site's inline route that
