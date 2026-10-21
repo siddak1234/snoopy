@@ -4,7 +4,8 @@ import mark from "@/public/a8x-mark.png";
 /**
  * Official Autom8x mark — the design project's assets/a8x-mark.png.
  * White artwork on transparency, drawn for the dark ground; the light theme
- * inverts it (html[data-theme="light"] .brand-mark in globals.css).
+ * inverts it at .87 to the app's near-black #383838 (html[data-theme="light"]
+ * .brand-mark in globals.css).
  */
 export default function LogoMark({
   height = 22,
