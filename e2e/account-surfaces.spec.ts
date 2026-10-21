@@ -1076,6 +1076,42 @@ test("P6 — a member is told who can decide, and offered no button", async ({
   await expect(heldStep(page).getByRole("button")).toHaveCount(0);
 });
 
+test("R5c 1 — a job that reaches its approval while its page is open offers Approve and Deny in step 4 with no reload: its approvals are read again until the waiting one is listed (Build 25)", async ({
+  page,
+}) => {
+  await fixtureControl("held-job-running");
+  await page.goto(heldJob);
+  const main = page.locator("main");
+  await expect(main.getByText(/^running$/iu)).toBeVisible();
+  const step = heldStep(page);
+  await expect(step.getByRole("button")).toHaveCount(0);
+  // A reload from here on would lose this mark.
+  await page.evaluate(() => Object.assign(window, { sameDocument: true }));
+  const listReads = async () =>
+    (await fixtureRead<{ approvalListReads: number }>("counts"))
+      .approvalListReads;
+  const before = await listReads();
+  // It holds, and the first read of the list after does not list its
+  // approval yet.
+  await fixtureControl("held-job-holds");
+  await expect(step).toHaveAttribute("data-state", "held", {
+    timeout: 10_000,
+  });
+  await expect(step.getByRole("button", { name: "Approve" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(step.getByRole("button", { name: "Deny" })).toBeVisible();
+  await expect(step).toContainText(
+    "Waiting for approval: Document 2: the total can't be read.",
+  );
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { sameDocument?: boolean }).sameDocument,
+    ),
+  ).toBe(true);
+  expect((await listReads()) - before).toBeGreaterThanOrEqual(2);
+});
+
 test("P7 — a decided row fades and folds away, its pill never Pending beside a decision; the other stays; the last one leaving goes to Activity", async ({
   page,
 }) => {
@@ -1084,6 +1120,14 @@ test("P7 — a decided row fades and folds away, its pill never Pending beside a
   await page.goto("/account/approvals");
   const rows = approvalRows(page);
   await expect(rows).toHaveCount(2);
+  // Each row names its flow and the step it waits at, as the app does —
+  // never the step id (Build 25, the review's R5c 6).
+  await expect(
+    page.getByTestId("approval-title-a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1"),
+  ).toHaveText(
+    /^Invoice Processing · Needs your approval · expires in \d+[hd]$/u,
+  );
+  await expect(page.locator("main")).not.toContainText("ask-approval");
   // Every pill a leaving row shows, as it shows it.
   await page.evaluate(() => {
     const seen: string[] = [];
@@ -1206,6 +1250,30 @@ test.describe("the run package", () => {
     await expect(main.getByRole("alert")).toHaveText(
       "Could not download. Try again.",
     );
+    expect((await packageFiles()).length).toBe(4);
+  });
+
+  test("R5c 2 — a signed link that is not https is never followed: Download PDF and Download Excel say they could not download, and the page stays (Build 25)", async ({
+    page,
+  }) => {
+    let downloads = 0;
+    page.on("download", () => (downloads += 1));
+    for (const scheme of ["http", "javascript"]) {
+      await fixtureControl(`signed-link-scheme?scheme=${scheme}`);
+      for (const name of ["Download PDF", "Download Excel"]) {
+        await page.goto(job);
+        const title = await page.title();
+        const main = page.locator("main");
+        await main.getByRole("button", { name }).click();
+        await expect(main.getByRole("alert")).toHaveText(
+          "Could not download. Try again.",
+        );
+        await expect(main.getByRole("button", { name })).toBeEnabled();
+        await expect(page).toHaveURL(new RegExp(`${job}$`, "u"));
+        expect(await page.title()).toBe(title);
+      }
+    }
+    expect(downloads).toBe(0);
     expect((await packageFiles()).length).toBe(4);
   });
 

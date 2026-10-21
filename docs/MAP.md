@@ -121,6 +121,7 @@
 - [lib/run-documents.ts](../lib/run-documents.ts): A run's documents, as the run page's Documents cards draw them (Build 21,
 - [lib/run-progress.ts](../lib/run-progress.ts): A run's STEPS (Build 21, spec A7; the session's S14; the owner's build 20
 - [lib/session-contract.ts](../lib/session-contract.ts): no header
+- [lib/signed-link.ts](../lib/signed-link.ts): A signed link the browser goes to (Build 25, the review's R5c 2): the run
 - [lib/site.ts](../lib/site.ts): no header
 - [lib/subscription-entitlements.ts](../lib/subscription-entitlements.ts): no header
 - [lib/team-types.ts](../lib/team-types.ts): The team kinds (the owner, build 7: "project types should just be teams or
@@ -161,7 +162,7 @@
 
 ### Tests
 
-- `test/`: account, automation, billing, boundaries, brand, browser, build21, build22, build24, change, connection, connections, deployed, doc, export, flow, global, kit, new, platform, pre, repo, run, session, structure, tenancy, upload, vendor, verify
+- `test/`: account, automation, billing, boundaries, brand, browser, build21, build22, build24, change, connection, connections, deployed, doc, export, flow, global, kit, new, platform, pre, repo, run, session, signed, structure, tenancy, upload, vendor, verify
 
 ## Skills, agents and hooks
 

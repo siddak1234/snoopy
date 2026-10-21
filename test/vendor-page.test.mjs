@@ -120,12 +120,27 @@ test("Connections goes back to the page the connect started on, with how the sig
     panel,
     /if \(!callbackStatus\) return;\s*const back = takeConnectReturn\(\);\s*if \(back\) router\.replace\(withCallbackStatus\(back, callbackStatus\)\);/u,
   );
-  assert.match(panel, /rememberConnect\(provider\.providerId, returnTo\);/u);
+  // Both rows start a connect the one way (Build 25, the review's R5c 5):
+  // the way back kept, then the vendor's consent page.
+  assert.match(
+    read("app/account/connections/start-connect.ts"),
+    /rememberConnect\(providerId, returnTo\);\s*window\.location\.assign\(result\.authorizationUrl\);/u,
+  );
+  assert.match(
+    panel,
+    /await startConnect\(\s*workspaceId,\s*provider\.providerId,\s*returnTo,?\s*\)/u,
+  );
   const rows = read("app/account/flows/VendorRows.tsx");
   assert.match(
     rows,
-    /rememberConnect\(option\.providerId, returnTo\);\s*window\.location\.assign\(result\.authorizationUrl\);/u,
+    /await startConnect\(\s*workspaceId,\s*option\.providerId,\s*returnTo,?\s*\)/u,
   );
+  for (const caller of [panel, rows]) {
+    assert.doesNotMatch(
+      caller,
+      /beginConnectionAuthorization|rememberConnect/u,
+    );
+  }
 });
 
 test("Connect integration (~~Connect vendor~~ until Build 22, the session's S21): a tap saves and goes back to the flow — no Done, no Save, no Intuit button, no Disconnect (spec A2; the session's S13)", () => {
@@ -178,9 +193,13 @@ test("Connect integration (~~Connect vendor~~ until Build 22, the session's S21)
   ]) {
     assert.match(rows, words);
   }
-  // The whole row is the control, for an owner or admin only.
+  // The whole row is the control: connected, or connectable by this person,
+  // and never read-only (Build 25, the review's R5c 3).
   assert.match(rows, /role="radio"\s+aria-checked=\{isChosen\}/u);
-  assert.match(rows, /const tappable = canManage;/u);
+  assert.match(
+    rows,
+    /const tappable = !readOnly && \(connected \|\| canManage\);/u,
+  );
   assert.match(
     rows,
     /disabled=\{\s*!tappable \|\| \(busy !== null && busy !== option\.providerId\)\s*\}/u,
@@ -414,8 +433,11 @@ test("a member sees the integration and never changes it: no row is a choice —
     rows,
     /\bVENDOR_MEMBER_NOTE,\s*\} from "@\/lib\/connection-rows";/u,
   );
-  assert.match(rows, /const tappable = canManage;/u);
-  assert.match(rows, /if \(busy \|\| !canManage\) return;/u);
+  assert.match(
+    rows,
+    /const tappable = !readOnly && \(connected \|\| canManage\);/u,
+  );
+  assert.match(rows, /if \(busy \|\| readOnly\) return;/u);
   // A vendor row: disabled, said so, no tap.
   assert.match(rows, /aria-disabled=\{!tappable \|\| undefined\}/u);
   assert.match(
@@ -425,12 +447,23 @@ test("a member sees the integration and never changes it: no row is a choice —
   // None: the same.
   assert.match(
     rows,
-    /disabled=\{!canManage \|\| \(busy !== null && busy !== NONE\)\}\s*aria-disabled=\{!canManage \|\| undefined\}\s*onClick=\{canManage \? \(\) => tap\(null\) : undefined\}/u,
+    /disabled=\{readOnly \|\| \(busy !== null && busy !== NONE\)\}\s*aria-disabled=\{readOnly \|\| undefined\}\s*onClick=\{readOnly \? undefined : \(\) => tap\(null\)\}/u,
   );
-  // The note under a member's list only.
+  // The note under a read-only list only.
   assert.match(
     rows,
-    /\{canManage \? null : \([\s\S]*?\{VENDOR_MEMBER_NOTE\}[\s\S]*?\)\}/u,
+    /\{readOnly \? \([\s\S]*?\{VENDOR_MEMBER_NOTE\}[\s\S]*?\) : null\}/u,
+  );
+  // Read-only for a member on Connect integration, and on the Set up of a
+  // flow already on; a new flow's Set up is a member's to choose (backend
+  // ADR-0043 §2; the app's `readOnly={!canManage && editing}`).
+  assert.match(
+    read("app/account/flows/[subscriptionId]/vendor/VendorChoice.tsx"),
+    /canManage=\{canManage\}\s*readOnly=\{!canManage\}/u,
+  );
+  assert.match(
+    read("app/account/flows/[subscriptionId]/setup/SetupForm.tsx"),
+    /readOnly=\{!canManage && !turnOn\}/u,
   );
   // A vendor not connected still says who connects it.
   assert.match(

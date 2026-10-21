@@ -4,6 +4,7 @@ import {
   useEffect,
   useState,
   useSyncExternalStore,
+  useTransition,
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -39,9 +40,9 @@ import {
   DOWNLOAD_FAILED,
   DOWNLOAD_PDF,
   VIEW_PACKAGE,
+  askPackageOnceMore,
   packageAvailable,
   packageFileHref,
-  packageRetryWaitMs,
   toDocumentCards,
   type DocumentCardView,
   type DocumentRowView,
@@ -49,6 +50,7 @@ import {
 import {
   RUN_REREAD_MS,
   heldDecision,
+  rereadForApproval,
   runDuration,
   runLabel,
   runResultLine,
@@ -60,6 +62,7 @@ import {
   type TrackerRow,
   type TrackerState,
 } from "@/lib/run-progress";
+import { followSignedLink } from "@/lib/signed-link";
 import { CancelRunButton } from "./CancelRunButton";
 
 // Every origin the contract names, so a run says how it started. A new origin
@@ -101,7 +104,12 @@ export type RunDecision = { approval: Approval; canDecide: boolean } | null;
  * again every 2 s while the run is pending or running (`RUN_REREAD_MS`),
  * through `/api/platform`, one read at a time; the page as the server drew it
  * comes back whenever it is drawn again (a cancel or a decision revalidates
- * it).
+ * it). A run held with no approval of its job listed yet (it turned held while
+ * the page was open, or was read before its approval was) has the page drawn
+ * again by the server, which reads its approvals, every 2 s, one at a time and
+ * at most `HELD_APPROVAL_REREADS` times, until the approval is listed or the
+ * run leaves held (`rereadForApproval`; Build 25, the review's R5c 1). So
+ * Approve and Deny appear in step 4 with no reload.
  */
 export function RunLive({
   workspaceId,
@@ -151,6 +159,20 @@ export function RunLive({
       clearTimeout(timer);
     };
   }, [going, reads, workspaceId, run.id]);
+
+  // Held, with its approval not listed yet: the server draws the page again,
+  // its approvals read with it, until the approval is there (R5c 1).
+  const [redrawing, startRedraw] = useTransition();
+  const [approvalReads, setApprovalReads] = useState(0);
+  const owed = rereadForApproval(run, approvals, approvalReads);
+  useEffect(() => {
+    if (!owed || redrawing) return;
+    const timer = setTimeout(() => {
+      setApprovalReads((count) => count + 1);
+      startRedraw(() => router.refresh());
+    }, RUN_REREAD_MS);
+    return () => clearTimeout(timer);
+  }, [owed, redrawing, approvalReads, router]);
 
   // Every step from the start (spec A7; S14): by the catalog's groups, the
   // newest version's, for any run whose every reported step they still
@@ -337,9 +359,9 @@ function browserTimeZone(): string {
  * zone. Each request carries its own key — a replay could only answer the
  * same link, and a fresh one never meets a refusal kept under the last. The
  * platform busy building others (503) is asked once more after its
- * `retry-after`; then the refusal is the caller's.
+ * `retry-after` (`askPackageOnceMore`); then the refusal is the caller's.
  */
-async function createPackageFile(
+function createPackageFile(
   workspaceId: string,
   runId: string,
   format: PackageFormat,
@@ -349,36 +371,30 @@ async function createPackageFile(
     format,
     ...(zone ? { timeZone: zone } : {}),
   };
-  const ask = () =>
-    platformApiJson<RunPackageFile>(
-      `/v1/workspaces/${encodeURIComponent(workspaceId)}/runs/${encodeURIComponent(runId)}/package`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "idempotency-key": `run-package-${format}-${crypto.randomUUID()}`,
+  return askPackageOnceMore(
+    () =>
+      platformApiJson<RunPackageFile>(
+        `/v1/workspaces/${encodeURIComponent(workspaceId)}/runs/${encodeURIComponent(runId)}/package`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "idempotency-key": `run-package-${format}-${crypto.randomUUID()}`,
+          },
+          body: JSON.stringify(body),
         },
-        body: JSON.stringify(body),
-      },
-    );
-  try {
-    return await ask();
-  } catch (error) {
-    const wait =
-      error instanceof PlatformApiError && error.status === 503
-        ? packageRetryWaitMs(error.retryAfterSeconds)
-        : null;
-    if (wait === null) throw error;
-    await new Promise((resolve) => setTimeout(resolve, wait));
-    return ask();
-  }
+      ),
+    (error) => (error instanceof PlatformApiError ? error : null),
+  );
 }
 
 /**
  * The run package's buttons (Build 24, P12; the owner's build 23 words): View
  * package — on the run page — and Download PDF and Download Excel, on both. A
  * download goes to the file's signed link, which saves it (an attachment; no
- * page is left and nothing crosses origins); a refusal is said under the row.
+ * page is left and nothing crosses origins); a refusal is said under the row,
+ * and so is a link that is not https, which is never followed
+ * (`followSignedLink`; Build 25, the review's R5c 2).
  */
 export function PackageActions({
   workspaceId,
@@ -398,7 +414,7 @@ export function PackageActions({
     setError(null);
     try {
       const file = await createPackageFile(workspaceId, runId, format);
-      window.location.assign(file.downloadUrl);
+      if (!followSignedLink(file.downloadUrl)) setError(DOWNLOAD_FAILED);
     } catch {
       setError(DOWNLOAD_FAILED);
     } finally {

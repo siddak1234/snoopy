@@ -27,17 +27,13 @@ import {
   disconnectTitle,
 } from "@/lib/connection-rows";
 import type { Connection, ConnectionProvider } from "@/lib/connections";
-import {
-  beginConnectionAuthorization,
-  connectProviderWithKey,
-  disconnectConnection,
-} from "./actions";
+import { connectProviderWithKey, disconnectConnection } from "./actions";
 import {
   PENDING_CONNECT,
-  rememberConnect,
   takeConnectReturn,
   withCallbackStatus,
 } from "./pending-connect";
+import { startConnect } from "./start-connect";
 
 function pendingConnect(): string | null {
   try {
@@ -141,28 +137,26 @@ export function ConnectionsPanel({
   const authorize = (provider: ConnectionProvider) => {
     setBusyProvider(provider.providerId);
     startTransition(async () => {
-      const result = await beginConnectionAuthorization(
+      const started = await startConnect(
         workspaceId,
         provider.providerId,
+        returnTo,
       );
-      if (result.ok && result.alreadyConnectedAs) {
+      if (started.status === "already") {
         setBusyProvider(null);
         setNotice(
-          `${provider.displayName} is already connected as ${result.alreadyConnectedAs}, with everything it needs — there is nothing to authorize.`,
+          `${provider.displayName} is already connected as ${started.connectedAs}, with everything it needs — there is nothing to authorize.`,
         );
         router.refresh();
         return;
       }
-      if (!result.ok || !result.authorizationUrl) {
+      if (started.status === "refused") {
         setBusyProvider(null);
         setRowError({
           providerId: provider.providerId,
-          message: result.ok ? "Could not start the connection" : result.error,
+          message: started.message,
         });
-        return;
       }
-      rememberConnect(provider.providerId, returnTo);
-      window.location.assign(result.authorizationUrl);
     });
   };
 

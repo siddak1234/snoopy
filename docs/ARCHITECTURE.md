@@ -41,7 +41,12 @@ is distinct from login identity and follows the public connection-provider
 contract: Reconnect keeps the connected account, and **Replace account** is a
 separate, confirmed owner-or-admin intent that names the exact connection it
 replaces (backend ADR-0019 §4, ADR-0026). A grant that already holds what the
-provider asks for is reused without consent, and the page says so.
+provider asks for is reused without consent, and the page says so. Connections
+and a flow step's vendor rows start a connect the same way
+(`app/account/connections/start-connect.ts`). A member sees a flow's
+integration and does not change it, with one exception: on a newly added
+flow's Set up, the member makes its first choice, a connected vendor or None
+(backend ADR-0043 §2), as the app's Set up allows.
 
 ## Runs and approvals
 
@@ -58,8 +63,15 @@ A held job is decided where it waits: step 4 of its run page offers the one
 Approve and Deny pair (`app/account/approvals/ApprovalDecision.tsx`, Deny the
 danger variant) to a role the job's newest approval names, and says who can
 otherwise; a decision draws the run page again (the action revalidates it by
-the job id the platform answers with). On Approvals a decided row fades and
-folds away, its pill saying the decision, and the last one leaving goes to
+the job id the platform answers with). A run can turn held while its page is
+open, or the page can read it before its approval is listed. Then the server
+draws the page again, which reads the approvals, every 2 s, one read at a time
+and at most ten times, until the approval is listed or the run leaves held
+(`rereadForApproval` in `lib/run-progress.ts`). So Approve and Deny appear
+with no reload. A job whose approval is listed is not read again for it. On
+Approvals each row names its flow and the step it waits at, "{flow} · {step
+title}" (`approvalTitle`), never the step id. A decided row fades and folds
+away, its pill saying the decision, and the last one leaving goes to
 Activity; under reduced motion it leaves at once.
 
 A job that has documents and has ended or is held has a run package (backend
@@ -67,7 +79,11 @@ ADR-0045): View package, Download PDF and Download Excel replace Download
 JSON. A download asks the platform for the file through `/api/platform` in the
 browser's zone and goes to the signed link it answers — an attachment, so the
 browser saves it and nothing crosses origins; a platform busy building others
-(503) is asked once more after its `retry-after`. The package page,
+(503) is asked once more after its `retry-after` (`askPackageOnceMore` in
+`lib/run-documents.ts`, the package route's ask too). The browser follows a
+signed link only when it is https (`lib/signed-link.ts`, the complete
+export's Download file too), as the server and the app do. Anything else is
+never followed, and the page says "Could not download. Try again." The package page,
 `/account/runs/[runId]/package`, shows the PDF itself: the platform's links are
 attachments only, so the site's own route (`app/account/runs/[runId]/package/file/route.ts`, server
 only) asks for the PDF, reads the signed link on the server
