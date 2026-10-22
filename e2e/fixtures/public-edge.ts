@@ -371,6 +371,13 @@ function initialState() {
     // every one refused; the workspace's flows, or the catalog, unreadable.
     approvalListFailing: 0,
     approvalListRefused: 0,
+    // §12.1 #300: the next reads of one run refused (503), each counted — a
+    // run page's re-reads meet them, and the page that drew it stays.
+    runReadsFailing: 0,
+    runReadsRefused: 0,
+    // #58's audit (backend 27.2.1): Invoice Processing's entry as a flow that
+    // declares no word for its documents.
+    documentWordsDeclared: true,
     subscriptionsFailing: false,
     catalogFailing: false,
     // Build 25 (the review's R5c 2): signed links answered with another
@@ -481,10 +488,7 @@ function oauthConnectionState(): Connections["ConnectionState"] {
     id: state.oauthConnectionId,
     providerId: oauthProvider.providerId,
     workspaceId,
-    externalAccount: {
-      id: "fixture-oauth-account",
-      displayName: "Fixture OAuth account",
-    },
+    externalAccount: { displayName: "Fixture OAuth account" },
     status: state.oauthStatus,
     requiredScopes: ["fixture.read"],
     grantedScopes: ["fixture.read"],
@@ -499,10 +503,7 @@ const connection = {
   id: "77777777-7777-4777-8777-777777777777",
   providerId: keyProvider.providerId,
   workspaceId,
-  externalAccount: {
-    id: "fixture-account",
-    displayName: "Fixture account",
-  },
+  externalAccount: { displayName: "Fixture account" },
   status: "connected",
   requiredScopes: [],
   grantedScopes: [],
@@ -649,10 +650,7 @@ function googleConnection(): Connections["Connection"] {
     id: googleConnectionId,
     providerId: googleProvider.providerId,
     workspaceId,
-    externalAccount: {
-      id: "fixture-google-account",
-      displayName: "person@example.com",
-    },
+    externalAccount: { displayName: "person@example.com" },
     status: "connected",
     requiredScopes: googleProvider.scopes,
     grantedScopes: googleProvider.scopes,
@@ -984,7 +982,7 @@ function quickbooksConnection(): Connections["Connection"] {
     id: quickbooksConnectionId,
     providerId: quickbooksProvider.providerId,
     workspaceId,
-    externalAccount: { id: "fixture-company", displayName: "Fixture Company" },
+    externalAccount: { displayName: "Fixture Company" },
     status: "connected",
     requiredScopes: quickbooksProvider.scopes,
     grantedScopes: quickbooksProvider.scopes,
@@ -1028,10 +1026,25 @@ function fixtureCatalog(): Automations["AutomationCatalogResponse"] {
         subscribed: state.projectAutomationScopes.length > 0,
       },
       teamDraftAutomation,
-      { ...invoiceAutomation, subscribed: state.invoiceAdded },
+      {
+        ...(state.documentWordsDeclared
+          ? invoiceAutomation
+          : wordlessInvoice()),
+        subscribed: state.invoiceAdded,
+      },
     ],
     categories: ["All", "Accounting", "Operations"],
   };
+}
+
+// Invoice Processing's entry with no word for its documents (`catalog-words-none`).
+function wordlessInvoice(): Omit<typeof invoiceAutomation, "documentWords"> {
+  const entry: Omit<typeof invoiceAutomation, "documentWords"> &
+    Partial<Pick<typeof invoiceAutomation, "documentWords">> = {
+    ...invoiceAutomation,
+  };
+  delete entry.documentWords;
+  return entry;
 }
 
 const manualSubscriptionId = "99999999-9999-4999-8999-999999999999";
@@ -1888,6 +1901,16 @@ const server = createServer(
       "/__fixture/approvals-failing-once": () => {
         state.approvalListFailing = 1;
       },
+      // §12.1 #300: the next `count` reads of a run refused, several in a row.
+      "/__fixture/run-reads-failing": () => {
+        const count = Number(url.searchParams.get("count") ?? "1");
+        if (!Number.isSafeInteger(count) || count < 1) return false;
+        state.runReadsFailing = count;
+      },
+      // #58's audit: the catalog's Invoice Processing declares no word.
+      "/__fixture/catalog-words-none": () => {
+        state.documentWordsDeclared = false;
+      },
       "/__fixture/subscriptions-failing": () => {
         state.subscriptionsFailing = true;
       },
@@ -2140,6 +2163,7 @@ const server = createServer(
         // refused (Build 25's audit).
         approvalListReads: state.approvalListReads,
         approvalListRefused: state.approvalListRefused,
+        runReadsRefused: state.runReadsRefused,
         // Every checkout asked for: a refused one leaves no plan behind.
         checkoutAttempts: state.checkoutAttempts,
         // Every team a test created — where, and the name and kind it was
@@ -3267,10 +3291,7 @@ const server = createServer(
           outcome: "reused",
           connection: {
             ...oauthConnectionState(),
-            externalAccount: {
-              id: "fixture-other-account",
-              displayName: "Fixture other account",
-            },
+            externalAccount: { displayName: "Fixture other account" },
           },
         } satisfies ConnectionOperations["beginConnectionAuthorization"]["responses"][200]["content"]["application/json"]);
       }
@@ -4205,6 +4226,11 @@ const server = createServer(
           endedAt: run.endedAt ?? null,
           documents: invoiceDocuments(documentsOf),
         } satisfies Automations["RunDocumentsFile"]);
+      }
+      if (state.runReadsFailing > 0) {
+        state.runReadsFailing -= 1;
+        state.runReadsRefused += 1;
+        return respond(response, 503, problem(503, "Service Unavailable"));
       }
       const run = fixtureRun(runId);
       const failed = run.status === "failed";
