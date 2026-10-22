@@ -97,11 +97,15 @@ package's page (the PDF itself, in a frame of the site's inline route that
 answers it `application/pdf` inline, a busy platform asked once more; its
 downloads, an https link only; a job with no package yet), Approvals (each
 row its flow and step, fewer words when those cannot be read; a decided row
-leaves, and the last one goes to Activity), the A8X mark's near-black #212121
-on the light ground, every run by its
+leaves, and the last one goes to Activity; a run page that keeps itself
+through refused re-reads, and tells a member watching a job turn held who can
+decide), a document headed in its flow's word or else "Document", the A8X
+mark's near-black #212121 on the light ground of the site, the account, Sign
+in and Set up your organization, every run by its
 full id, a run's file (PUT straight to the fixture's object store, across
 origins), a webhook flow's address, connections (one row each — mark, name, the account's email or its
-state, one button — each disconnect confirmed first), departments (a
+state, one button — each disconnect confirmed first; every row pinned in both palettes, read as data:
+its mark, words, colours and height, the app's row snapshot's half), departments (a
 department is a project in the platform's contract: its members, asking to
 join and the answers), setting up an organization
 (a refused domain claim retried on the organization made), the organization's
