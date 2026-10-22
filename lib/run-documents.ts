@@ -155,13 +155,25 @@ const STATUS_TONES: Record<RunDocument["status"], DocumentTone> = {
 /** Said under a document's lines when it has more than were read. */
 export const DOCUMENT_MORE_LINES = "More lines on the document.";
 
+/** What a flow calls one of its documents, and many (`AutomationCatalogEntry.documentWords`). */
+export type DocumentWords = { singular: string; plural: string };
+
+/** A flow that names no word for its documents (the owner, 2026-10-21). */
+export const DOCUMENT_WORD = "Document";
+
 /**
- * "Invoice 1 of 3" — the closed row's heading (Build 24, P10; the owner's
- * build 23 words), whatever the document's type; the type is the body's first
- * row. ~~"Document 1 of 3"~~ until Build 24.
+ * "Invoice 1 of 3" — the closed row's heading, in the word its flow declares
+ * (backend BUILD-PLAN 27.2.1; the owner, 2026-10-21: "invoice is invoice
+ * processing specific"), else "Document 1 of 3", whatever the document's type;
+ * the type is the body's first row. ~~"Invoice" for every flow~~ from Build 24
+ * (P10) until then.
  */
-export function documentOf(index: number, count: number): string {
-  return `Invoice ${index} of ${count}`;
+export function documentOf(
+  index: number,
+  count: number,
+  words?: DocumentWords | null,
+): string {
+  return `${words?.singular ?? DOCUMENT_WORD} ${index} of ${count}`;
 }
 
 /**
@@ -276,6 +288,7 @@ export function toDocumentCard(
   count: number,
   approval?: "rejected" | "expired" | null,
   files?: readonly RunFile[],
+  words?: DocumentWords | null,
 ): DocumentCardView {
   const money = (value: string | null) =>
     documentMoney(value, document.currency);
@@ -338,7 +351,7 @@ export function toDocumentCard(
     .join(" · ");
   return {
     index: document.index,
-    heading: documentOf(document.index, count),
+    heading: documentOf(document.index, count, words),
     chip: notApproved ? "Not approved" : STATUS_CHIPS[document.status],
     tone: notApproved ? "muted" : STATUS_TONES[document.status],
     glance: glance || null,
@@ -366,15 +379,19 @@ export function toDocumentCard(
   };
 }
 
-/** Every document's card, in the file's order; `files` are the job's uploads (`RunDetail.files`). */
+/**
+ * Every document's card, in the file's order; `files` are the job's uploads
+ * (`RunDetail.files`); `words`, the flow's for its documents (its catalog entry).
+ */
 export function toDocumentCards(
   documents: readonly RunDocument[] | undefined,
   approval?: "rejected" | "expired" | null,
   files?: readonly RunFile[],
+  words?: DocumentWords | null,
 ): DocumentCardView[] {
   const list = [...(documents ?? [])].sort((a, b) => a.index - b.index);
   return list.map((document) =>
-    toDocumentCard(document, list.length, approval, files),
+    toDocumentCard(document, list.length, approval, files, words),
   );
 }
 

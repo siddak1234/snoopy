@@ -190,7 +190,11 @@ test("each document is a closed row that opens in place: <details> never drawn o
     card,
     /<\/summary>\s*<div[^>]*>\s*<dl[^>]*>\{pairs\(card\.facts, "fact"\)\}<\/dl>/u,
   );
-  assert.match(live, /toDocumentCards\([\s\S]*?detail\.files,\s*\)/u);
+  // The job's files give each card its Format; the flow's words head it (backend BUILD-PLAN 27.5.1).
+  assert.match(
+    live,
+    /toDocumentCards\([\s\S]*?detail\.files,\s*flow\?\.documentWords,\s*\)/u,
+  );
 });
 
 const PACKAGE_PAGE = "app/account/runs/[runId]/package/page.tsx";
