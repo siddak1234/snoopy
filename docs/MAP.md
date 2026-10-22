@@ -162,7 +162,7 @@
 
 ### Tests
 
-- `test/`: account, automation, billing, boundaries, brand, browser, build21, build22, build24, change, connection, connections, deployed, doc, export, flow, global, kit, new, platform, pre, repo, run, session, signed, structure, tenancy, upload, vendor, verify
+- `test/`: account, automation, billing, boundaries, brand, browser, build21, build22, build24, change, connection, connections, deployed, doc, export, flow, global, kit, new, no, platform, pre, repo, run, session, signed, structure, tenancy, upload, vendor, verify
 
 ## Skills, agents and hooks
 

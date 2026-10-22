@@ -46,6 +46,7 @@ import {
   toDocumentCards,
   type DocumentCardView,
   type DocumentRowView,
+  type DocumentWords,
 } from "@/lib/run-documents";
 import {
   RUN_REREAD_MS,
@@ -83,6 +84,8 @@ const ORIGIN_LABEL: Record<RunOrigin, string> = {
  */
 export type RunFlow = {
   name: string;
+  /** What the flow calls its documents, when it declares it (backend BUILD-PLAN 27.2.1). */
+  documentWords?: DocumentWords;
   pipeline: DeclaredStep[];
   groups?: ProgressGroup[];
   tracker?: TrackerFlow;
@@ -221,6 +224,7 @@ export function RunLive({
         ? "expired"
         : null,
     detail.files,
+    flow?.documentWords,
   );
   const result = runResultLine(run, listed);
   const facts = [

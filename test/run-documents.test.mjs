@@ -180,7 +180,7 @@ test('every line: its description, its amount, and "{quantity} × {unit price}" 
     { description: "—", amount: null, each: null },
   ]);
   assert.equal(card.moreLines, true);
-  assert.equal(card.heading, "Invoice 1 of 2");
+  assert.equal(card.heading, "Document 1 of 2", "a flow that names no word");
 });
 
 test("the rows: totals, the discount as taken off, how it was paid, the result, then the automation's own lines", () => {
@@ -295,17 +295,28 @@ test("every type in words, the seller beside it, its place by the parts printed"
   assert.equal(toDocumentCard(doc(), 1).when, "Oct 14, 2026 · 2:32 PM");
 });
 
-test('cards come in the file\'s order, each "Invoice i of n" whatever its type — ~~"Document i of n"~~ until Build 24 (P10)', () => {
-  const cards = toDocumentCards([
+test('cards come in the file\'s order, each "{its flow\'s word} i of n" whatever its type, "Document i of n" for a flow that names none (backend BUILD-PLAN 27.2.1)', () => {
+  const documents = [
     doc({ index: 3 }),
     doc({ index: 1, type: "bill" }),
     doc({ index: 2 }),
-  ]);
+  ];
+  const invoices = toDocumentCards(documents, null, undefined, {
+    singular: "Invoice",
+    plural: "Invoices",
+  });
   assert.deepEqual(
-    cards.map((card) => card.heading),
+    invoices.map((card) => card.heading),
     ["Invoice 1 of 3", "Invoice 2 of 3", "Invoice 3 of 3"],
   );
-  assert.equal(cards[1].heading, "Invoice 2 of 3");
+  assert.equal(invoices[1].heading, "Invoice 2 of 3");
+  for (const words of [undefined, null])
+    assert.deepEqual(
+      toDocumentCards(documents, null, undefined, words).map(
+        (card) => card.heading,
+      ),
+      ["Document 1 of 3", "Document 2 of 3", "Document 3 of 3"],
+    );
   assert.deepEqual(toDocumentCards(undefined), []);
 });
 

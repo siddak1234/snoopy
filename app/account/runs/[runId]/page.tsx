@@ -115,6 +115,7 @@ export default async function RunDetailPage(
   const flow: RunFlow = entry
     ? {
         name: entry.name,
+        ...(entry.documentWords ? { documentWords: entry.documentWords } : {}),
         pipeline: entry.pipeline.map((step) => ({
           id: step.id,
           title: step.title,

@@ -44,6 +44,7 @@ records by size. Then:
 | A route, server action or component | [app/CLAUDE.md](app/CLAUDE.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | A browser or fixture test, a visual baseline | [e2e/CLAUDE.md](e2e/CLAUDE.md), README "Verification" |
 | Where a change belongs | [docs/REPO-STRUCTURE.md](docs/REPO-STRUCTURE.md) |
+| What each repository holds; no code for one flow | `../snoopy-backend/docs/platform/AUTOM8X-MASTER-PLAN.md` §3.4, read only; `test/no-flow-code.test.mjs` |
 | The gates, the scripts | [README.md](README.md) "Verification" and "Useful scripts" |
 | Push a change | `/audit-change` ([skill](.claude/skills/audit-change/SKILL.md)), "Gates and push" below |
 | Find where something lives | the `explorer` agent ([.claude/agents/explorer.md](.claude/agents/explorer.md)) |
