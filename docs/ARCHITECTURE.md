@@ -69,7 +69,8 @@ otherwise; a decision draws the run page again (the action revalidates it by
 the job id the platform answers with). A run can turn held while its page is
 open, or the page can read it before its approval is listed. Then the browser
 reads the job and its approvals again through `/api/platform`, every 2 s, one
-read at a time and at most ten times, until the approval is listed or the run
+re-read (the job and its approvals, two requests together) at a time and at
+most ten times, until the approval is listed or the run
 leaves held (`rereadForApproval` in `lib/run-progress.ts`), and works out step
 4's pair from what it read (`waitingDecision`). So Approve and Deny appear
 with no reload. A read that fails costs only itself: the page stays as it
