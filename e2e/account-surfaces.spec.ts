@@ -865,6 +865,193 @@ test("13 — a disconnected account leaves its row offering Connect; Disconnect 
   await page.waitForURL(/^https:\/\/oauth\.invalid\/authorize/);
 });
 
+/**
+ * Every connection row as it is drawn — the website's half of backend
+ * BUILD-PLAN 25.4.40, the snapshot the app pins in
+ * `snoopy-mobile/__tests__/connection-row.test.tsx` in both palettes: each
+ * row's mark (its kind and its name), its name and line, its button's words,
+ * the colour each is drawn in, and its height. Read as data, not as pixels,
+ * so it is the same in every engine and on every machine.
+ */
+/** What `drawnConnectionRows` reads on Connections, in each palette. */
+const CONNECTION_ROWS: Record<"light" | "dark", unknown[]> = {
+  light: [
+    {
+      row: "connection-fixture-key",
+      mark: "icon",
+      markColour: "rgb(85, 72, 171)",
+      name: "Fixture key provider",
+      nameColour: "rgb(32, 34, 47)",
+      line: "Not connected",
+      lineColour: "rgb(102, 106, 130)",
+      button: "Connect",
+      buttonColour: "rgb(32, 34, 47)",
+      buttonGround: "rgba(0, 0, 0, 0)",
+      height: 64,
+    },
+    {
+      row: "connection-fixture-oauth",
+      mark: "icon",
+      markColour: "rgb(85, 72, 171)",
+      name: "Fixture OAuth provider",
+      nameColour: "rgb(32, 34, 47)",
+      line: "Connected",
+      lineColour: "rgb(102, 106, 130)",
+      button: "Disconnect",
+      buttonColour: "rgb(220, 38, 38)",
+      buttonGround: "rgba(239, 68, 68, 0.1)",
+      height: 64,
+    },
+    {
+      row: "connection-quickbooks",
+      mark: "image QuickBooks",
+      markColour: null,
+      name: "QuickBooks Online",
+      nameColour: "rgb(32, 34, 47)",
+      line: "Not connected",
+      lineColour: "rgb(102, 106, 130)",
+      button: "Connect",
+      buttonColour: "rgb(32, 34, 47)",
+      buttonGround: "rgba(0, 0, 0, 0)",
+      height: 64,
+    },
+    {
+      row: "connection-google",
+      mark: "glyph Google",
+      markColour: "rgb(32, 34, 47)",
+      name: "Google",
+      nameColour: "rgb(32, 34, 47)",
+      line: "person@example.com",
+      lineColour: "rgb(102, 106, 130)",
+      button: "Disconnect",
+      buttonColour: "rgb(220, 38, 38)",
+      buttonGround: "rgba(239, 68, 68, 0.1)",
+      height: 64,
+    },
+  ],
+  dark: [
+    {
+      row: "connection-fixture-key",
+      mark: "icon",
+      markColour: "rgb(210, 206, 253)",
+      name: "Fixture key provider",
+      nameColour: "rgb(233, 233, 237)",
+      line: "Not connected",
+      lineColour: "rgb(178, 182, 202)",
+      button: "Connect",
+      buttonColour: "rgb(233, 233, 237)",
+      buttonGround: "rgba(0, 0, 0, 0)",
+      height: 64,
+    },
+    {
+      row: "connection-fixture-oauth",
+      mark: "icon",
+      markColour: "rgb(210, 206, 253)",
+      name: "Fixture OAuth provider",
+      nameColour: "rgb(233, 233, 237)",
+      line: "Connected",
+      lineColour: "rgb(178, 182, 202)",
+      button: "Disconnect",
+      buttonColour: "rgb(248, 113, 113)",
+      buttonGround: "rgba(239, 68, 68, 0.1)",
+      height: 64,
+    },
+    {
+      row: "connection-quickbooks",
+      mark: "image QuickBooks",
+      markColour: null,
+      name: "QuickBooks Online",
+      nameColour: "rgb(233, 233, 237)",
+      line: "Not connected",
+      lineColour: "rgb(178, 182, 202)",
+      button: "Connect",
+      buttonColour: "rgb(233, 233, 237)",
+      buttonGround: "rgba(0, 0, 0, 0)",
+      height: 64,
+    },
+    {
+      row: "connection-google",
+      mark: "glyph Google",
+      markColour: "rgb(233, 233, 237)",
+      name: "Google",
+      nameColour: "rgb(233, 233, 237)",
+      line: "person@example.com",
+      lineColour: "rgb(178, 182, 202)",
+      button: "Disconnect",
+      buttonColour: "rgb(248, 113, 113)",
+      buttonGround: "rgba(239, 68, 68, 0.1)",
+      height: 64,
+    },
+  ],
+};
+
+async function drawnConnectionRows(page: Page) {
+  // A stored theme fades each colour in: read the rows settled.
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter(
+          (animation) =>
+            animation.effect?.getTiming().iterations !==
+            Number.POSITIVE_INFINITY,
+        )
+        .map((animation) => animation.finished.catch(() => null)),
+    ),
+  );
+  return page.locator("[data-connection-row]").evaluateAll((rows) =>
+    rows.map((row) => {
+      const colour = (element: Element | null | undefined) =>
+        element ? getComputedStyle(element).color : null;
+      const mark = row.querySelector("[data-mark]");
+      const [name, line] = [
+        ...row.querySelectorAll(":scope > span:not([data-mark]) > span"),
+      ];
+      const button = row.querySelector("button");
+      return {
+        row: row.getAttribute("data-testid"),
+        mark: mark
+          ? [
+              mark.getAttribute("data-mark"),
+              mark.getAttribute("alt") ?? mark.getAttribute("aria-label"),
+            ]
+              .filter(Boolean)
+              .join(" ")
+          : null,
+        markColour:
+          mark && mark.getAttribute("data-mark") !== "image"
+            ? colour(mark)
+            : null,
+        name: name?.textContent ?? null,
+        nameColour: colour(name),
+        line: line?.textContent ?? null,
+        lineColour: colour(line),
+        button: button?.textContent ?? null,
+        buttonColour: colour(button),
+        buttonGround: button ? getComputedStyle(button).backgroundColor : null,
+        height: Math.round(row.getBoundingClientRect().height),
+      };
+    }),
+  );
+}
+
+test("the connection row in both palettes, pinned: every vendor's mark, name, line and button, and each one's colour (backend 25.4.40)", async ({
+  page,
+}) => {
+  for (const theme of ["light", "dark"] as const) {
+    await page.addInitScript(
+      (value) => localStorage.setItem("theme", value),
+      theme,
+    );
+    await page.goto("/account/connections");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    await expect(page.locator("[data-connection-row]").first()).toBeVisible();
+    expect(await drawnConnectionRows(page), theme).toEqual(
+      CONNECTION_ROWS[theme],
+    );
+  }
+});
+
 test("15 — an unmet connection links to Connections by the provider's name from the flow's Step 1, and Turn on waits for it", async ({
   page,
 }) => {
@@ -1081,6 +1268,31 @@ test("P6 — a member is told who can decide, and offered no button", async ({
   await expect(heldStep(page).getByRole("button")).toHaveCount(0);
 });
 
+test("a member watching a job turn held is told who can decide, and offered no button, with no reload (§12.1 #300; #57's audit)", async ({
+  page,
+}) => {
+  await fixtureControl("held-job-running");
+  await presentSession(page, "member");
+  await page.goto(heldJob);
+  await expect(page.locator("main").getByText(/^running$/iu)).toBeVisible();
+  // A reload from here on would lose this mark.
+  await page.evaluate(() => Object.assign(window, { sameDocument: true }));
+  await fixtureControl("held-job-holds");
+  const step = heldStep(page);
+  await expect(step).toHaveAttribute("data-state", "held", {
+    timeout: 10_000,
+  });
+  await expect(step).toContainText("Only owner or admin can decide this.", {
+    timeout: 15_000,
+  });
+  await expect(step.getByRole("button")).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { sameDocument?: boolean }).sameDocument,
+    ),
+  ).toBe(true);
+});
+
 test("R5c 1 — a job that reaches its approval while its page is open offers Approve and Deny in step 4 with no reload: its approvals are read again until the waiting one is listed (Build 25)", async ({
   page,
 }) => {
@@ -1183,6 +1395,60 @@ test("a held job's approvals re-read that fails costs only that read: the run pa
       () => (window as unknown as { sameDocument?: boolean }).sameDocument,
     ),
   ).toBe(true);
+});
+
+test("a job's re-reads refused several in a row cost only those reads: the run page stays as it was, and the next read draws what the job did (§12.1 #300; #57's audit)", async ({
+  page,
+}) => {
+  await fixtureControl("held-job-running");
+  await page.goto(heldJob);
+  const main = page.locator("main");
+  await expect(main.getByText(/^running$/iu)).toBeVisible();
+  await page.evaluate(() => Object.assign(window, { sameDocument: true }));
+  // Drawn: the browser's next three reads of the job are refused (503).
+  await fixtureControl("run-reads-failing?count=3");
+  await expect
+    .poll(
+      async () =>
+        (await fixtureRead<{ runReadsRefused: number }>("counts"))
+          .runReadsRefused,
+      { timeout: 20_000 },
+    )
+    .toBe(3);
+  await expect(main.getByText(/^running$/iu)).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "The platform could not answer just now",
+    }),
+  ).toHaveCount(0);
+  // The next read answers: the job holds, and step 4 says so with no reload.
+  await fixtureControl("held-job-holds");
+  await expect(heldStep(page)).toHaveAttribute("data-state", "held", {
+    timeout: 10_000,
+  });
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { sameDocument?: boolean }).sameDocument,
+    ),
+  ).toBe(true);
+});
+
+test('a flow that declares no word for its documents heads each one "Document n of 3", and so does a run whose flow the catalog does not list (backend 27.2.1; #58\'s audit)', async ({
+  page,
+}) => {
+  for (const control of ["catalog-words-none", "catalog-empty"]) {
+    await fixtureControl("reset");
+    await fixtureControl(control);
+    await page.goto("/account/runs/fixture-run-invoice");
+    const cards = page.locator("main details[data-testid^='document-']");
+    await expect(cards, control).toHaveCount(3);
+    await expect(cards.nth(0).locator("summary"), control).toContainText(
+      "Document 1 of 3",
+    );
+    await expect(page.locator("main"), control).not.toContainText(
+      "Invoice 1 of 3",
+    );
+  }
 });
 
 test("an Approvals row whose flows or catalog cannot be read loses those words, never the page or its buttons (Build 25's audit; the review's R5c 6)", async ({
@@ -1914,6 +2180,8 @@ test("26 — each account page reads the workspace list once, counted at the pla
     organizationProject,
     "/account/teams",
     "/account/settings",
+    // The run page too (§12.1 #300; #57's audit).
+    "/account/runs/fixture-run-invoice",
   ]) {
     await fixtureControl("reset");
     await page.goto(path);
@@ -1964,45 +2232,74 @@ async function darkestGrey(page: Page, element: Locator): Promise<number> {
   }
 }
 
+/**
+ * The A8X mark on a page's light ground: the design's near-black #212121, its
+ * white artwork inverted at .87 (Build 25's audit). The theme is set before
+ * the page loads; the mark is read settled.
+ */
+async function expectNearBlackMark(page: Page, path: string) {
+  await page.goto(path);
+  await expect(page).toHaveURL(
+    new RegExp(`${path.replace(/[/.?]/gu, "\\$&")}$`, "u"),
+  );
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  const mark = page.locator(".brand-mark").first();
+  await expect(mark).toBeVisible();
+  await expect
+    .poll(() =>
+      mark.evaluate(
+        (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
+      ),
+    )
+    .toBe(true);
+  // A stored theme fades each colour in: the mark's and its ground's
+  // finite animations are let finish first, so it is read settled.
+  await mark.evaluate((element) => {
+    const animations: Animation[] = [];
+    for (let node: Element | null = element; node; node = node.parentElement)
+      animations.push(
+        ...node
+          .getAnimations()
+          .filter(
+            (animation) =>
+              animation.effect?.getTiming().iterations !==
+              Number.POSITIVE_INFINITY,
+          ),
+      );
+    return Promise.all(
+      animations.map((animation) => animation.finished.catch(() => null)),
+    );
+  });
+  const grey = await darkestGrey(page, mark);
+  // 255 × (1 − 0.87) = 33 = 0x21; invert(1) draws 0, invert(0.78) 0x38.
+  expect(
+    Math.abs(grey - 0x21),
+    `${path}: drawn in grey ${grey}`,
+  ).toBeLessThanOrEqual(4);
+}
+
 test("on the light ground the A8X mark is the design's near-black #212121 — its white artwork inverted at .87 — on the site and in the account (Build 25's audit)", async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem("theme", "light"));
-  for (const path of ["/", "/account"]) {
-    await page.goto(path);
-    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-    const mark = page.locator(".brand-mark").first();
-    await expect(mark).toBeVisible();
-    await expect
-      .poll(() =>
-        mark.evaluate(
-          (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
-        ),
-      )
-      .toBe(true);
-    // A stored theme fades each colour in: the mark's and its ground's
-    // finite animations are let finish first, so it is read settled.
-    await mark.evaluate((element) => {
-      const animations: Animation[] = [];
-      for (let node: Element | null = element; node; node = node.parentElement)
-        animations.push(
-          ...node
-            .getAnimations()
-            .filter(
-              (animation) =>
-                animation.effect?.getTiming().iterations !==
-                Number.POSITIVE_INFINITY,
-            ),
-        );
-      return Promise.all(
-        animations.map((animation) => animation.finished.catch(() => null)),
-      );
-    });
-    const grey = await darkestGrey(page, mark);
-    // 255 × (1 − 0.87) = 33 = 0x21; invert(1) draws 0, invert(0.78) 0x38.
-    expect(
-      Math.abs(grey - 0x21),
-      `${path}: drawn in grey ${grey}`,
-    ).toBeLessThanOrEqual(4);
-  }
+  for (const path of ["/", "/account"]) await expectNearBlackMark(page, path);
+});
+
+test("the A8X mark is the same near-black #212121 on Set up your organization's light ground (§12.1 #300; #57's audit)", async ({
+  page,
+}) => {
+  await presentSession(page, "requester");
+  await page.addInitScript(() => localStorage.setItem("theme", "light"));
+  await expectNearBlackMark(page, "/onboarding/setup-org");
+});
+
+test.describe("signed out, on the light ground", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test("the A8X mark is the same near-black #212121 on Sign in (§12.1 #300; #57's audit)", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => localStorage.setItem("theme", "light"));
+    await expectNearBlackMark(page, "/login");
+  });
 });

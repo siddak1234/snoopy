@@ -2979,6 +2979,11 @@ test.describe("Invoice Processing's page, Step 1 to its run (spec A6, A7; Build 
     await expect(main.locator("details[data-testid^='document-']")).toHaveCount(
       3,
     );
+    // Cards that arrive on a live re-read are headed in the flow's word, as
+    // the server-drawn page heads them (backend 27.2.1; #58's audit).
+    await expect(
+      main.locator("details[data-testid^='document-'] summary").first(),
+    ).toContainText("Invoice 1 of 3");
     await expect(main.getByRole("button", { name: "Cancel run" })).toHaveCount(
       0,
     );

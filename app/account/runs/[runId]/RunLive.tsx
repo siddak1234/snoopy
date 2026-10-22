@@ -105,8 +105,9 @@ export type RunFlow = {
  * comes back whenever it is drawn again (a cancel or a decision revalidates
  * it). A run held with no approval of its job listed yet (it turned held while
  * the page was open, or was read before its approval was) has the job and its
- * approvals read again here, in the browser, every 2 s, one at a time and at
- * most `HELD_APPROVAL_REREADS` times, until the approval is listed or the run
+ * approvals read again here, in the browser, every 2 s, one re-read (the job's
+ * read and the approvals', together) at a time and at most
+ * `HELD_APPROVAL_REREADS` times, until the approval is listed or the run
  * leaves held (`rereadForApproval`; Build 25, the review's R5c 1). So Approve
  * and Deny appear in step 4 with no reload. A read that fails costs only
  * itself: the page stays as it was, as the app's does. ~~The server drew the
