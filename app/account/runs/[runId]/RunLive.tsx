@@ -118,8 +118,8 @@ export type RunFlow = {
  * **A run with a title and a score** (backend ADR-0046; Round 19, plan §5.4)
  * is headed by them — the title in the full id's place (the id stays among
  * the facts), the score large beside it — and the sections it read follow
- * its result line as rows that open and close, the first open, before its
- * steps, details and documents.
+ * directly under its result line as rows that open and close, the first
+ * open, before its tiles, steps, details and documents.
  */
 export function RunLive({
   workspaceId,
@@ -150,6 +150,7 @@ export function RunLive({
   const { run, steps, details, documents, sections } = detail;
   // Headed by what the flow named it and its score, when it has both.
   const headed = run.title !== undefined && run.score !== undefined;
+  const hasSections = sections !== undefined && sections.length > 0;
   const going = run.status === "pending" || run.status === "running";
 
   useEffect(() => {
@@ -278,8 +279,15 @@ export function RunLive({
             {result}
           </p>
         ) : null}
+        {/* What it read, directly under its result line (plan §5.4), as the
+            app draws it: then the tiles. */}
+        {hasSections ? (
+          <section aria-label="What was read" className={result ? "mt-4" : ""}>
+            <SectionRows sections={sections} firstOpen testId="run-section" />
+          </section>
+        ) : null}
         <dl
-          className={`grid grid-cols-2 gap-3 sm:max-w-sm ${result ? "mt-4" : ""}`}
+          className={`grid grid-cols-2 gap-3 sm:max-w-sm ${result || hasSections ? "mt-4" : ""}`}
         >
           <Tile
             label="Duration"
@@ -288,12 +296,6 @@ export function RunLive({
           <Tile label="Steps done" value={stepsDone(tracker)} />
         </dl>
       </div>
-
-      {sections && sections.length > 0 ? (
-        <section aria-label="What was read" className="py-5">
-          <SectionRows sections={sections} firstOpen testId="run-section" />
-        </section>
-      ) : null}
 
       <section aria-labelledby="run-steps-title" className="py-5">
         <h2

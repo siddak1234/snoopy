@@ -12,6 +12,7 @@ import type {
   Item,
 } from "@/lib/automations";
 import {
+  OTHER,
   OTHER_CHOICE,
   OTHER_MAX_LENGTH,
   TEXT_MAX_LENGTH,
@@ -206,7 +207,7 @@ export function UploadItemCard({
 
 /**
  * A select field (plan §5.2): its title over its choices (`selectChoices`);
- * "Other" shows a text box under it for a value of the person's own, 40
+ * "Other" shows a text box under it, labelled "Other", for a value of the person's own, 40
  * characters at most.
  */
 function SelectField({
@@ -257,17 +258,21 @@ function SelectField({
           </option>
         ))}
       </select>
+      {/* Its own name, "Other", visible — never the select's, which a
+          screen reader would say twice (as the app labels it). */}
       {other ? (
-        <FormInput
-          id={`${id}-other`}
-          aria-label={field.title}
-          value={typed}
-          onChange={(event) => onType(event.currentTarget.value)}
-          maxLength={OTHER_MAX_LENGTH}
-          required={field.required}
-          disabled={disabled}
-          autoComplete="off"
-        />
+        <div className="mt-3">
+          <FormInput
+            id={`${id}-other`}
+            label={OTHER}
+            value={typed}
+            onChange={(event) => onType(event.currentTarget.value)}
+            maxLength={OTHER_MAX_LENGTH}
+            required={field.required}
+            disabled={disabled}
+            autoComplete="off"
+          />
+        </div>
       ) : null}
       {error ? (
         <p className="mt-1 text-sm text-[var(--error-text)]" role="alert">

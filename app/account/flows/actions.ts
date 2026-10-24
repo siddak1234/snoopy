@@ -373,7 +373,7 @@ const FLOW_CHANGED = "This flow has changed. Reload the page.";
  */
 const RUN_REFUSALS: Record<string, string> = {
   artifact_unavailable: "That file can no longer be used. Choose it again.",
-  item_not_ready: "It is still being read. Try again in a moment.",
+  item_not_ready: "Try again in a moment.",
   item_archived: "It was archived, so it takes no new runs.",
   item_required: FLOW_CHANGED,
   items_not_declared: FLOW_CHANGED,
@@ -615,7 +615,14 @@ export type ItemActionResult =
     };
 
 /** An item the platform would not make, for a reason this page cannot fix. */
-const ITEM_REFUSED = "It was not made. Try again.";
+const ITEM_REFUSED = "Nothing was uploaded. Try again.";
+
+/**
+ * The upload card's refusal of its values — the words both clients say
+ * (Round 19's review, finding 9); each refused field says so under it.
+ */
+const ITEM_VALUES_REFUSED =
+  "Nothing was uploaded. Check each value and try again.";
 
 /**
  * Make an item from a file (backend ADR-0046, `createItem`; plan §5.2): the
@@ -676,7 +683,7 @@ export async function createItem(input: {
       );
       return {
         ok: false,
-        error: "It was not made. Check each value and try again.",
+        error: ITEM_VALUES_REFUSED,
         ...(fields.length > 0 ? { fields } : {}),
       };
     }

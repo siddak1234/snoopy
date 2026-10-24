@@ -192,13 +192,18 @@ export type SelectChoice = { value: string; label: string };
 
 /** The choice that shows a text box for a value of the person's own. */
 export const OTHER_CHOICE = "other";
+/** A saved value's choice: these words, then the value's own. */
+const SAVED = "saved:";
 
 /**
  * A select's choices on the upload card (plan §5.2): its `options`, then the
  * values typed for it on earlier items (`listItems`' `choices`, the owner's
  * "save that name in case future jobs are uploaded to that name") that are not
- * among them, then "Other" when it takes a typed value. Each held by its place,
- * never its words, so no option can be mistaken for "Other".
+ * among them, then "Other" when it takes a typed value. An option is held by
+ * its place and a saved value by its words (`saved:<words>`), never by its
+ * place in `choices`: that list is read again while the card is open, and a
+ * name typed meanwhile that sorts ahead would move the one picked. No choice
+ * can be mistaken for "Other".
  */
 export function selectChoices(
   field: ItemField,
@@ -211,11 +216,11 @@ export function selectChoices(
   }));
   if (!field.allowOther) return choices;
   const seen = new Set(options);
-  (saved ?? []).forEach((label, at) => {
-    if (seen.has(label)) return;
+  for (const label of saved ?? []) {
+    if (seen.has(label)) continue;
     seen.add(label);
-    choices.push({ value: `saved:${at}`, label });
-  });
+    choices.push({ value: `${SAVED}${label}`, label });
+  }
   choices.push({ value: OTHER_CHOICE, label: OTHER });
   return choices;
 }
@@ -253,7 +258,9 @@ export function itemFieldValues(
       value =
         choice === OTHER_CHOICE
           ? (typed[field.key] ?? "")
-          : (label?.label ?? "");
+          : choice.startsWith(SAVED)
+            ? choice.slice(SAVED.length)
+            : (label?.label ?? "");
     }
     value = value.trim();
     if (value) values[field.key] = value;
@@ -272,36 +279,70 @@ export type RankedRow = {
   dim: boolean;
 };
 
-/** A run's name before it has one of its own, by where it is. */
-const UNNAMED: Record<ItemRunOf["status"], string> = {
-  pending: READING,
-  running: READING,
-  held: "Waiting",
-  succeeded: "Done",
-  failed: COULD_NOT_READ,
-  cancelled: "Stopped",
+/**
+ * A finished run's name when it has none of its own: its status, in the
+ * app's words (`statusLabel`) — its failure line says why.
+ */
+const UNNAMED: Record<
+  Exclude<ItemRunOf["status"], "pending" | "running">,
+  string
+> = {
+  held: "Held",
+  succeeded: "Success",
+  failed: "Failed",
+  cancelled: "Cancelled",
 };
 
 /**
  * An item's runs, ranked exactly as the platform answers them (`readItem`:
- * highest score first, runs without one after them, then newest), numbered
- * 1…n: each its title or, still being read, "Reading…"; its score; its result
- * line — and a failed one its failure, dimmed.
+ * highest score first, runs without one after them, then newest), never
+ * sorted again here, numbered 1…n: a run still going "Reading…", with no
+ * score; a finished one its title, else its status; its score; its result
+ * line — and a failed one its failure, dimmed. The app's `rankedRuns`.
  */
 export function rankedRows(runs: readonly ItemRunOf[]): RankedRow[] {
-  return runs.map((run, at) => ({
-    id: run.id,
-    rank: at + 1,
-    title: run.title ?? UNNAMED[run.status],
-    score: typeof run.score === "number" ? run.score : null,
-    line:
-      run.status === "succeeded"
-        ? (run.resultSummary ?? null)
-        : run.status === "failed"
-          ? (run.failureReason ?? null)
-          : null,
-    dim: run.status === "failed" || run.status === "cancelled",
-  }));
+  return runs.map((run, at) => {
+    const going = run.status === "pending" || run.status === "running";
+    return {
+      id: run.id,
+      rank: at + 1,
+      title:
+        run.status === "pending" || run.status === "running"
+          ? READING
+          : (run.title ?? UNNAMED[run.status]),
+      score: !going && typeof run.score === "number" ? run.score : null,
+      line:
+        run.status === "succeeded"
+          ? (run.resultSummary ?? null)
+          : run.status === "failed"
+            ? (run.failureReason ?? null)
+            : null,
+      dim: run.status === "failed" || run.status === "cancelled",
+    };
+  });
+}
+
+/**
+ * Whether an item's page offers "Add {run}" (plan §5.3): to an owner or admin,
+ * for an item that is ready and not archived, on a flow whose run can start —
+ * live, answering, and declaring a run file — as the app's `canStartRun`;
+ * otherwise the section is not drawn at all.
+ */
+export function canAddRun(state: {
+  canManage: boolean;
+  item: Pick<ItemRowOf, "status" | "archivedAt">;
+  live: boolean;
+  available: boolean;
+  runInputs: number;
+}): boolean {
+  return (
+    state.canManage &&
+    state.item.status === "ready" &&
+    !state.item.archivedAt &&
+    state.live &&
+    state.available &&
+    state.runInputs > 0
+  );
 }
 
 /** Whether an item's page is read again: it, or one of its runs, is still going. */

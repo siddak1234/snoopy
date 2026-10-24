@@ -122,8 +122,9 @@ surface a change audit probed and no test asserted), `e2e/dialogs.spec.ts`
 and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: its items
 grouped on its page with no run start form, the upload card's "Other" and the
 values typed before, an item's runs ranked and what was read, a run headed by
-its title and score with its sections, Archive, and an owner's buttons a
-member does not see), sharing `e2e/helpers.ts`. The playbook's human keyboard
+its title and score with its sections, Archive, an owner's buttons a member
+does not see and a member's presses refused in words, and an unanswered list
+said "Unavailable"), sharing `e2e/helpers.ts`. The playbook's human keyboard
 traversal (NFR-35) has a hand-over test in the same suite:
 `KEYBOARD_JOURNEY=1 node scripts/run-browser-fixtures.mjs --headed --grep "keyboard journey"`
 opens the built site against the fixture, signed in, and pauses for the person

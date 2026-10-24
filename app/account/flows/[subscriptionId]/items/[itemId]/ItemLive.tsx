@@ -19,6 +19,7 @@ import type {
 import {
   addRunLabel,
   archiveLabel,
+  canAddRun,
   inSentence,
   itemGoing,
   itemSubheader,
@@ -38,7 +39,8 @@ export const WHAT_AI_READ = "What AI read";
  * An item's page, live (Round 19, plan §5.3; backend ADR-0046). Top to
  * bottom: its title, its group's value and where it is ("Accounting ·
  * Ready", "Reading…", or why it could not be read); for an owner or admin
- * while it is ready and not archived, "Add candidate": the flow's run file,
+ * while it is ready and not archived and a run can start (`canAddRun`: the
+ * flow live, answering, with a run file), "Add candidate": the flow's run file,
  * the accepted types in words, and Start — the run names this item and
  * joins the list below as "Reading…"; its runs, ranked exactly as the
  * platform answers them (`rankedRows`), each opening its run's page; "What AI
@@ -116,7 +118,13 @@ export function ItemLive({
       subheader={itemSubheader(item, declared.groupField)}
       back={<BackLink href={flowPath(subscriptionId)} />}
     >
-      {canManage && item.status === "ready" && !archived ? (
+      {canAddRun({
+        canManage,
+        item,
+        live,
+        available,
+        runInputs: runInput.length,
+      }) ? (
         <section aria-labelledby="item-add-title" className="py-5 first:pt-0">
           <h2
             id="item-add-title"

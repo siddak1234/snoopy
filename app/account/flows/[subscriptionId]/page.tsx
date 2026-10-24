@@ -81,8 +81,8 @@ import { owedLines, vendorPath } from "../vendor-path";
  * version it runs declares as `items` — draws them after its steps
  * (`FlowItems`), and Step 1 holds no run start form, since its runs each name
  * an item and start on the item's page; Turn on stays while it is off. Its
- * items are read with the page; one that cannot be read costs the list, never
- * the page.
+ * items are read with the page; a list that cannot be read is "Unavailable",
+ * never the page.
  *
  * ~~Connections~~ ("Remove the connections in the bottom as well") and ~~the
  * move to a newer version~~ ("I also dont want a move to vx number in the
@@ -93,11 +93,14 @@ import { owedLines, vendorPath } from "../vendor-path";
  * Opened from its card on Flows (Open).
  */
 
-/** A flow's items, or an empty list when the platform cannot say. */
+/**
+ * A flow's items, or null when the platform cannot say — "Unavailable", as
+ * Step 5's addresses, never an empty list a flow with items does not have.
+ */
 async function readItems(
   workspaceId: string,
   subscriptionId: string,
-): Promise<ListItemsResponse> {
+): Promise<ListItemsResponse | null> {
   try {
     return await listItems(workspaceId, subscriptionId);
   } catch (error) {
@@ -105,7 +108,7 @@ async function readItems(
       error instanceof PlatformServerError ||
       error instanceof PlatformNotConfiguredError
     )
-      return { items: [], choices: {} };
+      return null;
     throw error;
   }
 }
@@ -192,7 +195,7 @@ export default async function FlowPage(
   const declaredItems = subscription.items;
   const items = declaredItems
     ? await readItems(workspaceId, subscription.id)
-    : null;
+    : undefined;
   const available = entry?.available === true;
   const providerById = new Map(
     providers.providers.map((provider) => [provider.providerId, provider]),
@@ -403,7 +406,7 @@ export default async function FlowPage(
         </ol>
       </section>
 
-      {declaredItems && items ? (
+      {declaredItems && items !== undefined ? (
         <FlowItems
           workspaceId={workspaceId}
           subscriptionId={subscription.id}

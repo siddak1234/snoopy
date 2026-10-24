@@ -7,6 +7,7 @@ import {
   READING,
   addRunLabel,
   archiveLabel,
+  canAddRun,
   firstChoice,
   groupItems,
   inSentence,
@@ -153,8 +154,8 @@ test("Other: a select offers its options, then the values typed before that are 
   assert.deepEqual(selectChoices(area, ["Coastal", "North", "Inland"]), [
     { value: "option:0", label: "North" },
     { value: "option:1", label: "South" },
-    { value: "saved:0", label: "Coastal" },
-    { value: "saved:2", label: "Inland" },
+    { value: "saved:Coastal", label: "Coastal" },
+    { value: "saved:Inland", label: "Inland" },
     { value: OTHER_CHOICE, label: OTHER },
   ]);
   assert.deepEqual(
@@ -185,7 +186,12 @@ test("Other: what is sent is the option, the saved value, or what was typed for 
     { area: "South", name: "Spring intake" },
   );
   assert.deepEqual(
-    itemFieldValues([area, name], saved, { area: "saved:0" }, { name: "A" }),
+    itemFieldValues(
+      [area, name],
+      saved,
+      { area: "saved:Coastal" },
+      { name: "A" },
+    ),
     { area: "Coastal", name: "A" },
   );
   // A typed value is the field's value, saved by the platform and offered
@@ -215,7 +221,55 @@ test("Other: what is sent is the option, the saved value, or what was typed for 
   );
 });
 
-test("an item's runs keep the platform's ranking, numbered 1…n: the title or Reading…, the score, the result line, a failure dimmed", () => {
+test("a saved value is held by its words: a name typed meanwhile that sorts ahead of it, read while the card is open, never changes what is sent (Round 19 review, finding 1)", () => {
+  // Picked from the list the card opened with…
+  const pick = selectChoices(area, ["Coastal", "Inland"]).find(
+    (choice) => choice.label === "Inland",
+  );
+  assert.ok(pick);
+  // …and sent after a re-read in which "Delta" joined ahead of it.
+  assert.deepEqual(
+    itemFieldValues(
+      [area, name],
+      { area: ["Coastal", "Delta", "Inland"] },
+      { area: pick.value },
+      { name: "A" },
+    ),
+    { area: "Inland", name: "A" },
+  );
+  // Still the same words when the list no longer holds it at all.
+  assert.deepEqual(
+    itemFieldValues([area, name], { area: [] }, { area: pick.value }, {}),
+    { area: "Inland" },
+  );
+});
+
+test("an item's runs keep the platform's order exactly — never sorted again here — numbered 1…n (Round 19 review, finding 8)", () => {
+  // An order a sort by score, or by status, would change.
+  const rows = rankedRows([
+    { id: "low", status: "succeeded", title: "Ben Ito", score: 64 },
+    {
+      id: "high",
+      status: "succeeded",
+      title: "Ada Lane",
+      score: 91,
+      resultSummary: "Strong fit",
+    },
+    { id: "failed", status: "failed", failureReason: "No text." },
+    { id: "pending", status: "pending" },
+  ]);
+  assert.deepEqual(
+    rows.map((row) => [row.rank, row.id]),
+    [
+      [1, "low"],
+      [2, "high"],
+      [3, "failed"],
+      [4, "pending"],
+    ],
+  );
+});
+
+test("a run still going reads Reading… with no score; a finished one its title, else its status in the app's words; its result line; a failure dimmed with its reason (Round 19 review, finding 4)", () => {
   const rows = rankedRows([
     {
       id: "a",
@@ -225,9 +279,12 @@ test("an item's runs keep the platform's ranking, numbered 1…n: the title or R
       resultSummary: "Strong fit",
     },
     { id: "b", status: "succeeded", title: "Ben Ito", score: 0 },
-    { id: "c", status: "running" },
-    { id: "d", status: "failed", failureReason: "No text." },
+    { id: "c", status: "running", title: "Early", score: 5 },
+    { id: "d", status: "failed", failureReason: "Scoring timed out." },
     { id: "e", status: "pending" },
+    { id: "f", status: "cancelled" },
+    { id: "g", status: "held" },
+    { id: "h", status: "succeeded" },
   ]);
   assert.deepEqual(rows, [
     {
@@ -243,13 +300,44 @@ test("an item's runs keep the platform's ranking, numbered 1…n: the title or R
     {
       id: "d",
       rank: 4,
-      title: COULD_NOT_READ,
+      title: "Failed",
       score: null,
-      line: "No text.",
+      line: "Scoring timed out.",
       dim: true,
     },
     { id: "e", rank: 5, title: READING, score: null, line: null, dim: false },
+    {
+      id: "f",
+      rank: 6,
+      title: "Cancelled",
+      score: null,
+      line: null,
+      dim: true,
+    },
+    { id: "g", rank: 7, title: "Held", score: null, line: null, dim: false },
+    { id: "h", rank: 8, title: "Success", score: null, line: null, dim: false },
   ]);
+});
+
+test("Add is offered only where a run can start: an owner or admin, the item ready and not archived, the flow live, answering and declaring a run file (Round 19 review, finding 3)", () => {
+  const can = {
+    canManage: true,
+    item: { status: "ready", archivedAt: null },
+    live: true,
+    available: true,
+    runInputs: 1,
+  };
+  assert.equal(canAddRun(can), true);
+  for (const [why, change] of [
+    ["a member", { canManage: false }],
+    ["still being read", { item: { status: "reading", archivedAt: null } }],
+    ["not read", { item: { status: "failed", archivedAt: null } }],
+    ["archived", { item: { status: "ready", archivedAt: "2026-08-02" } }],
+    ["the flow off", { live: false }],
+    ["the flow not answering", { available: false }],
+    ["no run file", { runInputs: 0 }],
+  ])
+    assert.equal(canAddRun({ ...can, ...change }), false, why);
 });
 
 test("an item's page is read again while it, or one of its runs, is going", () => {

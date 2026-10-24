@@ -388,6 +388,7 @@ function initialState() {
     // select, each item's runs (all set when it is turned on), and what the
     // website sent to make an item or start a run of one.
     itemsFlow: false,
+    itemsFailing: false,
     items: [] as Automations["Item"][],
     itemChoices: [] as string[],
     itemRuns: new Map<string, Automations["Run"][]>(),
@@ -2370,6 +2371,10 @@ const server = createServer(
         state.itemChoices = ["Coastal", "Inland"];
         state.itemRuns = new Map([[readyItemId, readyItemRuns()]]);
       },
+      // The flow's item list, unanswered (503).
+      "/__fixture/items-failing": () => {
+        state.itemsFailing = true;
+      },
       "/__fixture/items-read": () => {
         for (const item of state.items)
           if (item.status === "reading") item.status = "ready";
@@ -4044,6 +4049,8 @@ const server = createServer(
         }
       }
       if (method === "GET" && pathname === itemsPath) {
+        if (state.itemsFailing)
+          return respond(response, 503, problem(503, "Service Unavailable"));
         return respond(response, 200, {
           items: state.items.filter((item) => item.archivedAt === null),
           choices: { area: [...state.itemChoices].sort() },

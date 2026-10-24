@@ -8,6 +8,7 @@ import { UploadSimpleIcon } from "@phosphor-icons/react/dist/ssr/UploadSimple";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { Button } from "@/components/ui/Button";
 import type { AutomationItems, ListItemsResponse } from "@/lib/automations";
+import { EMAIL_UNAVAILABLE } from "@/lib/flow-email";
 import {
   groupItems,
   itemLine,
@@ -27,7 +28,9 @@ import { UploadItemCard } from "./UploadItemCard";
  * card; then the items, grouped by the flow's `groupField` in the order
  * `groupItems` gives, each row its title and its line (`itemLine`: how many
  * runs and the best score, "Reading…" or "Couldn't read"), opening its page.
- * None yet: the one empty row.
+ * None yet: the one empty row; a list the platform could not answer:
+ * "Unavailable" in that row, as Step 5's addresses say it — never "None yet"
+ * for a flow that has items.
  *
  * **Read again while one is being read**, every 2 s as a run's page is
  * (`RUN_REREAD_MS`), one read at a time, through `/api/platform`; a read that
@@ -45,7 +48,8 @@ export function FlowItems({
   subscriptionId: string;
   /** The items the version the flow runs declares. */
   declared: AutomationItems;
-  initial: ListItemsResponse;
+  /** The flow's items, or null when they could not be read. */
+  initial: ListItemsResponse | null;
   /** An owner or admin: Upload is theirs. */
   canManage: boolean;
 }) {
@@ -59,7 +63,8 @@ export function FlowItems({
   }
   const [reads, setReads] = useState(0);
   const [uploading, setUploading] = useState(false);
-  const reading = list.items.some((item) => item.status === "reading");
+  const reading =
+    list?.items.some((item) => item.status === "reading") ?? false;
 
   useEffect(() => {
     if (!reading) return;
@@ -86,7 +91,7 @@ export function FlowItems({
   const groupField = declared.fields.find(
     (field) => field.key === declared.groupField && field.control === "select",
   );
-  const groups = groupItems(list.items, groupField);
+  const groups = list ? groupItems(list.items, groupField) : [];
 
   return (
     <section aria-labelledby="flow-items-title" className="py-5">
@@ -112,7 +117,7 @@ export function FlowItems({
       </div>
       {groups.length === 0 ? (
         <div className="mt-3">
-          <EmptyRow text={noneYet(declared.words)} />
+          <EmptyRow text={list ? noneYet(declared.words) : EMAIL_UNAVAILABLE} />
         </div>
       ) : (
         <div data-testid="flow-items" className="mt-1 flex flex-col">
@@ -161,15 +166,17 @@ export function FlowItems({
           workspaceId={workspaceId}
           subscriptionId={subscriptionId}
           declared={declared}
-          saved={list.choices}
+          saved={list?.choices ?? {}}
           onClose={() => setUploading(false)}
           onMade={(item) => {
             setUploading(false);
             setList((current) => ({
-              ...current,
+              choices: current?.choices ?? {},
               items: [
                 item,
-                ...current.items.filter((other) => other.id !== item.id),
+                ...(current?.items ?? []).filter(
+                  (other) => other.id !== item.id,
+                ),
               ],
             }));
             router.refresh();

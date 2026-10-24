@@ -37,7 +37,7 @@ test("a flow with items draws them after its steps, and its run start form gets 
   );
   assert.match(
     page,
-    /\{declaredItems && items \? \(\s*<FlowItems[\s\S]*?declared=\{declaredItems\}[\s\S]*?canManage=\{canManage\}/u,
+    /\{declaredItems && items !== undefined \? \(\s*<FlowItems[\s\S]*?declared=\{declaredItems\}[\s\S]*?canManage=\{canManage\}/u,
   );
   // RunStart draws nothing for a live flow with no fields, and Turn on for one off.
   const start = code(read("app/account/flows/RunStart.tsx"));
@@ -55,9 +55,10 @@ test("Upload, Add and Archive are an owner's or admin's: drawn only under canMan
     /\{canManage \? \(\s*<Button[\s\S]*?data-testid="item-upload-open"/u,
   );
   const live = code(read(ITEM_LIVE));
+  // Add only where a run can start (`canAddRun`, finding 3 of the review).
   assert.match(
     live,
-    /\{canManage && item\.status === "ready" && !archived \? \(\s*<section aria-labelledby="item-add-title"/u,
+    /\{canAddRun\(\{\s*canManage,\s*item,\s*live,\s*available,\s*runInputs: runInput\.length,\s*\}\) \? \(\s*<section aria-labelledby="item-add-title"/u,
   );
   assert.match(
     live,
@@ -108,8 +109,58 @@ test("a run with a title and a score is headed by them, the full id kept among i
   );
   assert.match(live, /data-testid="run-score"/u);
   assert.match(live, /\{ label: "Run ID", value: run\.id \}/u);
+  // Directly under the result line, before the tiles and the steps (plan
+  // §5.4, as the app draws it; finding 5 of the review).
+  const result = live.indexOf('data-testid="run-result"');
+  const sections = live.indexOf('testId="run-section"');
+  assert.ok(result > 0 && result < sections, "sections after the result line");
   assert.ok(
-    live.indexOf('testId="run-section"') < live.indexOf('id="run-steps-title"'),
+    sections < live.indexOf('label="Duration"'),
+    "sections before the tiles",
+  );
+  assert.ok(sections < live.indexOf('id="run-steps-title"'));
+});
+
+test("an item list the platform could not answer is Unavailable, never None yet (finding 2 of the review)", () => {
+  const page = code(read(FLOW_PAGE));
+  assert.match(
+    page,
+    /async function readItems\([^)]*\): Promise<ListItemsResponse \| null> \{\s*try \{\s*return await listItems\(workspaceId, subscriptionId\);\s*\} catch \(error\) \{\s*if \([^)]*\)\s*return null;/u,
+  );
+  assert.match(page, /\{declaredItems && items !== undefined \? \(/u);
+  assert.match(
+    code(read(FLOW_ITEMS)),
+    /<EmptyRow\s+text=\{list \? noneYet\(declared\.words\) : EMAIL_UNAVAILABLE\}/u,
+  );
+});
+
+test("the upload card's Other box has its own visible name, Other — never the select's (finding 6 of the review)", () => {
+  const card = code(read("app/account/flows/UploadItemCard.tsx"));
+  assert.match(card, /<FormInput\s+id=\{`\$\{id\}-other`\}\s+label=\{OTHER\}/u);
+  assert.doesNotMatch(card, /aria-label=\{field\.title\}/u);
+});
+
+test("the item refusals are one set of words with the app's: Nothing was uploaded, Try again in a moment, the archive line in the flow's run word (finding 9 of the review)", () => {
+  const actions = code(read("app/account/flows/actions.ts"));
+  assert.match(
+    actions,
+    /const ITEM_VALUES_REFUSED =\s*"Nothing was uploaded\. Check each value and try again\.";/u,
+  );
+  assert.match(actions, /error: ITEM_VALUES_REFUSED,/u);
+  assert.match(
+    actions,
+    /const ITEM_REFUSED = "Nothing was uploaded\. Try again\.";/u,
+  );
+  assert.doesNotMatch(actions, /It was not made/u);
+  const live = code(read(ITEM_LIVE));
+  assert.match(
+    live,
+    /It leaves the list and takes no new \{inSentence\(runWords\)\}\. Its\{" "\}\s*\{inSentence\(runWords\)\} stay\./u,
+  );
+  // A refused field says so under it.
+  assert.match(
+    code(read("app/account/flows/UploadItemCard.tsx")),
+    /refused\.includes\(field\.key\) \? CHECK_THIS : undefined/u,
   );
 });
 
@@ -120,10 +171,7 @@ test("a run started on an item's page names it, and the platform's item refusals
     /const itemId = String\(formData\.get\("itemId"\) \?\? ""\);/u,
   );
   assert.match(actions, /\.\.\.\(itemId \? \{ itemId \} : \{\}\),/u);
-  assert.match(
-    actions,
-    /item_not_ready: "It is still being read\. Try again in a moment\.",/u,
-  );
+  assert.match(actions, /item_not_ready: "Try again in a moment\.",/u);
   assert.match(
     actions,
     /item_archived: "It was archived, so it takes no new runs\.",/u,
@@ -160,10 +208,6 @@ test("an item's page reads the platform through lib/platform-server.ts per reque
   const live = code(read(ITEM_LIVE));
   assert.match(live, /<SectionCard\b/u);
   assert.match(live, /<EmptyRow text=\{noneYet\(declared\.runWords\)\} \/>/u);
-  assert.match(
-    code(read(FLOW_ITEMS)),
-    /<EmptyRow text=\{noneYet\(declared\.words\)\} \/>/u,
-  );
 });
 
 test("the privacy page says Candidate Reviewer has an AI model read the job description and each resume, through OpenRouter, with nothing else from the workspace (plan §5.6)", () => {

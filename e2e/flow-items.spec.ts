@@ -131,9 +131,10 @@ test("the upload card: the options, the values typed before and Other; a typed v
     `application/pdf,${WORD_FILE},image/jpeg,image/png`,
   );
   await expect(card.getByText("PDF, Word file or photo")).toBeVisible();
-  await expect(card.getByRole("textbox", { name: "Area" })).toHaveCount(0);
+  await expect(card.getByRole("textbox", { name: "Other" })).toHaveCount(0);
   await select.selectOption({ label: "Other" });
-  const other = card.getByRole("textbox", { name: "Area" });
+  // Its own name, Other — not the select's.
+  const other = card.getByRole("textbox", { name: "Other" });
   await expect(other).toHaveAttribute("maxlength", "40");
   await other.fill("Delta");
   await card.getByLabel("Name").fill("Delta list");
@@ -195,7 +196,7 @@ test("an item's page: its runs ranked as the platform answers, a failure dimmed;
     "1Ada LaneStrong fit · 3 of 3Score 91",
     "2Ben ItoFair fit · 2 of 3Score 64",
     "3Reading…",
-    "4Couldn't readThe file could not be read.",
+    "4FailedThe file could not be read.",
   ]);
   await expect(page.getByTestId("item-run-4")).toHaveAttribute(
     "data-dim",
@@ -249,7 +250,7 @@ test("an item's page: its runs ranked as the platform answers, a failure dimmed;
     "2Ben ItoFair fit · 2 of 3Score 64",
     "3Reading…",
     "4Reading…",
-    "5Couldn't readThe file could not be read.",
+    "5FailedThe file could not be read.",
   ]);
 });
 
@@ -309,4 +310,59 @@ test("Archive batch asks first, then the item leaves its flow's list", async ({
   await expect(
     page.getByTestId("flow-items").getByText("Spring intake"),
   ).toHaveCount(0);
+});
+
+test("an item list the platform cannot answer reads Unavailable, never None yet", async ({
+  page,
+}) => {
+  await fixtureControl("items-failing");
+  await page.goto(FLOW);
+  const section = page.locator("section", {
+    has: page.getByRole("heading", { level: 2, name: "Batches" }),
+  });
+  await expect(section.getByText("Unavailable")).toBeVisible();
+  await expect(section.getByText("No batches yet.")).toHaveCount(0);
+  await expectNoAxeViolations(page);
+});
+
+// A member's press, refused by the platform (403, `requiredRole`): the page
+// was drawn for an owner, and the session is a member's by the time of the
+// press — each said in the same words.
+const OWNERS_AND_ADMINS = "Only an owner or admin can do this.";
+
+test("Upload refused for a member says only an owner or admin can", async ({
+  page,
+}) => {
+  await page.goto(FLOW);
+  await page.getByRole("button", { name: "Upload batch" }).click();
+  const card = page.getByTestId("item-upload");
+  await card.getByLabel("Name").fill("Member list");
+  await card.getByLabel("Batch file").setInputFiles(entryPdf);
+  await expect(card.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
+  await presentSession(page, "member");
+  await card.getByRole("button", { name: "Upload", exact: true }).click();
+  await expect(card.getByText(OWNERS_AND_ADMINS)).toBeVisible();
+});
+
+test("Start refused for a member says only an owner or admin can", async ({
+  page,
+}) => {
+  await page.goto(ITEM);
+  const add = page.getByTestId("item-add");
+  await add.getByLabel("Entry file").setInputFiles(entryPdf);
+  await expect(add.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
+  await presentSession(page, "member");
+  await add.getByRole("button", { name: "Start" }).click();
+  await expect(add.getByText(OWNERS_AND_ADMINS)).toBeVisible();
+});
+
+test("Archive refused for a member says only an owner or admin can", async ({
+  page,
+}) => {
+  await page.goto(ITEM);
+  await presentSession(page, "member");
+  await page.getByRole("button", { name: "Archive batch" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Archive" }).click();
+  await expect(dialog.getByText(OWNERS_AND_ADMINS)).toBeVisible();
 });
