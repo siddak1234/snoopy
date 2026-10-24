@@ -4,15 +4,64 @@
  * every image drawn upright onto a canvas and saved as a JPEG whose long side
  * is at most 2,576 px. Anything else is refused before anything is sent.
  *
+ * A field that names its types (`acceptedContentTypes`, backend ADR-0046; a
+ * run's file field and an item's file) is offered those: a JPEG or a PNG
+ * among them is still drawn again, any other — a Word file — is sent as it
+ * is, never re-encoded, and a type outside them is refused in words that
+ * name what is accepted ("Choose a PDF, Word file or photo."). Without them,
+ * today's PDF, JPEG or PNG.
+ *
  * The decisions are pure, so `test/run-file-image.test.mjs` holds them;
  * `reencodeImage` is the browser's half.
  */
 
 /**
- * The file chooser's `accept`: a PDF, a JPEG or a PNG. Named here because a
- * run-input field carries no list of types.
+ * The file chooser's `accept` for a field that names no types: a PDF, a JPEG
+ * or a PNG.
  */
 export const RUN_FILE_ACCEPT = "application/pdf,image/jpeg,image/png";
+
+/** A Word file (.docx): sent as it is. */
+export const WORD_FILE =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+/** The chooser's `accept`: the field's own types when it names them, else a PDF, a JPEG or a PNG. */
+export function fileAccept(accepted?: readonly string[]): string {
+  return accepted && accepted.length > 0 ? accepted.join(",") : RUN_FILE_ACCEPT;
+}
+
+/** Whether Take photo is offered: a photo is sent as a JPEG, so only where a JPEG is taken. */
+export function takesPhotos(accepted?: readonly string[]): boolean {
+  return (
+    !accepted ||
+    accepted.length === 0 ||
+    accepted.some((type) => type.toLowerCase() === "image/jpeg")
+  );
+}
+
+/** A type in words: "PDF", "Word file", "photo"; one this list does not know, as it is. */
+function typeInWords(type: string): string {
+  const media = type.toLowerCase();
+  if (media === "application/pdf") return "PDF";
+  if (media === WORD_FILE) return "Word file";
+  if (media.startsWith("image/")) return "photo";
+  return type;
+}
+
+/** The accepted types in words, each once, in the field's order: "PDF, Word file or photo". */
+export function typesInWords(accepted?: readonly string[]): string {
+  if (!accepted || accepted.length === 0) return "PDF, JPEG or PNG";
+  const names = [...new Set(accepted.map(typeInWords))];
+  return names.length === 1
+    ? names[0]
+    : `${names.slice(0, -1).join(", ")} or ${names.at(-1)}`;
+}
+
+/** A file of a type the field does not take, said before anything is sent. */
+export function notAcceptedLine(accepted?: readonly string[]): string {
+  if (!accepted || accepted.length === 0) return NOT_A_RUN_FILE;
+  return `Choose a ${typesInWords(accepted)}.`;
+}
 
 /** The longest side, in pixels, an image is sent at. */
 export const IMAGE_LONG_SIDE_MAX = 2576;
@@ -34,12 +83,28 @@ export type RunFileSource = "chooser" | "camera";
  * is drawn again and sent as a JPEG; anything else is refused. A photo is an
  * image whatever type the camera gave it, so it is drawn again too — what the
  * platform receives is a JPEG either way.
+ *
+ * Given the field's `accepted` types, only those are taken: a JPEG or a PNG
+ * is drawn again while a JPEG is taken, and any other accepted type — a Word
+ * file — is sent as it is.
  */
 export function planRunFile(
   type: string,
   source: RunFileSource,
+  accepted?: readonly string[],
 ): "send" | "re-encode" | "refuse" {
   const media = type.toLowerCase();
+  if (accepted && accepted.length > 0) {
+    const takes = (candidate: string) =>
+      accepted.some((entry) => entry.toLowerCase() === candidate);
+    const photos = takesPhotos(accepted);
+    if (source === "camera" && media.startsWith("image/"))
+      return photos ? "re-encode" : "refuse";
+    if (!takes(media)) return "refuse";
+    if ((media === "image/jpeg" || media === "image/png") && photos)
+      return "re-encode";
+    return "send";
+  }
   if (media === "application/pdf") return "send";
   if (media === "image/jpeg" || media === "image/png") return "re-encode";
   if (source === "camera" && media.startsWith("image/")) return "re-encode";

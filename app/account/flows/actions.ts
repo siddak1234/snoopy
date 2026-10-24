@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { PlatformServerError } from "@/lib/platform-server";
 import {
+  archiveItem as archiveWorkspaceItem,
   cancelRun as cancelWorkspaceRun,
+  createItem as createWorkspaceItem,
   createRun,
   createSubscription,
   decideApproval as decideWorkspaceApproval,
@@ -14,14 +16,17 @@ import {
   type CreateSubscriptionRequest,
   type DecideApprovalRequest,
   type FlowEmailRecipients,
+  type Item,
   type UpdateSubscriptionRequest,
 } from "@/lib/automations";
 import { VENDOR_MEMBER_NOTE } from "@/lib/connection-rows";
 import { EMAIL_SAVE_FAILED } from "@/lib/flow-email";
+import { problemFields } from "@/lib/flow-items";
 import { heldCopy } from "@/lib/held-flow";
 import { overPlanRefusal } from "@/lib/plan-limit";
 import { subscriptionEntitlementState } from "@/lib/subscription-entitlements";
 import { activeWorkspaceIfShown, WORKSPACE_CHANGED } from "@/lib/tenancy";
+import { uploadRefusalMessage } from "./upload-refusals";
 
 /**
  * Mutations on the automation surface.
@@ -355,14 +360,27 @@ async function saveConfig(
   }
 }
 
+/** A flow whose declaration changed under the page: it names items now, or no longer. */
+const FLOW_CHANGED = "This flow has changed. Reload the page.";
+
 /**
  * The refusals a run can meet that name their reason (backend FR-14), in
  * words. A file already given to a run, or gone, cannot be fixed by checking
- * the values: its field is emptied to choose the file again.
+ * the values: its field is emptied to choose the file again. A run that names
+ * an item (backend ADR-0046) is refused for the item's sake — still being
+ * read, or archived (409) — or because the flow's items changed under the
+ * page (422); those words name no flow's things.
  */
 const RUN_REFUSALS: Record<string, string> = {
   artifact_unavailable: "That file can no longer be used. Choose it again.",
+  item_not_ready: "It is still being read. Try again in a moment.",
+  item_archived: "It was archived, so it takes no new runs.",
+  item_required: FLOW_CHANGED,
+  items_not_declared: FLOW_CHANGED,
 };
+
+/** A change only an owner or admin may make, refused (`details.requiredRole`). */
+const OWNERS_AND_ADMINS = "Only an owner or admin can do this.";
 
 /**
  * A run refused because its flow is at capacity AND its queue is full (backend
@@ -402,20 +420,31 @@ export async function startRun(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: "Reopen the form and try again." };
   }
 
+  // The item a run of a flow with items names (backend ADR-0046); the
+  // platform refuses one on a flow without, so none is sent there.
+  const itemId = String(formData.get("itemId") ?? "");
   const body: CreateRunRequest = {
     subscriptionId,
     input: declaredValues(formData, "input"),
+    ...(itemId ? { itemId } : {}),
   };
   try {
     const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
     if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
     const response = await createRun(workspaceId, body, idempotencyKey);
     revalidatePath("/account/runs");
+    if (itemId)
+      revalidatePath(
+        `/account/flows/${encodeURIComponent(subscriptionId)}/items/${encodeURIComponent(itemId)}`,
+      );
     return { ok: true, runId: response.run.id };
   } catch (error) {
     if (!(error instanceof PlatformServerError)) throw error;
     const reason = error.details?.reason;
-    const known = typeof reason === "string" ? RUN_REFUSALS[reason] : undefined;
+    const known =
+      typeof reason === "string" && Object.hasOwn(RUN_REFUSALS, reason)
+        ? RUN_REFUSALS[reason]
+        : undefined;
     if (error.status === 422 && known) {
       return {
         ok: false,
@@ -431,11 +460,15 @@ export async function startRun(formData: FormData): Promise<ActionResult> {
         error: "The run was not started. Check each value and try again.",
       };
     }
+    if (error.status === 409 && known) return { ok: false, error: known };
     if (error.status === 409) {
       return {
         ok: false,
         error: "This flow is not live, so it cannot run.",
       };
+    }
+    if (error.status === 403 && error.details?.requiredRole) {
+      return { ok: false, error: OWNERS_AND_ADMINS, state: "forbidden" };
     }
     if (error.status === 429 && reason === "max_concurrent_runs") {
       return { ok: false, error: FLOW_QUEUE_FULL };
@@ -562,6 +595,147 @@ export async function cancelRun(formData: FormData): Promise<ActionResult> {
         error: "This run has already stopped, so there is nothing to cancel.",
       };
     }
+    return { ok: false, error: error.message };
+  }
+}
+
+/** What making an item came to: the item, or a refusal and the fields it names. */
+export type ItemActionResult =
+  | { ok: true; item: Item }
+  | {
+      ok: false;
+      error: string;
+      /** The fields the platform refused, by key: each says so under it. */
+      fields?: string[];
+      state?:
+        | "file-unavailable"
+        | "forbidden"
+        | "plan-limit"
+        | "entitlements-unavailable";
+    };
+
+/** An item the platform would not make, for a reason this page cannot fix. */
+const ITEM_REFUSED = "It was not made. Try again.";
+
+/**
+ * Make an item from a file (backend ADR-0046, `createItem`; plan §5.2): the
+ * values of its fields, chosen and typed on the upload card, and the file the
+ * card already uploaded — and the platform starts the run that reads it.
+ * Owner or admin only, as the platform allows.
+ *
+ * **The key is the card's**, made when it opens and again whenever a value
+ * changes (as a run's is, `startRun`): a resubmission after a lost answer
+ * reuses it, and the platform answers the same item rather than a second.
+ * A refused field is named by its key (`details.problems`), so the card says
+ * so under it; a file that can no longer be used empties the file field.
+ */
+export async function createItem(input: {
+  /** The workspace the page showed. */
+  workspaceId: string;
+  subscriptionId: string;
+  fields: Record<string, string>;
+  /** The keys of the item's fields, which a refusal's problems are read against. */
+  fieldKeys: string[];
+  /** The uploaded file's artifact id. */
+  file: string;
+  idempotencyKey: string;
+}): Promise<ItemActionResult> {
+  if (!input.subscriptionId)
+    return { ok: false, error: "A subscription is required." };
+  if (!input.file) return { ok: false, error: "Choose the file first." };
+  if (!/^[A-Za-z0-9._~:-]{16,128}$/u.test(input.idempotencyKey)) {
+    return { ok: false, error: "Reopen the form and try again." };
+  }
+  try {
+    const workspaceId = await activeWorkspaceIfShown(input.workspaceId);
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+    const { item } = await createWorkspaceItem(
+      workspaceId,
+      input.subscriptionId,
+      { fields: input.fields, file: input.file },
+      input.idempotencyKey,
+    );
+    revalidatePath(
+      `/account/flows/${encodeURIComponent(input.subscriptionId)}`,
+    );
+    return { ok: true, item };
+  } catch (error) {
+    if (!(error instanceof PlatformServerError)) throw error;
+    const reason = error.details?.reason;
+    if (error.status === 422 && reason === "artifact_unavailable") {
+      return {
+        ok: false,
+        error: RUN_REFUSALS.artifact_unavailable,
+        state: "file-unavailable",
+      };
+    }
+    if (error.status === 422) {
+      const fields = problemFields(
+        error.details?.problems,
+        input.fieldKeys.map((key) => ({ key })),
+      );
+      return {
+        ok: false,
+        error: "It was not made. Check each value and try again.",
+        ...(fields.length > 0 ? { fields } : {}),
+      };
+    }
+    if (error.status === 409 && reason === "subscription_not_live") {
+      return {
+        ok: false,
+        error: uploadRefusalMessage(reason) ?? ITEM_REFUSED,
+      };
+    }
+    if (error.status === 409) return { ok: false, error: FLOW_CHANGED };
+    const entitlement = subscriptionEntitlementState(
+      error.status,
+      error.details,
+    );
+    if (entitlement === "plan-limit") {
+      return {
+        ok: false,
+        error: overPlanRefusal(error.details),
+        state: "plan-limit",
+      };
+    }
+    if (entitlement === "entitlements-unavailable") {
+      return {
+        ok: false,
+        error:
+          "Runs are unavailable while billing entitlements are not configured.",
+        state: "entitlements-unavailable",
+      };
+    }
+    if (error.status === 403) {
+      return { ok: false, error: OWNERS_AND_ADMINS, state: "forbidden" };
+    }
+    return { ok: false, error: error.message || ITEM_REFUSED };
+  }
+}
+
+/**
+ * Archive an item (backend ADR-0046, `archiveItem`): one-way — it leaves its
+ * flow's list and takes no new run; its runs and their results stay. Owner or
+ * admin only, behind the page's confirmation.
+ */
+export async function archiveItem(formData: FormData): Promise<ActionResult> {
+  const itemId = String(formData.get("itemId") ?? "");
+  const subscriptionId = String(formData.get("subscriptionId") ?? "");
+  if (!itemId || !subscriptionId)
+    return { ok: false, error: "An item is required." };
+  try {
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
+    if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
+    await archiveWorkspaceItem(workspaceId, itemId);
+    revalidatePath(
+      `/account/flows/${encodeURIComponent(subscriptionId)}`,
+      "layout",
+    );
+    return { ok: true, subscriptionId };
+  } catch (error) {
+    if (!(error instanceof PlatformServerError)) throw error;
+    if (error.status === 403)
+      return { ok: false, error: OWNERS_AND_ADMINS, state: "forbidden" };
     return { ok: false, error: error.message };
   }
 }

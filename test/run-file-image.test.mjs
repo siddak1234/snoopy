@@ -5,10 +5,16 @@ import { test } from "node:test";
 import {
   IMAGE_JPEG_QUALITY,
   IMAGE_LONG_SIDE_MAX,
+  NOT_A_RUN_FILE,
   RUN_FILE_ACCEPT,
+  WORD_FILE,
   boundedSize,
+  fileAccept,
   jpegName,
+  notAcceptedLine,
   planRunFile,
+  takesPhotos,
+  typesInWords,
 } from "../app/account/flows/run-file-image.ts";
 
 /**
@@ -23,12 +29,50 @@ import {
 const read = (path) =>
   readFileSync(resolve(import.meta.dirname, "..", path), "utf8");
 
-test("the file chooser takes a PDF, a JPEG or a PNG, named in code", () => {
+test("the file chooser takes a PDF, a JPEG or a PNG, named in code, for a field that names no types", () => {
   assert.equal(RUN_FILE_ACCEPT, "application/pdf,image/jpeg,image/png");
+  assert.equal(fileAccept(undefined), RUN_FILE_ACCEPT);
+  assert.equal(fileAccept([]), RUN_FILE_ACCEPT);
+  const field = read("app/account/flows/RunFileField.tsx");
+  assert.match(field, /const accepted = field\.acceptedContentTypes;/u);
   assert.match(
-    read("app/account/flows/RunFileField.tsx"),
-    /id=\{inputId\}\s*type="file"\s*accept=\{RUN_FILE_ACCEPT\}/u,
+    field,
+    /id=\{inputId\}\s*type="file"\s*accept=\{fileAccept\(accepted\)\}/u,
   );
+});
+
+test("a field that names its types (acceptedContentTypes, backend ADR-0046) offers those, sends a Word file as it is, and says what it takes (plan §5.5)", () => {
+  const items = ["application/pdf", WORD_FILE, "image/jpeg", "image/png"];
+  const noImages = ["application/pdf", WORD_FILE];
+  assert.equal(fileAccept(items), items.join(","));
+  // A Word file is sent as it is, never drawn again; a PDF too.
+  assert.equal(planRunFile(WORD_FILE, "chooser", items), "send");
+  assert.equal(planRunFile("application/pdf", "chooser", items), "send");
+  // A JPEG or a PNG is drawn again while a JPEG is taken.
+  assert.equal(planRunFile("image/png", "chooser", items), "re-encode");
+  assert.equal(planRunFile("image/jpeg", "camera", items), "re-encode");
+  // Outside the field's types: refused, even a PDF's neighbours.
+  assert.equal(planRunFile("image/jpeg", "chooser", noImages), "refuse");
+  assert.equal(planRunFile("image/heic", "camera", noImages), "refuse");
+  assert.equal(planRunFile("application/msword", "chooser", items), "refuse");
+  assert.equal(planRunFile("text/plain", "chooser", items), "refuse");
+  // Without types, today's rule: a Word file is refused.
+  assert.equal(planRunFile(WORD_FILE, "chooser"), "refuse");
+  // Take photo only where a JPEG is taken.
+  assert.equal(takesPhotos(items), true);
+  assert.equal(takesPhotos(noImages), false);
+  assert.equal(takesPhotos(undefined), true);
+  // The refusal and the line beside the button name what is accepted.
+  assert.equal(typesInWords(items), "PDF, Word file or photo");
+  assert.equal(typesInWords(noImages), "PDF or Word file");
+  assert.equal(typesInWords(["application/pdf"]), "PDF");
+  assert.equal(notAcceptedLine(items), "Choose a PDF, Word file or photo.");
+  assert.equal(notAcceptedLine(undefined), NOT_A_RUN_FILE);
+  assert.equal(NOT_A_RUN_FILE, "Choose a PDF, JPEG or PNG file.");
+  const field = read("app/account/flows/RunFileField.tsx");
+  assert.match(field, /planRunFile\(chosen\.type, source, accepted\)/u);
+  assert.match(field, /setError\(notAcceptedLine\(accepted\)\)/u);
+  assert.match(field, /takesPhotos\(accepted\)/u);
 });
 
 test("a PDF is sent as it is, a JPEG or a PNG is drawn again, and anything else is refused", () => {

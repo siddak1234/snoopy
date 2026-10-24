@@ -115,11 +115,15 @@ billing (Free, Plus and Pro — the platform's, or the one the website draws
 while the platform lists none — and a second plan refused), the quick and the
 complete export (its link followed only when https), account deletion, and the platform's refusals —
 without real accounts or credentials, and each test starts from the fixture's
-first state. Four specs: `e2e/accessibility.spec.ts`,
+first state. Five specs: `e2e/accessibility.spec.ts`,
 `e2e/public-edge-fixture.spec.ts`, `e2e/account-surfaces.spec.ts` (every
-surface a change audit probed and no test asserted) and `e2e/dialogs.spec.ts`
-(every dialog's Escape, click outside, focus return and hold, one row each),
-sharing `e2e/helpers.ts`. The playbook's human keyboard
+surface a change audit probed and no test asserted), `e2e/dialogs.spec.ts`
+(every dialog's Escape, click outside, focus return and hold, one row each)
+and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: its items
+grouped on its page with no run start form, the upload card's "Other" and the
+values typed before, an item's runs ranked and what was read, a run headed by
+its title and score with its sections, Archive, and an owner's buttons a
+member does not see), sharing `e2e/helpers.ts`. The playbook's human keyboard
 traversal (NFR-35) has a hand-over test in the same suite:
 `KEYBOARD_JOURNEY=1 node scripts/run-browser-fixtures.mjs --headed --grep "keyboard journey"`
 opens the built site against the fixture, signed in, and pauses for the person

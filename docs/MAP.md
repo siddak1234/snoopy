@@ -70,6 +70,7 @@
 - `/account/billing`: [app/account/billing/page.tsx](../app/account/billing/page.tsx)
 - `/account/connections`: [app/account/connections/page.tsx](../app/account/connections/page.tsx)
 - `/account/flows/[subscriptionId]/email`: [app/account/flows/[subscriptionId]/email/page.tsx](../app/account/flows/[subscriptionId]/email/page.tsx)
+- `/account/flows/[subscriptionId]/items/[itemId]`: [app/account/flows/[subscriptionId]/items/[itemId]/page.tsx](../app/account/flows/[subscriptionId]/items/[itemId]/page.tsx)
 - `/account/flows/[subscriptionId]`: [app/account/flows/[subscriptionId]/page.tsx](../app/account/flows/[subscriptionId]/page.tsx)
 - `/account/flows/[subscriptionId]/setup`: [app/account/flows/[subscriptionId]/setup/page.tsx](../app/account/flows/[subscriptionId]/setup/page.tsx)
 - `/account/flows/[subscriptionId]/vendor`: [app/account/flows/[subscriptionId]/vendor/page.tsx](../app/account/flows/[subscriptionId]/vendor/page.tsx)
@@ -108,6 +109,7 @@
 - [lib/export-contract.ts](../lib/export-contract.ts): no header
 - [lib/exports.ts](../lib/exports.ts): no header
 - [lib/flow-email.ts](../lib/flow-email.ts): Who a flow's run emails go to, as the website draws it (Build 22, P1 and P5;
+- [lib/flow-items.ts](../lib/flow-items.ts): A flow's ITEMS as the website draws them (Round 19, plan §5; backend
 - [lib/flow-steps.ts](../lib/flow-steps.ts): A flow page's STEPS and its vendor choices (Build 21, spec A6; Build 22,
 - [lib/held-flow.ts](../lib/held-flow.ts): A workspace holds each flow once (the owner, build 12's #9): Personal is one
 - [lib/join-link.ts](../lib/join-link.ts): The line under Copy join link (the owner's build 9, decision 5): what the
@@ -133,6 +135,7 @@
 - [e2e/account-surfaces.spec.ts](../e2e/account-surfaces.spec.ts): no header
 - [e2e/connection-callback.spec.ts](../e2e/connection-callback.spec.ts): no header
 - [e2e/dialogs.spec.ts](../e2e/dialogs.spec.ts): no header
+- [e2e/flow-items.spec.ts](../e2e/flow-items.spec.ts): no header
 - [e2e/marketing.visual.spec.ts](../e2e/marketing.visual.spec.ts): Marketing is intentionally static and design-owned. These snapshots protect
 - [e2e/public-edge-fixture.spec.ts](../e2e/public-edge-fixture.spec.ts): no header
 
@@ -162,7 +165,7 @@
 
 ### Tests
 
-- `test/`: account, automation, billing, boundaries, brand, browser, build21, build22, build24, change, connection, connections, deployed, doc, export, flow, global, kit, new, no, platform, pre, repo, run, session, signed, structure, tenancy, upload, vendor, verify
+- `test/`: account, automation, billing, boundaries, brand, browser, build21, build22, build24, change, connection, connections, deployed, doc, export, flow, global, kit, new, no, platform, pre, repo, round19, run, session, signed, structure, tenancy, upload, vendor, verify
 
 ## Skills, agents and hooks
 

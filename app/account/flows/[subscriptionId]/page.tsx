@@ -6,11 +6,13 @@ import { getAppSession } from "@/lib/app-session";
 import {
   emptyWhenUnavailable,
   listAutomations,
+  listItems,
   listSubscriptions,
   readFlowEmailRecipients,
   readRunStats,
   type AutomationSetupField,
   type FlowEmailRecipients,
+  type ListItemsResponse,
 } from "@/lib/automations";
 import {
   emptyConnectionsWhenUnavailable,
@@ -50,6 +52,7 @@ import {
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { AutomationActions } from "../AutomationActions";
 import { FlowDashboard } from "../FlowDashboard";
+import { FlowItems } from "../FlowItems";
 import { RunStart } from "../RunStart";
 import { placeOf } from "../place";
 import { owedLines, vendorPath } from "../vendor-path";
@@ -74,6 +77,13 @@ import { owedLines, vendorPath } from "../vendor-path";
  *    Set up, through Edit setup, as in the app (its M3);
  * 4. at the bottom: Pause, **Edit setup**, the webhook address, Archive.
  *
+ * **A flow with items** (Round 19, plan §5.1; backend ADR-0046) — what the
+ * version it runs declares as `items` — draws them after its steps
+ * (`FlowItems`), and Step 1 holds no run start form, since its runs each name
+ * an item and start on the item's page; Turn on stays while it is off. Its
+ * items are read with the page; one that cannot be read costs the list, never
+ * the page.
+ *
  * ~~Connections~~ ("Remove the connections in the bottom as well") and ~~the
  * move to a newer version~~ ("I also dont want a move to vx number in the
  * flows. The user always gets the latest version") until Build 22 (the
@@ -82,6 +92,23 @@ import { owedLines, vendorPath } from "../vendor-path";
  *
  * Opened from its card on Flows (Open).
  */
+
+/** A flow's items, or an empty list when the platform cannot say. */
+async function readItems(
+  workspaceId: string,
+  subscriptionId: string,
+): Promise<ListItemsResponse> {
+  try {
+    return await listItems(workspaceId, subscriptionId);
+  } catch (error) {
+    if (
+      error instanceof PlatformServerError ||
+      error instanceof PlatformNotConfiguredError
+    )
+      return { items: [], choices: {} };
+    throw error;
+  }
+}
 
 /**
  * Step 5's addresses (Build 22, the session's S22): who gets this flow's run
@@ -161,6 +188,11 @@ export default async function FlowPage(
   )(subscription);
   const canManage = administers(role);
   const live = subscription.status === "live";
+  // The items the version it RUNS declares (backend ADR-0046), as its setup.
+  const declaredItems = subscription.items;
+  const items = declaredItems
+    ? await readItems(workspaceId, subscription.id)
+    : null;
   const available = entry?.available === true;
   const providerById = new Map(
     providers.providers.map((provider) => [provider.providerId, provider]),
@@ -255,7 +287,8 @@ export default async function FlowPage(
       <RunStart
         workspaceId={workspaceId}
         subscriptionId={subscription.id}
-        runInput={subscription.runInput ?? []}
+        // A flow with items starts its runs on an item's page: Turn on only.
+        runInput={declaredItems ? [] : (subscription.runInput ?? [])}
         live={live}
         available={available}
         canGoLive={subscription.unmetConnections.length === 0}
@@ -369,6 +402,16 @@ export default async function FlowPage(
           ))}
         </ol>
       </section>
+
+      {declaredItems && items ? (
+        <FlowItems
+          workspaceId={workspaceId}
+          subscriptionId={subscription.id}
+          declared={declaredItems}
+          initial={items}
+          canManage={canManage}
+        />
+      ) : null}
 
       <div className="py-5">
         <AutomationActions

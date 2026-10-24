@@ -20,7 +20,7 @@ export default function PrivacyPage() {
           Privacy Policy
         </h1>
         <p className="mt-6 max-w-[56ch] text-base leading-7 text-[color-mix(in_srgb,var(--color-text)_78%,transparent)]">
-          Effective and last updated: October 18, 2026. This policy explains
+          Effective and last updated: October 24, 2026. This policy explains
           what information Autom8x collects, why, and what we do with it. It is
           written to be read; if anything is unclear, contact us at{" "}
           <LegalLink href={`mailto:${LEGAL_EMAIL}`}>{LEGAL_EMAIL}</LegalLink>.
@@ -149,6 +149,21 @@ export default function PrivacyPage() {
             line items and the store&apos;s location when printed, is kept with
             the run&apos;s results, shown to the members of your workspace, and
             can be downloaded as a file.
+          </p>
+          <p>
+            Candidate Reviewer has an AI model read the job description given to
+            it when a job is uploaded, and each resume given to that job&apos;s
+            runs, to read the job&apos;s requirements and to score and summarize
+            each candidate against them. The platform sends each document, with
+            Autom8x&apos;s fixed instructions, to OpenRouter in the same way and
+            under the same rules; a Word file&apos;s text is sent in place of
+            the file. With a resume go the job&apos;s department and role and
+            what was read from its description, and nothing else from your
+            workspace: not your name, email address or other account details,
+            and not the flow&apos;s settings. What is read from a job
+            description and from each resume, including a candidate&apos;s name
+            and contact details, is kept with the job and the run&apos;s results
+            and shown to the members of your workspace.
           </p>
           <p>
             Every request tells OpenRouter to use only endpoints in the United

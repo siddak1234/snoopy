@@ -14,11 +14,13 @@ import { FormError } from "@/components/ui/FormError";
 import type { AutomationRunInputField } from "@/lib/automations";
 import { putFileToSignedUrl } from "@/lib/platform-api";
 import {
-  NOT_A_RUN_FILE,
-  RUN_FILE_ACCEPT,
+  fileAccept,
   jpegName,
+  notAcceptedLine,
   planRunFile,
   reencodeImage,
+  takesPhotos,
+  typesInWords,
   type RunFileSource,
 } from "./run-file-image";
 import { completeRunUpload, openRunUpload } from "./upload-actions";
@@ -57,9 +59,13 @@ const unknownOnServer = () => false;
  * What is sent is `run-file-image.ts`'s (backend BUILD-PLAN 25.8.5, the owner's
  * decision 8 of 2026-10-10), as the app sends it: a PDF as it is; a JPEG or a
  * PNG, and every photo, drawn upright and saved as a JPEG whose long side is at
- * most 2,576 px; anything else refused in words before anything is sent. The
- * file is chosen with Upload; on a phone or a tablet the field also offers
- * Take photo, the camera (spec §3.D: icons 20 inside a button).
+ * most 2,576 px; anything else refused in words before anything is sent. A
+ * field that names its types (`acceptedContentTypes`, backend ADR-0046) offers
+ * those, sends a Word file as it is, and offers Take photo only where a JPEG
+ * is taken. The file is chosen with Upload; on a phone or a tablet the field
+ * also offers Take photo, the camera (spec §3.D: icons 20 inside a button).
+ * With `showTypes`, the accepted types in words beside it ("PDF, Word file or
+ * photo"), as an item's file and its runs' show them (plan §5.2, §5.3).
  *
  * An upload belongs to the field that started it: its busy state is reported
  * under the field's key, it stops when the field goes (the form closed), and an
@@ -70,21 +76,24 @@ export function RunFileField({
   workspaceId,
   subscriptionId,
   onBusyChange,
+  showTypes = false,
 }: {
   field: AutomationRunInputField;
   /** The workspace the page showed; the upload is refused once it is not active. */
   workspaceId: string;
   subscriptionId: string;
   onBusyChange: (key: string, busy: boolean) => void;
+  /** Say the accepted types beside the button (an item's file, and its runs'). */
+  showTypes?: boolean;
 }) {
   const inputId = useId();
+  const typesId = useId();
+  const accepted = field.acceptedContentTypes;
   const input = useRef<HTMLInputElement>(null);
   const camera = useRef<HTMLInputElement>(null);
-  const offersCamera = useSyncExternalStore(
-    watchPointer,
-    onPhoneOrTablet,
-    unknownOnServer,
-  );
+  const offersCamera =
+    useSyncExternalStore(watchPointer, onPhoneOrTablet, unknownOnServer) &&
+    takesPhotos(accepted);
   const inFlight = useRef<AbortController | null>(null);
   const report = useRef(onBusyChange);
   useEffect(() => {
@@ -116,7 +125,7 @@ export function RunFileField({
     // A photo takes the chooser's place, so the chooser no longer names a
     // file the field does not hold.
     if (source === "camera" && input.current) input.current.value = "";
-    const plan = planRunFile(chosen.type, source);
+    const plan = planRunFile(chosen.type, source, accepted);
     inFlight.current?.abort();
     if (plan === "refuse") {
       // Refused here, before anything is sent: the platform refuses it too,
@@ -127,7 +136,7 @@ export function RunFileField({
       }
       setState({ kind: "empty" });
       if (input.current) input.current.value = "";
-      setError(NOT_A_RUN_FILE);
+      setError(notAcceptedLine(accepted));
       return;
     }
     const upload = new AbortController();
@@ -215,14 +224,14 @@ export function RunFileField({
         ref={input}
         id={inputId}
         type="file"
-        accept={RUN_FILE_ACCEPT}
+        accept={fileAccept(accepted)}
         hidden
         disabled={state.kind === "uploading"}
         onChange={(event) =>
           void choose(event.currentTarget.files?.[0], "chooser")
         }
       />
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         {offersCamera ? (
           <>
             {/* The camera, opened by Take photo, as the chooser is. It has
@@ -260,10 +269,16 @@ export function RunFileField({
           className="inline-flex items-center gap-2"
           disabled={state.kind === "uploading"}
           onClick={() => input.current?.click()}
+          aria-describedby={showTypes ? typesId : undefined}
         >
           <UploadSimpleIcon size={20} aria-hidden />
           Upload<span className="sr-only"> for {field.title}</span>
         </Button>
+        {showTypes ? (
+          <span id={typesId} className="text-xs text-[var(--muted)]">
+            {typesInWords(accepted)}
+          </span>
+        ) : null}
       </div>
       <p aria-live="polite" className="mt-1 text-xs text-[var(--muted)]">
         {state.kind === "uploading"
