@@ -473,8 +473,12 @@ test("a manual run is started only from the pinned version's declared input — 
     /const canRun = live && available && runInput\.length > 0;/,
   );
   assert.match(runStart, /<RunInputFields\s+runInput=\{runInput\}/);
-  // The pinned version's declaration, not the catalog's newest.
-  assert.match(flowPage, /runInput=\{subscription\.runInput \?\? \[\]\}/);
+  // The pinned version's declaration, not the catalog's newest — none for a
+  // flow with items, whose runs start on an item's page (Round 19).
+  assert.match(
+    flowPage,
+    /runInput=\{declaredItems \? \[\] : \(subscription\.runInput \?\? \[\]\)\}/,
+  );
   assert.match(fields, /prefix="input"/);
   // The run is created through the generated client, once per key, and the
   // person is taken to its page.

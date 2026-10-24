@@ -29,6 +29,12 @@ import { RunInputFields } from "./ManifestFields";
  * owner's D1: "we dont need to say this at all … the terms and privacy policy
  * includes that information"): a run starts at the press. A started run is
  * somewhere to go: its own page, where its steps arrive.
+ *
+ * **On an item's page** (backend ADR-0046; plan §5.3) the same form starts a
+ * run that names the item (`itemId`): its file, with the accepted types in
+ * words beside it, and Start. A run started there stays on the item's page
+ * (`onStarted`), where it joins the ranked list as "Reading…", and the form
+ * empties for the next file.
  */
 export function RunStart({
   workspaceId,
@@ -38,6 +44,8 @@ export function RunStart({
   available,
   canGoLive,
   initialKey,
+  itemId,
+  onStarted,
 }: {
   /** The workspace this page shows; every action is refused once it is not active. */
   workspaceId: string;
@@ -54,6 +62,10 @@ export function RunStart({
    * the browser draw the same one; each change of a value makes a new one.
    */
   initialKey: string;
+  /** The item every run started here names, on an item's page. */
+  itemId?: string;
+  /** Called with a started run's id in place of going to its page. */
+  onStarted?: (runId: string) => void;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -101,7 +113,15 @@ export function RunStart({
         }
         return;
       }
-      if (result.runId) router.push(`/account/runs/${result.runId}`);
+      if (!result.runId) return;
+      if (onStarted) {
+        // Emptied for the next file, under a new key.
+        setFileRound((round) => round + 1);
+        newRunKey();
+        onStarted(result.runId);
+        return;
+      }
+      router.push(`/account/runs/${result.runId}`);
     });
   };
 
@@ -132,6 +152,7 @@ export function RunStart({
     >
       <input type="hidden" name="subscriptionId" value={subscriptionId} />
       <input type="hidden" name="idempotencyKey" value={runKey} />
+      {itemId ? <input type="hidden" name="itemId" value={itemId} /> : null}
       {runInput.length > 0 ? (
         <RunInputFields
           runInput={runInput}
@@ -139,6 +160,7 @@ export function RunStart({
           subscriptionId={subscriptionId}
           onUploadingChange={onUploadingChange}
           fileRound={fileRound}
+          showTypes={itemId !== undefined}
         />
       ) : null}
       <FormError message={error} />
@@ -150,7 +172,13 @@ export function RunStart({
             className="inline-flex items-center gap-2"
           >
             <PlayIcon size={20} aria-hidden />
-            {pending ? "Starting…" : uploading ? "Uploading…" : "Start run"}
+            {pending
+              ? "Starting…"
+              : uploading
+                ? "Uploading…"
+                : itemId
+                  ? "Start"
+                  : "Start run"}
           </Button>
         ) : (
           <Button

@@ -83,6 +83,20 @@ export type CreateRunPackageFileRequest =
   operations["createRunPackageFile"]["requestBody"]["content"]["application/json"];
 export type UpdateFlowEmailRecipientsRequest =
   operations["updateFlowEmailRecipients"]["requestBody"]["content"]["application/json"];
+export type AutomationItems = components["schemas"]["AutomationItems"];
+export type AutomationItemField = components["schemas"]["AutomationItemField"];
+export type Item = components["schemas"]["Item"];
+export type RunSection = components["schemas"]["RunSection"];
+export type ListItemsResponse =
+  operations["listItems"]["responses"][200]["content"]["application/json"];
+export type CreateItemRequest =
+  operations["createItem"]["requestBody"]["content"]["application/json"];
+export type CreateItemResponse =
+  operations["createItem"]["responses"][201]["content"]["application/json"];
+export type ReadItemResponse =
+  operations["readItem"]["responses"][200]["content"]["application/json"];
+export type ArchiveItemResponse =
+  operations["archiveItem"]["responses"][200]["content"]["application/json"];
 
 export function listAutomations(
   workspaceId: string,
@@ -314,6 +328,58 @@ export function createRun(
     body: JSON.stringify(body),
     idempotencyKey,
   });
+}
+
+/**
+ * A flow's items, newest first, and the values typed for its fields
+ * (backend ADR-0046): any member may read them. A flow that declares no items
+ * answers both empty.
+ */
+export function listItems(
+  workspaceId: string,
+  subscriptionId: string,
+): Promise<ListItemsResponse> {
+  return platformServerJson<ListItemsResponse>(
+    `${scope(workspaceId)}/subscriptions/${encodeURIComponent(subscriptionId)}/items`,
+  );
+}
+
+/**
+ * An item made from an uploaded file (`file`, its artifact id), and the run
+ * that reads it started — owner or admin only. The key is the caller's: a
+ * resubmitted card reuses its own, and the platform answers the same item.
+ */
+export function createItem(
+  workspaceId: string,
+  subscriptionId: string,
+  body: CreateItemRequest,
+  idempotencyKey: string,
+): Promise<CreateItemResponse> {
+  return platformServerJson<CreateItemResponse>(
+    `${scope(workspaceId)}/subscriptions/${encodeURIComponent(subscriptionId)}/items`,
+    { method: "POST", body: JSON.stringify(body), idempotencyKey },
+  );
+}
+
+/** One item and its runs, ranked by score (any member). */
+export function readItem(
+  workspaceId: string,
+  itemId: string,
+): Promise<ReadItemResponse> {
+  return platformServerJson<ReadItemResponse>(
+    `${scope(workspaceId)}/items/${encodeURIComponent(itemId)}`,
+  );
+}
+
+/** Archives an item, one-way and idempotent — owner or admin only. */
+export function archiveItem(
+  workspaceId: string,
+  itemId: string,
+): Promise<ArchiveItemResponse> {
+  return platformServerJson<ArchiveItemResponse>(
+    `${scope(workspaceId)}/items/${encodeURIComponent(itemId)}/archive`,
+    { method: "POST", idempotencyKey: newIdempotencyKey("item-archive") },
+  );
 }
 
 /** Only a `pending` or `running` run can be cancelled; any other answers 404. */

@@ -102,6 +102,40 @@ that does not say where it came from (`Sec-Fetch-Site`), and names this site's
 origin as the page that asked does. Its ask may take 30 s (the platform builds
 for at most 20 s), and the route states `maxDuration = 60`.
 
+## A flow's items
+
+A flow may declare items (backend ADR-0046; Round 19): things a person makes
+once, from a file, that its runs then belong to. Every word for them is the
+platform's — `items.words`, `items.runWords`, each field's `title` and
+`options` — and the rules that draw them are pure, in `lib/flow-items.ts`, the
+same as the app's. A flow page whose version declares `items` draws them after
+its steps (`app/account/flows/FlowItems.tsx`) and no run start form, since each
+run names an item (`createRun`'s `itemId`); Turn on stays. They are grouped by
+the flow's `groupField`: its options' order, then values typed for it A–Z,
+rows newest first, each "Reading…", "Couldn't read" or "{n} {runs} · Top
+{score}", read again every 2 s while one is being read; a list the platform
+could not answer is "Unavailable". "Upload {item}", for an owner or admin,
+opens the upload card (`UploadItemCard.tsx`): a select of the field's options,
+the values typed before (`listItems`' `choices`, each held by its words, so a
+re-read while the card is open never changes the pick) and "Other", whose own
+box, labelled Other, takes 40 characters; a text box; the file, uploaded
+through a run's own upload path; then `createItem` with a key made with the
+card ("Nothing was uploaded…", and a refused field under its field). An item's
+page, `/account/flows/[subscriptionId]/items/[itemId]`, shows its runs in
+exactly `readItem`'s order, numbered, a run going "Reading…", an untitled one
+its status, a failed one in the muted colour; "What AI read", its sections
+closed; "Add {run}" — the run's file and Start, staying on the page — only
+where a run can start (`canAddRun`); and Archive, behind a confirmation, for an
+owner or admin only. A run with a `title` and a `score` is headed by them, and
+its `sections` come directly under its result line, before its tiles, as rows
+that open and close, the first open; a section's
+link is drawn only when it is `http:` or `https:` and opens outside the site
+(`components/dashboard/SectionRows.tsx`). A file field that names its
+`acceptedContentTypes` offers those, sends a Word file as it is, offers Take
+photo only where a JPEG is taken, and refuses another type in words that name
+what it takes (`app/account/flows/run-file-image.ts`); without them, a PDF,
+JPEG or PNG as before.
+
 ## Container and operations
 
 The Docker image uses Next standalone output and the non-root `nextjs` user.

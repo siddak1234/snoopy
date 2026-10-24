@@ -19,6 +19,7 @@ import { MinusCircleIcon } from "@phosphor-icons/react/dist/ssr/MinusCircle";
 import { WarningCircleIcon } from "@phosphor-icons/react/dist/ssr/WarningCircle";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { BackLink } from "@/components/dashboard/BackLink";
+import { SectionRows } from "@/components/dashboard/SectionRows";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
@@ -113,6 +114,12 @@ export type RunFlow = {
  * itself: the page stays as it was, as the app's does. ~~The server drew the
  * page again for each re-read~~ until Build 25's audit: one failed read put
  * the account's error page in its place.
+ *
+ * **A run with a title and a score** (backend ADR-0046; Round 19, plan §5.4)
+ * is headed by them — the title in the full id's place (the id stays among
+ * the facts), the score large beside it — and the sections it read follow
+ * directly under its result line as rows that open and close, the first
+ * open, before its tiles, steps, details and documents.
  */
 export function RunLive({
   workspaceId,
@@ -140,7 +147,10 @@ export function RunLive({
     setListed(approvals);
   }
   const [reads, setReads] = useState(0);
-  const { run, steps, details, documents } = detail;
+  const { run, steps, details, documents, sections } = detail;
+  // Headed by what the flow named it and its score, when it has both.
+  const headed = run.title !== undefined && run.score !== undefined;
+  const hasSections = sections !== undefined && sections.length > 0;
   const going = run.status === "pending" || run.status === "running";
 
   useEffect(() => {
@@ -240,10 +250,23 @@ export function RunLive({
 
   return (
     <SectionCard
-      title={runLabel(run.id)}
+      title={headed && run.title ? run.title : runLabel(run.id)}
       subheader={flow?.name ?? run.templateId}
       back={<BackLink href="/account/runs" />}
-      primaryAction={<StatusPill status={run.status} />}
+      primaryAction={
+        <>
+          {headed ? (
+            <span
+              data-testid="run-score"
+              className="text-3xl font-medium text-[var(--text)]"
+            >
+              <span className="sr-only">Score </span>
+              {run.score}
+            </span>
+          ) : null}
+          <StatusPill status={run.status} />
+        </>
+      }
     >
       <div className="py-5 first:pt-0">
         {/* How it went, on a line of its own, in the automation's words. */}
@@ -256,8 +279,15 @@ export function RunLive({
             {result}
           </p>
         ) : null}
+        {/* What it read, directly under its result line (plan §5.4), as the
+            app draws it: then the tiles. */}
+        {hasSections ? (
+          <section aria-label="What was read" className={result ? "mt-4" : ""}>
+            <SectionRows sections={sections} firstOpen testId="run-section" />
+          </section>
+        ) : null}
         <dl
-          className={`grid grid-cols-2 gap-3 sm:max-w-sm ${result ? "mt-4" : ""}`}
+          className={`grid grid-cols-2 gap-3 sm:max-w-sm ${result || hasSections ? "mt-4" : ""}`}
         >
           <Tile
             label="Duration"
