@@ -132,6 +132,7 @@ export function RunInputFields({
   subscriptionId,
   onUploadingChange,
   fileRound,
+  showTypes = false,
 }: {
   runInput: AutomationRunInputField[];
   /** The workspace the page showed, which a file's upload is checked against. */
@@ -140,6 +141,8 @@ export function RunInputFields({
   onUploadingChange: (key: string, uploading: boolean) => void;
   /** Changed to empty every file field — a file the platform will no longer take. */
   fileRound: number;
+  /** Say each file field's accepted types beside it (an item's runs). */
+  showTypes?: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -151,6 +154,7 @@ export function RunInputFields({
             workspaceId={workspaceId}
             subscriptionId={subscriptionId}
             onBusyChange={onUploadingChange}
+            showTypes={showTypes}
           />
         ) : (
           <ManifestFieldInput

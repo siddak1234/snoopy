@@ -383,6 +383,18 @@ function initialState() {
     // Build 25 (the review's R5c 2): signed links answered with another
     // scheme than https — the package's and the complete export's.
     signedLinkScheme: null as "http" | "javascript" | null,
+    // Round 19 (backend ADR-0046): a flow with items, off until a test turns
+    // it on, so no other test meets it. Its items, the values typed for its
+    // select, each item's runs (all set when it is turned on), and what the
+    // website sent to make an item or start a run of one.
+    itemsFlow: false,
+    itemsFailing: false,
+    items: [] as Automations["Item"][],
+    itemChoices: [] as string[],
+    itemRuns: new Map<string, Automations["Run"][]>(),
+    itemKeys: new Map<string, string>(),
+    itemCreates: [] as Json[],
+    itemRunStarts: [] as Json[],
   };
 }
 let state = initialState();
@@ -1032,6 +1044,7 @@ function fixtureCatalog(): Automations["AutomationCatalogResponse"] {
           : wordlessInvoice()),
         subscribed: state.invoiceAdded,
       },
+      ...(state.itemsFlow ? [itemsAutomation] : []),
     ],
     categories: ["All", "Accounting", "Operations"],
   };
@@ -1045,6 +1058,258 @@ function wordlessInvoice(): Omit<typeof invoiceAutomation, "documentWords"> {
   };
   delete entry.documentWords;
   return entry;
+}
+
+// Round 19 (backend ADR-0046): a made-up flow with items — every word it
+// shows comes from here, never from the website, which names no flow's things.
+const itemsSubscriptionId = "b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1";
+const readyItemId = "b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2";
+const readingItemId = "b3b3b3b3-b3b3-4b3b-8b3b-b3b3b3b3b3b3";
+const failedItemId = "b4b4b4b4-b4b4-4b4b-8b4b-b4b4b4b4b4b4";
+const emptyItemId = "b5b5b5b5-b5b5-4b5b-8b5b-b5b5b5b5b5b5";
+const archivedItemId = "b6b6b6b6-b6b6-4b6b-8b6b-b6b6b6b6b6b6";
+const scoredRunId = "c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1";
+const WORD_FILE =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+const areaOptions = ["North", "South"];
+const itemsDeclared = {
+  words: { singular: "Batch", plural: "Batches" },
+  runWords: { singular: "Entry", plural: "Entries" },
+  titleField: "name",
+  groupField: "area",
+  fields: [
+    {
+      key: "area",
+      title: "Area",
+      control: "select",
+      options: areaOptions,
+      allowOther: true,
+      defaultValue: "North",
+      required: true,
+    },
+    {
+      key: "name",
+      title: "Name",
+      control: "text",
+      maxLength: 60,
+      required: true,
+    },
+  ],
+  file: {
+    key: "batchFile",
+    title: "Batch file",
+    description: "The batch to read.",
+    acceptedContentTypes: [
+      "application/pdf",
+      WORD_FILE,
+      "image/jpeg",
+      "image/png",
+    ],
+  },
+} satisfies Automations["AutomationItems"];
+
+const itemsRunInput = [
+  {
+    key: "entryFile",
+    title: "Entry file",
+    description: "One entry to read.",
+    control: "artifact",
+    required: false,
+    acceptedContentTypes: ["application/pdf", WORD_FILE],
+  },
+] satisfies Automations["AutomationRunInputField"][];
+
+const itemsAutomation = {
+  ...automation("fixture-items", "Item automation"),
+  subscribed: true,
+  usesAi: true,
+  pipeline: [
+    {
+      id: "entry-received",
+      kicker: "TRIGGER",
+      title: "Entry received",
+      description: "An entry is given.",
+    },
+  ],
+  items: itemsDeclared,
+} satisfies Automations["AutomationCatalogEntry"];
+
+function itemsSubscription(): Automations["Subscription"] {
+  return {
+    id: itemsSubscriptionId,
+    workspaceId,
+    templateId: itemsAutomation.templateId,
+    templateVersion: 1,
+    status: "live",
+    config: {},
+    unmetConnections: [],
+    triggerKind: "manual",
+    setup: [],
+    runInput: itemsRunInput,
+    items: itemsDeclared,
+    projectId: null,
+    createdByUserId: userId,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function fixtureItem(
+  id: string,
+  area: string,
+  name: string,
+  createdAt: string,
+  rest: Partial<Automations["Item"]> = {},
+): Automations["Item"] {
+  return {
+    id,
+    subscriptionId: itemsSubscriptionId,
+    title: name,
+    fields: { area, name },
+    status: "ready",
+    runCount: 0,
+    topScore: null,
+    createdAt,
+    createdByUserId: userId,
+    archivedAt: null,
+    ...rest,
+  };
+}
+
+// Newest first, as the platform lists them. Grouped on the page as North
+// (Autumn, then Winter), South, then the typed Coastal; Inland's only item is
+// archived, so it is offered on the upload card and draws no group.
+function fixtureItems(): Automations["Item"][] {
+  return [
+    fixtureItem(
+      emptyItemId,
+      "North",
+      "Autumn intake",
+      "2026-08-12T11:00:00.000Z",
+    ),
+    fixtureItem(
+      readingItemId,
+      "North",
+      "Winter intake",
+      "2026-08-12T10:00:00.000Z",
+      { status: "reading" },
+    ),
+    fixtureItem(
+      readyItemId,
+      "South",
+      "Spring intake",
+      "2026-08-12T09:00:00.000Z",
+      {
+        runCount: 4,
+        topScore: 91,
+        sections: [
+          {
+            title: "Summary",
+            entries: [{ title: "Spring intake", text: "Three must-haves." }],
+          },
+          {
+            title: "Must-haves",
+            entries: [{ title: "First" }, { title: "Second" }],
+          },
+        ],
+      },
+    ),
+    fixtureItem(
+      failedItemId,
+      "Coastal",
+      "Harbour list",
+      "2026-08-12T08:00:00.000Z",
+      { status: "failed", failureReason: "The file had no text." },
+    ),
+    fixtureItem(
+      archivedItemId,
+      "Inland",
+      "Old list",
+      "2026-08-01T08:00:00.000Z",
+      {
+        archivedAt: "2026-08-02T08:00:00.000Z",
+      },
+    ),
+  ];
+}
+
+function itemRun(
+  id: string,
+  status: Automations["Run"]["status"],
+  rest: Partial<Automations["Run"]> = {},
+): Automations["Run"] {
+  return {
+    id,
+    workspaceId,
+    subscriptionId: itemsSubscriptionId,
+    templateId: itemsAutomation.templateId,
+    templateVersion: 1,
+    status,
+    origin: "manual",
+    rootRunId: id,
+    requestId: "fixture-request",
+    itemId: readyItemId,
+    startedAt: now,
+    createdAt: now,
+    updatedAt: now,
+    ...rest,
+  };
+}
+
+// As readItem ranks them: highest score first, then those without one,
+// newest first.
+function readyItemRuns(): Automations["Run"][] {
+  return [
+    itemRun(scoredRunId, "succeeded", {
+      title: "Ada Lane",
+      score: 91,
+      resultSummary: "Strong fit · 3 of 3",
+      endedAt: now,
+    }),
+    itemRun("c2c2c2c2-c2c2-4c2c-8c2c-c2c2c2c2c2c2", "succeeded", {
+      title: "Ben Ito",
+      score: 64,
+      resultSummary: "Fair fit · 2 of 3",
+      endedAt: now,
+    }),
+    itemRun("c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3", "running"),
+    itemRun("c4c4c4c4-c4c4-4c4c-8c4c-c4c4c4c4c4c4", "failed", {
+      failureReason: "The file could not be read.",
+      endedAt: now,
+    }),
+  ];
+}
+
+// What the scored run read, for its page: the first section open, the others
+// closed; a link only when it is https or http.
+const scoredRunSections: Automations["RunSection"][] = [
+  {
+    title: "Contact",
+    entries: [
+      {
+        title: "ada@example.test",
+        subtitle: "Email",
+        url: "https://example.test/ada",
+      },
+      { title: "Not a link", url: "javascript:alert(1)" },
+    ],
+  },
+  {
+    title: "Experience",
+    entries: [
+      {
+        title: "Lead · Example Co",
+        subtitle: "2021 – now",
+        text: "Ran the example team.",
+      },
+    ],
+  },
+  { title: "Education", entries: [{ title: "Example School" }] },
+];
+
+function itemOf(itemId: string): Automations["Item"] | undefined {
+  return state.items.find((item) => item.id === itemId);
 }
 
 const manualSubscriptionId = "99999999-9999-4999-8999-999999999999";
@@ -2098,6 +2363,22 @@ const server = createServer(
       },
       // Over the plan's flow allowance (decision 7a3): the list says so, and a
       // run's start is refused with the numbers.
+      // Round 19: the flow with items, listed; and every item being read,
+      // read — as the run that reads its file ends.
+      "/__fixture/items-flow": () => {
+        state.itemsFlow = true;
+        state.items = fixtureItems();
+        state.itemChoices = ["Coastal", "Inland"];
+        state.itemRuns = new Map([[readyItemId, readyItemRuns()]]);
+      },
+      // The flow's item list, unanswered (503).
+      "/__fixture/items-failing": () => {
+        state.itemsFailing = true;
+      },
+      "/__fixture/items-read": () => {
+        for (const item of state.items)
+          if (item.status === "reading") item.status = "ready";
+      },
       "/__fixture/over-plan": () => {
         state.overPlan = true;
       },
@@ -2276,6 +2557,13 @@ const server = createServer(
     }
     // FR-14: every completed file and the run it was given to, read by a test
     // at the fixture, because the run's page does not show its input.
+    // Round 19: what the website sent to make an item, and to start a run of one.
+    if (request.method === "GET" && url.pathname === "/__fixture/items") {
+      return respond(response, 200, {
+        creates: state.itemCreates,
+        runStarts: state.itemRunStarts,
+      });
+    }
     if (request.method === "GET" && url.pathname === "/__fixture/files") {
       response.writeHead(200, {
         "content-type": "application/json",
@@ -3383,6 +3671,7 @@ const server = createServer(
           ...(state.archivableAgain ? [state.archivableAgain] : []),
           ...state.projectAutomationScopes.map(projectAutomationSubscription),
           ...(state.invoiceAdded ? [invoiceSubscription()] : []),
+          ...(state.itemsFlow ? [itemsSubscription()] : []),
           { ...manualSubscription, status: state.manualStatus },
           webhookSubscription(),
           ...(state.archivableArchived ? [] : [archivableSubscription]),
@@ -3722,6 +4011,183 @@ const server = createServer(
           secret: `fixture-secret-${state.webhookSecrets}`,
           rotated: state.webhookSecretRotated,
         } satisfies Automations["IssuedWebhookEndpoint"]);
+      }
+    }
+    // Round 19 (backend ADR-0046): the flow with items — its uploads, its
+    // items, and a run that names one.
+    if (state.itemsFlow) {
+      const scope = `/v1/workspaces/${workspaceId}`;
+      const itemsPath = `${scope}/subscriptions/${itemsSubscriptionId}/items`;
+      if (method === "POST" && isWorkspacePath(pathname, "/uploads")) {
+        const body = (await requestJson(request)) as {
+          subscriptionId?: string;
+          filename?: string;
+          contentType?: string;
+          sizeBytes?: number;
+        };
+        if (body.subscriptionId === itemsSubscriptionId) {
+          const contentType = body.contentType ?? "";
+          if (!itemsDeclared.file.acceptedContentTypes.includes(contentType)) {
+            return respond(
+              response,
+              400,
+              refusal(400, "content_type_not_accepted"),
+            );
+          }
+          const uploadSessionId = crypto.randomUUID();
+          state.uploads.set(uploadSessionId, {
+            filename: body.filename ?? "file",
+            contentType,
+            sizeBytes: body.sizeBytes ?? 0,
+          });
+          return respond(response, 200, {
+            uploadSessionId,
+            uploadUrl: `https://127.0.0.1:${port}/__fixture/objects/${uploadSessionId}?size=${body.sizeBytes}`,
+            expiresAt: now,
+            maximumSizeBytes: 5_000_000,
+          } satisfies Automations["UploadTicket"]);
+        }
+      }
+      if (method === "GET" && pathname === itemsPath) {
+        if (state.itemsFailing)
+          return respond(response, 503, problem(503, "Service Unavailable"));
+        return respond(response, 200, {
+          items: state.items.filter((item) => item.archivedAt === null),
+          choices: { area: [...state.itemChoices].sort() },
+        } satisfies AutomationOperations["listItems"]["responses"][200]["content"]["application/json"]);
+      }
+      if (method === "POST" && pathname === itemsPath) {
+        const key = request.headers["idempotency-key"];
+        if (typeof key !== "string" || !key)
+          return respond(response, 400, problem(400, "Bad Request"));
+        if (!administering) {
+          return respond(
+            response,
+            403,
+            problem(403, "Forbidden", { requiredRole: "admin" }),
+          );
+        }
+        const replayed = itemOf(state.itemKeys.get(key) ?? "");
+        if (replayed) return respond(response, 200, { item: replayed });
+        const body = (await requestJson(request)) as {
+          fields?: Record<string, string>;
+          file?: string;
+        };
+        state.itemCreates.push(body as Json);
+        const fields = body.fields ?? {};
+        const problems: { path: string; message: string }[] = [];
+        const area = fields.area ?? "North";
+        if (area.length > 40)
+          problems.push({ path: "fields.area", message: "too long" });
+        if (!fields.name || fields.name.length > 60)
+          problems.push({ path: "fields.name", message: "is required" });
+        if (problems.length > 0) {
+          return respond(
+            response,
+            422,
+            problem(422, "Unprocessable Content", { problems }),
+          );
+        }
+        const file = state.files.get(body.file ?? "");
+        if (!file || file.runId) {
+          return respond(response, 422, refusal(422, "artifact_unavailable"));
+        }
+        file.runId = "item-read";
+        const made = fixtureItem(
+          crypto.randomUUID(),
+          area,
+          fields.name,
+          new Date().toISOString(),
+          { status: "reading" },
+        );
+        state.items.unshift(made);
+        state.itemKeys.set(key, made.id);
+        if (!areaOptions.includes(area) && !state.itemChoices.includes(area))
+          state.itemChoices.push(area);
+        return respond(response, 201, { item: made });
+      }
+      const itemPathMatch = new RegExp(
+        `^${scope}/items/([^/]+)(/archive)?$`,
+        "u",
+      ).exec(pathname);
+      if (itemPathMatch) {
+        const item = itemOf(itemPathMatch[1] ?? "");
+        if (!item) return respond(response, 404, problem(404, "Not Found"));
+        if (method === "GET" && !itemPathMatch[2]) {
+          return respond(response, 200, {
+            item,
+            runs: state.itemRuns.get(item.id) ?? [],
+          } satisfies AutomationOperations["readItem"]["responses"][200]["content"]["application/json"]);
+        }
+        if (method === "POST" && itemPathMatch[2]) {
+          if (!administering) {
+            return respond(
+              response,
+              403,
+              problem(403, "Forbidden", { requiredRole: "admin" }),
+            );
+          }
+          item.archivedAt ??= now;
+          return respond(response, 200, { item });
+        }
+      }
+      if (method === "POST" && isWorkspacePath(pathname, "/runs")) {
+        const body = (await requestJson(request)) as {
+          subscriptionId?: string;
+          itemId?: string;
+          input?: Json;
+        };
+        if (body.subscriptionId === itemsSubscriptionId) {
+          state.itemRunStarts.push(body as Json);
+          if (!body.itemId)
+            return respond(response, 422, refusal(422, "item_required"));
+          if (!administering) {
+            return respond(
+              response,
+              403,
+              problem(403, "Forbidden", { requiredRole: "admin" }),
+            );
+          }
+          const item = itemOf(body.itemId);
+          if (!item) return respond(response, 404, problem(404, "Not Found"));
+          if (item.archivedAt)
+            return respond(response, 409, refusal(409, "item_archived"));
+          if (item.status !== "ready")
+            return respond(response, 409, refusal(409, "item_not_ready"));
+          const fileId = body.input?.entryFile;
+          const file =
+            typeof fileId === "string" ? state.files.get(fileId) : undefined;
+          if (!file || file.runId)
+            return respond(response, 422, refusal(422, "artifact_unavailable"));
+          const run = itemRun(crypto.randomUUID(), "pending", {
+            itemId: item.id,
+          });
+          file.runId = run.id;
+          state.itemRuns.set(item.id, [
+            ...(state.itemRuns.get(item.id) ?? []).filter(
+              (other) => typeof other.score === "number",
+            ),
+            run,
+            ...(state.itemRuns.get(item.id) ?? []).filter(
+              (other) => typeof other.score !== "number",
+            ),
+          ]);
+          item.runCount += 1;
+          return respond(response, 201, { run });
+        }
+      }
+      if (method === "GET" && pathname === `${scope}/runs/${scoredRunId}`) {
+        const run = (state.itemRuns.get(readyItemId) ?? []).find(
+          (candidate) => candidate.id === scoredRunId,
+        );
+        if (run) {
+          return respond(response, 200, {
+            run,
+            steps: [],
+            events: [],
+            sections: scoredRunSections,
+          } satisfies AutomationOperations["readRun"]["responses"][200]["content"]["application/json"]);
+        }
       }
     }
     // FR-14: an upload for the manual automation, which asks for a file.
