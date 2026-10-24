@@ -23,8 +23,8 @@ import { UploadItemCard } from "./UploadItemCard";
 /**
  * A flow's items on its page (Round 19, plan §5.1; backend ADR-0046), after
  * its numbered steps and in place of its run start form — a run of such a
- * flow names an item. Headed by the flow's own word for them ("Jobs"), with
- * "Upload job" for an owner or admin (`canManage`), which opens the upload
+ * flow names an item. Headed by the flow's own word for them (`items.words`'
+ * plural), with "Upload {one}" for an owner or admin (`canManage`), which opens the upload
  * card; then the items, grouped by the flow's `groupField` in the order
  * `groupItems` gives, each row its title and its line (`itemLine`: how many
  * runs and the best score, "Reading…" or "Couldn't read"), opening its page.

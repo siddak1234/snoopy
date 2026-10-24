@@ -157,8 +157,9 @@ export default function PrivacyPage() {
             each candidate against them. The platform sends each document, with
             Autom8x&apos;s fixed instructions, to OpenRouter in the same way and
             under the same rules; a Word file&apos;s text is sent in place of
-            the file. With a resume go the job&apos;s department and role and
-            what was read from its description, and nothing else from your
+            the file. To score a candidate, what was read from the job
+            description and from the resume is sent, without the
+            candidate&apos;s name or contact details, and nothing else from your
             workspace: not your name, email address or other account details,
             and not the flow&apos;s settings. What is read from a job
             description and from each resume, including a candidate&apos;s name

@@ -16,7 +16,7 @@ import { ItemLive } from "./ItemLive";
 
 /**
  * One of a flow's items (Round 19, plan §5.3; backend ADR-0046): its title,
- * its group's value and where it is; for an owner or admin, "Add candidate" —
+ * its group's value and where it is; for an owner or admin, "Add {run}" —
  * the flow's run file and Start, each run naming this item; its runs, ranked
  * as the platform answers them; "What AI read", its file's reading in rows
  * that open and close; and, for an owner or admin, Archive. Every word for

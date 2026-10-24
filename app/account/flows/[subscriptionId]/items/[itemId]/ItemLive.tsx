@@ -37,10 +37,10 @@ export const WHAT_AI_READ = "What AI read";
 
 /**
  * An item's page, live (Round 19, plan §5.3; backend ADR-0046). Top to
- * bottom: its title, its group's value and where it is ("Accounting ·
+ * bottom: its title, its group's value and where it is ("{group} ·
  * Ready", "Reading…", or why it could not be read); for an owner or admin
  * while it is ready and not archived and a run can start (`canAddRun`: the
- * flow live, answering, with a run file), "Add candidate": the flow's run file,
+ * flow live, answering, with a run file), "Add {run}": the flow's run file,
  * the accepted types in words, and Start — the run names this item and
  * joins the list below as "Reading…"; its runs, ranked exactly as the
  * platform answers them (`rankedRows`), each opening its run's page; "What AI
