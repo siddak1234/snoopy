@@ -74,18 +74,24 @@ test("the Flows list: grouped by department, the departments A–Z, each keeping
   page,
 }) => {
   await page.goto("/account/flows");
-  // The catalog lists Operations' flows first: A–Z puts Accounting first.
+  // The catalog lists Operations' flows first and Customer Support's last:
+  // A–Z puts Accounting first and Customer Support second.
   const departments = page.getByTestId("flows-department");
   await expect(departments.locator("h2")).toHaveText([
     "Accounting",
+    "Customer Support",
     "Operations",
   ]);
   await expect(departments.nth(0).locator("h3")).toHaveText([
     "Invoice Processing",
   ]);
-  const operations = departments.nth(1).locator("h3");
+  // A department of two words names its section (the review's finding 4).
+  await expect(
+    page.getByRole("region", { name: "Customer Support" }).locator("h3"),
+  ).toHaveText(["Item automation"]);
+  const operations = departments.nth(2).locator("h3");
   await expect(operations.first()).toHaveText("Plan-limit automation");
-  await expect(operations.last()).toHaveText("Item automation");
+  await expect(operations.last()).toHaveText("Team draft automation");
   await expectNoAxeViolations(page);
 });
 

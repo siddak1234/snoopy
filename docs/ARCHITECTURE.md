@@ -46,7 +46,8 @@ page reuses:
   and never the browser's own `<select>`.
 - **A row that opens a page** is `PageRow` (`components/dashboard/PageRow.tsx`):
   a closed section's box and height, the arrow at its end.
-- **Every run's page** ends with the Run details row, then View flow;
+- **Every run's page** ends with the package's buttons when it has them,
+  then the Run details row, then Cancel run while it goes on and View flow;
   Duration, Steps done, the steps, Started, Ended, Trigger and the Run ID are
   on its details page, `/account/runs/[runId]/details`. What a run read comes
   first, under "{Run word} details", in its result line's place.
@@ -86,17 +87,18 @@ the job's uploaded files (`RunDetail.files`): its own file, else the only one.
 
 A run's page and its details page ("Screen standards") are one `RunLive`,
 read alike (`app/account/runs/[runId]/run-page-data.ts`). A held job is
-decided where it waits: step 4 on its details page offers the one
+decided on its page: under the result line, "Waiting for approval.", the one
 Approve and Deny pair (`app/account/approvals/ApprovalDecision.tsx`, Deny the
 danger variant) to a role the job's newest approval names, and says who can
-otherwise; a decision draws the page again (the action revalidates it by
+otherwise; step 4 on its details page keeps the step's state alone (build
+28's review, finding 1). A decision draws the page again (the action revalidates it by
 the job id the platform answers with). A run can turn held while its page is
 open, or the page can read it before its approval is listed. Then the browser
 reads the job and its approvals again through `/api/platform`, every 2 s, one
 re-read (the job and its approvals, two requests together) at a time and at
 most ten times, until the approval is listed or the run
-leaves held (`rereadForApproval` in `lib/run-progress.ts`), and works out step
-4's pair from what it read (`waitingDecision`). So Approve and Deny appear
+leaves held (`rereadForApproval` in `lib/run-progress.ts`), and works out
+the pair from what it read (`waitingDecision`). So Approve and Deny appear
 with no reload. A read that fails costs only itself: the page stays as it
 was, as the app's does. A job whose approval is listed is not read again for
 it. On Approvals each row names its flow and the step it waits at, "{flow} ·

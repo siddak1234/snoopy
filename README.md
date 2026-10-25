@@ -86,10 +86,11 @@ with no vendor to choose is sent to Connections instead), who gets its email
 ten; a member reads them), a run's details page, opened from the Run details
 row on every run's page (every step from the start — its
 integration and its email among them, the running one spinning — read again
-while it goes on, a held job's step 4 with Approve and Deny, appearing with no
-reload when the job reaches it while its page is open — read again at most
-ten times, never once listed or gone on, a failed read keeping the page), a
-run's page (each document it read a closed row of its own that opens in place — headed in its
+while it goes on, a held job's step 4 its state alone), a run's page (a held
+job's Approve and Deny under its result line, appearing with no reload when
+the job reaches it while its page is open — read again at most ten times,
+never once listed or gone on, a failed read keeping the page; the package's
+buttons, then Run details, then View flow; each document it read a closed row of its own that opens in place — headed in its
 flow's word ("Invoice 1 of 3" for Invoice Processing, "Document 1 of 3" for a flow
 that names none; the catalog's `documentWords`), its Document type and Format — and View package, Download PDF and
 Download Excel, each download to the platform's signed link, an https one

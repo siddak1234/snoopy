@@ -71,7 +71,7 @@ test("one Approve and Deny pair on both pages: Approve primary, Deny danger, App
     );
 });
 
-test("a held step offers the decision: RunLive's held row renders ApprovalDecision while the job's approval waits and this person may decide, else who can; a saved decision draws the page again (P6)", () => {
+test("a held job's page offers the decision: RunLive renders ApprovalDecision under the result line while the job's approval waits and this person may decide, else who can; a saved decision draws the page again (P6; build 28's review, finding 1)", () => {
   const live = code(read(LIVE));
   assert.match(
     live,
@@ -79,8 +79,14 @@ test("a held step offers the decision: RunLive's held row renders ApprovalDecisi
   );
   assert.match(
     live,
-    /<TrackerItem key=\{row\.key\} row=\{row\}>\s*(?:\{\s*\}\s*)?\{row\.state === "held" &&\s*decided === "pending" &&\s*decision\?\.approval\.status === "pending" \? \(\s*<ApprovalDecision\s+approvalId=\{decision\.approval\.id\}\s+canDecide=\{decision\.canDecide\}\s+eligibleRoles=\{decision\.approval\.eligibleRoles\}/u,
+    /const waiting =\s*run\.status === "held" &&\s*decided === "pending" &&\s*decision\?\.approval\.status === "pending";/u,
   );
+  assert.match(
+    live,
+    /\{waiting && decision \? \(\s*<div\s+data-testid="run-decision"[^>]*>\s*<ApprovalDecision\s+approvalId=\{decision\.approval\.id\}\s+canDecide=\{decision\.canDecide\}\s+eligibleRoles=\{decision\.approval\.eligibleRoles\}/u,
+  );
+  // One pair: no step of the details page draws its own.
+  assert.equal(live.match(/<ApprovalDecision\b/gu)?.length, 1);
   assert.match(
     live,
     /onDecision=\{\(_, state\) => \{\s*if \(state === "saved"\) router\.refresh\(\);\s*\}\}/u,

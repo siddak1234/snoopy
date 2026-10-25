@@ -51,8 +51,7 @@ import {
   type DocumentRowView,
   type DocumentWords,
 } from "@/lib/run-documents";
-import { viewFileLabel } from "@/lib/flow-items";
-import { runFilePath } from "@/lib/run-files";
+import { runFilePath, runFileRows } from "@/lib/run-files";
 import {
   RUN_DETAILS,
   RUN_REREAD_MS,
@@ -96,8 +95,8 @@ export type RunFlow = {
   documentWords?: DocumentWords;
   /** What the flow calls one of its runs, when it has items (`items.runWords`). */
   runWord?: string;
-  /** What the flow calls a run's file: its first file field's title ("Resume"). */
-  fileTitle?: string;
+  /** The file fields of the version the flow runs, in order: what names a run's files ("Resume"). */
+  fileFields?: { control: string; title: string }[];
   pipeline: DeclaredStep[];
   groups?: ProgressGroup[];
   tracker?: TrackerFlow;
@@ -113,15 +112,16 @@ export type RunFlow = {
  *   status; for a run of an item, a "View {file}" row for its file ("View
  *   resume", the flow's word; build 28, item 7) opening the file's page; how
  *   it went, or — a run that read sections — what it read under
- *   "{Run word} details" in its place; each document it read on
- *   a card of its own (or a v1/v2 run's Details); the Run details row
- *   (`PageRow`); View package, Download PDF and Download Excel once the job
- *   can be packaged (Build 24, P12; ~~Download JSON~~ until then); Cancel run
- *   while it goes on, and View flow;
- * - **its details page** (`details`): Duration and Steps done;
- *   every step from the start, each where the run is — a held step with
- *   Approve and Deny under it (Build 24, P6); then Started, Ended, Trigger and
- *   the full Run ID.
+ *   "{Run word} details" in its place; a held job's Approve and Deny under
+ *   its result line (Build 24, P6); each document it read on a card of its
+ *   own (or a v1/v2 run's Details); View package, Download PDF and Download
+ *   Excel once the job can be packaged (Build 24, P12; ~~Download JSON~~
+ *   until then); the Run details row (`PageRow`); Cancel run while it goes
+ *   on, and View flow;
+ * - **its details page** (`details`): Duration and Steps done; every step
+ *   from the start, each where the run is — a held step its state, "Waiting
+ *   for approval" (~~Approve and Deny under it~~ until build 28's review);
+ *   then Started, Ended, Trigger and the full Run ID.
  *
  * ~~All of it on the run's page~~ until build 28. Both are read
  * again every 2 s while the run is pending or running (`RUN_REREAD_MS`),
@@ -133,7 +133,7 @@ export type RunFlow = {
  * read and the approvals', together) at a time and at most
  * `HELD_APPROVAL_REREADS` times, until the approval is listed or the run
  * leaves held (`rereadForApproval`; Build 25, the review's R5c 1). So Approve
- * and Deny appear in step 4 with no reload. A read that fails costs only
+ * and Deny appear under the result line with no reload. A read that fails costs only
  * itself: the page stays as it was, as the app's does. ~~The server drew the
  * page again for each re-read~~ until Build 25's audit: one failed read put
  * the account's error page in its place.
@@ -277,8 +277,13 @@ export function RunLive({
   ];
 
   const name = headed && run.title ? run.title : runLabel(run.id);
+  // Held, its newest approval waiting: Approve and Deny on the run's page.
+  const waiting =
+    run.status === "held" &&
+    decided === "pending" &&
+    decision?.approval.status === "pending";
   // A run of an item: its uploaded file, to view, download and share.
-  const files = run.itemId ? (detail.files ?? []) : [];
+  const files = run.itemId ? runFileRows(detail.files, flow?.fileFields) : [];
 
   if (view === "details") {
     return (
@@ -312,23 +317,7 @@ export function RunLive({
           </h2>
           <ol data-testid="run-steps" className="mt-4 flex flex-col gap-4">
             {tracker.map((row) => (
-              <TrackerItem key={row.key} row={row}>
-                {/* The decision where the job waits (Build 24, P6): one press,
-                    then the page is drawn again — running on, or Denied */}
-                {row.state === "held" &&
-                decided === "pending" &&
-                decision?.approval.status === "pending" ? (
-                  <ApprovalDecision
-                    approvalId={decision.approval.id}
-                    canDecide={decision.canDecide}
-                    eligibleRoles={decision.approval.eligibleRoles}
-                    workspaceId={workspaceId}
-                    onDecision={(_, state) => {
-                      if (state === "saved") router.refresh();
-                    }}
-                  />
-                ) : null}
-              </TrackerItem>
+              <TrackerItem key={row.key} row={row} />
             ))}
           </ol>
         </section>
@@ -382,9 +371,7 @@ export function RunLive({
               testId={`run-file-${file.id}`}
             >
               <span className="min-w-0 truncate font-medium text-[var(--text)]">
-                {files.length === 1 && flow?.fileTitle
-                  ? viewFileLabel(flow.fileTitle)
-                  : `View ${file.filename}`}
+                {file.label}
               </span>
             </PageRow>
           ))}
@@ -394,15 +381,36 @@ export function RunLive({
       {/* How it went, on a line of its own, in the automation's words — for
           a run that read no sections: one that did is said by them (build
           28, item 8: "Instead of strong match 6 of 6"). */}
-      {result && !hasSections ? (
+      {(result && !hasSections) || waiting ? (
         <div className="py-5 first:pt-0">
-          <p
-            data-testid="run-result"
-            {...(run.status === "failed" ? { role: "alert" } : {})}
-            className={`text-sm ${RESULT_TONE[run.status] ?? "text-[var(--text)]"}`}
-          >
-            {result}
-          </p>
+          {result && !hasSections ? (
+            <p
+              data-testid="run-result"
+              {...(run.status === "failed" ? { role: "alert" } : {})}
+              className={`text-sm ${RESULT_TONE[run.status] ?? "text-[var(--text)]"}`}
+            >
+              {result}
+            </p>
+          ) : null}
+          {/* The decision where the job waits, under its result line (Build
+              24, P6; build 28's review, finding 1: not one tap more): one
+              press, then the page is drawn again — running on, or Denied. */}
+          {waiting && decision ? (
+            <div
+              data-testid="run-decision"
+              className={result && !hasSections ? "mt-3" : ""}
+            >
+              <ApprovalDecision
+                approvalId={decision.approval.id}
+                canDecide={decision.canDecide}
+                eligibleRoles={decision.approval.eligibleRoles}
+                workspaceId={workspaceId}
+                onDecision={(_, state) => {
+                  if (state === "saved") router.refresh();
+                }}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -471,13 +479,17 @@ export function RunLive({
       <div className="py-5 first:pt-0">
         {/* Every run's, whatever its flow (build 28, item 9): the steps and
             the facts on a page of their own. */}
+        {/* The package's three first, then Run details, directly over
+            Cancel run and View flow (build 28's review, finding 2). */}
+        {packageAvailable(run.status, documents) ? (
+          <div className="mb-5 flex flex-wrap items-center gap-2">
+            <PackageActions workspaceId={workspaceId} runId={run.id} view />
+          </div>
+        ) : null}
         <PageRow href={runDetailsPath(run.id)} testId="run-details-row">
           <span className="font-medium text-[var(--text)]">{RUN_DETAILS}</span>
         </PageRow>
         <div className="mt-5 flex flex-wrap items-center gap-2">
-          {packageAvailable(run.status, documents) ? (
-            <PackageActions workspaceId={workspaceId} runId={run.id} view />
-          ) : null}
           {/* Only the two states the platform cancels; any other answers 404. */}
           {going ? (
             <CancelRunButton runId={run.id} workspaceId={run.workspaceId} />
@@ -674,7 +686,7 @@ const STATE_LOOK: Record<
  * step's integration; step 5's Email sent and when, Sending email… or Done
  * (Build 23's A7, `lib/run-progress.ts`) — never a step's own summary
  * and never a step id (B6). A platform step this build does not know has no
- * state, so no line. Under it, what the row offers: a held step's decision.
+ * state, so no line. Under it, what the row offers, when a page gives it.
  */
 function TrackerItem({
   row,

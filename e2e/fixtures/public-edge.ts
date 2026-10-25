@@ -1128,6 +1128,8 @@ const itemsRunInput = [
 
 const itemsAutomation = {
   ...automation("fixture-items", "Item automation"),
+  // A department of two words (the review of build 28, finding 4).
+  category: "Customer Support",
   subscribed: true,
   usesAi: true,
   pipeline: [

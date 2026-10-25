@@ -11,7 +11,6 @@ import {
   type Subscription,
 } from "@/lib/automations";
 import { settingLine, stepTitle } from "@/lib/flow-steps";
-import { runFileTitle } from "@/lib/run-files";
 import {
   PlatformNotConfiguredError,
   PlatformServerError,
@@ -31,13 +30,13 @@ import type { RunFlow } from "./RunLive";
  * screen joins the catalog), so its name, steps' titles and groups come from
  * there, and the word for one of its runs (`items.runWords`, the version the
  * flow runs, else the catalog's) heads what it read; its file's word is its
- * version's first file field's title (`runFileTitle`). A held run's approvals are
+ * version's file fields (`runFileRows`). A held run's approvals are
  * read too: a waiting document whose approval was refused or ran out says "Not
- * approved" (S21), and while its newest waits, step 4 offers Approve and Deny
- * to a role it names (Build 24, P6; the role read as Approvals reads it, from
+ * approved" (S21), and while its newest waits, the run's page offers Approve
+ * and Deny under its result line to a role it names (Build 24, P6; the role read as Approvals reads it, from
  * the workspace list the layout read already). The role goes with every run,
  * held or not: a run that turns held while its page is open has its approvals
- * read again in the browser (`RunLive`), and step 4 offers the pair from there.
+ * read again in the browser (`RunLive`), and the page offers the pair from there.
  *
  * And its flow, as it is now (Build 22, the session's S23): a setting step's
  * line — the integration the flow has chosen — and a title by connection
@@ -114,14 +113,17 @@ export async function readRunPage(
       (connection) => connection.providerId === providerId,
     )?.displayName ?? providerId;
   const runWord = (subscription?.items ?? entry?.items)?.runWords.singular;
-  // The flow's word for the run's file (build 28, item 7: "View resume").
-  const fileTitle = runFileTitle(subscription?.runInput);
+  // The flow's words for the run's files (build 28, item 7: "View resume"):
+  // its version's file fields, in order.
+  const fileFields = subscription?.runInput
+    ?.filter((field) => field.control === "artifact")
+    .map((field) => ({ control: field.control, title: field.title }));
   const flow: RunFlow = entry
     ? {
         name: entry.name,
         ...(entry.documentWords ? { documentWords: entry.documentWords } : {}),
         ...(runWord ? { runWord } : {}),
-        ...(fileTitle ? { fileTitle } : {}),
+        ...(fileFields ? { fileFields } : {}),
         pipeline: entry.pipeline.map((step) => ({
           id: step.id,
           title: step.title,

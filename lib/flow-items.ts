@@ -115,14 +115,6 @@ export function uploadLabel(words: ItemWords): string {
   return `Upload ${inSentence(words.singular)}`;
 }
 
-/**
- * The row that opens a file's page, in the flow's word for the file (Round
- * 19, build 28; the owner's item 7): "View resume".
- */
-export function viewFileLabel(title: string): string {
-  return `View ${inSentence(title)}`;
-}
-
 /** The item page's heading over the file that starts a run: "Add candidate". */
 export function addRunLabel(runWords: ItemWords): string {
   return `Add ${inSentence(runWords.singular)}`;

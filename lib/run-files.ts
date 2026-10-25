@@ -1,9 +1,9 @@
 /**
  * A run's or an item's uploaded file, as the website shows it (Round 19,
  * build 28; the owner's items 4 and 7: "a page to review the original
- * document that you can download and share like other documents"): its
- * page's paths (the row that opens it is `viewFileLabel`'s, in
- * `lib/flow-items.ts`); the file shown in place only when a browser draws it
+ * document that you can download and share like other documents"): the rows
+ * that open a run's files, named as the app's (`runFileRows`); the pages'
+ * paths; the file shown in place only when a browser draws it
  * (a PDF, a JPEG or a PNG), else downloaded to be opened; and its line. The
  * platform answers a short-lived signed link, never the bytes (backend
  * `readRunFile`, `readItemFile`).
@@ -66,12 +66,59 @@ export function fileLine(file: {
     .join(" · ");
 }
 
+/** A run's file when its flow names none (the app's `FILE_WORD`). */
+export const FILE_WORD = "File";
+
 /**
- * The flow's word for a run's file: the title of its version's first file
- * field ("Resume"), else none — and a page then says the file's own name.
+ * A word inside a sentence — "View resume" — its first letter made small when
+ * the next one is small too, so "NDA" stays: `inSentence` in
+ * `lib/flow-items.ts`, here too since this module loads on its own.
  */
-export function runFileTitle(
+function inSentence(word: string): string {
+  return /^\p{Lu}\p{Ll}/u.test(word)
+    ? word.charAt(0).toLocaleLowerCase("en-US") + word.slice(1)
+    : word;
+}
+
+/** The row that opens a file's page, in the flow's word for it: "View resume". */
+export function viewFileLabel(title: string): string {
+  return `View ${inSentence(title)}`;
+}
+
+/** One "View {file}" row of a run's page: the file it opens, its word and its label. */
+export type RunFileRow = { id: string; title: string; label: string };
+
+/**
+ * A run's files as its page offers them — the app's `runFileRows`
+ * (`snoopy-mobile/lib/view/items.ts`; the owner's build 28 item 7: "the
+ * first section should be the view resume button"): one row per file the
+ * job uploaded (`RunDetail.files`, in upload order), each named by its
+ * flow's file field — the `artifact` fields of its version's `runInput`, in
+ * order, the first for any file past them; "File" when the flow names none
+ * — "View resume"; files that share a word say which they are, "View photo
+ * 1 of 2". The word alone heads the file's page.
+ */
+export function runFileRows(
+  files: readonly { id: string }[] | undefined,
   runInput: readonly { control: string; title: string }[] | undefined,
-): string | null {
-  return runInput?.find((field) => field.control === "artifact")?.title ?? null;
+): RunFileRow[] {
+  const fields = (runInput ?? []).filter(
+    (field) => field.control === "artifact",
+  );
+  const titles = (files ?? []).map(
+    (_, at) => (fields[at] ?? fields[0])?.title ?? FILE_WORD,
+  );
+  return (files ?? []).map((file, at) => {
+    const title = titles[at] ?? FILE_WORD;
+    const same = titles.filter((other) => other === title).length;
+    const nth = titles
+      .slice(0, at + 1)
+      .filter((other) => other === title).length;
+    const label = viewFileLabel(title);
+    return {
+      id: file.id,
+      title,
+      label: same > 1 ? `${label} ${nth} of ${same}` : label,
+    };
+  });
 }

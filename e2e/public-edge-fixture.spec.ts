@@ -2761,6 +2761,22 @@ test("a finished run of three receipts: its full id, each receipt on its own car
     0,
   );
 
+  // The page's foot (build 28's review, finding 2, as the app draws it): the
+  // package's three, then Run details, then View flow.
+  const foot = await page.evaluate(() => {
+    const all = [...document.querySelectorAll("main *")];
+    const named = (selector: string, words: string) =>
+      [...document.querySelectorAll(`main ${selector}`)].find(
+        (element) => element.textContent?.trim() === words,
+      );
+    return [
+      named("button", "Download Excel"),
+      document.querySelector('main [data-testid="run-details-row"]'),
+      named("a", "View flow"),
+    ].map((element) => (element ? all.indexOf(element) : -1));
+  });
+  expect(foot.every((at) => at >= 0)).toBe(true);
+  expect(foot[0]! < foot[1]! && foot[1]! < foot[2]!).toBe(true);
   // Run details, a row with an arrow at the foot of the page (build 28, item
   // 9): how it went, the tiles, every step and the facts.
   await main.getByRole("link", { name: "Run details" }).click();

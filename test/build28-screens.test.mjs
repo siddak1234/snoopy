@@ -3,17 +3,19 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
 import { byDepartment } from "../app/account/flows/departments.ts";
-import { TOTAL, itemTiles, viewFileLabel } from "../lib/flow-items.ts";
+import { TOTAL, itemTiles } from "../lib/flow-items.ts";
 import {
   FILE_GONE,
+  FILE_WORD,
   RUN_FILE_MAXIMUM_BYTES,
   fileLine,
   fileViewHref,
   itemFilePath,
   runFilePath,
-  runFileTitle,
+  runFileRows,
   shownInPlace,
   sizeInWords,
+  viewFileLabel,
 } from "../lib/run-files.ts";
 import {
   RUN_DETAILS,
@@ -54,26 +56,33 @@ test("the Flows list is grouped by department, the departments A–Z, each keepi
     entry("Alpha report", "Operations"),
     entry("Hiring", "HR"),
     entry("Audit", "accounting"),
+    entry("Tickets", "Customer Support"),
   ]);
   assert.deepEqual(
     groups.map((group) => [
       group.department,
+      group.id,
       group.entries.map((each) => each.name),
     ]),
     [
-      ["Accounting", ["Bills"]],
-      ["accounting", ["Audit"]],
-      ["HR", ["Hiring"]],
-      ["Operations", ["Zeta report", "Alpha report"]],
+      ["Accounting", "department-1", ["Bills"]],
+      ["accounting", "department-2", ["Audit"]],
+      ["Customer Support", "department-3", ["Tickets"]],
+      ["HR", "department-4", ["Hiring"]],
+      ["Operations", "department-5", ["Zeta report", "Alpha report"]],
     ],
   );
+  // An id by place: one word, never a department's name with its space.
+  for (const group of groups) assert.match(group.id, /^department-\d+$/u);
   assert.deepEqual(byDepartment([]), []);
   // The page draws them so, its card no longer saying its category.
   const page = code(read("app/account/flows/page.tsx"));
   assert.match(
     page,
-    /byDepartment\(catalog\.automations\)\.map\(\(\{ department, entries \}\) => \(/u,
+    /byDepartment\(catalog\.automations\)\.map\(\(\{ department, id, entries \}\) => \(\s*<section\s+key=\{id\}\s+aria-labelledby=\{id\}/u,
   );
+  assert.match(page, /<h2\s+id=\{id\}/u);
+  assert.doesNotMatch(page, /department-\$\{department\}/u);
   assert.doesNotMatch(page, /\{automation\.category\}/u);
 });
 
@@ -141,7 +150,7 @@ test("an item's page draws no sections, and its runs as rows the height of a sec
   );
 });
 
-test("Run details: its row on every run's page, its page the tiles, the steps and the facts; the result line only for a run that read no sections (items 8 and 9)", () => {
+test("Run details: its row on every run's page, after the package's buttons and over Cancel run and View flow; its page the tiles, the steps and the facts; the result line only for a run that read no sections, a held job's decision under it (items 8 and 9; the review's findings 1 and 2)", () => {
   assert.equal(RUN_DETAILS, "Run details");
   assert.equal(runDetailsPath("r 1/2"), "/account/runs/r%201%2F2/details");
   assert.equal(runSectionsHeading("Entry"), "Entry details");
@@ -156,7 +165,6 @@ test("Run details: its row on every run's page, its page the tiles, the steps an
     'label="Duration"',
     'label="Steps done"',
     'data-testid="run-steps"',
-    "<ApprovalDecision",
     "data-testid={`run-fact-${fact.label}`}",
   ]) {
     assert.ok(details.includes(drawn), `the details page draws ${drawn}`);
@@ -167,14 +175,47 @@ test("Run details: its row on every run's page, its page the tiles, the steps an
   assert.ok(!details.includes('data-testid="run-result"'));
   assert.match(
     run,
-    /\{result && !hasSections \? \(\s*<div className="py-5 first:pt-0">\s*<p\s+data-testid="run-result"/u,
+    /\{\(result && !hasSections\) \|\| waiting \? \(\s*<div className="py-5 first:pt-0">\s*\{result && !hasSections \? \(\s*<p\s+data-testid="run-result"/u,
   );
-  // The row is drawn for every run, under no condition, before View flow.
+  // A held job's Approve and Deny, under the result line on the run's page;
+  // its details page keeps the step's state alone (finding 1).
+  assert.ok(!details.includes("<ApprovalDecision"));
   assert.match(
-    run,
-    /<div className="py-5 first:pt-0">\s*(?:\{\s*\}\s*)?<PageRow href=\{runDetailsPath\(run\.id\)\} testId="run-details-row">/u,
+    live,
+    /const waiting =\s*run\.status === "held" &&\s*decided === "pending" &&\s*decision\?\.approval\.status === "pending";/u,
   );
-  assert.ok(run.indexOf("run-details-row") < run.indexOf("View flow"));
+  const result = run.indexOf('data-testid="run-result"');
+  const decision = run.indexOf('data-testid="run-decision"');
+  assert.ok(
+    result > 0 && result < decision,
+    "the decision under the result line",
+  );
+  assert.ok(decision < run.indexOf("<ApprovalDecision"));
+  assert.ok(
+    run.indexOf("<ApprovalDecision") < run.indexOf('testId="run-section"'),
+  );
+  // The row is drawn for every run, under no condition: after the package's
+  // buttons, directly over Cancel run and View flow (finding 2).
+  const packaged = run.indexOf("<PackageActions");
+  const row = run.indexOf(
+    '<PageRow href={runDetailsPath(run.id)} testId="run-details-row">',
+  );
+  assert.ok(
+    packaged > 0 && packaged < row,
+    "the package's buttons, then Run details",
+  );
+  assert.match(
+    run.slice(row),
+    /^<PageRow href=\{runDetailsPath\(run\.id\)\} testId="run-details-row">[\s\S]*?<\/PageRow>\s*<div className="mt-5 flex flex-wrap items-center gap-2">\s*(?:\{\s*\}\s*)?\{going \? \(\s*<CancelRunButton/u,
+  );
+  assert.ok(run.indexOf("CancelRunButton") < run.indexOf("View flow"));
+  assert.ok(
+    !run
+      .slice(0, row)
+      .match(
+        /\{(?:going|headed|hasSections|waiting|files\.length > 0) \? \(\s*<PageRow href=\{runDetailsPath/u,
+      ),
+  );
   // What it read comes first, under the flow's word for a run.
   assert.match(run, /\{runSectionsHeading\(flow\?\.runWord\)\}/u);
   assert.ok(
@@ -264,18 +305,35 @@ test("a file's page: its paths, its words, shown in place only when a browser dr
     fileLine({ format: "DOCX", pages: null, sizeBytes: 10 }),
     "DOCX · 10 bytes",
   );
-  assert.equal(
-    runFileTitle([
-      { control: "text", title: "Note" },
-      { control: "artifact", title: "Entry file" },
-      { control: "artifact", title: "Second" },
-    ]),
-    "Entry file",
-  );
-  assert.equal(runFileTitle([{ control: "text", title: "Note" }]), null);
-  assert.equal(runFileTitle(undefined), null);
   assert.equal(RUN_FILE_MAXIMUM_BYTES, 25 * 1024 * 1024);
   assert.equal(FILE_GONE, "This file is no longer kept.");
+});
+
+test("a run's files, named as the app's runFileRows: by its flow's file fields in order, files that share a word say which, \"File\" when the flow names none (item 7; the review's finding 3)", () => {
+  const photo = { control: "artifact", title: "Photo" };
+  const notes = { control: "text", title: "Notes" };
+  const entry = { control: "artifact", title: "Entry file" };
+  assert.deepEqual(runFileRows([{ id: "f1" }], [notes, entry]), [
+    { id: "f1", title: "Entry file", label: "View entry file" },
+  ]);
+  assert.deepEqual(runFileRows([{ id: "f1" }, { id: "f2" }], [photo]), [
+    { id: "f1", title: "Photo", label: "View photo 1 of 2" },
+    { id: "f2", title: "Photo", label: "View photo 2 of 2" },
+  ]);
+  assert.deepEqual(
+    runFileRows([{ id: "f1" }, { id: "f2" }], [photo, entry]).map(
+      (row) => row.label,
+    ),
+    ["View photo", "View entry file"],
+  );
+  assert.deepEqual(runFileRows([{ id: "f1" }], undefined), [
+    { id: "f1", title: FILE_WORD, label: "View file" },
+  ]);
+  assert.deepEqual(runFileRows([{ id: "f1" }], [notes]), [
+    { id: "f1", title: "File", label: "View file" },
+  ]);
+  assert.deepEqual(runFileRows(undefined, [entry]), []);
+  assert.equal(FILE_WORD, "File");
 });
 
 test("a file is handed on by this site's own route: inline only in a type a browser draws, else an attachment of no type; never cached, nosniff, framed by this site, asked only by its pages (items 4 and 7)", () => {
@@ -332,26 +390,27 @@ test("a run of an item has its file's row first, in the flow's word; the item's 
   const live = code(read(RUN_LIVE));
   assert.match(
     live,
-    /const files = run\.itemId \? \(detail\.files \?\? \[\]\) : \[\];/u,
+    /const files = run\.itemId\s*\? runFileRows\(detail\.files, flow\?\.fileFields\)\s*: \[\];/u,
   );
   const runPage = live.slice(live.lastIndexOf("<SectionCard"));
   const row = runPage.indexOf("runFilePath(run.id, file.id)");
   assert.ok(row > 0, "the run's page draws the file's row");
   assert.ok(row < runPage.indexOf('data-testid="run-result"'));
   assert.ok(row < runPage.indexOf('testId="run-section"'));
-  assert.match(
-    live,
-    /files\.length === 1 && flow\?\.fileTitle\s*\? viewFileLabel\(flow\.fileTitle\)/u,
-  );
+  assert.match(runPage, /\{file\.label\}/u);
+  assert.doesNotMatch(live, /View \$\{file\.filename\}/u);
   assert.match(
     code(read("app/account/runs/[runId]/run-page-data.ts")),
-    /const fileTitle = runFileTitle\(subscription\?\.runInput\);/u,
+    /const fileFields = subscription\?\.runInput\s*\?\.filter\(\(field\) => field\.control === "artifact"\)/u,
   );
+  // The file's page is headed by the same word as its row.
   const page = code(read("app/account/runs/[runId]/files/[fileId]/page.tsx"));
   assert.match(
     page,
-    /const file = detail\.files\?\.find\(\(candidate\) => candidate\.id === fileId\);\s*if \(!file\) notFound\(\);/u,
+    /const row = runFileRows\(detail\.files, flow\?\.fileFields\)\.find\(\s*\(candidate\) => candidate\.id === fileId,\s*\);\s*if \(!file \|\| !row\) notFound\(\);/u,
   );
+  assert.match(page, /title=\{row\.title\}/u);
+  assert.doesNotMatch(page, /file\.filename\}/u);
   const itemFile = code(
     read("app/account/flows/[subscriptionId]/items/[itemId]/file/page.tsx"),
   );

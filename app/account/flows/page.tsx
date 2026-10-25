@@ -135,15 +135,15 @@ export default async function FlowsPage() {
           text="More are on the way."
         />
       ) : (
-        byDepartment(catalog.automations).map(({ department, entries }) => (
+        byDepartment(catalog.automations).map(({ department, id, entries }) => (
           <section
-            key={department}
-            aria-labelledby={`department-${department}`}
+            key={id}
+            aria-labelledby={id}
             data-testid="flows-department"
             className="py-5 first:pt-0"
           >
             <h2
-              id={`department-${department}`}
+              id={id}
               className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
             >
               {department}
