@@ -42,8 +42,6 @@ export type ItemRunOf = {
   status: "pending" | "running" | "held" | "succeeded" | "failed" | "cancelled";
   title?: string;
   score?: number;
-  resultSummary?: string;
-  failureReason?: string;
 };
 
 /** An item, or a run, whose file is still being read. */
@@ -132,17 +130,16 @@ export function itemSubheader(
     .join(" · ");
 }
 
-/** Newest first; two made at the same moment keep the platform's order. */
-function newestFirst<T extends { createdAt: string }>(
-  items: readonly T[],
-): T[] {
+/** A–Z whatever the case, as the app sorts them. */
+function byWords(a: string, b: string): number {
+  return a.localeCompare(b, "en-US", { sensitivity: "base" });
+}
+
+/** By title A–Z; two of the same title keep the platform's order. */
+function titlesAZ<T extends { title: string }>(items: readonly T[]): T[] {
   return items
     .map((item, at) => ({ item, at }))
-    .sort(
-      (a, b) =>
-        Date.parse(b.item.createdAt) - Date.parse(a.item.createdAt) ||
-        a.at - b.at,
-    )
+    .sort((a, b) => byWords(a.item.title, b.item.title) || a.at - b.at)
     .map(({ item }) => item);
 }
 
@@ -150,17 +147,60 @@ function newestFirst<T extends { createdAt: string }>(
 export type ItemGroup<T> = { title: string | null; items: T[] };
 
 /**
- * The flow page's items, grouped by the flow's `groupField` (plan §5.1): the
- * groups in the order of its `options`, then the values typed for it A–Z,
- * then items with no value, under no header; rows newest first in each. No
- * group field: one group, under no header.
+ * A word for many, in a sentence — "departments", "areas", "categories" —
+ * from the field's own title (`AutomationItemField.title`), which the
+ * contract gives in one form only.
+ */
+export function pluralOf(word: string): string {
+  const small = inSentence(word);
+  if (/[^aeiou]y$/iu.test(small)) return `${small.slice(0, -1)}ies`;
+  if (/(?:s|x|z|ch|sh)$/iu.test(small)) return `${small}es`;
+  return `${small}s`;
+}
+
+/** The group filter's choice for every group. */
+export const ALL_GROUPS = "all";
+/** A group's choice: these words, then the value's own. */
+const GROUP = "group:";
+
+/**
+ * The group filter's choices (plan §3; the owner's build 28 items 2 and 3):
+ * "All {field, many}" first — "All departments" — then each value the items
+ * carry, A–Z. A value is held by its words (`group:<words>`), never by its
+ * place, so a re-read of the list never moves the one picked.
+ */
+export function groupChoices(
+  items: readonly Pick<ItemRowOf, "fields">[],
+  groupField: Pick<ItemField, "key" | "title">,
+): SelectChoice[] {
+  const values = new Set<string>();
+  for (const item of items) {
+    const value = item.fields[groupField.key];
+    if (value) values.add(value);
+  }
+  return [
+    { value: ALL_GROUPS, label: `All ${pluralOf(groupField.title)}` },
+    ...[...values]
+      .sort(byWords)
+      .map((label) => ({ value: `${GROUP}${label}`, label })),
+  ];
+}
+
+/**
+ * The flow page's items (plan §3; the owner's build 28 items 2 and 3),
+ * grouped by the flow's `groupField`: the groups A–Z — the options and the
+ * values typed for it alike — then items with no value, under no header; the
+ * rows A–Z by title in each. `chosen` (a `groupChoices` value) keeps the one
+ * group it names; "All", or a group no item carries now, keeps them all. No
+ * group field: one group, under no header, A–Z.
  */
 export function groupItems<T extends ItemRowOf>(
   items: readonly T[],
-  groupField: ItemField | undefined,
+  groupField: Pick<ItemField, "key"> | undefined,
+  chosen: string = ALL_GROUPS,
 ): ItemGroup<T>[] {
   if (!groupField) {
-    return items.length > 0 ? [{ title: null, items: newestFirst(items) }] : [];
+    return items.length > 0 ? [{ title: null, items: titlesAZ(items) }] : [];
   }
   const byValue = new Map<string, T[]>();
   const ungrouped: T[] = [];
@@ -172,18 +212,18 @@ export function groupItems<T extends ItemRowOf>(
     }
     byValue.set(value, [...(byValue.get(value) ?? []), item]);
   }
-  const options = groupField.options ?? [];
-  const typed = [...byValue.keys()]
-    .filter((value) => !options.includes(value))
-    .sort((a, b) => a.localeCompare(b, "en-US", { sensitivity: "base" }));
-  const groups: ItemGroup<T>[] = [...options, ...typed]
-    .filter((value) => byValue.has(value))
+  const picked = chosen.startsWith(GROUP) ? chosen.slice(GROUP.length) : null;
+  if (picked !== null && byValue.has(picked)) {
+    return [{ title: picked, items: titlesAZ(byValue.get(picked) ?? []) }];
+  }
+  const groups: ItemGroup<T>[] = [...byValue.keys()]
+    .sort(byWords)
     .map((value) => ({
       title: value,
-      items: newestFirst(byValue.get(value) ?? []),
+      items: titlesAZ(byValue.get(value) ?? []),
     }));
   if (ungrouped.length > 0)
-    groups.push({ title: null, items: newestFirst(ungrouped) });
+    groups.push({ title: null, items: titlesAZ(ungrouped) });
   return groups;
 }
 
@@ -268,20 +308,23 @@ export function itemFieldValues(
   return values;
 }
 
-/** One of an item's runs, as its page ranks it. */
+/**
+ * One of an item's runs, as its page ranks it: a compact row, the height of a
+ * section's row — its rank, its title, its score and the arrow (the owner's
+ * build 28 item 5); ~~its result line~~ until build 28.
+ */
 export type RankedRow = {
   id: string;
   rank: number;
   title: string;
   score: number | null;
-  line: string | null;
   /** A run that failed or was stopped: drawn dimmed. */
   dim: boolean;
 };
 
 /**
  * A finished run's name when it has none of its own: its status, in the
- * app's words (`statusLabel`) — its failure line says why.
+ * app's words (`statusLabel`); its page says why.
  */
 const UNNAMED: Record<
   Exclude<ItemRunOf["status"], "pending" | "running">,
@@ -297,8 +340,8 @@ const UNNAMED: Record<
  * An item's runs, ranked exactly as the platform answers them (`readItem`:
  * highest score first, runs without one after them, then newest), never
  * sorted again here, numbered 1…n: a run still going "Reading…", with no
- * score; a finished one its title, else its status; its score; its result
- * line — and a failed one its failure, dimmed. The app's `rankedRuns`.
+ * score; a finished one its title, else its status; its score — and a failed
+ * or stopped one dimmed. The app's `rankedRuns`.
  */
 export function rankedRows(runs: readonly ItemRunOf[]): RankedRow[] {
   return runs.map((run, at) => {
@@ -311,12 +354,6 @@ export function rankedRows(runs: readonly ItemRunOf[]): RankedRow[] {
           ? READING
           : (run.title ?? UNNAMED[run.status]),
       score: !going && typeof run.score === "number" ? run.score : null,
-      line:
-        run.status === "succeeded"
-          ? (run.resultSummary ?? null)
-          : run.status === "failed"
-            ? (run.failureReason ?? null)
-            : null,
       dim: run.status === "failed" || run.status === "cancelled",
     };
   });

@@ -42,8 +42,10 @@ const authenticatedRoutes: ReadonlyArray<{
   },
   { path: "/account/runs" },
   { path: "/account/runs/fixture-run-ok", fixture: {} },
-  // A run of three receipts, each on its own card (Build 21, spec A7).
+  // A run of three receipts, each on its own card (Build 21, spec A7), and
+  // its details page — its steps and facts (build 28, item 9).
   { path: "/account/runs/fixture-run-invoice", fixture: {} },
+  { path: "/account/runs/fixture-run-invoice/details", fixture: {} },
   // Invoice Processing's own pages (Build 21, spec A2, A6; the owner's AM4;
   // Build 22, P1–P5): its page, its Set up, its Connect integration page for
   // its step 2, and who gets its email.

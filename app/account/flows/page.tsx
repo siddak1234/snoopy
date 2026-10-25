@@ -17,6 +17,7 @@ import { StatusPill } from "@/components/dashboard/StatusPill";
 import { Button } from "@/components/ui/Button";
 import { flowPath } from "@/lib/flow-steps";
 import { AddAutomation } from "./AddAutomation";
+import { byDepartment } from "./departments";
 import { placeOf } from "./place";
 import { listWorkspaceProjects, resolveActiveWorkspaceId } from "@/lib/tenancy";
 
@@ -49,6 +50,10 @@ import { listWorkspaceProjects, resolveActiveWorkspaceId } from "@/lib/tenancy";
  * run, set up again, paused, moved and archived. Add adds the flow and opens
  * its Set up, once. ~~Run, Set up, Turn on / Pause, Archive flow, the move and
  * the webhook address on the card~~ until Build 21.
+ *
+ * **By department** (plan §3; the owner's build 28 item 1): the cards are
+ * grouped under their department, the catalog's `category`, the departments
+ * A–Z (`byDepartment`) — the header says it, so the card no longer does.
  *
  * Archived flows are read by name (`status=archived`, backend §12.1 #203) and
  * listed last, each with the day it was archived (BUILD-PLAN 24.11.11) and
@@ -130,17 +135,32 @@ export default async function FlowsPage() {
           text="More are on the way."
         />
       ) : (
-        <div className="grid gap-4 py-5 first:pt-0 sm:grid-cols-2">
-          {catalog.automations.map((automation) => (
-            <AutomationCard
-              key={`${automation.templateId}.v${automation.version}`}
-              automation={automation}
-              subscriptions={byTemplate.get(automation.templateId) ?? []}
-              place={place}
-              workspaceId={workspaceId}
-            />
-          ))}
-        </div>
+        byDepartment(catalog.automations).map(({ department, entries }) => (
+          <section
+            key={department}
+            aria-labelledby={`department-${department}`}
+            data-testid="flows-department"
+            className="py-5 first:pt-0"
+          >
+            <h2
+              id={`department-${department}`}
+              className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
+            >
+              {department}
+            </h2>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              {entries.map((automation) => (
+                <AutomationCard
+                  key={`${automation.templateId}.v${automation.version}`}
+                  automation={automation}
+                  subscriptions={byTemplate.get(automation.templateId) ?? []}
+                  place={place}
+                  workspaceId={workspaceId}
+                />
+              ))}
+            </div>
+          </section>
+        ))
       )}
 
       {archived.length > 0 ? (
@@ -229,15 +249,13 @@ function AutomationCard({
     <div className="bubble flex flex-col gap-3 p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs tracking-[0.06em] text-[var(--muted)] uppercase">
-            {automation.category}
-          </p>
-          <h2
+          {/* Its department is its group's header (build 28's item 1). */}
+          <h3
             id={`automation-${automation.templateId}-name`}
-            className="mt-1 truncate text-base font-medium text-[var(--text)]"
+            className="truncate text-base font-medium text-[var(--text)]"
           >
             {automation.name}
-          </h2>
+          </h3>
         </div>
       </div>
 

@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CaretRightIcon } from "@phosphor-icons/react/dist/ssr/CaretRight";
 import { UploadSimpleIcon } from "@phosphor-icons/react/dist/ssr/UploadSimple";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { Button } from "@/components/ui/Button";
+import { Dropdown } from "@/components/ui/Dropdown";
 import type { AutomationItems, ListItemsResponse } from "@/lib/automations";
 import { EMAIL_UNAVAILABLE } from "@/lib/flow-email";
 import {
+  ALL_GROUPS,
+  groupChoices,
   groupItems,
   itemLine,
   itemPath,
@@ -21,16 +24,21 @@ import { RUN_REREAD_MS } from "@/lib/run-progress";
 import { UploadItemCard } from "./UploadItemCard";
 
 /**
- * A flow's items on its page (Round 19, plan §5.1; backend ADR-0046), after
- * its numbered steps and in place of its run start form — a run of such a
- * flow names an item. Headed by the flow's own word for them (`items.words`'
- * plural), with "Upload {one}" for an owner or admin (`canManage`), which opens the upload
- * card; then the items, grouped by the flow's `groupField` in the order
- * `groupItems` gives, each row its title and its line (`itemLine`: how many
- * runs and the best score, "Reading…" or "Couldn't read"), opening its page.
- * None yet: the one empty row; a list the platform could not answer:
- * "Unavailable" in that row, as Step 5's addresses say it — never "None yet"
- * for a flow that has items.
+ * A flow's items on its page (Round 19, plan §5.1; backend ADR-0046) — the
+ * page's whole body since build 28 (plan §3; the owner's build 28 items 2 and
+ * 3: no dashboard, no steps), a run of such a flow naming an item. Headed by
+ * the flow's own word for them (`items.words`' plural), with "Upload {one}"
+ * for an owner or admin (`canManage`), which opens the upload card; then, for
+ * a flow with a `groupField`, its filter — the website's drop-down
+ * (`Dropdown`), "All {field, many}" first and each value the items carry A–Z
+ * (`groupChoices`), named by the field's title — and the items `groupItems`
+ * gives for the choice: every group A–Z under its header, or the chosen one's
+ * alone; rows A–Z, each its title and its line (`itemLine`: how many runs and
+ * the best score, "Reading…" or "Couldn't read"), opening its page. None yet:
+ * the one empty row; a list the platform could not answer: "Unavailable" in
+ * that row, as Step 5's addresses say it — never "None yet" for a flow that
+ * has items. ~~Grouped in the options' order, newest first, under the
+ * steps~~ until build 28.
  *
  * **Read again while one is being read**, every 2 s as a run's page is
  * (`RUN_REREAD_MS`), one read at a time, through `/api/platform`; a read that
@@ -91,10 +99,20 @@ export function FlowItems({
   const groupField = declared.fields.find(
     (field) => field.key === declared.groupField && field.control === "select",
   );
-  const groups = list ? groupItems(list.items, groupField) : [];
+  const filterId = useId();
+  const [chosen, setChosen] = useState(ALL_GROUPS);
+  const choices =
+    groupField && list && list.items.length > 0
+      ? groupChoices(list.items, groupField)
+      : [];
+  // A group no item carries any more (one archived) is All again.
+  const shown = choices.some((choice) => choice.value === chosen)
+    ? chosen
+    : ALL_GROUPS;
+  const groups = list ? groupItems(list.items, groupField, shown) : [];
 
   return (
-    <section aria-labelledby="flow-items-title" className="py-5">
+    <section aria-labelledby="flow-items-title" className="py-5 first:pt-0">
       <div className="flex items-center justify-between gap-3">
         <h2
           id="flow-items-title"
@@ -115,6 +133,22 @@ export function FlowItems({
           </Button>
         ) : null}
       </div>
+      {groupField && choices.length > 0 ? (
+        <div className="mt-3 flex">
+          <span id={`${filterId}-label`} className="sr-only">
+            {groupField.title}
+          </span>
+          <Dropdown
+            id={filterId}
+            look="pill"
+            labelledBy={`${filterId}-label`}
+            options={choices}
+            value={shown}
+            onChange={setChosen}
+            testId="flow-items-filter"
+          />
+        </div>
+      ) : null}
       {groups.length === 0 ? (
         <div className="mt-3">
           <EmptyRow text={list ? noneYet(declared.words) : EMAIL_UNAVAILABLE} />
@@ -123,7 +157,7 @@ export function FlowItems({
         <div data-testid="flow-items" className="mt-1 flex flex-col">
           {groups.map((group, at) => (
             <div key={group.title ?? `none-${at}`} className="mt-3">
-              {group.title ? (
+              {group.title && shown === ALL_GROUPS ? (
                 <h3
                   data-testid="flow-item-group"
                   className="px-2 text-xs font-medium tracking-wide text-[var(--muted)] uppercase"

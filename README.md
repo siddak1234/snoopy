@@ -83,12 +83,13 @@ connect is said under its row; a member sees the integration and no row is a
 choice; a flow still on an older version
 with no vendor to choose is sent to Connections instead), who gets its email
 (an owner or admin adds and removes addresses, each saved at once, at most
-ten; a member reads them), a run's page (every step from the start — its
+ten; a member reads them), a run's details page, opened from the Run details
+row on every run's page (every step from the start — its
 integration and its email among them, the running one spinning — read again
 while it goes on, a held job's step 4 with Approve and Deny, appearing with no
 reload when the job reaches it while its page is open — read again at most
-ten times, never once listed or gone on, a failed read keeping the page —
-each document it read a closed row of its own that opens in place — headed in its
+ten times, never once listed or gone on, a failed read keeping the page), a
+run's page (each document it read a closed row of its own that opens in place — headed in its
 flow's word ("Invoice 1 of 3" for Invoice Processing, "Document 1 of 3" for a flow
 that names none; the catalog's `documentWords`), its Document type and Format — and View package, Download PDF and
 Download Excel, each download to the platform's signed link, an https one
@@ -119,10 +120,13 @@ first state. Five specs: `e2e/accessibility.spec.ts`,
 `e2e/public-edge-fixture.spec.ts`, `e2e/account-surfaces.spec.ts` (every
 surface a change audit probed and no test asserted), `e2e/dialogs.spec.ts`
 (every dialog's Escape, click outside, focus return and hold, one row each)
-and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: its items
-grouped on its page with no run start form, the upload card's "Other" and the
-values typed before, an item's runs ranked and what was read, a run headed by
-its title and score with its sections, Archive, an owner's buttons a member
+and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: the Flows
+list by department A–Z; its items grouped A–Z under its group filter, the
+website's drop-down, on its page with no Dashboard, no Steps and no run start
+form; the upload card's drop-down, "Other" and the values typed before; an
+item's runs ranked in compact rows a closed section's height; a run headed by
+its title and score with its sections under "{Run word} details" and its Run
+details page; Archive, an owner's buttons a member
 does not see and a member's presses refused in words, and an unanswered list
 said "Unavailable"), sharing `e2e/helpers.ts`. The playbook's human keyboard
 traversal (NFR-35) has a hand-over test in the same suite:

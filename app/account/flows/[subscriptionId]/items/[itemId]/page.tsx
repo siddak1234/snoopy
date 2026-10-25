@@ -18,9 +18,11 @@ import { ItemLive } from "./ItemLive";
  * One of a flow's items (Round 19, plan §5.3; backend ADR-0046): its title,
  * its group's value and where it is; for an owner or admin, "Add {run}" —
  * the flow's run file and Start, each run naming this item; its runs, ranked
- * as the platform answers them; "What AI read", its file's reading in rows
- * that open and close; and, for an owner or admin, Archive. Every word for
- * the item and its runs is the flow's (`items.words`, `items.runWords`).
+ * as the platform answers them, in compact rows (plan §3); and, for an owner
+ * or admin, Archive. Every word for the item and its runs is the flow's
+ * (`items.words`, `items.runWords`). ~~"What AI read"~~ until build 28 (the
+ * owner's item 4): its sections go to the item's file page (plan §3), which
+ * reads the item's file (plan §1).
  *
  * Read with the page, and then kept live by `ItemLive`. An item of another
  * workspace, or of another flow than the path's, is the same "not found" one

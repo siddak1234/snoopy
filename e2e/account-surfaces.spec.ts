@@ -265,6 +265,7 @@ test.describe("on a small screen", () => {
       ["/account/organization", "Organization"],
       [organizationProject, "Department"],
       ["/account/runs/fixture-run-ok", "Run"],
+      ["/account/runs/fixture-run-ok/details", "Run details"],
       [FLOWS.manual, "Flow"],
       [`${FLOWS.manual}/setup`, "Set up"],
       [`${FLOWS.invoice}/vendor?field=vendor`, "Connect integration"],
@@ -1197,8 +1198,10 @@ test("17 — Deny is recorded as rejected, and the last row leaving goes to Acti
   expect(await approvalStatuses()).toEqual(["rejected"]);
 });
 
-// The held Invoice Processing job, and its step 4 — where it waits.
+// The held Invoice Processing job, and its step 4 — where it waits, on the
+// job's details page since build 28 (item 9).
 const heldJob = "/account/runs/fixture-run-invoice-held";
+const heldJobDetails = `${heldJob}/details`;
 const heldStep = (page: Page) =>
   page.locator("main").getByTestId("run-step-group:record");
 const approvalRows = (page: Page) =>
@@ -1212,7 +1215,7 @@ test("P6 — a held job's step 4 offers Approve and Deny, Deny red; Approving…
   page,
 }) => {
   await fixtureControl("invoice-approval-pending");
-  await page.goto(heldJob);
+  await page.goto(heldJobDetails);
   const step = heldStep(page);
   await expect(step).toHaveAttribute("data-state", "held");
   await expect(step).toContainText(
@@ -1228,7 +1231,7 @@ test("P6 — a held job's step 4 offers Approve and Deny, Deny red; Approving…
     page.locator("main").getByRole("button", { name: "Approve" }),
   ).toHaveCount(1);
   await expectNoAxeViolations(page);
-  const held = await holdRequest(page, `**${heldJob}`, isServerAction);
+  const held = await holdRequest(page, `**${heldJobDetails}`, isServerAction);
   await approve.click();
   await held.arrived;
   await expect(step.getByRole("button", { name: "Approving…" })).toBeDisabled();
@@ -1237,7 +1240,7 @@ test("P6 — a held job's step 4 offers Approve and Deny, Deny red; Approving…
   await expect(page.locator("main").getByText(/^running$/iu)).toBeVisible();
   await expect(step).toHaveAttribute("data-state", "working");
   await expect(step.getByRole("button")).toHaveCount(0);
-  await expect(page).toHaveURL(new RegExp(`${heldJob}$`, "u"));
+  await expect(page).toHaveURL(new RegExp(`${heldJobDetails}$`, "u"));
   expect(await approvalStatuses()).toEqual(["approved"]);
 });
 
@@ -1245,15 +1248,17 @@ test("P6 — Deny in step 4: the step says Denied, the result Denied, its waitin
   page,
 }) => {
   await fixtureControl("invoice-approval-pending");
-  await page.goto(heldJob);
+  await page.goto(heldJobDetails);
   await heldStep(page).getByRole("button", { name: "Deny" }).click();
   const main = page.locator("main");
-  await expect(main.getByTestId("run-result")).toHaveText("Denied");
   await expect(heldStep(page)).toHaveAttribute("data-state", "held");
   await expect(heldStep(page).locator("p").nth(1)).toHaveText("Denied");
   await expect(heldStep(page).getByRole("button")).toHaveCount(0);
-  await expect(main.getByTestId("document-2-chip")).toHaveText("Not approved");
   expect(await approvalStatuses()).toEqual(["rejected"]);
+  // How it went and its documents are on the job's own page.
+  await page.goto(heldJob);
+  await expect(main.getByTestId("run-result")).toHaveText("Denied");
+  await expect(main.getByTestId("document-2-chip")).toHaveText("Not approved");
 });
 
 test("P6 — a member is told who can decide, and offered no button", async ({
@@ -1261,7 +1266,7 @@ test("P6 — a member is told who can decide, and offered no button", async ({
 }) => {
   await fixtureControl("invoice-approval-pending");
   await presentSession(page, "member");
-  await page.goto(heldJob);
+  await page.goto(heldJobDetails);
   await expect(heldStep(page)).toContainText(
     "Only owner or admin can decide this.",
   );
@@ -1273,7 +1278,7 @@ test("a member watching a job turn held is told who can decide, and offered no b
 }) => {
   await fixtureControl("held-job-running");
   await presentSession(page, "member");
-  await page.goto(heldJob);
+  await page.goto(heldJobDetails);
   await expect(page.locator("main").getByText(/^running$/iu)).toBeVisible();
   // A reload from here on would lose this mark.
   await page.evaluate(() => Object.assign(window, { sameDocument: true }));
@@ -1297,7 +1302,7 @@ test("R5c 1 — a job that reaches its approval while its page is open offers Ap
   page,
 }) => {
   await fixtureControl("held-job-running");
-  await page.goto(heldJob);
+  await page.goto(heldJobDetails);
   const main = page.locator("main");
   await expect(main.getByText(/^running$/iu)).toBeVisible();
   const step = heldStep(page);
@@ -1336,7 +1341,7 @@ test("R5c 1 — a held job whose approval is never listed is read again for it a
   test.setTimeout(75_000);
   await fixtureControl("held-job-holds?hidden=100000");
   const before = await approvalListReads();
-  await page.goto(heldJob);
+  await page.goto(heldJobDetails);
   const step = heldStep(page);
   await expect(step).toHaveAttribute("data-state", "held");
   // The read that drew the page, then HELD_APPROVAL_REREADS (10) more, each
@@ -1352,7 +1357,7 @@ test("R5c 1 — a held job that goes on while its approval is read for is not re
 }) => {
   await fixtureControl("held-job-holds?hidden=100000");
   const before = await approvalListReads();
-  await page.goto(heldJob);
+  await page.goto(heldJobDetails);
   await expect
     .poll(approvalListReads, { timeout: 15_000 })
     .toBeGreaterThanOrEqual(before + 3);
@@ -1372,7 +1377,7 @@ test("a held job's approvals re-read that fails costs only that read: the run pa
   // The read that draws the page does not list the approval yet; the first
   // re-read is refused (503), and the next one lists it.
   await fixtureControl("held-job-holds?hidden=1");
-  await page.goto(heldJob);
+  await page.goto(heldJobDetails);
   const step = heldStep(page);
   await expect(step).toHaveAttribute("data-state", "held");
   await page.evaluate(() => Object.assign(window, { sameDocument: true }));
@@ -1401,7 +1406,7 @@ test("a job's re-reads refused several in a row cost only those reads: the run p
   page,
 }) => {
   await fixtureControl("held-job-running");
-  await page.goto(heldJob);
+  await page.goto(heldJobDetails);
   const main = page.locator("main");
   await expect(main.getByText(/^running$/iu)).toBeVisible();
   await page.evaluate(() => Object.assign(window, { sameDocument: true }));

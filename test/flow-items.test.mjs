@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  ALL_GROUPS,
   COULD_NOT_READ,
   OTHER,
   OTHER_CHOICE,
@@ -9,6 +10,7 @@ import {
   archiveLabel,
   canAddRun,
   firstChoice,
+  groupChoices,
   groupItems,
   inSentence,
   itemFieldValues,
@@ -17,6 +19,7 @@ import {
   itemPath,
   itemSubheader,
   noneYet,
+  pluralOf,
   problemFields,
   rankedRows,
   sectionLink,
@@ -69,28 +72,42 @@ test("every word for the items is the platform's, inside a sentence where it fal
   assert.equal(itemPath("s 1", "i/2"), "/account/flows/s%201/items/i%2F2");
 });
 
-test("items group by the group field: its options' order, then typed values A–Z, then none; newest first in each", () => {
+test("items group by the group field: the groups A–Z, options and typed values alike, then none; rows A–Z by title in each (build 28, items 2 and 3)", () => {
+  // The platform's order (newest first) and the options' order, which an
+  // A–Z sort changes: North is the first option, South made first.
   const items = [
     item("winter", "North", "2026-08-12T10:00:00Z"),
     item("harbour", "Coastal", "2026-08-12T08:00:00Z"),
     item("autumn", "North", "2026-08-12T11:00:00Z"),
-    item("spring", "South", "2026-08-12T09:00:00Z"),
+    item("spring", "South", "2026-08-12T13:00:00Z"),
     item("bay", "anchorage", "2026-08-12T07:00:00Z"),
     item("loose", undefined, "2026-08-12T12:00:00Z"),
+    item("idle", undefined, "2026-08-12T14:00:00Z"),
   ];
   const groups = groupItems(items, area);
   assert.deepEqual(
     groups.map((group) => [group.title, group.items.map((each) => each.id)]),
     [
-      ["North", ["autumn", "winter"]],
-      ["South", ["spring"]],
-      // Typed values after the options, A–Z whatever their case.
+      // A–Z whatever their case, an option or a typed value alike.
       ["anchorage", ["bay"]],
       ["Coastal", ["harbour"]],
-      [null, ["loose"]],
+      ["North", ["autumn", "winter"]],
+      ["South", ["spring"]],
+      [null, ["idle", "loose"]],
     ],
   );
-  // An option with no item draws no group; no group field is one group.
+  // Two of the same title keep the platform's order.
+  assert.deepEqual(
+    groupItems(
+      [
+        item("b", "North", "2026-08-12T10:00:00Z", { title: "Same" }),
+        item("a", "North", "2026-08-12T11:00:00Z", { title: "Same" }),
+      ],
+      area,
+    )[0].items.map((each) => each.id),
+    ["b", "a"],
+  );
+  // An option with no item draws no group; no group field is one group, A–Z.
   assert.deepEqual(
     groupItems([item("spring", "South", "2026-08-12T09:00:00Z")], area).map(
       (group) => group.title,
@@ -100,11 +117,57 @@ test("items group by the group field: its options' order, then typed values A–
   assert.deepEqual(
     groupItems(items, undefined).map((group) => [
       group.title,
-      group.items[0].id,
+      group.items.map((each) => each.id),
     ]),
-    [[null, "loose"]],
+    [[null, ["autumn", "bay", "harbour", "idle", "loose", "spring", "winter"]]],
   );
   assert.deepEqual(groupItems([], area), []);
+});
+
+test("the group filter: All {field, many} first, then each value the items carry A–Z, each held by its words; a choice keeps its group alone (build 28, items 2 and 3)", () => {
+  const items = [
+    item("winter", "North", "2026-08-12T10:00:00Z"),
+    item("harbour", "Coastal", "2026-08-12T08:00:00Z"),
+    item("autumn", "North", "2026-08-12T11:00:00Z"),
+    item("loose", undefined, "2026-08-12T12:00:00Z"),
+  ];
+  // South is an option no item carries: not offered.
+  assert.deepEqual(groupChoices(items, area), [
+    { value: ALL_GROUPS, label: "All areas" },
+    { value: "group:Coastal", label: "Coastal" },
+    { value: "group:North", label: "North" },
+  ]);
+  assert.deepEqual(
+    groupItems(items, area, "group:North").map((group) => [
+      group.title,
+      group.items.map((each) => each.id),
+    ]),
+    [["North", ["autumn", "winter"]]],
+  );
+  // All, or a group no item carries now (its last one archived): every group.
+  for (const chosen of [ALL_GROUPS, "group:South", "North"])
+    assert.deepEqual(
+      groupItems(items, area, chosen).map((group) => group.title),
+      ["Coastal", "North", null],
+      chosen,
+    );
+  // A value typed as "all" is a group, never All.
+  assert.deepEqual(
+    groupChoices([item("x", "all", "2026-08-12T10:00:00Z")], area).map(
+      (choice) => choice.value,
+    ),
+    [ALL_GROUPS, "group:all"],
+  );
+});
+
+test("a field's title for many, inside a sentence: departments, areas, categories, statuses", () => {
+  assert.equal(pluralOf("Department"), "departments");
+  assert.equal(pluralOf("Area"), "areas");
+  assert.equal(pluralOf("Category"), "categories");
+  assert.equal(pluralOf("Day"), "days");
+  assert.equal(pluralOf("Status"), "statuses");
+  assert.equal(pluralOf("Branch"), "branches");
+  assert.equal(pluralOf("NDA"), "NDAs");
 });
 
 test("a row says Reading…, Couldn't read, or its runs and the best score in the flow's words", () => {
@@ -269,7 +332,7 @@ test("an item's runs keep the platform's order exactly — never sorted again he
   );
 });
 
-test("a run still going reads Reading… with no score; a finished one its title, else its status in the app's words; its result line; a failure dimmed with its reason (Round 19 review, finding 4)", () => {
+test("a run still going reads Reading… with no score; a finished one its title, else its status in the app's words; a failure dimmed — a compact row, rank, title and score, no result line (Round 19 review, finding 4; build 28, item 5)", () => {
   const rows = rankedRows([
     {
       id: "a",
@@ -287,35 +350,14 @@ test("a run still going reads Reading… with no score; a finished one its title
     { id: "h", status: "succeeded" },
   ]);
   assert.deepEqual(rows, [
-    {
-      id: "a",
-      rank: 1,
-      title: "Ada Lane",
-      score: 91,
-      line: "Strong fit",
-      dim: false,
-    },
-    { id: "b", rank: 2, title: "Ben Ito", score: 0, line: null, dim: false },
-    { id: "c", rank: 3, title: READING, score: null, line: null, dim: false },
-    {
-      id: "d",
-      rank: 4,
-      title: "Failed",
-      score: null,
-      line: "Scoring timed out.",
-      dim: true,
-    },
-    { id: "e", rank: 5, title: READING, score: null, line: null, dim: false },
-    {
-      id: "f",
-      rank: 6,
-      title: "Cancelled",
-      score: null,
-      line: null,
-      dim: true,
-    },
-    { id: "g", rank: 7, title: "Held", score: null, line: null, dim: false },
-    { id: "h", rank: 8, title: "Success", score: null, line: null, dim: false },
+    { id: "a", rank: 1, title: "Ada Lane", score: 91, dim: false },
+    { id: "b", rank: 2, title: "Ben Ito", score: 0, dim: false },
+    { id: "c", rank: 3, title: READING, score: null, dim: false },
+    { id: "d", rank: 4, title: "Failed", score: null, dim: true },
+    { id: "e", rank: 5, title: READING, score: null, dim: false },
+    { id: "f", rank: 6, title: "Cancelled", score: null, dim: true },
+    { id: "g", rank: 7, title: "Held", score: null, dim: false },
+    { id: "h", rank: 8, title: "Success", score: null, dim: false },
   ]);
 });
 

@@ -19,6 +19,7 @@ import { MinusCircleIcon } from "@phosphor-icons/react/dist/ssr/MinusCircle";
 import { WarningCircleIcon } from "@phosphor-icons/react/dist/ssr/WarningCircle";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { BackLink } from "@/components/dashboard/BackLink";
+import { PageRow } from "@/components/dashboard/PageRow";
 import { SectionRows } from "@/components/dashboard/SectionRows";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { Button } from "@/components/ui/Button";
@@ -50,12 +51,15 @@ import {
   type DocumentWords,
 } from "@/lib/run-documents";
 import {
+  RUN_DETAILS,
   RUN_REREAD_MS,
   heldDecision,
   rereadForApproval,
+  runDetailsPath,
   runDuration,
   runLabel,
   runResultLine,
+  runSectionsHeading,
   stepsDone,
   trackerRows,
   waitingDecision,
@@ -87,6 +91,8 @@ export type RunFlow = {
   name: string;
   /** What the flow calls its documents, when it declares it (backend BUILD-PLAN 27.2.1). */
   documentWords?: DocumentWords;
+  /** What the flow calls one of its runs, when it has items (`items.runWords`). */
+  runWord?: string;
   pipeline: DeclaredStep[];
   groups?: ProgressGroup[];
   tracker?: TrackerFlow;
@@ -94,13 +100,23 @@ export type RunFlow = {
 
 /**
  * One run, live (Build 21, spec A7; the owner's build 20 item 10: "It shoukd
- * show all the steps and a live tracker of which ones are done"): its full id
- * and status; how it went; Duration and Steps done; every step from the start,
- * each where the run is — a held step with Approve and Deny under it (Build 24,
- * P6); each document it read on a card of its own; the facts; View package,
- * Download PDF and Download Excel once the job can be packaged (Build 24,
- * P12; ~~Download JSON~~ until then); Cancel run while it goes on, and View
- * flow. Read
+ * show all the steps and a live tracker of which ones are done"), as one of
+ * two pages (build 28, the owner's item 9: Run details "a standard … a
+ * component with an arrow"; `view`):
+ *
+ * - **the run's page** (`run`): its full id, or its title and score, and its
+ *   status; how it went, or — a run that read sections — what it read under
+ *   "{Run word} details" in its place; each document it read on
+ *   a card of its own (or a v1/v2 run's Details); the Run details row
+ *   (`PageRow`); View package, Download PDF and Download Excel once the job
+ *   can be packaged (Build 24, P12; ~~Download JSON~~ until then); Cancel run
+ *   while it goes on, and View flow;
+ * - **its details page** (`details`): Duration and Steps done;
+ *   every step from the start, each where the run is — a held step with
+ *   Approve and Deny under it (Build 24, P6); then Started, Ended, Trigger and
+ *   the full Run ID.
+ *
+ * ~~All of it on the run's page~~ until build 28. Both are read
  * again every 2 s while the run is pending or running (`RUN_REREAD_MS`),
  * through `/api/platform`, one read at a time; the page as the server drew it
  * comes back whenever it is drawn again (a cancel or a decision revalidates
@@ -117,9 +133,11 @@ export type RunFlow = {
  *
  * **A run with a title and a score** (backend ADR-0046; Round 19, plan §5.4)
  * is headed by them — the title in the full id's place (the id stays among
- * the facts), the score large beside it — and the sections it read follow
- * directly under its result line as rows that open and close, the first
- * open, before its tiles, steps, details and documents.
+ * its details), the score large beside it — and the sections it read come
+ * first, under "{Run word} details" (`runSectionsHeading`), as rows that open
+ * and close, the first open, in its result line's place. ~~Under its result
+ * line~~ until build 28 (the owner's item 8: "Instead of strong match 6 of
+ * 6").
  */
 export function RunLive({
   workspaceId,
@@ -127,7 +145,10 @@ export function RunLive({
   flow,
   approvals,
   role,
+  view,
 }: {
+  /** Which page: the run's own, or its details (build 28, item 9). */
+  view: "run" | "details";
   workspaceId: string;
   initial: RunDetail;
   flow: RunFlow;
@@ -248,9 +269,78 @@ export function RunLive({
     { label: "Run ID", value: run.id },
   ];
 
+  const name = headed && run.title ? run.title : runLabel(run.id);
+
+  if (view === "details") {
+    return (
+      <SectionCard
+        title={RUN_DETAILS}
+        subheader={name}
+        back={<BackLink href={`/account/runs/${encodeURIComponent(run.id)}`} />}
+        primaryAction={<StatusPill status={run.status} />}
+      >
+        <div className="py-5 first:pt-0">
+          <dl className="grid grid-cols-2 gap-3 sm:max-w-sm">
+            <Tile
+              label="Duration"
+              value={runDuration(run.startedAt, run.endedAt)}
+            />
+            <Tile label="Steps done" value={stepsDone(tracker)} />
+          </dl>
+        </div>
+
+        <section aria-labelledby="run-steps-title" className="py-5">
+          <h2
+            id="run-steps-title"
+            className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
+          >
+            Steps
+          </h2>
+          <ol data-testid="run-steps" className="mt-4 flex flex-col gap-4">
+            {tracker.map((row) => (
+              <TrackerItem key={row.key} row={row}>
+                {/* The decision where the job waits (Build 24, P6): one press,
+                    then the page is drawn again — running on, or Denied */}
+                {row.state === "held" &&
+                decided === "pending" &&
+                decision?.approval.status === "pending" ? (
+                  <ApprovalDecision
+                    approvalId={decision.approval.id}
+                    canDecide={decision.canDecide}
+                    eligibleRoles={decision.approval.eligibleRoles}
+                    workspaceId={workspaceId}
+                    onDecision={(_, state) => {
+                      if (state === "saved") router.refresh();
+                    }}
+                  />
+                ) : null}
+              </TrackerItem>
+            ))}
+          </ol>
+        </section>
+
+        <div className="py-5">
+          <dl className="grid gap-3 sm:grid-cols-2">
+            {facts.map((fact) => (
+              <div key={fact.label}>
+                <dt className="text-xs text-[var(--muted)]">{fact.label}</dt>
+                <dd
+                  data-testid={`run-fact-${fact.label}`}
+                  className="mt-0.5 text-sm break-all text-[var(--text)] select-all"
+                >
+                  {fact.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </SectionCard>
+    );
+  }
+
   return (
     <SectionCard
-      title={headed && run.title ? run.title : runLabel(run.id)}
+      title={name}
       subheader={flow?.name ?? run.templateId}
       back={<BackLink href="/account/runs" />}
       primaryAction={
@@ -268,9 +358,11 @@ export function RunLive({
         </>
       }
     >
-      <div className="py-5 first:pt-0">
-        {/* How it went, on a line of its own, in the automation's words. */}
-        {result ? (
+      {/* How it went, on a line of its own, in the automation's words — for
+          a run that read no sections: one that did is said by them (build
+          28, item 8: "Instead of strong match 6 of 6"). */}
+      {result && !hasSections ? (
+        <div className="py-5 first:pt-0">
           <p
             data-testid="run-result"
             {...(run.status === "failed" ? { role: "alert" } : {})}
@@ -278,57 +370,33 @@ export function RunLive({
           >
             {result}
           </p>
-        ) : null}
-        {/* What it read, directly under its result line (plan §5.4), as the
-            app draws it: then the tiles. */}
-        {hasSections ? (
-          <section aria-label="What was read" className={result ? "mt-4" : ""}>
-            <SectionRows sections={sections} firstOpen testId="run-section" />
-          </section>
-        ) : null}
-        <dl
-          className={`grid grid-cols-2 gap-3 sm:max-w-sm ${result || hasSections ? "mt-4" : ""}`}
-        >
-          <Tile
-            label="Duration"
-            value={runDuration(run.startedAt, run.endedAt)}
-          />
-          <Tile label="Steps done" value={stepsDone(tracker)} />
-        </dl>
-      </div>
+        </div>
+      ) : null}
 
-      <section aria-labelledby="run-steps-title" className="py-5">
-        <h2
-          id="run-steps-title"
-          className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
+      {/* What it read, first (build 28's items 7 and 8): "{Run word}
+          details" over its sections, the first open. */}
+      {hasSections ? (
+        <section
+          aria-labelledby="run-sections-title"
+          className="py-5 first:pt-0"
         >
-          Steps
-        </h2>
-        <ol data-testid="run-steps" className="mt-4 flex flex-col gap-4">
-          {tracker.map((row) => (
-            <TrackerItem key={row.key} row={row}>
-              {/* The decision where the job waits (Build 24, P6): one press,
-                  then the page is drawn again — running on, or Denied */}
-              {row.state === "held" &&
-              decided === "pending" &&
-              decision?.approval.status === "pending" ? (
-                <ApprovalDecision
-                  approvalId={decision.approval.id}
-                  canDecide={decision.canDecide}
-                  eligibleRoles={decision.approval.eligibleRoles}
-                  workspaceId={workspaceId}
-                  onDecision={(_, state) => {
-                    if (state === "saved") router.refresh();
-                  }}
-                />
-              ) : null}
-            </TrackerItem>
-          ))}
-        </ol>
-      </section>
+          <h2
+            id="run-sections-title"
+            className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
+          >
+            {runSectionsHeading(flow?.runWord)}
+          </h2>
+          <div className="mt-3">
+            <SectionRows sections={sections} firstOpen testId="run-section" />
+          </div>
+        </section>
+      ) : null}
 
       {cards.length > 0 ? (
-        <section aria-labelledby="run-documents-title" className="py-5">
+        <section
+          aria-labelledby="run-documents-title"
+          className="py-5 first:pt-0"
+        >
           <h2
             id="run-documents-title"
             className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
@@ -344,7 +412,10 @@ export function RunLive({
       ) : details && details.length > 0 ? (
         // What a v1/v2 run saved, as its automation wrote it for people
         // (backend ADR-0037) — drawn only where no documents are.
-        <section aria-labelledby="run-details-title" className="py-5">
+        <section
+          aria-labelledby="run-details-title"
+          className="py-5 first:pt-0"
+        >
           <h2
             id="run-details-title"
             className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
@@ -364,20 +435,12 @@ export function RunLive({
         </section>
       ) : null}
 
-      <div className="py-5">
-        <dl className="grid gap-3 sm:grid-cols-2">
-          {facts.map((fact) => (
-            <div key={fact.label}>
-              <dt className="text-xs text-[var(--muted)]">{fact.label}</dt>
-              <dd
-                data-testid={`run-fact-${fact.label}`}
-                className="mt-0.5 text-sm break-all text-[var(--text)] select-all"
-              >
-                {fact.value}
-              </dd>
-            </div>
-          ))}
-        </dl>
+      <div className="py-5 first:pt-0">
+        {/* Every run's, whatever its flow (build 28, item 9): the steps and
+            the facts on a page of their own. */}
+        <PageRow href={runDetailsPath(run.id)} testId="run-details-row">
+          <span className="font-medium text-[var(--text)]">{RUN_DETAILS}</span>
+        </PageRow>
         <div className="mt-5 flex flex-wrap items-center gap-2">
           {packageAvailable(run.status, documents) ? (
             <PackageActions workspaceId={workspaceId} runId={run.id} view />
