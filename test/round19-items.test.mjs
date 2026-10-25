@@ -221,13 +221,13 @@ test("an item's page reads the platform through lib/platform-server.ts per reque
   assert.match(live, /<EmptyRow text=\{noneYet\(declared\.runWords\)\} \/>/u);
 });
 
-test("the privacy page says Candidate Reviewer has an AI model read the job description and each resume, through OpenRouter, with nothing else from the workspace (plan §5.6)", () => {
+test("the privacy page says Resume Screening, and Candidate Reviewer its first version, has an AI model read the job description and each resume, through OpenRouter, with nothing else from the workspace (plan §5.6; v2's name, 2026-10-25)", () => {
   const text = read("app/(marketing)/privacy/page.tsx")
     .replace(/\{" "\}/gu, " ")
     .replace(/&apos;/gu, "'")
     .replace(/\s+/gu, " ");
   for (const said of [
-    "Candidate Reviewer has an AI model read the job description given to it when a job is uploaded, and each resume given to that job's runs,",
+    "Resume Screening (and Candidate Reviewer, its first version) has an AI model read the job description given to it when a job is uploaded, and each resume given to that job's runs,",
     "to OpenRouter in the same way and under the same rules;",
     "and nothing else from your workspace: not your name, email address or other account details, and not the flow's settings.",
   ])
