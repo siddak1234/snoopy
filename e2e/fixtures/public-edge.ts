@@ -1069,6 +1069,10 @@ const failedItemId = "b4b4b4b4-b4b4-4b4b-8b4b-b4b4b4b4b4b4";
 const emptyItemId = "b5b5b5b5-b5b5-4b5b-8b5b-b5b5b5b5b5b5";
 const archivedItemId = "b6b6b6b6-b6b6-4b6b-8b6b-b6b6b6b6b6b6";
 const scoredRunId = "c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1";
+// Build 28 (plan §1): the ready item's file, and the scored run's, each
+// behind a signed link to the fixture's store.
+const itemFileId = "d1d1d1d1-d1d1-4d1d-8d1d-d1d1d1d1d1d1";
+const entryFileId = "d2d2d2d2-d2d2-4d2d-8d2d-d2d2d2d2d2d2";
 const WORD_FILE =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -1076,6 +1080,8 @@ const areaOptions = ["North", "South"];
 const itemsDeclared = {
   words: { singular: "Batch", plural: "Batches" },
   runWords: { singular: "Entry", plural: "Entries" },
+  // Build 28 (plan §1): made-up words for a run's verdict.
+  verdictWords: { positive: "Keep", negative: "Drop" },
   titleField: "name",
   groupField: "area",
   fields: [
@@ -1122,6 +1128,8 @@ const itemsRunInput = [
 
 const itemsAutomation = {
   ...automation("fixture-items", "Item automation"),
+  // A department of two words (the review of build 28, finding 4).
+  category: "Customer Support",
   subscribed: true,
   usesAi: true,
   pipeline: [
@@ -1169,6 +1177,8 @@ function fixtureItem(
     fields: { area, name },
     status: "ready",
     runCount: 0,
+    positiveCount: 0,
+    negativeCount: 0,
     topScore: null,
     createdAt,
     createdByUserId: userId,
@@ -1202,7 +1212,10 @@ function fixtureItems(): Automations["Item"][] {
       "2026-08-12T09:00:00.000Z",
       {
         runCount: 4,
+        positiveCount: 1,
+        negativeCount: 1,
         topScore: 91,
+        file: fixtureFile(itemFileId, "spring-intake.pdf"),
         sections: [
           {
             title: "Summary",
@@ -1264,12 +1277,14 @@ function readyItemRuns(): Automations["Run"][] {
     itemRun(scoredRunId, "succeeded", {
       title: "Ada Lane",
       score: 91,
+      verdict: "positive",
       resultSummary: "Strong fit · 3 of 3",
       endedAt: now,
     }),
     itemRun("c2c2c2c2-c2c2-4c2c-8c2c-c2c2c2c2c2c2", "succeeded", {
       title: "Ben Ito",
       score: 64,
+      verdict: "negative",
       resultSummary: "Fair fit · 2 of 3",
       endedAt: now,
     }),
@@ -1307,6 +1322,29 @@ const scoredRunSections: Automations["RunSection"][] = [
   },
   { title: "Education", entries: [{ title: "Example School" }] },
 ];
+
+/** A made-up uploaded file: a one-page PDF, its bytes the fixture's own. */
+function fixtureFile(id: string, filename: string): Automations["RunFile"] {
+  return {
+    id,
+    filename,
+    contentType: "application/pdf",
+    format: "PDF",
+    sizeBytes: fixturePdf(id).byteLength,
+    pages: 1,
+  };
+}
+
+/** A signed link to one of the fixture's uploaded files (`RunFileLink`). */
+function fixtureFileLink(file: Automations["RunFile"]): Json {
+  return {
+    file,
+    downloadUrl: signedLink(
+      `https://127.0.0.1:${port}/__fixture/run-file?id=${encodeURIComponent(file.id)}&name=${encodeURIComponent(file.filename)}`,
+    ),
+    expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+  } satisfies Automations["RunFileLink"];
+}
 
 function itemOf(itemId: string): Automations["Item"] | undefined {
   return state.items.find((item) => item.id === itemId);
@@ -2599,6 +2637,23 @@ const server = createServer(
       response.writeHead(200, {
         ...headers,
         "content-length": String(bytes.byteLength),
+      });
+      return response.end(bytes);
+    }
+    // Build 28 (plan §1): an uploaded file a signed link names — an
+    // attachment, as every signed link is; the made-up one-page PDF.
+    if (request.method === "GET" && url.pathname === "/__fixture/run-file") {
+      const id = url.searchParams.get("id") ?? "";
+      const name = (url.searchParams.get("name") ?? "file.pdf").replace(
+        /[^A-Za-z0-9._-]/gu,
+        "-",
+      );
+      const bytes = fixturePdf(id);
+      response.writeHead(200, {
+        "content-type": "application/octet-stream",
+        "content-disposition": `attachment; filename="${name}"`,
+        "content-length": String(bytes.byteLength),
+        "cache-control": "no-store",
       });
       return response.end(bytes);
     }
@@ -4106,6 +4161,17 @@ const server = createServer(
           state.itemChoices.push(area);
         return respond(response, 201, { item: made });
       }
+      // Build 28 (plan §1): the file an item was made from, behind its link;
+      // an item with none, or another workspace's, is not found.
+      const itemFileMatch = new RegExp(
+        `^${scope}/items/([^/]+)/file$`,
+        "u",
+      ).exec(pathname);
+      if (method === "GET" && itemFileMatch) {
+        const file = itemOf(itemFileMatch[1] ?? "")?.file;
+        if (!file) return respond(response, 404, problem(404, "Not Found"));
+        return respond(response, 200, fixtureFileLink(file));
+      }
       const itemPathMatch = new RegExp(
         `^${scope}/items/([^/]+)(/archive)?$`,
         "u",
@@ -4186,8 +4252,23 @@ const server = createServer(
             steps: [],
             events: [],
             sections: scoredRunSections,
+            files: [fixtureFile(entryFileId, "ada-lane.pdf")],
           } satisfies AutomationOperations["readRun"]["responses"][200]["content"]["application/json"]);
         }
+      }
+      // Build 28 (plan §1): the scored run's file, behind its link; any other
+      // file id is not this job's.
+      if (
+        method === "GET" &&
+        pathname.startsWith(`${scope}/runs/${scoredRunId}/files/`)
+      ) {
+        if (pathname !== `${scope}/runs/${scoredRunId}/files/${entryFileId}`)
+          return respond(response, 404, problem(404, "Not Found"));
+        return respond(
+          response,
+          200,
+          fixtureFileLink(fixtureFile(entryFileId, "ada-lane.pdf")),
+        );
       }
     }
     // FR-14: an upload for the manual automation, which asks for a file.

@@ -78,11 +78,14 @@ import { owedLines, vendorPath } from "../vendor-path";
  * 4. at the bottom: Pause, **Edit setup**, the webhook address, Archive.
  *
  * **A flow with items** (Round 19, plan §5.1; backend ADR-0046) — what the
- * version it runs declares as `items` — draws them after its steps
- * (`FlowItems`), and Step 1 holds no run start form, since its runs each name
- * an item and start on the item's page; Turn on stays while it is off. Its
- * items are read with the page; a list that cannot be read is "Unavailable",
- * never the page.
+ * version it runs declares as `items` — has no Dashboard and no Steps (plan
+ * §3; the owner's build 28 items 2 and 3: "It should just be upload
+ * candidate and jobs"): its items are the page (`FlowItems`), since its runs
+ * each name an item and start on the item's page. What Step 1 held besides
+ * the run form stays above them, with no heading: Turn on while it is off,
+ * "This flow is not responding" and what it is owed. Its items are read with
+ * the page; a list that cannot be read is "Unavailable", never the page.
+ * ~~Its items after its steps, Step 1 holding Turn on~~ until build 28.
  *
  * ~~Connections~~ ("Remove the connections in the bottom as well") and ~~the
  * move to a newer version~~ ("I also dont want a move to vx number in the
@@ -283,6 +286,15 @@ export default async function FlowPage(
     );
   };
 
+  // `available` is evidence from a reachability probe: saying so beats a
+  // Start run that fails at once.
+  const notResponding =
+    !available && entry ? (
+      <p className="mt-3 text-xs text-[var(--warning-text)]">
+        This flow is not responding, so it cannot run yet.
+      </p>
+    ) : null;
+
   // Step 1: the run's fields and Start run, or Turn on while the flow is off;
   // and what it is owed, each a link to where it is fixed.
   const stepOne = (
@@ -350,61 +362,69 @@ export default async function FlowPage(
       back={<BackLink href="/account/flows" />}
       primaryAction={<StatusPill status={subscription.status} />}
     >
-      <section
-        aria-labelledby="flow-dashboard-title"
-        className="py-5 first:pt-0"
-      >
-        <h2
-          id="flow-dashboard-title"
-          className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
-        >
-          Dashboard
-        </h2>
-        <FlowDashboard
-          workspaceId={workspaceId}
-          subscriptionId={subscription.id}
-          initial={counts}
-          draft={subscription.status === "draft"}
-        />
-      </section>
-
-      <section aria-labelledby="flow-steps-title" className="py-5">
-        <h2
-          id="flow-steps-title"
-          tabIndex={-1}
-          className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
-        >
-          Steps
-        </h2>
-        {!available && entry ? (
-          // `available` is evidence from a reachability probe: saying so beats
-          // a Start run that fails at once.
-          <p className="mt-3 text-xs text-[var(--warning-text)]">
-            This flow is not responding, so it cannot run yet.
-          </p>
-        ) : null}
-        {plan.length === 0 ? stepOne : null}
-        <ol className="mt-3 flex flex-col divide-y divide-[var(--ring)]">
-          {plan.map((row) => (
-            <li
-              key={row.id}
-              data-testid={`flow-step-${row.id}`}
-              className="flex flex-col py-3"
+      {declaredItems ? (
+        // A flow with items: no Dashboard and no Steps (build 28's items 2
+        // and 3). Turn on, the probe's line and what it is owed, only when
+        // there is one of them to say.
+        !live || owed.length > 0 || notResponding ? (
+          <div className="py-5 first:pt-0">
+            {notResponding}
+            {stepOne}
+          </div>
+        ) : null
+      ) : (
+        <>
+          <section
+            aria-labelledby="flow-dashboard-title"
+            className="py-5 first:pt-0"
+          >
+            <h2
+              id="flow-dashboard-title"
+              className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
             >
-              {/* The step's title only — no line under it (the session's
+              Dashboard
+            </h2>
+            <FlowDashboard
+              workspaceId={workspaceId}
+              subscriptionId={subscription.id}
+              initial={counts}
+              draft={subscription.status === "draft"}
+            />
+          </section>
+
+          <section aria-labelledby="flow-steps-title" className="py-5">
+            <h2
+              id="flow-steps-title"
+              tabIndex={-1}
+              className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
+            >
+              Steps
+            </h2>
+            {notResponding}
+            {plan.length === 0 ? stepOne : null}
+            <ol className="mt-3 flex flex-col divide-y divide-[var(--ring)]">
+              {plan.map((row) => (
+                <li
+                  key={row.id}
+                  data-testid={`flow-step-${row.id}`}
+                  className="flex flex-col py-3"
+                >
+                  {/* The step's title only — no line under it (the session's
                   S20; P2: "After step 4 i dont want to see quickbooks"). */}
-              <p className="text-sm font-medium text-[var(--text)]">
-                {row.label}
-              </p>
-              {row.input ? stepOne : null}
-              {row.kind === "setting" && row.fields.length > 0 ? (
-                <div className="mt-2">{row.fields.map(vendorRow)}</div>
-              ) : null}
-              {row.kind === "email" ? emailRow : null}
-            </li>
-          ))}
-        </ol>
-      </section>
+                  <p className="text-sm font-medium text-[var(--text)]">
+                    {row.label}
+                  </p>
+                  {row.input ? stepOne : null}
+                  {row.kind === "setting" && row.fields.length > 0 ? (
+                    <div className="mt-2">{row.fields.map(vendorRow)}</div>
+                  ) : null}
+                  {row.kind === "email" ? emailRow : null}
+                </li>
+              ))}
+            </ol>
+          </section>
+        </>
+      )}
 
       {declaredItems && items !== undefined ? (
         <FlowItems

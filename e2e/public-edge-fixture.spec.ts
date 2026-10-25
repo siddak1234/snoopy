@@ -387,6 +387,8 @@ test("a live flow whose pinned version declares run input is opened from its car
   await form.getByLabel("Invoice reference").fill("INV-1001");
   await form.getByRole("button", { name: "Start run" }).click();
   await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
+  // How it started: its details page's (build 28, item 9).
+  await page.getByRole("link", { name: "Run details" }).click();
   await expect(page.getByText("Manual", { exact: true })).toBeVisible();
 });
 
@@ -1860,8 +1862,13 @@ test("Add sends no team: the flow goes to the team of its category, which the pl
     }),
   ).toBeVisible();
   const card = automationCard(page, "Project automation");
-  // Its category, its price, and no version (spec §3.A, S9).
-  await expect(card).toContainText("Operations");
+  // Under its category's header (build 28's item 1), its price, and no
+  // version (spec §3.A, S9).
+  await expect(
+    page
+      .getByTestId("flows-department")
+      .filter({ has: page.getByRole("heading", { name: "Operations" }) }),
+  ).toContainText("Project automation");
   await expect(card).toContainText("Included");
   await expect(card).not.toContainText("Version");
   await expect(card.getByRole("combobox")).toHaveCount(0);
@@ -2046,7 +2053,11 @@ test("Invoice Processing: its card says its category, Included and its team; Add
   await fixtureControl("invoice-not-added");
   await page.goto("/account/flows");
   const card = automationCard(page, "Invoice Processing");
-  await expect(card).toContainText("Accounting");
+  await expect(
+    page
+      .getByTestId("flows-department")
+      .filter({ has: page.getByRole("heading", { name: "Accounting" }) }),
+  ).toContainText("Invoice Processing");
   await expect(card).toContainText("Included");
   await expect(card).not.toContainText(/Version|v3/u);
   await card.getByRole("button", { name: "Add" }).click();
@@ -2657,7 +2668,7 @@ test("a flow still on v1, whose QuickBooks the catalog's newer version makes opt
   expect(response?.status()).toBe(404);
 });
 
-test("a finished run of three receipts: its full id, every step done, each receipt on its own card — seller, place, numbers, lines, totals — and the package's buttons, no Download JSON (spec A7, A8; the owner's ~04:05Z and AM7; Build 24's P12)", async ({
+test("a finished run of three receipts: its full id, each receipt on its own card — seller, place, numbers, lines, totals — the package's buttons, no Download JSON; its details page every step done (spec A7, A8; the owner's ~04:05Z and AM7; Build 24's P12; build 28, item 9)", async ({
   page,
 }) => {
   await page.goto("/account/runs/fixture-run-invoice");
@@ -2670,36 +2681,10 @@ test("a finished run of three receipts: its full id, every step done, each recei
   await expect(main.getByTestId("run-result")).toHaveText(
     "3 receipts: 3 saved.",
   );
-  await expect(main.getByTestId("run-tile-Duration")).toHaveText("19s");
-  await expect(main.getByTestId("run-tile-Steps done")).toHaveText("5 / 5");
-  // A v3 run, drawn by v4's five steps — every step it reported v4 still
-  // declares (Build 22, S25): the integration the flow chose now, None (S23),
-  // and its email, sent (S24; Build 23's A7).
-  const steps = main.getByTestId("run-steps").locator("li");
-  await expect(steps.locator("p.font-medium")).toHaveText([
-    "1 · Upload invoice",
-    "2 · Connect integration",
-    "3 · AI processing",
-    "4 · Details saved",
-    "5 · Email sent",
-  ]);
-  await expect(steps.locator("p:not(.font-medium)")).toHaveText([
-    "Done · 12:00 PM",
-    "None",
-    "Done · 12:02 PM",
-    "Done · 12:04 PM",
-    "Email sent · 12:00 PM",
-  ]);
-  // Never a step's own words, never its id (B6).
-  for (const gone of [
-    "Photo, 1 page",
-    "Totals checked",
-    "check-documents",
-    "save-documents",
-    "Progress",
-  ]) {
-    await expect(main).not.toContainText(gone);
-  }
+  // Its tiles, its steps and its facts are its details page's (build 28,
+  // item 9): none of them here.
+  for (const gone of ["run-tile-Duration", "run-steps", "run-fact-Run ID"])
+    await expect(main.getByTestId(gone)).toHaveCount(0);
   // Each a closed row that opens in place (Build 24, P10): "Invoice n of 3",
   // its chip and {vendor} · {total} (S9); open, it starts with its Document
   // type and Format — the job's one photo, JPEG. Each opens on its own.
@@ -2754,13 +2739,10 @@ test("a finished run of three receipts: its full id, every step done, each recei
   ]) {
     await expect(cards.nth(2)).toContainText(words);
   }
-  // Documents, so no Details; the facts end with the full Run ID.
+  // Documents, so no Details; then Run details and View flow.
   await expect(
     main.getByRole("heading", { name: "Details", exact: true }),
   ).toHaveCount(0);
-  await expect(main.getByTestId("run-fact-Run ID")).toHaveText(
-    "fixture-run-invoice",
-  );
   await expect(main.getByRole("link", { name: "View flow" })).toHaveAttribute(
     "href",
     FLOWS.invoice,
@@ -2778,6 +2760,74 @@ test("a finished run of three receipts: its full id, every step done, each recei
   await expect(main.getByRole("button", { name: "Download JSON" })).toHaveCount(
     0,
   );
+
+  // The page's foot (build 28's review, finding 2, as the app draws it): the
+  // package's three, then Run details, then View flow.
+  const foot = await page.evaluate(() => {
+    const all = [...document.querySelectorAll("main *")];
+    const named = (selector: string, words: string) =>
+      [...document.querySelectorAll(`main ${selector}`)].find(
+        (element) => element.textContent?.trim() === words,
+      );
+    return [
+      named("button", "Download Excel"),
+      document.querySelector('main [data-testid="run-details-row"]'),
+      named("a", "View flow"),
+    ].map((element) => (element ? all.indexOf(element) : -1));
+  });
+  expect(foot.every((at) => at >= 0)).toBe(true);
+  expect(foot[0]! < foot[1]! && foot[1]! < foot[2]!).toBe(true);
+  // Run details, a row with an arrow at the foot of the page (build 28, item
+  // 9): how it went, the tiles, every step and the facts.
+  await main.getByRole("link", { name: "Run details" }).click();
+  await expect(page).toHaveURL(
+    /\/account\/runs\/fixture-run-invoice\/details$/u,
+  );
+  await expect(main.getByRole("heading", { level: 1 })).toHaveText(
+    "Run details",
+  );
+  await expect(main).toContainText("Run fixture-run-invoice");
+  await expect(main.getByTestId("run-tile-Duration")).toHaveText("19s");
+  await expect(main.getByTestId("run-tile-Steps done")).toHaveText("5 / 5");
+  // A v3 run, drawn by v4's five steps — every step it reported v4 still
+  // declares (Build 22, S25): the integration the flow chose now, None (S23),
+  // and its email, sent (S24; Build 23's A7).
+  const steps = main.getByTestId("run-steps").locator("li");
+  await expect(steps.locator("p.font-medium")).toHaveText([
+    "1 · Upload invoice",
+    "2 · Connect integration",
+    "3 · AI processing",
+    "4 · Details saved",
+    "5 · Email sent",
+  ]);
+  await expect(steps.locator("p:not(.font-medium)")).toHaveText([
+    "Done · 12:00 PM",
+    "None",
+    "Done · 12:02 PM",
+    "Done · 12:04 PM",
+    "Email sent · 12:00 PM",
+  ]);
+  // Never a step's own words, never its id (B6).
+  for (const gone of [
+    "Photo, 1 page",
+    "Totals checked",
+    "check-documents",
+    "save-documents",
+    "Progress",
+  ]) {
+    await expect(main).not.toContainText(gone);
+  }
+  // The facts end with the full Run ID; no documents here.
+  await expect(main.getByTestId("run-fact-Run ID")).toHaveText(
+    "fixture-run-invoice",
+  );
+  await expect(main.locator("details[data-testid^='document-']")).toHaveCount(
+    0,
+  );
+  await expectNoAxeViolations(page);
+  // Back goes to the run.
+  await main.getByRole("link", { name: "Back" }).click();
+  await expect(page).toHaveURL(/\/account\/runs\/fixture-run-invoice$/u);
 });
 
 test("a run is named by its full id, never its request id; a run of an older version is drawn by what it reported — never '34 accounts read' — its failure on its last step (spec A7, A8; run 793eef82 as it ran)", async ({
@@ -2792,6 +2842,9 @@ test("a run is named by its full id, never its request id; a run of an older ver
   await expect(main.getByTestId("run-result")).toHaveText(
     "Add one document per file.",
   );
+  await page.goto("/account/runs/793eef82-102d-81be-a2d3-9e8d4e2b2c36/details");
+  await expect(main).toContainText("Run 793eef82-102d-81be-a2d3-9e8d4e2b2c36");
+  await expect(main).not.toContainText("1e3231c6");
   await expect(main).not.toContainText("34 accounts read");
   const steps = main.getByTestId("run-steps").locator("li");
   await expect(steps).toHaveCount(6);
@@ -2839,14 +2892,16 @@ test("a held run's document whose approval was refused reads Not approved, and t
   await expect(main.getByTestId("run-result")).toHaveText("Denied");
   await expect(main.getByTestId("document-1-chip")).toHaveText("Saved");
   await expect(main.getByTestId("document-2-chip")).toHaveText("Not approved");
-  const record = main.getByTestId("run-step-group:record");
-  await expect(record).toHaveAttribute("data-state", "held");
-  await expect(record).toContainText("Denied");
-  await expect(record).not.toContainText("Waiting for approval");
   // Each document's Format is its own file's (Invoice Processing v6's
   // `source`; Build 24, P10).
   await expect(main.getByTestId("document-1")).toContainText("FormatPDF");
   await expect(main.getByTestId("document-2")).toContainText("FormatPNG");
+  // Its steps, on its details page (build 28, item 9).
+  await page.goto("/account/runs/fixture-run-invoice-held/details");
+  const record = main.getByTestId("run-step-group:record");
+  await expect(record).toHaveAttribute("data-state", "held");
+  await expect(record).toContainText("Denied");
+  await expect(record).not.toContainText("Waiting for approval");
   // Step 5 waits: the approval's email never checks it (Build 23's A7).
   const email = main.getByTestId("run-step-group:email");
   await expect(email).toHaveAttribute("data-state", "waiting");
@@ -2859,19 +2914,20 @@ test("a run still going, of a flow with no groups, is drawn by what it reported 
 }) => {
   await page.goto("/account/runs/fixture-run-running");
   const main = page.locator("main");
-  const steps = main.getByTestId("run-steps").locator("li");
-  await expect(steps.last()).toContainText("Working…");
-  await expect(main).not.toContainText("validate-input");
   await expect(
     main.getByRole("heading", { name: "Details", exact: true }),
   ).toHaveCount(0);
+  await page.goto("/account/runs/fixture-run-running/details");
+  const steps = main.getByTestId("run-steps").locator("li");
+  await expect(steps.last()).toContainText("Working…");
+  await expect(main).not.toContainText("validate-input");
 });
 
 test.describe("Invoice Processing's page, Step 1 to its run (spec A6, A7; Build 22, P1–P4)", () => {
   // The browser PUTs the file straight to the fixture's object store.
   test.use({ ignoreHTTPSErrors: true });
 
-  test("the page reads top to bottom — Dashboard, then Steps exactly 1 · Upload invoice with the Document and Start run, 2 · Connect integration with the integration row, 3 · AI processing, 4 · Details saved with nothing under it, 5 · Email sent with who gets it — Edit setup; no Connections, no move — and the run's page shows the five steps from the start, each as it is done, its email, and its documents when it ends", async ({
+  test("the page reads top to bottom — Dashboard, then Steps exactly 1 · Upload invoice with the Document and Start run, 2 · Connect integration with the integration row, 3 · AI processing, 4 · Details saved with nothing under it, 5 · Email sent with who gets it — Edit setup; no Connections, no move — and the run's details page shows the five steps from the start, each as it is done, and its email; the run's page its documents when it ends (build 28, item 9)", async ({
     page,
   }) => {
     await page.goto(FLOWS.invoice);
@@ -2939,6 +2995,15 @@ test.describe("Invoice Processing's page, Step 1 to its run (spec A6, A7; Build 
     await expect(page).toHaveURL(
       /\/account\/runs\/fixture-run-invoice-started$/,
     );
+    // The run's page: Cancel run while it goes on, and Run details, which
+    // opens its steps (build 28, item 9).
+    await expect(
+      main.getByRole("button", { name: "Cancel run" }),
+    ).toBeVisible();
+    await main.getByRole("link", { name: "Run details" }).click();
+    await expect(page).toHaveURL(
+      /\/account\/runs\/fixture-run-invoice-started\/details$/,
+    );
     // Every step from the start: the first working, the integration done from
     // the start (S23), the rest waiting — the email too, while the run goes on.
     const rows = main.getByTestId("run-steps").locator("li");
@@ -2961,21 +3026,19 @@ test.describe("Invoice Processing's page, Step 1 to its run (spec A6, A7; Build 
     }
     await expect(rows.nth(4)).toContainText("Waiting");
     await expect(main.getByTestId("run-tile-Steps done")).toHaveText("1 / 5");
-    await expect(
-      main.getByRole("button", { name: "Cancel run" }),
-    ).toBeVisible();
     // Read again while it goes on: its first step done, the next working.
     await fixtureControl("invoice-run-advance");
     await expect(rows.nth(0)).toHaveAttribute("data-state", "done");
     await expect(rows.nth(2)).toHaveAttribute("data-state", "working");
     await expect(main.getByTestId("run-tile-Steps done")).toHaveText("2 / 5");
-    // Ended: every step done — step 5 with its email on its way (Build 23's
-    // A7) — its three receipts, and nothing to cancel.
+    // Back on the run's page, it ends while open: its three receipts, and
+    // nothing to cancel.
+    await main.getByRole("link", { name: "Back" }).click();
+    await expect(page).toHaveURL(
+      /\/account\/runs\/fixture-run-invoice-started$/,
+    );
     await fixtureControl("invoice-run-advance");
     await expect(main.getByText(/^succeeded$/iu)).toBeVisible();
-    await expect(rows.nth(4)).toHaveAttribute("data-state", "done");
-    await expect(rows.nth(4)).toContainText("Sending email…");
-    await expect(main.getByTestId("run-tile-Steps done")).toHaveText("5 / 5");
     await expect(main.locator("details[data-testid^='document-']")).toHaveCount(
       3,
     );
@@ -2990,6 +3053,11 @@ test.describe("Invoice Processing's page, Step 1 to its run (spec A6, A7; Build 
     await expect(
       main.getByRole("button", { name: "Download PDF" }),
     ).toBeVisible();
+    // Every step done — step 5 with its email on its way (Build 23's A7).
+    await main.getByRole("link", { name: "Run details" }).click();
+    await expect(rows.nth(4)).toHaveAttribute("data-state", "done");
+    await expect(rows.nth(4)).toContainText("Sending email…");
+    await expect(main.getByTestId("run-tile-Steps done")).toHaveText("5 / 5");
     // Its email sent: read again, Email sent and when, every step done.
     await fixtureControl("invoice-run-advance");
     await page.reload();
@@ -3023,7 +3091,7 @@ test.describe("Invoice Processing's page, Step 1 to its run (spec A6, A7; Build 
     await expect(main).toContainText("Run fixture-run-invoice-started");
   });
 
-  test("with QuickBooks chosen, step 4 is QuickBooks updated on the flow's page and on its run's, and the run's step 2 says QuickBooks Online (D3; S23)", async ({
+  test("with QuickBooks chosen, step 4 is QuickBooks updated on the flow's page and on its run's details, and the run's step 2 says QuickBooks Online (D3; S23)", async ({
     page,
   }) => {
     await fixtureControl("quickbooks-connected");
@@ -3045,7 +3113,7 @@ test.describe("Invoice Processing's page, Step 1 to its run (spec A6, A7; Build 
     ]);
     await fixtureControl("invoice-run-started");
     await fixtureControl("invoice-run-advance");
-    await page.goto("/account/runs/fixture-run-invoice-started");
+    await page.goto("/account/runs/fixture-run-invoice-started/details");
     const rows = main.getByTestId("run-steps").locator("li");
     await expect(rows.locator("p:not(.font-medium)")).toHaveText([
       "Done · 12:00 PM",
@@ -3150,6 +3218,10 @@ test("a run's outcome is read on its own page — failure reason and result summ
       .getByRole("alert")
       .filter({ hasText: "input must carry vendor, amount, and reference" }),
   ).toBeVisible();
+  // How it started: on its details page, its row the last before View flow
+  // (build 28, item 9).
+  await page.getByRole("link", { name: "Run details" }).click();
+  await expect(page).toHaveURL(/\/account\/runs\/fixture-run-failed\/details$/);
   // Every run now starts from its trigger; the page says so rather than
   // defaulting to the manual start the website no longer offers.
   await expect(page.getByText("Triggered", { exact: true })).toBeVisible();

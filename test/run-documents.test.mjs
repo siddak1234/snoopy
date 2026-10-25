@@ -510,10 +510,11 @@ test("Download PDF and Download Excel: the platform's link, asked through /api/p
     assert.doesNotMatch(asker, /packageRetryWaitMs|setTimeout\(resolve/u);
   }
   assert.match(live, /setError\(DOWNLOAD_FAILED\);/u);
-  // Offered once the job can be packaged, with View package on the run page.
+  // Offered once the job can be packaged, with View package on the run page,
+  // in a row of their own over Run details (build 28's review, finding 2).
   assert.match(
     live,
-    /\{packageAvailable\(run\.status, documents\) \? \(\s*<PackageActions workspaceId=\{workspaceId\} runId=\{run\.id\} view \/>/u,
+    /\{packageAvailable\(run\.status, documents\) \? \(\s*<div className="mb-5 flex flex-wrap items-center gap-2">\s*<PackageActions workspaceId=\{workspaceId\} runId=\{run\.id\} view \/>/u,
   );
   // Gone, but in the struck-through history of its comments.
   assert.doesNotMatch(

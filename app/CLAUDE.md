@@ -50,7 +50,8 @@ or automation (BUILD-PLAN 24.11.11, Build 23's B1; routes and identifiers keep
 
 ## Parity with the app
 
-The web shows the same screens as the mobile app. The screen list is
+The web shows the same screens as the mobile app, by the screen standards both
+keep ([docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) "Screen standards"). The screen list is
 `snoopy-mobile`'s generated map (`snoopy-mobile/docs/MAP.md`, its routes). A
 screen added or changed on one side is added on the other in the same round, or
 the gap is a finding for that round.
