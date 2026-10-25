@@ -61,6 +61,7 @@ test("one Approve and Deny pair on both pages: Approve primary, Deny danger, App
   for (const path of [
     LIVE,
     "app/account/runs/[runId]/page.tsx",
+    "app/account/runs/[runId]/details/page.tsx",
     "app/account/approvals/page.tsx",
   ])
     assert.doesNotMatch(
@@ -70,7 +71,7 @@ test("one Approve and Deny pair on both pages: Approve primary, Deny danger, App
     );
 });
 
-test("a held step offers the decision: RunLive's held row renders ApprovalDecision while the job's approval waits and this person may decide, else who can; a saved decision draws the page again (P6)", () => {
+test("a held job's page offers the decision: RunLive renders ApprovalDecision under the result line while the job's approval waits and this person may decide, else who can; a saved decision draws the page again (P6; build 28's review, finding 1)", () => {
   const live = code(read(LIVE));
   assert.match(
     live,
@@ -78,8 +79,14 @@ test("a held step offers the decision: RunLive's held row renders ApprovalDecisi
   );
   assert.match(
     live,
-    /<TrackerItem key=\{row\.key\} row=\{row\}>\s*(?:\{\s*\}\s*)?\{row\.state === "held" &&\s*decided === "pending" &&\s*decision\?\.approval\.status === "pending" \? \(\s*<ApprovalDecision\s+approvalId=\{decision\.approval\.id\}\s+canDecide=\{decision\.canDecide\}\s+eligibleRoles=\{decision\.approval\.eligibleRoles\}/u,
+    /const waiting =\s*run\.status === "held" &&\s*decided === "pending" &&\s*decision\?\.approval\.status === "pending";/u,
   );
+  assert.match(
+    live,
+    /\{waiting && decision \? \(\s*<div\s+data-testid="run-decision"[^>]*>\s*<ApprovalDecision\s+approvalId=\{decision\.approval\.id\}\s+canDecide=\{decision\.canDecide\}\s+eligibleRoles=\{decision\.approval\.eligibleRoles\}/u,
+  );
+  // One pair: no step of the details page draws its own.
+  assert.equal(live.match(/<ApprovalDecision\b/gu)?.length, 1);
   assert.match(
     live,
     /onDecision=\{\(_, state\) => \{\s*if \(state === "saved"\) router\.refresh\(\);\s*\}\}/u,
@@ -98,15 +105,20 @@ test("a held step offers the decision: RunLive's held row renders ApprovalDecisi
   // The job's newest approval and this person's role, worked out where the
   // re-reads land, in the browser (Build 25's audit; waitingDecision's own
   // test holds the rule), and the role read with every run: one that turns
-  // held while its page is open is offered the pair from there.
+  // held while its page is open is offered the pair from there — on its
+  // details page since build 28 (item 9), read as the run's page reads it.
   assert.match(
     live,
     /const decision = waitingDecision\(run\.id, listed, role\);/u,
   );
-  const page = code(read("app/account/runs/[runId]/page.tsx"));
-  assert.match(page, /\n\s*roleInWorkspace\(workspaceId\),\n/u);
-  assert.match(page, /role=\{role\}/u);
-  assert.doesNotMatch(page, /held \? roleInWorkspace/u);
+  const data = code(read("app/account/runs/[runId]/run-page-data.ts"));
+  assert.match(data, /\n\s*roleInWorkspace\(workspaceId\),\n/u);
+  assert.doesNotMatch(data, /held \? roleInWorkspace/u);
+  for (const path of [
+    "app/account/runs/[runId]/page.tsx",
+    "app/account/runs/[runId]/details/page.tsx",
+  ])
+    assert.match(code(read(path)), /role=\{role\}/u, path);
 });
 
 test("a decision draws the job's run page again, by the id the platform answers with (P6; backend ADR-0044)", () => {

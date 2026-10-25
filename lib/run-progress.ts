@@ -441,6 +441,31 @@ export function runLabel(id: string): string {
   return `Run ${id}`;
 }
 
+/**
+ * The row at the foot of every run's page, and the page it opens (the owner's
+ * build 28 item 9: "a standard where run details is a component with an
+ * arrow"): the steps, Duration, Steps done, Started, Ended, Trigger and the
+ * Run ID — Invoice Processing's runs too. ~~All of them on the run's page~~
+ * until build 28.
+ */
+export const RUN_DETAILS = "Run details";
+
+/** A run's details page, under its own. */
+export function runDetailsPath(runId: string): string {
+  return `/account/runs/${encodeURIComponent(runId)}/details`;
+}
+
+/**
+ * The heading over what a run read (the owner's build 28 item 8): the flow's
+ * word for one of its runs and "details" — "{Run word} details" — or
+ * "Details" for a flow that names none — in the place of the run's result
+ * line, which a run that read sections no longer shows. ~~The result line
+ * over them~~ until build 28.
+ */
+export function runSectionsHeading(runWord: string | null | undefined): string {
+  return runWord ? `${runWord} details` : "Details";
+}
+
 /** What became of a held run's approval, as the run's page says it (the app's `heldDecision`). */
 export type HeldDecision =
   "pending" | "approved" | "rejected" | "closed" | "unknown";

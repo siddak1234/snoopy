@@ -388,6 +388,8 @@ test("a run is named by its FULL id — never the request id, never the first ei
   for (const path of [
     "app/account/runs/[runId]/RunLive.tsx",
     "app/account/runs/[runId]/page.tsx",
+    "app/account/runs/[runId]/details/page.tsx",
+    "app/account/runs/[runId]/run-page-data.ts",
     "app/account/runs/page.tsx",
     "app/account/page.tsx",
     "app/account/approvals/page.tsx",
@@ -948,7 +950,7 @@ test("the run page draws the tracker's rows and words alone — never a step's s
     live,
     /trackerRows\(\s*steps,\s*flow\?\.pipeline,\s*flow\?\.groups,\s*run,\s*undefined,\s*flow\?\.pipeline,\s*\{ flow: flow\?\.tracker, email: detail\.email, decision: decided \},\s*\);/u,
   );
-  const page = read("app/account/runs/[runId]/page.tsx");
+  const page = read("app/account/runs/[runId]/run-page-data.ts");
   assert.match(page, /stepTitle\(group, setup, subscription\.config\)/u);
   assert.match(page, /const line = settingLine\(/u);
   assert.match(
@@ -964,15 +966,24 @@ test("the run page draws the tracker's rows and words alone — never a step's s
     /if \(!going\) return;[\s\S]*?setTimeout\([\s\S]*?RUN_REREAD_MS\)/u,
   );
   assert.match(live, /\[going, reads, workspaceId, run\.id\]/u);
-  // The sections in the spec's order: Steps, Documents (or Details), the facts.
-  const order = ["Steps", "Documents", "Details"].map((name) =>
-    live.search(new RegExp(`>\\s*${name}\\s*</h2>`, "u")),
+  // The steps on the run's details page, before its facts (build 28, item
+  // 9); Documents (or Details) on the run's page.
+  const details = live.indexOf('if (view === "details") {');
+  const steps = live.search(/>\s*Steps\s*<\/h2>/u);
+  const facts = live.indexOf("data-testid={`run-fact-${fact.label}`}");
+  const runPage = live.indexOf("return (", live.indexOf("\n  }\n", details));
+  assert.ok(
+    details > 0 && details < steps && steps < facts,
+    "steps, then facts",
+  );
+  assert.ok(facts < runPage, "both on the details page");
+  const order = ["Documents", "Details"].map((name) =>
+    live.slice(runPage).search(new RegExp(`>\\s*${name}\\s*</h2>`, "u")),
   );
   assert.ok(
-    order.every((index) => index > 0),
+    order.every((index) => index > 0) && order[0] < order[1],
     String(order),
   );
-  assert.ok(order[0] < order[1] && order[1] < order[2], String(order));
   assert.ok(
     live.indexOf('label: "Run ID", value: run.id') > 0,
     "the facts end with the full Run ID",

@@ -28,7 +28,7 @@ const ITEM_LIVE =
 const RUN_LIVE = "app/account/runs/[runId]/RunLive.tsx";
 const SECTION_ROWS = "components/dashboard/SectionRows.tsx";
 
-test("a flow with items draws them after its steps, and its run start form gets no fields — Turn on only (plan §5.1)", () => {
+test("a flow with items draws them, and its run start form gets no fields — Turn on only (plan §5.1; no steps since build 28: test/build28-screens.test.mjs)", () => {
   const page = code(read(FLOW_PAGE));
   assert.match(page, /const declaredItems = subscription\.items;/u);
   assert.match(
@@ -71,7 +71,7 @@ test("Upload, Add and Archive are an owner's or admin's: drawn only under canMan
   assert.match(code(read(ITEM_PAGE)), /canManage=\{administers\(role\)\}/u);
 });
 
-test("sections open and close: every one closed but the first on a run's page, every one closed on an item's (plan §5.3, §5.4)", () => {
+test("sections open and close: every one closed but the first on a run's page; none on an item's since build 28 (plan §5.3, §5.4; build 28, item 4)", () => {
   const rows = code(read(SECTION_ROWS));
   assert.match(rows, /<details[\s\S]*?open=\{firstOpen && index === 0\}/u);
   assert.match(rows, /firstOpen = false,/u);
@@ -80,11 +80,7 @@ test("sections open and close: every one closed but the first on a run's page, e
     /<SectionRows sections=\{sections\} firstOpen testId="run-section" \/>/u,
   );
   const live = code(read(ITEM_LIVE));
-  assert.match(
-    live,
-    /<SectionRows sections=\{item\.sections\} testId="item-section" \/>/u,
-  );
-  assert.doesNotMatch(live, /firstOpen/u);
+  assert.doesNotMatch(live, /<SectionRows\b|firstOpen/u);
 });
 
 test("a section's link is drawn only through sectionLink, opening outside with noopener noreferrer", () => {
@@ -97,7 +93,7 @@ test("a section's link is drawn only through sectionLink, opening outside with n
   assert.doesNotMatch(rows, /href=\{entry\.url\}/u);
 });
 
-test("a run with a title and a score is headed by them, the full id kept among its facts; its sections come before its steps (plan §5.4)", () => {
+test("a run with a title and a score is headed by them, the full id kept among its facts; its sections come first, in its result line's place, the steps on its details page (plan §5.4; build 28, items 8 and 9)", () => {
   const live = code(read(RUN_LIVE));
   assert.match(
     live,
@@ -105,20 +101,35 @@ test("a run with a title and a score is headed by them, the full id kept among i
   );
   assert.match(
     live,
-    /title=\{headed && run\.title \? run\.title : runLabel\(run\.id\)\}/u,
+    /const name = headed && run\.title \? run\.title : runLabel\(run\.id\);/u,
   );
+  assert.match(live, /<SectionCard\s+title=\{name\}/u);
   assert.match(live, /data-testid="run-score"/u);
   assert.match(live, /\{ label: "Run ID", value: run\.id \}/u);
-  // Directly under the result line, before the tiles and the steps (plan
-  // §5.4, as the app draws it; finding 5 of the review).
+  // First on the run's page, under "{Run word} details", in the result
+  // line's place (build 28's items 7 and 8; ~~directly under the result
+  // line~~ until then); the tiles and the steps on its details page, before
+  // the run's page.
+  const details = live.indexOf('if (view === "details") {');
   const result = live.indexOf('data-testid="run-result"');
   const sections = live.indexOf('testId="run-section"');
-  assert.ok(result > 0 && result < sections, "sections after the result line");
+  assert.match(live, /\{result && !hasSections \? \(/u);
   assert.ok(
-    sections < live.indexOf('label="Duration"'),
-    "sections before the tiles",
+    details > 0 &&
+      details < live.indexOf('label="Duration"') &&
+      live.indexOf('label="Duration"') < live.indexOf('id="run-steps-title"') &&
+      live.indexOf('id="run-steps-title"') < result &&
+      result < sections,
+    "the details page's tiles and steps, then the run's page: its result line or its sections",
   );
-  assert.ok(sections < live.indexOf('id="run-steps-title"'));
+  assert.ok(
+    live.indexOf("{runSectionsHeading(flow?.runWord)}") < sections,
+    "the run word's heading over the sections",
+  );
+  assert.ok(
+    sections < live.indexOf('id="run-documents-title"'),
+    "sections before the documents",
+  );
 });
 
 test("an item list the platform could not answer is Unavailable, never None yet (finding 2 of the review)", () => {

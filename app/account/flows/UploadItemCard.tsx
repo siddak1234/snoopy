@@ -2,6 +2,7 @@
 
 import { useId, useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
+import { Dropdown } from "@/components/ui/Dropdown";
 import { FormError } from "@/components/ui/FormError";
 import { FormInput } from "@/components/ui/FormInput";
 import Modal from "@/components/ui/Modal";
@@ -28,24 +29,22 @@ import { RunFileField } from "./RunFileField";
 /** Under a field the platform refused. */
 const CHECK_THIS = "Check this value.";
 
-/** A field's input: the same look as `FormInput`'s. */
-const FIELD_CLASS =
-  "mt-1.5 w-full rounded-[var(--radius-md)] border border-[var(--color-divider)] bg-[var(--color-surface)] px-4 py-2.5 text-[var(--text)] transition hover:border-[color-mix(in_srgb,var(--color-text)_45%,transparent)] focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none disabled:opacity-60";
-
 /**
  * The upload card (Round 19, plan §5.2; backend ADR-0046): a dialog that
- * makes an item. Each of the flow's item fields, in order — a select of its
- * `options`, then the values typed for it before (`saved`, `listItems`'
- * `choices`), then "Other", which shows a text box of 40 characters; or a text
- * box — then the file, uploaded as soon as it is chosen through the run's own
+ * makes an item. Each of the flow's item fields, in order — a select, drawn
+ * as the website's drop-down (`Dropdown`; plan §3, decision 7: never buttons,
+ * never the browser's own select), of its `options`, then the values typed for
+ * it before (`saved`, `listItems`' `choices`), then "Other", which shows a
+ * text box of 40 characters; or a text box — then the file, uploaded as soon as it is chosen through the run's own
  * upload path (`RunFileField`: open, put, complete), with the types it takes
  * in words beside it. Upload sends the values and the file's id
  * (`createItem`); the card closes and the new row reads "Reading…".
  *
  * **One item per key**, as a run's form keeps one run per key: the key is
- * made with the card and again whenever a value changes, so only a resend of
- * the same values reuses it. A refusal is said on the card, and a field the
- * platform refused says so under it.
+ * made with the card and again whenever a value changes — a choice made in a
+ * drop-down too — so only a resend of the same values reuses it. A required
+ * select left unchosen is said on the card, as the file is. A refusal is said
+ * on the card, and a field the platform refused says so under it.
  */
 export function UploadItemCard({
   workspaceId,
@@ -95,6 +94,15 @@ export function UploadItemCard({
     const artifactId = String(
       new FormData(event.currentTarget).get(`input:${declared.file.key}`) ?? "",
     );
+    // The drop-down is no form control: a required one unchosen is said here.
+    const unchosen = declared.fields.find(
+      (field) =>
+        field.control === "select" && field.required && !picked[field.key],
+    );
+    if (unchosen) {
+      setError(`Choose the ${inSentence(unchosen.title)} first.`);
+      return;
+    }
     if (!artifactId) {
       setError(`Choose the ${inSentence(declared.file.title)} first.`);
       return;
@@ -153,9 +161,10 @@ export function UploadItemCard({
               typed={typed[field.key] ?? ""}
               error={fieldError(field)}
               disabled={pending}
-              onPick={(value) =>
-                setPicked((current) => ({ ...current, [field.key]: value }))
-              }
+              onPick={(value) => {
+                setPicked((current) => ({ ...current, [field.key]: value }));
+                newItemKey();
+              }}
               onType={(value) =>
                 setTyped((current) => ({ ...current, [field.key]: value }))
               }
@@ -206,9 +215,10 @@ export function UploadItemCard({
 }
 
 /**
- * A select field (plan §5.2): its title over its choices (`selectChoices`);
- * "Other" shows a text box under it, labelled "Other", for a value of the person's own, 40
- * characters at most.
+ * A select field (plan §5.2): its title over its choices (`selectChoices`),
+ * the website's drop-down (plan §3, decision 7); "Other" shows a text box
+ * under it, labelled "Other", for a value of the person's own, 40 characters
+ * at most.
  */
 function SelectField({
   field,
@@ -234,30 +244,21 @@ function SelectField({
   return (
     <div>
       <label
+        id={`${id}-label`}
         htmlFor={id}
         className="block text-sm font-medium text-[var(--text)]"
       >
         {field.title}
       </label>
-      <select
+      <Dropdown
         id={id}
+        labelledBy={`${id}-label`}
+        options={selectChoices(field, saved)}
         value={picked}
-        required={field.required}
+        onChange={onPick}
         disabled={disabled}
-        onChange={(event) => onPick(event.currentTarget.value)}
-        className={FIELD_CLASS}
-      >
-        {picked === "" ? (
-          <option value="" disabled>
-            Choose
-          </option>
-        ) : null}
-        {selectChoices(field, saved).map((choice) => (
-          <option key={choice.value} value={choice.value}>
-            {choice.label}
-          </option>
-        ))}
-      </select>
+        testId={id}
+      />
       {/* Its own name, "Other", visible — never the select's, which a
           screen reader would say twice (as the app labels it). */}
       {other ? (

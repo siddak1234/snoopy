@@ -78,6 +78,7 @@ export type CompleteUploadResponse =
 export type RunStatusCounts = components["schemas"]["RunStatusCounts"];
 export type FlowEmailRecipients = components["schemas"]["FlowEmailRecipients"];
 export type RunFile = components["schemas"]["RunFile"];
+export type RunFileLink = components["schemas"]["RunFileLink"];
 export type RunPackageFile = components["schemas"]["RunPackageFile"];
 export type CreateRunPackageFileRequest =
   operations["createRunPackageFile"]["requestBody"]["content"]["application/json"];
@@ -368,6 +369,33 @@ export function readItem(
 ): Promise<ReadItemResponse> {
   return platformServerJson<ReadItemResponse>(
     `${scope(workspaceId)}/items/${encodeURIComponent(itemId)}`,
+  );
+}
+
+/**
+ * The file an item was made from, behind a short-lived signed link (any
+ * member; Round 19, build 28) — never its bytes.
+ */
+export function readItemFile(
+  workspaceId: string,
+  itemId: string,
+): Promise<RunFileLink> {
+  return platformServerJson<RunFileLink>(
+    `${scope(workspaceId)}/items/${encodeURIComponent(itemId)}/file`,
+  );
+}
+
+/**
+ * One of a job's uploaded files, behind a short-lived signed link (anyone
+ * who may read the run; Round 19, build 28) — never its bytes.
+ */
+export function readRunFile(
+  workspaceId: string,
+  runId: string,
+  fileId: string,
+): Promise<RunFileLink> {
+  return platformServerJson<RunFileLink>(
+    `${scope(workspaceId)}/runs/${encodeURIComponent(runId)}/files/${encodeURIComponent(fileId)}`,
   );
 }
 

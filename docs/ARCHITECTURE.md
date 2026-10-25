@@ -32,6 +32,29 @@ this origin holds.
 - Tenancy state comes from typed Edge responses. Mutations have unique
   idempotency keys, while a user retry reuses its one explicit intent key.
 
+## Screen standards
+
+Build 28's (Round 19, plan §3), the same on the app
+(`snoopy-mobile/DESIGN-CONTRACT.md`); each is drawn by one part, which a new
+page reuses:
+
+- **Flows by department**: the Flows list groups its cards under their
+  department, the departments A–Z (`app/account/flows/departments.ts`).
+- **A choice is a drop-down**: a flow's `select` field and a list's filter
+  are the website's drop-down (`components/ui/Dropdown.tsx`) — a pill for a
+  filter, a field's box in a form, its panel glass — never a row of buttons
+  and never the browser's own `<select>`.
+- **A row that opens a page** is `PageRow` (`components/dashboard/PageRow.tsx`):
+  a closed section's box and height, the arrow at its end.
+- **Every run's page** ends with the package's buttons when it has them,
+  then the Run details row, then Cancel run while it goes on and View flow;
+  Duration, Steps done, the steps, Started, Ended, Trigger and the Run ID are
+  on its details page, `/account/runs/[runId]/details`. What a run read comes
+  first, under "{Run word} details", in its result line's place.
+- **A flow with items** is its items: no Dashboard, no Steps.
+- **A file's page** shows the original in place where a browser draws it,
+  then Download and Share, then what was read from it (`FileView`).
+
 ## Identity and connections
 
 Login is backend-mediated OAuth. The website renders only the provider policy
@@ -62,17 +85,20 @@ Processing, else "Document 1 of 3" (backend BUILD-PLAN 27.5.1) — with
 (`test/no-flow-code.test.mjs`); its Format is read from
 the job's uploaded files (`RunDetail.files`): its own file, else the only one.
 
-A held job is decided where it waits: step 4 of its run page offers the one
+A run's page and its details page ("Screen standards") are one `RunLive`,
+read alike (`app/account/runs/[runId]/run-page-data.ts`). A held job is
+decided on its page: under the result line, "Waiting for approval.", the one
 Approve and Deny pair (`app/account/approvals/ApprovalDecision.tsx`, Deny the
 danger variant) to a role the job's newest approval names, and says who can
-otherwise; a decision draws the run page again (the action revalidates it by
+otherwise; step 4 on its details page keeps the step's state alone (build
+28's review, finding 1). A decision draws the page again (the action revalidates it by
 the job id the platform answers with). A run can turn held while its page is
 open, or the page can read it before its approval is listed. Then the browser
 reads the job and its approvals again through `/api/platform`, every 2 s, one
 re-read (the job and its approvals, two requests together) at a time and at
 most ten times, until the approval is listed or the run
-leaves held (`rereadForApproval` in `lib/run-progress.ts`), and works out step
-4's pair from what it read (`waitingDecision`). So Approve and Deny appear
+leaves held (`rereadForApproval` in `lib/run-progress.ts`), and works out
+the pair from what it read (`waitingDecision`). So Approve and Deny appear
 with no reload. A read that fails costs only itself: the page stays as it
 was, as the app's does. A job whose approval is listed is not read again for
 it. On Approvals each row names its flow and the step it waits at, "{flow} ·
@@ -108,27 +134,42 @@ A flow may declare items (backend ADR-0046; Round 19): things a person makes
 once, from a file, that its runs then belong to. Every word for them is the
 platform's — `items.words`, `items.runWords`, each field's `title` and
 `options` — and the rules that draw them are pure, in `lib/flow-items.ts`, the
-same as the app's. A flow page whose version declares `items` draws them after
-its steps (`app/account/flows/FlowItems.tsx`) and no run start form, since each
-run names an item (`createRun`'s `itemId`); Turn on stays. They are grouped by
-the flow's `groupField`: its options' order, then values typed for it A–Z,
-rows newest first, each "Reading…", "Couldn't read" or "{n} {runs} · Top
-{score}", read again every 2 s while one is being read; a list the platform
-could not answer is "Unavailable". "Upload {item}", for an owner or admin,
+same as the app's. A flow page whose version declares `items` draws them
+(`app/account/flows/FlowItems.tsx`) and no run start form, since each run
+names an item (`createRun`'s `itemId`); Turn on stays. They are grouped by the flow's `groupField`, the
+groups A–Z and the rows A–Z, under its filter — "All {field, many}" first,
+then each value the items carry, A–Z — each row "Reading…", "Couldn't read"
+or "{n} {runs} · Top {score}", read again every 2 s while one is being read;
+a list the platform could not answer is "Unavailable". "Upload {item}", for an owner or admin,
 opens the upload card (`UploadItemCard.tsx`): a select of the field's options,
 the values typed before (`listItems`' `choices`, each held by its words, so a
 re-read while the card is open never changes the pick) and "Other", whose own
 box, labelled Other, takes 40 characters; a text box; the file, uploaded
 through a run's own upload path; then `createItem` with a key made with the
 card ("Nothing was uploaded…", and a refused field under its field). An item's
-page, `/account/flows/[subscriptionId]/items/[itemId]`, shows its runs in
-exactly `readItem`'s order, numbered, a run going "Reading…", an untitled one
-its status, a failed one in the muted colour; "What AI read", its sections
-closed; "Add {run}" — the run's file and Start, staying on the page — only
-where a run can start (`canAddRun`); and Archive, behind a confirmation, for an
-owner or admin only. A run with a `title` and a `score` is headed by them, and
-its `sections` come directly under its result line, before its tiles, as rows
-that open and close, the first open; a section's
+page, `/account/flows/[subscriptionId]/items/[itemId]`, shows its tiles —
+Total, then the flow's `items.verdictWords` with the item's `positiveCount`
+and `negativeCount`, green and red (`itemTiles`; none for a flow that
+declares no verdict words); the `items.file.title` row, opening the item's
+file page; "Add {run}" — the run's file and Start, staying on the page — only
+where a run can start (`canAddRun`); its runs in exactly `readItem`'s order,
+each a `PageRow` of its rank, title and score, a run going "Reading…", an
+untitled one its status, a failed one in the muted colour; and Archive,
+behind a confirmation, for an owner or admin only. The item's file page,
+`…/items/[itemId]/file`, shows the file (`readItemFile`) and then its
+`sections`, all closed. A run with a `title` and a `score` is headed by
+them; a run of an item opens with "View {file}" — its version's first file
+field's title (`runFileTitle`) — to the run's file page,
+`/account/runs/[runId]/files/[fileId]` (`readRunFile`); its `sections` are
+rows that open and close, the first open, under the flow's `items.runWords`.
+A file page (`components/dashboard/FileView.tsx`, the rules in
+`lib/run-files.ts`) frames a PDF, JPEG or PNG through its own view route (`app/account/runs/[runId]/files/[fileId]/view/route.ts`, the item's alike)
+— the platform's signed link read on the server (`lib/file-view.ts`), inline
+in that type, any other type an attachment, never cached, framed by this site
+alone and asked only by its pages (`Sec-Fetch-Site`) — then Download, the
+signed link followed only when https, and Share where the browser hands
+files to the share sheet, the bytes read from that same route
+(`siteFileBlob`); a section's
 link is drawn only when it is `http:` or `https:` and opens outside the site
 (`components/dashboard/SectionRows.tsx`). A file field that names its
 `acceptedContentTypes` offers those, sends a Word file as it is, offers Take
