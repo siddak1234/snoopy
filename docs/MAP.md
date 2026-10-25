@@ -70,6 +70,8 @@
 - `/account/billing`: [app/account/billing/page.tsx](../app/account/billing/page.tsx)
 - `/account/connections`: [app/account/connections/page.tsx](../app/account/connections/page.tsx)
 - `/account/flows/[subscriptionId]/email`: [app/account/flows/[subscriptionId]/email/page.tsx](../app/account/flows/[subscriptionId]/email/page.tsx)
+- `/account/flows/[subscriptionId]/items/[itemId]/file`: [app/account/flows/[subscriptionId]/items/[itemId]/file/page.tsx](../app/account/flows/[subscriptionId]/items/[itemId]/file/page.tsx)
+- `API /account/flows/[subscriptionId]/items/[itemId]/file/view`: [app/account/flows/[subscriptionId]/items/[itemId]/file/view/route.ts](../app/account/flows/[subscriptionId]/items/[itemId]/file/view/route.ts)
 - `/account/flows/[subscriptionId]/items/[itemId]`: [app/account/flows/[subscriptionId]/items/[itemId]/page.tsx](../app/account/flows/[subscriptionId]/items/[itemId]/page.tsx)
 - `/account/flows/[subscriptionId]`: [app/account/flows/[subscriptionId]/page.tsx](../app/account/flows/[subscriptionId]/page.tsx)
 - `/account/flows/[subscriptionId]/setup`: [app/account/flows/[subscriptionId]/setup/page.tsx](../app/account/flows/[subscriptionId]/setup/page.tsx)
@@ -78,6 +80,8 @@
 - `/account/organization`: [app/account/organization/page.tsx](../app/account/organization/page.tsx)
 - `/account`: [app/account/page.tsx](../app/account/page.tsx)
 - `/account/runs/[runId]/details`: [app/account/runs/[runId]/details/page.tsx](../app/account/runs/[runId]/details/page.tsx)
+- `/account/runs/[runId]/files/[fileId]`: [app/account/runs/[runId]/files/[fileId]/page.tsx](../app/account/runs/[runId]/files/[fileId]/page.tsx)
+- `API /account/runs/[runId]/files/[fileId]/view`: [app/account/runs/[runId]/files/[fileId]/view/route.ts](../app/account/runs/[runId]/files/[fileId]/view/route.ts)
 - `API /account/runs/[runId]/package/file`: [app/account/runs/[runId]/package/file/route.ts](../app/account/runs/[runId]/package/file/route.ts)
 - `/account/runs/[runId]/package`: [app/account/runs/[runId]/package/page.tsx](../app/account/runs/[runId]/package/page.tsx)
 - `/account/runs/[runId]`: [app/account/runs/[runId]/page.tsx](../app/account/runs/[runId]/page.tsx)
@@ -109,6 +113,7 @@
 - [lib/env.ts](../lib/env.ts): Validate the website's intentionally small production secret boundary.
 - [lib/export-contract.ts](../lib/export-contract.ts): no header
 - [lib/exports.ts](../lib/exports.ts): no header
+- [lib/file-view.ts](../lib/file-view.ts): no header
 - [lib/flow-email.ts](../lib/flow-email.ts): Who a flow's run emails go to, as the website draws it (Build 22, P1 and P5;
 - [lib/flow-items.ts](../lib/flow-items.ts): A flow's ITEMS as the website draws them (Round 19, plan §5; backend
 - [lib/flow-steps.ts](../lib/flow-steps.ts): A flow page's STEPS and its vendor choices (Build 21, spec A6; Build 22,
@@ -122,6 +127,7 @@
 - [lib/platform-server.ts](../lib/platform-server.ts): Server-side calls to the backend, from a Server Component or a Server Action.
 - [lib/retry-after.ts](../lib/retry-after.ts): A refused request's `retry-after`, and the wait it asks for in words — backend
 - [lib/run-documents.ts](../lib/run-documents.ts): A run's documents, as the run page's Documents cards draw them (Build 21,
+- [lib/run-files.ts](../lib/run-files.ts): A run's or an item's uploaded file, as the website shows it (Round 19,
 - [lib/run-progress.ts](../lib/run-progress.ts): A run's STEPS (Build 21, spec A7; the session's S14; the owner's build 20
 - [lib/session-contract.ts](../lib/session-contract.ts): no header
 - [lib/signed-link.ts](../lib/signed-link.ts): A signed link the browser goes to (Build 25, the review's R5c 2): the run

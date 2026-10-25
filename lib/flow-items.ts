@@ -31,6 +31,8 @@ export type ItemRowOf = {
   status: "reading" | "ready" | "failed";
   failureReason?: string;
   runCount: number;
+  positiveCount?: number;
+  negativeCount?: number;
   topScore: number | null;
   createdAt: string;
   archivedAt?: string | null;
@@ -43,6 +45,39 @@ export type ItemRunOf = {
   title?: string;
   score?: number;
 };
+
+/** What a run's verdict is called (`items.verdictWords`): "Advance", "Decline". */
+export type VerdictWords = { positive: string; negative: string };
+
+/** One of an item's tiles: its value over its label, in its tone. */
+export type ItemTile = {
+  key: "total" | "positive" | "negative";
+  label: string;
+  value: number;
+};
+
+/** The first of an item's tiles: all its runs. */
+export const TOTAL = "Total";
+
+/**
+ * An item's tiles, side by side at the top of its page (plan §3; the owner's
+ * build 28 item 6: "total candidates, green … would be the hireable ones and
+ * red would be do not hire"): Total, then the flow's words for a positive and
+ * a negative verdict with the item's tallies (`positiveCount`,
+ * `negativeCount`) — green and red. None for a flow whose items declare no
+ * verdict words: it gives no verdict to count.
+ */
+export function itemTiles(
+  item: { runCount: number; positiveCount: number; negativeCount: number },
+  words: VerdictWords | undefined,
+): ItemTile[] {
+  if (!words) return [];
+  return [
+    { key: "total", label: TOTAL, value: item.runCount },
+    { key: "positive", label: words.positive, value: item.positiveCount },
+    { key: "negative", label: words.negative, value: item.negativeCount },
+  ];
+}
 
 /** An item, or a run, whose file is still being read. */
 export const READING = "Reading…";
@@ -78,6 +113,14 @@ export function itemPath(subscriptionId: string, itemId: string): string {
 /** The flow page's button that makes an item: "Upload job". */
 export function uploadLabel(words: ItemWords): string {
   return `Upload ${inSentence(words.singular)}`;
+}
+
+/**
+ * The row that opens a file's page, in the flow's word for the file (Round
+ * 19, build 28; the owner's item 7): "View resume".
+ */
+export function viewFileLabel(title: string): string {
+  return `View ${inSentence(title)}`;
 }
 
 /** The item page's heading over the file that starts a run: "Add candidate". */

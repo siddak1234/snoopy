@@ -11,6 +11,7 @@ import {
   type Subscription,
 } from "@/lib/automations";
 import { settingLine, stepTitle } from "@/lib/flow-steps";
+import { runFileTitle } from "@/lib/run-files";
 import {
   PlatformNotConfiguredError,
   PlatformServerError,
@@ -29,7 +30,8 @@ import type { RunFlow } from "./RunLive";
  * of state transitions. The run names no flow (`Run.templateId`'s own words: a
  * screen joins the catalog), so its name, steps' titles and groups come from
  * there, and the word for one of its runs (`items.runWords`, the version the
- * flow runs, else the catalog's) heads what it read. A held run's approvals are
+ * flow runs, else the catalog's) heads what it read; its file's word is its
+ * version's first file field's title (`runFileTitle`). A held run's approvals are
  * read too: a waiting document whose approval was refused or ran out says "Not
  * approved" (S21), and while its newest waits, step 4 offers Approve and Deny
  * to a role it names (Build 24, P6; the role read as Approvals reads it, from
@@ -112,11 +114,14 @@ export async function readRunPage(
       (connection) => connection.providerId === providerId,
     )?.displayName ?? providerId;
   const runWord = (subscription?.items ?? entry?.items)?.runWords.singular;
+  // The flow's word for the run's file (build 28, item 7: "View resume").
+  const fileTitle = runFileTitle(subscription?.runInput);
   const flow: RunFlow = entry
     ? {
         name: entry.name,
         ...(entry.documentWords ? { documentWords: entry.documentWords } : {}),
         ...(runWord ? { runWord } : {}),
+        ...(fileTitle ? { fileTitle } : {}),
         pipeline: entry.pipeline.map((step) => ({
           id: step.id,
           title: step.title,

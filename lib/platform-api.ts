@@ -132,6 +132,30 @@ export async function signOutFromPlatform(): Promise<void> {
 const UPLOAD_TIMEOUT_MS = 15 * 60_000;
 
 /**
+ * One of this site's own file routes — a run's or an item's file, which the
+ * site reads from the platform's signed link on the server (`lib/file-view.ts`)
+ * — as bytes in the browser, for the share sheet (Round 19, build 28). Only
+ * a path of this site's account pages, with its own cookie; never a
+ * platform call and never another origin.
+ */
+export async function siteFileBlob(path: string): Promise<Blob> {
+  if (!path.startsWith("/account/"))
+    throw new PlatformApiError("The file could not be read.", 0);
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+  } catch {
+    throw new PlatformApiError("The file could not be read.", 0);
+  }
+  if (!response.ok)
+    throw new PlatformApiError("The file could not be read.", response.status);
+  return response.blob();
+}
+
+/**
  * Sends a file straight to the store, at a URL the platform signed for it
  * (backend FR-14) — not a platform call, so no cookie and no `/api/platform`.
  * The size is signed into the URL, and the browser sets `Content-Length` from

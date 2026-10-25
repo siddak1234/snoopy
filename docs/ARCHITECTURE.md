@@ -51,6 +51,8 @@ page reuses:
   on its details page, `/account/runs/[runId]/details`. What a run read comes
   first, under "{Run word} details", in its result line's place.
 - **A flow with items** is its items: no Dashboard, no Steps.
+- **A file's page** shows the original in place where a browser draws it,
+  then Download and Share, then what was read from it (`FileView`).
 
 ## Identity and connections
 
@@ -143,15 +145,29 @@ re-read while the card is open never changes the pick) and "Other", whose own
 box, labelled Other, takes 40 characters; a text box; the file, uploaded
 through a run's own upload path; then `createItem` with a key made with the
 card ("Nothing was uploaded…", and a refused field under its field). An item's
-page, `/account/flows/[subscriptionId]/items/[itemId]`, shows "Add {run}" —
-the run's file and Start, staying on the page — only where a run can start
-(`canAddRun`); its runs in exactly `readItem`'s order, each a `PageRow` of
-its rank, title and score, a run going "Reading…", an untitled one its
-status, a failed one in the muted colour; and Archive, behind a
-confirmation, for an owner or admin only — no sections (build 28, item 4). A
-run with a `title` and a `score` is headed by them, and its `sections` are
-rows that open and close, the first open, under the flow's `items.runWords`;
-a section's
+page, `/account/flows/[subscriptionId]/items/[itemId]`, shows its tiles —
+Total, then the flow's `items.verdictWords` with the item's `positiveCount`
+and `negativeCount`, green and red (`itemTiles`; none for a flow that
+declares no verdict words); the `items.file.title` row, opening the item's
+file page; "Add {run}" — the run's file and Start, staying on the page — only
+where a run can start (`canAddRun`); its runs in exactly `readItem`'s order,
+each a `PageRow` of its rank, title and score, a run going "Reading…", an
+untitled one its status, a failed one in the muted colour; and Archive,
+behind a confirmation, for an owner or admin only. The item's file page,
+`…/items/[itemId]/file`, shows the file (`readItemFile`) and then its
+`sections`, all closed. A run with a `title` and a `score` is headed by
+them; a run of an item opens with "View {file}" — its version's first file
+field's title (`runFileTitle`) — to the run's file page,
+`/account/runs/[runId]/files/[fileId]` (`readRunFile`); its `sections` are
+rows that open and close, the first open, under the flow's `items.runWords`.
+A file page (`components/dashboard/FileView.tsx`, the rules in
+`lib/run-files.ts`) frames a PDF, JPEG or PNG through its own view route (`app/account/runs/[runId]/files/[fileId]/view/route.ts`, the item's alike)
+— the platform's signed link read on the server (`lib/file-view.ts`), inline
+in that type, any other type an attachment, never cached, framed by this site
+alone and asked only by its pages (`Sec-Fetch-Site`) — then Download, the
+signed link followed only when https, and Share where the browser hands
+files to the share sheet, the bytes read from that same route
+(`siteFileBlob`); a section's
 link is drawn only when it is `http:` or `https:` and opens outside the site
 (`components/dashboard/SectionRows.tsx`). A file field that names its
 `acceptedContentTypes` offers those, sends a Word file as it is, offers Take

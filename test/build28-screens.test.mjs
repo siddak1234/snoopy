@@ -3,6 +3,18 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
 import { byDepartment } from "../app/account/flows/departments.ts";
+import { TOTAL, itemTiles, viewFileLabel } from "../lib/flow-items.ts";
+import {
+  FILE_GONE,
+  RUN_FILE_MAXIMUM_BYTES,
+  fileLine,
+  fileViewHref,
+  itemFilePath,
+  runFilePath,
+  runFileTitle,
+  shownInPlace,
+  sizeInWords,
+} from "../lib/run-files.ts";
 import {
   RUN_DETAILS,
   runDetailsPath,
@@ -16,7 +28,9 @@ import {
  * browser's own; an item's runs in compact rows and its sections off its
  * page; a run's page with "{Run word} details" first and the Run details row
  * for every run, its details page holding the result line, the tiles, the
- * steps and the facts. `test/flow-items.test.mjs` holds the item rules,
+ * steps and the facts; phase B, on the contract (backend cf17dbb): an item's
+ * tiles and its file page, a run's "View {file}" and its file page, each file
+ * read through this site's own route. `test/flow-items.test.mjs` holds the item rules,
  * `e2e/flow-items.spec.ts` what a browser draws. The fixtures are made up.
  */
 
@@ -180,4 +194,175 @@ test("Run details: its row on every run's page, its page the tiles, the steps an
     /view="details"/u,
   );
   assert.match(code(read("app/account/runs/[runId]/page.tsx")), /view="run"/u);
+});
+
+test("an item's tiles: Total, then the flow's verdict words with its tallies; none for a flow that declares no words (item 6)", () => {
+  const item = { runCount: 7, positiveCount: 3, negativeCount: 2 };
+  assert.deepEqual(itemTiles(item, { positive: "Keep", negative: "Drop" }), [
+    { key: "total", label: TOTAL, value: 7 },
+    { key: "positive", label: "Keep", value: 3 },
+    { key: "negative", label: "Drop", value: 2 },
+  ]);
+  assert.equal(TOTAL, "Total");
+  assert.deepEqual(itemTiles(item, undefined), []);
+  // Green and red, on top, then the file's row, before Add and the runs.
+  const live = code(
+    read("app/account/flows/[subscriptionId]/items/[itemId]/ItemLive.tsx"),
+  );
+  assert.match(
+    live,
+    /const tiles = itemTiles\(item, declared\.verdictWords\);/u,
+  );
+  assert.match(live, /positive: "text-\[var\(--success-text\)\]",/u);
+  assert.match(live, /negative: "text-\[var\(--error-text\)\]",/u);
+  const tiles = live.indexOf('data-testid="item-tiles"');
+  const file = live.indexOf('testId="item-file-row"');
+  assert.ok(tiles > 0 && tiles < file, "the tiles, then the file's row");
+  assert.ok(file < live.indexOf('aria-labelledby="item-add-title"'));
+  assert.ok(file < live.indexOf('data-testid="item-runs"'));
+  assert.match(
+    live,
+    /<PageRow\s+href=\{itemFilePath\(subscriptionId, item\.id\)\}\s+testId="item-file-row"\s*>\s*<span[^>]*>\s*\{declared\.file\.title\}/u,
+  );
+});
+
+test("a file's page: its paths, its words, shown in place only when a browser draws it (items 4 and 7)", () => {
+  assert.equal(viewFileLabel("Entry file"), "View entry file");
+  assert.equal(viewFileLabel("NDA"), "View NDA");
+  assert.equal(runFilePath("r/1", "f 2"), "/account/runs/r%2F1/files/f%202");
+  assert.equal(
+    itemFilePath("s 1", "i/2"),
+    "/account/flows/s%201/items/i%2F2/file",
+  );
+  assert.equal(fileViewHref("/account/x"), "/account/x/view");
+  for (const type of [
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "IMAGE/PNG",
+  ])
+    assert.equal(shownInPlace(type), true, type);
+  for (const type of [
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "image/heic",
+    "text/html",
+    "",
+  ])
+    assert.equal(shownInPlace(type), false, type);
+  assert.equal(sizeInWords(900), "900 bytes");
+  assert.equal(sizeInWords(24 * 1024), "24 KB");
+  assert.equal(sizeInWords(1.25 * 1024 * 1024), "1.3 MB");
+  assert.equal(
+    fileLine({ format: "PDF", pages: 2, sizeBytes: 2048 }),
+    "PDF · 2 pages · 2 KB",
+  );
+  assert.equal(
+    fileLine({ format: "PNG", pages: 1, sizeBytes: 10 }),
+    "PNG · 1 page · 10 bytes",
+  );
+  assert.equal(
+    fileLine({ format: "DOCX", pages: null, sizeBytes: 10 }),
+    "DOCX · 10 bytes",
+  );
+  assert.equal(
+    runFileTitle([
+      { control: "text", title: "Note" },
+      { control: "artifact", title: "Entry file" },
+      { control: "artifact", title: "Second" },
+    ]),
+    "Entry file",
+  );
+  assert.equal(runFileTitle([{ control: "text", title: "Note" }]), null);
+  assert.equal(runFileTitle(undefined), null);
+  assert.equal(RUN_FILE_MAXIMUM_BYTES, 25 * 1024 * 1024);
+  assert.equal(FILE_GONE, "This file is no longer kept.");
+});
+
+test("a file is handed on by this site's own route: inline only in a type a browser draws, else an attachment of no type; never cached, nosniff, framed by this site, asked only by its pages (items 4 and 7)", () => {
+  const view = code(read("lib/file-view.ts"));
+  assert.match(
+    view,
+    /if \(fetchSite !== "same-origin" && fetchSite !== "none"\)\s*return said\(403/u,
+  );
+  assert.match(
+    view,
+    /platformSignedFile\(downloadUrl, RUN_FILE_MAXIMUM_BYTES\)/u,
+  );
+  assert.match(view, /const inPlace = shownInPlace\(file\.contentType\);/u);
+  assert.match(
+    view,
+    /"content-type": inPlace\s*\? file\.contentType\.toLowerCase\(\)\s*: "application\/octet-stream",/u,
+  );
+  assert.match(view, /\$\{inPlace \? "inline" : "attachment"\}/u);
+  assert.match(view, /"x-content-type-options": "nosniff",/u);
+  assert.match(view, /"content-security-policy": "frame-ancestors 'self'",/u);
+  assert.match(view, /"cache-control": "private, no-store",/u);
+  // Each route reads its own operation; an item of another flow is not found.
+  assert.match(
+    code(read("app/account/runs/[runId]/files/[fileId]/view/route.ts")),
+    /readRunFile\(workspaceId, runId, fileId\)/u,
+  );
+  const item = code(
+    read(
+      "app/account/flows/[subscriptionId]/items/[itemId]/file/view/route.ts",
+    ),
+  );
+  assert.match(
+    item,
+    /if \(item\.subscriptionId !== subscriptionId\)\s*throw new PlatformServerError\("Not Found", 404\);\s*return readItemFile\(workspaceId, itemId\);/u,
+  );
+  // Download: the platform's link, asked when pressed, followed only when
+  // https; Share: the bytes from this site's route, never a hand-written fetch.
+  const file = code(read("components/dashboard/FileView.tsx"));
+  assert.match(
+    file,
+    /const link = await platformApiJson<RunFileLink>\(linkPath\);\s*if \(!followSignedLink\(link\.downloadUrl\)\) setError\(DOWNLOAD_FAILED\);/u,
+  );
+  assert.match(file, /const blob = await siteFileBlob\(viewHref\);/u);
+  assert.doesNotMatch(file, /\bfetch\(/u);
+  assert.match(file, /\{shownInPlace\(file\.contentType\) \? \(\s*<iframe/u);
+  const api = code(read("lib/platform-api.ts"));
+  assert.match(
+    api,
+    /export async function siteFileBlob\(path: string\): Promise<Blob> \{\s*if \(!path\.startsWith\("\/account\/"\)\)/u,
+  );
+});
+
+test("a run of an item has its file's row first, in the flow's word; the item's file page its sections, all closed (items 4 and 7)", () => {
+  const live = code(read(RUN_LIVE));
+  assert.match(
+    live,
+    /const files = run\.itemId \? \(detail\.files \?\? \[\]\) : \[\];/u,
+  );
+  const runPage = live.slice(live.lastIndexOf("<SectionCard"));
+  const row = runPage.indexOf("runFilePath(run.id, file.id)");
+  assert.ok(row > 0, "the run's page draws the file's row");
+  assert.ok(row < runPage.indexOf('data-testid="run-result"'));
+  assert.ok(row < runPage.indexOf('testId="run-section"'));
+  assert.match(
+    live,
+    /files\.length === 1 && flow\?\.fileTitle\s*\? viewFileLabel\(flow\.fileTitle\)/u,
+  );
+  assert.match(
+    code(read("app/account/runs/[runId]/run-page-data.ts")),
+    /const fileTitle = runFileTitle\(subscription\?\.runInput\);/u,
+  );
+  const page = code(read("app/account/runs/[runId]/files/[fileId]/page.tsx"));
+  assert.match(
+    page,
+    /const file = detail\.files\?\.find\(\(candidate\) => candidate\.id === fileId\);\s*if \(!file\) notFound\(\);/u,
+  );
+  const itemFile = code(
+    read("app/account/flows/[subscriptionId]/items/[itemId]/file/page.tsx"),
+  );
+  assert.match(
+    itemFile,
+    /if \(item\.subscriptionId !== subscriptionId\) notFound\(\);/u,
+  );
+  assert.match(
+    itemFile,
+    /<SectionRows sections=\{item\.sections\} testId="item-section" \/>/u,
+  );
+  assert.doesNotMatch(itemFile, /firstOpen/u);
+  assert.match(itemFile, /return FILE_GONE;/u);
 });

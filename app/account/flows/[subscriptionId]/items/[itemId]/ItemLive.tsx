@@ -6,6 +6,7 @@ import SectionCard from "@/components/dashboard/SectionCard";
 import { BackLink } from "@/components/dashboard/BackLink";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { PageRow } from "@/components/dashboard/PageRow";
+import { Tile } from "@/components/dashboard/Tile";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import Modal from "@/components/ui/Modal";
@@ -21,11 +22,14 @@ import {
   inSentence,
   itemGoing,
   itemSubheader,
+  itemTiles,
+  type ItemTile,
   noneYet,
   rankedRows,
 } from "@/lib/flow-items";
 import { flowPath } from "@/lib/flow-steps";
 import { platformApiJson } from "@/lib/platform-api";
+import { itemFilePath } from "@/lib/run-files";
 import { RUN_REREAD_MS } from "@/lib/run-progress";
 import { archiveItem } from "../../../actions";
 import { RunStart } from "../../../RunStart";
@@ -33,7 +37,11 @@ import { RunStart } from "../../../RunStart";
 /**
  * An item's page, live (Round 19, plan §5.3; backend ADR-0046). Top to
  * bottom: its title, its group's value and where it is ("{group} ·
- * Ready", "Reading…", or why it could not be read); for an owner or admin
+ * Ready", "Reading…", or why it could not be read); its tiles side by side
+ * (`itemTiles`; the owner's build 28 item 6): Total, then the flow's verdict
+ * words with the item's tallies, green and red; the "{File title}" row ("Job
+ * description", `items.file.title`; item 4) opening the item's file page —
+ * the file, then what was read from it; for an owner or admin
  * while it is ready and not archived and a run can start (`canAddRun`: the
  * flow live, answering, with a run file), "Add {run}": the flow's run file,
  * the accepted types in words, and Start — the run names this item and
@@ -42,8 +50,8 @@ import { RunStart } from "../../../RunStart";
  * section's (`PageRow`; the owner's build 28 item 5): its rank, its title, its
  * score and the arrow, opening its run's page; and Archive for an owner or
  * admin, behind its confirmation. ~~"What AI read", its file's reading, under
- * the runs~~ until build 28 (item 4): its sections go to the item's file page
- * (plan §3).
+ * the runs~~ until build 28 (item 4): its sections are on the item's file
+ * page.
  *
  * Read again every 2 s while it, or one of its runs, is still going
  * (`itemGoing`, `RUN_REREAD_MS`), one read at a time, through
@@ -109,6 +117,7 @@ export function ItemLive({
 
   const archived = item.archivedAt !== null;
   const rows = rankedRows(runs);
+  const tiles = itemTiles(item, declared.verdictWords);
 
   return (
     <SectionCard
@@ -116,6 +125,33 @@ export function ItemLive({
       subheader={itemSubheader(item, declared.groupField)}
       back={<BackLink href={flowPath(subscriptionId)} />}
     >
+      {tiles.length > 0 ? (
+        <dl
+          data-testid="item-tiles"
+          className="grid grid-cols-3 gap-3 py-5 first:pt-0"
+        >
+          {tiles.map((tile) => (
+            <Tile
+              key={tile.key}
+              label={tile.label}
+              value={String(tile.value)}
+              testId={`item-tile-${tile.key}`}
+              tone={TILE_TONE[tile.key]}
+            />
+          ))}
+        </dl>
+      ) : null}
+
+      <div className="py-5 first:pt-0">
+        <PageRow
+          href={itemFilePath(subscriptionId, item.id)}
+          testId="item-file-row"
+        >
+          <span className="min-w-0 truncate font-medium text-[var(--text)]">
+            {declared.file.title}
+          </span>
+        </PageRow>
+      </div>
       {canAddRun({
         canManage,
         item,
@@ -206,6 +242,13 @@ export function ItemLive({
     </SectionCard>
   );
 }
+
+/** Total in the text colour; the positive verdict green, the negative red. */
+const TILE_TONE: Record<ItemTile["key"], string> = {
+  total: "text-[var(--text)]",
+  positive: "text-[var(--success-text)]",
+  negative: "text-[var(--error-text)]",
+};
 
 /**
  * Archive, last and in red, behind the confirmation a flow's Archive has

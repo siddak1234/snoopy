@@ -21,6 +21,7 @@ import SectionCard from "@/components/dashboard/SectionCard";
 import { BackLink } from "@/components/dashboard/BackLink";
 import { PageRow } from "@/components/dashboard/PageRow";
 import { SectionRows } from "@/components/dashboard/SectionRows";
+import { Tile } from "@/components/dashboard/Tile";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
@@ -50,6 +51,8 @@ import {
   type DocumentRowView,
   type DocumentWords,
 } from "@/lib/run-documents";
+import { viewFileLabel } from "@/lib/flow-items";
+import { runFilePath } from "@/lib/run-files";
 import {
   RUN_DETAILS,
   RUN_REREAD_MS,
@@ -93,6 +96,8 @@ export type RunFlow = {
   documentWords?: DocumentWords;
   /** What the flow calls one of its runs, when it has items (`items.runWords`). */
   runWord?: string;
+  /** What the flow calls a run's file: its first file field's title ("Resume"). */
+  fileTitle?: string;
   pipeline: DeclaredStep[];
   groups?: ProgressGroup[];
   tracker?: TrackerFlow;
@@ -105,7 +110,9 @@ export type RunFlow = {
  * component with an arrow"; `view`):
  *
  * - **the run's page** (`run`): its full id, or its title and score, and its
- *   status; how it went, or — a run that read sections — what it read under
+ *   status; for a run of an item, a "View {file}" row for its file ("View
+ *   resume", the flow's word; build 28, item 7) opening the file's page; how
+ *   it went, or — a run that read sections — what it read under
  *   "{Run word} details" in its place; each document it read on
  *   a card of its own (or a v1/v2 run's Details); the Run details row
  *   (`PageRow`); View package, Download PDF and Download Excel once the job
@@ -270,6 +277,8 @@ export function RunLive({
   ];
 
   const name = headed && run.title ? run.title : runLabel(run.id);
+  // A run of an item: its uploaded file, to view, download and share.
+  const files = run.itemId ? (detail.files ?? []) : [];
 
   if (view === "details") {
     return (
@@ -284,8 +293,13 @@ export function RunLive({
             <Tile
               label="Duration"
               value={runDuration(run.startedAt, run.endedAt)}
+              testId="run-tile-Duration"
             />
-            <Tile label="Steps done" value={stepsDone(tracker)} />
+            <Tile
+              label="Steps done"
+              value={stepsDone(tracker)}
+              testId="run-tile-Steps done"
+            />
           </dl>
         </div>
 
@@ -358,6 +372,25 @@ export function RunLive({
         </>
       }
     >
+      {/* Right under its name and score (build 28, item 7): its file. */}
+      {files.length > 0 ? (
+        <div className="flex flex-col gap-2 py-5 first:pt-0">
+          {files.map((file) => (
+            <PageRow
+              key={file.id}
+              href={runFilePath(run.id, file.id)}
+              testId={`run-file-${file.id}`}
+            >
+              <span className="min-w-0 truncate font-medium text-[var(--text)]">
+                {files.length === 1 && flow?.fileTitle
+                  ? viewFileLabel(flow.fileTitle)
+                  : `View ${file.filename}`}
+              </span>
+            </PageRow>
+          ))}
+        </div>
+      ) : null}
+
       {/* How it went, on a line of its own, in the automation's words — for
           a run that read no sections: one that did is said by them (build
           28, item 8: "Instead of strong match 6 of 6"). */}
@@ -612,21 +645,6 @@ const RESULT_TONE: Partial<Record<RunDetail["run"]["status"], string>> = {
   failed: "text-[var(--error-text)]",
   held: "text-[var(--warning-text)]",
 };
-
-/** A tile: its value large over its label — the label first in the markup, as a list says it. */
-function Tile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col-reverse rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)] px-4 py-3">
-      <dt className="text-xs text-[var(--muted)]">{label}</dt>
-      <dd
-        data-testid={`run-tile-${label}`}
-        className="text-2xl font-medium text-[var(--text)]"
-      >
-        {value}
-      </dd>
-    </div>
-  );
-}
 
 const STATE_LOOK: Record<
   TrackerState,

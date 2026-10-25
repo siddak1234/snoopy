@@ -124,9 +124,11 @@ and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: the Flows
 list by department A–Z; its items grouped A–Z under its group filter, the
 website's drop-down, on its page with no Dashboard, no Steps and no run start
 form; the upload card's drop-down, "Other" and the values typed before; an
-item's runs ranked in compact rows a closed section's height; a run headed by
-its title and score with its sections under "{Run word} details" and its Run
-details page; Archive, an owner's buttons a member
+item's runs ranked in compact rows a closed section's height, its tiles and
+its file page — the file in place, its route for this site's pages alone,
+Download to its signed link, Share, then its sections; a run headed by its
+title and score with View {file} and its file page, its sections under
+"{Run word} details" and its Run details page; Archive, an owner's buttons a member
 does not see and a member's presses refused in words, and an unanswered list
 said "Unavailable"), sharing `e2e/helpers.ts`. The playbook's human keyboard
 traversal (NFR-35) has a hand-over test in the same suite:
