@@ -465,6 +465,12 @@ test("questions: the page's own form for each, with its context; nothing where t
     [],
     "no form, no title",
   );
+  // The page's form for a member draws nothing (ItemLive's canAdd): no title.
+  assert.deepEqual(
+    byTest(tree(titled, { forms: { run: () => null } }), "block-label"),
+    [],
+    "a form that draws nothing, no title",
+  );
 });
 
 /** Each case this build does not know, and what it must draw. */
