@@ -5,7 +5,7 @@ import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { getAppSession } from "@/lib/app-session";
 import { readRun } from "@/lib/automations";
 import { PlatformServerError } from "@/lib/platform-server";
-import { PACKAGE_UNAVAILABLE, packageAvailable } from "@/lib/run-documents";
+import { PACKAGE_UNAVAILABLE } from "@/lib/run-documents";
 import { runLabel } from "@/lib/run-progress";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 import { PackageActions, PackageFrame } from "../RunLive";
@@ -16,7 +16,8 @@ import { PackageActions, PackageFrame } from "../RunLive";
  * — cover, summary, subtotals, every invoice and the original files — in a
  * frame the page's height, through the site's own route (`file/route.ts`),
  * and Download PDF and Download Excel. A job the platform cannot package yet
- * (no documents, or still going) says so, with the way back to its run.
+ * (no documents, or still going: `packageAvailable`) says so, with the way
+ * back to its run.
  * ~~The package's content drawn as sections of this page~~ (the session's
  * S16), overridden by the owner: the page shows the PDF.
  */
@@ -40,7 +41,8 @@ export default async function RunPackagePage(
     throw error;
   }
   const job = detail.run.id;
-  const ready = packageAvailable(detail.run.status, detail.documents);
+  // The platform says whether the job has a package (backend ADR-0048).
+  const ready = detail.packageAvailable === true;
 
   return (
     <SectionCard

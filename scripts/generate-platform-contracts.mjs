@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -63,3 +63,43 @@ for (const { input, output } of contracts) {
     stdio: "inherit",
   });
 }
+
+// The block fixtures (backend ADR-0048 decision 9): every page body both
+// clients must draw to exactly its `text`. One file, headed by one sha256 over
+// the fixtures' bytes, each file in name order — the app's generator hashes
+// them the same way, so the two headers are equal when both clients assert
+// the same fixtures.
+const fixtureDirectory = join(
+  backendRoot,
+  "packages/contracts/fixtures/blocks",
+);
+if (!existsSync(fixtureDirectory)) {
+  throw new Error(
+    `Required block fixtures are unavailable: ${fixtureDirectory}`,
+  );
+}
+const fixtureFiles = readdirSync(fixtureDirectory)
+  .filter((name) => name.endsWith(".json"))
+  .sort();
+const fixtureHash = createHash("sha256");
+const fixtures = fixtureFiles.map((name) => {
+  const bytes = readFileSync(join(fixtureDirectory, name));
+  fixtureHash.update(bytes);
+  return JSON.parse(bytes.toString("utf8"));
+});
+const fixtureOutput = join(
+  root,
+  "lib/generated/platform-contracts/block-fixtures.ts",
+);
+writeFileSync(
+  fixtureOutput,
+  `// From snoopy-backend ${relative(backendRoot, fixtureDirectory)}/*.json, sha256 ${fixtureHash.digest("hex")}.\n` +
+    "// Regenerate with `npm run generate:platform-contracts`; never edit by hand.\n" +
+    "/** A page body and its visible words in reading order, closed sections left out. */\n" +
+    "export type BlockFixture = {\n  name: string;\n  about: string;\n  blockSetVersion: number;\n  blocks: readonly unknown[];\n  text: readonly string[];\n};\n\n" +
+    `export const BLOCK_FIXTURES: readonly BlockFixture[] = ${JSON.stringify(fixtures)};\n`,
+);
+execFileSync(prettier, [fixtureOutput, "--write"], {
+  cwd: root,
+  stdio: "inherit",
+});

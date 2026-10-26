@@ -20,7 +20,8 @@ const publicRoutes = [
 
 // Every page behind sign-in (register F37) — eighteen, found by
 // `find app/account app/onboarding -name page.tsx` — with the run page read
-// twice: a run that saved details, and one of three receipts (Build 21). The
+// four times: a run that saved details, one of three receipts (Build 21),
+// and the platform's v7 and v2 bodies as its block fixtures hold them. The
 // ones with an id read the fixture's team, runs and flow — its page, its Set
 // up, its Connect integration and who gets its email (Build 22) — and the
 // onboarding pages are read as the fixture's requester (a person with no
@@ -46,6 +47,10 @@ const authenticatedRoutes: ReadonlyArray<{
   // its details page — its steps and facts (build 28, item 9).
   { path: "/account/runs/fixture-run-invoice", fixture: {} },
   { path: "/account/runs/fixture-run-invoice/details", fixture: {} },
+  // The platform's own page bodies (backend ADR-0048, its block fixtures):
+  // Invoice Processing v7's run of three invoices, and v2's run with details.
+  { path: "/account/runs/blocks-v7-recorded", fixture: {} },
+  { path: "/account/runs/blocks-v2-details", fixture: {} },
   // Invoice Processing's own pages (Build 21, spec A2, A6; the owner's AM4;
   // Build 22, P1–P5): its page, its Set up, its Connect integration page for
   // its step 2, and who gets its email.

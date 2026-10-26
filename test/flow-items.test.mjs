@@ -6,7 +6,6 @@ import {
   OTHER,
   OTHER_CHOICE,
   READING,
-  addRunLabel,
   archiveLabel,
   canAddRun,
   firstChoice,
@@ -21,8 +20,6 @@ import {
   noneYet,
   pluralOf,
   problemFields,
-  rankedRows,
-  sectionLink,
   selectChoices,
   uploadLabel,
 } from "../lib/flow-items.ts";
@@ -30,8 +27,11 @@ import {
 /**
  * A flow's items as the website draws them (Round 19, plan §5; backend
  * ADR-0046): every word from the platform, the grouping and its order, the
- * select with "Other" and the values typed before, the ranked runs, and the
- * links a section may hold. The fixtures are made-up: no flow's words.
+ * select with "Other" and the values typed before, and when an item's page
+ * offers its run form. The fixtures are made-up: no flow's words. ~~The
+ * ranked runs and a section's links~~ until Round 21 (backend ADR-0048): the
+ * platform sends them as blocks, and its tests hold their words
+ * (`test/blocks-render.test.mjs` draws them).
  */
 
 const words = { singular: "Batch", plural: "Batches" };
@@ -62,7 +62,6 @@ function item(id, areaValue, createdAt, rest = {}) {
 
 test("every word for the items is the platform's, inside a sentence where it falls there", () => {
   assert.equal(uploadLabel(words), "Upload batch");
-  assert.equal(addRunLabel(runWords), "Add entry");
   assert.equal(archiveLabel(words), "Archive batch");
   assert.equal(noneYet(words), "No batches yet.");
   assert.equal(noneYet(runWords), "No entries yet.");
@@ -307,60 +306,6 @@ test("a saved value is held by its words: a name typed meanwhile that sorts ahea
   );
 });
 
-test("an item's runs keep the platform's order exactly — never sorted again here — numbered 1…n (Round 19 review, finding 8)", () => {
-  // An order a sort by score, or by status, would change.
-  const rows = rankedRows([
-    { id: "low", status: "succeeded", title: "Ben Ito", score: 64 },
-    {
-      id: "high",
-      status: "succeeded",
-      title: "Ada Lane",
-      score: 91,
-      resultSummary: "Strong fit",
-    },
-    { id: "failed", status: "failed", failureReason: "No text." },
-    { id: "pending", status: "pending" },
-  ]);
-  assert.deepEqual(
-    rows.map((row) => [row.rank, row.id]),
-    [
-      [1, "low"],
-      [2, "high"],
-      [3, "failed"],
-      [4, "pending"],
-    ],
-  );
-});
-
-test("a run still going reads Reading… with no score; a finished one its title, else its status in the app's words; a failure dimmed — a compact row, rank, title and score, no result line (Round 19 review, finding 4; build 28, item 5)", () => {
-  const rows = rankedRows([
-    {
-      id: "a",
-      status: "succeeded",
-      title: "Ada Lane",
-      score: 91,
-      resultSummary: "Strong fit",
-    },
-    { id: "b", status: "succeeded", title: "Ben Ito", score: 0 },
-    { id: "c", status: "running", title: "Early", score: 5 },
-    { id: "d", status: "failed", failureReason: "Scoring timed out." },
-    { id: "e", status: "pending" },
-    { id: "f", status: "cancelled" },
-    { id: "g", status: "held" },
-    { id: "h", status: "succeeded" },
-  ]);
-  assert.deepEqual(rows, [
-    { id: "a", rank: 1, title: "Ada Lane", score: 91, dim: false },
-    { id: "b", rank: 2, title: "Ben Ito", score: 0, dim: false },
-    { id: "c", rank: 3, title: READING, score: null, dim: false },
-    { id: "d", rank: 4, title: "Failed", score: null, dim: true },
-    { id: "e", rank: 5, title: READING, score: null, dim: false },
-    { id: "f", rank: 6, title: "Cancelled", score: null, dim: true },
-    { id: "g", rank: 7, title: "Held", score: null, dim: false },
-    { id: "h", rank: 8, title: "Success", score: null, dim: false },
-  ]);
-});
-
 test("Add is offered only where a run can start: an owner or admin, the item ready and not archived, the flow live, answering and declaring a run file (Round 19 review, finding 3)", () => {
   const can = {
     canManage: true,
@@ -394,21 +339,6 @@ test("an item's page is read again while it, or one of its runs, is going", () =
     false,
   );
   assert.equal(itemGoing({ status: "failed" }, []), false);
-});
-
-test("a section's link is drawn only when it is http or https", () => {
-  assert.equal(sectionLink("https://example.test/a"), "https://example.test/a");
-  assert.equal(sectionLink("http://example.test/"), "http://example.test/");
-  for (const refused of [
-    "javascript:alert(1)",
-    "data:text/html,x",
-    "mailto:a@example.test",
-    "//example.test",
-    "not a url",
-    "",
-    undefined,
-  ])
-    assert.equal(sectionLink(refused), null, String(refused));
 });
 
 test("a refused item names its fields from the platform's problems, and nothing else", () => {

@@ -2,11 +2,9 @@
 
 import { useEffect, useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { BlockList } from "@/components/blocks/BlockList";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { BackLink } from "@/components/dashboard/BackLink";
-import { EmptyRow } from "@/components/dashboard/EmptyRow";
-import { PageRow } from "@/components/dashboard/PageRow";
-import { Tile } from "@/components/dashboard/Tile";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import Modal from "@/components/ui/Modal";
@@ -16,45 +14,35 @@ import type {
   ReadItemResponse,
 } from "@/lib/automations";
 import {
-  addRunLabel,
   archiveLabel,
   canAddRun,
   inSentence,
   itemGoing,
   itemSubheader,
-  itemTiles,
-  type ItemTile,
-  noneYet,
-  rankedRows,
 } from "@/lib/flow-items";
 import { flowPath } from "@/lib/flow-steps";
 import { platformApiJson } from "@/lib/platform-api";
-import { itemFilePath } from "@/lib/run-files";
-import { RUN_REREAD_MS } from "@/lib/run-progress";
+import { BLOCKS_SHAPE, RUN_REREAD_MS } from "@/lib/run-progress";
 import { archiveItem } from "../../../actions";
 import { RunStart } from "../../../RunStart";
 
 /**
- * An item's page, live (Round 19, plan §5.3; backend ADR-0046). Top to
- * bottom: its title, its group's value and where it is ("{group} ·
- * Ready", "Reading…", or why it could not be read); its tiles side by side
- * (`itemTiles`; the owner's build 28 item 6): Total, then the flow's verdict
- * words with the item's tallies, green and red; the "{File title}" row ("Job
- * description", `items.file.title`; item 4) opening the item's file page —
- * the file, then what was read from it; for an owner or admin
- * while it is ready and not archived and a run can start (`canAddRun`: the
- * flow live, answering, with a run file), "Add {run}": the flow's run file,
- * the accepted types in words, and Start — the run names this item and
- * joins the list below as "Reading…"; its runs, ranked exactly as the
- * platform answers them (`rankedRows`), each a compact row the height of a
- * section's (`PageRow`; the owner's build 28 item 5): its rank, its title, its
- * score and the arrow, opening its run's page; and Archive for an owner or
- * admin, behind its confirmation. ~~"What AI read", its file's reading, under
- * the runs~~ until build 28 (item 4): its sections are on the item's file
- * page.
+ * An item's page, live (Round 19, plan §5.3; backend ADR-0046). Its header:
+ * its title, its group's value and where it is ("{group} · Ready",
+ * "Reading…", or why it could not be read). Its body, as the platform sent
+ * it (backend ADR-0048; `BlockList`), in its flow's `pages.item` order — its
+ * tiles, its file's row opening the item's file page, the form that starts
+ * one of its runs, and its runs, ranked as the platform answers them, each a
+ * compact row opening its run's page. The run form is `RunStart`, drawn only
+ * where a run can start (`canAddRun`: an owner or admin, the item ready and
+ * not archived, the flow live, answering, with a run file); the run names
+ * this item and joins the list as "Reading…". Its footer: Archive, for an
+ * owner or admin, behind its confirmation. An answer with no blocks draws the
+ * header, the footer and the fallback sentence. ~~Its tiles and ranked rows
+ * drawn here~~ until Round 21.
  *
  * Read again every 2 s while it, or one of its runs, is still going
- * (`itemGoing`, `RUN_REREAD_MS`), one read at a time, through
+ * (`going`, else `itemGoing`; `RUN_REREAD_MS`), one read at a time, through
  * `/api/platform`; a read that fails leaves the page as it was.
  */
 export function ItemLive({
@@ -92,14 +80,14 @@ export function ItemLive({
   }
   const [reads, setReads] = useState(0);
   const { item, runs } = detail;
-  const going = itemGoing(item, runs);
+  const going = detail.going ?? itemGoing(item, runs);
 
   useEffect(() => {
     if (!going) return;
     let alive = true;
     const timer = setTimeout(() => {
       platformApiJson<ReadItemResponse>(
-        `/v1/workspaces/${encodeURIComponent(workspaceId)}/items/${encodeURIComponent(item.id)}`,
+        `/v1/workspaces/${encodeURIComponent(workspaceId)}/items/${encodeURIComponent(item.id)}${BLOCKS_SHAPE}`,
       )
         .then((answer) => {
           if (alive) setDetail(answer);
@@ -116,8 +104,13 @@ export function ItemLive({
   }, [going, reads, workspaceId, item.id]);
 
   const archived = item.archivedAt !== null;
-  const rows = rankedRows(runs);
-  const tiles = itemTiles(item, declared.verdictWords);
+  const canAdd = canAddRun({
+    canManage,
+    item,
+    live,
+    available,
+    runInputs: runInput.length,
+  });
 
   return (
     <SectionCard
@@ -125,107 +118,33 @@ export function ItemLive({
       subheader={itemSubheader(item, declared.groupField)}
       back={<BackLink href={flowPath(subscriptionId)} />}
     >
-      {tiles.length > 0 ? (
-        <dl
-          data-testid="item-tiles"
-          className="grid grid-cols-3 gap-3 py-5 first:pt-0"
-        >
-          {tiles.map((tile) => (
-            <Tile
-              key={tile.key}
-              label={tile.label}
-              value={String(tile.value)}
-              testId={`item-tile-${tile.key}`}
-              tone={TILE_TONE[tile.key]}
-            />
-          ))}
-        </dl>
-      ) : null}
-
       <div className="py-5 first:pt-0">
-        <PageRow
-          href={itemFilePath(subscriptionId, item.id)}
-          testId="item-file-row"
-        >
-          <span className="min-w-0 truncate font-medium text-[var(--text)]">
-            {declared.file.title}
-          </span>
-        </PageRow>
+        <BlockList
+          blocks={detail.blocks}
+          testId="item-blocks"
+          context={{
+            subscriptionId,
+            forms: {
+              run: (form) =>
+                canAdd ? (
+                  <div data-testid="item-add">
+                    <RunStart
+                      workspaceId={workspaceId}
+                      subscriptionId={subscriptionId}
+                      runInput={runInput}
+                      live={live}
+                      available={available}
+                      canGoLive={canGoLive}
+                      initialKey={initialKey}
+                      itemId={form.itemId ?? item.id}
+                      onStarted={() => router.refresh()}
+                    />
+                  </div>
+                ) : null,
+            },
+          }}
+        />
       </div>
-      {canAddRun({
-        canManage,
-        item,
-        live,
-        available,
-        runInputs: runInput.length,
-      }) ? (
-        <section aria-labelledby="item-add-title" className="py-5 first:pt-0">
-          <h2
-            id="item-add-title"
-            className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
-          >
-            {addRunLabel(declared.runWords)}
-          </h2>
-          <div data-testid="item-add" className="mt-3">
-            <RunStart
-              workspaceId={workspaceId}
-              subscriptionId={subscriptionId}
-              runInput={runInput}
-              live={live}
-              available={available}
-              canGoLive={canGoLive}
-              initialKey={initialKey}
-              itemId={item.id}
-              onStarted={() => router.refresh()}
-            />
-          </div>
-        </section>
-      ) : null}
-
-      <section aria-labelledby="item-runs-title" className="py-5 first:pt-0">
-        <h2
-          id="item-runs-title"
-          className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
-        >
-          {declared.runWords.plural}
-        </h2>
-        {rows.length === 0 ? (
-          <div className="mt-3">
-            <EmptyRow text={noneYet(declared.runWords)} />
-          </div>
-        ) : (
-          <ol data-testid="item-runs" className="mt-3 flex flex-col gap-2">
-            {rows.map((row) => (
-              <li key={row.id}>
-                <PageRow
-                  href={`/account/runs/${encodeURIComponent(row.id)}`}
-                  testId={`item-run-${row.rank}`}
-                  dim={row.dim}
-                  end={
-                    row.score !== null ? (
-                      <span className="shrink-0 text-sm font-medium text-[var(--text)] tabular-nums">
-                        <span className="sr-only">Score </span>
-                        {row.score}
-                      </span>
-                    ) : null
-                  }
-                >
-                  <span className="w-6 shrink-0 text-[var(--muted)] tabular-nums">
-                    {row.rank}
-                  </span>
-                  {/* Dimmed in the muted token, never by opacity: its text
-                      keeps AA contrast. */}
-                  <span
-                    className={`min-w-0 truncate font-medium ${row.dim ? "text-[var(--muted)]" : "text-[var(--text)]"}`}
-                  >
-                    {row.title}
-                  </span>
-                </PageRow>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
 
       {canManage && !archived ? (
         <div className="py-5">
@@ -235,20 +154,13 @@ export function ItemLive({
             itemId={item.id}
             title={item.title}
             label={archiveLabel(declared.words)}
-            runWords={declared.runWords.plural}
+            runsWord={declared.runWords.plural}
           />
         </div>
       ) : null}
     </SectionCard>
   );
 }
-
-/** Total in the text colour; the positive verdict green, the negative red. */
-const TILE_TONE: Record<ItemTile["key"], string> = {
-  total: "text-[var(--text)]",
-  positive: "text-[var(--success-text)]",
-  negative: "text-[var(--error-text)]",
-};
 
 /**
  * Archive, last and in red, behind the confirmation a flow's Archive has
@@ -261,14 +173,15 @@ function ArchiveItem({
   itemId,
   title,
   label,
-  runWords,
+  runsWord,
 }: {
   workspaceId: string;
   subscriptionId: string;
   itemId: string;
   title: string;
   label: string;
-  runWords: string;
+  /** The flow's word for its runs, many: "candidates". */
+  runsWord: string;
 }) {
   const router = useRouter();
   const titleId = useId();
@@ -321,8 +234,8 @@ function ArchiveItem({
             Archive {title}?
           </h2>
           <p id={descriptionId} className="mt-1 text-sm text-[var(--muted)]">
-            It leaves the list and takes no new {inSentence(runWords)}. Its{" "}
-            {inSentence(runWords)} stay.
+            It leaves the list and takes no new {inSentence(runsWord)}. Its{" "}
+            {inSentence(runsWord)} stay.
           </p>
           <FormError message={error} />
           <div className="mt-6 flex flex-wrap gap-2">

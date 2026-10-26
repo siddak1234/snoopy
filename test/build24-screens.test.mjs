@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { test } from "node:test";
+import { after, before, test } from "node:test";
+import { BLOCK_FIXTURES } from "../lib/generated/platform-contracts/block-fixtures.ts";
+import {
+  elements,
+  loadBlocks,
+  parse,
+  visibleWords,
+} from "./blocks-harness.mjs";
 
 /**
  * Build 24's website guards that are not one module's (the owner's build 23
@@ -32,6 +39,21 @@ function runtimeFiles() {
   for (const directory of ["app", "components", "lib", "hooks"])
     walk(directory);
   return found;
+}
+
+let blocks;
+before(async () => {
+  blocks = await loadBlocks();
+});
+after(() => blocks?.cleanup());
+
+/** A parsed element as markup again, for its words. */
+function markupOf(node) {
+  if (node.text !== undefined) return node.text.replace(/</gu, "&lt;");
+  const attrs = Object.entries(node.attrs)
+    .map(([key, value]) => ` ${key}="${value}"`)
+    .join("");
+  return `<${node.tag}${attrs}>${node.children.map(markupOf).join("")}</${node.tag}>`;
 }
 
 const DECISION = "app/account/approvals/ApprovalDecision.tsx";
@@ -71,7 +93,7 @@ test("one Approve and Deny pair on both pages: Approve primary, Deny danger, App
     );
 });
 
-test("a held job's page offers the decision: RunLive renders ApprovalDecision under the result line while the job's approval waits and this person may decide, else who can; a saved decision draws the page again (P6; build 28's review, finding 1)", () => {
+test("a held job's page offers the decision: RunLive draws the platform's approval form (questions{approval}, under the result line) with ApprovalDecision to a role it names, else who can; a saved decision draws the page again (P6; build 28's review, finding 1; backend ADR-0048)", () => {
   const live = code(read(LIVE));
   assert.match(
     live,
@@ -79,11 +101,7 @@ test("a held job's page offers the decision: RunLive renders ApprovalDecision un
   );
   assert.match(
     live,
-    /const waiting =\s*run\.status === "held" &&\s*decided === "pending" &&\s*decision\?\.approval\.status === "pending";/u,
-  );
-  assert.match(
-    live,
-    /\{waiting && decision \? \(\s*<div\s+data-testid="run-decision"[^>]*>\s*<ApprovalDecision\s+approvalId=\{decision\.approval\.id\}\s+canDecide=\{decision\.canDecide\}\s+eligibleRoles=\{decision\.approval\.eligibleRoles\}/u,
+    /approval: \(form\) =>\s*form\.approvalId \? \(\s*<div data-testid="run-decision">\s*<ApprovalDecision\s+approvalId=\{form\.approvalId\}\s+canDecide=\{mayDecide\(role, form\.eligibleRoles\)\}\s+eligibleRoles=\{form\.eligibleRoles \?\? \[\]\}/u,
   );
   // One pair: no step of the details page draws its own.
   assert.equal(live.match(/<ApprovalDecision\b/gu)?.length, 1);
@@ -102,15 +120,10 @@ test("a held job's page offers the decision: RunLive renders ApprovalDecision un
     )?.length,
     1,
   );
-  // The job's newest approval and this person's role, worked out where the
-  // re-reads land, in the browser (Build 25's audit; waitingDecision's own
-  // test holds the rule), and the role read with every run: one that turns
-  // held while its page is open is offered the pair from there — on its
-  // details page since build 28 (item 9), read as the run's page reads it.
-  assert.match(
-    live,
-    /const decision = waitingDecision\(run\.id, listed, role\);/u,
-  );
+  // This person's role among the form's, worked out where the re-reads land,
+  // in the browser (Build 25's audit; mayDecide's own test holds the rule),
+  // and the role read with every run: one that turns held while its page is
+  // open is offered the pair from there.
   const data = code(read("app/account/runs/[runId]/run-page-data.ts"));
   assert.match(data, /\n\s*roleInWorkspace\(workspaceId\),\n/u);
   assert.doesNotMatch(data, /held \? roleInWorkspace/u);
@@ -186,27 +199,38 @@ test("one entry per job, by the job's id: no after-approval row on Activity, and
   );
 });
 
-test("each document is a closed row that opens in place: <details> never drawn open, its <summary> the heading, {vendor} · {total} and the chip; the body starts with Document type and Format, given the job's files (P10)", () => {
-  const live = code(read(LIVE));
-  const card = live.slice(live.indexOf("function DocumentCard"));
-  assert.match(
-    card,
-    /<details\s+data-testid=\{`document-\$\{card\.index\}`\}/u,
-  );
-  assert.doesNotMatch(card, /<details[^>]*\sopen\b/u);
-  assert.match(
-    card,
-    /<summary[\s\S]*?\{card\.heading\}[\s\S]*?\{card\.glance\}[\s\S]*?\{card\.chip\}[\s\S]*?<\/summary>/u,
-  );
-  assert.match(
-    card,
-    /<\/summary>\s*<div[^>]*>\s*<dl[^>]*>\{pairs\(card\.facts, "fact"\)\}<\/dl>/u,
-  );
-  // The job's files give each card its Format; the flow's words head it (backend BUILD-PLAN 27.5.1).
-  assert.match(
-    live,
-    /toDocumentCards\([\s\S]*?detail\.files,\s*flow\?\.documentWords,\s*\)/u,
-  );
+test("each document is a closed row that opens in place: never drawn open, its bar the heading, {vendor} · {total} and the chip; its body starts with Document type and Format, the row left out when the format is not known (P10; the platform's blocks since backend ADR-0048)", () => {
+  for (const name of ["v7-recorded", "v7-held-waiting", "v7-held-denied"]) {
+    const fixture = BLOCK_FIXTURES.find((candidate) => candidate.name === name);
+    const documents = fixture.blocks.filter(
+      (block) => block.type === "section" && / of \d+$/u.test(block.title),
+    );
+    assert.ok(documents.length > 0, name);
+    const markup = blocks.render(fixture.blocks);
+    const drawn = elements(parse(markup)).filter(
+      (node) => node.tag === "details",
+    );
+    assert.equal(drawn.length, documents.length, name);
+    drawn.forEach((node, index) => {
+      assert.equal("open" in node.attrs, false, `${name} ${index + 1} closed`);
+      const summary = node.children.find((child) => child.tag === "summary");
+      assert.deepEqual(
+        visibleWords(markupOf(summary)),
+        [
+          documents[index].title,
+          documents[index].subtitle,
+          documents[index].badge.text,
+        ],
+        `${name} ${index + 1}'s bar`,
+      );
+    });
+    // Format is left out when it is not known (P10).
+    for (const document of documents)
+      assert.match(
+        document.blocks[0].rows.map((row) => row.cells[0]).join("|"),
+        /^Document type(?:\|Format)?$/u,
+      );
+  }
 });
 
 const PACKAGE_PAGE = "app/account/runs/[runId]/package/page.tsx";
