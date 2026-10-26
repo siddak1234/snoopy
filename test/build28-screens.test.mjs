@@ -275,10 +275,10 @@ test("an item's tiles: Total, then the flow's verdict words with its tallies, gr
   assert.match(tone("block-metric-1"), /text-\[var\(--text\)\]/u);
   assert.match(tone("block-metric-2"), /text-\[var\(--success-text\)\]/u);
   assert.match(tone("block-metric-3"), /text-\[var\(--error-text\)\]/u);
-  // On top, then the file's row, before Add and the runs.
+  // On top, then the file's row, before Add (its form's own title) and the runs.
   assert.deepEqual(
     item.blocks.map((block) => block.type),
-    ["metric", "file", "text", "questions", "text", "list"],
+    ["metric", "file", "questions", "text", "list"],
   );
   assert.ok(
     !fixture("reviewer-v1-item").blocks.some(

@@ -1097,8 +1097,9 @@ test("16 — Cancel on a run another tab already stopped says so", async ({
   // re-read every 2 s (RunLive) would learn of the other tab's cancel and take
   // Cancel away before the click below — a race WebKit lost twice on PR #55.
   // A failed re-read leaves the page as it was; the cancel itself is not a read.
+  // The re-read asks for the page body (RunLive's BLOCKS_SHAPE, ADR-0048).
   await page.route(
-    /\/api\/platform\/v1\/workspaces\/[^/]+\/runs\/fixture-run-running$/,
+    /\/api\/platform\/v1\/workspaces\/[^/]+\/runs\/fixture-run-running\?shape=blocks$/,
     (route) => route.abort(),
   );
   await page.goto("/account/runs/fixture-run-running");
