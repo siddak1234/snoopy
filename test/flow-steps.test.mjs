@@ -24,7 +24,7 @@ import {
  * titles only — Step 1 holding the document and Start run, step 2 the
  * integration row, step 4 titled by the flow's choice, step 5 who gets the
  * email — then the actions with Edit setup; no Connections, no move. The
- * app's rules (snoopy-mobile `lib/view/pipeline.ts`, `lib/view/home.ts`).
+ * app's rules (`snoopy-mobile/lib/view/pipeline.ts`, `snoopy-mobile/lib/view/home.ts`).
  */
 
 const read = (path) =>
@@ -261,19 +261,27 @@ test("Today: from the browser's own midnight, each tile to Activity from it — 
 test("the flow page reads top to bottom: its name and status, Dashboard, Steps — titles only, Step 1 holding the run, a setting step its integration row, the email step its row — then its actions with Edit setup; no Connections, no move, no description, no help line (P1–P4)", () => {
   const page = read("app/account/flows/[subscriptionId]/page.tsx");
   const at = (pattern) => page.search(pattern);
-  const order = [
+  // The card, then its parts in their order, then its actions; the parts,
+  // with no manifest order (backend ADR-0048), Dashboard then Steps.
+  const card = [
     at(/<SectionCard\s+title=\{name\}/u),
-    at(/>\s*Dashboard\s*<\/h2>/u),
-    at(/>\s*Steps\s*<\/h2>/u),
+    at(/\{parts\.map\(part\)\}/u),
     at(/<AutomationActions\b/u),
   ];
-  assert.ok(
-    order.every((index) => index > 0),
-    String(order),
-  );
-  assert.deepEqual(
-    [...order].sort((a, b) => a - b),
-    order,
+  const parts = [at(/>\s*Dashboard\s*<\/h2>/u), at(/>\s*Steps\s*<\/h2>/u)];
+  for (const order of [card, parts]) {
+    assert.ok(
+      order.every((index) => index > 0),
+      String(order),
+    );
+    assert.deepEqual(
+      [...order].sort((a, b) => a - b),
+      order,
+    );
+  }
+  assert.match(
+    page,
+    /declaredItems \? \["items"\] : \["dashboard", "steps"\]/u,
   );
   // No Connections on the page (P3), and nothing to move to (P4).
   assert.doesNotMatch(page, /Connections\s*<\/h2>|ConnectionsPanel/u);

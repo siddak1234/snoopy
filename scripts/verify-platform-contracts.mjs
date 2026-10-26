@@ -8,6 +8,7 @@ const outputs = [
   join(root, "lib/generated/platform-contracts/platform.d.ts"),
   join(root, "lib/generated/platform-contracts/automations.d.ts"),
   join(root, "lib/generated/platform-contracts/connections.d.ts"),
+  join(root, "lib/generated/platform-contracts/block-fixtures.ts"),
 ];
 
 for (const output of outputs) {

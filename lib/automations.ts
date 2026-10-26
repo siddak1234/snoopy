@@ -6,6 +6,7 @@ import {
   workspacePath as scope,
 } from "@/lib/platform-server";
 import { formatDateTimeMediumUTC } from "@/lib/date";
+import { BLOCKS_SHAPE } from "@/lib/run-progress";
 import type {
   components,
   operations,
@@ -88,6 +89,11 @@ export type AutomationItems = components["schemas"]["AutomationItems"];
 export type AutomationItemField = components["schemas"]["AutomationItemField"];
 export type Item = components["schemas"]["Item"];
 export type RunSection = components["schemas"]["RunSection"];
+/** One of the ten blocks a run's or an item's page body is made of (backend ADR-0048). */
+export type Block = components["schemas"]["Block"];
+export type BlockOpen = components["schemas"]["BlockOpen"];
+/** Each page's parts in the order the flow's pinned manifest gives (`Subscription.pages`). */
+export type FlowPages = components["schemas"]["FlowPages"];
 export type ListItemsResponse =
   operations["listItems"]["responses"][200]["content"]["application/json"];
 export type CreateItemRequest =
@@ -144,12 +150,13 @@ export function listRuns(
   );
 }
 
+/** One job, its page body as blocks (`BLOCKS_SHAPE`): its run's page, Run details and its files read it. */
 export function readRun(
   workspaceId: string,
   runId: string,
 ): Promise<RunDetail> {
   return platformServerJson(
-    `${scope(workspaceId)}/runs/${encodeURIComponent(runId)}`,
+    `${scope(workspaceId)}/runs/${encodeURIComponent(runId)}${BLOCKS_SHAPE}`,
   );
 }
 
@@ -362,13 +369,13 @@ export function createItem(
   );
 }
 
-/** One item and its runs, ranked by score (any member). */
+/** One item, its page body as blocks (`BLOCKS_SHAPE`; any member). */
 export function readItem(
   workspaceId: string,
   itemId: string,
 ): Promise<ReadItemResponse> {
   return platformServerJson<ReadItemResponse>(
-    `${scope(workspaceId)}/items/${encodeURIComponent(itemId)}`,
+    `${scope(workspaceId)}/items/${encodeURIComponent(itemId)}${BLOCKS_SHAPE}`,
   );
 }
 

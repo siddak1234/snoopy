@@ -8,11 +8,12 @@ import {
   approvalTitle,
   groupState,
   heldDecision,
+  mayDecide,
   newestApproval,
   runDuration,
   runLabel,
   rereadForApproval,
-  runResultLine,
+  rereadForApprovalForm,
   stepStates,
   stepsDone,
   timeOfDay,
@@ -401,7 +402,7 @@ test("a run is named by its FULL id — never the request id, never the first ei
   }
 });
 
-test("the time a step was done, its duration and its result line, in the app's words", () => {
+test("the time a step was done and its duration, in the app's words; what became of a held job's approval (its result line is the platform's since backend ADR-0048)", () => {
   assert.equal(timeOfDay("2026-10-15T14:32:09.000Z"), "2:32 PM");
   assert.equal(timeOfDay("2026-10-15T00:05:00.000Z"), "12:05 AM");
   assert.equal(timeOfDay("not a time"), "");
@@ -420,34 +421,18 @@ test("the time a step was done, its duration and its result line, in the app's w
   );
   const held = { id: "r1", status: "held" };
   const approval = (status) => [{ runId: "r1", status }];
-  assert.equal(runResultLine(held, []), "Waiting for approval.");
-  assert.equal(
-    runResultLine(held, approval("pending")),
-    "Waiting for approval.",
-  );
+  assert.equal(heldDecision(held, []), "unknown");
+  assert.equal(heldDecision(held, approval("pending")), "pending");
+  assert.equal(heldDecision(held, approval("approved")), "approved");
+  assert.equal(heldDecision(held, approval("rejected")), "rejected");
+  assert.equal(heldDecision(held, approval("expired")), "closed");
+  assert.equal(heldDecision({ id: "r", status: "running" }, []), null);
   // The job goes on under its own id (ADR-0044): ~~"Approved — continued in
   // a new run"~~ until Build 24.
-  assert.equal(runResultLine(held, approval("approved")), "Approved");
   assert.doesNotMatch(
     read("lib/run-progress.ts").replace(/~~[\s\S]*?~~/gu, ""),
     /continued in a new run/u,
   );
-  // Denied (Build 24, P6; the session's S6: the owner's word), ~~Rejected~~.
-  assert.equal(runResultLine(held, approval("rejected")), "Denied");
-  assert.equal(
-    runResultLine(held, approval("expired")),
-    "No longer awaiting approval",
-  );
-  assert.equal(heldDecision(held, approval("expired")), "closed");
-  assert.equal(
-    runResultLine({ id: "r", status: "succeeded", resultSummary: "Done." }, []),
-    "Done.",
-  );
-  assert.equal(
-    runResultLine({ id: "r", status: "failed", failureReason: "Nope." }, []),
-    "Nope.",
-  );
-  assert.equal(runResultLine({ id: "r", status: "running" }, []), null);
 });
 
 // Invoice Processing v4 (snoopy-automations manifests/invoice-processing.v4.json;
@@ -682,8 +667,8 @@ test("a job's newest approval decides — by when it was asked, whatever the lis
   assert.equal(heldDecision(job, approvals), "pending");
   assert.equal(heldDecision(job, [...approvals].reverse()), "pending");
   assert.equal(
-    runResultLine(job, [asked("pending", 5), asked("rejected", 50)]),
-    "Denied",
+    heldDecision(job, [asked("pending", 5), asked("rejected", 50)]),
+    "rejected",
   );
   // Another job's approval is never this one's.
   assert.equal(
@@ -739,6 +724,49 @@ test("a held run with no approval of its job listed is read again for it, at mos
       false,
       status,
     );
+});
+
+test("a held run's page reads it again until the platform's approval form comes, at most 10 times; one with the form, or not held, never (backend ADR-0048; Build 25, the review's R5c 1)", () => {
+  const held = { status: "held" };
+  const form = {
+    type: "questions",
+    form: { kind: "approval", approvalId: "a-1", eligibleRoles: ["owner"] },
+  };
+  const result = {
+    type: "text",
+    text: "Waiting for approval.",
+    tone: "warning",
+  };
+  for (const blocks of [
+    undefined,
+    [],
+    [result],
+    [result, { type: "questions", form: { kind: "run" } }],
+  ]) {
+    for (let reads = 0; reads < 10; reads += 1)
+      assert.equal(
+        rereadForApprovalForm(held, blocks, reads),
+        true,
+        String(reads),
+      );
+    assert.equal(rereadForApprovalForm(held, blocks, 10), false);
+  }
+  assert.equal(rereadForApprovalForm(held, [result, form], 0), false);
+  for (const status of [
+    "pending",
+    "running",
+    "succeeded",
+    "failed",
+    "cancelled",
+  ])
+    assert.equal(rereadForApprovalForm({ status }, [result], 0), false, status);
+});
+
+test("who may decide: their role among the approval's roles; none read, never (Build 24, P6)", () => {
+  assert.equal(mayDecide("owner", ["owner", "admin"]), true);
+  assert.equal(mayDecide("member", ["owner", "admin"]), false);
+  assert.equal(mayDecide(undefined, ["owner"]), false);
+  assert.equal(mayDecide("owner", undefined), false);
 });
 
 test("step 4's decision: the job's newest approval while it waits, offered to a role it names; nothing once it is decided or none is listed (Build 24, P6; worked out in the browser since Build 25's audit)", () => {
@@ -957,9 +985,12 @@ test("the run page draws the tracker's rows and words alone — never a step's s
     page,
     /return live \?\? own\(await listArchivedSubscriptions\(workspaceId\)\);/u,
   );
-  assert.match(live, /\{row\.title\}/u);
-  assert.match(live, /\{row\.sub\}/u);
-  assert.doesNotMatch(live, /\.summary\b|\.stepId\b|heldReason/u);
+  const item = read("components/dashboard/TrackerItem.tsx");
+  assert.match(live, /<TrackerItem key=\{row\.key\} row=\{row\} \/>/u);
+  assert.match(item, /\{row\.title\}/u);
+  assert.match(item, /\{row\.sub\}/u);
+  for (const source of [live, item])
+    assert.doesNotMatch(source, /\.summary\b|\.stepId\b|heldReason/u);
   // Live: every 2 s while pending or running, one read at a time.
   assert.match(
     live,
@@ -967,7 +998,7 @@ test("the run page draws the tracker's rows and words alone — never a step's s
   );
   assert.match(live, /\[going, reads, workspaceId, run\.id\]/u);
   // The steps on the run's details page, before its facts (build 28, item
-  // 9); Documents (or Details) on the run's page.
+  // 9); the platform's body on the run's page.
   const details = live.indexOf('if (view === "details") {');
   const steps = live.search(/>\s*Steps\s*<\/h2>/u);
   const facts = live.indexOf("data-testid={`run-fact-${fact.label}`}");
@@ -977,13 +1008,7 @@ test("the run page draws the tracker's rows and words alone — never a step's s
     "steps, then facts",
   );
   assert.ok(facts < runPage, "both on the details page");
-  const order = ["Documents", "Details"].map((name) =>
-    live.slice(runPage).search(new RegExp(`>\\s*${name}\\s*</h2>`, "u")),
-  );
-  assert.ok(
-    order.every((index) => index > 0) && order[0] < order[1],
-    String(order),
-  );
+  assert.ok(live.indexOf("<BlockList", runPage) > runPage);
   assert.ok(
     live.indexOf('label: "Run ID", value: run.id') > 0,
     "the facts end with the full Run ID",
@@ -991,7 +1016,7 @@ test("the run page draws the tracker's rows and words alone — never a step's s
 });
 
 test("the running step's icon spins, still under reduced motion, and no other state's does (Build 23's A4)", () => {
-  const live = read("app/account/runs/[runId]/RunLive.tsx");
+  const live = read("components/dashboard/TrackerItem.tsx");
   const look = live.slice(
     live.indexOf("const STATE_LOOK"),
     live.indexOf("function TrackerItem"),
@@ -1002,10 +1027,7 @@ test("the running step's icon spins, still under reduced motion, and no other st
     .map((entry) => entry.split(":")[0]);
   assert.deepEqual(spinning, ["working"]);
   assert.match(look, /motion: "motion-safe:animate-spin"/u);
-  assert.match(
-    live,
-    /const \{ Icon, tone, motion \} = STATE_LOOK\[row\.state\]/u,
-  );
+  assert.match(live, /const \{ Icon, tone, motion \} = STATE_LOOK\[state\]/u);
   assert.match(
     live,
     /className=\{`mt-0\.5 shrink-0 \$\{tone\}\$\{motion \? ` \$\{motion\}` : ""\}`\}/u,
