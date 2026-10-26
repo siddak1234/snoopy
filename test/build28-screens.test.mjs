@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { test } from "node:test";
+import { after, before, test } from "node:test";
 import { byDepartment } from "../app/account/flows/departments.ts";
-import { TOTAL, itemTiles } from "../lib/flow-items.ts";
+import { BLOCK_FIXTURES } from "../lib/generated/platform-contracts/block-fixtures.ts";
 import {
   FILE_GONE,
   FILE_WORD,
@@ -17,11 +17,13 @@ import {
   sizeInWords,
   viewFileLabel,
 } from "../lib/run-files.ts";
+import { RUN_DETAILS, runDetailsPath } from "../lib/run-progress.ts";
 import {
-  RUN_DETAILS,
-  runDetailsPath,
-  runSectionsHeading,
-} from "../lib/run-progress.ts";
+  elements,
+  loadBlocks,
+  parse,
+  visibleWords,
+} from "./blocks-harness.mjs";
 
 /**
  * Build 28's screens on the website (Round 19, plan §3; the owner's build 28
@@ -34,6 +36,9 @@ import {
  * tiles and its file page, a run's "View {file}" and its file page, each file
  * read through this site's own route. `test/flow-items.test.mjs` holds the item rules,
  * `e2e/flow-items.spec.ts` what a browser draws. The fixtures are made up.
+ * Since Round 21 (backend ADR-0048) the run's and the item's bodies are the
+ * platform's blocks: what they say is read here from the platform's block
+ * fixtures, drawn by `BlockList`, and the backend's tests hold the words.
  */
 
 const root = resolve(import.meta.dirname, "..");
@@ -41,6 +46,17 @@ const read = (path) => readFileSync(join(root, path), "utf8");
 /** A source file's code alone: its comments — where gone words are struck through — left out. */
 const code = (source) =>
   source.replace(/\/\*[\s\S]*?\*\//gu, "").replace(/^\s*\/\/.*$/gmu, "");
+
+let blocks;
+before(async () => {
+  blocks = await loadBlocks();
+});
+after(() => blocks?.cleanup());
+const fixture = (name) => {
+  const found = BLOCK_FIXTURES.find((candidate) => candidate.name === name);
+  assert.ok(found, name);
+  return found;
+};
 
 const FLOW_PAGE = "app/account/flows/[subscriptionId]/page.tsx";
 const RUN_LIVE = "app/account/runs/[runId]/RunLive.tsx";
@@ -86,19 +102,21 @@ test("the Flows list is grouped by department, the departments A–Z, each keepi
   assert.doesNotMatch(page, /\{automation\.category\}/u);
 });
 
-test("a flow with items has no Dashboard and no Steps: its items are its page, Turn on and what it is owed above them (items 2 and 3)", () => {
+test("a flow with items has no Dashboard and no Steps: its items are its page, Turn on and what it is owed above them (items 2 and 3); its parts in its flow's pages order (backend ADR-0048)", () => {
   const page = code(read(FLOW_PAGE));
-  const items = page.indexOf("{declaredItems ? (");
-  const dashboard = page.indexOf('aria-labelledby="flow-dashboard-title"');
-  const steps = page.indexOf('aria-labelledby="flow-steps-title"');
-  const fallback = page.indexOf(") : (", items);
-  assert.ok(items > 0, "the page asks whether the flow has items");
-  // The Dashboard and the Steps are drawn only on the other side of it.
-  assert.ok(fallback > items && dashboard > fallback && steps > dashboard);
+  // Today's order unless the flow's manifest gives one: items, else the
+  // Dashboard and the Steps.
   assert.match(
     page,
-    /\{declaredItems \? \(\s*!live \|\| owed\.length > 0 \|\| notResponding \? \(\s*<div className="py-5 first:pt-0">\s*\{notResponding\}\s*\{stepOne\}/u,
+    /pageParts\(\s*subscription\.pages\?\.flow,\s*\["dashboard", "steps", "items"\] as const,\s*declaredItems \? \["items"\] : \["dashboard", "steps"\],\s*\)/u,
   );
+  const items = page.indexOf('if (name === "items")');
+  assert.ok(items > page.indexOf('aria-labelledby="flow-steps-title"'));
+  assert.match(
+    page.slice(items),
+    /\{!parts\.includes\("steps"\) &&\s*\(!live \|\| owed\.length > 0 \|\| notResponding\) \? \(\s*<div className="py-5 first:pt-0">\s*\{notResponding\}\s*\{stepOne\}/u,
+  );
+  assert.match(page, /\{parts\.map\(part\)\}/u);
 });
 
 test("the website's drop-down is a select-only combobox over a listbox of glass, never the browser's own select; the upload card and the item filter use it (decision 7)", () => {
@@ -138,14 +156,22 @@ test("an item's page draws no sections, and its runs as rows the height of a sec
     read("app/account/flows/[subscriptionId]/items/[itemId]/ItemLive.tsx"),
   );
   assert.doesNotMatch(live, /SectionRows|item\.sections/u);
-  assert.match(
-    live,
-    /<PageRow\s+href=\{`\/account\/runs\/\$\{encodeURIComponent\(row\.id\)\}`\}/u,
+  const rows = elements(
+    parse(blocks.render(fixture("reviewer-item").blocks)),
+  ).filter((node) => node.attrs["data-testid"] === "block-list-row");
+  assert.deepEqual(
+    rows.map((node) => node.attrs.href),
+    ["r1", "r2", "r3", "r4"].map((id) => `/account/runs/${id}`),
   );
+  for (const node of rows)
+    assert.match(
+      node.attrs.class,
+      /rounded-\[var\(--radius-md\)\][\s\S]*py-3/u,
+    );
   const row = code(read("components/dashboard/PageRow.tsx"));
   assert.match(row, /className=\{`\$\{SECTION_ROW\} \$\{SECTION_BAR\} /u);
   assert.match(
-    code(read("components/dashboard/SectionRows.tsx")),
+    code(read("components/blocks/renderers.tsx")),
     /className=\{`\$\{SECTION_BAR\} cursor-pointer/u,
   );
 });
@@ -153,8 +179,6 @@ test("an item's page draws no sections, and its runs as rows the height of a sec
 test("Run details: its row on every run's page, after the package's buttons and over Cancel run and View flow; its page the tiles, the steps and the facts; the result line only for a run that read no sections, a held job's decision under it (items 8 and 9; the review's findings 1 and 2)", () => {
   assert.equal(RUN_DETAILS, "Run details");
   assert.equal(runDetailsPath("r 1/2"), "/account/runs/r%201%2F2/details");
-  assert.equal(runSectionsHeading("Entry"), "Entry details");
-  assert.equal(runSectionsHeading(undefined), "Details");
   const live = code(read(RUN_LIVE));
   const split = live.indexOf('if (view === "details") {');
   const runPage = live.indexOf("return (", live.indexOf("\n  }\n", split));
@@ -170,29 +194,19 @@ test("Run details: its row on every run's page, after the package's buttons and 
     assert.ok(details.includes(drawn), `the details page draws ${drawn}`);
     assert.ok(!run.includes(drawn), `the run's page does not draw ${drawn}`);
   }
-  // How it went stays for a run that read no sections; sections take its
-  // place (item 8: "Instead of strong match 6 of 6").
-  assert.ok(!details.includes('data-testid="run-result"'));
-  assert.match(
-    run,
-    /\{\(result && !hasSections\) \|\| waiting \? \(\s*<div className="py-5 first:pt-0">\s*\{result && !hasSections \? \(\s*<p\s+data-testid="run-result"/u,
-  );
-  // A held job's Approve and Deny, under the result line on the run's page;
-  // its details page keeps the step's state alone (finding 1).
+  // The run's page draws the platform's body; its details page none of it.
+  assert.ok(!details.includes("<BlockList"));
   assert.ok(!details.includes("<ApprovalDecision"));
-  assert.match(
-    live,
-    /const waiting =\s*run\.status === "held" &&\s*decided === "pending" &&\s*decision\?\.approval\.status === "pending";/u,
-  );
-  const result = run.indexOf('data-testid="run-result"');
-  const decision = run.indexOf('data-testid="run-decision"');
+  assert.ok(run.indexOf("<BlockList") > 0);
+  assert.ok(run.indexOf("<BlockList") < run.indexOf("<PackageActions"));
+  // How it went stays for a run that read no sections; sections take its
+  // place (item 8), and a held job's decision is under the result line.
+  const held = fixture("v7-held-waiting").blocks.map((block) => block.type);
+  assert.deepEqual(held.slice(0, 2), ["text", "questions"]);
+  const candidate = fixture("reviewer-candidate");
   assert.ok(
-    result > 0 && result < decision,
-    "the decision under the result line",
-  );
-  assert.ok(decision < run.indexOf("<ApprovalDecision"));
-  assert.ok(
-    run.indexOf("<ApprovalDecision") < run.indexOf('testId="run-section"'),
+    !candidate.blocks.some((block) => block.type === "text" && block.tone),
+    "a run that read sections has no result line",
   );
   // The row is drawn for every run, under no condition: after the package's
   // buttons, directly over Cancel run and View flow (finding 2).
@@ -213,13 +227,19 @@ test("Run details: its row on every run's page, after the package's buttons and 
     !run
       .slice(0, row)
       .match(
-        /\{(?:going|headed|hasSections|waiting|files\.length > 0) \? \(\s*<PageRow href=\{runDetailsPath/u,
+        /\{(?:going|headed|packageAvailable)[^?]*\? \(\s*<PageRow href=\{runDetailsPath/u,
       ),
   );
-  // What it read comes first, under the flow's word for a run.
-  assert.match(run, /\{runSectionsHeading\(flow\?\.runWord\)\}/u);
-  assert.ok(
-    run.indexOf('testId="run-section"') < run.indexOf("run-documents-title"),
+  // What it read comes first, under the flow's word for a run, the first open.
+  assert.deepEqual(visibleWords(blocks.render(candidate.blocks)).slice(0, 3), [
+    "View resume",
+    "Candidate details",
+    "Experience",
+  ]);
+  const sections = candidate.blocks.filter((block) => block.type === "section");
+  assert.deepEqual(
+    sections.map((section) => section.open === true),
+    [true, ...sections.slice(1).map(() => false)],
   );
   // Both pages read the run as the other does.
   for (const path of [
@@ -237,33 +257,34 @@ test("Run details: its row on every run's page, after the package's buttons and 
   assert.match(code(read("app/account/runs/[runId]/page.tsx")), /view="run"/u);
 });
 
-test("an item's tiles: Total, then the flow's verdict words with its tallies; none for a flow that declares no words (item 6)", () => {
-  const item = { runCount: 7, positiveCount: 3, negativeCount: 2 };
-  assert.deepEqual(itemTiles(item, { positive: "Keep", negative: "Drop" }), [
-    { key: "total", label: TOTAL, value: 7 },
-    { key: "positive", label: "Keep", value: 3 },
-    { key: "negative", label: "Drop", value: 2 },
-  ]);
-  assert.equal(TOTAL, "Total");
-  assert.deepEqual(itemTiles(item, undefined), []);
-  // Green and red, on top, then the file's row, before Add and the runs.
-  const live = code(
-    read("app/account/flows/[subscriptionId]/items/[itemId]/ItemLive.tsx"),
+test("an item's tiles: Total, then the flow's verdict words with its tallies, green and red; none for a flow that declares no words (item 6)", () => {
+  const item = fixture("reviewer-item");
+  const metric = item.blocks[0];
+  assert.equal(metric.type, "metric");
+  assert.deepEqual(
+    metric.items.map((tile) => [tile.label, tile.tone ?? "neutral"]),
+    [
+      ["Total", "neutral"],
+      ["Advance", "success"],
+      ["Decline", "error"],
+    ],
   );
-  assert.match(
-    live,
-    /const tiles = itemTiles\(item, declared\.verdictWords\);/u,
+  const nodes = elements(parse(blocks.render(item.blocks)));
+  const tone = (id) =>
+    nodes.find((node) => node.attrs["data-testid"] === id).attrs.class;
+  assert.match(tone("block-metric-1"), /text-\[var\(--text\)\]/u);
+  assert.match(tone("block-metric-2"), /text-\[var\(--success-text\)\]/u);
+  assert.match(tone("block-metric-3"), /text-\[var\(--error-text\)\]/u);
+  // On top, then the file's row, before Add (its form's own title) and the runs.
+  assert.deepEqual(
+    item.blocks.map((block) => block.type),
+    ["metric", "file", "questions", "text", "list"],
   );
-  assert.match(live, /positive: "text-\[var\(--success-text\)\]",/u);
-  assert.match(live, /negative: "text-\[var\(--error-text\)\]",/u);
-  const tiles = live.indexOf('data-testid="item-tiles"');
-  const file = live.indexOf('testId="item-file-row"');
-  assert.ok(tiles > 0 && tiles < file, "the tiles, then the file's row");
-  assert.ok(file < live.indexOf('aria-labelledby="item-add-title"'));
-  assert.ok(file < live.indexOf('data-testid="item-runs"'));
-  assert.match(
-    live,
-    /<PageRow\s+href=\{itemFilePath\(subscriptionId, item\.id\)\}\s+testId="item-file-row"\s*>\s*<span[^>]*>\s*\{declared\.file\.title\}/u,
+  assert.ok(
+    !fixture("reviewer-v1-item").blocks.some(
+      (block) => block.type === "metric",
+    ),
+    "no verdict words, no tiles",
   );
 });
 
@@ -386,19 +407,18 @@ test("a file is handed on by this site's own route: inline only in a type a brow
   );
 });
 
-test("a run of an item has its file's row first, in the flow's word; the item's file page its sections, all closed (items 4 and 7)", () => {
-  const live = code(read(RUN_LIVE));
-  assert.match(
-    live,
-    /const files = run\.itemId\s*\? runFileRows\(detail\.files, flow\?\.fileFields\)\s*: \[\];/u,
+test("a run of an item has its file's row first, in the flow's word; the item's file page its reading, all closed (items 4 and 7)", () => {
+  const candidate = fixture("reviewer-candidate");
+  assert.equal(candidate.blocks[0].type, "file");
+  assert.equal(candidate.blocks[0].title, "View resume");
+  assert.equal(candidate.blocks[0].open.target, "run-file");
+  const drawn = elements(parse(blocks.render(candidate.blocks))).find(
+    (node) => node.attrs["data-testid"] === "block-file",
   );
-  const runPage = live.slice(live.lastIndexOf("<SectionCard"));
-  const row = runPage.indexOf("runFilePath(run.id, file.id)");
-  assert.ok(row > 0, "the run's page draws the file's row");
-  assert.ok(row < runPage.indexOf('data-testid="run-result"'));
-  assert.ok(row < runPage.indexOf('testId="run-section"'));
-  assert.match(runPage, /\{file\.label\}/u);
-  assert.doesNotMatch(live, /View \$\{file\.filename\}/u);
+  assert.equal(
+    drawn.attrs.href,
+    `/account/runs/${candidate.blocks[0].open.runId}/files/${candidate.blocks[0].open.fileId}`,
+  );
   assert.match(
     code(read("app/account/runs/[runId]/run-page-data.ts")),
     /const fileFields = subscription\?\.runInput\s*\?\.filter\(\(field\) => field\.control === "artifact"\)/u,
@@ -420,8 +440,12 @@ test("a run of an item has its file's row first, in the flow's word; the item's 
   );
   assert.match(
     itemFile,
-    /<SectionRows sections=\{item\.sections\} testId="item-section" \/>/u,
+    /<BlockList\s+blocks=\{item\.blocks\}\s+testId="item-reading"/u,
   );
-  assert.doesNotMatch(itemFile, /firstOpen/u);
+  assert.ok(
+    fixture("reviewer-item-reading").blocks.every(
+      (block) => block.type !== "section" || block.open !== true,
+    ),
+  );
   assert.match(itemFile, /return FILE_GONE;/u);
 });

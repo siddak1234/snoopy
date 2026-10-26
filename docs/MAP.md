@@ -126,7 +126,7 @@
 - [lib/platform-proxy.ts](../lib/platform-proxy.ts): Proxy-only session transport.
 - [lib/platform-server.ts](../lib/platform-server.ts): Server-side calls to the backend, from a Server Component or a Server Action.
 - [lib/retry-after.ts](../lib/retry-after.ts): A refused request's `retry-after`, and the wait it asks for in words — backend
-- [lib/run-documents.ts](../lib/run-documents.ts): A run's documents, as the run page's Documents cards draw them (Build 21,
+- [lib/run-documents.ts](../lib/run-documents.ts): The run package's words and rules (Build 24, P12; backend ADR-0045): the
 - [lib/run-files.ts](../lib/run-files.ts): A run's or an item's uploaded file, as the website shows it (Round 19,
 - [lib/run-progress.ts](../lib/run-progress.ts): A run's STEPS (Build 21, spec A7; the session's S14; the owner's build 20
 - [lib/session-contract.ts](../lib/session-contract.ts): no header
@@ -172,7 +172,7 @@
 
 ### Tests
 
-- `test/`: account, automation, billing, boundaries, brand, browser, build21, build22, build24, build28, change, connection, connections, deployed, doc, export, flow, global, kit, new, no, platform, pre, repo, round19, run, session, signed, structure, tenancy, upload, vendor, verify
+- `test/`: account, automation, billing, blocks, boundaries, brand, browser, build21, build22, build24, build28, change, connection, connections, deployed, doc, export, fixture, flow, global, kit, new, no, platform, pre, repo, round19, run, session, signed, structure, tenancy, upload, vendor, verify
 
 ## Skills, agents and hooks
 

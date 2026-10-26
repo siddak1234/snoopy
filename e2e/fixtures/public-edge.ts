@@ -18,6 +18,12 @@ import type {
   operations as ConnectionOperations,
 } from "../../lib/generated/platform-contracts/connections";
 
+// The page bodies' composer (ADR-0048), by its own path: Node runs this file
+// with its types stripped, which needs the `.ts`; the types are tsc's.
+const { itemBody, runBlocks } = (await import(
+  new URL("./page-bodies.ts", import.meta.url).href
+)) as typeof import("./page-bodies");
+
 const port = Number(process.env.FIXTURE_EDGE_PORT ?? "3443");
 const certificate = process.env.FIXTURE_EDGE_CERT;
 const privateKey = process.env.FIXTURE_EDGE_KEY;
@@ -367,6 +373,8 @@ function initialState() {
     heldJobLive: null as "running" | "held" | null,
     heldApprovalHiddenReads: 0,
     approvalListReads: 0,
+    // ADR-0048: every read of the held job's page body (shape=blocks).
+    heldJobBlockReads: 0,
     // Build 25's audit: the next read of the approvals list refused (503), and
     // every one refused; the workspace's flows, or the catalog, unreadable.
     approvalListFailing: 0,
@@ -2077,11 +2085,160 @@ function signedLink(https: string): string {
   return https;
 }
 
+/*
+ * The page bodies (backend ADR-0048): a one-run or one-item read that sends
+ * `shape=blocks` is answered as the platform's composer answers it — the run
+ * without details, documents and sections, with `blocks` and
+ * `packageAvailable`; the item with `runs: []`, `blocks`, `going` and its
+ * reading on `item.blocks`. `page-bodies.ts` builds them from the fixture's
+ * own made-up answers by the platform's rules, and
+ * `test/fixture-page-bodies.test.mjs` holds it to the platform's published
+ * bodies, so a test reads the body a page draws. The platform's own bodies
+ * (`packages/contracts/fixtures/blocks`) are served as they are under
+ * `blocks-{name}` run ids, for the scans and the screenshots.
+ */
+type Block = Automations["Block"];
+
+/** The job's approvals as the platform holds them: the list's, the held job's by its state. */
+function jobApprovals(runId: string): Automations["Approval"][] {
+  const unlisted =
+    runId === invoiceHeldRunId &&
+    (state.heldJobLive === "running" || state.heldApprovalHiddenReads > 0);
+  return [
+    ...state.approvals,
+    ...(state.approvals.some((entry) => entry.id === invoiceApprovalId)
+      ? []
+      : [invoiceApproval()]),
+  ].filter(
+    (entry) =>
+      entry.runId === runId && !(unlisted && entry.id === invoiceApprovalId),
+  );
+}
+
+/** A run's page body, from its answer: files, outcome, result (`pages.run`). */
+function runBody(detail: Json): Json {
+  const named = /^blocks-(.+)$/u.exec(String((detail.run as Json).id));
+  const fixture = named ? publishedBlocks(named[1] ?? "") : undefined;
+  const run = detail.run as Automations["Run"];
+  const { details, documents, sections, ...rest } =
+    detail as Automations["RunDetail"] & Json;
+  if (fixture) return { ...rest, blocks: fixture, packageAvailable: false };
+  const subscription = [
+    invoiceSubscription(),
+    ...(state.itemsFlow ? [itemsSubscription()] : []),
+  ].find((candidate) => candidate.id === run.subscriptionId);
+  const entry = fixtureCatalog().automations.find(
+    (candidate) => candidate.templateId === run.templateId,
+  );
+  const newest = jobApprovals(run.id)
+    .sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""))
+    .at(-1);
+  // The held job's read counted; a read the test left its approval off of
+  // spent, after this one is answered without it (R5c 1).
+  if (run.id === invoiceHeldRunId) {
+    state.heldJobBlockReads += 1;
+    if (state.heldApprovalHiddenReads > 0 && state.heldJobLive !== "running")
+      state.heldApprovalHiddenReads -= 1;
+  }
+  const runWord = subscription?.items?.runWords.singular;
+  const documentWord = entry?.documentWords?.singular;
+  return {
+    ...rest,
+    blocks: runBlocks({
+      run,
+      files: (detail.files as Automations["RunFile"][] | undefined) ?? [],
+      ...(details ? { details } : {}),
+      ...(documents ? { documents } : {}),
+      ...(sections ? { sections } : {}),
+      ...(newest ? { approval: newest } : {}),
+      ...(runWord ? { runWord } : {}),
+      ...(documentWord ? { documentWord } : {}),
+      fileFields: (subscription?.runInput ?? []).filter(
+        (field) => field.control === "artifact",
+      ),
+    }),
+    packageAvailable:
+      (documents?.length ?? 0) > 0 &&
+      run.status !== "pending" &&
+      run.status !== "running",
+  };
+}
+
+/** An item's page body, from its answer: tiles, file, add, runs (`pages.item`). */
+function itemPageBody(answer: Json): Json {
+  const item = answer.item as Automations["Item"];
+  const runs = (answer.runs as Automations["Run"][] | undefined) ?? [];
+  const page = itemBody({
+    item,
+    runs,
+    declared: itemsDeclared,
+    runFile: itemsRunInput.some((field) => field.control === "artifact"),
+  });
+  return {
+    item: page.reading ? { ...item, blocks: page.reading } : item,
+    runs: [],
+    blocks: page.blocks,
+    going: page.going,
+  };
+}
+
+/** Each page's parts, as the platform's `resolvePages` gives a manifest that declares none. */
+function withPages(subscription: Json): Json {
+  const items = subscription.items as
+    Automations["AutomationItems"] | undefined;
+  return {
+    ...subscription,
+    pages: subscription.pages ?? {
+      flow: items ? ["items"] : ["dashboard", "steps"],
+      item: items
+        ? items.verdictWords
+          ? ["tiles", "file", "add", "runs"]
+          : ["file", "add", "runs"]
+        : [],
+      run: ["files", "outcome", "result"],
+      file: ["viewer", "reading"],
+    },
+  };
+}
+
+/** The platform's published fixture bodies, by name (`block-fixtures.ts`). */
+let published: { name: string; blocks: readonly unknown[] }[] = [];
+void import(
+  new URL(
+    "../../lib/generated/platform-contracts/block-fixtures.ts",
+    import.meta.url,
+  ).href
+).then((module: { BLOCK_FIXTURES: typeof published }) => {
+  published = module.BLOCK_FIXTURES;
+});
+function publishedBlocks(name: string): Block[] | undefined {
+  return published.find((fixture) => fixture.name === name)?.blocks as
+    Block[] | undefined;
+}
+
+/** What a response answers as: a page body, the flows with their pages, or itself. */
+const shapes = new WeakMap<
+  import("node:http").ServerResponse,
+  "run" | "item" | "subscriptions"
+>();
+
 function respond(
   response: import("node:http").ServerResponse,
   status: number,
-  body: Json,
+  answer: Json,
 ) {
+  const shape = status === 200 ? shapes.get(response) : undefined;
+  const body =
+    shape === "run"
+      ? runBody(answer)
+      : shape === "item"
+        ? itemPageBody(answer)
+        : shape === "subscriptions" && Array.isArray(answer.subscriptions)
+          ? {
+              ...answer,
+              subscriptions: (answer.subscriptions as Json[]).map(withPages),
+            }
+          : answer;
   response.writeHead(status, {
     "content-type":
       status >= 400 ? "application/problem+json" : "application/json",
@@ -2112,6 +2269,23 @@ const server = createServer(
   { cert: readFileSync(certificate), key: readFileSync(privateKey) },
   async (request, response) => {
     const url = new URL(request.url ?? "/", `https://127.0.0.1:${port}`);
+    // A one-run or one-item read asked for its page body (ADR-0048), and the
+    // flows, which the platform lists with their pages.
+    if (request.method === "GET") {
+      const blocks = url.searchParams.get("shape") === "blocks";
+      if (
+        blocks &&
+        /^\/v1\/workspaces\/[^/]+\/runs\/[^/]+$/u.test(url.pathname)
+      )
+        shapes.set(response, "run");
+      else if (
+        blocks &&
+        /^\/v1\/workspaces\/[^/]+\/items\/[^/]+$/u.test(url.pathname)
+      )
+        shapes.set(response, "item");
+      else if (/^\/v1\/workspaces\/[^/]+\/subscriptions$/u.test(url.pathname))
+        shapes.set(response, "subscriptions");
+    }
     // The fixture's own control, never the published API: each test starts from
     // the same state (register F30, F48).
     if (request.method === "POST" && url.pathname === "/__fixture/reset") {
@@ -2481,6 +2655,7 @@ const server = createServer(
         // Every read of the approvals list (Build 25, R5c 1), and every one
         // refused (Build 25's audit).
         approvalListReads: state.approvalListReads,
+        heldJobBlockReads: state.heldJobBlockReads,
         approvalListRefused: state.approvalListRefused,
         runReadsRefused: state.runReadsRefused,
         // Every checkout asked for: a refused one leaves no plan behind.

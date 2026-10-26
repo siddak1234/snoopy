@@ -76,7 +76,6 @@ export const STEP_DONE = "Done";
 export const STEP_SKIPPED = "Skipped";
 export const STEP_STOPPED = "Stopped";
 export const STEP_FAILED = "Failed";
-export const WAITING_FOR_APPROVAL = "Waiting for approval.";
 /** A held step whose approval was denied (Build 24, P6; the session's S6). */
 export const STEP_DENIED = "Denied";
 
@@ -97,6 +96,15 @@ export function emailSentLine(time: string): string {
 
 /** How long a run's page waits, while the run has not ended, before it reads the run again (spec A7). */
 export const RUN_REREAD_MS = 2_000;
+
+/**
+ * The query every one-run and one-item read sends (backend ADR-0048): the page
+ * body as blocks — `blocks` and `packageAvailable` on a run, `blocks`, `going`
+ * and `item.blocks` on an item — in place of the fields a page would draw
+ * itself. The browser's re-reads send it too. Lists, the activity, approvals
+ * and exports have no shape.
+ */
+export const BLOCKS_SHAPE = "?shape=blocks";
 
 /**
  * How long a flow page waits, while a run of the flow is pending or running,
@@ -455,17 +463,6 @@ export function runDetailsPath(runId: string): string {
   return `/account/runs/${encodeURIComponent(runId)}/details`;
 }
 
-/**
- * The heading over what a run read (the owner's build 28 item 8): the flow's
- * word for one of its runs and "details" — "{Run word} details" — or
- * "Details" for a flow that names none — in the place of the run's result
- * line, which a run that read sections no longer shows. ~~The result line
- * over them~~ until build 28.
- */
-export function runSectionsHeading(runWord: string | null | undefined): string {
-  return runWord ? `${runWord} details` : "Details";
-}
-
 /** What became of a held run's approval, as the run's page says it (the app's `heldDecision`). */
 export type HeldDecision =
   "pending" | "approved" | "rejected" | "closed" | "unknown";
@@ -525,11 +522,20 @@ export function waitingDecision<
 ): { approval: T; canDecide: boolean } | null {
   const waiting = newestApproval(runId, approvals);
   return waiting?.status === "pending"
-    ? {
-        approval: waiting,
-        canDecide: Boolean(role && waiting.eligibleRoles.includes(role)),
-      }
+    ? { approval: waiting, canDecide: mayDecide(role, waiting.eligibleRoles) }
     : null;
+}
+
+/**
+ * Whether this person may decide an approval: their role among the roles it
+ * names, as Approvals reads it — the run page's approval form too (backend
+ * ADR-0048). The server checks it again and refuses with 403.
+ */
+export function mayDecide(
+  role: string | undefined,
+  eligibleRoles: readonly string[] | undefined,
+): boolean {
+  return Boolean(role && (eligibleRoles ?? []).includes(role));
 }
 
 /**
@@ -557,6 +563,33 @@ export function rereadForApproval(
 ): boolean {
   return (
     heldDecision(run, approvals) === "unknown" && reads < HELD_APPROVAL_REREADS
+  );
+}
+
+/**
+ * Whether a held run's page reads it again for its decision (backend
+ * ADR-0048): the run is held, its blocks hold no approval form
+ * (`questions{approval}`) yet, and fewer than `HELD_APPROVAL_REREADS` such
+ * reads were made. That is a run that turned held while its page was open,
+ * or one read before its approval was asked. The form appearing, or the run
+ * leaving held, ends it; so does the tenth read. Only the run is read: the
+ * form names its approval and who may decide it. The app's rule.
+ */
+export function rereadForApprovalForm(
+  run: { status: RunStatus },
+  blocks: readonly unknown[] | undefined,
+  reads: number,
+): boolean {
+  return (
+    run.status === "held" &&
+    reads < HELD_APPROVAL_REREADS &&
+    !(blocks ?? []).some(
+      (block) =>
+        typeof block === "object" &&
+        block !== null &&
+        (block as { type?: unknown }).type === "questions" &&
+        (block as { form?: { kind?: unknown } }).form?.kind === "approval",
+    )
   );
 }
 
@@ -590,39 +623,4 @@ export function approvalTitle(
     (candidate) => candidate.id === approval.stepId,
   );
   return step ? `${entry.name} · ${step.title}` : entry.name;
-}
-
-const HELD_DECISION_LINE: Record<HeldDecision, string> = {
-  pending: "Waiting for approval",
-  // The job goes on under its own id (ADR-0044): ~~"Approved — continued in
-  // a new run"~~ until Build 24.
-  approved: "Approved",
-  rejected: "Denied",
-  closed: "No longer awaiting approval",
-  unknown: "Held for review",
-};
-
-/**
- * The run's result line (spec A7): a succeeded run's summary, a failed run's
- * reason; a held one "Waiting for approval." while nobody has decided, else
- * the decided line in the app's words.
- */
-export function runResultLine(
-  run: {
-    id: string;
-    status: RunStatus;
-    resultSummary?: string;
-    failureReason?: string;
-  },
-  approvals: readonly ApprovalOf[],
-): string | null {
-  if (run.status === "succeeded") return run.resultSummary ?? null;
-  if (run.status === "failed") return run.failureReason ?? null;
-  if (run.status === "held") {
-    const decision = heldDecision(run, approvals) ?? "unknown";
-    return decision === "pending" || decision === "unknown"
-      ? WAITING_FOR_APPROVAL
-      : HELD_DECISION_LINE[decision];
-  }
-  return null;
 }

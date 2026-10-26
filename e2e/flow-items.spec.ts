@@ -37,6 +37,18 @@ const FLOW = "/account/flows/b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1";
 const READY_ITEM = "b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2";
 const ITEM = `${FLOW}/items/${READY_ITEM}`;
 const SCORED_RUN = "/account/runs/c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1";
+// The run's and the item's bodies are the platform's blocks (ADR-0048).
+const itemRuns = (page: Page) =>
+  page.getByTestId("item-blocks").getByTestId("block-list").last();
+const itemRun = (page: Page, rank: number) =>
+  itemRuns(page)
+    .getByTestId("block-list-row")
+    .nth(rank - 1);
+const runSection = (page: Page, n: number) =>
+  page
+    .getByTestId("run-blocks")
+    .getByTestId("block-section")
+    .nth(n - 1);
 const WORD_FILE =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -185,7 +197,7 @@ test("a member sees the items and an item's runs, without Upload, Add or Archive
   await expect(
     page.getByRole("heading", { level: 1, name: "Spring intake" }),
   ).toBeVisible();
-  await expect(page.getByTestId("item-runs")).toBeVisible();
+  await expect(itemRuns(page)).toBeVisible();
   await expect(page.getByTestId("item-add")).toHaveCount(0);
   await expect(page.getByTestId("item-archive")).toHaveCount(0);
   await expectNoAxeViolations(page);
@@ -308,25 +320,19 @@ test("an item's page: its runs ranked as the platform answers in compact rows th
     page.getByRole("heading", { level: 1, name: "Spring intake" }),
   ).toBeVisible();
   await expect(page.getByText("South · Ready")).toBeVisible();
-  const runs = page.getByTestId("item-runs");
+  const runs = itemRuns(page);
   expect(
     await runs
       .locator("li")
       .evaluateAll((rows) => rows.map((row) => (row.textContent ?? "").trim())),
   ).toEqual(["1Ada LaneScore 91", "2Ben ItoScore 64", "3Reading…", "4Failed"]);
-  await expect(page.getByTestId("item-run-4")).toHaveAttribute(
-    "data-dim",
-    "true",
-  );
-  await expect(page.getByTestId("item-run-1")).not.toHaveAttribute(
-    "data-dim",
-    "true",
-  );
+  await expect(itemRun(page, 4)).toHaveAttribute("data-dim", "true");
+  await expect(itemRun(page, 1)).not.toHaveAttribute("data-dim", "true");
   // What was read from its file is not on its page (build 28, item 4).
   await expect(
     page.getByRole("heading", { level: 2, name: "What AI read" }),
   ).toHaveCount(0);
-  await expect(page.getByTestId("item-section-1")).toHaveCount(0);
+  await expect(page.getByTestId("block-section")).toHaveCount(0);
   await expect(page.getByText("Three must-haves.")).toHaveCount(0);
   await expectNoAxeViolations(page);
 
@@ -342,7 +348,7 @@ test("an item's page: its runs ranked as the platform answers in compact rows th
   await add.getByLabel("Entry file").setInputFiles(entryPdf);
   await expect(add.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
   await add.getByRole("button", { name: "Start" }).click();
-  await expect(page.getByTestId("item-run-5")).toBeVisible();
+  await expect(itemRun(page, 5)).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`${ITEM}$`, "u"));
   const started = await fixtureRead<{ runStarts: Record<string, unknown>[] }>(
     "items",
@@ -362,11 +368,9 @@ test("an item's page: its runs ranked as the platform answers in compact rows th
   ]);
   // A compact row is a closed section's height (build 28, item 5: "the size
   // of the must haves drop down").
-  const rowHeight = (await page.getByTestId("item-run-1").boundingBox())
-    ?.height;
+  const rowHeight = (await itemRun(page, 1).boundingBox())?.height;
   await page.goto(SCORED_RUN);
-  const sectionHeight = (await page.getByTestId("run-section-2").boundingBox())
-    ?.height;
+  const sectionHeight = (await runSection(page, 2).boundingBox())?.height;
   expect(rowHeight).toBeGreaterThan(0);
   expect(Math.abs((rowHeight ?? 0) - (sectionHeight ?? 0))).toBeLessThan(1);
 });
@@ -384,30 +388,22 @@ test('a run with a title and a score is headed by them; its sections first, unde
   await expect(
     page.getByRole("heading", { level: 2, name: "Entry details" }),
   ).toBeVisible();
-  await expect(page.getByTestId("run-result")).toHaveCount(0);
+  await expect(page.getByTestId("block-text")).toHaveCount(0);
   await expect(page.getByText("Strong fit · 3 of 3")).toHaveCount(0);
-  await expect(page.getByTestId("run-section-1")).toHaveAttribute("open", "");
-  await expect(page.getByTestId("run-section-2")).not.toHaveAttribute(
-    "open",
-    "",
-  );
-  await expect(page.getByTestId("run-section-3")).not.toHaveAttribute(
-    "open",
-    "",
-  );
-  const link = page
-    .getByTestId("run-section-1")
-    .getByRole("link", { name: "https://example.test/ada" });
+  await expect(runSection(page, 1)).toHaveAttribute("open", "");
+  await expect(runSection(page, 2)).not.toHaveAttribute("open", "");
+  await expect(runSection(page, 3)).not.toHaveAttribute("open", "");
+  const link = runSection(page, 1).getByRole("link", {
+    name: "https://example.test/ada",
+  });
   await expect(link).toHaveAttribute("rel", "noopener noreferrer");
   await expect(link).toHaveAttribute("target", "_blank");
   await expect(page.getByText("Not a link")).toBeVisible();
-  await expect(page.getByTestId("run-section-1").getByRole("link")).toHaveCount(
-    1,
-  );
+  await expect(runSection(page, 1).getByRole("link")).toHaveCount(1);
   // The sections, then Run details, then View flow (build 28, item 9).
   const order = await page.evaluate(() => {
     const at = (selector: string) => document.querySelector(selector);
-    const section = at('[data-testid="run-section-1"]');
+    const section = at('[data-testid="block-section"]');
     const row = at('[data-testid="run-details-row"]');
     const flow = [...document.querySelectorAll("main a")].find(
       (link) => link.textContent?.trim() === "View flow",
@@ -425,7 +421,7 @@ test('a run with a title and a score is headed by them; its sections first, unde
   });
   expect(order).toBe(true);
   await expect(page.getByTestId("run-steps")).toHaveCount(0);
-  await page.getByTestId("run-section-2").locator("summary").click();
+  await runSection(page, 2).locator("summary").click();
   await expect(page.getByText("Ran the example team.")).toBeVisible();
   await expectNoAxeViolations(page);
   // Its details page: how it went, the tiles, the steps and the facts.
@@ -436,13 +432,13 @@ test('a run with a title and a score is headed by them; its sections first, unde
   ).toBeVisible();
   await expect(page.locator("main")).toContainText("Ada Lane");
   // Its result line is gone, not moved: its sections said it.
-  await expect(page.getByTestId("run-result")).toHaveCount(0);
+  await expect(page.getByTestId("block-text")).toHaveCount(0);
   await expect(page.getByTestId("run-steps")).toBeVisible();
   await expect(page.getByTestId("run-tile-Steps done")).toBeVisible();
   await expect(page.getByTestId("run-fact-Run ID")).toHaveText(
     SCORED_RUN.split("/").at(-1) ?? "",
   );
-  await expect(page.getByTestId("run-section-1")).toHaveCount(0);
+  await expect(page.getByTestId("block-section")).toHaveCount(0);
   await expectNoAxeViolations(page);
 });
 
@@ -501,20 +497,20 @@ test("an item's tiles: Total, then the flow's verdict words — green and red �
 }) => {
   await standInShareSheet(page);
   await page.goto(ITEM);
-  const tiles = page.getByTestId("item-tiles");
+  const tiles = page.getByTestId("block-metric");
   await expect(tiles.locator("dt")).toHaveText(["Total", "Keep", "Drop"]);
-  await expect(page.getByTestId("item-tile-total")).toHaveText("4");
-  await expect(page.getByTestId("item-tile-positive")).toHaveText("1");
-  await expect(page.getByTestId("item-tile-negative")).toHaveText("1");
-  await expect(page.getByTestId("item-tile-positive")).toHaveClass(
+  await expect(page.getByTestId("block-metric-1")).toHaveText("4");
+  await expect(page.getByTestId("block-metric-2")).toHaveText("1");
+  await expect(page.getByTestId("block-metric-3")).toHaveText("1");
+  await expect(page.getByTestId("block-metric-2")).toHaveClass(
     /text-\[var\(--success-text\)\]/u,
   );
-  await expect(page.getByTestId("item-tile-negative")).toHaveClass(
+  await expect(page.getByTestId("block-metric-3")).toHaveClass(
     /text-\[var\(--error-text\)\]/u,
   );
   // Tiles, the file's row, then Add and the runs.
   const order = await page.evaluate(() =>
-    ["item-tiles", "item-file-row", "item-add", "item-runs"].map((id) => {
+    ["block-metric", "block-file", "item-add", "block-list"].map((id) => {
       const at = document.querySelector(`[data-testid="${id}"]`);
       return at
         ? [...document.querySelectorAll("[data-testid]")].indexOf(at)
@@ -554,11 +550,9 @@ test("an item's tiles: Total, then the flow's verdict words — green and red �
   });
   expect(answers.elsewhere).toBe(403);
   // What was read from it, each section closed.
-  await expect(page.getByTestId("item-section-1")).not.toHaveAttribute(
-    "open",
-    "",
-  );
-  await page.getByTestId("item-section-1").locator("summary").click();
+  const reading = page.getByTestId("item-reading").getByTestId("block-section");
+  await expect(reading.first()).not.toHaveAttribute("open", "");
+  await reading.first().locator("summary").click();
   await expect(page.getByText("Three must-haves.")).toBeVisible();
   await expectNoAxeViolationsBesideTheFile(page);
   // Download: the platform's signed link; Share: the file itself.
@@ -607,7 +601,7 @@ test("a run of an item: View {file} first, in the flow's word; its file page: th
   const row = page.getByRole("link", { name: "View entry file" });
   await expect(row).toBeVisible();
   const first = await page.evaluate(() => {
-    const row = document.querySelector('[data-testid^="run-file-"]');
+    const row = document.querySelector('[data-testid="block-file"]');
     const heading = [...document.querySelectorAll("main h2")].find(
       (h) => h.textContent === "Entry details",
     );

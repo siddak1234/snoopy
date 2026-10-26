@@ -6,9 +6,9 @@ import { readRunPage } from "./run-page-data";
 
 /**
  * One run (Build 21, spec A7): named by its FULL id (A8; the owner's D4 and
- * AM2), or by its title and score (Round 19); a run of an item's "View
- * {file}" row to its file's page (build 28, item 7); how it went, or what it read
- * under "{Run word} details" in its place; each document it read; the Run details row (build 28, the
+ * AM2), or by its title and score (Round 19); its body as the platform sends
+ * it (backend ADR-0048: a run of an item's "View {file}" row, how it went and
+ * what is to decide, then what it read); the Run details row (build 28, the
  * owner's item 9: the steps, Duration, Started, Ended, Trigger and Run ID on
  * a page of their own, `details/page.tsx`); the run package's buttons (Build
  * 24, P12; ~~Download JSON~~ until then) and View flow — read by

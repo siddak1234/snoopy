@@ -2678,7 +2678,9 @@ test("a finished run of three receipts: its full id, each receipt on its own car
   );
   await expect(main).toContainText("Invoice Processing");
   await expect(main).not.toContainText("fixture-invoice ");
-  await expect(main.getByTestId("run-result")).toHaveText(
+  // Its body, the platform's blocks (ADR-0048): the result line first.
+  const body = main.getByTestId("run-blocks");
+  await expect(body.getByTestId("block-text").first()).toHaveText(
     "3 receipts: 3 saved.",
   );
   // Its tiles, its steps and its facts are its details page's (build 28,
@@ -2688,22 +2690,24 @@ test("a finished run of three receipts: its full id, each receipt on its own car
   // Each a closed row that opens in place (Build 24, P10): "Invoice n of 3",
   // its chip and {vendor} · {total} (S9); open, it starts with its Document
   // type and Format — the job's one photo, JPEG. Each opens on its own.
-  const cards = main.locator("details[data-testid^='document-']");
+  const cards = main.locator("details[data-testid='block-section']");
   await expect(cards).toHaveCount(3);
   for (const card of await cards.all())
     await expect(card).not.toHaveAttribute("open");
   await expect(cards.nth(0).locator("summary")).toContainText("Invoice 1 of 3");
-  await expect(main.getByTestId("document-1-glance")).toHaveText(
+  await expect(cards.nth(0).locator("summary")).toContainText(
     "Lowe's · $17.19",
   );
-  await expect(main.getByTestId("document-1-chip")).toHaveText("Saved");
-  await expect(main.getByTestId("document-2-line-1")).toBeHidden();
+  await expect(cards.nth(0).getByTestId("block-badge")).toHaveText("Saved");
+  const firstLine = (card: number) =>
+    cards.nth(card).getByTestId("block-table").first();
+  await expect(firstLine(1)).toBeHidden();
   await cards.nth(1).locator("summary").click();
   await expect(cards.nth(1)).toHaveAttribute("open");
   await expect(cards.nth(0)).not.toHaveAttribute("open");
   await expect(cards.nth(2)).not.toHaveAttribute("open");
-  await expect(main.getByTestId("document-2-line-1")).toBeVisible();
-  await expect(main.getByTestId("document-1-line-1")).toBeHidden();
+  await expect(firstLine(1)).toBeVisible();
+  await expect(firstLine(0)).toBeHidden();
   await expect(cards.nth(1)).toContainText("Document typeReceipt");
   await expect(cards.nth(1)).toContainText("FormatJPEG");
   for (const words of [
@@ -2821,9 +2825,9 @@ test("a finished run of three receipts: its full id, each receipt on its own car
   await expect(main.getByTestId("run-fact-Run ID")).toHaveText(
     "fixture-run-invoice",
   );
-  await expect(main.locator("details[data-testid^='document-']")).toHaveCount(
-    0,
-  );
+  await expect(
+    main.locator("details[data-testid='block-section']"),
+  ).toHaveCount(0);
   await expectNoAxeViolations(page);
   // Back goes to the run.
   await main.getByRole("link", { name: "Back" }).click();
@@ -2839,9 +2843,9 @@ test("a run is named by its full id, never its request id; a run of an older ver
     "Run 793eef82-102d-81be-a2d3-9e8d4e2b2c36",
   );
   await expect(main).not.toContainText("1e3231c6");
-  await expect(main.getByTestId("run-result")).toHaveText(
-    "Add one document per file.",
-  );
+  await expect(
+    main.getByTestId("run-blocks").getByTestId("block-text").first(),
+  ).toHaveText("Add one document per file.");
   await page.goto("/account/runs/793eef82-102d-81be-a2d3-9e8d4e2b2c36/details");
   await expect(main).toContainText("Run 793eef82-102d-81be-a2d3-9e8d4e2b2c36");
   await expect(main).not.toContainText("1e3231c6");
@@ -2889,13 +2893,18 @@ test("a held run's document whose approval was refused reads Not approved, and t
 }) => {
   await page.goto("/account/runs/fixture-run-invoice-held");
   const main = page.locator("main");
-  await expect(main.getByTestId("run-result")).toHaveText("Denied");
-  await expect(main.getByTestId("document-1-chip")).toHaveText("Saved");
-  await expect(main.getByTestId("document-2-chip")).toHaveText("Not approved");
+  await expect(
+    main.getByTestId("run-blocks").getByTestId("block-text").first(),
+  ).toHaveText("Denied");
+  const documents = main.locator("details[data-testid='block-section']");
+  await expect(documents.nth(0).getByTestId("block-badge")).toHaveText("Saved");
+  await expect(documents.nth(1).getByTestId("block-badge")).toHaveText(
+    "Not approved",
+  );
   // Each document's Format is its own file's (Invoice Processing v6's
   // `source`; Build 24, P10).
-  await expect(main.getByTestId("document-1")).toContainText("FormatPDF");
-  await expect(main.getByTestId("document-2")).toContainText("FormatPNG");
+  await expect(documents.nth(0)).toContainText("FormatPDF");
+  await expect(documents.nth(1)).toContainText("FormatPNG");
   // Its steps, on its details page (build 28, item 9).
   await page.goto("/account/runs/fixture-run-invoice-held/details");
   const record = main.getByTestId("run-step-group:record");
@@ -3039,13 +3048,13 @@ test.describe("Invoice Processing's page, Step 1 to its run (spec A6, A7; Build 
     );
     await fixtureControl("invoice-run-advance");
     await expect(main.getByText(/^succeeded$/iu)).toBeVisible();
-    await expect(main.locator("details[data-testid^='document-']")).toHaveCount(
-      3,
-    );
+    await expect(
+      main.locator("details[data-testid='block-section']"),
+    ).toHaveCount(3);
     // Cards that arrive on a live re-read are headed in the flow's word, as
     // the server-drawn page heads them (backend 27.2.1; #58's audit).
     await expect(
-      main.locator("details[data-testid^='document-'] summary").first(),
+      main.locator("details[data-testid='block-section'] summary").first(),
     ).toContainText("Invoice 1 of 3");
     await expect(main.getByRole("button", { name: "Cancel run" })).toHaveCount(
       0,

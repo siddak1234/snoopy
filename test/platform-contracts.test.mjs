@@ -5,6 +5,7 @@ import {
   cpSync,
   existsSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -56,6 +57,27 @@ test(
         `${file} does not name the contract it was generated from`,
       );
     }
+  },
+);
+
+test(
+  "the block fixtures name one sha256 over the fixtures' bytes, each file in name order — the app's rule, so the two headers agree (backend ADR-0048 decision 9)",
+  { skip: sibling },
+  () => {
+    const directory = join(backendRoot, "packages/contracts/fixtures/blocks");
+    const hash = createHash("sha256");
+    for (const name of readdirSync(directory)
+      .filter((file) => file.endsWith(".json"))
+      .sort())
+      hash.update(readFileSync(join(directory, name)));
+    const first = readFileSync(
+      join(root, "lib/generated/platform-contracts/block-fixtures.ts"),
+      "utf8",
+    ).split("\n")[0];
+    assert.equal(
+      first,
+      `// From snoopy-backend packages/contracts/fixtures/blocks/*.json, sha256 ${hash.digest("hex")}.`,
+    );
   },
 );
 

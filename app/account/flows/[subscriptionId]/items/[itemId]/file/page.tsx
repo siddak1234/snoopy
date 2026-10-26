@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
+import { BlockList } from "@/components/blocks/BlockList";
+import { Fallback } from "@/components/blocks/Fallback";
+import { pageParts } from "@/components/blocks/look";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { BackLink } from "@/components/dashboard/BackLink";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { FileView } from "@/components/dashboard/FileView";
-import { SectionRows } from "@/components/dashboard/SectionRows";
 import { getAppSession } from "@/lib/app-session";
 import {
   emptyWhenUnavailable,
@@ -27,10 +29,13 @@ import { resolveActiveWorkspaceId } from "@/lib/tenancy";
  * downloadable. Below it you scroll and get the data in drop downs"): headed
  * by the flow's word for it ("Job description", `items.file.title`), under
  * the item's title; the file itself, Download and Share (`FileView`); then
- * what was read from it, each section a row that opens, all closed
- * (`SectionRows`). A file the platform no longer keeps says so, and the
- * sections stay. An item of another workspace, or of another flow than the
- * path's, is the same "not found" as on the item's page.
+ * what was read from it, as the platform sent it (`item.blocks`, backend
+ * ADR-0048: each section a row that opens, all closed) — in its flow's
+ * `pages.file` order, the viewer and the reading by default; a part this
+ * build does not know, the fallback. A file the platform no longer keeps
+ * says so, and the reading stays. An item of another workspace, or of
+ * another flow than the path's, is the same "not found" as on the item's
+ * page.
  */
 
 export const dynamic = "force-dynamic";
@@ -78,11 +83,17 @@ export default async function ItemFilePage(
     }),
     readFile(workspaceId, item.id),
   ]);
-  const declared = subscriptions.subscriptions.find(
+  const subscription = subscriptions.subscriptions.find(
     (candidate) =>
       candidate.id === subscriptionId && candidate.status !== "archived",
-  )?.items;
+  );
+  const declared = subscription?.items;
   if (!declared) notFound();
+  const parts = pageParts(
+    subscription?.pages?.file,
+    ["viewer", "reading"] as const,
+    ["viewer", "reading"],
+  );
 
   return (
     <SectionCard
@@ -90,22 +101,39 @@ export default async function ItemFilePage(
       subheader={item.title}
       back={<BackLink href={itemPath(subscriptionId, item.id)} />}
     >
-      <div className="py-5 first:pt-0">
-        {typeof file === "string" ? (
-          <EmptyRow text={file} />
+      {parts.map((part, at) =>
+        part === "viewer" ? (
+          <div key={part} className="py-5 first:pt-0">
+            {typeof file === "string" ? (
+              <EmptyRow text={file} />
+            ) : (
+              <FileView
+                file={file.file}
+                viewHref={fileViewHref(itemFilePath(subscriptionId, item.id))}
+                linkPath={`/v1/workspaces/${encodeURIComponent(workspaceId)}/items/${encodeURIComponent(item.id)}/file`}
+              />
+            )}
+          </div>
+        ) : part === "reading" ? (
+          item.blocks && item.blocks.length > 0 ? (
+            <section
+              key={part}
+              aria-label={declared.file.title}
+              className="py-5 first:pt-0"
+            >
+              <BlockList
+                blocks={item.blocks}
+                testId="item-reading"
+                context={{ subscriptionId }}
+              />
+            </section>
+          ) : null
         ) : (
-          <FileView
-            file={file.file}
-            viewHref={fileViewHref(itemFilePath(subscriptionId, item.id))}
-            linkPath={`/v1/workspaces/${encodeURIComponent(workspaceId)}/items/${encodeURIComponent(item.id)}/file`}
-          />
-        )}
-      </div>
-      {item.sections && item.sections.length > 0 ? (
-        <section aria-label={declared.file.title} className="py-5">
-          <SectionRows sections={item.sections} testId="item-section" />
-        </section>
-      ) : null}
+          <div key={`unknown-${at}`} className="py-5 first:pt-0">
+            <Fallback />
+          </div>
+        ),
+      )}
     </SectionCard>
   );
 }

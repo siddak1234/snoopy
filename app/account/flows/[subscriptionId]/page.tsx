@@ -50,6 +50,8 @@ import {
   NoneMark,
 } from "@/components/dashboard/ConnectionRow";
 import { StatusPill } from "@/components/dashboard/StatusPill";
+import { Fallback } from "@/components/blocks/Fallback";
+import { pageParts } from "@/components/blocks/look";
 import { AutomationActions } from "../AutomationActions";
 import { FlowDashboard } from "../FlowDashboard";
 import { FlowItems } from "../FlowItems";
@@ -92,6 +94,10 @@ import { owedLines, vendorPath } from "../vendor-path";
  * flows. The user always gets the latest version") until Build 22 (the
  * owner's build 21 item 7): the platform moves every flow to the newest
  * version (backend ADR-0041), and Disconnect stays on Connections.
+ *
+ * Its parts — Dashboard, Steps, items — come in the order its flow's
+ * manifest gives (`Subscription.pages.flow`, backend ADR-0048), else in
+ * today's; a part this build does not know draws the fallback sentence.
  *
  * Opened from its card on Flows (Open).
  */
@@ -355,6 +361,106 @@ export default async function FlowPage(
       (candidate) => candidate.subscriptionId === subscription.id,
     ) ?? null;
 
+  // The page's parts in the order its flow's manifest gives them
+  // (`Subscription.pages.flow`, backend ADR-0048), else today's: a flow with
+  // items its items, any other its Dashboard and its Steps. A part this
+  // build does not know draws the fallback.
+  const parts = pageParts(
+    subscription.pages?.flow,
+    ["dashboard", "steps", "items"] as const,
+    declaredItems ? ["items"] : ["dashboard", "steps"],
+  );
+  const part = (name: (typeof parts)[number], at: number) => {
+    if (name === "dashboard")
+      return (
+        <section
+          key="dashboard"
+          aria-labelledby="flow-dashboard-title"
+          className="py-5 first:pt-0"
+        >
+          <h2
+            id="flow-dashboard-title"
+            className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
+          >
+            Dashboard
+          </h2>
+          <FlowDashboard
+            workspaceId={workspaceId}
+            subscriptionId={subscription.id}
+            initial={counts}
+            draft={subscription.status === "draft"}
+          />
+        </section>
+      );
+    if (name === "steps")
+      return (
+        <section
+          key="steps"
+          aria-labelledby="flow-steps-title"
+          className="py-5"
+        >
+          <h2
+            id="flow-steps-title"
+            tabIndex={-1}
+            className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
+          >
+            Steps
+          </h2>
+          {notResponding}
+          {plan.length === 0 ? stepOne : null}
+          <ol className="mt-3 flex flex-col divide-y divide-[var(--ring)]">
+            {plan.map((row) => (
+              <li
+                key={row.id}
+                data-testid={`flow-step-${row.id}`}
+                className="flex flex-col py-3"
+              >
+                {/* The step's title only — no line under it (the session's
+              S20; P2: "After step 4 i dont want to see quickbooks"). */}
+                <p className="text-sm font-medium text-[var(--text)]">
+                  {row.label}
+                </p>
+                {row.input ? stepOne : null}
+                {row.kind === "setting" && row.fields.length > 0 ? (
+                  <div className="mt-2">{row.fields.map(vendorRow)}</div>
+                ) : null}
+                {row.kind === "email" ? emailRow : null}
+              </li>
+            ))}
+          </ol>
+        </section>
+      );
+    if (name === "items")
+      return (
+        <div key="items" className="contents">
+          {/* A flow with items: no Dashboard and no Steps (build 28's items
+              2 and 3). Turn on, the probe's line and what it is owed, only
+              when there is one of them to say and no Steps say it. */}
+          {!parts.includes("steps") &&
+          (!live || owed.length > 0 || notResponding) ? (
+            <div className="py-5 first:pt-0">
+              {notResponding}
+              {stepOne}
+            </div>
+          ) : null}
+          {declaredItems && items !== undefined ? (
+            <FlowItems
+              workspaceId={workspaceId}
+              subscriptionId={subscription.id}
+              declared={declaredItems}
+              initial={items}
+              canManage={canManage}
+            />
+          ) : null}
+        </div>
+      );
+    return (
+      <div key={`unknown-${at}`} className="py-5 first:pt-0">
+        <Fallback />
+      </div>
+    );
+  };
+
   return (
     <SectionCard
       title={name}
@@ -362,79 +468,7 @@ export default async function FlowPage(
       back={<BackLink href="/account/flows" />}
       primaryAction={<StatusPill status={subscription.status} />}
     >
-      {declaredItems ? (
-        // A flow with items: no Dashboard and no Steps (build 28's items 2
-        // and 3). Turn on, the probe's line and what it is owed, only when
-        // there is one of them to say.
-        !live || owed.length > 0 || notResponding ? (
-          <div className="py-5 first:pt-0">
-            {notResponding}
-            {stepOne}
-          </div>
-        ) : null
-      ) : (
-        <>
-          <section
-            aria-labelledby="flow-dashboard-title"
-            className="py-5 first:pt-0"
-          >
-            <h2
-              id="flow-dashboard-title"
-              className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
-            >
-              Dashboard
-            </h2>
-            <FlowDashboard
-              workspaceId={workspaceId}
-              subscriptionId={subscription.id}
-              initial={counts}
-              draft={subscription.status === "draft"}
-            />
-          </section>
-
-          <section aria-labelledby="flow-steps-title" className="py-5">
-            <h2
-              id="flow-steps-title"
-              tabIndex={-1}
-              className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
-            >
-              Steps
-            </h2>
-            {notResponding}
-            {plan.length === 0 ? stepOne : null}
-            <ol className="mt-3 flex flex-col divide-y divide-[var(--ring)]">
-              {plan.map((row) => (
-                <li
-                  key={row.id}
-                  data-testid={`flow-step-${row.id}`}
-                  className="flex flex-col py-3"
-                >
-                  {/* The step's title only — no line under it (the session's
-                  S20; P2: "After step 4 i dont want to see quickbooks"). */}
-                  <p className="text-sm font-medium text-[var(--text)]">
-                    {row.label}
-                  </p>
-                  {row.input ? stepOne : null}
-                  {row.kind === "setting" && row.fields.length > 0 ? (
-                    <div className="mt-2">{row.fields.map(vendorRow)}</div>
-                  ) : null}
-                  {row.kind === "email" ? emailRow : null}
-                </li>
-              ))}
-            </ol>
-          </section>
-        </>
-      )}
-
-      {declaredItems && items !== undefined ? (
-        <FlowItems
-          workspaceId={workspaceId}
-          subscriptionId={subscription.id}
-          declared={declaredItems}
-          initial={items}
-          canManage={canManage}
-        />
-      ) : null}
+      {parts.map(part)}
 
       <div className="py-5">
         <AutomationActions

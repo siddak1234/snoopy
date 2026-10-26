@@ -38,7 +38,7 @@ export type ItemRowOf = {
   archivedAt?: string | null;
 };
 
-/** What a ranked row needs of one of an item's runs (`Run`). */
+/** What an item's page reads of one of its runs (`Run`): whether it goes on. */
 export type ItemRunOf = {
   id: string;
   status: "pending" | "running" | "held" | "succeeded" | "failed" | "cancelled";
@@ -46,40 +46,7 @@ export type ItemRunOf = {
   score?: number;
 };
 
-/** What a run's verdict is called (`items.verdictWords`): "Advance", "Decline". */
-export type VerdictWords = { positive: string; negative: string };
-
-/** One of an item's tiles: its value over its label, in its tone. */
-export type ItemTile = {
-  key: "total" | "positive" | "negative";
-  label: string;
-  value: number;
-};
-
-/** The first of an item's tiles: all its runs. */
-export const TOTAL = "Total";
-
-/**
- * An item's tiles, side by side at the top of its page (plan §3; the owner's
- * build 28 item 6: "total candidates, green … would be the hireable ones and
- * red would be do not hire"): Total, then the flow's words for a positive and
- * a negative verdict with the item's tallies (`positiveCount`,
- * `negativeCount`) — green and red. None for a flow whose items declare no
- * verdict words: it gives no verdict to count.
- */
-export function itemTiles(
-  item: { runCount: number; positiveCount: number; negativeCount: number },
-  words: VerdictWords | undefined,
-): ItemTile[] {
-  if (!words) return [];
-  return [
-    { key: "total", label: TOTAL, value: item.runCount },
-    { key: "positive", label: words.positive, value: item.positiveCount },
-    { key: "negative", label: words.negative, value: item.negativeCount },
-  ];
-}
-
-/** An item, or a run, whose file is still being read. */
+/** An item whose file is still being read. */
 export const READING = "Reading…";
 /** An item whose file could not be read. */
 export const COULD_NOT_READ = "Couldn't read";
@@ -113,11 +80,6 @@ export function itemPath(subscriptionId: string, itemId: string): string {
 /** The flow page's button that makes an item: "Upload job". */
 export function uploadLabel(words: ItemWords): string {
   return `Upload ${inSentence(words.singular)}`;
-}
-
-/** The item page's heading over the file that starts a run: "Add candidate". */
-export function addRunLabel(runWords: ItemWords): string {
-  return `Add ${inSentence(runWords.singular)}`;
 }
 
 /** The item page's button that archives it: "Archive job". */
@@ -344,61 +306,11 @@ export function itemFieldValues(
 }
 
 /**
- * One of an item's runs, as its page ranks it: a compact row, the height of a
- * section's row — its rank, its title, its score and the arrow (the owner's
- * build 28 item 5); ~~its result line~~ until build 28.
- */
-export type RankedRow = {
-  id: string;
-  rank: number;
-  title: string;
-  score: number | null;
-  /** A run that failed or was stopped: drawn dimmed. */
-  dim: boolean;
-};
-
-/**
- * A finished run's name when it has none of its own: its status, in the
- * app's words (`statusLabel`); its page says why.
- */
-const UNNAMED: Record<
-  Exclude<ItemRunOf["status"], "pending" | "running">,
-  string
-> = {
-  held: "Held",
-  succeeded: "Success",
-  failed: "Failed",
-  cancelled: "Cancelled",
-};
-
-/**
- * An item's runs, ranked exactly as the platform answers them (`readItem`:
- * highest score first, runs without one after them, then newest), never
- * sorted again here, numbered 1…n: a run still going "Reading…", with no
- * score; a finished one its title, else its status; its score — and a failed
- * or stopped one dimmed. The app's `rankedRuns`.
- */
-export function rankedRows(runs: readonly ItemRunOf[]): RankedRow[] {
-  return runs.map((run, at) => {
-    const going = run.status === "pending" || run.status === "running";
-    return {
-      id: run.id,
-      rank: at + 1,
-      title:
-        run.status === "pending" || run.status === "running"
-          ? READING
-          : (run.title ?? UNNAMED[run.status]),
-      score: !going && typeof run.score === "number" ? run.score : null,
-      dim: run.status === "failed" || run.status === "cancelled",
-    };
-  });
-}
-
-/**
- * Whether an item's page offers "Add {run}" (plan §5.3): to an owner or admin,
- * for an item that is ready and not archived, on a flow whose run can start —
- * live, answering, and declaring a run file — as the app's `canStartRun`;
- * otherwise the section is not drawn at all.
+ * Whether an item's page draws its run form (plan §5.3; the platform's
+ * `questions{run}` block, backend ADR-0048): to an owner or admin, for an
+ * item that is ready and not archived, on a flow whose run can start — live,
+ * answering, and declaring a run file — as the app's `canStartRun`;
+ * otherwise the form is not drawn at all.
  */
 export function canAddRun(state: {
   canManage: boolean;
@@ -417,7 +329,10 @@ export function canAddRun(state: {
   );
 }
 
-/** Whether an item's page is read again: it, or one of its runs, is still going. */
+/**
+ * Whether an item's page is read again: it, or one of its runs, is still
+ * going — the platform's `going` when it says, else worked out here.
+ */
 export function itemGoing(
   item: Pick<ItemRowOf, "status">,
   runs: readonly Pick<ItemRunOf, "status">[],
@@ -426,19 +341,6 @@ export function itemGoing(
     item.status === "reading" ||
     runs.some((run) => run.status === "pending" || run.status === "running")
   );
-}
-
-/** A section entry's link, only when it is `http:` or `https:`; else none. */
-export function sectionLink(url: string | undefined): string | null {
-  if (!url) return null;
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "http:" || parsed.protocol === "https:"
-      ? parsed.href
-      : null;
-  } catch {
-    return null;
-  }
 }
 
 /**

@@ -21,22 +21,20 @@ import type { RunFlow } from "./RunLive";
 /**
  * What a run's page and its details page read on the server (Build 21, spec
  * A7; build 28's item 9 split them): the run, by its FULL id, every step from
- * the start and each document it read — drawn once, then kept live by
- * `RunLive`.
+ * the start and its page body as blocks (backend ADR-0048; `readRun`) — drawn
+ * once, then kept live by `RunLive`.
  *
  * The screen renders `steps` — what the automation reported against the steps
  * its manifest declares — and not `events`, which is the platform's own record
  * of state transitions. The run names no flow (`Run.templateId`'s own words: a
  * screen joins the catalog), so its name, steps' titles and groups come from
- * there, and the word for one of its runs (`items.runWords`, the version the
- * flow runs, else the catalog's) heads what it read; its file's word is its
- * version's file fields (`runFileRows`). A held run's approvals are
- * read too: a waiting document whose approval was refused or ran out says "Not
- * approved" (S21), and while its newest waits, the run's page offers Approve
- * and Deny under its result line to a role it names (Build 24, P6; the role read as Approvals reads it, from
- * the workspace list the layout read already). The role goes with every run,
- * held or not: a run that turns held while its page is open has its approvals
- * read again in the browser (`RunLive`), and the page offers the pair from there.
+ * there; its file page's word is its version's file fields (`runFileRows`).
+ * A held run's approvals are read too, for step 4 on its details page. The
+ * role goes with every run, held or not: the approval form in a run's blocks
+ * offers Approve and Deny to a role it names (Build 24, P6; the role read as
+ * Approvals reads it, from the workspace list the layout read already), and
+ * a run that turns held while its page is open is read again in the browser
+ * (`RunLive`) until the form comes.
  *
  * And its flow, as it is now (Build 22, the session's S23): a setting step's
  * line — the integration the flow has chosen — and a title by connection
@@ -112,7 +110,6 @@ export async function readRunPage(
     entry?.requiredConnections.find(
       (connection) => connection.providerId === providerId,
     )?.displayName ?? providerId;
-  const runWord = (subscription?.items ?? entry?.items)?.runWords.singular;
   // The flow's words for the run's files (build 28, item 7: "View resume"):
   // its version's file fields, in order.
   const fileFields = subscription?.runInput
@@ -121,8 +118,6 @@ export async function readRunPage(
   const flow: RunFlow = entry
     ? {
         name: entry.name,
-        ...(entry.documentWords ? { documentWords: entry.documentWords } : {}),
-        ...(runWord ? { runWord } : {}),
         ...(fileFields ? { fileFields } : {}),
         pipeline: entry.pipeline.map((step) => ({
           id: step.id,

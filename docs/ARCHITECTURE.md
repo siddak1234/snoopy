@@ -24,7 +24,10 @@ this origin holds.
 
 - Browser calls use `lib/platform-api.ts`; server calls use
   `lib/platform-server.ts`; proxy session rotation uses `lib/platform-proxy.ts`.
-- Public response types are generated from the three published OpenAPI inputs.
+- Public response types are generated from the three published OpenAPI inputs,
+  and the platform's block fixtures beside them
+  (`lib/generated/platform-contracts/block-fixtures.ts`, one sha256 over the
+  fixtures' bytes in filename order — the rule both clients share).
   A web change cannot invent a request, response, cursor interpretation, billing
   flow, invite flow, or OAuth-provider policy.
 - No Prisma, direct database, Supabase SDK, object-store SDK, browser secret,
@@ -51,6 +54,20 @@ page reuses:
   Duration, Steps done, the steps, Started, Ended, Trigger and the Run ID are
   on its details page, `/account/runs/[runId]/details`. What a run read comes
   first, under "{Run word} details", in its result line's place.
+- **A page body is the platform's blocks** (backend ADR-0048): the run, item
+  and file pages draw their fixed header and footer, then the blocks the
+  one-run and one-item reads send with `shape=blocks` (`BLOCKS_SHAPE`), each
+  by one renderer per type (`components/blocks/`, keyed by the generated
+  `Block` union, no hooks), as sent and in order. A tone is a theme token; a
+  link is https only, checked again, its host under its title; a press is a
+  typed target this site maps to its route. A type, form or page part this
+  build does not know draws `FALLBACK` (`components/blocks/Fallback.tsx`),
+  an unknown tone neutral, an unknown step state the "unknown" look, an
+  unknown target no press; an answer with no blocks, the fallback alone. The
+  flow page draws its parts in `Subscription.pages.flow` order (`pageParts`),
+  else today's. No page reads documents, sections, details or a flow's
+  document, verdict or run words (`test/no-flow-code.test.mjs`), and both
+  clients draw every block fixture to its words (`test/blocks-parity.test.mjs`).
 - **A flow with items** is its items: no Dashboard, no Steps.
 - **A file's page** shows the original in place where a browser draws it,
   then Download and Share, then what was read from it (`FileView`).
@@ -78,37 +95,36 @@ by that run's id, and reads any id in a job as the whole job — every step,
 the held run's and the ones after its approval, in one timeline. So the run
 page draws a held step done once the job went on, and nothing here links one
 run of a job to another. The job's newest approval, by when it was asked, is
-the one a page says or offers. Each document is a closed row headed in its
-flow's word — the catalog entry's `documentWords`, "Invoice 1 of 3" for Invoice
-Processing, else "Document 1 of 3" (backend BUILD-PLAN 27.5.1) — with
-`{vendor} · {total}`, that opens on its own; no page holds code for one flow
-(`test/no-flow-code.test.mjs`); its Format is read from
-the job's uploaded files (`RunDetail.files`): its own file, else the only one.
+the one a page says or offers. What a run read is the platform's blocks
+("Screen standards"): each document a closed section headed in its flow's
+word — "Invoice 1 of 3" for Invoice Processing, else "Document 1 of 3" —
+with `{vendor} · {total}` and its chip, that opens on its own; the
+platform's composer words it (backend `apps/runs/src/pages`), and no page
+holds code for one flow (`test/no-flow-code.test.mjs`).
 
 A run's page and its details page ("Screen standards") are one `RunLive`,
 read alike (`app/account/runs/[runId]/run-page-data.ts`). A held job is
-decided on its page: under the result line, "Waiting for approval.", the one
-Approve and Deny pair (`app/account/approvals/ApprovalDecision.tsx`, Deny the
-danger variant) to a role the job's newest approval names, and says who can
-otherwise; step 4 on its details page keeps the step's state alone (build
-28's review, finding 1). A decision draws the page again (the action revalidates it by
+decided on its page: under the result line, "Waiting for approval.", the
+platform's approval form (`questions{approval}`), drawn as the one Approve
+and Deny pair (`app/account/approvals/ApprovalDecision.tsx`, Deny the danger
+variant) to a role the form names (`mayDecide`), and says who can otherwise;
+step 4 on its details page keeps the step's state alone (build 28's review,
+finding 1). A decision draws the page again (the action revalidates it by
 the job id the platform answers with). A run can turn held while its page is
-open, or the page can read it before its approval is listed. Then the browser
-reads the job and its approvals again through `/api/platform`, every 2 s, one
-re-read (the job and its approvals, two requests together) at a time and at
-most ten times, until the approval is listed or the run
-leaves held (`rereadForApproval` in `lib/run-progress.ts`), and works out
-the pair from what it read (`waitingDecision`). So Approve and Deny appear
-with no reload. A read that fails costs only itself: the page stays as it
-was, as the app's does. A job whose approval is listed is not read again for
-it. On Approvals each row names its flow and the step it waits at, "{flow} ·
+open, or the page can read it before its approval is asked. Then the browser
+reads the job again through `/api/platform`, every 2 s, one read at a time
+and at most ten times, until its form comes or the run leaves held
+(`rereadForApprovalForm` in `lib/run-progress.ts`); its details page reads
+the job and its approvals together until the approval is listed
+(`rereadForApproval`). So Approve and Deny appear with no reload. A read
+that fails costs only itself: the page stays as it was, as the app's does. On Approvals each row names its flow and the step it waits at, "{flow} ·
 {step title}" (`approvalTitle`), never the step id; when the flows or the
 catalog cannot be read, the row loses those words and keeps its buttons. A
 decided row fades and folds away, its pill saying the decision, and the last
 one leaving goes to Activity; under reduced motion it leaves at once.
 
 A job that has documents and has ended or is held has a run package (backend
-ADR-0045): View package, Download PDF and Download Excel replace Download
+ADR-0045; the platform says so, `RunDetail.packageAvailable`): View package, Download PDF and Download Excel replace Download
 JSON. A download asks the platform for the file through `/api/platform` in the
 browser's zone and goes to the signed link it answers — an attachment, so the
 browser saves it and nothing crosses origins; a platform busy building others
@@ -147,21 +163,23 @@ re-read while the card is open never changes the pick) and "Other", whose own
 box, labelled Other, takes 40 characters; a text box; the file, uploaded
 through a run's own upload path; then `createItem` with a key made with the
 card ("Nothing was uploaded…", and a refused field under its field). An item's
-page, `/account/flows/[subscriptionId]/items/[itemId]`, shows its tiles —
-Total, then the flow's `items.verdictWords` with the item's `positiveCount`
-and `negativeCount`, green and red (`itemTiles`; none for a flow that
-declares no verdict words); the `items.file.title` row, opening the item's
-file page; "Add {run}" — the run's file and Start, staying on the page — only
-where a run can start (`canAddRun`); its runs in exactly `readItem`'s order,
-each a `PageRow` of its rank, title and score, a run going "Reading…", an
-untitled one its status, a failed one in the muted colour; and Archive,
-behind a confirmation, for an owner or admin only. The item's file page,
+page, `/account/flows/[subscriptionId]/items/[itemId]`, shows its header,
+then its body as the platform's blocks ("Screen standards"): its tiles —
+Total, then the flow's verdict words with the item's tallies, green and red
+(none for a flow that declares no verdict words); its file's row, opening
+the item's file page; the run form ("Add {run}": the run's file and Start,
+staying on the page, drawn by `RunStart` only where a run can start,
+`canAddRun`); its runs in exactly `readItem`'s order, each a `PageRow` of its
+rank, title and score, a failed one in the muted colour; and Archive,
+behind a confirmation, for an owner or admin only. It is read again while
+the platform says it is `going`. The item's file page,
 `…/items/[itemId]/file`, shows the file (`readItemFile`) and then its
-`sections`, all closed. A run with a `title` and a `score` is headed by
-them; a run of an item opens with "View {file}" — its version's first file
-field's title (`runFileTitle`) — to the run's file page,
-`/account/runs/[runId]/files/[fileId]` (`readRunFile`); its `sections` are
-rows that open and close, the first open, under the flow's `items.runWords`.
+reading (`item.blocks`), every section closed, in its flow's `pages.file`
+order. A run with a `title` and a `score` is headed by them; a run of an
+item opens with "View {file}" to the run's file page,
+`/account/runs/[runId]/files/[fileId]` (`readRunFile`; headed by its
+version's file field's title, `runFileRows`); its sections open and close,
+the first open, under "{Run word} details".
 A file page (`components/dashboard/FileView.tsx`, the rules in
 `lib/run-files.ts`) frames a PDF, JPEG or PNG through its own view route (`app/account/runs/[runId]/files/[fileId]/view/route.ts`, the item's alike)
 — the platform's signed link read on the server (`lib/file-view.ts`), inline
@@ -169,9 +187,8 @@ in that type, any other type an attachment, never cached, framed by this site
 alone and asked only by its pages (`Sec-Fetch-Site`) — then Download, the
 signed link followed only when https, and Share where the browser hands
 files to the share sheet, the bytes read from that same route
-(`siteFileBlob`); a section's
-link is drawn only when it is `http:` or `https:` and opens outside the site
-(`components/dashboard/SectionRows.tsx`). A file field that names its
+(`siteFileBlob`); a block's link is drawn only when it is `https:` and
+opens outside the site (`components/blocks/look.ts`). A file field that names its
 `acceptedContentTypes` offers those, sends a Word file as it is, offers Take
 photo only where a JPEG is taken, and refuses another type in words that name
 what it takes (`app/account/flows/run-file-image.ts`); without them, a PDF,

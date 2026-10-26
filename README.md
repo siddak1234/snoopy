@@ -39,7 +39,8 @@ One command, the whole offline gate, in this order: `format:check`,
 place, and every file a changed doc names exists: `docs/docs-map.json`),
 `map -- --check` (`docs/MAP.md` is what `npm run map` builds from the tree),
 `lint`, `typecheck`, `audit:boundaries`, `test:contracts`, `verify:platform-contracts`
-(skipped out loud when `../snoopy-backend` is not checked out beside this
+(the generated contract types and the platform's block fixtures match the
+backend's; skipped out loud when `../snoopy-backend` is not checked out beside this
 repository), `build:no-backend` (the site with no backend, as a Vercel preview
 builds it), `probe:no-backend` (that build served as a preview serves it: the
 public pages load, the account area sends a visitor to sign in, and readiness
@@ -88,13 +89,17 @@ row on every run's page (every step from the start — its
 integration and its email among them, the running one spinning — read again
 while it goes on, a held job's step 4 its state alone), a run's page (a held
 job's Approve and Deny under its result line, appearing with no reload when
-the job reaches it while its page is open — read again at most ten times,
-never once listed or gone on, a failed read keeping the page; the package's
-buttons, then Run details, then View flow; each document it read a closed row of its own that opens in place — headed in its
-flow's word ("Invoice 1 of 3" for Invoice Processing, "Document 1 of 3" for a flow
-that names none; the catalog's `documentWords`), its Document type and Format — and View package, Download PDF and
-Download Excel, each download to the platform's signed link, an https one
-only), the run
+the job reaches it while its page is open, as docs/ARCHITECTURE.md's "Screen
+standards" says; its body the platform's blocks
+(`shape=blocks`, backend ADR-0048), which the fixture builds by the
+platform's rules (`e2e/fixtures/page-bodies.ts`, held to the platform's
+bodies by `test/fixture-page-bodies.test.mjs`) and, for `blocks-{name}` runs,
+serves as the platform's
+block fixtures hold them; each document it read a closed section of its own
+that opens in place, headed as "Screen standards" says; the
+package's buttons when the platform offers the package, then Run details,
+then View flow — and View package, Download PDF and Download Excel, each
+download to the platform's signed link, an https one only), the run
 package's page (the PDF itself, in a frame of the site's inline route that
 answers it `application/pdf` inline, a busy platform asked once more; its
 downloads, an https link only; a job with no package yet), Approvals (each
@@ -127,9 +132,10 @@ website's drop-down, on its page with no Dashboard, no Steps and no run start
 form; the upload card's drop-down, "Other" and the values typed before; an
 item's runs ranked in compact rows a closed section's height, its tiles and
 its file page — the file in place, its route for this site's pages alone,
-Download to its signed link, Share, then its sections; a run headed by its
-title and score with View {file} and its file page, its sections under
-"{Run word} details" and its Run details page; Archive, an owner's buttons a member
+Download to its signed link, Share, then its reading's sections; a run
+headed by its title and score with View {file} and its file page, its
+sections under "{Run word} details" and its Run details page — every body
+the platform's blocks; Archive, an owner's buttons a member
 does not see and a member's presses refused in words, and an unanswered list
 said "Unavailable"), sharing `e2e/helpers.ts`. The playbook's human keyboard
 traversal (NFR-35) has a hand-over test in the same suite:

@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { test } from "node:test";
+import { after, before, test } from "node:test";
+import { BLOCK_FIXTURES } from "../lib/generated/platform-contracts/block-fixtures.ts";
+import {
+  elements,
+  loadBlocks,
+  parse,
+  visibleWords,
+} from "./blocks-harness.mjs";
 
 /**
  * Round 19's website guards that are not one module's (plan §5; backend
@@ -11,7 +18,9 @@ import { test } from "node:test";
  * none on an item's; a run of an item names it; the item's page is read per
  * request through lib/platform-server.ts; and the privacy page says what
  * Candidate Reviewer has read. `test/flow-items.test.mjs` holds the rules;
- * `e2e/flow-items.spec.ts` what a browser draws.
+ * `e2e/flow-items.spec.ts` what a browser draws. Since Round 21 (backend
+ * ADR-0048) a run's and an item's bodies are the platform's blocks, read
+ * here from its fixtures as `BlockList` draws them.
  */
 
 const root = resolve(import.meta.dirname, "..");
@@ -26,7 +35,18 @@ const ITEM_PAGE = "app/account/flows/[subscriptionId]/items/[itemId]/page.tsx";
 const ITEM_LIVE =
   "app/account/flows/[subscriptionId]/items/[itemId]/ItemLive.tsx";
 const RUN_LIVE = "app/account/runs/[runId]/RunLive.tsx";
-const SECTION_ROWS = "components/dashboard/SectionRows.tsx";
+const RENDERERS = "components/blocks/renderers.tsx";
+
+let blocks;
+before(async () => {
+  blocks = await loadBlocks();
+});
+after(() => blocks?.cleanup());
+const fixture = (name) => {
+  const found = BLOCK_FIXTURES.find((candidate) => candidate.name === name);
+  assert.ok(found, name);
+  return found;
+};
 
 test("a flow with items draws them, and its run start form gets no fields — Turn on only (plan §5.1; no steps since build 28: test/build28-screens.test.mjs)", () => {
   const page = code(read(FLOW_PAGE));
@@ -55,10 +75,15 @@ test("Upload, Add and Archive are an owner's or admin's: drawn only under canMan
     /\{canManage \? \(\s*<Button[\s\S]*?data-testid="item-upload-open"/u,
   );
   const live = code(read(ITEM_LIVE));
-  // Add only where a run can start (`canAddRun`, finding 3 of the review).
+  // Add only where a run can start (`canAddRun`, finding 3 of the review):
+  // the platform's run form drawn by RunStart under that gate alone.
   assert.match(
     live,
-    /\{canAddRun\(\{\s*canManage,\s*item,\s*live,\s*available,\s*runInputs: runInput\.length,\s*\}\) \? \(\s*<section aria-labelledby="item-add-title"/u,
+    /const canAdd = canAddRun\(\{\s*canManage,\s*item,\s*live,\s*available,\s*runInputs: runInput\.length,\s*\}\);/u,
+  );
+  assert.match(
+    live,
+    /run: \(form\) =>\s*canAdd \? \(\s*<div data-testid="item-add">\s*<RunStart/u,
   );
   assert.match(
     live,
@@ -71,26 +96,37 @@ test("Upload, Add and Archive are an owner's or admin's: drawn only under canMan
   assert.match(code(read(ITEM_PAGE)), /canManage=\{administers\(role\)\}/u);
 });
 
-test("sections open and close: every one closed but the first on a run's page; none on an item's since build 28 (plan §5.3, §5.4; build 28, item 4)", () => {
-  const rows = code(read(SECTION_ROWS));
-  assert.match(rows, /<details[\s\S]*?open=\{firstOpen && index === 0\}/u);
-  assert.match(rows, /firstOpen = false,/u);
+test("sections open and close: every one closed but the first on a run's page; all closed in an item's reading (plan §5.3, §5.4; build 28, item 4; backend ADR-0048)", () => {
+  const openOf = (name) =>
+    elements(parse(blocks.render(fixture(name).blocks)))
+      .filter((node) => node.tag === "details")
+      .map((node) => "open" in node.attrs);
+  assert.deepEqual(openOf("reviewer-candidate"), [true, false]);
+  assert.deepEqual(openOf("reviewer-item-reading"), [false, false]);
   assert.match(
-    code(read(RUN_LIVE)),
-    /<SectionRows sections=\{sections\} firstOpen testId="run-section" \/>/u,
+    code(read(RENDERERS)),
+    /<details\s+data-testid="block-section"\s+open=\{block\.open === true\}/u,
   );
   const live = code(read(ITEM_LIVE));
   assert.doesNotMatch(live, /<SectionRows\b|firstOpen/u);
 });
 
-test("a section's link is drawn only through sectionLink, opening outside with noopener noreferrer", () => {
-  const rows = code(read(SECTION_ROWS));
-  assert.match(rows, /const link = sectionLink\(entry\.url\);/u);
+test("a section's link is drawn only when https, opening outside with noopener noreferrer; an http address its words alone (backend ADR-0048)", () => {
+  const renderers = code(read(RENDERERS));
+  assert.match(renderers, /const link = httpsLink\(item\.url\);/u);
   assert.match(
-    rows,
-    /\{link \? \(\s*<a\s+href=\{link\}\s+target="_blank"\s+rel="noopener noreferrer"/u,
+    renderers,
+    /link \? \(\s*<a\s+href=\{link\.href\}\s+target="_blank"\s+rel="noopener noreferrer"/u,
   );
-  assert.doesNotMatch(rows, /href=\{entry\.url\}/u);
+  assert.doesNotMatch(renderers, /href=\{item\.url\}/u);
+  const markup = blocks.render(fixture("reviewer-candidate").blocks);
+  const anchors = elements(parse(markup)).filter(
+    (node) => node.tag === "a" && node.attrs.target,
+  );
+  assert.deepEqual(
+    anchors.map((node) => [node.attrs.href, node.attrs.rel]),
+    [["https://school.example.test/accounting", "noopener noreferrer"]],
+  );
 });
 
 test("a run with a title and a score is headed by them, the full id kept among its facts; its sections come first, in its result line's place, the steps on its details page (plan §5.4; build 28, items 8 and 9)", () => {
@@ -106,29 +142,22 @@ test("a run with a title and a score is headed by them, the full id kept among i
   assert.match(live, /<SectionCard\s+title=\{name\}/u);
   assert.match(live, /data-testid="run-score"/u);
   assert.match(live, /\{ label: "Run ID", value: run\.id \}/u);
-  // First on the run's page, under "{Run word} details", in the result
-  // line's place (build 28's items 7 and 8; ~~directly under the result
-  // line~~ until then); the tiles and the steps on its details page, before
-  // the run's page.
+  // The details page's tiles and steps, then the run's page: its body.
   const details = live.indexOf('if (view === "details") {');
-  const result = live.indexOf('data-testid="run-result"');
-  const sections = live.indexOf('testId="run-section"');
-  assert.match(live, /\{result && !hasSections \? \(/u);
   assert.ok(
     details > 0 &&
       details < live.indexOf('label="Duration"') &&
       live.indexOf('label="Duration"') < live.indexOf('id="run-steps-title"') &&
-      live.indexOf('id="run-steps-title"') < result &&
-      result < sections,
-    "the details page's tiles and steps, then the run's page: its result line or its sections",
+      live.indexOf('id="run-steps-title"') < live.indexOf("<BlockList"),
   );
-  assert.ok(
-    live.indexOf("{runSectionsHeading(flow?.runWord)}") < sections,
-    "the run word's heading over the sections",
-  );
-  assert.ok(
-    sections < live.indexOf('id="run-documents-title"'),
-    "sections before the documents",
+  // First on the run's page, under "{Run word} details", in the result
+  // line's place (build 28's items 7 and 8).
+  assert.deepEqual(
+    visibleWords(blocks.render(fixture("reviewer-candidate").blocks)).slice(
+      1,
+      3,
+    ),
+    ["Candidate details", "Experience"],
   );
 });
 
@@ -166,7 +195,7 @@ test("the item refusals are one set of words with the app's: Nothing was uploade
   const live = code(read(ITEM_LIVE));
   assert.match(
     live,
-    /It leaves the list and takes no new \{inSentence\(runWords\)\}\. Its\{" "\}\s*\{inSentence\(runWords\)\} stay\./u,
+    /It leaves the list and takes no new \{inSentence\(runsWord\)\}\. Its\{" "\}\s*\{inSentence\(runsWord\)\} stay\./u,
   );
   // A refused field says so under it.
   assert.match(
@@ -218,7 +247,13 @@ test("an item's page reads the platform through lib/platform-server.ts per reque
     assert.doesNotMatch(code(read(path)), /\bfetch\(/u, path);
   const live = code(read(ITEM_LIVE));
   assert.match(live, /<SectionCard\b/u);
-  assert.match(live, /<EmptyRow text=\{noneYet\(declared\.runWords\)\} \/>/u);
+  assert.match(live, /<BlockList\s+blocks=\{detail\.blocks\}/u);
+  // Its one empty row: the platform's, drawn by EmptyRow.
+  assert.deepEqual(
+    visibleWords(blocks.render(fixture("empty-item").blocks)).at(-1),
+    "No candidates yet.",
+  );
+  assert.match(code(read(RENDERERS)), /<EmptyRow text=\{block\.empty\} \/>/u);
 });
 
 test("the privacy page says Resume Screening, and Candidate Reviewer its first version, has an AI model read the job description and each resume, through OpenRouter, with nothing else from the workspace (plan §5.6; v2's name, 2026-10-25)", () => {
