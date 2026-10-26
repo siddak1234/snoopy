@@ -27,7 +27,7 @@ this origin holds.
 - Public response types are generated from the three published OpenAPI inputs,
   and the platform's block fixtures beside them
   (`lib/generated/platform-contracts/block-fixtures.ts`, one sha256 over the
-  fixtures' bytes in name order — the app's rule).
+  fixtures' bytes in filename order — the rule both clients share).
   A web change cannot invent a request, response, cursor interpretation, billing
   flow, invite flow, or OAuth-provider policy.
 - No Prisma, direct database, Supabase SDK, object-store SDK, browser secret,
@@ -61,7 +61,7 @@ page reuses:
   `Block` union, no hooks), as sent and in order. A tone is a theme token; a
   link is https only, checked again, its host under its title; a press is a
   typed target this site maps to its route. A type, form or page part this
-  build does not know draws "This part can't be shown here yet." (`Fallback`),
+  build does not know draws `FALLBACK` (`components/blocks/Fallback.tsx`),
   an unknown tone neutral, an unknown step state the "unknown" look, an
   unknown target no press; an answer with no blocks, the fallback alone. The
   flow page draws its parts in `Subscription.pages.flow` order (`pageParts`),

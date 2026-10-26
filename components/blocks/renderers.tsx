@@ -85,7 +85,7 @@ export function TextBlock({ block }: { block: BlockOf<"text"> }) {
       data-testid="block-text"
       data-tone={block.tone ?? "neutral"}
       {...(block.tone === "error" ? { role: "alert" } : {})}
-      className={`text-sm break-words whitespace-pre-line ${textTone(block.tone)}${block.style === "strong" ? "font-medium" : ""}`}
+      className={`text-sm break-words whitespace-pre-line ${textTone(block.tone)} ${block.style === "strong" ? "font-medium" : ""}`}
     >
       {block.text}
     </p>
@@ -199,27 +199,61 @@ function Value({ item }: { item: ListItem }) {
   ) : null;
 }
 
-/** A row that opens a page: `PageRow` — its rank, its title, its chip, its score. */
+/**
+ * A row that opens a page: `PageRow` — its rank, its title, its chip, its
+ * score; then its subtitle, its text and its address, in that order, each
+ * under the title. The whole row is the press, so its address is its words
+ * alone, never a second link.
+ */
 function OpenRow({ item, href }: { item: ListItem; href: string }) {
+  const more = Boolean(item.subtitle || item.text || item.url);
+  const title = (
+    // Dimmed in the muted token, never by opacity: its text keeps AA contrast.
+    <span
+      className={`min-w-0 truncate font-medium ${item.muted ? "text-[var(--muted)]" : "text-[var(--text)]"}`}
+    >
+      {item.title}
+    </span>
+  );
   return (
     <PageRow
       href={href}
       testId="block-list-row"
       dim={item.muted === true}
-      end={<Value item={item} />}
+      end={more ? undefined : <Value item={item} />}
     >
       {item.lead ? (
         <span className="w-6 shrink-0 text-[var(--muted)] tabular-nums">
           {item.lead}
         </span>
       ) : null}
-      {/* Dimmed in the muted token, never by opacity: its text keeps AA contrast. */}
-      <span
-        className={`min-w-0 truncate font-medium ${item.muted ? "text-[var(--muted)]" : "text-[var(--text)]"}`}
-      >
-        {item.title}
-      </span>
-      {item.badge ? <Chip badge={item.badge} /> : null}
+      {more ? (
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="flex min-w-0 flex-1">{title}</span>
+            {item.badge ? <Chip badge={item.badge} /> : null}
+            <Value item={item} />
+          </span>
+          {item.subtitle ? (
+            <span className="text-xs break-words text-[var(--muted)]">
+              {item.subtitle}
+            </span>
+          ) : null}
+          {item.text ? (
+            <span className="break-words whitespace-pre-line text-[var(--text)]">
+              {item.text}
+            </span>
+          ) : null}
+          {item.url ? (
+            <span className="break-all text-[var(--text)]">{item.url}</span>
+          ) : null}
+        </span>
+      ) : (
+        <>
+          {title}
+          {item.badge ? <Chip badge={item.badge} /> : null}
+        </>
+      )}
     </PageRow>
   );
 }

@@ -73,7 +73,9 @@ test("text: its words in the result line's tones, an error one an alert; a label
   const [label] = byTest(nodes, "block-label");
   assert.equal(label.tag, "h2");
   assert.match(label.attrs.class, /uppercase/u);
-  assert.match(strong.attrs.class, /font-medium/u);
+  const classes = (node) => node.attrs.class.split(/\s+/u);
+  assert.ok(classes(strong).includes("font-medium"), strong.attrs.class);
+  assert.ok(!classes(ok).includes("font-medium"), ok.attrs.class);
   assert.match(muted.attrs.class, /text-\[var\(--muted\)\]/u);
   assert.deepEqual(
     visibleWords(
@@ -245,6 +247,46 @@ test("list: a row with a target a PageRow to its route, its score read as Score;
     anchors.map((node) => [node.attrs.href, node.attrs.target, node.attrs.rel]),
     [["https://school.example.test/a", "_blank", "noopener noreferrer"]],
     "only the https address is a link",
+  );
+});
+
+test("list: a row that opens a page keeps its subtitle, text and address, in the words' order, the address no second link", () => {
+  const list = [
+    {
+      type: "list",
+      items: [
+        {
+          lead: "1",
+          title: "Dana",
+          badge: { text: "Advance", tone: "success" },
+          value: "88",
+          valueLabel: "Score",
+          subtitle: "Payroll Lead",
+          text: "Ran payroll.",
+          url: "https://school.example.test/a",
+          open: { target: "run", runId: RUN },
+        },
+      ],
+    },
+  ];
+  const markup = draw(list);
+  assert.deepEqual(visibleWords(markup), [
+    "1",
+    "Dana",
+    "Advance",
+    "88",
+    "Payroll Lead",
+    "Ran payroll.",
+    "https://school.example.test/a",
+  ]);
+  const nodes = elements(parse(markup));
+  const [row] = byTest(nodes, "block-list-row");
+  assert.equal(row.tag, "a");
+  assert.equal(row.attrs.href, `/account/runs/${RUN}`);
+  assert.equal(
+    nodes.filter((node) => node.tag === "a").length,
+    1,
+    "the row is the one press",
   );
 });
 

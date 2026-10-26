@@ -66,9 +66,9 @@ for (const { input, output } of contracts) {
 
 // The block fixtures (backend ADR-0048 decision 9): every page body both
 // clients must draw to exactly its `text`. One file, headed by one sha256 over
-// the fixtures' bytes, each file in name order — the app's generator hashes
-// them the same way, so the two headers are equal when both clients assert
-// the same fixtures.
+// the fixtures' bytes, each file in filename order — the rule both clients
+// share, so the two headers are equal when both clients assert the same
+// fixtures.
 const fixtureDirectory = join(
   backendRoot,
   "packages/contracts/fixtures/blocks",

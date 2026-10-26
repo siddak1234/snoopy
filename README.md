@@ -93,7 +93,9 @@ the job reaches it while its page is open — the job read again until its
 approval form comes, at most ten times, never once it comes or the job goes
 on, a failed read keeping the page; its body the platform's blocks
 (`shape=blocks`, backend ADR-0048), which the fixture builds by the
-platform's rules and, for `blocks-{name}` runs, serves as the platform's
+platform's rules (`e2e/fixtures/page-bodies.ts`, held to the platform's
+bodies by `test/fixture-page-bodies.test.mjs`) and, for `blocks-{name}` runs,
+serves as the platform's
 block fixtures hold them; each document it read a closed section of its own
 that opens in place — "Invoice 1 of 3" for Invoice Processing, "Document 1
 of 3" for a flow that names none — its Document type and Format; the

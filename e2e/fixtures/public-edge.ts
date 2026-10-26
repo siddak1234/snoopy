@@ -18,6 +18,12 @@ import type {
   operations as ConnectionOperations,
 } from "../../lib/generated/platform-contracts/connections";
 
+// The page bodies' composer (ADR-0048), by its own path: Node runs this file
+// with its types stripped, which needs the `.ts`; the types are tsc's.
+const { itemBody, runBlocks } = (await import(
+  new URL("./page-bodies.ts", import.meta.url).href
+)) as typeof import("./page-bodies");
+
 const port = Number(process.env.FIXTURE_EDGE_PORT ?? "3443");
 const certificate = process.env.FIXTURE_EDGE_CERT;
 const privateKey = process.env.FIXTURE_EDGE_KEY;
@@ -2084,296 +2090,14 @@ function signedLink(https: string): string {
  * `shape=blocks` is answered as the platform's composer answers it — the run
  * without details, documents and sections, with `blocks` and
  * `packageAvailable`; the item with `runs: []`, `blocks`, `going` and its
- * reading on `item.blocks`. The fixture builds them from its own made-up
- * answers by the platform's rules (apps/runs/src/pages), so a test reads the
- * same body a page draws. The platform's own fixture bodies
+ * reading on `item.blocks`. `page-bodies.ts` builds them from the fixture's
+ * own made-up answers by the platform's rules, and
+ * `test/fixture-page-bodies.test.mjs` holds it to the platform's published
+ * bodies, so a test reads the body a page draws. The platform's own bodies
  * (`packages/contracts/fixtures/blocks`) are served as they are under
  * `blocks-{name}` run ids, for the scans and the screenshots.
  */
 type Block = Automations["Block"];
-
-const BLOCK_WORDS = {
-  documents: "Documents",
-  details: "Details",
-  waiting: "Waiting for approval.",
-  decided: {
-    approved: "Approved",
-    rejected: "Denied",
-    expired: "No longer awaiting approval",
-  } as Record<string, string>,
-  types: {
-    bill: "Bill",
-    invoice: "Invoice",
-    receipt: "Receipt",
-    credit_note: "Credit note",
-    statement: "Statement",
-    bank_statement: "Bank statement",
-    quote: "Quote",
-    purchase_order: "Purchase order",
-    other: "Document",
-  } as Record<string, string>,
-  chips: {
-    recorded: "Recorded",
-    saved: "Saved",
-    not_recorded: "Not recorded",
-    unconfirmed: "Not confirmed",
-    compared: "Compared",
-    waiting: "Waiting",
-  } as Record<string, string>,
-  paid: {
-    card: "Card",
-    cash: "Cash",
-    check: "Check",
-    bank_transfer: "Bank transfer",
-    other: "Other",
-  } as Record<string, string>,
-  unnamed: {
-    held: "Held",
-    succeeded: "Success",
-    failed: "Failed",
-    cancelled: "Cancelled",
-  } as Record<string, string>,
-};
-const MONTH_WORDS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-const CHIP_TONES: Record<string, Automations["BlockTone"]> = {
-  recorded: "success",
-  saved: "success",
-  compared: "success",
-  not_recorded: "warning",
-  unconfirmed: "warning",
-  waiting: "warning",
-};
-
-const smallFirst = (word: string) =>
-  /^\p{Lu}\p{Ll}/u.test(word)
-    ? word.charAt(0).toLocaleLowerCase("en-US") + word.slice(1)
-    : word;
-
-function blockMoney(value: string | null, currency: string | null) {
-  if (value === null) return null;
-  const match = /^(-?)(0|[1-9][0-9]*)(?:\.([0-9]+))?$/u.exec(value);
-  if (!match) return null;
-  const [, sign, whole = "", fraction = ""] = match;
-  const negative = sign === "-" ? "−" : "";
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/gu, ",");
-  if (currency === null || currency === "USD")
-    return `${negative}$${grouped}.${fraction.padEnd(2, "0")}`;
-  return `${negative}${grouped}${fraction ? `.${fraction}` : ""} ${currency}`;
-}
-
-function blockDate(value: string | null) {
-  const match = value ? /^(\d{4})-(\d{2})-(\d{2})$/u.exec(value) : null;
-  const month = match ? MONTH_WORDS[Number(match[2]) - 1] : undefined;
-  return match && month ? `${month} ${Number(match[3])}, ${match[1]}` : null;
-}
-
-function blockTime(value: string | null) {
-  const match = value ? /^([01][0-9]|2[0-3]):([0-5][0-9])$/u.exec(value) : null;
-  if (!match) return null;
-  const hours = Number(match[1]);
-  return `${hours % 12 || 12}:${match[2]} ${hours < 12 ? "AM" : "PM"}`;
-}
-
-const pairs = (rows: { label: string; value: string; strong?: boolean }[]) =>
-  ({
-    type: "table",
-    columns: [{ muted: true }, { align: "end" }],
-    rows: rows.map((row) => ({
-      cells: [row.label, row.value],
-      ...(row.strong ? { strong: true } : {}),
-    })),
-    divided: true,
-  }) satisfies Block;
-
-/** One document as its closed section: the platform's document adapter. */
-function documentBlock(
-  document: Automations["RunDocument"],
-  count: number,
-  word: string,
-  files: readonly Automations["RunFile"][],
-  notApproved: boolean,
-): Block {
-  const money = (value: string | null) => blockMoney(value, document.currency);
-  const type = BLOCK_WORDS.types[document.type] ?? "Document";
-  const own = document.source
-    ? files.find((file) => file.id === document.source?.file)
-    : undefined;
-  const format = (own ?? (files.length === 1 ? files[0] : undefined))?.format;
-  const place = [document.vendor.address, document.vendor.city]
-    .filter(Boolean)
-    .join(", ");
-  const location = [
-    place || null,
-    document.vendor.storeNumber ? `Store ${document.vendor.storeNumber}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  const when = [blockDate(document.date), blockTime(document.time)]
-    .filter(Boolean)
-    .join(" · ");
-  const ids = [
-    ...(document.number
-      ? [{ label: document.numberLabel ?? "No.", value: document.number }]
-      : []),
-    ...document.references.map((reference) => ({
-      label: reference.label,
-      value: reference.value,
-    })),
-  ];
-  const totals: { label: string; value: string; strong?: boolean }[] = [];
-  const amount = (label: string, value: string | null, strong?: boolean) => {
-    const text = money(value);
-    if (text !== null) totals.push({ label, value: text, strong });
-  };
-  amount("Subtotal", document.subtotal);
-  amount("Tax", document.tax);
-  amount("Tip", document.tip);
-  const discount = money(document.discount);
-  if (discount !== null)
-    totals.push({
-      label: "Discount",
-      value: discount.startsWith("−") ? discount : `−${discount}`,
-    });
-  amount("Total", document.total, true);
-  if (document.payment.method !== "not_shown")
-    totals.push({
-      label: "Paid",
-      value:
-        document.payment.method === "card" && document.payment.cardLast4
-          ? `Card ending ${document.payment.cardLast4}`
-          : (BLOCK_WORDS.paid[document.payment.method] ?? "Other"),
-    });
-  totals.push({ label: "Result", value: document.statusText });
-  for (const detail of document.details) totals.push(detail);
-  const glance = [document.vendor.name, money(document.total)]
-    .filter(Boolean)
-    .join(" · ");
-  const inside: Block[] = [
-    {
-      type: "table",
-      columns: [{ muted: true }, { align: "end" }],
-      rows: [
-        { cells: ["Document type", type] },
-        ...(format ? [{ cells: ["Format", format] }] : []),
-      ],
-    },
-    {
-      type: "text",
-      text: document.vendor.name ? `${type} · ${document.vendor.name}` : type,
-      style: "strong",
-    },
-    ...(location
-      ? [{ type: "text", text: location, style: "muted" } satisfies Block]
-      : []),
-    ...(when
-      ? [{ type: "text", text: when, style: "muted" } satisfies Block]
-      : []),
-    ...(ids.length > 0
-      ? [
-          {
-            type: "table",
-            columns: [{ muted: true }, { align: "end" }],
-            rows: ids.map((row) => ({ cells: [row.label, row.value] })),
-          } satisfies Block,
-        ]
-      : []),
-    ...(document.lineItems.length > 0
-      ? [
-          {
-            type: "table",
-            columns: [{}, { align: "end" }],
-            rows: document.lineItems.map((line) => {
-              const unit = money(line.unitPrice);
-              return {
-                cells: [line.description ?? "—", money(line.amount) ?? ""],
-                ...(line.quantity !== null && unit !== null
-                  ? { note: `${line.quantity} × ${unit}` }
-                  : {}),
-              };
-            }),
-            divided: true,
-          } satisfies Block,
-        ]
-      : []),
-    ...(!document.lineItemsComplete
-      ? [
-          {
-            type: "text",
-            text: "More lines on the document.",
-            style: "muted",
-          } satisfies Block,
-        ]
-      : []),
-    pairs(totals),
-  ];
-  return {
-    type: "section",
-    title: `${word} ${document.index} of ${count}`,
-    ...(glance ? { subtitle: glance } : {}),
-    badge: notApproved
-      ? { text: "Not approved", tone: "error" }
-      : {
-          text: BLOCK_WORDS.chips[document.status] ?? document.status,
-          tone: CHIP_TONES[document.status] ?? "neutral",
-        },
-    blocks: inside,
-  };
-}
-
-/** Sections as the platform's adapter makes them: a list each, an http address its words. */
-function sectionBlocks(
-  sections: readonly Automations["RunSection"][],
-  firstOpen: boolean,
-): Block[] {
-  return sections.map((section, index) => ({
-    type: "section",
-    title: section.title,
-    ...(firstOpen && index === 0 ? { open: true } : {}),
-    blocks: [
-      {
-        type: "list",
-        items: section.entries.map((entry) => {
-          const https = (() => {
-            try {
-              return entry.url && new URL(entry.url).protocol === "https:";
-            } catch {
-              return false;
-            }
-          })();
-          const http = (() => {
-            try {
-              return entry.url && new URL(entry.url).protocol === "http:";
-            } catch {
-              return false;
-            }
-          })();
-          const text = [entry.text, http ? entry.url : undefined]
-            .filter(Boolean)
-            .join("\n");
-          return {
-            title: entry.title,
-            ...(entry.subtitle ? { subtitle: entry.subtitle } : {}),
-            ...(text ? { text } : {}),
-            ...(https ? { url: entry.url } : {}),
-          };
-        }),
-      },
-    ],
-  }));
-}
 
 /** The job's approvals as the platform holds them: the list's, the held job's by its state. */
 function jobApprovals(runId: string): Automations["Approval"][] {
@@ -2406,28 +2130,9 @@ function runBody(detail: Json): Json {
   const entry = fixtureCatalog().automations.find(
     (candidate) => candidate.templateId === run.templateId,
   );
-  const files = (detail.files as Automations["RunFile"][] | undefined) ?? [];
-  const blocks: Block[] = [];
-  // files: a run of an item's uploads, by its version's file fields.
-  if (run.itemId) {
-    const fields = (subscription?.runInput ?? []).filter(
-      (field) => field.control === "artifact",
-    );
-    files.forEach((file, index) => {
-      const title = fields[index]?.title ?? fields[0]?.title ?? "File";
-      blocks.push({
-        type: "file",
-        title: `View ${smallFirst(title)}`,
-        open: { target: "run-file", runId: run.id, fileId: file.id },
-        file,
-      });
-    });
-  }
-  // outcome: the result line, toned by status, and the approval to decide.
-  const approvals = jobApprovals(run.id).sort((a, b) =>
-    (a.createdAt ?? "").localeCompare(b.createdAt ?? ""),
-  );
-  const newest = approvals.at(-1);
+  const newest = jobApprovals(run.id)
+    .sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""))
+    .at(-1);
   // The held job's read counted; a read the test left its approval off of
   // spent, after this one is answered without it (R5c 1).
   if (run.id === invoiceHeldRunId) {
@@ -2435,64 +2140,23 @@ function runBody(detail: Json): Json {
     if (state.heldApprovalHiddenReads > 0 && state.heldJobLive !== "running")
       state.heldApprovalHiddenReads -= 1;
   }
-  const hasResult = (sections?.length ?? 0) > 0;
-  if (run.status === "succeeded" && run.resultSummary && !hasResult)
-    blocks.push({ type: "text", text: run.resultSummary, tone: "success" });
-  if (run.status === "failed" && run.failureReason)
-    blocks.push({ type: "text", text: run.failureReason, tone: "error" });
-  if (run.status === "held") {
-    const line =
-      !newest || newest.status === "pending"
-        ? BLOCK_WORDS.waiting
-        : (BLOCK_WORDS.decided[newest.status] ?? BLOCK_WORDS.waiting);
-    blocks.push({ type: "text", text: line, tone: "warning" });
-    if (newest?.status === "pending")
-      blocks.push({
-        type: "questions",
-        form: {
-          kind: "approval",
-          approvalId: newest.id,
-          eligibleRoles: newest.eligibleRoles,
-        },
-      });
-  }
-  // result: the run's sections, documents or details (the adapter).
-  if (sections && sections.length > 0) {
-    const runWord = subscription?.items?.runWords.singular;
-    blocks.push({
-      type: "text",
-      text: runWord ? `${runWord} details` : BLOCK_WORDS.details,
-      style: "label",
-    });
-    blocks.push(...sectionBlocks(sections, true));
-  }
-  if (documents && documents.length > 0) {
-    const word = entry?.documentWords?.singular ?? "Document";
-    const notApproved =
-      newest?.status === "rejected" || newest?.status === "expired";
-    const list = [...documents].sort((a, b) => a.index - b.index);
-    blocks.push({ type: "text", text: BLOCK_WORDS.documents, style: "label" });
-    for (const document of list)
-      blocks.push(
-        documentBlock(
-          document,
-          list.length,
-          word,
-          files,
-          notApproved && document.status === "waiting",
-        ),
-      );
-  } else if (details && details.length > 0) {
-    blocks.push({ type: "text", text: BLOCK_WORDS.details, style: "label" });
-    blocks.push({
-      type: "table",
-      columns: [{ muted: true }, {}],
-      rows: details.map((line) => ({ cells: [line.label, line.value] })),
-    });
-  }
+  const runWord = subscription?.items?.runWords.singular;
+  const documentWord = entry?.documentWords?.singular;
   return {
     ...rest,
-    blocks,
+    blocks: runBlocks({
+      run,
+      files: (detail.files as Automations["RunFile"][] | undefined) ?? [],
+      ...(details ? { details } : {}),
+      ...(documents ? { documents } : {}),
+      ...(sections ? { sections } : {}),
+      ...(newest ? { approval: newest } : {}),
+      ...(runWord ? { runWord } : {}),
+      ...(documentWord ? { documentWord } : {}),
+      fileFields: (subscription?.runInput ?? []).filter(
+        (field) => field.control === "artifact",
+      ),
+    }),
     packageAvailable:
       (documents?.length ?? 0) > 0 &&
       run.status !== "pending" &&
@@ -2501,80 +2165,20 @@ function runBody(detail: Json): Json {
 }
 
 /** An item's page body, from its answer: tiles, file, add, runs (`pages.item`). */
-function itemBody(answer: Json): Json {
+function itemPageBody(answer: Json): Json {
   const item = answer.item as Automations["Item"];
   const runs = (answer.runs as Automations["Run"][] | undefined) ?? [];
-  const declared = itemsDeclared;
-  const blocks: Block[] = [];
-  if (declared.verdictWords)
-    blocks.push({
-      type: "metric",
-      items: [
-        { label: "Total", value: String(item.runCount) },
-        {
-          label: declared.verdictWords.positive,
-          value: String(item.positiveCount),
-          tone: "success",
-        },
-        {
-          label: declared.verdictWords.negative,
-          value: String(item.negativeCount),
-          tone: "error",
-        },
-      ],
-    });
-  blocks.push({
-    type: "file",
-    title: declared.file.title,
-    open: { target: "item-file", itemId: item.id },
-    ...(item.file ? { file: item.file } : {}),
+  const page = itemBody({
+    item,
+    runs,
+    declared: itemsDeclared,
+    runFile: itemsRunInput.some((field) => field.control === "artifact"),
   });
-  if (item.status === "ready" && !item.archivedAt && itemsRunInput.length > 0) {
-    blocks.push({
-      type: "text",
-      text: `Add ${smallFirst(declared.runWords.singular)}`,
-      style: "label",
-    });
-    blocks.push({ type: "questions", form: { kind: "run", itemId: item.id } });
-  }
-  blocks.push({
-    type: "text",
-    text: declared.runWords.plural,
-    style: "label",
-  });
-  blocks.push({
-    type: "list",
-    items: runs.map((run, index) => {
-      const going = run.status === "pending" || run.status === "running";
-      return {
-        lead: String(index + 1),
-        title: going
-          ? "Reading…"
-          : (run.title ?? BLOCK_WORDS.unnamed[run.status] ?? run.status),
-        ...(!going && typeof run.score === "number"
-          ? { value: String(run.score), valueLabel: "Score" }
-          : {}),
-        ...(run.status === "failed" || run.status === "cancelled"
-          ? { muted: true }
-          : {}),
-        open: { target: "run", runId: run.id },
-      };
-    }),
-    empty: `No ${smallFirst(declared.runWords.plural)} yet.`,
-  });
-  const { sections, ...rest } = item;
   return {
-    item: {
-      ...rest,
-      ...(sections && sections.length > 0
-        ? { blocks: sectionBlocks(sections, false) }
-        : {}),
-    },
+    item: page.reading ? { ...item, blocks: page.reading } : item,
     runs: [],
-    blocks,
-    going:
-      item.status === "reading" ||
-      runs.some((run) => run.status === "pending" || run.status === "running"),
+    blocks: page.blocks,
+    going: page.going,
   };
 }
 
@@ -2628,7 +2232,7 @@ function respond(
     shape === "run"
       ? runBody(answer)
       : shape === "item"
-        ? itemBody(answer)
+        ? itemPageBody(answer)
         : shape === "subscriptions" && Array.isArray(answer.subscriptions)
           ? {
               ...answer,
