@@ -490,8 +490,15 @@ export function QuestionsBlock({
   if (typeof kind !== "string" || !KNOWN_FORMS.includes(kind))
     return <Fallback />;
   const form = context.forms?.[kind as FormKind];
+  // Its title ("Add candidate") is drawn with the form, so a page that offers
+  // no form draws neither.
   return form ? (
     <div data-testid={`block-form-${kind}`} data-block-form={kind}>
+      {block.title ? (
+        <h2 data-testid="block-label" className={`${LABEL} pt-2 first:pt-0`}>
+          {block.title}
+        </h2>
+      ) : null}
       {form(block.form)}
     </div>
   ) : null;

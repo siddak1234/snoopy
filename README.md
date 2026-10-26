@@ -89,16 +89,14 @@ row on every run's page (every step from the start — its
 integration and its email among them, the running one spinning — read again
 while it goes on, a held job's step 4 its state alone), a run's page (a held
 job's Approve and Deny under its result line, appearing with no reload when
-the job reaches it while its page is open — the job read again until its
-approval form comes, at most ten times, never once it comes or the job goes
-on, a failed read keeping the page; its body the platform's blocks
+the job reaches it while its page is open, as docs/ARCHITECTURE.md's "Screen
+standards" says; its body the platform's blocks
 (`shape=blocks`, backend ADR-0048), which the fixture builds by the
 platform's rules (`e2e/fixtures/page-bodies.ts`, held to the platform's
 bodies by `test/fixture-page-bodies.test.mjs`) and, for `blocks-{name}` runs,
 serves as the platform's
 block fixtures hold them; each document it read a closed section of its own
-that opens in place — "Invoice 1 of 3" for Invoice Processing, "Document 1
-of 3" for a flow that names none — its Document type and Format; the
+that opens in place, headed as "Screen standards" says; the
 package's buttons when the platform offers the package, then Run details,
 then View flow — and View package, Download PDF and Download Excel, each
 download to the platform's signed link, an https one only), the run

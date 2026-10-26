@@ -445,6 +445,26 @@ test("questions: the page's own form for each, with its context; nothing where t
     ),
     [blocks.FALLBACK],
   );
+  // Its title is drawn with the form, and only with it: a member, or a flow not
+  // live, sees no "Add candidate" with nothing under it.
+  const titled = [
+    {
+      type: "questions",
+      title: "Add candidate",
+      form: { kind: "run", itemId: ITEM },
+    },
+  ];
+  const offered = tree(titled, context);
+  assert.deepEqual(
+    byTest(offered, "block-label").map((node) => node.children[0].text),
+    ["Add candidate"],
+  );
+  assert.equal(offered.filter((node) => node.tag === "button").length, 1);
+  assert.deepEqual(
+    byTest(tree(titled), "block-label"),
+    [],
+    "no form, no title",
+  );
 });
 
 /** Each case this build does not know, and what it must draw. */

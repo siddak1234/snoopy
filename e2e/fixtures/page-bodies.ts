@@ -446,9 +446,11 @@ export function itemBody(input: ItemPageInput): {
     open: { target: "item-file", itemId: item.id },
     ...(item.file ? { file: item.file } : {}),
   });
+  // The heading rides on the form, as the platform sends it (backend item-page.ts).
   if (item.status === "ready" && !item.archivedAt && input.runFile)
-    blocks.push(label(`Add ${smallFirst(declared.runWords.singular)}`), {
+    blocks.push({
       type: "questions",
+      title: `Add ${smallFirst(declared.runWords.singular)}`,
       form: { kind: "run", itemId: item.id },
     });
   blocks.push(label(declared.runWords.plural), {

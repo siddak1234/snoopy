@@ -1,4 +1,4 @@
-// From snoopy-backend packages/contracts/fixtures/blocks/*.json, sha256 887fb44bd71cda808cd5a4085f67af738adba10029f99b4b8c54cd7d52531430.
+// From snoopy-backend packages/contracts/fixtures/blocks/*.json, sha256 63b316782e438803a2ea5a3bf52f3fd2f8a50189d40b70294b3893b27b7e3b7d.
 // Regenerate with `npm run generate:platform-contracts`; never edit by hand.
 /** A page body and its visible words in reading order, closed sections left out. */
 export type BlockFixture = {
@@ -134,9 +134,9 @@ export const BLOCK_FIXTURES: readonly BlockFixture[] = [
           pages: 3,
         },
       },
-      { type: "text", text: "Add candidate", style: "label" },
       {
         type: "questions",
+        title: "Add candidate",
         form: { kind: "run", itemId: "0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b" },
       },
       { type: "text", text: "Candidates", style: "label" },
@@ -150,7 +150,6 @@ export const BLOCK_FIXTURES: readonly BlockFixture[] = [
       "0",
       "Decline",
       "Job description",
-      "Add candidate",
       "Candidates",
       "No candidates yet.",
     ],
@@ -284,9 +283,9 @@ export const BLOCK_FIXTURES: readonly BlockFixture[] = [
           pages: 3,
         },
       },
-      { type: "text", text: "Add candidate", style: "label" },
       {
         type: "questions",
+        title: "Add candidate",
         form: { kind: "run", itemId: "0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b" },
       },
       { type: "text", text: "Candidates", style: "label" },
@@ -330,7 +329,6 @@ export const BLOCK_FIXTURES: readonly BlockFixture[] = [
       "1",
       "Decline",
       "Job description",
-      "Add candidate",
       "Candidates",
       "1",
       "Dana Whitfield",
@@ -365,9 +363,9 @@ export const BLOCK_FIXTURES: readonly BlockFixture[] = [
           pages: 3,
         },
       },
-      { type: "text", text: "Add candidate", style: "label" },
       {
         type: "questions",
+        title: "Add candidate",
         form: { kind: "run", itemId: "0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b" },
       },
       { type: "text", text: "Candidates", style: "label" },
@@ -405,7 +403,6 @@ export const BLOCK_FIXTURES: readonly BlockFixture[] = [
     ],
     text: [
       "Job description",
-      "Add candidate",
       "Candidates",
       "1",
       "Dana Whitfield",
