@@ -170,6 +170,38 @@ export function settledPage(page: Page) {
   );
 }
 
+/**
+ * A spacing class's pixels as drawn — `mt-2`, `md:px-6` — at Tailwind's 4 px
+ * a step (`lib/spacing.ts`, whose numbers the screens are measured against).
+ */
+export function spacingPx(className: string): number {
+  const step = Number(className.split("-").at(-1));
+  if (!Number.isFinite(step))
+    throw new Error(`not a spacing step: ${className}`);
+  return step * 4;
+}
+
+/**
+ * The room drawn under an element, in whole pixels: from its bottom to the
+ * top of the next thing drawn after it in `main`, in document order, that has
+ * a box and starts below it. Null when nothing follows.
+ */
+export function drawnGapBelow(locator: Locator) {
+  return locator.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const main = element.closest("main") ?? document.body;
+    const walker = document.createTreeWalker(main, NodeFilter.SHOW_ELEMENT);
+    walker.currentNode = element;
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (element.contains(node)) continue;
+      const next = (node as Element).getBoundingClientRect();
+      if (next.height > 0 && next.top >= box.bottom - 0.5)
+        return Math.round(next.top - box.bottom);
+    }
+    return null;
+  });
+}
+
 /** Waits for an element's transitions to finish, so a state is read settled. */
 export function settledAnimations(locator: Locator) {
   // A transition cancelled by the next state rejects `finished`; that is settled too.

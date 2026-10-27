@@ -403,6 +403,17 @@ function initialState() {
     itemKeys: new Map<string, string>(),
     itemCreates: [] as Json[],
     itemRunStarts: [] as Json[],
+    // Round 21 v2 (backend ADR-0048 amendment 1): every runs list's query as
+    // the website sent it; the list answered as the platform that searches,
+    // sorts, pages and counts it (`total`) does; the image blocks' file gone
+    // (404) or failing (500) for the next reads; the scored run's file link
+    // gone; and the run package refused (500).
+    runsQueries: [] as string[],
+    runsCounted: false,
+    pictureGone: false,
+    pictureFailing: 0,
+    entryFileLinkGone: false,
+    packageFailing: false,
   };
 }
 let state = initialState();
@@ -1081,6 +1092,17 @@ const scoredRunId = "c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1";
 // behind a signed link to the fixture's store.
 const itemFileId = "d1d1d1d1-d1d1-4d1d-8d1d-d1d1d1d1d1d1";
 const entryFileId = "d2d2d2d2-d2d2-4d2d-8d2d-d2d2d2d2d2d2";
+// Round 21 v2: the run the platform's image blocks open
+// (`packages/contracts/fixtures/blocks` drawn-image and drawn-image-pdf), and
+// its two files behind their signed links — a made-up 16 by 12 JPEG, and the
+// made-up one-page PDF.
+const pictureRunId = "0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a";
+const pictureJpegId = "0e0e0e0e-0e0e-4e0e-8e0e-0e0e0e0e0e0e";
+const picturePdfId = "0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f";
+const fixtureJpeg = Buffer.from(
+  "/9j/4AAQSkZJRgABAQAASABIAAD/4QBMRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAEKADAAQAAAABAAAADAAAAAD/7QA4UGhvdG9zaG9wIDMuMAA4QklNBAQAAAAAAAA4QklNBCUAAAAAABDUHYzZjwCyBOmACZjs+EJ+/8AAEQgADAAQAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/bAEMABAQEBAQEBgQEBgkGBgYJDAkJCQkMDwwMDAwMDxIPDw8PDw8SEhISEhISEhUVFRUVFRkZGRkZHBwcHBwcHBwcHP/bAEMBBAUFBwcHDAcHDB0UEBQdHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHf/dAAQAAf/aAAwDAQACEQMRAD8A+/qKKKAP/9k=",
+  "base64",
+);
 const WORD_FILE =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -1881,6 +1903,30 @@ function waitingApproval(): Automations["Approval"] {
 }
 
 /**
+ * The runs list as the platform that searches, sorts, pages and counts it
+ * answers (backend ADR-0048 amendment 1, decision 4): 30 made-up runs, newest
+ * first, `q` matched in a run's id, `sort` newest or oldest, `page` of 25,
+ * and `total`, the runs that match.
+ */
+function countedRuns(
+  url: URL,
+): AutomationOperations["listRuns"]["responses"][200]["content"]["application/json"] {
+  const q = (url.searchParams.get("q") ?? "").toLowerCase();
+  const all = Array.from({ length: 30 }, (_, at) => ({
+    ...fixtureRun(okRunId),
+    id: `fixture-counted-${String(at + 1).padStart(2, "0")}`,
+    createdAt: new Date(Date.parse(now) - at * 60_000).toISOString(),
+  })).filter((run) => run.id.includes(q));
+  const ordered =
+    url.searchParams.get("sort") === "oldest" ? [...all].reverse() : all;
+  const page = Number(url.searchParams.get("page") ?? "1") || 1;
+  return {
+    runs: ordered.slice((page - 1) * 25, page * 25),
+    total: ordered.length,
+  };
+}
+
+/**
  * A made-up run package PDF (Build 24, P12): one Letter page that names the
  * job — a real PDF, built here with its cross-reference table, so a browser
  * can show it. Never the owner's sample package.
@@ -2591,6 +2637,50 @@ const server = createServer(
         for (const item of state.items)
           if (item.status === "reading") item.status = "ready";
       },
+      // Round 21 v2: 28 more items, so the flow lists 32 — more than a page
+      // of 25 — newest first as the platform lists them: 14 before the four,
+      // 14 after. Only once the flow with items is on.
+      "/__fixture/items-many": () => {
+        if (!state.itemsFlow) return false;
+        const more = Array.from({ length: 28 }, (_, at) => {
+          const n = String(at + 1).padStart(2, "0");
+          return fixtureItem(
+            `e0e0e0e0-e0e0-4e0e-8e0e-0000000000${n}`,
+            "South",
+            `Extra intake ${n}`,
+            new Date(
+              at < 14
+                ? Date.parse("2026-08-20T12:00:00.000Z") - at * 3_600_000
+                : Date.parse("2026-08-10T12:00:00.000Z") -
+                    (at - 14) * 3_600_000,
+            ).toISOString(),
+          );
+        });
+        state.items = [...more.slice(0, 14), ...state.items, ...more.slice(14)];
+      },
+      // The scored run judged negative: its score red, its word Drop.
+      "/__fixture/scored-run-negative": () => {
+        const run = state.itemRuns
+          .get(readyItemId)
+          ?.find((candidate) => candidate.id === scoredRunId);
+        if (!run) return false;
+        run.verdict = "negative";
+      },
+      "/__fixture/runs-counted": () => {
+        state.runsCounted = true;
+      },
+      "/__fixture/picture-gone": () => {
+        state.pictureGone = true;
+      },
+      "/__fixture/picture-failing-once": () => {
+        state.pictureFailing = 1;
+      },
+      "/__fixture/entry-file-link-gone": () => {
+        state.entryFileLinkGone = true;
+      },
+      "/__fixture/package-failing": () => {
+        state.packageFailing = true;
+      },
       "/__fixture/over-plan": () => {
         state.overPlan = true;
       },
@@ -2688,6 +2778,8 @@ const server = createServer(
         quickbooksConnected: state.quickbooksConnected,
         // Build 22: every list of extra email addresses saved, in order.
         emailSaves: state.emailSaves,
+        // Round 21 v2: every runs list's query, as sent.
+        runsQueries: state.runsQueries,
       });
     }
     if (
@@ -2823,7 +2915,7 @@ const server = createServer(
         /[^A-Za-z0-9._-]/gu,
         "-",
       );
-      const bytes = fixturePdf(id);
+      const bytes = id === pictureJpegId ? fixtureJpeg : fixturePdf(id);
       response.writeHead(200, {
         "content-type": "application/octet-stream",
         "content-disposition": `attachment; filename="${name}"`,
@@ -4437,7 +4529,10 @@ const server = createServer(
         method === "GET" &&
         pathname.startsWith(`${scope}/runs/${scoredRunId}/files/`)
       ) {
-        if (pathname !== `${scope}/runs/${scoredRunId}/files/${entryFileId}`)
+        if (
+          pathname !== `${scope}/runs/${scoredRunId}/files/${entryFileId}` ||
+          state.entryFileLinkGone
+        )
           return respond(response, 404, problem(404, "Not Found"));
         return respond(
           response,
@@ -4814,6 +4909,7 @@ const server = createServer(
       } satisfies AutomationOperations["createRun"]["responses"][201]["content"]["application/json"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/runs")) {
+      state.runsQueries.push(url.search);
       if (state.runsRead === "failing") {
         return respond(response, 503, problem(503, "Service Unavailable"));
       }
@@ -4831,6 +4927,7 @@ const server = createServer(
           : subscriptionId === null || subscriptionId === manualSubscriptionId
             ? listedRunIds
             : [];
+      if (state.runsCounted) return respond(response, 200, countedRuns(url));
       return respond(response, 200, {
         runs: state.runsRead === "empty" ? [] : ids.map(fixtureRun),
       } satisfies AutomationOperations["listRuns"]["responses"][200]["content"]["application/json"]);
@@ -4844,6 +4941,36 @@ const server = createServer(
         200,
         fixtureRunStats(url.searchParams.get("since")),
       );
+    }
+    // Round 21 v2: the image blocks' files, behind their signed links — gone
+    // (404) or failing (500) while the fixture says so; any other file id is
+    // not this job's.
+    const pictureAsked = new RegExp(
+      `^/v1/workspaces/${workspaceId}/runs/${pictureRunId}/files/([^/]+)$`,
+      "u",
+    ).exec(pathname);
+    if (method === "GET" && pictureAsked) {
+      if (state.pictureGone)
+        return respond(response, 404, problem(404, "Not Found"));
+      if (state.pictureFailing > 0) {
+        state.pictureFailing -= 1;
+        return respond(response, 500, problem(500, "Internal Server Error"));
+      }
+      const file =
+        pictureAsked[1] === pictureJpegId
+          ? {
+              id: pictureJpegId,
+              filename: "receipt.jpg",
+              contentType: "image/jpeg",
+              format: "JPEG",
+              sizeBytes: fixtureJpeg.byteLength,
+              pages: 1,
+            }
+          : pictureAsked[1] === picturePdfId
+            ? fixtureFile(picturePdfId, "scanned-page.pdf")
+            : null;
+      if (!file) return respond(response, 404, problem(404, "Not Found"));
+      return respond(response, 200, fixtureFileLink(file));
     }
     // Build 24 (P12; backend ADR-0045): a job's package as a PDF or an Excel
     // file, behind a signed link to the fixture's store — never the bytes.
@@ -4869,6 +4996,8 @@ const server = createServer(
         timeZone: body.timeZone ?? null,
         keyed,
       });
+      if (state.packageFailing)
+        return respond(response, 500, problem(500, "Internal Server Error"));
       if (state.packageBusy > 0) {
         state.packageBusy -= 1;
         response.setHeader("retry-after", "1");

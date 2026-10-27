@@ -1908,6 +1908,280 @@ test.describe("the run package", () => {
     // Never a third time.
     expect((await packageFiles()).length - again).toBe(2);
   });
+
+  test("F4 — Share when the platform cannot make the package: this site's share route answers 502, the run page says it could not share under its buttons, nothing reaches the sheet, and Share can be pressed again; a cross-site ask of the route is refused (Round 21 v2)", async ({
+    page,
+  }) => {
+    await standInShareSheet(page);
+    const answers: number[] = [];
+    page.on("response", (response) => {
+      if (new URL(response.url()).pathname === "/account/share")
+        answers.push(response.status());
+    });
+    await fixtureControl("package-failing");
+    await page.goto(job);
+    const actions = page.getByTestId("package-actions");
+    const share = actions.getByRole("button", { name: "Share" });
+    await share.click();
+    await expect(actions).toContainText("Could not share. Try again.");
+    await expect.poll(() => answers).toEqual([502]);
+    expect(await shared(page)).toBeUndefined();
+    await expect(share).toBeEnabled();
+    const crossSite = await page.request.get(
+      "/account/share?run=fixture-run-invoice&format=pdf",
+      { headers: { "sec-fetch-site": "cross-site" } },
+    );
+    expect(crossSite.status()).toBe(403);
+  });
+});
+
+// Round 21 v2 (backend ADR-0048 amendment 1): the platform's published block
+// fixtures, served by the fixture under `blocks-{name}` run ids, as a person
+// uses them — the picture, a group of drop-downs, and a long list or table's
+// search, sort and pages.
+test.describe("the image block (Round 21 v2)", () => {
+  const imageRun = "0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a";
+  const filePage = `/account/runs/${imageRun}/files/0e0e0e0e-0e0e-4e0e-8e0e-0e0e0e0e0e0e`;
+  const viewReads = (page: Page) =>
+    observe(page, (request) =>
+      new URL(request.url()).pathname.endsWith("/view"),
+    );
+
+  test("a picture is read once, from its file page's own route, drawn from those bytes inside a link to that page, and let go when it leaves; a scanned PDF is a frame 480 px tall titled by its alt", async ({
+    page,
+  }) => {
+    const views = viewReads(page);
+    await page.goto("/account/runs/blocks-drawn-image");
+    const picture = page.getByTestId("block-image");
+    const image = picture.locator("img");
+    await expect(image).toHaveAttribute("src", /^blob:/u);
+    await expect(image).toHaveAttribute(
+      "alt",
+      "The receipt from Harbor Paper Co.",
+    );
+    await expect
+      .poll(() =>
+        image.evaluate((element: HTMLImageElement) =>
+          element.complete ? element.naturalWidth : 0,
+        ),
+      )
+      .toBeGreaterThan(0);
+    await expect(picture).toHaveAttribute("href", filePage);
+    expect(views.map((url) => new URL(url).pathname)).toEqual([
+      `${filePage}/view`,
+    ]);
+    // Leaving the picture lets its object URL go.
+    const objectUrl = await image.getAttribute("src");
+    await image.click();
+    await expect(page).toHaveURL(new RegExp(`${filePage}$`, "u"));
+    expect(
+      await page.evaluate(async (url) => {
+        try {
+          await (await fetch(url)).blob();
+          return true;
+        } catch {
+          return false;
+        }
+      }, objectUrl ?? ""),
+    ).toBe(false);
+    await page.goto("/account/runs/blocks-drawn-image-pdf");
+    const frame = page.locator('iframe[data-testid="block-image"]');
+    await expect(frame).toHaveAttribute("title", "The scanned delivery note");
+    await expect(frame).toHaveAttribute("src", /^blob:/u);
+    expect(Math.round((await frame.boundingBox())?.height ?? 0)).toBe(480);
+  });
+
+  test("a picture whose file is gone says so, with no Try again; any other failure says it could not open the file, and Try again reads it once more and draws it", async ({
+    page,
+  }) => {
+    const picture = page.getByTestId("block-image");
+    await fixtureControl("picture-gone");
+    await page.goto("/account/runs/blocks-drawn-image");
+    await expect(picture).toHaveText("This file is no longer kept.");
+    await expect(
+      picture.getByRole("button", { name: "Try again" }),
+    ).toHaveCount(0);
+    await fixtureControl("reset");
+    await fixtureControl("picture-failing-once");
+    const views = viewReads(page);
+    await page.goto("/account/runs/blocks-drawn-image");
+    await expect(picture).toContainText("Could not open the file. Try again.");
+    expect(views).toHaveLength(1);
+    await picture.getByRole("button", { name: "Try again" }).click();
+    await expect(picture.locator("img")).toHaveAttribute("src", /^blob:/u);
+    expect(views).toHaveLength(2);
+  });
+});
+
+test("a group: its title over one card of drop-downs, the first open; each opens and closes on its own, several open at once (Round 21 v2, F6)", async ({
+  page,
+}) => {
+  await page.goto("/account/runs/blocks-reviewer-candidate-grouped");
+  const group = page.getByTestId("block-group");
+  await expect(group).toHaveCount(1);
+  await expect(group.getByTestId("block-group-title")).toHaveText(
+    /^candidate details$/iu,
+  );
+  const sections = group.locator('details[data-testid="block-section"]');
+  await expect(sections).toHaveCount(2);
+  await expect(sections.nth(0)).toHaveAttribute("open", "");
+  await expect(sections.nth(1)).not.toHaveAttribute("open", "");
+  await expect(group.getByText("Payroll Lead")).toBeVisible();
+  await expect(group.getByText("B.S. Accounting")).toBeHidden();
+  await sections.nth(1).locator("summary").click();
+  await expect(sections.nth(1)).toHaveAttribute("open", "");
+  await expect(sections.nth(0)).toHaveAttribute("open", "");
+  await expect(group.getByText("B.S. Accounting")).toBeVisible();
+  await sections.nth(0).locator("summary").click();
+  await expect(sections.nth(0)).not.toHaveAttribute("open", "");
+  await expect(sections.nth(1)).toHaveAttribute("open", "");
+});
+
+/** A long block's numbers as drawn, in order: "$12.50", "Score 40" → 12.5, 40. */
+const numbersOf = async (cells: Locator) =>
+  (await cells.allInnerTexts()).map((text) =>
+    Number(text.replace(/[^0-9.]/gu, "")),
+  );
+const nonIncreasing = (values: number[]) =>
+  values.every((value, at) => at === 0 || values[at - 1]! >= value);
+
+test("a long list: 25 rows a page, Next and Previous; a sort high to low orders across the pages and goes back to page 1; Search finds a row and a miss says so; Clear search brings every row back (Round 21 v2; ADR-0048 amendment 1)", async ({
+  page,
+}) => {
+  await page.goto("/account/runs/blocks-long-list");
+  const paged = page.getByTestId("block-paged");
+  const rows = paged.getByTestId("block-list").locator(":scope > li");
+  const pager = paged.getByTestId("list-pager");
+  await expect(rows).toHaveCount(25);
+  await expect(pager).toContainText("Page 1 of 2");
+  await paged.getByRole("button", { name: "Next page" }).click();
+  await expect(pager).toContainText("Page 2 of 2");
+  await expect(rows).toHaveCount(5);
+  await paged.getByRole("button", { name: "Previous page" }).click();
+  await expect(pager).toContainText("Page 1 of 2");
+  await paged.getByRole("button", { name: "Next page" }).click();
+  // A sort: the order as sent first, then high to low; page 1 again.
+  await paged.getByTestId("list-sort").click();
+  const menu = page.getByTestId("list-sort-menu");
+  await expect(menu.getByRole("option").first()).toHaveText("Default order");
+  await menu.getByRole("option", { name: "Score: high to low" }).click();
+  await expect(pager).toContainText("Page 1 of 2");
+  const values = paged.getByTestId("block-list-value");
+  await expect(values).toHaveCount(25);
+  const first = await numbersOf(values);
+  expect(nonIncreasing(first)).toBe(true);
+  await paged.getByRole("button", { name: "Next page" }).click();
+  await expect(values).toHaveCount(5);
+  const second = await numbersOf(values);
+  expect(nonIncreasing([...first, ...second])).toBe(true);
+  // Search: one row, on page 1 of 1; a miss; then every row again.
+  const search = paged.getByTestId("list-search");
+  await expect(search).toHaveAttribute("placeholder", "Search");
+  await search.fill("Applicant 07");
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText("Applicant 07");
+  await expect(pager).toContainText("Page 1 of 1");
+  await search.fill("zzzz");
+  await expect(paged).toContainText('Nothing matches "zzzz".');
+  await paged.getByRole("button", { name: "Clear search" }).click();
+  await expect(rows).toHaveCount(25);
+  await expect(search).toHaveValue("");
+});
+
+test("a long table: sorted by its number column high to low across its pages, and searched case-free in any cell (Round 21 v2; ADR-0048 amendment 1)", async ({
+  page,
+}) => {
+  await page.goto("/account/runs/blocks-long-table");
+  const paged = page.getByTestId("block-paged");
+  const rows = paged.getByTestId("block-table").locator("tbody tr");
+  const pager = paged.getByTestId("list-pager");
+  await expect(rows).toHaveCount(25);
+  await expect(pager).toContainText("Page 1 of 2");
+  await paged.getByTestId("list-sort").click();
+  await page
+    .getByTestId("list-sort-menu")
+    .getByRole("option", { name: "Total: high to low" })
+    .click();
+  const totals = rows.locator("td:nth-child(2)");
+  await expect
+    .poll(async () => nonIncreasing(await numbersOf(totals)))
+    .toBe(true);
+  const first = await numbersOf(totals);
+  expect(first).toHaveLength(25);
+  await paged.getByRole("button", { name: "Next page" }).click();
+  await expect(rows).toHaveCount(5);
+  expect(nonIncreasing([...first, ...(await numbersOf(totals))])).toBe(true);
+  await paged.getByTestId("list-search").fill("lark");
+  await expect(rows).toHaveCount(5);
+  for (const text of await rows.allInnerTexts())
+    expect(text).toContain("Lark Labels");
+});
+
+test("Activity's search, sort and pages: Enter puts q in the address and the platform is asked for it, with the flow, the outcome and the time, and never needsReview; × clears it; counted past 25, Oldest first and Next page are each an address the platform reads; a search that finds nothing says so (Round 21 v2; ADR-0048 amendment 1)", async ({
+  page,
+}) => {
+  const asked = async () =>
+    (await fixtureRead<{ runsQueries: string[] }>("counts")).runsQueries;
+  const lastAsked = async () => (await asked()).at(-1)?.replace(/^\?/u, "");
+  await page.goto("/account/runs");
+  const search = page.getByTestId("activity-search");
+  await expect(search).toHaveAttribute("placeholder", "Search runs");
+  expect(await lastAsked()).toBe("sort=newest&page=1");
+  // An answer without a count is one page: no sort, no pager.
+  await expect(page.getByTestId("activity-sort")).toHaveCount(0);
+  await expect(page.getByTestId("activity-pager")).toHaveCount(0);
+  await search.fill("Invoice");
+  await search.press("Enter");
+  await expect(page).toHaveURL(/\/account\/runs\?q=Invoice$/u);
+  await expect.poll(lastAsked).toBe("q=Invoice&sort=newest&page=1");
+  await expect(search).toHaveValue("Invoice");
+  await page.getByRole("button", { name: "Clear search" }).click();
+  await expect(page).toHaveURL(/\/account\/runs$/u);
+  // The flow, the outcome and the time go on as the platform's own.
+  const since = "2026-10-26T04:00:00.000Z";
+  await page.goto(
+    `/account/runs?status=failed&since=${encodeURIComponent(since)}&flow=99999999-9999-4999-8999-999999999999`,
+  );
+  await expect(search).toBeVisible();
+  expect(await lastAsked()).toBe(
+    new URLSearchParams({
+      subscriptionId: "99999999-9999-4999-8999-999999999999",
+      status: "failed",
+      since,
+      sort: "newest",
+      page: "1",
+    }).toString(),
+  );
+  // The platform that counts: a miss, then 30 runs on two pages.
+  await fixtureControl("runs-counted");
+  await page.goto("/account/runs?q=zzzz");
+  await expect(page.locator("main")).toContainText('Nothing matches "zzzz".');
+  await page.goto("/account/runs");
+  const pager = page.getByTestId("activity-pager");
+  const rows = page.getByTestId("activity-runs").locator(":scope > li");
+  await expect(pager).toContainText("Page 1 of 2");
+  await expect(rows).toHaveCount(25);
+  await expect(rows.first()).toContainText("Run fixture-counted-01");
+  const sort = page.getByTestId("activity-sort");
+  await expect(sort).toHaveText("Newest first");
+  await sort.click();
+  await page
+    .getByTestId("activity-sort-menu")
+    .getByRole("option", { name: "Oldest first" })
+    .click();
+  await expect(page).toHaveURL(/\/account\/runs\?sort=oldest$/u);
+  await expect(rows.first()).toContainText("Run fixture-counted-30");
+  await expect.poll(lastAsked).toBe("sort=oldest&page=1");
+  await pager.getByRole("button", { name: "Next page" }).click();
+  await expect(page).toHaveURL(/\/account\/runs\?sort=oldest&page=2$/u);
+  await expect(rows).toHaveCount(5);
+  await expect(pager).toContainText("Page 2 of 2");
+  await expect.poll(lastAsked).toBe("sort=oldest&page=2");
+  expect(
+    (await asked()).every(
+      (query) => !new URLSearchParams(query).has("needsReview"),
+    ),
+  ).toBe(true);
 });
 
 test("P7 — under reduced motion a decided row leaves at once, with no fade", async ({

@@ -127,20 +127,27 @@ complete export (its link followed only when https), account deletion, and the p
 without real accounts or credentials, and each test starts from the fixture's
 first state. Five specs: `e2e/accessibility.spec.ts`,
 `e2e/public-edge-fixture.spec.ts`, `e2e/account-surfaces.spec.ts` (every
-surface a change audit probed and no test asserted), `e2e/dialogs.spec.ts`
+surface a change audit probed and no test asserted — Round 21 v2's among them:
+the image block, a group of drop-downs, a long list's and table's search, sort
+and pages, Activity's search, sort and pages as the platform is asked for
+them, and Share refused), `e2e/dialogs.spec.ts`
 (every dialog's Escape, click outside, focus return and hold, one row each)
 and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: the Flows
 list by department A–Z; its items grouped A–Z under its group filter, the
 website's drop-down, on its page with no Dashboard, no Steps and no run start
-form; the upload card's drop-down, "Other" and the values typed before; an
-item's runs ranked in compact rows a closed section's height, its tiles and
+form, searched, and past 25 sorted and paged; the upload card's drop-down, "Other" and the values typed before; an
+item's runs ranked in compact rows a closed section's height, each score in
+its verdict's colour with its word as a chip, searched, its tiles and
 its file page — the file in place, its route for this site's pages alone,
 Download to its signed link, Share, then its reading's sections; a run
-headed by its title and score with View {file} and its file page, its
+headed by its title and its score in its verdict's colour with View {file}
+and its file page (a file no longer linked framed by this site's route), its
 sections under "{Run word} details" and its Run details page — every body
 the platform's blocks; Archive, an owner's buttons a member
 does not see and a member's presses refused in words, and an unanswered list
-said "Unavailable"), sharing `e2e/helpers.ts`. The playbook's human keyboard
+said "Unavailable"), sharing `e2e/helpers.ts`. The spacing table
+(`lib/spacing.ts`) is measured as drawn, from each box's edges: an item's
+titles and Settings' groups, and the page's edge at 390 and 900 px wide. The playbook's human keyboard
 traversal (NFR-35) has a hand-over test in the same suite:
 `KEYBOARD_JOURNEY=1 node scripts/run-browser-fixtures.mjs --headed --grep "keyboard journey"`
 opens the built site against the fixture, signed in, and pauses for the person
