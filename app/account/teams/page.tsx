@@ -12,6 +12,8 @@ import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { ProjectList } from "@/components/dashboard/ProjectList";
 import type { ProjectListItem } from "@/components/dashboard/ProjectList";
 import { AskToJoinList } from "@/components/dashboard/AskToJoinList";
+import { SectionTitle } from "@/components/dashboard/SectionTitle";
+import { GROUP_BAND, SPACING } from "@/lib/spacing";
 
 /**
  * Teams (BUILD-PLAN 24.11.11). A team is a sub-organization with its own flows
@@ -75,21 +77,14 @@ export default async function AccountTeamsPage() {
           text="A department has its own flows and its own people."
         />
       ) : (
-        shown.map(({ workspace, mine, askable }, index) => {
+        shown.map(({ workspace, mine, askable }) => {
           const askHeadingId = `ask-to-join-${workspace.id}`;
           return (
-            <div
-              key={workspace.id}
-              className={
-                index === 0
-                  ? "py-4 first:pt-0"
-                  : "border-t border-[var(--ring)] py-4"
-              }
-            >
+            <div key={workspace.id} className={GROUP_BAND}>
               <h2 className="text-sm font-medium text-[var(--text)]">
                 {workspace.type === "personal" ? "Personal" : workspace.name}
               </h2>
-              <div className="mt-2">
+              <div className={SPACING.title.top}>
                 {mine.length === 0 ? (
                   <p className="text-sm text-[var(--muted)]">
                     You are not in a department here yet.
@@ -99,14 +94,15 @@ export default async function AccountTeamsPage() {
                 )}
               </div>
               {askable.length > 0 ? (
-                <div className="mt-4">
-                  <h3
+                <div className={SPACING.group.top}>
+                  <SectionTitle
+                    as="h3"
                     id={askHeadingId}
                     tabIndex={-1}
-                    className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase focus:outline-none"
+                    quietFocus
                   >
                     Ask to join
-                  </h3>
+                  </SectionTitle>
                   <AskToJoinList
                     workspaceId={workspace.id}
                     headingId={askHeadingId}

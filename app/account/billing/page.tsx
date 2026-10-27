@@ -14,6 +14,7 @@ import {
   roleInWorkspace,
 } from "@/lib/tenancy";
 import { BillingPanel } from "./BillingPanel";
+import { Group } from "@/components/dashboard/Group";
 
 /**
  * Billing — the workspace's plan and the way to change it (BUILD-PLAN 8.3).
@@ -93,7 +94,7 @@ export default async function AccountBillingPage() {
 
   return (
     <SectionCard title="Billing">
-      <div className="py-4 first:pt-0">
+      <Group>
         <BillingPanel
           workspaceId={workspaceId}
           billing={billing}
@@ -104,7 +105,7 @@ export default async function AccountBillingPage() {
               : null
           }
         />
-      </div>
+      </Group>
     </SectionCard>
   );
 }

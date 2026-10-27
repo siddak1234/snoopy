@@ -15,6 +15,7 @@ import {
   type ActionResult,
 } from "./actions";
 import { WebhookAddressButton } from "./WebhookAddressButton";
+import { SPACING } from "@/lib/spacing";
 
 /** The row at the bottom of a flow's page that opens Set up again (the owner's AM4). */
 export const EDIT_SETUP = "Edit setup";
@@ -187,7 +188,7 @@ export function AutomationActions({
           </h2>
           <p
             id={`automation-archive-${subscription.id}-description`}
-            className="mt-1 text-sm text-[var(--muted)]"
+            className={`${SPACING.title.top} text-sm text-[var(--muted)]`}
           >
             It stops and moves to Archived flows. Its runs stay in Activity, and
             you can unarchive it later.

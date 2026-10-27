@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { SPACING } from "@/lib/spacing";
+import { GROUP_BAND, SPACING } from "@/lib/spacing";
 
 /**
  * A section with nothing to list yet, or no workspace to list it for — the one
@@ -11,7 +11,8 @@ import { SPACING } from "@/lib/spacing";
  * somewhere to go. Only a whole page takes the title; a section inside one
  * stays the single line: a band of its page card, or, inside the blocks
  * (`band={false}`), the line alone, which the blocks space (`inner`). The
- * band keeps its 20 above and below, which `test/structure-contract` holds.
+ * band is every band's (`GROUP_BAND`), so an empty section sits as far from
+ * its neighbours as a filled one.
  */
 export function EmptyRow({
   text,
@@ -32,7 +33,7 @@ export function EmptyRow({
     return <p className="text-sm text-[var(--muted)]">{text}</p>;
   if (!title) {
     return (
-      <div className="py-5 first:pt-0">
+      <div className={GROUP_BAND}>
         <p className="text-sm text-[var(--muted)]">{text}</p>
       </div>
     );

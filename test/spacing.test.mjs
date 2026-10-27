@@ -4,7 +4,12 @@ import { join, resolve } from "node:path";
 import { test } from "node:test";
 import { BLOCK_SPACING } from "../lib/generated/platform-contracts/block-rules.ts";
 import { NONE, SPACING, spacingClasses } from "../lib/spacing.ts";
-import { offTable, spacingSources, spacingTokens } from "./spacing-scan.mjs";
+import {
+  handBands,
+  offTable,
+  spacingSources,
+  spacingTokens,
+} from "./spacing-scan.mjs";
 
 /**
  * The spacing table (backend `BLOCK_SPACING`, ADR-0048 amendment 1; the
@@ -12,9 +17,12 @@ import { offTable, spacingSources, spacingTokens } from "./spacing-scan.mjs";
  * name's number at Tailwind's 4 px a step, and every padding, margin and gap
  * class under components/ and app/account is one of them — but for the
  * classes written before the table, counted file by file in
- * `test/spacing-baseline.json`, which may only go down. So a new `py-5`
- * anywhere fails here, and a part the table spaces (the page card, the
- * titles, the rows, the tiles, the lists, the blocks) holds none.
+ * `test/spacing-baseline.json`, which may only go down and names nothing
+ * under app/account (the review's finding 5). So a new `py-5` anywhere
+ * fails here, and a part the table spaces (the page card, the titles, the
+ * rows, the tiles, the lists, the blocks) holds none. And no screen types a
+ * band or a title of its own (finding 4): `Group` and `SectionTitle` draw
+ * them.
  */
 
 const root = resolve(import.meta.dirname, "..");
@@ -67,6 +75,12 @@ test("the spacing check: no padding, margin or gap class under components/ and a
     `${spacingSources().length} sources`,
   );
   assert.deepEqual(overBaseline(offTable(spacingClasses())), []);
+  // The account screens hold none: only older parts are counted (the
+  // public pages, the plain controls and the chips' 10 by 2).
+  assert.deepEqual(
+    Object.keys(BASELINE).filter((path) => path.startsWith("app/account/")),
+    [],
+  );
   // The baseline names only sources that are there.
   const sources = new Set(spacingSources());
   for (const path of Object.keys(BASELINE)) assert.ok(sources.has(path), path);
@@ -127,4 +141,62 @@ test("a planted py-5 fails the check, in a part and in a screen alike", () => {
   assert.deepEqual(spacingTokens('"min-h-11 h-4 w-6 top-2 space-x-2"'), [
     "space-x-2",
   ]);
+});
+
+/** The sources the band check reads: the spacing check's, but the public pages (`components/marketing`, their own sections). */
+const BAND_SOURCES = () =>
+  spacingSources().filter((path) => !path.startsWith("components/marketing/"));
+/** Where a band or a title is typed by hand: `lib/spacing.ts`, `Group` and `SectionTitle` say them. */
+const BAND_HOMES = new Set([
+  "components/dashboard/Group.tsx",
+  "components/dashboard/SectionTitle.tsx",
+]);
+function handTyped(read = (path) => readFileSync(join(root, path), "utf8")) {
+  return BAND_SOURCES()
+    .filter((path) => !BAND_HOMES.has(path))
+    .flatMap((path) => handBands(read(path)).map((line) => `${path}: ${line}`));
+}
+
+test("no screen types a band or a section title by hand: Group (or GROUP_BAND) and SectionTitle draw them", () => {
+  assert.deepEqual(handTyped(), []);
+  // Settings, a flow's page and the run page draw their bands as Group.
+  const read = (path) => readFileSync(join(root, path), "utf8");
+  for (const path of [
+    "app/account/settings/page.tsx",
+    "app/account/flows/[subscriptionId]/page.tsx",
+    "app/account/runs/[runId]/RunLive.tsx",
+    "components/account/LinkedAccountsSection.tsx",
+    "app/account/settings/WorkspaceExportSection.tsx",
+  ])
+    assert.match(read(path), /<Group\b/u, path);
+});
+
+test("a planted band or title fails the band check, and the reader takes only those", () => {
+  const read = (path) => readFileSync(join(root, path), "utf8");
+  for (const [plant, line] of [
+    ['<div className="py-4 first:pt-0">', "band: py-4 first:pt-0"],
+    [
+      '<div className="border-t border-[var(--ring)] pt-4">',
+      "band: border-t border-[var(--ring)] pt-4",
+    ],
+    [
+      '<h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">',
+      "title: text-xs font-medium tracking-wide text-[var(--muted)] uppercase",
+    ],
+  ]) {
+    const target = "app/account/settings/page.tsx";
+    assert.deepEqual(
+      handTyped((path) =>
+        path === target
+          ? `${read(path)}\nconst planted = ${JSON.stringify(plant.split('"')[1])};\n`
+          : read(path),
+      ),
+      [`${target}: ${line}`],
+      plant,
+    );
+  }
+  assert.deepEqual(
+    handBands('className={`${GROUP_BAND} flex`} title="py-3 pt-4"'),
+    [],
+  );
 });

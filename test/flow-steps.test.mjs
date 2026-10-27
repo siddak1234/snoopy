@@ -268,7 +268,7 @@ test("the flow page reads top to bottom: its name and status, Dashboard, Steps â
     at(/\{parts\.map\(part\)\}/u),
     at(/<AutomationActions\b/u),
   ];
-  const parts = [at(/>\s*Dashboard\s*<\/h2>/u), at(/>\s*Steps\s*<\/h2>/u)];
+  const parts = [at(/title="Dashboard"/u), at(/title="Steps"/u)];
   for (const order of [card, parts]) {
     assert.ok(
       order.every((index) => index > 0),
@@ -297,7 +297,7 @@ test("the flow page reads top to bottom: its name and status, Dashboard, Steps â
   assert.match(page, /<div id="run"/u);
   assert.match(
     page,
-    /\{row\.kind === "setting" && row\.fields\.length > 0 \? \(\s*<div className="mt-2">\{row\.fields\.map\(vendorRow\)\}<\/div>\s*\) : null\}\s*\{row\.kind === "email" \? emailRow : null\}/u,
+    /\{row\.kind === "setting" && row\.fields\.length > 0 \? \(\s*<div>\{row\.fields\.map\(vendorRow\)\}<\/div>\s*\) : null\}\s*\{row\.kind === "email" \? emailRow : null\}/u,
   );
   assert.match(page, /href=\{emailPath\(subscription\.id\)\}/u);
   // Unread, its address says Unavailable, and it still opens (S22).

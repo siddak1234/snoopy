@@ -5,6 +5,7 @@ import type {
   AutomationRunInputField,
   AutomationSetupField,
 } from "@/lib/automations";
+import { SPACING } from "@/lib/spacing";
 
 /**
  * Form fields a manifest declares, rendered as the manifest orders them.
@@ -104,7 +105,7 @@ export function SetupFields({
             key={`${section}-${groupIndex}`}
             role="group"
             aria-label={name}
-            className="space-y-4"
+            className={`flex flex-col ${SPACING.group.gap}`}
           >
             <NumberedStep index={groupIndex + firstSection} title={name} />
             {fields.map((field) => (
@@ -145,7 +146,7 @@ export function RunInputFields({
   showTypes?: boolean;
 }) {
   return (
-    <div className="space-y-4">
+    <div className={`flex flex-col ${SPACING.group.gap}`}>
       {runInput.map((field) =>
         field.control === "artifact" ? (
           <RunFileField
@@ -173,9 +174,10 @@ export function RunInputFields({
 function OptionalMark({ field }: { field: ManifestField }) {
   if (field.required) return null;
   return (
-    <span className="ml-2 text-xs font-normal text-[var(--muted)]">
-      Optional
-    </span>
+    <>
+      {" "}
+      <span className="text-xs font-normal text-[var(--muted)]">Optional</span>
+    </>
   );
 }
 
@@ -203,7 +205,7 @@ function ManifestFieldInput({
         />
         <label
           htmlFor={fieldId}
-          className="flex items-start gap-2 text-sm text-[var(--text)]"
+          className="flex items-center gap-2 text-sm text-[var(--text)]"
         >
           <input
             id={fieldId}
@@ -211,7 +213,7 @@ function ManifestFieldInput({
             type="checkbox"
             value="true"
             defaultChecked={initialValue === true}
-            className="mt-1 size-4 rounded border-[var(--color-divider)] accent-[var(--color-accent)]"
+            className="size-4 rounded border-[var(--color-divider)] accent-[var(--color-accent)]"
           />
           <span className="font-medium">{field.title}</span>
         </label>
@@ -281,7 +283,7 @@ const NOTIFIES: Record<
 function FieldMetadata({ field }: { field: ManifestField }) {
   if (!("notifies" in field) || !field.notifies) return null;
   return (
-    <p className="mt-1 text-xs text-[var(--muted)]">
+    <p className={`${SPACING.inner.top} text-xs text-[var(--muted)]`}>
       Controls the notification sent when {NOTIFIES[field.notifies]}.
     </p>
   );

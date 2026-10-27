@@ -95,9 +95,8 @@ test("the Flows list is grouped by department, the departments A–Z, each keepi
   const page = code(read("app/account/flows/page.tsx"));
   assert.match(
     page,
-    /byDepartment\(catalog\.automations\)\.map\(\(\{ department, id, entries \}\) => \(\s*<section\s+key=\{id\}\s+aria-labelledby=\{id\}/u,
+    /byDepartment\(catalog\.automations\)\.map\(\(\{ department, id, entries \}\) => \(\s*<Group\s+key=\{id\}\s+title=\{department\}\s+titleId=\{id\}/u,
   );
-  assert.match(page, /<h2\s+id=\{id\}/u);
   assert.doesNotMatch(page, /department-\$\{department\}/u);
   assert.doesNotMatch(page, /\{automation\.category\}/u);
 });
@@ -111,10 +110,10 @@ test("a flow with items has no Dashboard and no Steps: its items are its page, T
     /pageParts\(\s*subscription\.pages\?\.flow,\s*\["dashboard", "steps", "items"\] as const,\s*declaredItems \? \["items"\] : \["dashboard", "steps"\],\s*\)/u,
   );
   const items = page.indexOf('if (name === "items")');
-  assert.ok(items > page.indexOf('aria-labelledby="flow-steps-title"'));
+  assert.ok(items > page.indexOf('titleId="flow-steps-title"'));
   assert.match(
     page.slice(items),
-    /\{!parts\.includes\("steps"\) &&\s*\(!live \|\| owed\.length > 0 \|\| notResponding\) \? \(\s*<div className="py-4 first:pt-0">\s*\{notResponding\}\s*\{stepOne\}/u,
+    /\{!parts\.includes\("steps"\) &&\s*\(!live \|\| owed\.length > 0 \|\| notResponding\) \? \(\s*<Group>\s*<div className=\{`flex flex-col \$\{SPACING\.inner\.gap\}`\}>\s*\{notResponding\}\s*\{stepOne\}/u,
   );
   assert.match(page, /\{parts\.map\(part\)\}/u);
 });

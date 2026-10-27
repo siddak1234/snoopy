@@ -15,7 +15,13 @@ import { OrgJoinRequestList } from "@/components/dashboard/OrgJoinRequestList";
 import { OrgJoinLink } from "@/components/dashboard/OrgJoinLink";
 import { OrgDomainOnly } from "@/components/dashboard/OrgDomainOnly";
 import { joinLinkLine } from "@/lib/join-link";
+import { Group } from "@/components/dashboard/Group";
+import { SectionTitle } from "@/components/dashboard/SectionTitle";
+import { GROUP_BAND, SPACING } from "@/lib/spacing";
 import type { OrgMember } from "@/components/dashboard/OrgMemberList";
+
+/** A detail's row: its name over its value on a phone, beside it on a wider screen. */
+const DETAIL_ROW = `flex flex-col ${SPACING.inner.gap} sm:flex-row sm:items-start`;
 
 export default async function OrganizationPage() {
   const session = await getAppSession();
@@ -53,12 +59,9 @@ export default async function OrganizationPage() {
       title="Organization"
       subheader="Manage your organization settings and members."
     >
-      <div className="py-4 first:pt-0">
-        <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-          Organization details
-        </h2>
-        <dl className="mt-2 space-y-3 text-sm">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
+      <Group title="Organization details">
+        <dl className={`flex flex-col ${SPACING.group.gap} text-sm`}>
+          <div className={DETAIL_ROW}>
             <dt className="w-20 shrink-0 text-[var(--muted)]">Name</dt>
             <dd>
               <OrgNameEditor
@@ -67,16 +70,14 @@ export default async function OrganizationPage() {
               />
             </dd>
           </div>
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-4">
-            <dt className="w-20 shrink-0 pt-0.5 text-[var(--muted)]">Domain</dt>
+          <div className={DETAIL_ROW}>
+            <dt className="w-20 shrink-0 text-[var(--muted)]">Domain</dt>
             <dd>
               <OrgDomainSection workspaceId={workspace.id} domains={domains} />
             </dd>
           </div>
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-4">
-            <dt className="w-20 shrink-0 pt-1 text-[var(--muted)]">
-              Join link
-            </dt>
+          <div className={DETAIL_ROW}>
+            <dt className="w-20 shrink-0 text-[var(--muted)]">Join link</dt>
             <dd className="min-w-0 flex-1">
               <OrgJoinLink
                 workspaceId={workspace.id}
@@ -84,10 +85,8 @@ export default async function OrganizationPage() {
               />
             </dd>
           </div>
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-4">
-            <dt className="w-20 shrink-0 pt-0.5 text-[var(--muted)]">
-              Who can join
-            </dt>
+          <div className={DETAIL_ROW}>
+            <dt className="w-20 shrink-0 text-[var(--muted)]">Who can join</dt>
             <dd className="min-w-0 flex-1">
               {/* The owner's build 13 decision 8B: absent from the summary means off. */}
               <OrgDomainOnly
@@ -97,29 +96,26 @@ export default async function OrganizationPage() {
             </dd>
           </div>
         </dl>
-      </div>
+      </Group>
 
-      <div className="border-t border-[var(--ring)] py-4">
-        <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-          Members
-        </h2>
+      {/* Each list keeps its own title gap: the band and its title only. */}
+      <section className={GROUP_BAND}>
+        <SectionTitle>Members</SectionTitle>
         <OrgMemberList
           workspaceId={workspace.id}
           orgName={workspace.name}
           viewerUserId={session.user.id}
           members={members}
         />
-      </div>
+      </section>
 
-      <div className="border-t border-[var(--ring)] py-4 pb-0">
-        <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-          Join requests
-        </h2>
+      <section className={GROUP_BAND}>
+        <SectionTitle>Join requests</SectionTitle>
         <OrgJoinRequestList
           workspaceId={workspace.id}
           requests={joinRequests}
         />
-      </div>
+      </section>
     </SectionCard>
   );
 }

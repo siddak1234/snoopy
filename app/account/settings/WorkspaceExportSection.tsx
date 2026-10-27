@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { FileActions } from "@/components/dashboard/FileActions";
-import { SectionTitle } from "@/components/dashboard/SectionTitle";
+import { Group } from "@/components/dashboard/Group";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import {
@@ -10,7 +10,7 @@ import {
   isPartialWorkspaceExport,
   type WorkspaceExportResponse,
 } from "@/lib/export-contract";
-import { GROUP_BAND, SPACING } from "@/lib/spacing";
+import { SPACING } from "@/lib/spacing";
 import { CompleteExportSection } from "./CompleteExportSection";
 import { requestWorkspaceExport } from "./export-actions";
 
@@ -71,9 +71,8 @@ export function WorkspaceExportSection({
   const partial = response ? isPartialWorkspaceExport(response) : false;
 
   return (
-    <section className={`border-t border-[var(--ring)] ${GROUP_BAND}`}>
-      <SectionTitle>Workspace data export</SectionTitle>
-      <p className={`${SPACING.title.top} text-sm text-[var(--muted)]`}>
+    <Group title="Workspace data export">
+      <p className="text-sm text-[var(--muted)]">
         Download a quick summary of this workspace&apos;s records — each part
         bounded to its most recent entries.
       </p>
@@ -148,6 +147,6 @@ export function WorkspaceExportSection({
           </ul>
         </div>
       ) : null}
-    </section>
+    </Group>
   );
 }

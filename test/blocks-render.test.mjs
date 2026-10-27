@@ -586,7 +586,7 @@ test("a page's parts follow its flow's manifest, else today's order; a part this
     );
     assert.match(
       page,
-      /<div key=\{`unknown-\$\{at\}`\} className="py-4 first:pt-0">\s*<Fallback \/>/u,
+      /<Group key=\{`unknown-\$\{at\}`\}>\s*<Fallback \/>/u,
       path,
     );
   }

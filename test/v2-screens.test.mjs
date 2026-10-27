@@ -32,14 +32,17 @@ const SHARE_ROUTE = "app/account/share/route.ts";
 
 let loaded;
 before(async () => {
-  loaded = await loadModules([SCORE, ACTIONS, CONTROLS, SHARE_ROUTE], {
-    stubs: {
-      "@/lib/app-session":
-        "export const getAppSession = async () => ({ user: { id: 'u1', email: 'a@example.test' } });",
-      "@/lib/tenancy":
-        "export const resolveActiveWorkspaceId = async () => 'w1';",
+  loaded = await loadModules(
+    [SCORE, ACTIONS, CONTROLS, SHARE_ROUTE, "components/blocks/ListTools.tsx"],
+    {
+      stubs: {
+        "@/lib/app-session":
+          "export const getAppSession = async () => ({ user: { id: 'u1', email: 'a@example.test' } });",
+        "@/lib/tenancy":
+          "export const resolveActiveWorkspaceId = async () => 'w1';",
+      },
     },
-  });
+  );
 });
 after(() => loaded?.cleanup());
 
@@ -74,14 +77,16 @@ test("Activity: q, sort, page, status and since reach the platform, the flow as 
   // listRuns sends exactly that query.
   assert.match(
     read("lib/automations.ts"),
-    /`\$\{scope\(workspaceId\)\}\/runs\$\{runsQuery\(query\)\}`/u,
+    /`\$\{scope\(workspaceId\)\}\/runs\$\{query \? runsQuery\(query\) : ""\}`/u,
   );
   assert.match(
     read("app/account/runs/page.tsx"),
     /listRuns\(workspaceId, query\)/u,
   );
-  // None of them: today's newest 100, exactly as before.
-  assert.equal(runsQuery(activityQuery({})), "");
+  // None of them still sends the sort and the page, so the platform pages
+  // plain Activity and counts it (`total`); Home alone reads the newest 100.
+  assert.equal(runsQuery(activityQuery({})), "?sort=newest&page=1");
+  assert.match(read("app/account/page.tsx"), /listRuns\(workspaceId\)\)/u);
   // What the address may not say is no filter at all.
   assert.deepEqual(
     activityQuery({ q: "x".repeat(90), sort: "random", page: "0" }),
@@ -149,6 +154,40 @@ test("Activity: a total of 30 is long, its sort and pager shown; 25 or no total 
   );
 });
 
+test("Activity with no search, filter, sort or page: a total of 30 shows the sort and the pager", () => {
+  const bare = activityQuery({});
+  const sent = new URLSearchParams(runsQuery(bare).slice(1));
+  assert.equal(sent.get("sort"), "newest");
+  assert.equal(sent.get("page"), "1");
+  // The platform (the snapshot's contract): any of these, and the answer is
+  // one page of 25 with `total`.
+  assert.match(
+    read("lib/generated/platform-contracts/automations.d.ts"),
+    /With none of `q`, `status`, `needsReview`, `since`, `sort` and `page`, the answer is today's newest 100, unchanged\. With any of them, it is one page of 25 and `total`/u,
+  );
+  const { long, pages } = activityPages(30, 25);
+  assert.deepEqual({ long, pages }, { long: true, pages: 2 });
+  const tools = elements(
+    parse(
+      draw(CONTROLS, "ActivityToolsView", {
+        query: bare,
+        long,
+        onGo: () => {},
+      }),
+    ),
+  );
+  assert.equal(byTest(tools, "activity-search").length, 1);
+  assert.equal(byTest(tools, "activity-sort").length, 1);
+  const pager = draw("components/blocks/ListTools.tsx", "Pager", {
+    page: bare.page ?? 1,
+    pages,
+    onPage: () => {},
+    testId: "activity-pager",
+  });
+  assert.equal(byTest(elements(parse(pager)), "activity-pager").length, 1);
+  assert.ok(visibleWords(pager).includes("Page 1 of 2"), visibleWords(pager));
+});
+
 const NAMES = { positive: "Advance", negative: "Decline" };
 
 test("F1: a positive run's score is green with the chip Advance; a negative one red with Decline; none plain, no chip", () => {
@@ -206,6 +245,7 @@ const actionsView = (props) =>
     parse(
       draw(ACTIONS, "FileActionsView", {
         busy: false,
+        shareReady: true,
         error: null,
         onAct: () => {},
         onShare: () => {},
@@ -255,6 +295,16 @@ test("F4: Download, then Share, on all five places; with canShare false, no Shar
     ),
     ["Download"],
   );
+  // Share waits, disabled, until its file is read.
+  const waiting = actionsView({
+    downloads: [{ label: "Download", run: async () => null }],
+    canShare: true,
+    shareReady: false,
+  }).filter((node) => node.tag === "button");
+  assert.deepEqual(
+    waiting.map((node) => node.attrs.disabled !== undefined),
+    [false, true],
+  );
   // The five places: both file pages (FileView), the package's two
   // documents, and Settings › Data's two exports — each FileActions, with
   // its downloads first and a file to share.
@@ -292,46 +342,46 @@ test("F4: Share sends the file itself, a File of its bytes and type — never a 
   const sent = [];
   const sheet = { share: async (data) => sent.push(data) };
   const bytes = new Blob(["%PDF-1.4"], { type: "application/octet-stream" });
-  const error = await loaded.modules[ACTIONS].shareFile(
-    {
-      filename: "run.pdf",
-      contentType: "application/pdf",
-      read: async () => ({ blob: bytes, filename: "0a0a.pdf" }),
-    },
-    sheet,
-  );
+  const { preparedShare, readShareFile, shareFile } = loaded.modules[ACTIONS];
+  const file = await readShareFile({
+    filename: "run.pdf",
+    contentType: "application/pdf",
+    read: async () => ({ blob: bytes, filename: "0a0a.pdf" }),
+  });
+  const error = await shareFile(file, sheet);
   assert.equal(error, null);
   assert.equal(sent.length, 1);
   assert.deepEqual(Object.keys(sent[0]).sort(), ["files", "title"]);
-  const [file] = sent[0].files;
-  assert.ok(file instanceof File);
-  assert.equal(file.name, "0a0a.pdf");
-  assert.equal(file.type, "application/pdf");
-  assert.equal(await file.text(), "%PDF-1.4");
+  const [shared] = sent[0].files;
+  assert.ok(shared instanceof File);
+  assert.equal(shared.name, "0a0a.pdf");
+  assert.equal(shared.type, "application/pdf");
+  assert.equal(await shared.text(), "%PDF-1.4");
+  // With no name from the route, its own.
+  assert.equal(
+    (
+      await readShareFile({
+        filename: "a.pdf",
+        contentType: "application/pdf",
+        read: async () => ({ blob: bytes }),
+      })
+    ).name,
+    "a.pdf",
+  );
   // Closing the sheet is no refusal; anything else is.
-  const closed = await loaded.modules[ACTIONS].shareFile(
-    {
-      filename: "a.pdf",
-      contentType: "application/pdf",
-      read: async () => ({ blob: bytes }),
+  const closed = await shareFile(file, {
+    share: async () => {
+      throw new DOMException("closed", "AbortError");
     },
-    {
-      share: async () => {
-        throw new DOMException("closed", "AbortError");
-      },
-    },
-  );
+  });
   assert.equal(closed, null);
-  const refused = await loaded.modules[ACTIONS].shareFile(
-    {
-      filename: "a.pdf",
-      contentType: "application/pdf",
-      read: async () => {
-        throw new Error("no");
-      },
+  const refused = await preparedShare({
+    filename: "a.pdf",
+    contentType: "application/pdf",
+    read: async () => {
+      throw new Error("no");
     },
-    sheet,
-  );
+  }).press(sheet);
   assert.equal(refused, "Could not share. Try again.");
   // Each place reads the bytes from this site's own routes, never a signed link.
   assert.match(
@@ -349,6 +399,68 @@ test("F4: Share sends the file itself, a File of its bytes and type — never a 
   assert.match(
     read("app/account/settings/WorkspaceExportSection.tsx"),
     /read: async \(\) => exportFile\(response\)/u,
+  );
+});
+
+test("F4: Share opens the sheet in the press itself, its file read before — a slow read is no NotAllowedError", async () => {
+  const { preparedShare } = loaded.modules[ACTIONS];
+  // A browser's share sheet: open only while the press lasts (its user
+  // activation), refused with NotAllowedError after.
+  let pressing = false;
+  const sent = [];
+  const sheet = {
+    share: async (data) => {
+      if (!pressing) throw new DOMException("no activation", "NotAllowedError");
+      sent.push(data);
+    },
+  };
+  const press = (prepared) => {
+    pressing = true;
+    const done = prepared.press(sheet);
+    pressing = false;
+    return done;
+  };
+  const slow = (read) => ({
+    filename: "run.pdf",
+    contentType: "application/pdf",
+    read: () =>
+      new Promise((resolve, reject) =>
+        setTimeout(() => {
+          try {
+            resolve(read());
+          } catch (thrown) {
+            reject(thrown);
+          }
+        }, 30),
+      ),
+  });
+  const bytes = () => ({ blob: new Blob(["%PDF-1.4"]) });
+  // Read as soon as Share can show; the press then shares at once.
+  const prepared = preparedShare(slow(bytes));
+  assert.equal(prepared.ready(), null);
+  assert.ok((await prepared.reading) instanceof File);
+  assert.equal(await press(prepared), null);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].files[0].name, "run.pdf");
+  // A read that failed is read again in the press: the sheet then refuses,
+  // said as a refusal, never thrown.
+  let reads = 0;
+  const failing = preparedShare(
+    slow(() => {
+      reads += 1;
+      if (reads === 1) throw new Error("busy");
+      return bytes();
+    }),
+  );
+  assert.equal(await failing.reading, null);
+  assert.equal(await press(failing), "Could not share. Try again.");
+  assert.equal(sent.length, 1);
+  // The page asks it at once: Share waits for the read, and the press calls it.
+  const source = read(ACTIONS);
+  assert.match(source, /const made = preparedShare\(latest\.current\);/u);
+  assert.match(
+    source,
+    /if \(ready && prepared\) void act\(\(\) => prepared\.share\.press\(\)\);/u,
   );
 });
 

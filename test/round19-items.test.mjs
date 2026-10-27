@@ -87,7 +87,7 @@ test("Upload, Add and Archive are an owner's or admin's: drawn only under canMan
   );
   assert.match(
     live,
-    /\{canManage && !archived \? \(\s*<div className="py-4">\s*<ArchiveItem/u,
+    /\{canManage && !archived \? \(\s*<Group>\s*<ArchiveItem/u,
   );
   assert.match(
     code(read(FLOW_PAGE)),
@@ -151,8 +151,9 @@ test("a run with a title and a score is headed by them, the full id kept among i
   assert.ok(
     details > 0 &&
       details < live.indexOf('label="Duration"') &&
-      live.indexOf('label="Duration"') < live.indexOf('id="run-steps-title"') &&
-      live.indexOf('id="run-steps-title"') < live.indexOf("<BlockList"),
+      live.indexOf('label="Duration"') <
+        live.indexOf('titleId="run-steps-title"') &&
+      live.indexOf('titleId="run-steps-title"') < live.indexOf("<BlockList"),
   );
   // First on the run's page, under "{Run word} details", in the result
   // line's place (build 28's items 7 and 8).

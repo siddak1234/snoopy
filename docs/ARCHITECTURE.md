@@ -55,23 +55,21 @@ page reuses:
   false, a row of one card of divided rows (`LIST_CARD`): a list block's
   rows, a flow's items, Activity's runs and Home's recent runs.
 - **The spacing table** (backend `BLOCK_SPACING`, ADR-0048 amendment 1; the
-  owner's Q8), the same names on the app, in pixels here (`lib/spacing.ts`,
-  Tailwind's 4 px a step): `edge` 20 (`px-5`), `edgeWide` 24 on a screen
-  768 px and up (`md:px-6`); `group` 16 between groups (`gap-4`, `mt-4`,
-  a band's `py-4`); `title` 8 from a title to what it heads (`mt-2`);
-  `inner` 8 inside a card (`gap-2`); a row `rowY` 12 and `rowX` 16
-  (`py-3 px-4`), at least `rowMinHeight` 44 (`min-h-11`); `card` 16
-  (`p-4`), the page card `cardWide` 24 on a wide screen (`md:p-6`);
-  `bottom` 24 (`pb-6`). The account shell carries the edge and the bottom
-  (`EDGE`), `SectionCard` the card, `SectionTitle` and `Group` a title and
-  what it heads, `PageRow`, `Tile` and the list card the rows. A title sits
-  `title` above what it heads and `group` below what came before it — a
-  form's title ("Add candidate") and a label block ("Candidates") alike
-  (F3); a group of related rows is one card with dividers; nothing above
-  the first group. No screen types its own spacing: `test/spacing.test.mjs`
-  fails on a padding, margin or gap class under components/ and
-  app/account outside the table's, past the classes written before it
-  (`test/spacing-baseline.json`, which only goes down).
+  owner's Q8), the same names on the app: the numbers are the platform's
+  (`lib/generated/platform-contracts/block-rules.ts`), and their classes
+  here are [`lib/spacing.ts`](../lib/spacing.ts), the one place either is
+  written. The parts carry them: the account shell the edge and the bottom
+  (`EDGE`), `SectionCard` the card, `Group` a band of it (`GROUP_BAND`) with
+  its title (`SectionTitle`) and what that heads, `PageRow`, `Tile` and the
+  list card the rows. A title sits `title` above what it heads and `group`
+  below what came before it — a form's title ("Add candidate") and a label
+  block ("Candidates") alike (F3); a group of related rows is one card with
+  dividers; nothing above the first group. `test/spacing.test.mjs` holds it:
+  every padding, margin and gap class under components/ and app/account is
+  one of the table's, but for older classes counted file by file in
+  `test/spacing-baseline.json`, which only goes down and names nothing under
+  app/account (the public pages, the plain controls and the chips are left);
+  and no screen there types a band or a section title of its own.
 - **Search, sort and pages** (ADR-0048 amendment 1, decision 4; the bar is
   `components/blocks/ListTools.tsx`, the words the platform's
   `BLOCK_WORDS`, never typed here — `test/block-words.test.mjs`): a search
@@ -85,7 +83,9 @@ page reuses:
   "Newest first", and Activity keeps `q`, `sort` and `page` in its address
   (`ActivityControls`) and sends them, with the outcome as `status` and
   the time as `since`, to the platform, which searches and counts
-  (`total`); it never sends `needsReview`. A search that finds nothing
+  (`total`) — plain Activity too, its sort and page always sent
+  (`runsQuery`), while Home reads the newest 100; it never sends
+  `needsReview`. A search that finds nothing
   says "Nothing matches "{query}".".
 - **Every run's page** ends with the package's buttons when it has them,
   then the Run details row, then Cancel run while it goes on and View flow;
@@ -126,9 +126,10 @@ page reuses:
   `FileActions` (`components/dashboard/FileActions.tsx`) on both file pages,
   a run package's PDF and Excel (Download PDF, Download Excel, then Share,
   the PDF) and Settings › Data's two exports. Share sends the file itself
-  — its bytes, read when pressed from this site's own route, as a `File` —
-  never its signed link, and shows only where the browser takes that file
-  (`navigator.canShare`). A package's documents and the complete export
+  — its bytes, read from this site's own route as soon as Share shows, so
+  the press opens the share sheet at once (a browser allows it only for a
+  few seconds after a press), as a `File` — never its signed link, and
+  shows only where the browser takes that file (`navigator.canShare`). A package's documents and the complete export
   are read through `app/account/share/route.ts` (`?run={id}&format=` or
   `?export={id}`): its ask and its signed link read on the server, the
   bytes an attachment of no type, never cached, `nosniff`, for this site's

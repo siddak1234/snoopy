@@ -41,6 +41,8 @@ import {
   roleInWorkspace,
 } from "@/lib/tenancy";
 import SectionCard from "@/components/dashboard/SectionCard";
+import { Group } from "@/components/dashboard/Group";
+import { SPACING } from "@/lib/spacing";
 import { BackLink } from "@/components/dashboard/BackLink";
 import {
   CONNECTION_ROW,
@@ -58,6 +60,9 @@ import { FlowItems } from "../FlowItems";
 import { RunStart } from "../RunStart";
 import { placeOf } from "../place";
 import { owedLines, vendorPath } from "../vendor-path";
+
+/** A step's link row (an integration, the email): the table's row padding, lit on hover. */
+const LINK_ROW = `rounded-[var(--radius-md)] ${SPACING.rowX.x} transition hover:bg-[var(--surface-hover)]`;
 
 /**
  * A flow's page — the run page for a flow (Build 21, spec A6; the owner's AM4
@@ -260,7 +265,7 @@ export default async function FlowPage(
         aria-label={`${none ? "None" : nameOf(chosen)}: change the integration`}
         // Its state — Connected, Not connected, or None's line — said too.
         aria-describedby={`flow-vendor-${key}-line`}
-        className={`${CONNECTION_ROW} rounded-[var(--radius-md)] px-2 transition hover:bg-[var(--surface-hover)]`}
+        className={`${CONNECTION_ROW} ${LINK_ROW}`}
       >
         <ConnectionRowBody
           mark={
@@ -296,7 +301,7 @@ export default async function FlowPage(
   // Start run that fails at once.
   const notResponding =
     !available && entry ? (
-      <p className="mt-2 text-xs text-[var(--warning-text)]">
+      <p className="text-xs text-[var(--warning-text)]">
         This flow is not responding, so it cannot run yet.
       </p>
     ) : null;
@@ -304,7 +309,7 @@ export default async function FlowPage(
   // Step 1: the run's fields and Start run, or Turn on while the flow is off;
   // and what it is owed, each a link to where it is fixed.
   const stepOne = (
-    <div id="run" className="mt-2 flex scroll-mt-6 flex-col gap-2">
+    <div id="run" className="flex scroll-mt-6 flex-col gap-2">
       <RunStart
         workspaceId={workspaceId}
         subscriptionId={subscription.id}
@@ -340,7 +345,7 @@ export default async function FlowPage(
       prefetch={false}
       href={emailPath(subscription.id)}
       data-testid="flow-email"
-      className={`${CONNECTION_ROW} mt-2 rounded-[var(--radius-md)] px-2 transition hover:bg-[var(--surface-hover)]`}
+      className={`${CONNECTION_ROW} ${LINK_ROW}`}
     >
       <ConnectionRowBody
         mark={<GlyphMark icon={EnvelopeSimpleIcon} />}
@@ -373,62 +378,48 @@ export default async function FlowPage(
   const part = (name: (typeof parts)[number], at: number) => {
     if (name === "dashboard")
       return (
-        <section
-          key="dashboard"
-          aria-labelledby="flow-dashboard-title"
-          className="py-4 first:pt-0"
-        >
-          <h2
-            id="flow-dashboard-title"
-            className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
-          >
-            Dashboard
-          </h2>
+        <Group key="dashboard" title="Dashboard" titleId="flow-dashboard-title">
           <FlowDashboard
             workspaceId={workspaceId}
             subscriptionId={subscription.id}
             initial={counts}
             draft={subscription.status === "draft"}
           />
-        </section>
+        </Group>
       );
     if (name === "steps")
       return (
-        <section
+        <Group
           key="steps"
-          aria-labelledby="flow-steps-title"
-          className="py-4"
+          title="Steps"
+          titleId="flow-steps-title"
+          titleTabIndex={-1}
         >
-          <h2
-            id="flow-steps-title"
-            tabIndex={-1}
-            className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
-          >
-            Steps
-          </h2>
-          {notResponding}
-          {plan.length === 0 ? stepOne : null}
-          <ol className="mt-2 flex flex-col divide-y divide-[var(--ring)]">
-            {plan.map((row) => (
-              <li
-                key={row.id}
-                data-testid={`flow-step-${row.id}`}
-                className="flex flex-col py-3"
-              >
-                {/* The step's title only — no line under it (the session's
+          <div className={`flex flex-col ${SPACING.inner.gap}`}>
+            {notResponding}
+            {plan.length === 0 ? stepOne : null}
+            <ol className="flex flex-col divide-y divide-[var(--ring)]">
+              {plan.map((row) => (
+                <li
+                  key={row.id}
+                  data-testid={`flow-step-${row.id}`}
+                  className={`flex flex-col ${SPACING.inner.gap} ${SPACING.rowY.y}`}
+                >
+                  {/* The step's title only — no line under it (the session's
               S20; P2: "After step 4 i dont want to see quickbooks"). */}
-                <p className="text-sm font-medium text-[var(--text)]">
-                  {row.label}
-                </p>
-                {row.input ? stepOne : null}
-                {row.kind === "setting" && row.fields.length > 0 ? (
-                  <div className="mt-2">{row.fields.map(vendorRow)}</div>
-                ) : null}
-                {row.kind === "email" ? emailRow : null}
-              </li>
-            ))}
-          </ol>
-        </section>
+                  <p className="text-sm font-medium text-[var(--text)]">
+                    {row.label}
+                  </p>
+                  {row.input ? stepOne : null}
+                  {row.kind === "setting" && row.fields.length > 0 ? (
+                    <div>{row.fields.map(vendorRow)}</div>
+                  ) : null}
+                  {row.kind === "email" ? emailRow : null}
+                </li>
+              ))}
+            </ol>
+          </div>
+        </Group>
       );
     if (name === "items")
       return (
@@ -438,10 +429,12 @@ export default async function FlowPage(
               when there is one of them to say and no Steps say it. */}
           {!parts.includes("steps") &&
           (!live || owed.length > 0 || notResponding) ? (
-            <div className="py-4 first:pt-0">
-              {notResponding}
-              {stepOne}
-            </div>
+            <Group>
+              <div className={`flex flex-col ${SPACING.inner.gap}`}>
+                {notResponding}
+                {stepOne}
+              </div>
+            </Group>
           ) : null}
           {declaredItems && items !== undefined ? (
             <FlowItems
@@ -455,9 +448,9 @@ export default async function FlowPage(
         </div>
       );
     return (
-      <div key={`unknown-${at}`} className="py-4 first:pt-0">
+      <Group key={`unknown-${at}`}>
         <Fallback />
-      </div>
+      </Group>
     );
   };
 
@@ -470,7 +463,7 @@ export default async function FlowPage(
     >
       {parts.map(part)}
 
-      <div className="py-4">
+      <Group>
         <AutomationActions
           workspaceId={workspaceId}
           name={name}
@@ -484,7 +477,7 @@ export default async function FlowPage(
           }
           webhook={subscription.triggerKind === "webhook" && canManage}
         />
-      </div>
+      </Group>
     </SectionCard>
   );
 }

@@ -59,10 +59,11 @@ test("one empty-row component, not a private copy per page (register F29)", () =
 
 test("a whole page with nothing on it is the app's empty screen, and a section stays one line (register F29, the owner's build 9)", () => {
   const row = read("components/dashboard/EmptyRow.tsx");
-  // Without a title, the row it always was.
+  // Without a title, one line in a band like every other (`GROUP_BAND`;
+  // ~~`py-5`~~ until Round 21's v2).
   assert.match(
     row,
-    /if \(!title\) \{\s*return \(\s*<div className="py-5 first:pt-0">\s*<p className="text-sm text-\[var\(--muted\)\]">\{text\}<\/p>\s*<\/div>\s*\);\s*\}/u,
+    /if \(!title\) \{\s*return \(\s*<div className=\{GROUP_BAND\}>\s*<p className="text-sm text-\[var\(--muted\)\]">\{text\}<\/p>\s*<\/div>\s*\);\s*\}/u,
   );
   // With one: the icon, decorative, then the title, its line and the action.
   assert.match(row, /<span\s+aria-hidden/u);
@@ -354,7 +355,7 @@ test("one refusal, one alert, in the connections dialogs (register F52)", () => 
   );
   assert.match(
     panel,
-    /<FormError message=\{disconnectError\} className="mt-3" \/>/u,
+    /<FormError\s+message=\{disconnectError\}\s+className=\{SPACING\.inner\.top\}\s+\/>/u,
   );
   assert.doesNotMatch(panel, /<FormError message=\{error\} className=/u);
   // The vendor page has one refusal line under its rows, and no dialog.

@@ -28,6 +28,34 @@ function stringTexts(source) {
   return out;
 }
 
+/**
+ * A band or a section title typed by hand (the review's finding 4): a string
+ * holding a band's classes — the table's `group` above and below (`py-4`),
+ * none above the first (`first:pt-0`), or a divider over `pt-4` — or a
+ * title's small capitals (`tracking-wide` with `uppercase`). The page card's
+ * bands are `Group` (or `GROUP_BAND` with `SectionTitle`), its titles
+ * `SectionTitle`; each says it once, in `lib/spacing.ts` and those parts.
+ */
+export function handBands(source) {
+  const out = [];
+  // Comments are words about the classes, not classes.
+  const code = source
+    .replace(/\/\*[\s\S]*?\*\//gu, " ")
+    .replace(/^\s*\/\/.*$/gmu, " ");
+  for (const text of stringTexts(code)) {
+    const tokens = new Set(text.split(/\s+/u));
+    if (
+      tokens.has("py-4") ||
+      tokens.has("first:pt-0") ||
+      (tokens.has("border-t") && tokens.has("pt-4"))
+    )
+      out.push(`band: ${text.trim()}`);
+    if (tokens.has("tracking-wide") && tokens.has("uppercase"))
+      out.push(`title: ${text.trim()}`);
+  }
+  return out;
+}
+
 /** Each spacing class a source names, in order. */
 export function spacingTokens(source) {
   return stringTexts(source)

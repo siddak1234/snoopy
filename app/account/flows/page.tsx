@@ -13,7 +13,9 @@ import { heldCopy } from "@/lib/held-flow";
 import { flowsOverPlan, overPlanSentence } from "@/lib/plan-limit";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
+import { Group } from "@/components/dashboard/Group";
 import { StatusPill } from "@/components/dashboard/StatusPill";
+import { CARD, SPACING } from "@/lib/spacing";
 import { Button } from "@/components/ui/Button";
 import { flowPath } from "@/lib/flow-steps";
 import { AddAutomation } from "./AddAutomation";
@@ -136,19 +138,13 @@ export default async function FlowsPage() {
         />
       ) : (
         byDepartment(catalog.automations).map(({ department, id, entries }) => (
-          <section
+          <Group
             key={id}
-            aria-labelledby={id}
-            data-testid="flows-department"
-            className="py-4 first:pt-0"
+            title={department}
+            titleId={id}
+            testId="flows-department"
           >
-            <h2
-              id={id}
-              className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
-            >
-              {department}
-            </h2>
-            <div className="mt-2 grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               {entries.map((automation) => (
                 <AutomationCard
                   key={`${automation.templateId}.v${automation.version}`}
@@ -159,16 +155,13 @@ export default async function FlowsPage() {
                 />
               ))}
             </div>
-          </section>
+          </Group>
         ))
       )}
 
       {archived.length > 0 ? (
-        <div className="border-t border-[var(--ring)] py-4">
-          <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-            Archived flows
-          </h2>
-          <p className="mt-1 text-xs text-[var(--muted)]">
+        <Group title="Archived flows">
+          <p className="text-xs text-[var(--muted)]">
             An archived flow keeps its history here. Unarchive it any time.
           </p>
           <ul className="mt-2 divide-y divide-[var(--ring)]">
@@ -223,7 +216,7 @@ export default async function FlowsPage() {
               );
             })}
           </ul>
-        </div>
+        </Group>
       ) : null}
     </SectionCard>
   );
@@ -246,7 +239,7 @@ function AutomationCard({
   const held = heldCopy(subscriptions, automation.templateId);
 
   return (
-    <div className="bubble flex flex-col gap-2 p-5">
+    <div className={`bubble flex flex-col ${SPACING.inner.gap} ${CARD}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           {/* Its department is its group's header (build 28's item 1). */}
@@ -282,7 +275,7 @@ function AutomationCard({
           key={subscription.id}
           id={`flow-${subscription.id}`}
           tabIndex={-1}
-          className="flex flex-col gap-2 border-t border-[var(--ring)] pt-3"
+          className={`flex flex-col ${SPACING.inner.gap} border-t border-[var(--ring)] ${SPACING.group.pt}`}
         >
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-[var(--muted)]">{place(subscription)}</p>

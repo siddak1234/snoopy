@@ -344,8 +344,10 @@ export function activityQuery(params: {
 /**
  * The runs list's query for Activity (`listRuns`): its flow, and the outcome
  * and the time as the platform's `status` and `since` — the platform filters
- * them, so a page is never emptied by a filter here — with its search, sort
- * and page. The website has no "Needs review", and never sends `needsReview`.
+ * them, so a page is never emptied by a filter here — with its search, and
+ * always its sort (`newest` when none) and page (1 when none), so even plain
+ * Activity is one page of 25 with the platform's `total`. The website has no
+ * "Needs review", and never sends `needsReview`.
  */
 export function runsQuery(query: ActivityQuery): string {
   const out = new URLSearchParams();
@@ -353,10 +355,9 @@ export function runsQuery(query: ActivityQuery): string {
   if (query.q) out.set("q", query.q);
   if (query.outcome) out.set("status", query.outcome);
   if (query.since) out.set("since", query.since);
-  if (query.sort) out.set("sort", query.sort);
-  if (query.page) out.set("page", String(query.page));
-  const text = out.toString();
-  return text ? `?${text}` : "";
+  out.set("sort", query.sort ?? "newest");
+  out.set("page", String(query.page ?? 1));
+  return `?${out.toString()}`;
 }
 
 /** Activity's own address for a query: what it keeps in the address, a new search or sort on page 1. */

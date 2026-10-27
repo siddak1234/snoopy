@@ -9,6 +9,7 @@ import { PACKAGE_UNAVAILABLE } from "@/lib/run-documents";
 import { runLabel } from "@/lib/run-progress";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 import { PackageActions, PackageFrame } from "../RunLive";
+import { Group } from "@/components/dashboard/Group";
 
 /**
  * A job's run package (Build 24, P12; the owner's build 23 words: "View
@@ -56,9 +57,9 @@ export default async function RunPackagePage(
       }
     >
       {ready ? (
-        <div className="py-4 first:pt-0">
+        <Group>
           <PackageFrame runId={job} />
-        </div>
+        </Group>
       ) : (
         <EmptyRow text={PACKAGE_UNAVAILABLE} />
       )}

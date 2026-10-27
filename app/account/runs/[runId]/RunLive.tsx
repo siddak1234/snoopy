@@ -8,6 +8,7 @@ import { BlockList } from "@/components/blocks/BlockList";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { BackLink } from "@/components/dashboard/BackLink";
 import { FileActions } from "@/components/dashboard/FileActions";
+import { Group } from "@/components/dashboard/Group";
 import { PageRow } from "@/components/dashboard/PageRow";
 import { RunScore } from "@/components/dashboard/RunScore";
 import { Tile } from "@/components/dashboard/Tile";
@@ -250,7 +251,7 @@ export function RunLive({
         back={<BackLink href={`/account/runs/${encodeURIComponent(run.id)}`} />}
         primaryAction={<StatusPill status={run.status} />}
       >
-        <div className="py-4 first:pt-0">
+        <Group>
           <dl className="grid grid-cols-2 gap-2 sm:max-w-sm">
             <Tile
               label="Duration"
@@ -263,37 +264,31 @@ export function RunLive({
               testId="run-tile-Steps done"
             />
           </dl>
-        </div>
+        </Group>
 
-        <section aria-labelledby="run-steps-title" className="py-4">
-          <h2
-            id="run-steps-title"
-            className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
-          >
-            Steps
-          </h2>
-          <ol data-testid="run-steps" className="mt-4 flex flex-col gap-4">
+        <Group title="Steps" titleId="run-steps-title">
+          <ol data-testid="run-steps" className="flex flex-col gap-4">
             {tracker.map((row) => (
               <TrackerItem key={row.key} row={row} />
             ))}
           </ol>
-        </section>
+        </Group>
 
-        <div className="py-4">
+        <Group>
           <dl className="grid gap-2 sm:grid-cols-2">
             {facts.map((fact) => (
               <div key={fact.label}>
                 <dt className="text-xs text-[var(--muted)]">{fact.label}</dt>
                 <dd
                   data-testid={`run-fact-${fact.label}`}
-                  className="mt-0.5 text-sm break-all text-[var(--text)] select-all"
+                  className="text-sm break-all text-[var(--text)] select-all"
                 >
                   {fact.value}
                 </dd>
               </div>
             ))}
           </dl>
-        </div>
+        </Group>
       </SectionCard>
     );
   }
@@ -317,7 +312,7 @@ export function RunLive({
     >
       {/* The body, as the platform sent it: the run's files, its result
           line and what is to decide, then what it read (ADR-0048). */}
-      <div className="py-4 first:pt-0">
+      <Group>
         <BlockList
           blocks={detail.blocks}
           testId="run-blocks"
@@ -344,9 +339,9 @@ export function RunLive({
             },
           }}
         />
-      </div>
+      </Group>
 
-      <div className="py-4 first:pt-0">
+      <Group>
         {/* Every run's, whatever its flow (build 28, item 9): the steps and
             the facts on a page of their own. */}
         {/* The package's three first, then Run details, directly over
@@ -375,7 +370,7 @@ export function RunLive({
             View flow
           </Button>
         </div>
-      </div>
+      </Group>
     </SectionCard>
   );
 }

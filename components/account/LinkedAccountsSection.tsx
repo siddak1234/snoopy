@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Group } from "@/components/dashboard/Group";
+import { SPACING } from "@/lib/spacing";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import Modal from "@/components/ui/Modal";
@@ -196,12 +198,9 @@ export default function LinkedAccountsSection() {
 
   if (state.loading) {
     return (
-      <div className="border-t border-[var(--ring)] pt-4">
-        <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-          Linked accounts
-        </h2>
-        <p className="mt-2 text-sm text-[var(--muted)]">Loading…</p>
-      </div>
+      <Group title="Linked accounts">
+        <p className="text-sm text-[var(--muted)]">Loading…</p>
+      </Group>
     );
   }
 
@@ -210,13 +209,10 @@ export default function LinkedAccountsSection() {
   // same-email join and the credentials sentence~~ (register F86) — linking
   // still works as it did; the line no longer explains it.
   return (
-    <div className="border-t border-[var(--ring)] pt-4">
-      <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-        Linked accounts
-      </h2>
+    <Group title="Linked accounts">
       <p
         data-testid="linked-accounts-lead"
-        className="mt-2 text-sm text-[var(--muted)]"
+        className="text-sm text-[var(--muted)]"
       >
         Sign in with any of these.
       </p>
@@ -236,7 +232,7 @@ export default function LinkedAccountsSection() {
           to see your linked accounts.
         </p>
       ) : null}
-      <ul className="mt-4 space-y-2">
+      <ul className="mt-4 flex flex-col gap-2">
         {state.providers.map(({ id, label }) => {
           const isLinked = state.linked.has(id);
           const isPrimary = state.primaryProvider === id;
@@ -342,7 +338,7 @@ export default function LinkedAccountsSection() {
           </h2>
           <p
             id="unlink-description"
-            className="mt-1 text-sm text-[var(--muted)]"
+            className={`${SPACING.title.top} text-sm text-[var(--muted)]`}
           >
             You can still sign in with your other linked accounts, and link this
             one again later.
@@ -371,6 +367,6 @@ export default function LinkedAccountsSection() {
           </div>
         </Modal>
       ) : null}
-    </div>
+    </Group>
   );
 }

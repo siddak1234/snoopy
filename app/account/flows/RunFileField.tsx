@@ -25,6 +25,7 @@ import {
 } from "./run-file-image";
 import { completeRunUpload, openRunUpload } from "./upload-actions";
 import { completeWhenMeasured } from "./upload-completion";
+import { SPACING } from "@/lib/spacing";
 
 /**
  * A phone or a tablet: its primary pointer is a finger, "a pointing device of
@@ -280,14 +281,17 @@ export function RunFileField({
           </span>
         ) : null}
       </div>
-      <p aria-live="polite" className="mt-1 text-xs text-[var(--muted)]">
+      <p
+        aria-live="polite"
+        className={`${SPACING.inner.top} text-xs text-[var(--muted)]`}
+      >
         {state.kind === "uploading"
           ? `Uploading ${state.name}…`
           : state.kind === "ready"
             ? `Ready: ${state.name} (${formatSize(state.sizeBytes)})`
             : null}
       </p>
-      <FormError message={error} className="mt-1 text-xs" />
+      <FormError message={error} className={`${SPACING.inner.top} text-xs`} />
     </div>
   );
 }

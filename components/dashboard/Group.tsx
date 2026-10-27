@@ -12,6 +12,8 @@ import { SectionTitle } from "./SectionTitle";
 export function Group({
   title,
   titleId,
+  titleTabIndex,
+  label,
   action,
   children,
   testId,
@@ -19,6 +21,10 @@ export function Group({
 }: {
   title?: ReactNode;
   titleId?: string;
+  /** -1: a title the page moves focus to. */
+  titleTabIndex?: number;
+  /** The band's name for a screen reader, when it has no title. */
+  label?: string;
   /** Beside the title, at its end: Upload, a filter. */
   action?: ReactNode;
   children: ReactNode;
@@ -28,15 +34,20 @@ export function Group({
   const heading =
     title === undefined ? null : action ? (
       <div className={`flex items-center justify-between ${SPACING.inner.gap}`}>
-        <SectionTitle id={titleId}>{title}</SectionTitle>
+        <SectionTitle id={titleId} tabIndex={titleTabIndex}>
+          {title}
+        </SectionTitle>
         {action}
       </div>
     ) : (
-      <SectionTitle id={titleId}>{title}</SectionTitle>
+      <SectionTitle id={titleId} tabIndex={titleTabIndex}>
+        {title}
+      </SectionTitle>
     );
   return (
     <section
       aria-labelledby={title === undefined ? undefined : titleId}
+      aria-label={label}
       data-testid={testId}
       className={`${GROUP_BAND} ${className}`.trim()}
     >

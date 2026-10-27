@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { decideApproval } from "@/app/account/flows/actions";
 import type { Approval } from "@/lib/automations";
 import { runLabel } from "@/lib/run-progress";
+import { ROW_BAND, SPACING } from "@/lib/spacing";
 
 /** The two decisions, as the platform names them (the API value stays `rejected`; the word is Deny). */
 export type Decision = "approved" | "rejected";
@@ -209,13 +210,13 @@ export function ApprovalQueue({
         }`}
       >
         <div className="min-h-0 overflow-hidden">
-          <div className="flex flex-col gap-2 py-4 group-first/row:pt-0">
+          <div className={`flex flex-col ${SPACING.inner.gap} ${ROW_BAND}`}>
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-sm text-[var(--text)]">{approval.reason}</p>
                 <p
                   data-testid={`approval-title-${approval.id}`}
-                  className="mt-1 text-xs text-[var(--muted)]"
+                  className="text-xs text-[var(--muted)]"
                 >
                   {title} · expires {expires}
                 </p>

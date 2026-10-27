@@ -7,6 +7,7 @@ import Modal from "@/components/ui/Modal";
 import type { IssuedWebhookEndpoint, WebhookEndpoint } from "@/lib/automations";
 import { formatDateMediumUTC } from "@/lib/date";
 import { issueWebhookAddress, readWebhookAddress } from "./webhook-actions";
+import { CARD, SPACING } from "@/lib/spacing";
 
 /**
  * Where a vendor sends the events that start this automation (backend §12.1
@@ -117,7 +118,7 @@ export function WebhookAddressButton({
           </h2>
           <p
             id={`${titleId}-desc`}
-            className="mt-1 text-sm text-[var(--muted)]"
+            className={`${SPACING.title.top} text-sm text-[var(--muted)]`}
           >
             Where a service sends the events that start this flow — give it this
             address and the secret, which it sends as the{" "}
@@ -154,11 +155,15 @@ export function WebhookAddressButton({
               : ""}
           </p>
           {issued ? (
-            <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--ring)] p-3">
+            <div
+              className={`${SPACING.group.top} rounded-[var(--radius-md)] border border-[var(--ring)] ${CARD}`}
+            >
               <p className="text-xs text-[var(--muted)]">
                 Secret — shown this once. Copy it now.
               </p>
-              <code className="mt-1 block text-sm break-all text-[var(--text)]">
+              <code
+                className={`${SPACING.inner.top} block text-sm break-all text-[var(--text)]`}
+              >
                 {issued.secret}
               </code>
             </div>

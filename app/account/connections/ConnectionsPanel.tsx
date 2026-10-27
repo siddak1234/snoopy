@@ -34,6 +34,8 @@ import {
   withCallbackStatus,
 } from "./pending-connect";
 import { startConnect } from "./start-connect";
+import { Group } from "@/components/dashboard/Group";
+import { SPACING } from "@/lib/spacing";
 
 function pendingConnect(): string | null {
   try {
@@ -235,7 +237,7 @@ export function ConnectionsPanel({
     );
 
   return (
-    <div className="py-4 first:pt-0">
+    <Group>
       {callbackStatus === "connected" ? (
         <p role="status" className="mb-4 text-sm text-[var(--success-text)]">
           Connection completed successfully.
@@ -307,7 +309,7 @@ export function ConnectionsPanel({
                 {failed ? (
                   <p
                     role="alert"
-                    className="pb-3 text-xs text-[var(--error-text)]"
+                    className={`${SPACING.inner.pb} text-xs text-[var(--error-text)]`}
                   >
                     {rowError.message}
                   </p>
@@ -340,13 +342,13 @@ export function ConnectionsPanel({
           </h2>
           <p
             id="disconnect-connection-description"
-            className="mt-1 text-sm text-[var(--muted)]"
+            className={`${SPACING.title.top} text-sm text-[var(--muted)]`}
           >
             {disconnectBody(
               connectionOf(disconnecting.providerId)?.usedByCount ?? 0,
             )}
           </p>
-          <FormError message={disconnectError} className="mt-3" />
+          <FormError message={disconnectError} className={SPACING.inner.top} />
           <div className="mt-4 flex flex-wrap gap-2">
             <Button
               type="button"
@@ -384,11 +386,14 @@ export function ConnectionsPanel({
           </h2>
           <p
             id="connect-provider-description"
-            className="mt-1 text-sm text-[var(--muted)]"
+            className={`${SPACING.title.top} text-sm text-[var(--muted)]`}
           >
             Provide the connection details supplied by this provider.
           </p>
-          <form onSubmit={submitKeyForm} className="mt-4 space-y-4">
+          <form
+            onSubmit={submitKeyForm}
+            className={`${SPACING.group.top} flex flex-col ${SPACING.group.gap}`}
+          >
             <input
               type="hidden"
               name="providerId"
@@ -419,7 +424,7 @@ export function ConnectionsPanel({
                 was not created.
               </p>
             ) : null}
-            <div className="flex flex-wrap gap-2 pt-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
                 variant="ghost"
@@ -449,6 +454,6 @@ export function ConnectionsPanel({
           </form>
         </Modal>
       ) : null}
-    </div>
+    </Group>
   );
 }

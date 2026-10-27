@@ -4,6 +4,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { loginHref } from "@/lib/platform-api";
 import { tryAgainIn } from "@/lib/retry-after";
+import { PAGE_CARD, SPACING } from "@/lib/spacing";
+
+/** The notice's card: the page card's padding, `group` under the page's top. */
+const NOTICE = `bubble mx-auto ${SPACING.group.top} flex max-w-lg flex-col ${SPACING.inner.gap} ${PAGE_CARD}`;
 
 /**
  * What the account area shows when the platform refused or could not answer —
@@ -38,7 +42,7 @@ export function PlatformUnavailable({
     <section
       role="alert"
       aria-labelledby="platform-unavailable-title"
-      className="bubble mx-auto mt-10 flex max-w-lg flex-col gap-2 p-6 sm:p-8"
+      className={NOTICE}
     >
       <h1
         id="platform-unavailable-title"
@@ -78,7 +82,7 @@ export function SessionEnded() {
     <section
       role="alert"
       aria-labelledby="session-ended-title"
-      className="bubble mx-auto mt-10 flex max-w-lg flex-col gap-2 p-6 sm:p-8"
+      className={NOTICE}
     >
       <h1
         id="session-ended-title"

@@ -5,9 +5,11 @@
  * platform publishes the names and numbers
  * (`lib/generated/platform-contracts/block-rules.ts`); Tailwind reads class
  * names from the source, so each is written out whole here, and
- * `test/spacing.test.mjs` proves every one equals its number. No screen types
- * its own spacing: the parts below carry it, and the spacing check fails on a
- * padding, margin or gap class that is not one of these.
+ * `test/spacing.test.mjs` proves every one equals its number. The parts
+ * carry them (`Group`, `SectionTitle`, `SectionCard`, `PageRow`, `Tile`), and
+ * the spacing check fails on a padding, margin or gap class that is not one
+ * of these — but for older ones outside app/account, counted in
+ * `test/spacing-baseline.json` — and on a band or a title typed by hand.
  *
  * Pure, and loaded by its unit test as it is: no React and no `@/` import.
  */
@@ -61,12 +63,15 @@ export const NONE = [
   "m-0",
   "gap-0",
   "lg:mb-0",
+  "group-first/row:pt-0",
 ] as const;
 
 /** The page's edge, a phone's then a wide screen's. */
 export const EDGE = `${SPACING.edge.x} ${SPACING.edgeWide.x}`;
 /** A band of a page card between dividers: `group` above and below, none above the first. */
 export const GROUP_BAND = `${SPACING.group.y} first:pt-0`;
+/** A band inside a row that animates away (Needs review): the same, none above the first row. */
+export const ROW_BAND = `${SPACING.group.y} group-first/row:pt-0`;
 /** A row: its padding, and at least 44 tall. */
 export const ROW = `${SPACING.rowX.x} ${SPACING.rowY.y} ${SPACING.rowMinHeight.min}`;
 /** Inside a card. */

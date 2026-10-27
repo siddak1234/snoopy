@@ -7,6 +7,7 @@ import { fileViewHref, runFilePath, runFileRows } from "@/lib/run-files";
 import { runLabel } from "@/lib/run-progress";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 import { readRunPage } from "../../run-page-data";
+import { Group } from "@/components/dashboard/Group";
 
 /**
  * One of a job's uploaded files (Round 19, build 28; the owner's item 7: "a
@@ -44,13 +45,13 @@ export default async function RunFilePage(
       subheader={run.title ?? runLabel(run.id)}
       back={<BackLink href={`/account/runs/${encodeURIComponent(run.id)}`} />}
     >
-      <div className="py-4 first:pt-0">
+      <Group>
         <FileView
           file={file}
           viewHref={fileViewHref(page)}
           linkPath={`/v1/workspaces/${encodeURIComponent(workspaceId)}/runs/${encodeURIComponent(run.id)}/files/${encodeURIComponent(file.id)}`}
         />
-      </div>
+      </Group>
     </SectionCard>
   );
 }

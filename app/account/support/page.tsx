@@ -1,6 +1,7 @@
 import SectionCard from "@/components/dashboard/SectionCard";
 import { site } from "@/lib/site";
 import { Button } from "@/components/ui/Button";
+import { Group } from "@/components/dashboard/Group";
 
 /**
  * Where a signed-in person finds help, and where Intuit's app review is
@@ -19,7 +20,7 @@ export default function AccountSupportPage() {
         </Button>
       }
     >
-      <div className="py-4 first:pt-0">
+      <Group>
         <p className="text-sm text-[var(--muted)]">
           For help, email{" "}
           <a
@@ -30,7 +31,7 @@ export default function AccountSupportPage() {
           </a>
           .
         </p>
-      </div>
+      </Group>
     </SectionCard>
   );
 }

@@ -25,6 +25,7 @@ import {
 } from "@/lib/flow-items";
 import { createItem } from "./actions";
 import { RunFileField } from "./RunFileField";
+import { SPACING } from "@/lib/spacing";
 
 /** Under a field the platform refused. */
 const CHECK_THIS = "Check this value.";
@@ -276,7 +277,10 @@ function SelectField({
         </div>
       ) : null}
       {error ? (
-        <p className="mt-1 text-sm text-[var(--error-text)]" role="alert">
+        <p
+          className={`${SPACING.inner.top} text-sm text-[var(--error-text)]`}
+          role="alert"
+        >
           {error}
         </p>
       ) : null}

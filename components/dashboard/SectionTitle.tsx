@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 
 /** A title's small capitals: every heading over a page's parts. */
 export const TITLE =
@@ -15,14 +15,29 @@ export function SectionTitle({
   id,
   testId,
   as: Tag = "h2",
+  tabIndex,
+  quietFocus = false,
+  ref,
 }: {
   children: ReactNode;
   id?: string;
   testId?: string;
   as?: "h2" | "h3";
+  /** -1: a title the page moves focus to (Steps, Ask to join). */
+  tabIndex?: number;
+  /** No focus ring when the page moves focus to it. */
+  quietFocus?: boolean;
+  /** The heading itself: a page that moves focus to it. */
+  ref?: Ref<HTMLHeadingElement>;
 }) {
   return (
-    <Tag id={id} data-testid={testId} className={TITLE}>
+    <Tag
+      ref={ref}
+      id={id}
+      data-testid={testId}
+      tabIndex={tabIndex}
+      className={quietFocus ? `${TITLE} focus:outline-none` : TITLE}
+    >
       {children}
     </Tag>
   );

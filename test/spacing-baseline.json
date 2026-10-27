@@ -1,88 +1,9 @@
 {
   "about": "Each source under components/ and app/account, and the spacing classes in it that are not the table's (lib/spacing.ts), counted: the classes written before the table (Round 21, v2), which may only go down. A source not named here uses the table's classes alone. Lower a count when a class goes; never raise one.",
   "files": {
-    "app/account/approvals/ApprovalDecision.tsx": {
-      "group-first/row:pt-0": 1,
-      "mt-1": 1
-    },
-    "app/account/billing/BillingPanel.tsx": {
-      "gap-1": 2,
-      "pt-3": 1,
-      "px-2.5": 1,
-      "py-0.5": 1
-    },
-    "app/account/connections/ConnectionsPanel.tsx": {
-      "mt-1": 2,
-      "mt-3": 1,
-      "pb-3": 1,
-      "pt-2": 1,
-      "space-y-4": 1
-    },
-    "app/account/error.tsx": {
-      "mt-10": 1,
-      "p-6": 1,
-      "sm:p-8": 1
-    },
-    "app/account/flows/AutomationActions.tsx": {
-      "mt-1": 1
-    },
-    "app/account/flows/ManifestFields.tsx": {
-      "ml-2": 1,
-      "mt-1": 2,
-      "space-y-4": 2
-    },
-    "app/account/flows/RunFileField.tsx": {
-      "mt-1": 2
-    },
-    "app/account/flows/UploadItemCard.tsx": {
-      "mt-1": 1
-    },
-    "app/account/flows/VendorRows.tsx": {
-      "pb-3": 1,
-      "pt-3": 1,
-      "px-2": 4
-    },
-    "app/account/flows/WebhookAddressButton.tsx": {
-      "mt-1": 2,
-      "p-3": 1
-    },
-    "app/account/flows/[subscriptionId]/email/EmailRecipientsForm.tsx": {
-      "mt-1": 2
-    },
-    "app/account/flows/[subscriptionId]/items/[itemId]/ItemLive.tsx": {
-      "mt-1": 1
-    },
-    "app/account/flows/[subscriptionId]/page.tsx": {
-      "px-2": 2
-    },
-    "app/account/flows/[subscriptionId]/setup/SetupForm.tsx": {
-      "gap-6": 2,
-      "mb-1": 1,
-      "space-y-4": 1
-    },
-    "app/account/flows/page.tsx": {
-      "mt-1": 1,
-      "p-5": 1,
-      "pt-3": 1
-    },
-    "app/account/organization/page.tsx": {
-      "gap-1": 4,
-      "pt-0.5": 2,
-      "pt-1": 1,
-      "sm:gap-4": 4,
-      "space-y-3": 1
-    },
-    "app/account/runs/[runId]/CancelRunButton.tsx": {
-      "mt-1": 1
-    },
-    "app/account/runs/[runId]/RunLive.tsx": {
-      "mt-0.5": 1
-    },
     "components/account/LinkedAccountsSection.tsx": {
-      "mt-1": 1,
       "px-3": 1,
-      "py-1.5": 1,
-      "space-y-2": 1
+      "py-1.5": 1
     },
     "components/auth/OAuthButtons.tsx": {
       "gap-3": 1
@@ -103,9 +24,6 @@
     "components/dashboard/DeleteProjectButton.tsx": {
       "px-2": 1,
       "py-1.5": 1
-    },
-    "components/dashboard/EmptyRow.tsx": {
-      "py-5": 1
     },
     "components/dashboard/LeaveProjectButton.tsx": {
       "mt-1": 1,
@@ -144,11 +62,6 @@
     "components/dashboard/OrgNameEditor.tsx": {
       "px-2": 1,
       "py-1": 1
-    },
-    "components/dashboard/PlatformUnavailable.tsx": {
-      "mt-10": 2,
-      "p-6": 2,
-      "sm:p-8": 2
     },
     "components/dashboard/ProjectList.tsx": {
       "pt-1": 1,

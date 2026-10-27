@@ -140,16 +140,16 @@ export async function listArchivedSubscriptions(
 }
 
 /**
- * The workspace's jobs, newest first: with no search, filter, sort or page,
- * today's newest 100; with any (Activity's `runsQuery`), one page of 25 and
- * `total` (backend ADR-0048 amendment 1).
+ * The workspace's jobs, newest first: with no query (Home), today's newest
+ * 100; with Activity's query (`runsQuery`, which always sends a sort and a
+ * page), one page of 25 and `total` (backend ADR-0048 amendment 1).
  */
 export function listRuns(
   workspaceId: string,
-  query: ActivityQuery = {},
+  query?: ActivityQuery,
 ): Promise<ListRunsResponse> {
   return platformServerJson<ListRunsResponse>(
-    `${scope(workspaceId)}/runs${runsQuery(query)}`,
+    `${scope(workspaceId)}/runs${query ? runsQuery(query) : ""}`,
   );
 }
 
