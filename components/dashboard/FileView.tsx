@@ -14,9 +14,11 @@ export const DOWNLOAD = "Download";
 /**
  * An uploaded file on its own page (Round 19, build 28; the owner's items 4
  * and 7: "the original document downloadable", "download and share like
- * other documents"): the file itself, in a frame of the page's own route
- * (`viewHref`, `lib/file-view.ts`) when a browser draws it — a PDF, a JPEG
- * or a PNG — else "Download it to open it."; its name and its line (format,
+ * other documents"): the file itself, in a frame of its bytes, read once
+ * from the page's own route (`viewHref`, `lib/file-view.ts`, through
+ * `usePageFile`), or of the route itself when that read fails, when a browser
+ * draws it — a PDF, a JPEG or a PNG — else "Download it to open it."; its
+ * name and its line (format,
  * pages, size); then Download — the platform's signed link, asked when
  * pressed through `/api/platform` (`linkPath`) and followed only when https
  * (`followSignedLink`), an attachment, so no page is left — and Share, where
@@ -89,7 +91,9 @@ export function FileView({
             ? {
                 filename: file.filename,
                 contentType: file.contentType,
-                held: page.held,
+                // The frame's bytes under the file's own name: the route's
+                // header-safe name would turn "résumé" into "r-sum-".
+                held: page.held && { blob: page.held.blob },
               }
             : {
                 filename: file.filename,

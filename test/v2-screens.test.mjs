@@ -398,7 +398,19 @@ test("F4: Share sends the file itself, a File of its bytes and type — never a 
     view,
     /const page = usePageFile\(inPlace \? viewHref : null\);/u,
   );
-  assert.match(view, /held: page\.held,/u);
+  // A file page shares under the file's own name, never the route's
+  // header-safe one ("Ada Lane résumé.pdf", not "Ada-Lane-r-sum-.pdf").
+  assert.match(view, /held: page\.held && \{ blob: page\.held\.blob \},/u);
+  assert.equal(
+    (
+      await readShareFile({
+        filename: "Ada Lane résumé.pdf",
+        contentType: "application/pdf",
+        held: { blob: bytes },
+      })
+    ).name,
+    "Ada Lane résumé.pdf",
+  );
   assert.match(
     view,
     /read: async \(\) => \(\{ blob: await siteFileBlob\(viewHref\) \}\)/u,
