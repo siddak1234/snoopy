@@ -1951,6 +1951,18 @@ test.describe("the image block (Round 21 v2)", () => {
     page,
   }) => {
     const views = viewReads(page);
+    // Every object URL the page lets go, as the page itself calls it: WebKit
+    // still answers a fetch of a released blob: URL for a while, so the
+    // release is read where it happens, not from a later fetch.
+    await page.addInitScript(() => {
+      const released: string[] = [];
+      const revoke = URL.revokeObjectURL.bind(URL);
+      (window as unknown as { released: string[] }).released = released;
+      URL.revokeObjectURL = (url: string) => {
+        released.push(url);
+        revoke(url);
+      };
+    });
     await page.goto("/account/runs/blocks-drawn-image");
     const picture = page.getByTestId("block-image");
     const image = picture.locator("img");
@@ -1974,16 +1986,13 @@ test.describe("the image block (Round 21 v2)", () => {
     const objectUrl = await image.getAttribute("src");
     await image.click();
     await expect(page).toHaveURL(new RegExp(`${filePage}$`, "u"));
-    expect(
-      await page.evaluate(async (url) => {
-        try {
-          await (await fetch(url)).blob();
-          return true;
-        } catch {
-          return false;
-        }
-      }, objectUrl ?? ""),
-    ).toBe(false);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => (window as unknown as { released: string[] }).released,
+        ),
+      )
+      .toContain(objectUrl);
     await page.goto("/account/runs/blocks-drawn-image-pdf");
     const frame = page.locator('iframe[data-testid="block-image"]');
     await expect(frame).toHaveAttribute("title", "The scanned delivery note");
