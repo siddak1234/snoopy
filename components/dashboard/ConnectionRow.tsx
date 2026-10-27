@@ -12,7 +12,7 @@ import { brandMark } from "@/lib/brand-logos";
  * buttons and such"): the vendor's mark at 24 × 24 · its name · under it one
  * short line — the account's email, or its state — and on the right one
  * thing: our own button, a check, a caret, or nothing. At least 64 tall for
- * every provider (`CONNECTION_ROW`). The app's `components/connection-row.tsx`
+ * every provider (`CONNECTION_ROW`). The app's `snoopy-mobile/components/connection-row.tsx`
  * on the website.
  *
  * Used on Connections, on a flow page's integration and email rows, on Set up,
@@ -23,7 +23,7 @@ import { brandMark } from "@/lib/brand-logos";
 
 /** The row's box: the same least height, gap and padding for every provider. */
 export const CONNECTION_ROW =
-  "flex min-h-16 w-full items-center gap-3 py-3 text-left";
+  "flex min-h-16 w-full items-center gap-2 py-3 text-left";
 
 /**
  * A vendor's mark at 24 × 24 (the session's S12): QuickBooks' round symbol,

@@ -168,8 +168,8 @@ export function WebhookAddressButton({
               This flow has no address yet.
             </p>
           ) : null}
-          <FormError message={error} className="mt-3" />
-          <div className="mt-6 flex flex-wrap gap-2">
+          <FormError message={error} className="mt-2" />
+          <div className="mt-4 flex flex-wrap gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -189,7 +189,7 @@ export function WebhookAddressButton({
             ) : null}
           </div>
           {endpoint ? (
-            <p className="mt-3 text-xs text-[var(--muted)]">
+            <p className="mt-2 text-xs text-[var(--muted)]">
               A new secret keeps the address and stops the old secret at once.
             </p>
           ) : null}

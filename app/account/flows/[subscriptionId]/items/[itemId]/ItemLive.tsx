@@ -118,7 +118,7 @@ export function ItemLive({
       subheader={itemSubheader(item, declared.groupField)}
       back={<BackLink href={flowPath(subscriptionId)} />}
     >
-      <div className="py-5 first:pt-0">
+      <div className="py-4 first:pt-0">
         <BlockList
           blocks={detail.blocks}
           testId="item-blocks"
@@ -147,7 +147,7 @@ export function ItemLive({
       </div>
 
       {canManage && !archived ? (
-        <div className="py-5">
+        <div className="py-4">
           <ArchiveItem
             workspaceId={workspaceId}
             subscriptionId={subscriptionId}
@@ -238,7 +238,7 @@ function ArchiveItem({
             {inSentence(runsWord)} stay.
           </p>
           <FormError message={error} />
-          <div className="mt-6 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             <Button
               type="button"
               variant="ghost"

@@ -203,7 +203,7 @@ function ManifestFieldInput({
         />
         <label
           htmlFor={fieldId}
-          className="flex items-start gap-3 text-sm text-[var(--text)]"
+          className="flex items-start gap-2 text-sm text-[var(--text)]"
         >
           <input
             id={fieldId}

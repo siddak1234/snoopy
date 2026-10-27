@@ -140,7 +140,7 @@ export default async function FlowsPage() {
             key={id}
             aria-labelledby={id}
             data-testid="flows-department"
-            className="py-5 first:pt-0"
+            className="py-4 first:pt-0"
           >
             <h2
               id={id}
@@ -148,7 +148,7 @@ export default async function FlowsPage() {
             >
               {department}
             </h2>
-            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <div className="mt-2 grid gap-4 sm:grid-cols-2">
               {entries.map((automation) => (
                 <AutomationCard
                   key={`${automation.templateId}.v${automation.version}`}
@@ -164,14 +164,14 @@ export default async function FlowsPage() {
       )}
 
       {archived.length > 0 ? (
-        <div className="border-t border-[var(--ring)] py-5">
+        <div className="border-t border-[var(--ring)] py-4">
           <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
             Archived flows
           </h2>
           <p className="mt-1 text-xs text-[var(--muted)]">
             An archived flow keeps its history here. Unarchive it any time.
           </p>
-          <ul className="mt-3 divide-y divide-[var(--ring)]">
+          <ul className="mt-2 divide-y divide-[var(--ring)]">
             {archived.map((subscription) => {
               const entry = catalogEntry.get(subscription.templateId);
               const name =
@@ -246,8 +246,8 @@ function AutomationCard({
   const held = heldCopy(subscriptions, automation.templateId);
 
   return (
-    <div className="bubble flex flex-col gap-3 p-5">
-      <div className="flex items-start justify-between gap-3">
+    <div className="bubble flex flex-col gap-2 p-5">
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           {/* Its department is its group's header (build 28's item 1). */}
           <h3
@@ -284,7 +284,7 @@ function AutomationCard({
           tabIndex={-1}
           className="flex flex-col gap-2 border-t border-[var(--ring)] pt-3"
         >
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-[var(--muted)]">{place(subscription)}</p>
             <StatusPill status={subscription.status} />
           </div>

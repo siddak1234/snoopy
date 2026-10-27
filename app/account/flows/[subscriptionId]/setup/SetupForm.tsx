@@ -171,7 +171,7 @@ export function SetupForm({
   };
 
   return (
-    <div className="flex flex-col gap-6 py-5 first:pt-0">
+    <div className="flex flex-col gap-6 py-4 first:pt-0">
       {callbackStatus === "connected" ? (
         <p role="status" className="text-sm text-[var(--success-text)]">
           Connection completed successfully.

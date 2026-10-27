@@ -296,7 +296,7 @@ export default async function FlowPage(
   // Start run that fails at once.
   const notResponding =
     !available && entry ? (
-      <p className="mt-3 text-xs text-[var(--warning-text)]">
+      <p className="mt-2 text-xs text-[var(--warning-text)]">
         This flow is not responding, so it cannot run yet.
       </p>
     ) : null;
@@ -304,7 +304,7 @@ export default async function FlowPage(
   // Step 1: the run's fields and Start run, or Turn on while the flow is off;
   // and what it is owed, each a link to where it is fixed.
   const stepOne = (
-    <div id="run" className="mt-3 flex scroll-mt-6 flex-col gap-3">
+    <div id="run" className="mt-2 flex scroll-mt-6 flex-col gap-2">
       <RunStart
         workspaceId={workspaceId}
         subscriptionId={subscription.id}
@@ -376,7 +376,7 @@ export default async function FlowPage(
         <section
           key="dashboard"
           aria-labelledby="flow-dashboard-title"
-          className="py-5 first:pt-0"
+          className="py-4 first:pt-0"
         >
           <h2
             id="flow-dashboard-title"
@@ -397,7 +397,7 @@ export default async function FlowPage(
         <section
           key="steps"
           aria-labelledby="flow-steps-title"
-          className="py-5"
+          className="py-4"
         >
           <h2
             id="flow-steps-title"
@@ -408,7 +408,7 @@ export default async function FlowPage(
           </h2>
           {notResponding}
           {plan.length === 0 ? stepOne : null}
-          <ol className="mt-3 flex flex-col divide-y divide-[var(--ring)]">
+          <ol className="mt-2 flex flex-col divide-y divide-[var(--ring)]">
             {plan.map((row) => (
               <li
                 key={row.id}
@@ -438,7 +438,7 @@ export default async function FlowPage(
               when there is one of them to say and no Steps say it. */}
           {!parts.includes("steps") &&
           (!live || owed.length > 0 || notResponding) ? (
-            <div className="py-5 first:pt-0">
+            <div className="py-4 first:pt-0">
               {notResponding}
               {stepOne}
             </div>
@@ -455,7 +455,7 @@ export default async function FlowPage(
         </div>
       );
     return (
-      <div key={`unknown-${at}`} className="py-5 first:pt-0">
+      <div key={`unknown-${at}`} className="py-4 first:pt-0">
         <Fallback />
       </div>
     );
@@ -470,7 +470,7 @@ export default async function FlowPage(
     >
       {parts.map(part)}
 
-      <div className="py-5">
+      <div className="py-4">
         <AutomationActions
           workspaceId={workspaceId}
           name={name}

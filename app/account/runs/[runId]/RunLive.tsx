@@ -2,18 +2,18 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { DownloadSimpleIcon } from "@phosphor-icons/react/dist/ssr/DownloadSimple";
 import { FileTextIcon } from "@phosphor-icons/react/dist/ssr/FileText";
 import { FlowArrowIcon } from "@phosphor-icons/react/dist/ssr/FlowArrow";
 import { BlockList } from "@/components/blocks/BlockList";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { BackLink } from "@/components/dashboard/BackLink";
+import { FileActions } from "@/components/dashboard/FileActions";
 import { PageRow } from "@/components/dashboard/PageRow";
+import { RunScore } from "@/components/dashboard/RunScore";
 import { Tile } from "@/components/dashboard/Tile";
 import { TrackerItem } from "@/components/dashboard/TrackerItem";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { Button } from "@/components/ui/Button";
-import { FormError } from "@/components/ui/FormError";
 import { ApprovalDecision } from "@/app/account/approvals/ApprovalDecision";
 import type {
   Approval,
@@ -25,7 +25,11 @@ import type {
 } from "@/lib/automations";
 import { formatDateTimeMediumUTC as formatWhen } from "@/lib/date";
 import { flowPath } from "@/lib/flow-steps";
-import { PlatformApiError, platformApiJson } from "@/lib/platform-api";
+import {
+  PlatformApiError,
+  platformApiJson,
+  siteFileNamed,
+} from "@/lib/platform-api";
 import {
   DOWNLOAD_EXCEL,
   DOWNLOAD_FAILED,
@@ -33,6 +37,7 @@ import {
   VIEW_PACKAGE,
   askPackageOnceMore,
   packageFileHref,
+  shareHref,
 } from "@/lib/run-documents";
 import {
   BLOCKS_SHAPE,
@@ -51,6 +56,7 @@ import {
   type ProgressGroup,
   type TrackerFlow,
 } from "@/lib/run-progress";
+import { verdictChip, type VerdictNames } from "@/lib/run-verdict";
 import { followSignedLink } from "@/lib/signed-link";
 import type { WorkspaceRole } from "@/lib/tenancy";
 import { CancelRunButton } from "./CancelRunButton";
@@ -73,6 +79,8 @@ export type RunFlow = {
   name: string;
   /** The file fields of the version the flow runs, in order: what names a run's files ("Resume"). */
   fileFields?: { control: string; title: string }[];
+  /** What the flow calls its verdicts ("Advance", "Decline"): the score's chip (`verdictChip`). */
+  verdictNames?: VerdictNames;
   pipeline: DeclaredStep[];
   groups?: ProgressGroup[];
   tracker?: TrackerFlow;
@@ -242,8 +250,8 @@ export function RunLive({
         back={<BackLink href={`/account/runs/${encodeURIComponent(run.id)}`} />}
         primaryAction={<StatusPill status={run.status} />}
       >
-        <div className="py-5 first:pt-0">
-          <dl className="grid grid-cols-2 gap-3 sm:max-w-sm">
+        <div className="py-4 first:pt-0">
+          <dl className="grid grid-cols-2 gap-2 sm:max-w-sm">
             <Tile
               label="Duration"
               value={runDuration(run.startedAt, run.endedAt)}
@@ -257,7 +265,7 @@ export function RunLive({
           </dl>
         </div>
 
-        <section aria-labelledby="run-steps-title" className="py-5">
+        <section aria-labelledby="run-steps-title" className="py-4">
           <h2
             id="run-steps-title"
             className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
@@ -271,8 +279,8 @@ export function RunLive({
           </ol>
         </section>
 
-        <div className="py-5">
-          <dl className="grid gap-3 sm:grid-cols-2">
+        <div className="py-4">
+          <dl className="grid gap-2 sm:grid-cols-2">
             {facts.map((fact) => (
               <div key={fact.label}>
                 <dt className="text-xs text-[var(--muted)]">{fact.label}</dt>
@@ -297,14 +305,11 @@ export function RunLive({
       back={<BackLink href="/account/runs" />}
       primaryAction={
         <>
-          {headed ? (
-            <span
-              data-testid="run-score"
-              className="text-3xl font-medium text-[var(--text)]"
-            >
-              <span className="sr-only">Score </span>
-              {run.score}
-            </span>
+          {headed && run.score !== undefined ? (
+            <RunScore
+              score={run.score}
+              chip={verdictChip(run.verdict, flow?.verdictNames)}
+            />
           ) : null}
           <StatusPill status={run.status} />
         </>
@@ -312,7 +317,7 @@ export function RunLive({
     >
       {/* The body, as the platform sent it: the run's files, its result
           line and what is to decide, then what it read (ADR-0048). */}
-      <div className="py-5 first:pt-0">
+      <div className="py-4 first:pt-0">
         <BlockList
           blocks={detail.blocks}
           testId="run-blocks"
@@ -341,20 +346,20 @@ export function RunLive({
         />
       </div>
 
-      <div className="py-5 first:pt-0">
+      <div className="py-4 first:pt-0">
         {/* Every run's, whatever its flow (build 28, item 9): the steps and
             the facts on a page of their own. */}
         {/* The package's three first, then Run details, directly over
             Cancel run and View flow (build 28's review, finding 2). */}
         {detail.packageAvailable === true ? (
-          <div className="mb-5 flex flex-wrap items-center gap-2">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
             <PackageActions workspaceId={workspaceId} runId={run.id} view />
           </div>
         ) : null}
         <PageRow href={runDetailsPath(run.id)} testId="run-details-row">
           <span className="font-medium text-[var(--text)]">{RUN_DETAILS}</span>
         </PageRow>
-        <div className="mt-5 flex flex-wrap items-center gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           {/* Only the two states the platform cancels; any other answers 404. */}
           {going ? (
             <CancelRunButton runId={run.id} workspaceId={run.workspaceId} />
@@ -420,7 +425,8 @@ function createPackageFile(
 
 /**
  * The run package's buttons (Build 24, P12; the owner's build 23 words): View
- * package — on the run page — and Download PDF and Download Excel, on both. A
+ * package — on the run page — and Download PDF and Download Excel, on both,
+ * then Share, the PDF itself (`FileActions`; the owner's F4 and Q7). A
  * download goes to the file's signed link, which saves it (an attachment; no
  * page is left and nothing crosses origins); a refusal is said under the row,
  * and so is a link that is not https, which is never followed
@@ -436,57 +442,46 @@ export function PackageActions({
   /** Whether to offer View package too: the run page's row. */
   view: boolean;
 }) {
-  const [busy, setBusy] = useState<PackageFormat | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const download = async (format: PackageFormat) => {
-    if (busy) return;
-    setBusy(format);
-    setError(null);
+  const download = (format: PackageFormat) => async () => {
     try {
       const file = await createPackageFile(workspaceId, runId, format);
-      if (!followSignedLink(file.downloadUrl)) setError(DOWNLOAD_FAILED);
+      return followSignedLink(file.downloadUrl) ? null : DOWNLOAD_FAILED;
     } catch {
-      setError(DOWNLOAD_FAILED);
-    } finally {
-      setBusy(null);
+      return DOWNLOAD_FAILED;
     }
   };
   return (
-    <>
-      {view ? (
-        <Button
-          href={`/account/runs/${encodeURIComponent(runId)}/package`}
-          variant="secondary"
-          size="sm"
-          prefetch={false}
-          className="inline-flex items-center gap-2"
-        >
-          <FileTextIcon size={20} aria-hidden />
-          {VIEW_PACKAGE}
-        </Button>
-      ) : null}
-      <Button
-        variant="secondary"
-        size="sm"
-        disabled={busy !== null}
-        onClick={() => void download("pdf")}
-        className="inline-flex items-center gap-2"
-      >
-        <DownloadSimpleIcon size={20} aria-hidden />
-        {DOWNLOAD_PDF}
-      </Button>
-      <Button
-        variant="secondary"
-        size="sm"
-        disabled={busy !== null}
-        onClick={() => void download("xlsx")}
-        className="inline-flex items-center gap-2"
-      >
-        <DownloadSimpleIcon size={20} aria-hidden />
-        {DOWNLOAD_EXCEL}
-      </Button>
-      <FormError message={error} className="order-last basis-full" />
-    </>
+    <FileActions
+      testId="package-actions"
+      before={
+        view ? (
+          <Button
+            href={`/account/runs/${encodeURIComponent(runId)}/package`}
+            variant="secondary"
+            size="sm"
+            prefetch={false}
+            className="inline-flex items-center gap-2"
+          >
+            <FileTextIcon size={20} aria-hidden />
+            {VIEW_PACKAGE}
+          </Button>
+        ) : null
+      }
+      downloads={[
+        { label: DOWNLOAD_PDF, run: download("pdf") },
+        { label: DOWNLOAD_EXCEL, run: download("xlsx") },
+      ]}
+      // Share: the package's PDF itself, its bytes read through this site's
+      // own route — never the signed link.
+      share={{
+        filename: `${runLabel(runId)}.pdf`,
+        contentType: "application/pdf",
+        read: () =>
+          siteFileNamed(
+            shareHref({ runId, format: "pdf", timeZone: browserTimeZone() }),
+          ),
+      }}
+    />
   );
 }
 

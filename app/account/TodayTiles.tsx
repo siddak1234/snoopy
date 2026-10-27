@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Tile } from "@/components/dashboard/Tile";
 import type { RunStats } from "@/lib/automations";
 import { localMidnight, todayHref } from "@/lib/flow-steps";
 import { platformApiJson } from "@/lib/platform-api";
+import { SPACING } from "@/lib/spacing";
 
 /** The tiles' words: the app's TODAY (its `toStatTiles`), and its unreadable figure. */
 const TILES = [
@@ -69,40 +70,37 @@ export function TodayTiles({ workspaceId }: { workspaceId: string }) {
     return (
       <p
         data-testid="home-stats-unavailable"
-        className="mt-3 rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--muted)]"
+        className={`rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)] ${SPACING.rowX.x} ${SPACING.rowY.y} text-sm text-[var(--muted)]`}
       >
         {TODAY_UNAVAILABLE}
       </p>
     );
 
   return (
-    <div data-testid="home-stats" className="mt-3 grid grid-cols-3 gap-3">
+    <div
+      data-testid="home-stats"
+      className={`grid grid-cols-3 ${SPACING.inner.gap}`}
+    >
       {TILES.map((tile) => {
         const value = stats === null ? "—" : String(stats[tile.count]);
         const quiet = stats === null;
         return (
-          <Link
+          <Tile
             key={tile.label}
-            prefetch={false}
+            label={tile.label}
+            value={value}
+            testId={`today-stat-${tile.label}`}
+            linkTestId={`today-${tile.label}`}
+            tone={
+              quiet ? "text-[var(--muted)]" : tile.tone || "text-[var(--text)]"
+            }
             href={
               since
                 ? todayHref(since, "outcome" in tile ? tile.outcome : undefined)
                 : "/account/runs"
             }
-            data-testid={`today-${tile.label}`}
-            className="flex flex-col gap-1 rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)] px-4 py-3 transition hover:bg-[var(--surface-hover)]"
-          >
-            <span
-              data-testid={`today-stat-${tile.label}`}
-              className={`text-2xl font-medium ${quiet ? "text-[var(--muted)]" : tile.tone || "text-[var(--text)]"}`}
-            >
-              {value}
-            </span>
-            <span className="text-xs text-[var(--muted)]">
-              {tile.label}
-              <span className="sr-only">, see these runs in Activity</span>
-            </span>
-          </Link>
+            hint=", see these runs in Activity"
+          />
         );
       })}
     </div>

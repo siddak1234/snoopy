@@ -56,7 +56,7 @@ export default async function RunPackagePage(
       }
     >
       {ready ? (
-        <div className="py-5 first:pt-0">
+        <div className="py-4 first:pt-0">
           <PackageFrame runId={job} />
         </div>
       ) : (

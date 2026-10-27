@@ -235,7 +235,7 @@ export function ConnectionsPanel({
     );
 
   return (
-    <div className="py-5 first:pt-0">
+    <div className="py-4 first:pt-0">
       {callbackStatus === "connected" ? (
         <p role="status" className="mb-4 text-sm text-[var(--success-text)]">
           Connection completed successfully.
@@ -318,7 +318,7 @@ export function ConnectionsPanel({
         </ul>
       )}
       {canManage || providers.length === 0 ? null : (
-        <p className="mt-3 text-sm text-[var(--muted)]">
+        <p className="mt-2 text-sm text-[var(--muted)]">
           {CONNECTIONS_MANAGED_BY}
         </p>
       )}
@@ -347,7 +347,7 @@ export function ConnectionsPanel({
             )}
           </p>
           <FormError message={disconnectError} className="mt-3" />
-          <div className="mt-6 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -388,7 +388,7 @@ export function ConnectionsPanel({
           >
             Provide the connection details supplied by this provider.
           </p>
-          <form onSubmit={submitKeyForm} className="mt-6 space-y-4">
+          <form onSubmit={submitKeyForm} className="mt-4 space-y-4">
             <input
               type="hidden"
               name="providerId"

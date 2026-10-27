@@ -42,7 +42,7 @@ export default async function AccountSettingsPage() {
 
   return (
     <SectionCard title="Settings">
-      <div className="py-5 first:pt-0">
+      <div className="py-4 first:pt-0">
         <p className="text-sm text-[var(--muted)]">
           Account and workspace settings. Connected accounts for flows are on
           the Connections page.
@@ -51,7 +51,7 @@ export default async function AccountSettingsPage() {
       <LinkedAccountsSection />
 
       {showOrgCreate ? (
-        <div className="border-t border-[var(--ring)] py-5">
+        <div className="border-t border-[var(--ring)] py-4">
           <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
             Create organization workspace
           </h2>
@@ -67,14 +67,14 @@ export default async function AccountSettingsPage() {
           </div>
         </div>
       ) : showOrgLink ? (
-        <div className="border-t border-[var(--ring)] py-5">
+        <div className="border-t border-[var(--ring)] py-4">
           <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
             Organization
           </h2>
           <p className="mt-2 text-sm text-[var(--muted)]">
             You belong to an organization workspace.
           </p>
-          <div className="mt-3">
+          <div className="mt-2">
             <Link
               prefetch={false}
               href="/account/organization"
@@ -91,7 +91,7 @@ export default async function AccountSettingsPage() {
         workspaceId={workspaceId ?? ""}
       />
 
-      <div className="border-t border-[var(--ring)] pt-5">
+      <div className="border-t border-[var(--ring)] pt-4">
         <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Danger zone
         </h2>
@@ -99,7 +99,7 @@ export default async function AccountSettingsPage() {
           Permanently delete your account, your personal workspace, and every
           organization you alone own.
         </p>
-        <div className="mt-3">
+        <div className="mt-2">
           <DeleteAccountButton />
         </div>
       </div>

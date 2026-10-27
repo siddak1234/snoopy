@@ -71,7 +71,7 @@ function PlanCard({
       <p className="text-lg font-medium text-[var(--text)]">{name}</p>
       <p className="text-2xl font-semibold text-[var(--text)]">{price}</p>
       {children ? (
-        <div className="flex flex-col items-start gap-3 pt-3">{children}</div>
+        <div className="flex flex-col items-start gap-2 pt-3">{children}</div>
       ) : null}
     </li>
   );

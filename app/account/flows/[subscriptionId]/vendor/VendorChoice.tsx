@@ -124,7 +124,7 @@ export function VendorChoice({
   }, [callbackStatus, returnedFor, options]);
 
   return (
-    <div className="py-5 first:pt-0">
+    <div className="py-4 first:pt-0">
       {callbackStatus === "error" ? (
         <p role="alert" className="mb-4 text-sm text-[var(--error-text)]">
           The connection could not be completed. Try again or contact an owner.

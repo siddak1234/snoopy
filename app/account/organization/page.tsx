@@ -53,11 +53,11 @@ export default async function OrganizationPage() {
       title="Organization"
       subheader="Manage your organization settings and members."
     >
-      <div className="py-5 first:pt-0">
+      <div className="py-4 first:pt-0">
         <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Organization details
         </h2>
-        <dl className="mt-3 space-y-3 text-sm">
+        <dl className="mt-2 space-y-3 text-sm">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
             <dt className="w-20 shrink-0 text-[var(--muted)]">Name</dt>
             <dd>
@@ -99,7 +99,7 @@ export default async function OrganizationPage() {
         </dl>
       </div>
 
-      <div className="border-t border-[var(--ring)] py-5">
+      <div className="border-t border-[var(--ring)] py-4">
         <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Members
         </h2>
@@ -111,7 +111,7 @@ export default async function OrganizationPage() {
         />
       </div>
 
-      <div className="border-t border-[var(--ring)] py-5 pb-0">
+      <div className="border-t border-[var(--ring)] py-4 pb-0">
         <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Join requests
         </h2>

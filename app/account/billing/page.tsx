@@ -93,7 +93,7 @@ export default async function AccountBillingPage() {
 
   return (
     <SectionCard title="Billing">
-      <div className="py-5 first:pt-0">
+      <div className="py-4 first:pt-0">
         <BillingPanel
           workspaceId={workspaceId}
           billing={billing}

@@ -6,6 +6,7 @@ import { addMemberToProjectAction } from "@/app/account/teams/actions";
 import Modal from "@/components/ui/Modal";
 import { FormError } from "@/components/ui/FormError";
 import type { ProjectRole } from "@/lib/tenancy";
+import { Button } from "@/components/ui/Button";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -66,13 +67,9 @@ export function ProjectMemberPicker({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="btn-primary inline-flex !min-h-0 !px-4 !py-1.5 text-sm"
-      >
+      <Button type="button" onClick={() => setOpen(true)} size="sm">
         Add members
-      </button>
+      </Button>
 
       {open ? (
         <Modal
@@ -101,7 +98,7 @@ export function ProjectMemberPicker({
           ) : (
             <ul className="mt-4 max-h-80 divide-y divide-[var(--ring)] overflow-y-auto">
               {available.map((m) => (
-                <li key={m.userId} className="flex items-center gap-3 py-3">
+                <li key={m.userId} className="flex items-center gap-2 py-3">
                   {/* Name + email */}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-[var(--text)]">
@@ -138,28 +135,29 @@ export function ProjectMemberPicker({
                   </select>
 
                   {/* Add button */}
-                  <button
+                  <Button
                     type="button"
                     onClick={() => handleAdd(m.userId)}
                     disabled={!!addingUserId}
-                    className="btn-primary shrink-0 px-3 py-1 text-xs disabled:opacity-60"
+                    size="sm"
+                    className="shrink-0 disabled:opacity-60"
                   >
                     {addingUserId === m.userId ? "Adding…" : "Add"}
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
           )}
 
-          <div className="mt-5 flex justify-end">
-            <button
+          <div className="mt-4 flex justify-end">
+            <Button
               type="button"
               onClick={() => setOpen(false)}
               disabled={!!addingUserId}
-              className="btn-secondary inline-flex px-5"
+              variant="secondary"
             >
               Done
-            </button>
+            </Button>
           </div>
         </Modal>
       ) : null}

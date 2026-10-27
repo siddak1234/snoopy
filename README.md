@@ -93,7 +93,8 @@ the job reaches it while its page is open, as docs/ARCHITECTURE.md's "Screen
 standards" says; its body the platform's blocks
 (`shape=blocks`, backend ADR-0048), which the fixture builds by the
 platform's rules (`e2e/fixtures/page-bodies.ts`, held to the platform's
-bodies by `test/fixture-page-bodies.test.mjs`) and, for `blocks-{name}` runs,
+bodies by `test/fixture-page-bodies.test.mjs`; an item's runs searchable,
+each toned by its verdict, since block set 2) and, for `blocks-{name}` runs,
 serves as the platform's
 block fixtures hold them; each document it read a closed section of its own
 that opens in place, headed as "Screen standards" says; the
@@ -167,7 +168,7 @@ secret provisioning belongs to the deployment configuration round, not here.
 | `npm run test:contracts` | Public-contract and boundary behavior tests, and the common kit's own (`scripts/kit/kit.test.mjs`) |
 | `npm run check:docs` | Each changed area's doc changed with it, and each fact in one place (`docs/docs-map.json`) |
 | `npm run map` | Rebuild `docs/MAP.md` from the tree; `-- --check` fails when it is stale |
-| `npm run generate:platform-contracts` | Regenerate the typed client from `../snoopy-backend`'s published contracts |
+| `npm run generate:platform-contracts` | Regenerate the typed client from `../snoopy-backend`'s published contracts, its block fixtures and its block rules (`block-rules.ts`: the words, the spacing table and the search and sort cases) |
 | `npm run verify:platform-contracts` | Report a generated type that differs from its contract; changes nothing |
 | `npm run audit:boundaries` | Reject browser secrets, direct DB access, manual fetches, and raw hex colours |
 | `npm run test:browser` | Public accessibility in Chromium and Firefox (and WebKit in CI), and Chromium's visual baselines |

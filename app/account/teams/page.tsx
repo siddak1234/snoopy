@@ -82,14 +82,14 @@ export default async function AccountTeamsPage() {
               key={workspace.id}
               className={
                 index === 0
-                  ? "py-5 first:pt-0"
-                  : "border-t border-[var(--ring)] py-5"
+                  ? "py-4 first:pt-0"
+                  : "border-t border-[var(--ring)] py-4"
               }
             >
               <h2 className="text-sm font-medium text-[var(--text)]">
                 {workspace.type === "personal" ? "Personal" : workspace.name}
               </h2>
-              <div className="mt-3">
+              <div className="mt-2">
                 {mine.length === 0 ? (
                   <p className="text-sm text-[var(--muted)]">
                     You are not in a department here yet.
@@ -99,7 +99,7 @@ export default async function AccountTeamsPage() {
                 )}
               </div>
               {askable.length > 0 ? (
-                <div className="mt-5">
+                <div className="mt-4">
                   <h3
                     id={askHeadingId}
                     tabIndex={-1}

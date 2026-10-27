@@ -44,7 +44,7 @@ export default async function RunFilePage(
       subheader={run.title ?? runLabel(run.id)}
       back={<BackLink href={`/account/runs/${encodeURIComponent(run.id)}`} />}
     >
-      <div className="py-5 first:pt-0">
+      <div className="py-4 first:pt-0">
         <FileView
           file={file}
           viewHref={fileViewHref(page)}

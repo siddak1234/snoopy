@@ -209,8 +209,8 @@ export function ApprovalQueue({
         }`}
       >
         <div className="min-h-0 overflow-hidden">
-          <div className="flex flex-col gap-3 py-5 group-first/row:pt-0">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-2 py-4 group-first/row:pt-0">
+            <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-sm text-[var(--text)]">{approval.reason}</p>
                 <p
@@ -231,7 +231,7 @@ export function ApprovalQueue({
               </span>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <ApprovalDecision
                 approvalId={approval.id}
                 canDecide={canDecide}

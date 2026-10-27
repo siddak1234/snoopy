@@ -196,7 +196,7 @@ export default function LinkedAccountsSection() {
 
   if (state.loading) {
     return (
-      <div className="border-t border-[var(--ring)] pt-5">
+      <div className="border-t border-[var(--ring)] pt-4">
         <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
           Linked accounts
         </h2>
@@ -210,7 +210,7 @@ export default function LinkedAccountsSection() {
   // same-email join and the credentials sentence~~ (register F86) — linking
   // still works as it did; the line no longer explains it.
   return (
-    <div className="border-t border-[var(--ring)] pt-5">
+    <div className="border-t border-[var(--ring)] pt-4">
       <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
         Linked accounts
       </h2>
@@ -257,7 +257,7 @@ export default function LinkedAccountsSection() {
                 }`}
               >
                 <span
-                  className={`flex min-w-0 items-center gap-3 ${isLinked ? "opacity-75" : ""}`.trim()}
+                  className={`flex min-w-0 items-center gap-2 ${isLinked ? "opacity-75" : ""}`.trim()}
                 >
                   {/* The provider's own mark at 24, from the design's sign-in
                       glyphs (spec A5; the owner's build 20 item 8: "Rather
@@ -286,7 +286,7 @@ export default function LinkedAccountsSection() {
                     Primary
                   </span>
                 ) : isLinked ? (
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <span className="text-xs text-[var(--muted)] opacity-75">
                       Linked
                     </span>
@@ -347,7 +347,7 @@ export default function LinkedAccountsSection() {
             You can still sign in with your other linked accounts, and link this
             one again later.
           </p>
-          <div className="mt-6 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             <Button
               type="button"
               variant="ghost"

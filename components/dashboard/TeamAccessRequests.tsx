@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { decideTeamAccessAction } from "@/app/account/teams/actions";
 import { FormError } from "@/components/ui/FormError";
 import type { AccessRequest } from "@/lib/tenancy";
+import { Button } from "@/components/ui/Button";
 
 /**
  * Who is asking to join a team (BUILD-PLAN 24.11.11, backend 24.11.2), for those
@@ -38,21 +39,21 @@ export function TeamAccessRequests({
 
   if (pending.length === 0) {
     return (
-      <p className="mt-3 text-sm text-[var(--muted)]">
+      <p className="mt-2 text-sm text-[var(--muted)]">
         No one is asking to join.
       </p>
     );
   }
 
   return (
-    <div className="mt-3">
+    <div className="mt-2">
       <ul className="divide-y divide-[var(--ring)]">
         {pending.map((request) => {
           const busy = workingId === request.id;
           return (
             <li
               key={request.id}
-              className="flex flex-wrap items-center gap-3 py-3"
+              className="flex flex-wrap items-center gap-2 py-3"
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-[var(--text)]">
@@ -64,14 +65,15 @@ export function TeamAccessRequests({
                   </p>
                 ) : null}
               </div>
-              <button
+              <Button
                 type="button"
                 onClick={() => decide(request.id, "approve")}
                 disabled={busy}
-                className="btn-primary inline-flex px-3 py-1.5 text-xs disabled:opacity-60"
+                size="sm"
+                className="disabled:opacity-60"
               >
                 {busy ? "Updating…" : "Approve"}
-              </button>
+              </Button>
               <button
                 type="button"
                 onClick={() => decide(request.id, "deny")}
@@ -84,7 +86,7 @@ export function TeamAccessRequests({
           );
         })}
       </ul>
-      <FormError message={error} className="mt-3" />
+      <FormError message={error} className="mt-2" />
     </div>
   );
 }

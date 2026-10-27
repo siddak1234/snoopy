@@ -121,7 +121,7 @@ export function AutomationActions({
               <Link
                 prefetch={false}
                 href={setupHref}
-                className="flex min-h-14 items-center gap-3 px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)]"
+                className="flex min-h-14 items-center gap-2 px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)]"
               >
                 <SlidersHorizontalIcon
                   aria-hidden
@@ -193,7 +193,7 @@ export function AutomationActions({
             you can unarchive it later.
           </p>
           <FormError message={error} />
-          <div className="mt-6 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             <Button
               type="button"
               variant="ghost"

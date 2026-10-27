@@ -6,6 +6,7 @@ import Modal from "@/components/ui/Modal";
 import { leaveProjectAction } from "@/app/account/teams/actions";
 import { FormInput } from "@/components/ui/FormInput";
 import { FormError } from "@/components/ui/FormError";
+import { Button } from "@/components/ui/Button";
 
 export function LeaveProjectButton({
   projectId,
@@ -88,7 +89,7 @@ export function LeaveProjectButton({
             <span className="font-semibold text-[var(--text)]">DELETE</span>.
           </p>
 
-          <div className="mt-6 space-y-4">
+          <div className="mt-4 space-y-4">
             <FormInput
               id="leave-project-confirm"
               label="Confirmation"
@@ -106,22 +107,23 @@ export function LeaveProjectButton({
             <FormError message={error} />
 
             <div className="flex flex-wrap gap-2 pt-2">
-              <button
+              <Button
                 type="button"
                 onClick={reset}
                 disabled={pending}
-                className="btn-secondary inline-flex px-5"
+                variant="secondary"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={onConfirm}
                 disabled={!canConfirm || pending}
-                className="btn-danger inline-flex px-5 disabled:pointer-events-none disabled:opacity-50"
+                variant="danger"
+                className="disabled:pointer-events-none disabled:opacity-50"
               >
                 {pending ? "Leaving…" : "Leave department"}
-              </button>
+              </Button>
             </div>
           </div>
         </Modal>

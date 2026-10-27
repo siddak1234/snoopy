@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
 import { PlatformServerError } from "@/lib/platform-server";
@@ -17,6 +16,7 @@ import { ProjectMemberList } from "@/components/dashboard/ProjectMemberList";
 import type { MemberRow } from "@/components/dashboard/ProjectMemberList";
 import type { AvailableMember } from "@/components/dashboard/ProjectMemberPicker";
 import { TeamAccessRequests } from "@/components/dashboard/TeamAccessRequests";
+import { Button } from "@/components/ui/Button";
 
 /** The requests, where the platform has them (404 before the SEVENTEENTH promotion). */
 async function requestsIfThere(
@@ -101,13 +101,14 @@ export default async function TeamDetailPage({
       }
       secondaryAction={
         <div className="flex flex-wrap items-center gap-2">
-          <Link
+          <Button
             prefetch={false}
             href="/account/teams"
-            className="btn-secondary inline-flex !min-h-0 !px-4 !py-1.5 text-sm"
+            variant="secondary"
+            size="sm"
           >
             Back to departments
-          </Link>
+          </Button>
           {owner ? (
             <DeleteProjectButton
               projectId={project.id}
@@ -125,13 +126,13 @@ export default async function TeamDetailPage({
       }
     >
       {project.description ? (
-        <p className="pb-5 text-sm text-[var(--muted)]">
+        <p className="pb-4 text-sm text-[var(--muted)]">
           {project.description}
         </p>
       ) : null}
 
       {organization ? (
-        <div className="border-t border-[var(--ring)] py-5 first:pt-0">
+        <div className="border-t border-[var(--ring)] py-4 first:pt-0">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
               Members
@@ -152,7 +153,7 @@ export default async function TeamDetailPage({
       ) : null}
 
       {organization && canManage ? (
-        <div className="border-t border-[var(--ring)] py-5 pb-0">
+        <div className="border-t border-[var(--ring)] py-4 pb-0">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
               Asking to join

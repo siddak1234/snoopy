@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { FileActions } from "@/components/dashboard/FileActions";
+import { SectionTitle } from "@/components/dashboard/SectionTitle";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import {
@@ -8,17 +10,26 @@ import {
   isPartialWorkspaceExport,
   type WorkspaceExportResponse,
 } from "@/lib/export-contract";
+import { GROUP_BAND, SPACING } from "@/lib/spacing";
 import { CompleteExportSection } from "./CompleteExportSection";
 import { requestWorkspaceExport } from "./export-actions";
 
+/** The summary's file: its JSON, under the workspace's name for it. */
+function exportFile(response: WorkspaceExportResponse) {
+  return {
+    filename: `workspace-export-${response.workspaceId}.json`,
+    blob: new Blob([JSON.stringify(response, null, 2)], {
+      type: "application/json",
+    }),
+  };
+}
+
 function downloadExport(response: WorkspaceExportResponse) {
-  const file = new Blob([JSON.stringify(response, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(file);
+  const { filename, blob } = exportFile(response);
+  const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `workspace-export-${response.workspaceId}.json`;
+  anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
 }
@@ -28,6 +39,8 @@ function downloadExport(response: WorkspaceExportResponse) {
  * member's email, every project and every run, so it is an owner's or an
  * admin's (Access's `assertWorkspaceAdministrator`). A member is told who can
  * rather than offered a button the platform would refuse (register F8).
+ * Download JSON, then Share, the same JSON file (`FileActions`; the owner's
+ * F4 and Q7).
  */
 export function WorkspaceExportSection({
   canExport,
@@ -58,16 +71,16 @@ export function WorkspaceExportSection({
   const partial = response ? isPartialWorkspaceExport(response) : false;
 
   return (
-    <section className="border-t border-[var(--ring)] py-5">
-      <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-        Workspace data export
-      </h2>
-      <p className="mt-2 text-sm text-[var(--muted)]">
+    <section className={`border-t border-[var(--ring)] ${GROUP_BAND}`}>
+      <SectionTitle>Workspace data export</SectionTitle>
+      <p className={`${SPACING.title.top} text-sm text-[var(--muted)]`}>
         Download a quick summary of this workspace&apos;s records — each part
         bounded to its most recent entries.
       </p>
       {canExport ? (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div
+          className={`${SPACING.inner.top} flex flex-wrap ${SPACING.inner.gap}`}
+        >
           <Button
             variant="secondary"
             size="sm"
@@ -77,28 +90,41 @@ export function WorkspaceExportSection({
             {pending ? "Preparing export…" : "Prepare export"}
           </Button>
           {response ? (
-            <Button
-              size="sm"
-              disabled={pending}
-              onClick={() => downloadExport(response)}
-            >
-              Download JSON
-            </Button>
+            <FileActions
+              testId="workspace-export-actions"
+              downloads={[
+                {
+                  label: "Download JSON",
+                  disabled: pending,
+                  run: async () => {
+                    downloadExport(response);
+                    return null;
+                  },
+                },
+              ]}
+              share={{
+                filename: exportFile(response).filename,
+                contentType: "application/json",
+                read: async () => exportFile(response),
+              }}
+            />
           ) : null}
         </div>
       ) : null}
       {canExport ? (
         <CompleteExportSection workspaceId={workspaceId} />
       ) : (
-        <p className="mt-3 text-sm text-[var(--muted)]">
+        <p className={`${SPACING.inner.top} text-sm text-[var(--muted)]`}>
           Exporting a workspace is for its owners and admins, because the export
           holds every member&apos;s email and every department.
         </p>
       )}
-      <FormError message={error} className="mt-3" />
+      <FormError message={error} className={SPACING.inner.top} />
 
       {response ? (
-        <div className="mt-4 space-y-3 text-sm">
+        <div
+          className={`${SPACING.group.top} flex flex-col ${SPACING.inner.gap} text-sm`}
+        >
           <p
             role="status"
             className={
@@ -111,7 +137,7 @@ export function WorkspaceExportSection({
               ? "This is a partial export. Some records or service sections are unavailable or bounded."
               : "This export is complete."}
           </p>
-          <ul className="space-y-1 text-[var(--muted)]">
+          <ul className="flex flex-col text-[var(--muted)]">
             {response.services.map((section) => (
               <li key={section.service}>
                 {exportServiceLabel(section.service)}:{" "}

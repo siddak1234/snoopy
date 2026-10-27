@@ -37,7 +37,7 @@ export function OrgDomainOnly({
 
   return (
     <div>
-      <label className="flex items-start gap-3 text-sm">
+      <label className="flex items-start gap-2 text-sm">
         <input
           type="checkbox"
           role="switch"

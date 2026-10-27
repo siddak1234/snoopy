@@ -262,7 +262,7 @@ function SelectField({
       {/* Its own name, "Other", visible — never the select's, which a
           screen reader would say twice (as the app labels it). */}
       {other ? (
-        <div className="mt-3">
+        <div className="mt-2">
           <FormInput
             id={`${id}-other`}
             label={OTHER}

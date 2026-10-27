@@ -9,6 +9,7 @@ import {
 import { ConfirmRemoveButton } from "@/components/dashboard/ConfirmRemoveButton";
 import { FormError } from "@/components/ui/FormError";
 import type { TeamDirectoryEntry } from "@/lib/tenancy";
+import { Button } from "@/components/ui/Button";
 
 /**
  * The teams in an organization a person can ask to join (BUILD-PLAN 24.11.11,
@@ -44,12 +45,12 @@ export function AskToJoinList({
   }
 
   return (
-    <div className="mt-3">
+    <div className="mt-2">
       <ul className="divide-y divide-[var(--ring)]">
         {entries.map((entry) => (
           <li
             key={entry.id}
-            className="flex flex-wrap items-center justify-between gap-3 py-3"
+            className="flex flex-wrap items-center justify-between gap-2 py-3"
           >
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-[var(--text)]">
@@ -74,19 +75,21 @@ export function AskToJoinList({
                 />
               </div>
             ) : (
-              <button
+              <Button
                 type="button"
                 onClick={() => ask(entry.id)}
                 disabled={asking !== null}
-                className="btn-secondary inline-flex px-3 py-1.5 text-xs disabled:opacity-60"
+                variant="secondary"
+                size="sm"
+                className="disabled:opacity-60"
               >
                 {asking === entry.id ? "Asking…" : "Request to join"}
-              </button>
+              </Button>
             )}
           </li>
         ))}
       </ul>
-      <FormError message={error} className="mt-3" />
+      <FormError message={error} className="mt-2" />
     </div>
   );
 }

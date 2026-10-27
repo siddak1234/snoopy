@@ -71,8 +71,8 @@ export function CancelRunButton({
             It stops where it is and is not resumed. Steps it already finished
             stay finished.
           </p>
-          <FormError message={error} className="mt-3" />
-          <div className="mt-6 flex flex-wrap gap-2">
+          <FormError message={error} className="mt-2" />
+          <div className="mt-4 flex flex-wrap gap-2">
             <Button
               type="button"
               variant="ghost"

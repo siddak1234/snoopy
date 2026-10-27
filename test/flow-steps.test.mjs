@@ -324,12 +324,12 @@ test("the dashboard reads top to bottom: Today, the approvals banner while somet
   const home = read("app/account/page.tsx");
   const at = (pattern) => home.search(pattern);
   const order = [
-    at(/>\s*Today\s*<\/h2>/u),
+    at(/title="Today"/u),
     at(/<TodayTiles\b/u),
     at(/item needs" : "items need"\}\s*your review/u),
     at(/Exceptions your agents held for judgment/u),
     at(/data-testid="home-quick-actions"/u),
-    at(/>\s*Recent runs\s*<\/h2>/u),
+    at(/title="Recent runs"/u),
   ];
   assert.ok(
     order.every((index) => index > 0),
@@ -440,7 +440,7 @@ test("Activity is filtered only by a flow id shaped as one — a UUID, as the pl
   const activity = read("app/account/runs/page.tsx");
   assert.match(
     activity,
-    /const \{ flowId, outcome, since \} = activityFilter\(flow, status, from\);/u,
+    /const query = activityQuery\(await props\.searchParams\);\s*const \{ flowId, outcome, since \} = query;/u,
   );
   assert.doesNotMatch(activity, /typeof flow === "string"/u);
 });

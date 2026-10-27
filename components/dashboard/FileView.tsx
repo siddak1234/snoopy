@@ -1,36 +1,15 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
-import { DownloadSimpleIcon } from "@phosphor-icons/react/dist/ssr/DownloadSimple";
-import { ShareNetworkIcon } from "@phosphor-icons/react/dist/ssr/ShareNetwork";
-import { Button } from "@/components/ui/Button";
-import { FormError } from "@/components/ui/FormError";
 import type { RunFile, RunFileLink } from "@/lib/automations";
 import { platformApiJson, siteFileBlob } from "@/lib/platform-api";
 import { DOWNLOAD_FAILED } from "@/lib/run-documents";
-import {
-  DOWNLOAD_TO_OPEN,
-  SHARE_FAILED,
-  fileLine,
-  shownInPlace,
-} from "@/lib/run-files";
+import { DOWNLOAD_TO_OPEN, fileLine, shownInPlace } from "@/lib/run-files";
 import { followSignedLink } from "@/lib/signed-link";
+import { SPACING } from "@/lib/spacing";
+import { FileActions } from "./FileActions";
 
-const noSubscription = () => () => {};
-
-/** Whether this browser hands a file of this kind to the share sheet. */
-function sharesFiles(filename: string, contentType: string): boolean {
-  try {
-    return (
-      typeof navigator.canShare === "function" &&
-      navigator.canShare({
-        files: [new File([""], filename, { type: contentType })],
-      })
-    );
-  } catch {
-    return false;
-  }
-}
+/** The word on a file page's Download. */
+export const DOWNLOAD = "Download";
 
 /**
  * An uploaded file on its own page (Round 19, build 28; the owner's items 4
@@ -42,8 +21,9 @@ function sharesFiles(filename: string, contentType: string): boolean {
  * pressed through `/api/platform` (`linkPath`) and followed only when https
  * (`followSignedLink`), an attachment, so no page is left — and Share, where
  * the browser can hand a file to the share sheet (`navigator.canShare`): the
- * file read from the page's own route (`siteFileBlob`). A refusal is said
- * under the buttons; a share the person closes is no refusal.
+ * file read from the page's own route (`siteFileBlob`) — both `FileActions`,
+ * as every document's are. A refusal is said under the buttons; a share the
+ * person closes is no refusal.
  */
 export function FileView({
   file,
@@ -56,50 +36,19 @@ export function FileView({
   /** The platform's read of its signed link: `/v1/workspaces/…`. */
   linkPath: string;
 }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // The share sheet takes files only in some browsers; the server says no.
-  const canShare = useSyncExternalStore(
-    noSubscription,
-    () => sharesFiles(file.filename, file.contentType),
-    () => false,
-  );
-
+  // Download: the platform's signed link, asked when pressed, followed only
+  // when https. Share: the bytes from this page's own route.
   const download = async () => {
-    if (busy) return;
-    setBusy(true);
-    setError(null);
     try {
       const link = await platformApiJson<RunFileLink>(linkPath);
-      if (!followSignedLink(link.downloadUrl)) setError(DOWNLOAD_FAILED);
+      return followSignedLink(link.downloadUrl) ? null : DOWNLOAD_FAILED;
     } catch {
-      setError(DOWNLOAD_FAILED);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const share = async () => {
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const blob = await siteFileBlob(viewHref);
-      await navigator.share({
-        files: [new File([blob], file.filename, { type: file.contentType })],
-        title: file.filename,
-      });
-    } catch (thrown) {
-      // Closing the share sheet is the person's choice, not a failure.
-      if (!(thrown instanceof DOMException && thrown.name === "AbortError"))
-        setError(SHARE_FAILED);
-    } finally {
-      setBusy(false);
+      return DOWNLOAD_FAILED;
     }
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={`flex flex-col ${SPACING.group.gap}`}>
       {shownInPlace(file.contentType) ? (
         <iframe
           title={file.filename}
@@ -118,31 +67,14 @@ export function FileView({
           {fileLine(file)}
         </p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          variant="secondary"
-          size="sm"
-          disabled={busy}
-          onClick={() => void download()}
-          className="inline-flex items-center gap-2"
-        >
-          <DownloadSimpleIcon size={20} aria-hidden />
-          Download
-        </Button>
-        {canShare ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={busy}
-            onClick={() => void share()}
-            className="inline-flex items-center gap-2"
-          >
-            <ShareNetworkIcon size={20} aria-hidden />
-            Share
-          </Button>
-        ) : null}
-        <FormError message={error} className="order-last basis-full" />
-      </div>
+      <FileActions
+        downloads={[{ label: DOWNLOAD, run: download }]}
+        share={{
+          filename: file.filename,
+          contentType: file.contentType,
+          read: async () => ({ blob: await siteFileBlob(viewHref) }),
+        }}
+      />
     </div>
   );
 }

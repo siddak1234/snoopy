@@ -103,7 +103,7 @@ export default async function ItemFilePage(
     >
       {parts.map((part, at) =>
         part === "viewer" ? (
-          <div key={part} className="py-5 first:pt-0">
+          <div key={part} className="py-4 first:pt-0">
             {typeof file === "string" ? (
               <EmptyRow text={file} />
             ) : (
@@ -119,7 +119,7 @@ export default async function ItemFilePage(
             <section
               key={part}
               aria-label={declared.file.title}
-              className="py-5 first:pt-0"
+              className="py-4 first:pt-0"
             >
               <BlockList
                 blocks={item.blocks}
@@ -129,7 +129,7 @@ export default async function ItemFilePage(
             </section>
           ) : null
         ) : (
-          <div key={`unknown-${at}`} className="py-5 first:pt-0">
+          <div key={`unknown-${at}`} className="py-4 first:pt-0">
             <Fallback />
           </div>
         ),

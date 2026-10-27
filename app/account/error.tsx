@@ -44,7 +44,7 @@ export default function AccountError({ retry }: { retry: () => void }) {
     return (
       <section
         aria-busy="true"
-        className="bubble mx-auto mt-10 flex max-w-lg flex-col gap-3 p-6 sm:p-8"
+        className="bubble mx-auto mt-10 flex max-w-lg flex-col gap-2 p-6 sm:p-8"
       >
         <p className="text-sm text-[var(--muted)]">Loading…</p>
       </section>

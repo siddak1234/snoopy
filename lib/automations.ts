@@ -6,6 +6,7 @@ import {
   workspacePath as scope,
 } from "@/lib/platform-server";
 import { formatDateTimeMediumUTC } from "@/lib/date";
+import { runsQuery, type ActivityQuery } from "@/lib/flow-steps";
 import { BLOCKS_SHAPE } from "@/lib/run-progress";
 import type {
   components,
@@ -89,7 +90,7 @@ export type AutomationItems = components["schemas"]["AutomationItems"];
 export type AutomationItemField = components["schemas"]["AutomationItemField"];
 export type Item = components["schemas"]["Item"];
 export type RunSection = components["schemas"]["RunSection"];
-/** One of the ten blocks a run's or an item's page body is made of (backend ADR-0048). */
+/** One of the thirteen blocks a run's or an item's page body is made of (backend ADR-0048 and its amendment 1). */
 export type Block = components["schemas"]["Block"];
 export type BlockOpen = components["schemas"]["BlockOpen"];
 /** Each page's parts in the order the flow's pinned manifest gives (`Subscription.pages`). */
@@ -138,15 +139,17 @@ export async function listArchivedSubscriptions(
   );
 }
 
+/**
+ * The workspace's jobs, newest first: with no search, filter, sort or page,
+ * today's newest 100; with any (Activity's `runsQuery`), one page of 25 and
+ * `total` (backend ADR-0048 amendment 1).
+ */
 export function listRuns(
   workspaceId: string,
-  subscriptionId?: string,
+  query: ActivityQuery = {},
 ): Promise<ListRunsResponse> {
-  const query = subscriptionId
-    ? `?subscriptionId=${encodeURIComponent(subscriptionId)}`
-    : "";
   return platformServerJson<ListRunsResponse>(
-    `${scope(workspaceId)}/runs${query}`,
+    `${scope(workspaceId)}/runs${runsQuery(query)}`,
   );
 }
 

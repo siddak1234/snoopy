@@ -121,7 +121,7 @@ test("Download PDF and Download Excel: the platform's link, asked through /api/p
   // Followed only when https (Build 25, the review's R5c 2).
   assert.match(
     live,
-    /if \(!followSignedLink\(file\.downloadUrl\)\) setError\(DOWNLOAD_FAILED\);/u,
+    /return followSignedLink\(file\.downloadUrl\) \? null : DOWNLOAD_FAILED;/u,
   );
   assert.doesNotMatch(live, /window\.location\.assign/u);
   // The one retry, the route's too (Build 25, the review's R5c 5).
@@ -139,12 +139,12 @@ test("Download PDF and Download Excel: the platform's link, asked through /api/p
   ]) {
     assert.doesNotMatch(asker, /packageRetryWaitMs|setTimeout\(resolve/u);
   }
-  assert.match(live, /setError\(DOWNLOAD_FAILED\);/u);
+  assert.match(live, /\} catch \{\s*return DOWNLOAD_FAILED;\s*\}/u);
   // Offered once the job can be packaged, with View package on the run page,
   // in a row of their own over Run details (build 28's review, finding 2).
   assert.match(
     live,
-    /\{detail\.packageAvailable === true \? \(\s*<div className="mb-5 flex flex-wrap items-center gap-2">\s*<PackageActions workspaceId=\{workspaceId\} runId=\{run\.id\} view \/>/u,
+    /\{detail\.packageAvailable === true \? \(\s*<div className="mb-4 flex flex-wrap items-center gap-2">\s*<PackageActions workspaceId=\{workspaceId\} runId=\{run\.id\} view \/>/u,
   );
   // Gone, but in the struck-through history of its comments.
   assert.doesNotMatch(

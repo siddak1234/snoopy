@@ -72,7 +72,7 @@ test("Upload, Add and Archive are an owner's or admin's: drawn only under canMan
   const items = code(read(FLOW_ITEMS));
   assert.match(
     items,
-    /\{canManage \? \(\s*<Button[\s\S]*?data-testid="item-upload-open"/u,
+    /action=\{\s*canManage \? \(\s*<Button[\s\S]*?data-testid="item-upload-open"/u,
   );
   const live = code(read(ITEM_LIVE));
   // Add only where a run can start (`canAddRun`, finding 3 of the review):
@@ -87,7 +87,7 @@ test("Upload, Add and Archive are an owner's or admin's: drawn only under canMan
   );
   assert.match(
     live,
-    /\{canManage && !archived \? \(\s*<div className="py-5">\s*<ArchiveItem/u,
+    /\{canManage && !archived \? \(\s*<div className="py-4">\s*<ArchiveItem/u,
   );
   assert.match(
     code(read(FLOW_PAGE)),
@@ -140,7 +140,11 @@ test("a run with a title and a score is headed by them, the full id kept among i
     /const name = headed && run\.title \? run\.title : runLabel\(run\.id\);/u,
   );
   assert.match(live, /<SectionCard\s+title=\{name\}/u);
-  assert.match(live, /data-testid="run-score"/u);
+  assert.match(live, /<RunScore\b/u);
+  assert.match(
+    code(read("components/dashboard/RunScore.tsx")),
+    /data-testid="run-score"/u,
+  );
   assert.match(live, /\{ label: "Run ID", value: run\.id \}/u);
   // The details page's tiles and steps, then the run's page: its body.
   const details = live.indexOf('if (view === "details") {');
@@ -170,7 +174,7 @@ test("an item list the platform could not answer is Unavailable, never None yet 
   assert.match(page, /\{declaredItems && items !== undefined \? \(/u);
   assert.match(
     code(read(FLOW_ITEMS)),
-    /<EmptyRow\s+text=\{list \? noneYet\(declared\.words\) : EMAIL_UNAVAILABLE\}/u,
+    /text=\{\s*!items\s*\? EMAIL_UNAVAILABLE\s*:[\s\S]*?: noneYet\(declared\.words\)\s*\}/u,
   );
 });
 
@@ -253,7 +257,10 @@ test("an item's page reads the platform through lib/platform-server.ts per reque
     visibleWords(blocks.render(fixture("empty-item").blocks)).at(-1),
     "No candidates yet.",
   );
-  assert.match(code(read(RENDERERS)), /<EmptyRow text=\{block\.empty\} \/>/u);
+  assert.match(
+    code(read(RENDERERS)),
+    /<EmptyRow band=\{false\} text=\{block\.empty\} \/>/u,
+  );
 });
 
 test("the privacy page says Resume Screening, and Candidate Reviewer its first version, has an AI model read the job description and each resume, through OpenRouter, with nothing else from the workspace (plan §5.6; v2's name, 2026-10-25)", () => {

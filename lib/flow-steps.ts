@@ -3,8 +3,9 @@
  * P1–P4 — the owner's build 21 items 5–7: "1. Upooad Invoice / 2. Connect
  * integration … / 3. Then something about AI Processing / 4. Quickbooks
  * updated / 5. Email sent"), a run page's titles and setting lines (S23), and
- * the dashboard's Today (W1). The same rules as the app's (snoopy-mobile
- * `lib/view/pipeline.ts`, `lib/view/runs.ts`, `components/setup-field.tsx`).
+ * the dashboard's Today (W1). The same rules as the app's
+ * (`snoopy-mobile/lib/view/pipeline.ts`, `snoopy-mobile/lib/view/runs.ts`,
+ * `snoopy-mobile/components/setup-field.tsx`).
  * ~~Home's Run a flow (A9)~~ until Build 22 (the owner's build 21 item 1:
  * "Remove run a flow section").
  *
@@ -294,4 +295,93 @@ export function activityFilter(
       ? { since }
       : {}),
   };
+}
+
+/** How Activity is ordered: newest first, today's, or oldest first. */
+export type ActivitySort = "newest" | "oldest";
+
+/** What Activity asks the platform for: the filters above, and its search, sort and page. */
+export type ActivityQuery = ReturnType<typeof activityFilter> & {
+  q?: string;
+  sort?: ActivitySort;
+  page?: number;
+};
+
+/** The platform's bounds on a search and a page (`RUNS_LIST_LIMITS`). */
+export const ACTIVITY_LIMITS = { queryLength: 80, pages: 200 } as const;
+
+/**
+ * Activity's address read whole (backend ADR-0048 amendment 1, decision 4):
+ * `activityFilter`'s flow, outcome and time, then `q` (trimmed, at most 80
+ * characters), `sort` (`newest` or `oldest`) and `page` (1 to 200). Anything
+ * else is left out, as no filter.
+ */
+export function activityQuery(params: {
+  flow?: unknown;
+  status?: unknown;
+  since?: unknown;
+  q?: unknown;
+  sort?: unknown;
+  page?: unknown;
+}): ActivityQuery {
+  const q =
+    typeof params.q === "string"
+      ? params.q.trim().slice(0, ACTIVITY_LIMITS.queryLength)
+      : "";
+  const page = typeof params.page === "string" ? Number(params.page) : NaN;
+  return {
+    ...activityFilter(params.flow, params.status, params.since),
+    ...(q ? { q } : {}),
+    ...(params.sort === "newest" || params.sort === "oldest"
+      ? { sort: params.sort }
+      : {}),
+    ...(Number.isInteger(page) && page >= 1 && page <= ACTIVITY_LIMITS.pages
+      ? { page }
+      : {}),
+  };
+}
+
+/**
+ * The runs list's query for Activity (`listRuns`): its flow, and the outcome
+ * and the time as the platform's `status` and `since` — the platform filters
+ * them, so a page is never emptied by a filter here — with its search, sort
+ * and page. The website has no "Needs review", and never sends `needsReview`.
+ */
+export function runsQuery(query: ActivityQuery): string {
+  const out = new URLSearchParams();
+  if (query.flowId) out.set("subscriptionId", query.flowId);
+  if (query.q) out.set("q", query.q);
+  if (query.outcome) out.set("status", query.outcome);
+  if (query.since) out.set("since", query.since);
+  if (query.sort) out.set("sort", query.sort);
+  if (query.page) out.set("page", String(query.page));
+  const text = out.toString();
+  return text ? `?${text}` : "";
+}
+
+/** Activity's own address for a query: what it keeps in the address, a new search or sort on page 1. */
+export function activityHref(query: ActivityQuery): string {
+  const out = new URLSearchParams();
+  if (query.flowId) out.set("flow", query.flowId);
+  if (query.outcome) out.set("status", query.outcome);
+  if (query.since) out.set("since", query.since);
+  if (query.q) out.set("q", query.q);
+  if (query.sort && query.sort !== "newest") out.set("sort", query.sort);
+  if (query.page && query.page > 1) out.set("page", String(query.page));
+  const text = out.toString();
+  return text ? `/account/runs?${text}` : "/account/runs";
+}
+
+/**
+ * Activity's pages from the platform's count: long — sorted and paged —
+ * only when `total` says more than `size`; an answer with no `total` (a
+ * platform before the search) is one page.
+ */
+export function activityPages(
+  total: number | undefined,
+  size: number,
+): { long: boolean; pages: number } {
+  if (typeof total !== "number" || total <= size)
+    return { long: false, pages: 1 };
+  return { long: true, pages: Math.ceil(total / size) };
 }

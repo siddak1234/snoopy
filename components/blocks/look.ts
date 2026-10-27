@@ -40,10 +40,6 @@ export const chipTone = (tone: unknown): string => CHIP_TONE[toneOf(tone)];
 export const CHIP =
   "inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium";
 
-/** A label: the small capitals every heading over a page's parts has. */
-export const LABEL =
-  "text-xs font-medium tracking-wide text-[var(--muted)] uppercase";
-
 /**
  * An address to open outside the site: `https:` only, with a host and no
  * user or password — as the platform checks it, checked again when drawn.

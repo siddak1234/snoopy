@@ -9,7 +9,8 @@ import { SECTION_BAR, SECTION_ROW } from "./SectionRows";
  * section's box and bar (`SectionRows`), so it is exactly a closed section's
  * height, with what it names on the left, `end` (a score) before the arrow,
  * and the whole row the link. An item's ranked runs and every run page's
- * Run details. The app's row with an arrow, on the website.
+ * Run details; a flow's items, Activity's runs and Home's recent runs. The
+ * app's row with an arrow, on the website.
  */
 export function PageRow({
   href,
@@ -17,6 +18,8 @@ export function PageRow({
   end,
   testId,
   dim = false,
+  boxed = true,
+  label,
 }: {
   href: string;
   children: ReactNode;
@@ -25,6 +28,10 @@ export function PageRow({
   testId?: string;
   /** A failed or stopped run: `data-dim`, its words in the muted token. */
   dim?: boolean;
+  /** Its own box; false for a row of one card (`LIST_CARD`), its dividers the card's. */
+  boxed?: boolean;
+  /** Its name for a screen reader, when its words alone do not say it. */
+  label?: string;
 }) {
   return (
     <Link
@@ -32,9 +39,10 @@ export function PageRow({
       href={href}
       data-testid={testId}
       data-dim={dim ? "true" : undefined}
-      className={`${SECTION_ROW} ${SECTION_BAR} transition hover:bg-[var(--surface-hover)]`}
+      aria-label={label}
+      className={`${boxed ? `${SECTION_ROW} ` : ""}${SECTION_BAR} transition hover:bg-[var(--surface-hover)]`}
     >
-      <span className="flex min-w-0 flex-1 items-center gap-3 text-sm">
+      <span className="flex min-w-0 flex-1 items-center gap-2 text-sm">
         {children}
       </span>
       {end}

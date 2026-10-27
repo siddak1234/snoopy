@@ -13,6 +13,7 @@ import type {
   OrganizationDomain,
   OrganizationDomainJoinPolicy,
 } from "@/lib/tenancy";
+import { Button } from "@/components/ui/Button";
 
 export function OrgDomainSection({
   workspaceId,
@@ -128,7 +129,7 @@ export function OrgDomainSection({
                       then verify this domain.
                     </p>
                   ) : null}
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
                     <label className="text-xs text-[var(--muted)]">
                       Joining
                       <select
@@ -214,13 +215,15 @@ export function OrgDomainSection({
             <option value="invite_only">Invite only</option>
           </select>
         </label>
-        <button
+        <Button
           type="submit"
           disabled={claiming}
-          className="btn-secondary inline-flex px-4 py-2 text-sm disabled:opacity-60"
+          variant="secondary"
+          size="sm"
+          className="disabled:opacity-60"
         >
           {claiming ? "Adding…" : "Add domain"}
-        </button>
+        </Button>
       </form>
       {verificationRecordValue ? (
         <p className="text-xs text-[var(--muted)]">

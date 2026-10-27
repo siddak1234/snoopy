@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { FileActions } from "@/components/dashboard/FileActions";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import type { WorkspaceExportJob } from "@/lib/exports";
-import { DOWNLOAD_FAILED } from "@/lib/run-documents";
+import { siteFileNamed } from "@/lib/platform-api";
+import { DOWNLOAD_FAILED, shareHref } from "@/lib/run-documents";
+import { typeOfName } from "@/lib/run-files";
 import { followSignedLink } from "@/lib/signed-link";
+import { SPACING } from "@/lib/spacing";
 import { readCompleteExport, startCompleteExport } from "./export-actions";
 
 /** How often a running export is asked about. */
@@ -35,6 +39,8 @@ const FAILURES: Record<string, string> = {
  * earlier may have expired by the time it is clicked. The file itself is kept
  * for a day. A link that is not https is never followed, and the page says it
  * could not download (`followSignedLink`; Build 25, the review's R5c 2).
+ * Download file, then Share, the file itself, read through this site's own
+ * route (`FileActions`; the owner's F4 and Q7).
  *
  * `workspaceId` is the workspace the page shows: every call is refused once
  * another tab has made a different one active (register F28).
@@ -100,30 +106,30 @@ export function CompleteExportSection({
     });
   };
 
-  const download = () => {
-    if (!job) return;
-    setError(null);
-    startTransition(async () => {
-      const result = await readCompleteExport(workspaceId, job.id);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      setJob(result.job);
-      if (result.job.file && !followSignedLink(result.job.file.downloadUrl))
-        setError(DOWNLOAD_FAILED);
-    });
+  const download = async (): Promise<string | null> => {
+    if (!job) return null;
+    const result = await readCompleteExport(workspaceId, job.id).catch(() => ({
+      ok: false as const,
+      error: DOWNLOAD_FAILED,
+    }));
+    if (!result.ok) return result.error;
+    setJob(result.job);
+    return result.job.file && !followSignedLink(result.job.file.downloadUrl)
+      ? DOWNLOAD_FAILED
+      : null;
   };
 
   const running = job?.status === "running";
 
   return (
-    <div className="mt-4">
+    <div className={SPACING.group.top}>
       <p className="text-sm text-[var(--muted)]">
         Or export everything as one file, however large the workspace. It takes
         a moment to prepare and is kept for a day.
       </p>
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div
+        className={`${SPACING.inner.top} flex flex-wrap ${SPACING.inner.gap}`}
+      >
         <Button
           variant="secondary"
           size="sm"
@@ -132,13 +138,25 @@ export function CompleteExportSection({
         >
           {running ? "Preparing everything…" : "Export everything"}
         </Button>
-        {job?.status === "ready" ? (
-          <Button size="sm" disabled={pending} onClick={download}>
-            Download file
-          </Button>
+        {job?.status === "ready" && job.file ? (
+          <FileActions
+            testId="complete-export-actions"
+            downloads={[
+              { label: "Download file", run: download, disabled: pending },
+            ]}
+            share={{
+              filename: job.file.filename,
+              contentType: typeOfName(job.file.filename),
+              read: () => siteFileNamed(shareHref({ exportId: job.id })),
+            }}
+          />
         ) : null}
       </div>
-      <p role="status" aria-live="polite" className="mt-3 text-sm">
+      <p
+        role="status"
+        aria-live="polite"
+        className={`${SPACING.inner.top} text-sm`}
+      >
         {job?.status === "ready"
           ? job.complete
             ? "Ready. The file holds the whole workspace."
@@ -150,7 +168,7 @@ export function CompleteExportSection({
               ? "That file has been removed. Export again for a new one."
               : null}
       </p>
-      <FormError message={error} className="mt-2" />
+      <FormError message={error} className={SPACING.inner.top} />
     </div>
   );
 }

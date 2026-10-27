@@ -27,7 +27,10 @@ this origin holds.
 - Public response types are generated from the three published OpenAPI inputs,
   and the platform's block fixtures beside them
   (`lib/generated/platform-contracts/block-fixtures.ts`, one sha256 over the
-  fixtures' bytes in filename order — the rule both clients share).
+  fixtures' bytes in filename order — the rule both clients share), and its
+  block rules the same way (`block-rules.ts`: `BLOCK_WORDS`,
+  `BLOCK_SPACING` and the search and sort cases, its own sha256 over
+  `fixtures/block-rules/`).
   A web change cannot invent a request, response, cursor interpretation, billing
   flow, invite flow, or OAuth-provider policy.
 - No Prisma, direct database, Supabase SDK, object-store SDK, browser secret,
@@ -48,7 +51,42 @@ page reuses:
   filter, a field's box in a form, its panel glass — never a row of buttons
   and never the browser's own `<select>`.
 - **A row that opens a page** is `PageRow` (`components/dashboard/PageRow.tsx`):
-  a closed section's box and height, the arrow at its end.
+  a closed section's box and height, the arrow at its end — or, `boxed`
+  false, a row of one card of divided rows (`LIST_CARD`): a list block's
+  rows, a flow's items, Activity's runs and Home's recent runs.
+- **The spacing table** (backend `BLOCK_SPACING`, ADR-0048 amendment 1; the
+  owner's Q8), the same names on the app, in pixels here (`lib/spacing.ts`,
+  Tailwind's 4 px a step): `edge` 20 (`px-5`), `edgeWide` 24 on a screen
+  768 px and up (`md:px-6`); `group` 16 between groups (`gap-4`, `mt-4`,
+  a band's `py-4`); `title` 8 from a title to what it heads (`mt-2`);
+  `inner` 8 inside a card (`gap-2`); a row `rowY` 12 and `rowX` 16
+  (`py-3 px-4`), at least `rowMinHeight` 44 (`min-h-11`); `card` 16
+  (`p-4`), the page card `cardWide` 24 on a wide screen (`md:p-6`);
+  `bottom` 24 (`pb-6`). The account shell carries the edge and the bottom
+  (`EDGE`), `SectionCard` the card, `SectionTitle` and `Group` a title and
+  what it heads, `PageRow`, `Tile` and the list card the rows. A title sits
+  `title` above what it heads and `group` below what came before it — a
+  form's title ("Add candidate") and a label block ("Candidates") alike
+  (F3); a group of related rows is one card with dividers; nothing above
+  the first group. No screen types its own spacing: `test/spacing.test.mjs`
+  fails on a padding, margin or gap class under components/ and
+  app/account outside the table's, past the classes written before it
+  (`test/spacing-baseline.json`, which only goes down).
+- **Search, sort and pages** (ADR-0048 amendment 1, decision 4; the bar is
+  `components/blocks/ListTools.tsx`, the words the platform's
+  `BLOCK_WORDS`, never typed here — `test/block-words.test.mjs`): a search
+  box on every flow list whatever its length — a flow's items ("Search
+  {items}", `FlowItems`), an item's runs (`searchable`) and Activity
+  ("Search runs"); on more than 25 rows, the sort ("Default order", the
+  order sent, first) and the pages ("Previous", "Page {n} of {total}",
+  "Next"), 25 a page. A list or table in the blocks is wrapped in `Paged`
+  (searching, sorting and paging in the browser by `lib/block-sort.ts`'s
+  rules, which pass the platform's cases), a flow's items sort "A to Z" or
+  "Newest first", and Activity keeps `q`, `sort` and `page` in its address
+  (`ActivityControls`) and sends them, with the outcome as `status` and
+  the time as `since`, to the platform, which searches and counts
+  (`total`); it never sends `needsReview`. A search that finds nothing
+  says "Nothing matches "{query}".".
 - **Every run's page** ends with the package's buttons when it has them,
   then the Run details row, then Cancel run while it goes on and View flow;
   Duration, Steps done, the steps, Started, Ended, Trigger and the Run ID are
@@ -58,12 +96,25 @@ page reuses:
   and file pages draw their fixed header and footer, then the blocks the
   one-run and one-item reads send with `shape=blocks` (`BLOCKS_SHAPE`), each
   by one renderer per type (`components/blocks/`, keyed by the generated
-  `Block` union, no hooks), as sent and in order. A tone is a theme token; a
+  `Block` union, no hooks — but for the two client parts they hand on to, a
+  picture's read and a long list's search, sort and pages), as sent and in
+  order. A tone is a theme token; a
   link is https only, checked again, its host under its title; a press is a
   typed target this site maps to its route. A type, form or page part this
   build does not know draws `FALLBACK` (`components/blocks/Fallback.tsx`),
   an unknown tone neutral, an unknown step state the "unknown" look, an
-  unknown target no press; an answer with no blocks, the fallback alone. The
+  unknown target no press; an answer with no blocks, the fallback alone.
+  Since block set 2, thirteen types: an `image` is one of the run's own
+  files drawn in the page (`Picture`, read once from its file page's view
+  route through `siteFileBlob`; a JPEG or PNG up to 480 px tall in its
+  page's link, a PDF in a frame; "Opening the file…", "This file is no
+  longer kept." or "Could not open the file. Try again." with Try again, the
+  file page's words in `lib/run-files.ts`); a `chart` a bar or line chart
+  in SVG, read aloud as its `alt`, its words text nodes; a `group`
+  (`GroupCard`, the owner's F6 and Q6) its title, then one card of its
+  sections as drop-downs, divided, the first open and several open at
+  once; a list is one card of divided rows, each score in its `valueTone`
+  (green or red, the run's verdict) beside its chip. The
   flow page draws its parts in `Subscription.pages.flow` order (`pageParts`),
   else today's. No page reads documents, sections, details or a flow's
   document, verdict or run words (`test/no-flow-code.test.mjs`), and both
@@ -71,6 +122,23 @@ page reuses:
 - **A flow with items** is its items: no Dashboard, no Steps.
 - **A file's page** shows the original in place where a browser draws it,
   then Download and Share, then what was read from it (`FileView`).
+- **Download, then Share, on every document** (the owner's F4 and Q7):
+  `FileActions` (`components/dashboard/FileActions.tsx`) on both file pages,
+  a run package's PDF and Excel (Download PDF, Download Excel, then Share,
+  the PDF) and Settings › Data's two exports. Share sends the file itself
+  — its bytes, read when pressed from this site's own route, as a `File` —
+  never its signed link, and shows only where the browser takes that file
+  (`navigator.canShare`). A package's documents and the complete export
+  are read through `app/account/share/route.ts` (`?run={id}&format=` or
+  `?export={id}`): its ask and its signed link read on the server, the
+  bytes an attachment of no type, never cached, `nosniff`, for this site's
+  pages alone (`Sec-Fetch-Site`, `lib/file-view.ts`'s `askedHere`); the
+  workspace summary shares its own JSON.
+- **A run's score** is in its verdict's colour (the owner's F1 and Q5):
+  the positive green and the negative red, with the flow's word for it as a
+  chip ("Advance", "Decline"; `RunScore`, `lib/run-verdict.ts`, the one
+  place that reads the flow's verdict words); with no verdict, plain and
+  alone.
 
 ## Identity and connections
 

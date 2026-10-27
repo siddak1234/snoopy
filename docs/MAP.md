@@ -87,6 +87,7 @@
 - `/account/runs/[runId]`: [app/account/runs/[runId]/page.tsx](../app/account/runs/[runId]/page.tsx)
 - `/account/runs`: [app/account/runs/page.tsx](../app/account/runs/page.tsx)
 - `/account/settings`: [app/account/settings/page.tsx](../app/account/settings/page.tsx)
+- `API /account/share`: [app/account/share/route.ts](../app/account/share/route.ts)
 - `/account/support`: [app/account/support/page.tsx](../app/account/support/page.tsx)
 - `/account/teams/[id]`: [app/account/teams/[id]/page.tsx](../app/account/teams/[id]/page.tsx)
 - `/account/teams`: [app/account/teams/page.tsx](../app/account/teams/page.tsx)
@@ -103,6 +104,7 @@
 - [lib/automations.ts](../lib/automations.ts): no header
 - [lib/backend-origin.ts](../lib/backend-origin.ts): Parse the only backend location the website is allowed to know.
 - [lib/billing.ts](../lib/billing.ts): no header
+- [lib/block-sort.ts](../lib/block-sort.ts): Search, sort and pages on a list or a table (backend ADR-0048 amendment 1,
 - [lib/brand-logos.ts](../lib/brand-logos.ts): A vendor's mark on the one connection row, by the icon name the platform
 - [lib/connection-rows.ts](../lib/connection-rows.ts): The one connection row (Build 21, spec A4; the owner's build 20 items 6 and
 - [lib/connections.ts](../lib/connections.ts): no header
@@ -129,9 +131,11 @@
 - [lib/run-documents.ts](../lib/run-documents.ts): The run package's words and rules (Build 24, P12; backend ADR-0045): the
 - [lib/run-files.ts](../lib/run-files.ts): A run's or an item's uploaded file, as the website shows it (Round 19,
 - [lib/run-progress.ts](../lib/run-progress.ts): A run's STEPS (Build 21, spec A7; the session's S14; the owner's build 20
+- [lib/run-verdict.ts](../lib/run-verdict.ts): A run's verdict, as its page names and colours it (the owner's F1 and Q5,
 - [lib/session-contract.ts](../lib/session-contract.ts): no header
 - [lib/signed-link.ts](../lib/signed-link.ts): A signed link the browser goes to (Build 25, the review's R5c 2): the run
 - [lib/site.ts](../lib/site.ts): no header
+- [lib/spacing.ts](../lib/spacing.ts): The spacing table (backend `BLOCK_SPACING`, ADR-0048 amendment 1; the
 - [lib/subscription-entitlements.ts](../lib/subscription-entitlements.ts): no header
 - [lib/team-types.ts](../lib/team-types.ts): The team kinds (the owner, build 7: "project types should just be teams or
 - [lib/tenancy.ts](../lib/tenancy.ts): no header
@@ -172,7 +176,7 @@
 
 ### Tests
 
-- `test/`: account, automation, billing, blocks, boundaries, brand, browser, build21, build22, build24, build28, change, connection, connections, deployed, doc, export, fixture, flow, global, kit, new, no, platform, pre, repo, round19, run, session, signed, structure, tenancy, upload, vendor, verify
+- `test/`: account, automation, billing, block, blocks, boundaries, brand, browser, build21, build22, build24, build28, change, connection, connections, deployed, doc, export, fixture, flow, global, kit, new, no, picture, platform, pre, repo, round19, run, session, signed, spacing, structure, tenancy, upload, v2, vendor, verify
 
 ## Skills, agents and hooks
 

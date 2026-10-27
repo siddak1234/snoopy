@@ -68,11 +68,11 @@ export function ProjectMemberList({
   }
 
   if (members.length === 0) {
-    return <p className="mt-3 text-sm text-[var(--muted)]">No members yet.</p>;
+    return <p className="mt-2 text-sm text-[var(--muted)]">No members yet.</p>;
   }
 
   return (
-    <ul className="mt-3 divide-y divide-[var(--ring)]">
+    <ul className="mt-2 divide-y divide-[var(--ring)]">
       {members.map((m) => (
         <MemberRowItem
           key={m.userId}
@@ -180,7 +180,7 @@ function MemberRowItem({
   }
 
   return (
-    <li className="flex flex-wrap items-center gap-3 py-3">
+    <li className="flex flex-wrap items-center gap-2 py-3">
       {/* Name + email + joined date */}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-[var(--text)]">

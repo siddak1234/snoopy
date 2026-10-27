@@ -147,7 +147,7 @@ export function EmailRecipientsForm({
   };
 
   return (
-    <div className="py-5 first:pt-0">
+    <div className="py-4 first:pt-0">
       <section aria-labelledby="email-always-title" data-testid="email-always">
         <h2 id="email-always-title" className={HEADING}>
           {EMAIL_ALWAYS_LABEL}
@@ -176,7 +176,7 @@ export function EmailRecipientsForm({
       <section
         aria-labelledby="email-also-title"
         data-testid="email-also"
-        className="pt-5"
+        className="pt-4"
       >
         <h2
           id="email-also-title"

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { loginHref } from "@/lib/platform-api";
@@ -39,7 +38,7 @@ export function PlatformUnavailable({
     <section
       role="alert"
       aria-labelledby="platform-unavailable-title"
-      className="bubble mx-auto mt-10 flex max-w-lg flex-col gap-3 p-6 sm:p-8"
+      className="bubble mx-auto mt-10 flex max-w-lg flex-col gap-2 p-6 sm:p-8"
     >
       <h1
         id="platform-unavailable-title"
@@ -79,7 +78,7 @@ export function SessionEnded() {
     <section
       role="alert"
       aria-labelledby="session-ended-title"
-      className="bubble mx-auto mt-10 flex max-w-lg flex-col gap-3 p-6 sm:p-8"
+      className="bubble mx-auto mt-10 flex max-w-lg flex-col gap-2 p-6 sm:p-8"
     >
       <h1
         id="session-ended-title"
@@ -91,13 +90,9 @@ export function SessionEnded() {
         Sign in again to carry on where you were.
       </p>
       <div>
-        <Link
-          prefetch={false}
-          href={loginHref(pathname)}
-          className="btn-primary btn-sm inline-flex"
-        >
+        <Button prefetch={false} href={loginHref(pathname)} size="sm">
           Sign in again
-        </Link>
+        </Button>
       </div>
     </section>
   );

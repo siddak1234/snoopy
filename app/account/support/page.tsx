@@ -1,6 +1,6 @@
-import Link from "next/link";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { site } from "@/lib/site";
+import { Button } from "@/components/ui/Button";
 
 /**
  * Where a signed-in person finds help, and where Intuit's app review is
@@ -14,16 +14,12 @@ export default function AccountSupportPage() {
     <SectionCard
       title="Support"
       primaryAction={
-        <Link
-          prefetch={false}
-          href="/contact"
-          className="btn-secondary inline-flex px-5"
-        >
+        <Button prefetch={false} href="/contact" variant="secondary">
           Contact us
-        </Link>
+        </Button>
       }
     >
-      <div className="py-5 first:pt-0">
+      <div className="py-4 first:pt-0">
         <p className="text-sm text-[var(--muted)]">
           For help, email{" "}
           <a
