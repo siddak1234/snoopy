@@ -136,7 +136,7 @@ and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: the Flows
 list by department A–Z; its items grouped A–Z under its group filter, the
 website's drop-down, on its page with no Dashboard, no Steps and no run start
 form, searched, and past 25 sorted and paged; the upload card's drop-down, "Other" and the values typed before; an
-item's runs ranked in compact rows a closed section's height, each score in
+item's runs ranked in one card of divided rows, each as tall as a closed section's bar, each score in
 its verdict's colour with its word as a chip, searched, its tiles and
 its file page — the file in place, its route for this site's pages alone,
 Download to its signed link, Share, then its reading's sections; a run
