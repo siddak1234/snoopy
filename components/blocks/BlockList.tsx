@@ -1,15 +1,18 @@
 import type { ReactNode } from "react";
 import type { Block } from "@/lib/automations";
+import { SPACING } from "@/lib/spacing";
 import { Fallback } from "./Fallback";
+import { GroupCard } from "./GroupCard";
+import { Paged } from "./Paged";
 import {
   BadgeBlock,
+  ChartBlock,
   FileBlock,
+  ImageBlock,
   LinkBlock,
-  ListBlock,
   MetricBlock,
   QuestionsBlock,
   SectionBlock,
-  TableBlock,
   TextBlock,
   TimelineBlock,
   type BlockContext,
@@ -26,16 +29,24 @@ type Renderer<K extends Block["type"]> = (
 ) => ReactNode;
 
 /**
- * The registry: one renderer for each of the contract's ten types, keyed by
- * the generated union, so a type the contract adds fails the build here until
- * it is drawn (backend ADR-0048 decisions 8 and 12; `test/blocks-render`).
+ * The registry: one renderer for each of the contract's thirteen types, keyed
+ * by the generated union, so a type the contract adds fails the build here
+ * until it is drawn (backend ADR-0048 decisions 8 and 12, and its amendment
+ * 1; `test/blocks-render`). A list or a table is drawn inside `Paged`, which
+ * adds its search, sort and pages when it has more than 25 rows, or a
+ * search when the platform marks the list `searchable`; it is handed the
+ * place alone, never the page's forms.
  */
 export const RENDERERS: { [K in Block["type"]]: Renderer<K> } = {
   text: (block) => <TextBlock block={block} />,
   metric: (block) => <MetricBlock block={block} />,
   badge: (block) => <BadgeBlock block={block} />,
-  table: (block) => <TableBlock block={block} />,
-  list: (block, context) => <ListBlock block={block} context={context} />,
+  table: (block, context) => (
+    <Paged block={block} place={{ subscriptionId: context.subscriptionId }} />
+  ),
+  list: (block, context) => (
+    <Paged block={block} place={{ subscriptionId: context.subscriptionId }} />
+  ),
   section: (block, _, inner) => <SectionBlock block={block} inner={inner} />,
   file: (block, context) => <FileBlock block={block} context={context} />,
   link: (block) => <LinkBlock block={block} />,
@@ -43,7 +54,26 @@ export const RENDERERS: { [K in Block["type"]]: Renderer<K> } = {
   questions: (block, context) => (
     <QuestionsBlock block={block} context={context} />
   ),
+  image: (block, context) => <ImageBlock block={block} context={context} />,
+  chart: (block) => <ChartBlock block={block} />,
+  group: (block, _, inner) => <GroupCard block={block} inner={inner} />,
 };
+
+/** A label block: a title, so what follows it sits the `title` gap under it. */
+const isLabel = (block: unknown): boolean =>
+  typeof block === "object" &&
+  block !== null &&
+  (block as { type?: unknown }).type === "text" &&
+  (block as { style?: unknown }).style === "label";
+
+/**
+ * The gap above a block (the spacing table's rules, F3): none above the
+ * first; `title` under a label, which heads it; else `group`.
+ */
+function gapAbove(blocks: readonly unknown[], index: number): string {
+  if (index === 0) return "";
+  return isLabel(blocks[index - 1]) ? SPACING.title.top : SPACING.group.top;
+}
 
 /** One block by its type's renderer; a type this build does not know, the fallback. */
 function drawBlock(
@@ -76,9 +106,10 @@ function Blocks({
     <Blocks blocks={within} context={context} />
   );
   return (
-    <div data-testid={testId} className="flex flex-col gap-3">
+    <div data-testid={testId} className="flex flex-col">
       {blocks.map((block, index) => (
-        <div key={index} className="contents">
+        // A block that draws nothing (a form the page does not offer) takes no gap.
+        <div key={index} className={`${gapAbove(blocks, index)} empty:hidden`}>
           {drawBlock(block, context, inner)}
         </div>
       ))}

@@ -13,7 +13,9 @@ import { heldCopy } from "@/lib/held-flow";
 import { flowsOverPlan, overPlanSentence } from "@/lib/plan-limit";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
+import { Group } from "@/components/dashboard/Group";
 import { StatusPill } from "@/components/dashboard/StatusPill";
+import { CARD, SPACING } from "@/lib/spacing";
 import { Button } from "@/components/ui/Button";
 import { flowPath } from "@/lib/flow-steps";
 import { AddAutomation } from "./AddAutomation";
@@ -121,7 +123,7 @@ export default async function FlowsPage() {
         <p
           role="status"
           data-testid="flows-over-plan"
-          className="mb-4 rounded-[var(--radius-md)] border border-[var(--warning-border)] bg-[var(--warning-bg)] px-4 py-3 text-sm text-[var(--warning-text)]"
+          className={`${SPACING.group.bottom} rounded-[var(--radius-md)] border border-[var(--warning-border)] bg-[var(--warning-bg)] ${SPACING.rowX.x} ${SPACING.rowY.y} text-sm text-[var(--warning-text)]`}
         >
           {overPlanSentence(overPlan.allowed, overPlan.live)}
         </p>
@@ -136,19 +138,13 @@ export default async function FlowsPage() {
         />
       ) : (
         byDepartment(catalog.automations).map(({ department, id, entries }) => (
-          <section
+          <Group
             key={id}
-            aria-labelledby={id}
-            data-testid="flows-department"
-            className="py-5 first:pt-0"
+            title={department}
+            titleId={id}
+            testId="flows-department"
           >
-            <h2
-              id={id}
-              className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase"
-            >
-              {department}
-            </h2>
-            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <div className={`grid ${SPACING.group.gap} sm:grid-cols-2`}>
               {entries.map((automation) => (
                 <AutomationCard
                   key={`${automation.templateId}.v${automation.version}`}
@@ -159,19 +155,16 @@ export default async function FlowsPage() {
                 />
               ))}
             </div>
-          </section>
+          </Group>
         ))
       )}
 
       {archived.length > 0 ? (
-        <div className="border-t border-[var(--ring)] py-5">
-          <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-            Archived flows
-          </h2>
-          <p className="mt-1 text-xs text-[var(--muted)]">
+        <Group title="Archived flows">
+          <p className="text-xs text-[var(--muted)]">
             An archived flow keeps its history here. Unarchive it any time.
           </p>
-          <ul className="mt-3 divide-y divide-[var(--ring)]">
+          <ul className={`${SPACING.inner.top} divide-y divide-[var(--ring)]`}>
             {archived.map((subscription) => {
               const entry = catalogEntry.get(subscription.templateId);
               const name =
@@ -186,7 +179,7 @@ export default async function FlowsPage() {
               return (
                 <li
                   key={subscription.id}
-                  className="flex flex-wrap items-center justify-between gap-2 py-3"
+                  className={`flex flex-wrap items-center justify-between ${SPACING.inner.gap} ${SPACING.rowY.y}`}
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-[var(--text)]">
@@ -196,7 +189,9 @@ export default async function FlowsPage() {
                       {place(subscription)}
                     </p>
                   </div>
-                  <div className="flex flex-col items-end gap-2">
+                  <div
+                    className={`flex flex-col items-end ${SPACING.inner.gap}`}
+                  >
                     <span className="text-xs text-[var(--muted)]">
                       Archived {formatDay(subscription.updatedAt)}
                     </span>
@@ -223,7 +218,7 @@ export default async function FlowsPage() {
               );
             })}
           </ul>
-        </div>
+        </Group>
       ) : null}
     </SectionCard>
   );
@@ -246,8 +241,8 @@ function AutomationCard({
   const held = heldCopy(subscriptions, automation.templateId);
 
   return (
-    <div className="bubble flex flex-col gap-3 p-5">
-      <div className="flex items-start justify-between gap-3">
+    <div className={`bubble flex flex-col ${SPACING.inner.gap} ${CARD}`}>
+      <div className={`flex items-start justify-between ${SPACING.inner.gap}`}>
         <div className="min-w-0">
           {/* Its department is its group's header (build 28's item 1). */}
           <h3
@@ -282,9 +277,11 @@ function AutomationCard({
           key={subscription.id}
           id={`flow-${subscription.id}`}
           tabIndex={-1}
-          className="flex flex-col gap-2 border-t border-[var(--ring)] pt-3"
+          className={`flex flex-col ${SPACING.inner.gap} border-t border-[var(--ring)] ${SPACING.group.pt}`}
         >
-          <div className="flex items-center justify-between gap-3">
+          <div
+            className={`flex items-center justify-between ${SPACING.inner.gap}`}
+          >
             <p className="text-xs text-[var(--muted)]">{place(subscription)}</p>
             <StatusPill status={subscription.status} />
           </div>

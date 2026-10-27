@@ -7,10 +7,12 @@ import {
   type Page,
   type Request,
 } from "@playwright/test";
+import { SPACING } from "../lib/spacing";
 import {
   FLOWS,
   automationCard,
   connectionRow,
+  drawnGapBelow,
   expectNoAxeViolations,
   fixtureControl,
   fixtureRead,
@@ -20,6 +22,9 @@ import {
   presentSession,
   runForm,
   settledAnimations,
+  shared,
+  spacingPx,
+  standInShareSheet,
   worstContrast,
 } from "./helpers";
 
@@ -3718,6 +3723,50 @@ test("workspace export distinguishes complete and partial public responses", asy
   await expect(page.getByText("This is a partial export.")).toBeVisible();
 });
 
+test("F4 — the summary export: Download JSON saves the file the page holds, and Share hands that same JSON file to the sheet; a browser whose sheet takes no files is offered Download JSON alone (Round 21 v2)", async ({
+  page,
+  browser,
+}) => {
+  await standInShareSheet(page);
+  await page.goto("/account/settings");
+  await page.getByRole("button", { name: "Prepare export" }).click();
+  const actions = page.getByTestId("workspace-export-actions");
+  await expect(actions.getByRole("button")).toHaveText([
+    "Download JSON",
+    "Share",
+  ]);
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    actions.getByRole("button", { name: "Download JSON" }).click(),
+  ]);
+  const name = download.suggestedFilename();
+  expect(name).toMatch(/^workspace-export-.+\.json$/u);
+  await actions.getByRole("button", { name: "Share" }).click();
+  await expect
+    .poll(() => shared(page))
+    .toMatchObject({ name, type: "application/json" });
+  // No sheet that takes files: no Share.
+  const context = await browser.newContext({
+    storageState: process.env.PLAYWRIGHT_AUTH_STORAGE_STATE,
+  });
+  try {
+    const plain = await context.newPage();
+    await plain.addInitScript(() =>
+      Object.assign(navigator, {
+        canShare: () => false,
+        share: async () => undefined,
+      }),
+    );
+    await plain.goto("/account/settings");
+    await plain.getByRole("button", { name: "Prepare export" }).click();
+    await expect(
+      plain.getByTestId("workspace-export-actions").getByRole("button"),
+    ).toHaveText(["Download JSON"]);
+  } finally {
+    await context.close();
+  }
+});
+
 test.describe("the complete export (backend §12.1 #39)", () => {
   // The download link is the fixture's own, as a signed store URL would be.
   test.use({ ignoreHTTPSErrors: true });
@@ -3741,6 +3790,37 @@ test.describe("the complete export (backend §12.1 #39)", () => {
     expect(file.suggestedFilename()).toBe("workspace-export.json");
     // The third read's link — asked for at the click, not kept from the second.
     expect(new URL(file.url()).searchParams.get("read")).toBe("3");
+  });
+
+  test("Share reads nothing until it is pressed: the first press reads the file, busy, and the next hands it to the sheet (F4; the review's finding 1)", async ({
+    page,
+  }) => {
+    await standInShareSheet(page);
+    const reads = observe(
+      page,
+      (request) => new URL(request.url()).pathname === "/account/share",
+    );
+    await page.goto("/account/settings");
+    await page.getByRole("button", { name: "Export everything" }).click();
+    await expect(
+      page.getByText("Ready. The file holds the whole workspace."),
+    ).toBeVisible({ timeout: 15_000 });
+    const share = page
+      .getByTestId("complete-export-actions")
+      .getByRole("button", { name: "Share" });
+    await expect(share).toBeEnabled();
+    await page.waitForLoadState("networkidle");
+    expect(reads).toEqual([]);
+    await share.click();
+    await expect.poll(() => reads.length).toBe(1);
+    await expect(share).toBeEnabled();
+    expect(await shared(page)).toBeUndefined();
+    await share.click();
+    await expect
+      .poll(() => shared(page))
+      // The file under the name the share route gives it.
+      .toMatchObject({ name: "workspace-export-2026-08-12.json" });
+    expect(reads).toHaveLength(1);
   });
 
   test("a link that is not https is never followed: Download file says it could not download, and the page stays (Build 25, the review's R5c 2)", async ({
@@ -4033,11 +4113,16 @@ test("Settings shows the Linked accounts lead in one line — Sign in with any o
   await page.goto("/account/settings");
   // One line under the heading, once the accounts are read, as in the app
   // (Build 21, spec A5; the owner's build 20 item 9).
-  const lead = page
-    .locator("main")
-    .getByRole("heading", { name: "Linked accounts" })
-    .locator("xpath=following-sibling::p[1]");
-  await expect(lead).toHaveText("Sign in with any of these.");
+  const group = page
+    .locator("main section")
+    .filter({ has: page.getByRole("heading", { name: "Linked accounts" }) })
+    .last();
+  await expect(group.locator("p").first()).toHaveText(
+    "Sign in with any of these.",
+  );
+  await expect(
+    group.getByText("Sign in with any of these.", { exact: true }),
+  ).toBeVisible();
   // Each sign-in account by its provider's own glyph, never a key.
   const rows = page
     .locator("main li")
@@ -4048,6 +4133,37 @@ test("Settings shows the Linked accounts lead in one line — Sign in with any o
   await expect(
     page.getByText("Link additional sign-in options to this account."),
   ).toHaveCount(0);
+});
+
+test("Settings as drawn: each group's title sits the spacing table's title gap above what it heads, and the page's edge is the phone's at 390 px wide and the wide screen's at 900 (lib/spacing.ts; Round 21 v2, F3)", async ({
+  page,
+}) => {
+  await page.goto("/account/settings");
+  const titles = page.locator("main section > h2");
+  await expect(titles.first()).toBeVisible();
+  const names = await titles.allInnerTexts();
+  expect(names.length).toBeGreaterThanOrEqual(3);
+  const gaps: [string, number | null][] = [];
+  for (const [at, name] of names.entries())
+    gaps.push([name, await drawnGapBelow(titles.nth(at))]);
+  expect(gaps).toEqual(
+    names.map((name) => [name, spacingPx(SPACING.title.top)]),
+  );
+  for (const [width, edge] of [
+    [390, spacingPx(SPACING.edge.x)],
+    [900, spacingPx(SPACING.edgeWide.x)],
+  ] as const) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/account/settings");
+    const bubble = page.locator("main .bubble").first();
+    await expect(bubble).toBeVisible();
+    expect(
+      await bubble.evaluate((element) =>
+        Math.round(element.getBoundingClientRect().left),
+      ),
+      `the page's edge at ${width} px wide`,
+    ).toBe(edge);
+  }
 });
 
 test("Unlink takes a linked sign-in account off, confirmed first; the one signed up with has none; a refusal is said in the app's words (backend 24.11.1, build 10)", async ({

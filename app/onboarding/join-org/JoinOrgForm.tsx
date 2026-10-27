@@ -8,6 +8,7 @@ import {
   createPersonalWorkspaceAction,
 } from "@/app/onboarding/actions";
 import { FormError } from "@/components/ui/FormError";
+import { Button } from "@/components/ui/Button";
 
 export function JoinOrgForm({
   workspaceId,
@@ -76,28 +77,30 @@ export function JoinOrgForm({
           <p className="text-sm text-[var(--muted)]">
             Your request was sent for approval.
           </p>
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={handleCancelRequest}
             disabled={busy}
-            className="btn-secondary inline-flex w-full justify-center px-5 disabled:opacity-60"
+            className="w-full justify-center disabled:opacity-60"
           >
             {pending === "join" ? "Cancelling…" : "Cancel request"}
-          </button>
+          </Button>
         </>
       ) : (
-        <button
+        <Button
           type="button"
           onClick={handleJoin}
           disabled={busy || requested}
-          className="btn-primary inline-flex w-full justify-center px-5 disabled:opacity-60"
+          className="w-full justify-center disabled:opacity-60"
         >
           {pending === "join"
             ? "Joining…"
             : requested
               ? "Request pending"
               : `Join ${workspaceName}`}
-        </button>
+        </Button>
       )}
 
       <div className="relative flex items-center py-1">

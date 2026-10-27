@@ -16,7 +16,9 @@ import ts from "typescript";
  * relative paths, transpiled with TypeScript as `global-error-render` does,
  * and loaded from under `node_modules` so `react`, `next` and the icons
  * resolve. `mutate` changes a source before it is transpiled — the copy of
- * the renderer a bite proof needs. Not a test file: the block tests share it.
+ * the renderer a bite proof needs; `loadModules` does the same for any entry,
+ * with stubs for the server modules a test cannot have. Not a test file:
+ * the block tests share it.
  */
 
 const root = resolve(import.meta.dirname, "..");
@@ -44,12 +46,31 @@ function resolveSpecifier(from, specifier) {
 
 const outName = (path) => `${path.replace(/[/[\]]/gu, "_")}.mjs`;
 
-export async function loadBlocks({ mutate = (_, source) => source } = {}) {
+/** A bare `next/…` a transpiled module names by its file, as Node resolves it (its `.js`). */
+const nextFile = (specifier) =>
+  /^next\/[a-z-]+$/u.test(specifier) ? `${specifier}.js` : null;
+
+/**
+ * Each source `entries` imports, followed through `@/` and relative paths,
+ * transpiled into one folder under `node_modules/.cache`, and each entry
+ * loaded. `mutate` changes a source before it is transpiled (a bite proof's
+ * copy); `stubs` stands a module's source in for one of the site's own (a
+ * server module's session or workspace, which a test cannot have), keyed by
+ * its `@/` specifier.
+ */
+export async function loadModules(
+  entries,
+  { mutate = (_, source) => source, stubs = {} } = {},
+) {
   const cache = join(root, "node_modules", ".cache");
   mkdirSync(cache, { recursive: true });
   const directory = mkdtempSync(join(cache, "blocks-"));
   const done = new Set();
-  const pending = [ENTRY];
+  const pending = [...entries];
+  const stubName = (specifier) =>
+    `stub_${specifier.replace(/[^A-Za-z0-9]/gu, "_")}.mjs`;
+  for (const [specifier, source] of Object.entries(stubs))
+    writeFileSync(join(directory, stubName(specifier)), source);
   while (pending.length > 0) {
     const path = pending.pop();
     if (done.has(path)) continue;
@@ -65,7 +86,9 @@ export async function loadBlocks({ mutate = (_, source) => source } = {}) {
     output = output.replace(
       /(\bfrom\s*|\bimport\s*)"([^"]+)"/gu,
       (whole, lead, specifier) => {
-        if (specifier === "next/link") return `${lead}"next/link.js"`;
+        if (nextFile(specifier)) return `${lead}"${nextFile(specifier)}"`;
+        if (Object.hasOwn(stubs, specifier))
+          return `${lead}"./${stubName(specifier)}"`;
         if (!local(specifier)) return whole;
         const target = resolveSpecifier(path, specifier);
         pending.push(target);
@@ -74,28 +97,36 @@ export async function loadBlocks({ mutate = (_, source) => source } = {}) {
     );
     writeFileSync(join(directory, outName(path)), output);
   }
-  const blocks = await import(
-    pathToFileURL(join(directory, outName(ENTRY))).href
-  );
-  const look = await import(
-    pathToFileURL(join(directory, outName("components/blocks/look.ts"))).href
-  );
-  const fallback = await import(
-    pathToFileURL(join(directory, outName("components/blocks/Fallback.tsx")))
-      .href
-  );
+  const modules = {};
+  for (const entry of entries)
+    modules[entry] = await import(
+      pathToFileURL(join(directory, outName(entry))).href
+    );
+  return {
+    modules,
+    cleanup: () => rmSync(directory, { recursive: true, force: true }),
+  };
+}
+
+export async function loadBlocks({ mutate = (_, source) => source } = {}) {
+  const LOOK = "components/blocks/look.ts";
+  const FALLBACK = "components/blocks/Fallback.tsx";
+  const { modules, cleanup } = await loadModules([ENTRY, LOOK, FALLBACK], {
+    mutate,
+  });
+  const blocks = modules[ENTRY];
   const { createElement } = await import("react");
   const { renderToStaticMarkup } = await import("react-dom/server");
   return {
     ...blocks,
-    look,
-    FALLBACK: fallback.FALLBACK,
+    look: modules[LOOK],
+    FALLBACK: modules[FALLBACK].FALLBACK,
     createElement,
     render: (list, context) =>
       renderToStaticMarkup(
         createElement(blocks.BlockList, { blocks: list, context }),
       ),
-    cleanup: () => rmSync(directory, { recursive: true, force: true }),
+    cleanup,
   };
 }
 

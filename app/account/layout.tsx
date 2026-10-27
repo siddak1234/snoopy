@@ -13,6 +13,7 @@ import {
   DashboardHeader,
 } from "@/components/dashboard/DashboardNav";
 import { AccountTopBar } from "@/components/dashboard/AccountTopBar";
+import { EDGE, SPACING } from "@/lib/spacing";
 
 const SIGN_IN = loginHref("/account");
 
@@ -64,16 +65,18 @@ export default async function AccountLayout({
   return (
     // Self-contained dashboard shell: the route-group split means no marketing
     // header/container wraps this tree anymore, so it owns its own top bar and
-    // horizontal padding.
-    <div className="min-h-screen px-4 pb-6 md:px-6">
+    // the page's edge and bottom — the spacing table's (`EDGE`, `bottom`).
+    <div className={`min-h-screen ${EDGE} ${SPACING.bottom.bottom}`}>
       <AccountTopBar
         workspaces={workspaces}
         activeWorkspaceId={activeWorkspaceId}
       />
-      <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
+      <div
+        className={`flex flex-col ${SPACING.group.gap} lg:flex-row ${SPACING.edgeWide.gap}`}
+      >
         <DashboardSidebar showOrgSettings={showOrgSettings} />
         <div className="min-w-0 flex-1">
-          <header className="mb-4 lg:mb-0">
+          <header className={`${SPACING.group.bottom} lg:mb-0`}>
             <DashboardHeader showOrgSettings={showOrgSettings} />
           </header>
           <main>{children}</main>

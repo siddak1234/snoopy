@@ -15,6 +15,7 @@ import {
   type ActionResult,
 } from "./actions";
 import { WebhookAddressButton } from "./WebhookAddressButton";
+import { SPACING } from "@/lib/spacing";
 
 /** The row at the bottom of a flow's page that opens Set up again (the owner's AM4). */
 export const EDIT_SETUP = "Edit setup";
@@ -94,7 +95,7 @@ export function AutomationActions({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={`flex flex-col ${SPACING.group.gap}`}>
       {subscription.status === "live" ? (
         <div>
           <Button
@@ -121,7 +122,7 @@ export function AutomationActions({
               <Link
                 prefetch={false}
                 href={setupHref}
-                className="flex min-h-14 items-center gap-3 px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)]"
+                className={`flex min-h-14 items-center ${SPACING.inner.gap} ${SPACING.rowX.x} ${SPACING.rowY.y} text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)]`}
               >
                 <SlidersHorizontalIcon
                   aria-hidden
@@ -141,7 +142,7 @@ export function AutomationActions({
               #91): only for a webhook-started version, and only for an owner
               or admin, as the platform allows no one else. */}
           {webhook ? (
-            <li className="px-4 py-3">
+            <li className={`${SPACING.rowX.x} ${SPACING.rowY.y}`}>
               <WebhookAddressButton
                 workspaceId={workspaceId}
                 subscriptionId={subscription.id}
@@ -187,13 +188,15 @@ export function AutomationActions({
           </h2>
           <p
             id={`automation-archive-${subscription.id}-description`}
-            className="mt-1 text-sm text-[var(--muted)]"
+            className={`${SPACING.title.top} text-sm text-[var(--muted)]`}
           >
             It stops and moves to Archived flows. Its runs stay in Activity, and
             you can unarchive it later.
           </p>
           <FormError message={error} />
-          <div className="mt-6 flex flex-wrap gap-2">
+          <div
+            className={`${SPACING.group.top} flex flex-wrap ${SPACING.inner.gap}`}
+          >
             <Button
               type="button"
               variant="ghost"

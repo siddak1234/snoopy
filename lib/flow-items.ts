@@ -140,6 +140,55 @@ function titlesAZ<T extends { title: string }>(items: readonly T[]): T[] {
     .map(({ item }) => item);
 }
 
+/**
+ * How a flow's items are ordered in each group (backend ADR-0048 amendment
+ * 1, decision 4): A–Z by title, today's, or newest first, the platform's
+ * own order. The choice is offered only on a list of more than 25.
+ */
+export type ItemOrder = "az" | "newest";
+
+/** The rows of a group in an order. */
+function inOrder<T extends { title: string }>(
+  items: readonly T[],
+  order: ItemOrder,
+): T[] {
+  return order === "newest" ? [...items] : titlesAZ(items);
+}
+
+/** The sort choices of a long list of items, in the platform's words (`BLOCK_WORDS`). */
+export function itemOrders(words: {
+  aToZ: string;
+  newestFirst: string;
+}): { value: ItemOrder; label: string }[] {
+  return [
+    { value: "az", label: words.aToZ },
+    { value: "newest", label: words.newestFirst },
+  ];
+}
+
+/**
+ * One page of grouped items: `size` rows from the groups as they are drawn,
+ * each under its group's header, the groups cut where the page is.
+ */
+export function pageGroups<T>(
+  groups: readonly ItemGroup<T>[],
+  page: number,
+  size: number,
+): ItemGroup<T>[] {
+  const rows = groups.flatMap((group) =>
+    group.items.map((item) => ({ title: group.title, item })),
+  );
+  const last = Math.max(1, Math.ceil(rows.length / size));
+  const at = (Math.min(Math.max(1, Math.floor(page) || 1), last) - 1) * size;
+  const out: ItemGroup<T>[] = [];
+  for (const { title, item } of rows.slice(at, at + size)) {
+    const tail = out[out.length - 1];
+    if (tail && tail.title === title) tail.items.push(item);
+    else out.push({ title, items: [item] });
+  }
+  return out;
+}
+
 /** A group of the flow page's items: its header (null for none) and its rows. */
 export type ItemGroup<T> = { title: string | null; items: T[] };
 
@@ -189,15 +238,19 @@ export function groupChoices(
  * values typed for it alike — then items with no value, under no header; the
  * rows A–Z by title in each. `chosen` (a `groupChoices` value) keeps the one
  * group it names; "All", or a group no item carries now, keeps them all. No
- * group field: one group, under no header, A–Z.
+ * group field: one group, under no header, A–Z. `order` "newest" keeps the
+ * platform's order in each group instead (a long list's sort).
  */
 export function groupItems<T extends ItemRowOf>(
   items: readonly T[],
   groupField: Pick<ItemField, "key"> | undefined,
   chosen: string = ALL_GROUPS,
+  order: ItemOrder = "az",
 ): ItemGroup<T>[] {
   if (!groupField) {
-    return items.length > 0 ? [{ title: null, items: titlesAZ(items) }] : [];
+    return items.length > 0
+      ? [{ title: null, items: inOrder(items, order) }]
+      : [];
   }
   const byValue = new Map<string, T[]>();
   const ungrouped: T[] = [];
@@ -211,16 +264,18 @@ export function groupItems<T extends ItemRowOf>(
   }
   const picked = chosen.startsWith(GROUP) ? chosen.slice(GROUP.length) : null;
   if (picked !== null && byValue.has(picked)) {
-    return [{ title: picked, items: titlesAZ(byValue.get(picked) ?? []) }];
+    return [
+      { title: picked, items: inOrder(byValue.get(picked) ?? [], order) },
+    ];
   }
   const groups: ItemGroup<T>[] = [...byValue.keys()]
     .sort(byWords)
     .map((value) => ({
       title: value,
-      items: titlesAZ(byValue.get(value) ?? []),
+      items: inOrder(byValue.get(value) ?? [], order),
     }));
   if (ungrouped.length > 0)
-    groups.push({ title: null, items: titlesAZ(ungrouped) });
+    groups.push({ title: null, items: inOrder(ungrouped, order) });
   return groups;
 }
 

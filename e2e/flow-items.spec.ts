@@ -1,11 +1,17 @@
 import { AxeBuilder } from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Download, type Page } from "@playwright/test";
+import { SPACING } from "../lib/spacing";
 import {
+  drawnGapBelow,
   expectNoAxeViolations,
   fixtureControl,
   fixtureRead,
+  observe,
   presentSession,
   runForm,
+  shared,
+  spacingPx,
+  standInShareSheet,
 } from "./helpers";
 
 /**
@@ -184,6 +190,80 @@ test("a flow with items: no Dashboard, no Steps; its items grouped A–Z, rows A
   await expect(filter).toHaveText("South");
 });
 
+/** The flow page's item rows' titles, in order. */
+const itemTitles = (page: Page) =>
+  page
+    .getByTestId("flow-items")
+    .locator('a[data-testid^="flow-item-"]')
+    .evaluateAll((rows) =>
+      rows.map(
+        (row) => row.querySelector("span.truncate")?.textContent?.trim() ?? "",
+      ),
+    );
+
+test("a flow's items: Search {items} finds by title as it is typed, case-free, and a miss says so; past 25, A to Z or Newest first, and pages, a new sort on page 1 (Round 21 v2; ADR-0048 amendment 1)", async ({
+  page,
+}) => {
+  await page.goto(FLOW);
+  const search = page.getByTestId("flow-items-search");
+  await expect(search).toHaveAttribute("placeholder", "Search batches");
+  // Four items: no sort and no pages.
+  await expect(page.getByTestId("flow-items-sort")).toHaveCount(0);
+  await expect(page.getByTestId("flow-items-pager")).toHaveCount(0);
+  await search.fill("INTAKE");
+  await expect
+    .poll(() => itemTitles(page))
+    .toEqual(["Autumn intake", "Winter intake", "Spring intake"]);
+  await search.fill("zzzz");
+  await expect(page.locator("main")).toContainText('Nothing matches "zzzz".');
+  await expect(page.getByTestId("flow-items")).toHaveCount(0);
+  await page.getByRole("button", { name: "Clear search" }).click();
+  await expect.poll(async () => (await itemTitles(page)).length).toBe(4);
+
+  // Thirty-two: sorted, A to Z first, and paged by 25.
+  await fixtureControl("items-many");
+  await page.reload();
+  const pager = page.getByTestId("flow-items-pager");
+  const sort = page.getByTestId("flow-items-sort");
+  await expect(pager).toContainText("Page 1 of 2");
+  await expect(sort).toHaveText("A to Z");
+  await expect.poll(async () => (await itemTitles(page)).length).toBe(25);
+  await pager.getByRole("button", { name: "Next page" }).click();
+  await expect(pager).toContainText("Page 2 of 2");
+  // A to Z: South's rows, Extra intake 23 to 28, then Spring intake.
+  await expect
+    .poll(() => itemTitles(page))
+    .toEqual([
+      ...[23, 24, 25, 26, 27, 28].map((n) => `Extra intake ${n}`),
+      "Spring intake",
+    ]);
+  // Newest first: the platform's order, from page 1.
+  await sort.click();
+  await page
+    .getByTestId("flow-items-sort-menu")
+    .getByRole("option", { name: "Newest first" })
+    .click();
+  await expect(sort).toHaveText("Newest first");
+  await expect(pager).toContainText("Page 1 of 2");
+  const newest = await itemTitles(page);
+  expect(newest).toHaveLength(25);
+  expect(newest.slice(0, 3)).toEqual([
+    "Harbour list",
+    "Autumn intake",
+    "Winter intake",
+  ]);
+  expect(newest.slice(17, 19)).toEqual(["Spring intake", "Extra intake 15"]);
+  await pager.getByRole("button", { name: "Next page" }).click();
+  await expect(pager).toContainText("Page 2 of 2");
+  await expect.poll(async () => (await itemTitles(page)).length).toBe(7);
+  // A search goes back to page 1, and finds across the pages.
+  await search.fill("intake 2");
+  await expect.poll(async () => (await itemTitles(page)).length).toBe(9);
+  await expect(page.getByTestId("flow-items-pager")).toContainText(
+    "Page 1 of 1",
+  );
+});
+
 test("a member sees the items and an item's runs, without Upload, Add or Archive", async ({
   page,
 }) => {
@@ -325,7 +405,12 @@ test("an item's page: its runs ranked as the platform answers in compact rows th
     await runs
       .locator("li")
       .evaluateAll((rows) => rows.map((row) => (row.textContent ?? "").trim())),
-  ).toEqual(["1Ada LaneScore 91", "2Ben ItoScore 64", "3Reading…", "4Failed"]);
+  ).toEqual([
+    "1Ada LaneKeepScore 91",
+    "2Ben ItoDropScore 64",
+    "3Reading…",
+    "4Failed",
+  ]);
   await expect(itemRun(page, 4)).toHaveAttribute("data-dim", "true");
   await expect(itemRun(page, 1)).not.toHaveAttribute("data-dim", "true");
   // What was read from its file is not on its page (build 28, item 4).
@@ -360,19 +445,101 @@ test("an item's page: its runs ranked as the platform answers in compact rows th
       .locator("li")
       .evaluateAll((rows) => rows.map((row) => (row.textContent ?? "").trim())),
   ).toEqual([
-    "1Ada LaneScore 91",
-    "2Ben ItoScore 64",
+    "1Ada LaneKeepScore 91",
+    "2Ben ItoDropScore 64",
     "3Reading…",
     "4Reading…",
     "5Failed",
   ]);
   // A compact row is a closed section's height (build 28, item 5: "the size
-  // of the must haves drop down").
+  // of the must haves drop down"): its bar. The rows are one card now, the
+  // borders the card's (Round 21 v2, F2), so a row is the section's bar, the
+  // section's own border outside it.
   const rowHeight = (await itemRun(page, 1).boundingBox())?.height;
   await page.goto(SCORED_RUN);
-  const sectionHeight = (await runSection(page, 2).boundingBox())?.height;
+  const sectionHeight = (
+    await runSection(page, 2).locator("summary").boundingBox()
+  )?.height;
   expect(rowHeight).toBeGreaterThan(0);
   expect(Math.abs((rowHeight ?? 0) - (sectionHeight ?? 0))).toBeLessThan(1);
+});
+
+test("an item's ranked runs: each score in its verdict's colour, green for Keep and red for Drop, its word as a chip beside it, in one bordered card; Search finds a run by its name, and a miss says so (Round 21 v2, F2)", async ({
+  page,
+}) => {
+  await page.goto(ITEM);
+  const ada = itemRun(page, 1);
+  const ben = itemRun(page, 2);
+  await expect(ada).toContainText("Ada Lane");
+  await expect(ben).toContainText("Ben Ito");
+  const score = (row: typeof ada) => row.getByTestId("block-list-value");
+  await expect(score(ada)).toHaveAttribute("data-tone", "success");
+  await expect(score(ben)).toHaveAttribute("data-tone", "error");
+  await expect(ada.getByTestId("block-badge")).toHaveText("Keep");
+  await expect(ben.getByTestId("block-badge")).toHaveText("Drop");
+  await expect(ada.getByTestId("block-badge")).toHaveAttribute(
+    "data-tone",
+    "success",
+  );
+  await expect(ben.getByTestId("block-badge")).toHaveAttribute(
+    "data-tone",
+    "error",
+  );
+  const colour = (row: typeof ada) =>
+    score(row).evaluate((element) => getComputedStyle(element).color);
+  expect(await colour(ada)).not.toBe(await colour(ben));
+  // The runs are one card of rows, bordered.
+  expect(
+    await itemRuns(page).evaluate(
+      (element) => getComputedStyle(element).borderTopWidth,
+    ),
+  ).not.toBe("0px");
+  // The platform marks the runs searchable: the box, whatever their length.
+  const paged = page.getByTestId("item-blocks").getByTestId("block-paged");
+  const search = paged.getByTestId("list-search");
+  await expect(search).toHaveAttribute("placeholder", "Search");
+  await search.fill("ben");
+  await expect(itemRuns(page).getByTestId("block-list-row")).toHaveCount(1);
+  await expect(itemRun(page, 1)).toContainText("Ben Ito");
+  await search.fill("zzzz");
+  await expect(paged).toContainText('Nothing matches "zzzz".');
+  await paged.getByRole("button", { name: "Clear search" }).click();
+  await expect(itemRuns(page).getByTestId("block-list-row")).toHaveCount(4);
+});
+
+test("an item's page as drawn: each title sits the spacing table's title gap above what it heads, and its group gap below the block before (lib/spacing.ts; Round 21 v2, F3)", async ({
+  page,
+}) => {
+  await page.goto(ITEM);
+  const labels = page.locator("main").getByTestId("block-label");
+  await expect(labels.first()).toBeVisible();
+  const titles = await labels.allInnerTexts();
+  expect(titles.length).toBeGreaterThanOrEqual(2);
+  const below: [string, number | null][] = [];
+  for (const [at, title] of titles.entries())
+    below.push([title, await drawnGapBelow(labels.nth(at))]);
+  expect(below).toEqual(
+    titles.map((title) => [title, spacingPx(SPACING.title.top)]),
+  );
+  // Above each title that follows a block: the block's own wrapper, measured
+  // from the last block drawn before it.
+  const above = await labels.evaluateAll((all) =>
+    all.map((label) => {
+      const wrapper = label.parentElement!;
+      let previous = wrapper.previousElementSibling;
+      while (previous && previous.getBoundingClientRect().height === 0)
+        previous = previous.previousElementSibling;
+      return previous
+        ? Math.round(
+            wrapper.getBoundingClientRect().top -
+              previous.getBoundingClientRect().bottom,
+          )
+        : null;
+    }),
+  );
+  const measured = above.filter((gap) => gap !== null);
+  expect(measured.length).toBeGreaterThanOrEqual(1);
+  expect(measured).toEqual(measured.map(() => spacingPx(SPACING.group.top)));
 });
 
 test('a run with a title and a score is headed by them; its sections first, under "{Run word} details", rows, the first open; a link only when http or https, opening outside; then Run details, its page the result line, the steps and the facts; axe', async ({
@@ -383,6 +550,17 @@ test('a run with a title and a score is headed by them; its sections first, unde
     page.getByRole("heading", { level: 1, name: "Ada Lane" }),
   ).toBeVisible();
   await expect(page.getByTestId("run-score")).toHaveText("Score 91");
+  // In its verdict's colour, its word a chip beside it (Round 21 v2, F1).
+  await expect(page.getByTestId("run-score")).toHaveAttribute(
+    "data-tone",
+    "success",
+  );
+  await expect(
+    page
+      .getByTestId("run-score")
+      .locator("xpath=..")
+      .getByTestId("block-badge"),
+  ).toHaveText("Keep");
   // "{Run word} details" over its sections; no result line here (build 28,
   // items 7 and 8: "Instead of strong match 6 of 6").
   await expect(
@@ -442,28 +620,40 @@ test('a run with a title and a score is headed by them; its sections first, unde
   await expectNoAxeViolations(page);
 });
 
+test("a run judged negative is headed by its score in red, its word Drop a chip beside it; positive, green and Keep (Round 21 v2, F1)", async ({
+  page,
+}) => {
+  await page.goto(SCORED_RUN);
+  const score = page.getByTestId("run-score");
+  const chip = score.locator("xpath=..").getByTestId("block-badge");
+  await expect(score).toHaveAttribute("data-tone", "success");
+  await expect(chip).toHaveAttribute("data-tone", "success");
+  const green = await score.evaluate(
+    (element) => getComputedStyle(element).color,
+  );
+  await fixtureControl("scored-run-negative");
+  await page.reload();
+  await expect(score).toHaveText("Score 91");
+  await expect(score).toHaveAttribute("data-tone", "error");
+  await expect(chip).toHaveText("Drop");
+  await expect(chip).toHaveAttribute("data-tone", "error");
+  expect(
+    await score.evaluate((element) => getComputedStyle(element).color),
+  ).not.toBe(green);
+});
+
 // Build 28 (plan §1, §3): the fixture's files behind their signed links.
 const ITEM_FILE_LINK =
   "https://127.0.0.1:3443/__fixture/run-file?id=d1d1d1d1-d1d1-4d1d-8d1d-d1d1d1d1d1d1&name=spring-intake.pdf";
 const ENTRY_FILE = "d2d2d2d2-d2d2-4d2d-8d2d-d2d2d2d2d2d2";
 const ENTRY_FILE_LINK = `https://127.0.0.1:3443/__fixture/run-file?id=${ENTRY_FILE}&name=ada-lane.pdf`;
 
-/** The share sheet, stood in for: what it was handed is kept on the page. */
-async function standInShareSheet(page: Page) {
-  await page.addInitScript(() => {
-    Object.assign(navigator, {
-      canShare: () => true,
-      share: async (data: ShareData) => {
-        const file = data.files?.[0];
-        Object.assign(window, {
-          shared: file
-            ? { name: file.name, type: file.type, size: file.size }
-            : null,
-        });
-      },
-    });
-  });
-}
+/**
+ * A download from the platform's signed link: a headless browser may save the
+ * file page's own frame (its PDF, from the page's read) as a download too.
+ */
+const fromSignedLink = (download: Download) =>
+  download.url().startsWith("https://127.0.0.1:3443/");
 
 /** WCAG 2.2 AA on a file's page; its frame holds the file, not this site's page. */
 async function expectNoAxeViolationsBesideTheFile(page: Page) {
@@ -522,6 +712,10 @@ test("an item's tiles: Total, then the flow's verdict words — green and red �
   ).toBe(true);
   await expectNoAxeViolations(page);
 
+  // Each read of the file page's route, from here on.
+  const views = observe(page, (request) =>
+    new URL(request.url()).pathname.endsWith("/file/view"),
+  );
   await page.getByRole("link", { name: "Batch file" }).click();
   await expect(page).toHaveURL(new RegExp(`${ITEM}/file$`, "u"));
   const main = page.locator("main");
@@ -533,12 +727,13 @@ test("an item's tiles: Total, then the flow's verdict words — green and red �
   await expect(page.getByTestId("file-line")).toHaveText(
     /^PDF · 1 page · \d+ bytes$/u,
   );
-  // The file itself, through this site's route: inline, its own type, for
-  // this site's pages alone.
+  // The file itself, read once from this site's route — inline, its own
+  // type, for this site's pages alone — and shown from those bytes.
   await expect(page.getByTestId("file-frame")).toHaveAttribute(
     "src",
-    `${ITEM}/file/view`,
+    /^blob:/u,
   );
+  expect(views).toHaveLength(1);
   const answers = await viewAnswers(page, `${ITEM}/file/view`);
   expect(answers.own).toEqual({
     status: 200,
@@ -557,17 +752,18 @@ test("an item's tiles: Total, then the flow's verdict words — green and red �
   await expectNoAxeViolationsBesideTheFile(page);
   // Download: the platform's signed link; Share: the file itself.
   const [download] = await Promise.all([
-    page.waitForEvent("download"),
+    page.waitForEvent("download", { predicate: fromSignedLink }),
     main.getByRole("button", { name: "Download" }).click(),
   ]);
   expect(download.url()).toBe(ITEM_FILE_LINK);
   await expect(page).toHaveURL(new RegExp(`${ITEM}/file$`, "u"));
+  // Share: the frame's own bytes, at the first press — never read again
+  // (the one more read is viewAnswers').
   await main.getByRole("button", { name: "Share" }).click();
   await expect
-    .poll(() =>
-      page.evaluate(() => (window as unknown as { shared?: unknown }).shared),
-    )
+    .poll(() => shared(page))
     .toMatchObject({ name: "spring-intake.pdf", type: "application/pdf" });
+  expect(views).toHaveLength(2);
   // Back goes to the item.
   await main.getByRole("link", { name: "Back" }).click();
   await expect(page).toHaveURL(new RegExp(`${ITEM}$`, "u"));
@@ -588,7 +784,7 @@ test("an item's file under another flow's path is not found, and a member reads 
   await presentSession(page, "member");
   await page.goto(`${ITEM}/file`);
   const [download] = await Promise.all([
-    page.waitForEvent("download"),
+    page.waitForEvent("download", { predicate: fromSignedLink }),
     page.locator("main").getByRole("button", { name: "Download" }).click(),
   ]);
   expect(download.url()).toBe(ITEM_FILE_LINK);
@@ -623,7 +819,7 @@ test("a run of an item: View {file} first, in the flow's word; its file page: th
   await expect(main).toContainText("Ada Lane");
   await expect(page.getByTestId("file-frame")).toHaveAttribute(
     "src",
-    `${filePage}/view`,
+    /^blob:/u,
   );
   const answers = await viewAnswers(page, `${filePage}/view`);
   expect(answers.own).toMatchObject({
@@ -634,7 +830,7 @@ test("a run of an item: View {file} first, in the flow's word; its file page: th
   expect(answers.elsewhere).toBe(403);
   await expectNoAxeViolationsBesideTheFile(page);
   const [download] = await Promise.all([
-    page.waitForEvent("download"),
+    page.waitForEvent("download", { predicate: fromSignedLink }),
     main.getByRole("button", { name: "Download" }).click(),
   ]);
   expect(download.url()).toBe(ENTRY_FILE_LINK);
@@ -650,6 +846,24 @@ test("a run of an item: View {file} first, in the flow's word; its file page: th
       `${SCORED_RUN}/files/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/view`,
     ),
   ).toBe(404);
+});
+
+test("a run's file page whose file the platform no longer links: the frame shows this site's route itself, which says why, and Share, reading at the press, says it could not share and hands nothing on (Round 21 v2, FileView)", async ({
+  page,
+}) => {
+  await standInShareSheet(page);
+  const filePage = `${SCORED_RUN}/files/${ENTRY_FILE}`;
+  await fixtureControl("entry-file-link-gone");
+  await page.goto(filePage);
+  await expect(page.getByTestId("file-frame")).toHaveAttribute(
+    "src",
+    `${filePage}/view`,
+  );
+  const actions = page.getByTestId("file-actions");
+  await actions.getByRole("button", { name: "Share" }).click();
+  await expect(actions).toContainText("Could not share. Try again.");
+  expect(await shared(page)).toBeUndefined();
+  await expect(actions.getByRole("button", { name: "Share" })).toBeEnabled();
 });
 
 test("Archive batch asks first, then the item leaves its flow's list", async ({

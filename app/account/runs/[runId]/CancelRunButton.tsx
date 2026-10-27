@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import Modal from "@/components/ui/Modal";
 import { cancelRun } from "@/app/account/flows/actions";
+import { SPACING } from "@/lib/spacing";
 
 /**
  * Cancel a run that has not ended (`cancelRun`). Rendered only for a `pending`
@@ -66,13 +67,15 @@ export function CancelRunButton({
           </h2>
           <p
             id="cancel-run-description"
-            className="mt-1 text-sm text-[var(--muted)]"
+            className={`${SPACING.title.top} text-sm text-[var(--muted)]`}
           >
             It stops where it is and is not resumed. Steps it already finished
             stay finished.
           </p>
-          <FormError message={error} className="mt-3" />
-          <div className="mt-6 flex flex-wrap gap-2">
+          <FormError message={error} className={SPACING.inner.top} />
+          <div
+            className={`${SPACING.group.top} flex flex-wrap ${SPACING.inner.gap}`}
+          >
             <Button
               type="button"
               variant="ghost"

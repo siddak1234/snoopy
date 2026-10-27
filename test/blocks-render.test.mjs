@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { after, before, test } from "node:test";
+import { BLOCK_FIXTURES } from "../lib/generated/platform-contracts/block-fixtures.ts";
 import {
   elements,
   loadBlocks,
@@ -10,7 +11,8 @@ import {
 } from "./blocks-harness.mjs";
 
 /**
- * The ten block renderers, drawn (backend ADR-0048 decisions 8–10): each type
+ * The thirteen block renderers, drawn (backend ADR-0048 decisions 8–10, and
+ * its amendment 1's image, chart and group): each type
  * its words, its tone's theme token, its open or closed state and its press;
  * and everything this build does not know — a type at the top level or in a
  * section, a form, a page part, a target, a tone, a step state — drawn as the
@@ -36,7 +38,7 @@ const tree = (list, context) => elements(parse(draw(list, context)));
 const byTest = (nodes, id) =>
   nodes.filter((node) => node.attrs["data-testid"] === id);
 
-/** The contract's ten types, read from the generated union. */
+/** The contract's thirteen types, read from the generated union. */
 function unionTypes() {
   const generated = read("lib/generated/platform-contracts/automations.d.ts");
   const start = generated.indexOf("\n    Block:\n");
@@ -47,9 +49,9 @@ function unionTypes() {
   ].map((match) => match[1]);
 }
 
-test("the registry draws exactly the contract's ten types, keyed by the generated union", () => {
+test("the registry draws exactly the contract's thirteen types, keyed by the generated union", () => {
   const types = unionTypes();
-  assert.equal(types.length, 10, types.join(", "));
+  assert.equal(types.length, 13, types.join(", "));
   assert.deepEqual(Object.keys(blocks.RENDERERS).sort(), [...types].sort());
   assert.match(
     read("components/blocks/BlockList.tsx"),
@@ -477,7 +479,7 @@ test("questions: the page's own form for each, with its context; nothing where t
 const UNKNOWN = [
   [
     "an unknown type at the top level",
-    [{ type: "chart", points: [1] }],
+    [{ type: "gauge", points: [1] }],
     (b) => [b.FALLBACK],
   ],
   [
@@ -584,7 +586,7 @@ test("a page's parts follow its flow's manifest, else today's order; a part this
     );
     assert.match(
       page,
-      /<div key=\{`unknown-\$\{at\}`\} className="py-5 first:pt-0">\s*<Fallback \/>/u,
+      /<Group key=\{`unknown-\$\{at\}`\}>\s*<Fallback \/>/u,
       path,
     );
   }
@@ -608,4 +610,159 @@ test("an address opens outside only when it is https with a host and no user or 
     undefined,
   ])
     assert.equal(httpsLink(refused), null, String(refused));
+});
+
+const fixture = (name) => {
+  const found = BLOCK_FIXTURES.find((one) => one.name === name);
+  assert.ok(found, name);
+  return found;
+};
+
+/** What a renderer hands on: the element a hookless renderer returns, drawn once more. */
+function handedOn(type, block, context = {}) {
+  const element = blocks.RENDERERS[type](block, context, () => null);
+  return element.type(element.props);
+}
+
+test("image: its address is its typed target's alone, the file page's own view route; a planted url gives no outside address", () => {
+  const [image] = fixture("drawn-image").blocks;
+  const picture = handedOn("image", image);
+  const page = `/account/runs/${image.open.runId}/files/${image.open.fileId}`;
+  assert.equal(picture.props.page, page);
+  assert.equal(picture.props.view, `${page}/view`);
+  assert.equal(picture.props.alt, image.alt);
+  assert.equal(picture.props.pdf, false);
+  const [scan] = fixture("drawn-image-pdf").blocks;
+  assert.equal(handedOn("image", scan).props.pdf, true);
+  // A block that names an address of its own: the address stays the target's.
+  const planted = {
+    ...image,
+    url: "https://evil.example.test/x.jpg",
+    src: "https://evil.example.test/y.jpg",
+    alt: "https://evil.example.test/z.jpg",
+  };
+  const drawn = handedOn("image", planted);
+  assert.equal(drawn.props.page, page);
+  assert.equal(drawn.props.view, `${page}/view`);
+  const markup = draw([planted]);
+  assert.doesNotMatch(markup, /evil\.example/u);
+  assert.doesNotMatch(markup, /<img|<iframe/u, "nothing is read on the server");
+  // A target this build does not know: the file's row, with no press.
+  const nodes = tree([{ ...image, open: { target: "elsewhere" } }]);
+  assert.equal(byTest(nodes, "block-image").length, 0);
+  assert.equal(byTest(nodes, "block-file")[0].tag, "div");
+});
+
+test("chart: a box read aloud as its alt, its words text nodes a screen reader skips, its bars SVG widths with no style", () => {
+  for (const name of [
+    "drawn-chart-bar",
+    "drawn-chart-line",
+    "reviewer-item-scores",
+  ]) {
+    const chart = fixture(name).blocks.find((block) => block.type === "chart");
+    const markup = draw([chart]);
+    assert.doesNotMatch(markup, /style=/u, name);
+    const nodes = elements(parse(markup));
+    const [box] = byTest(nodes, "block-chart");
+    assert.equal(box.attrs.role, "img", name);
+    assert.equal(box.attrs["aria-label"], chart.alt, name);
+    for (const child of box.children)
+      assert.equal(child.attrs["aria-hidden"], "true", `${name}: ${child.tag}`);
+  }
+  const [bar] = fixture("drawn-chart-bar").blocks;
+  const widths = byTest(elements(parse(draw([bar]))), "block-chart-bar").map(
+    (rect) => Number(rect.attrs.width),
+  );
+  assert.deepEqual(
+    widths.map((width) => Math.round(width * 100) / 100),
+    [100, 81.36, 25.9],
+  );
+  // Text nodes only: a word that looks like markup stays words.
+  const planted = {
+    ...bar,
+    title: "<b>Spend</b>",
+    points: [{ label: "<i>x</i>", value: 1, text: "1" }],
+  };
+  const markup = draw([planted]);
+  assert.doesNotMatch(markup, /<b>|<i>/u);
+  assert.deepEqual(visibleWords(markup), ["<b>Spend</b>", "<i>x</i>", "1"]);
+  // A line: stretched, its stroke and dots kept; a dot at each of 24 or fewer.
+  const [line] = fixture("drawn-chart-line").blocks;
+  const lineNodes = elements(parse(draw([line])));
+  const svg = lineNodes.find((node) => node.tag === "svg");
+  assert.equal(svg.attrs.preserveAspectRatio, "none");
+  assert.equal(
+    lineNodes.find((node) => node.tag === "polyline").attrs["vector-effect"],
+    "non-scaling-stroke",
+  );
+  assert.equal(byTest(lineNodes, "block-chart-dot").length, 6);
+  const many = {
+    ...line,
+    points: Array.from({ length: 30 }, (_, at) => ({
+      label: `W${at}`,
+      value: at,
+      text: String(at),
+    })),
+  };
+  assert.equal(byTest(tree([many]), "block-chart-dot").length, 0);
+});
+
+test("group: its title, then one card holding its sections as drop-downs, the first open, none sharing a name", () => {
+  const grouped = fixture("reviewer-candidate-grouped");
+  const nodes = tree(grouped.blocks);
+  const [group] = byTest(nodes, "block-group");
+  assert.ok(group, "one group");
+  const inside = elements(group);
+  assert.equal(byTest(inside, "block-group-title")[0].tag, "h2");
+  const cards = group.children.filter((node) =>
+    (node.attrs.class ?? "").includes("divide-y"),
+  );
+  assert.equal(cards.length, 1, "one card");
+  assert.equal(group.children.length, 2, "its title, then its card");
+  const sections = cards[0].children.filter((node) => node.tag === "details");
+  assert.equal(sections.length, 2);
+  assert.equal("open" in sections[0].attrs, true);
+  assert.equal("open" in sections[1].attrs, false);
+  assert.ok(sections.every((section) => !("name" in section.attrs)));
+  // The sections have no box of their own: the card's dividers part them.
+  assert.ok(
+    sections.every((section) => !section.attrs.class.includes("border")),
+  );
+});
+
+test("list: one card of divided rows; each score toned by its valueTone — success green, error red, none plain — beside its chip", () => {
+  const verdicts = fixture("reviewer-item-verdicts");
+  const nodes = tree(verdicts.blocks);
+  const [card] = byTest(nodes, "block-list");
+  assert.equal(card.tag, "ol");
+  assert.match(card.attrs.class, /divide-y/u);
+  assert.match(card.attrs.class, /border/u);
+  const rows = byTest(nodes, "block-list-row");
+  assert.equal(rows.length, 3);
+  assert.ok(
+    rows.every((row) => !/\bborder\b/u.test(row.attrs.class)),
+    "no row its own box",
+  );
+  const values = byTest(nodes, "block-list-value");
+  assert.deepEqual(
+    values.map((value) => [
+      value.attrs["data-tone"],
+      value.attrs.class.match(/text-\[var\(--[a-z-]+\)\]/u)[0],
+    ]),
+    [
+      ["success", "text-[var(--success-text)]"],
+      ["neutral", "text-[var(--text)]"],
+      ["error", "text-[var(--error-text)]"],
+    ],
+  );
+  assert.deepEqual(
+    byTest(nodes, "block-badge").map((chip) => [
+      chip.attrs["data-tone"],
+      chip.children[0].text,
+    ]),
+    [
+      ["success", "Advance"],
+      ["error", "Decline"],
+    ],
+  );
 });

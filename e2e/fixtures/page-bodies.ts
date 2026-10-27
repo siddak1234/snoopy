@@ -453,18 +453,32 @@ export function itemBody(input: ItemPageInput): {
       title: `Add ${smallFirst(declared.runWords.singular)}`,
       form: { kind: "run", itemId: item.id },
     });
+  // Its runs: searchable, each finished one with a verdict green or red,
+  // its word the chip (block set v2, backend item-page.ts `rankedRuns`).
   blocks.push(label(declared.runWords.plural), {
     type: "list",
+    searchable: true,
     items: runs.map((run, index) => {
       const going = run.status === "pending" || run.status === "running";
+      const words = declared.verdictWords;
+      const tone =
+        words && !going && run.verdict
+          ? run.verdict === "positive"
+            ? ("success" as const)
+            : ("error" as const)
+          : undefined;
       return {
         lead: String(index + 1),
         title: going
           ? WORDS.reading
           : (run.title ?? WORDS.unnamed[run.status] ?? run.status),
+        ...(tone && words && run.verdict
+          ? { badge: { text: words[run.verdict], tone } }
+          : {}),
         ...(!going && typeof run.score === "number"
           ? { value: String(run.score), valueLabel: WORDS.score }
           : {}),
+        ...(tone ? { valueTone: tone } : {}),
         ...(run.status === "failed" || run.status === "cancelled"
           ? { muted: true }
           : {}),

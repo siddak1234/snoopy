@@ -1,5 +1,11 @@
+import { PAGE_CARD, SPACING } from "@/lib/spacing";
+
 /**
- * Single main card for a dashboard section. Title row + body; use dividers between blocks.
+ * Single main card for a dashboard section. Title row + body; use dividers
+ * between blocks. Spaced by the table (`lib/spacing.ts`): `card` inside it,
+ * `cardWide` on a wide screen; the title's line `title` above the subheader;
+ * `group` between the header and the body, whose bands (`Group`) are
+ * `group` apart, none above the first.
  */
 export default function SectionCard({
   title,
@@ -32,29 +38,39 @@ export default function SectionCard({
   const subheaderText = subheader ?? defaultSubheader[title] ?? "";
 
   return (
-    <div className="bubble px-6 py-6 sm:px-8 sm:py-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className={back ? "flex min-w-0 items-start gap-3" : undefined}>
+    <div className={`bubble ${PAGE_CARD}`}>
+      <div
+        className={`flex flex-col ${SPACING.group.gap} sm:flex-row sm:items-start sm:justify-between`}
+      >
+        <div
+          className={
+            back ? `flex min-w-0 items-start ${SPACING.inner.gap}` : undefined
+          }
+        >
           {back}
           <div className="min-w-0">
             <h1 className="text-2xl font-medium text-[var(--text)]">
               {greeting ?? title}
             </h1>
             {subheaderText ? (
-              <p className="mt-1 text-sm text-[var(--muted)]">
+              <p className={`${SPACING.title.top} text-sm text-[var(--muted)]`}>
                 {subheaderText}
               </p>
             ) : null}
           </div>
         </div>
         {(primaryAction ?? secondaryAction) ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <div
+            className={`flex shrink-0 flex-wrap items-center ${SPACING.inner.gap}`}
+          >
             {primaryAction}
             {secondaryAction}
           </div>
         ) : null}
       </div>
-      <div className="mt-6 flex flex-col divide-y divide-[var(--ring)]">
+      <div
+        className={`${SPACING.group.top} flex flex-col divide-y divide-[var(--ring)]`}
+      >
         {children}
       </div>
     </div>

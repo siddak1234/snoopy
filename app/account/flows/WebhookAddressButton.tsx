@@ -7,6 +7,7 @@ import Modal from "@/components/ui/Modal";
 import type { IssuedWebhookEndpoint, WebhookEndpoint } from "@/lib/automations";
 import { formatDateMediumUTC } from "@/lib/date";
 import { issueWebhookAddress, readWebhookAddress } from "./webhook-actions";
+import { CARD, SPACING } from "@/lib/spacing";
 
 /**
  * Where a vendor sends the events that start this automation (backend §12.1
@@ -117,28 +118,32 @@ export function WebhookAddressButton({
           </h2>
           <p
             id={`${titleId}-desc`}
-            className="mt-1 text-sm text-[var(--muted)]"
+            className={`${SPACING.title.top} text-sm text-[var(--muted)]`}
           >
             Where a service sends the events that start this flow — give it this
             address and the secret, which it sends as the{" "}
             <code>x-autom8x-webhook-secret</code> header.
           </p>
           {endpoint === undefined && !error ? (
-            <p className="mt-4 text-sm text-[var(--muted)]">Loading…</p>
+            <p className={`${SPACING.group.top} text-sm text-[var(--muted)]`}>
+              Loading…
+            </p>
           ) : null}
           {address ? (
-            <p className="mt-4 text-sm break-all text-[var(--text)]">
+            <p
+              className={`${SPACING.group.top} text-sm break-all text-[var(--text)]`}
+            >
               <span className="block text-xs text-[var(--muted)]">Address</span>
               <code>{address}</code>
             </p>
           ) : null}
           {endpoint && !address ? (
-            <p className="mt-4 text-sm text-[var(--text)]">
+            <p className={`${SPACING.group.top} text-sm text-[var(--text)]`}>
               Address id <code>{endpoint.endpointId}</code>
             </p>
           ) : null}
           {endpoint?.lastDeliveryAt ? (
-            <p className="mt-2 text-xs text-[var(--muted)]">
+            <p className={`${SPACING.inner.top} text-xs text-[var(--muted)]`}>
               Last delivery {formatDateMediumUTC(endpoint.lastDeliveryAt)}
               {endpoint.lastOutcome
                 ? `: ${endpoint.lastOutcome.replaceAll("_", " ")}`
@@ -154,22 +159,28 @@ export function WebhookAddressButton({
               : ""}
           </p>
           {issued ? (
-            <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--ring)] p-3">
+            <div
+              className={`${SPACING.group.top} rounded-[var(--radius-md)] border border-[var(--ring)] ${CARD}`}
+            >
               <p className="text-xs text-[var(--muted)]">
                 Secret — shown this once. Copy it now.
               </p>
-              <code className="mt-1 block text-sm break-all text-[var(--text)]">
+              <code
+                className={`${SPACING.inner.top} block text-sm break-all text-[var(--text)]`}
+              >
                 {issued.secret}
               </code>
             </div>
           ) : null}
           {endpoint === null ? (
-            <p className="mt-4 text-sm text-[var(--muted)]">
+            <p className={`${SPACING.group.top} text-sm text-[var(--muted)]`}>
               This flow has no address yet.
             </p>
           ) : null}
-          <FormError message={error} className="mt-3" />
-          <div className="mt-6 flex flex-wrap gap-2">
+          <FormError message={error} className={SPACING.inner.top} />
+          <div
+            className={`${SPACING.group.top} flex flex-wrap ${SPACING.inner.gap}`}
+          >
             <Button
               type="button"
               variant="ghost"
@@ -189,7 +200,7 @@ export function WebhookAddressButton({
             ) : null}
           </div>
           {endpoint ? (
-            <p className="mt-3 text-xs text-[var(--muted)]">
+            <p className={`${SPACING.inner.top} text-xs text-[var(--muted)]`}>
               A new secret keeps the address and stops the old secret at once.
             </p>
           ) : null}

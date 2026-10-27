@@ -19,11 +19,13 @@ import { runLabel } from "@/lib/run-progress";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
+import { Group } from "@/components/dashboard/Group";
+import { PageRow } from "@/components/dashboard/PageRow";
+import { LIST_CARD } from "@/components/dashboard/SectionRows";
 import { StatusPill } from "@/components/dashboard/StatusPill";
+import { Button } from "@/components/ui/Button";
+import { GROUP_BAND, ROW, SPACING } from "@/lib/spacing";
 import { TodayTiles } from "./TodayTiles";
-
-const HEADING =
-  "text-xs font-medium tracking-wide text-[var(--muted)] uppercase";
 
 /** How many recent runs the dashboard lists, as the app's RECENT RUNS (Build 22, the session's S27). */
 const RECENT_RUNS = 4;
@@ -132,27 +134,20 @@ export default async function AccountDashboardPage() {
       subheader="Here's what's happening in your workspace."
     >
       {home ? (
-        <section
-          aria-labelledby="today-title"
-          data-testid="home-today"
-          className="py-5 first:pt-0"
-        >
-          <h2 id="today-title" className={HEADING}>
-            Today
-          </h2>
+        <Group title="Today" titleId="today-title" testId="home-today">
           <TodayTiles workspaceId={home.workspaceId} />
-        </section>
+        </Group>
       ) : (
         <EmptyRow text="No workspace is active yet." />
       )}
 
       {home && home.pending > 0 ? (
-        <div className="py-5">
+        <div className={GROUP_BAND}>
           <Link
             prefetch={false}
             href="/account/approvals"
             data-testid="home-approvals"
-            className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--accent)] bg-[var(--chip-bg)] px-4 py-3 transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+            className={`flex items-center ${SPACING.inner.gap} rounded-[var(--radius-md)] border border-[var(--accent)] bg-[var(--chip-bg)] ${ROW} transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]`}
           >
             <HandPalmIcon
               aria-hidden
@@ -183,48 +178,47 @@ export default async function AccountDashboardPage() {
           title="Nothing automated. Yet."
           text="Add a prebuilt flow and your first agent is running in minutes — no building required."
           action={
-            <Link
-              prefetch={false}
+            <Button
               href="/account/flows"
-              className="btn-primary inline-flex items-center gap-2 px-5"
+              prefetch={false}
+              className={`inline-flex items-center ${SPACING.inner.gap}`}
             >
               <PlusIcon aria-hidden size={20} />
               Add a flow
-            </Link>
+            </Button>
           }
         />
       ) : home ? (
         <>
-          <div data-testid="home-quick-actions" className="py-5">
-            <div className="grid grid-cols-2 gap-3 sm:max-w-md">
-              <Link
-                prefetch={false}
+          <div data-testid="home-quick-actions" className={GROUP_BAND}>
+            <div
+              className={`grid grid-cols-2 ${SPACING.inner.gap} sm:max-w-md`}
+            >
+              <Button
                 href="/account/flows"
-                className="btn-primary inline-flex items-center justify-center gap-2 px-5"
+                prefetch={false}
+                className={`inline-flex items-center justify-center ${SPACING.inner.gap}`}
               >
                 <PlusIcon aria-hidden size={20} />
                 Add a flow
-              </Link>
-              <Link
-                prefetch={false}
+              </Button>
+              <Button
                 href="/account/flows"
-                className="btn-secondary inline-flex items-center justify-center gap-2 px-5"
+                variant="secondary"
+                prefetch={false}
+                className={`inline-flex items-center justify-center ${SPACING.inner.gap}`}
               >
                 <FlowArrowIcon aria-hidden size={20} />
                 Flows
-              </Link>
+              </Button>
             </div>
           </div>
 
-          <section
-            aria-labelledby="recent-runs-title"
-            data-testid="home-recent-runs"
-            className="py-5"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <h2 id="recent-runs-title" className={HEADING}>
-                Recent runs
-              </h2>
+          <Group
+            title="Recent runs"
+            titleId="recent-runs-title"
+            testId="home-recent-runs"
+            action={
               <Link
                 prefetch={false}
                 href="/account/runs"
@@ -232,38 +226,38 @@ export default async function AccountDashboardPage() {
               >
                 See all
               </Link>
-            </div>
+            }
+          >
             {home.recent === null ? (
-              <p className="mt-3 text-sm text-[var(--muted)]">
+              <p className="text-sm text-[var(--muted)]">
                 Recent activity could not be read just now.
               </p>
             ) : home.recent.length > 0 ? (
-              <ul className="mt-3 space-y-2">
+              <ul className={LIST_CARD}>
                 {home.recent.map(({ run, name }) => (
                   <li key={run.id}>
-                    <Link
-                      prefetch={false}
+                    <PageRow
                       href={`/account/runs/${encodeURIComponent(run.id)}`}
-                      aria-label={`Run of ${name}, ${run.status}`}
-                      className="flex flex-wrap items-center gap-2 rounded-xl px-2 py-2 transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset"
+                      boxed={false}
+                      label={`Run of ${name}, ${run.status}`}
+                      end={<StatusPill status={run.status} />}
                     >
-                      <span className="font-medium text-[var(--text)]">
-                        {name}
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate font-medium text-[var(--text)]">
+                          {name}
+                        </span>
+                        <span className="text-xs break-all text-[var(--muted)]">
+                          {formatWhen(run.createdAt)} · {runLabel(run.id)}
+                        </span>
                       </span>
-                      <StatusPill status={run.status} />
-                      <span className="text-xs break-all text-[var(--muted)]">
-                        {formatWhen(run.createdAt)} · {runLabel(run.id)}
-                      </span>
-                    </Link>
+                    </PageRow>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="mt-3 text-sm text-[var(--muted)]">
-                No activity yet.
-              </p>
+              <p className="text-sm text-[var(--muted)]">No activity yet.</p>
             )}
-          </section>
+          </Group>
         </>
       ) : null}
     </SectionCard>

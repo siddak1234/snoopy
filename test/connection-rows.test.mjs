@@ -18,7 +18,7 @@ import {
  * format and size for each connection component on the list not random
  * buttons"): line 2 says the account's email, else its state; one button of
  * ours — Connect, Reconnect, Disconnect — and Disconnect asks first, saying
- * what it stops. The app's words (snoopy-mobile `lib/content/screen-states.ts`).
+ * what it stops. The app's words (`snoopy-mobile/lib/content/screen-states.ts`).
  */
 
 const read = (path) =>
@@ -146,6 +146,6 @@ test("Connections lists every provider in one row each — no description, no 'U
   const row = read("components/dashboard/ConnectionRow.tsx");
   assert.match(
     row,
-    /"flex min-h-16 w-full items-center gap-3 py-3 text-left"/u,
+    /"flex min-h-16 w-full items-center gap-2 py-3 text-left"/u,
   );
 });

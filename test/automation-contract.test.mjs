@@ -1053,7 +1053,7 @@ test("archived flows are read by name, and only rows that are archived are kept 
     /`\$\{scope\(workspaceId\)\}\/subscriptions\?status=archived`,\s*\);\s*return response\.subscriptions\.filter\(\s*\(subscription\) => subscription\.status === "archived",\s*\);/u,
   );
   assert.match(page, /listArchivedSubscriptions\(workspaceId\)/u);
-  assert.match(page, />\s*Archived flows\s*</u);
+  assert.match(page, /<Group title="Archived flows">/u);
   assert.match(page, /Archived \{formatDay\(subscription\.updatedAt\)\}/u);
 });
 

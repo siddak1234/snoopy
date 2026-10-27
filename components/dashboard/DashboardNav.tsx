@@ -159,7 +159,7 @@ export function DashboardHeader({ showOrgSettings }: OrganizationLinks) {
 
   return (
     <div ref={containerRef} className="relative lg:hidden">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => setMenuOpen((prev) => !prev)}

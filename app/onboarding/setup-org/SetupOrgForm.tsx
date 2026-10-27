@@ -8,6 +8,7 @@ import {
 } from "@/app/onboarding/actions";
 import { FormInput } from "@/components/ui/FormInput";
 import { FormError } from "@/components/ui/FormError";
+import { Button } from "@/components/ui/Button";
 
 export function SetupOrgForm({ domain }: { domain: string }) {
   const [error, setError] = useState<string | null>(null);
@@ -98,17 +99,17 @@ export function SetupOrgForm({ domain }: { domain: string }) {
 
       <FormError message={error} />
 
-      <button
+      <Button
         type="submit"
         disabled={busy}
-        className="btn-primary inline-flex w-full justify-center px-5 disabled:opacity-60"
+        className="w-full justify-center disabled:opacity-60"
       >
         {pending === "create"
           ? "Creating…"
           : createdId
             ? `Claim ${domain} again`
             : "Create organization"}
-      </button>
+      </Button>
 
       <div className="relative flex items-center py-1">
         <div className="flex-grow border-t border-[var(--ring)]" />

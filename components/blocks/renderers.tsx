@@ -3,27 +3,35 @@ import { CaretDownIcon } from "@phosphor-icons/react/dist/ssr/CaretDown";
 import { CaretRightIcon } from "@phosphor-icons/react/dist/ssr/CaretRight";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { PageRow } from "@/components/dashboard/PageRow";
-import { SECTION_BAR, SECTION_ROW } from "@/components/dashboard/SectionRows";
+import { SectionTitle } from "@/components/dashboard/SectionTitle";
+import {
+  LIST_CARD,
+  SECTION_BAR,
+  SECTION_ROW,
+} from "@/components/dashboard/SectionRows";
 import { Tile } from "@/components/dashboard/Tile";
 import { TrackerItem } from "@/components/dashboard/TrackerItem";
 import type { Block } from "@/lib/automations";
+import { fileViewHref } from "@/lib/run-files";
+import { CARD, ROW, SPACING } from "@/lib/spacing";
 import { Fallback } from "./Fallback";
 import {
   CHIP,
-  LABEL,
   chipTone,
   httpsLink,
   openHref,
   textTone,
   type BlockPlace,
 } from "./look";
+import { Picture } from "./Picture";
 
 /**
  * One renderer per block type (backend ADR-0048 decision 8), each made from a
  * part this site already has, and none using a hook — so the server-drawn
  * file pages draw them as the live pages do. Every word is the block's, as
  * sent and in order; nothing here adds, drops or rewords one. Text nodes
- * only: no markup is ever made from a block's words.
+ * only: no markup is ever made from a block's words. Spaced by the table
+ * alone (`lib/spacing.ts`; the spacing check).
  */
 
 export type BlockOf<K extends Block["type"]> = Extract<Block, { type: K }>;
@@ -47,7 +55,7 @@ export type DrawBlocks = (blocks: readonly unknown[]) => ReactNode;
 const KNOWN_FORMS: readonly string[] = ["approval", "run", "item", "setup"];
 
 /** A chip: a badge block, a section's, a list row's. */
-function Chip({ badge }: { badge: { text: string; tone?: unknown } }) {
+export function Chip({ badge }: { badge: { text: string; tone?: unknown } }) {
   return (
     <span
       data-testid="block-badge"
@@ -66,11 +74,7 @@ function Chip({ badge }: { badge: { text: string; tone?: unknown } }) {
  */
 export function TextBlock({ block }: { block: BlockOf<"text"> }) {
   if (block.style === "label")
-    return (
-      <h2 data-testid="block-label" className={`${LABEL} pt-2 first:pt-0`}>
-        {block.text}
-      </h2>
-    );
+    return <SectionTitle testId="block-label">{block.text}</SectionTitle>;
   if (block.style === "muted")
     return (
       <p
@@ -98,7 +102,7 @@ export function MetricBlock({ block }: { block: BlockOf<"metric"> }) {
   return (
     <dl
       data-testid="block-metric"
-      className={`grid gap-3 ${columns[Math.min(block.items.length, 4) - 1] ?? "grid-cols-4"}`}
+      className={`grid ${SPACING.inner.gap} ${columns[Math.min(block.items.length, 4) - 1] ?? "grid-cols-4"}`}
     >
       {block.items.map((item, index) => (
         <Tile
@@ -142,7 +146,7 @@ export function TableBlock({ block }: { block: BlockOf<"table"> }) {
               <th
                 key={index}
                 scope="col"
-                className={`pb-1.5 text-xs font-medium text-[var(--muted)] ${align(index)}`}
+                className={`${SPACING.inner.pb} text-xs font-medium text-[var(--muted)] ${align(index)}`}
               >
                 {column.title ?? ""}
               </th>
@@ -163,7 +167,7 @@ export function TableBlock({ block }: { block: BlockOf<"table"> }) {
             {block.columns.map((_, index) => (
               <td
                 key={index}
-                className={`py-0.5 align-top break-words ${index > 0 ? "pl-4" : ""} ${align(index)} ${muted(index)}`}
+                className={`align-top break-words ${block.divided ? SPACING.inner.py : ""} ${index > 0 ? SPACING.rowX.left : ""} ${align(index)} ${muted(index)}`}
               >
                 {row.cells[index] ?? ""}
               </td>
@@ -173,7 +177,7 @@ export function TableBlock({ block }: { block: BlockOf<"table"> }) {
             <tr>
               <td
                 colSpan={block.columns.length}
-                className="pb-1 text-xs text-[var(--muted)]"
+                className={`${SPACING.inner.pb} text-xs text-[var(--muted)]`}
               >
                 {row.note}
               </td>
@@ -187,10 +191,19 @@ export function TableBlock({ block }: { block: BlockOf<"table"> }) {
 
 type ListItem = BlockOf<"list">["items"][number];
 
-/** A row's score, read as its label ("Score") by a screen reader. */
+/**
+ * A row's score, read as its label ("Score") by a screen reader, in its
+ * `valueTone`'s colour — the platform's, from the run's verdict: the
+ * positive one green, the negative red, none the text's (Q5). The colour is
+ * never the only sign: the row's chip says the verdict's word.
+ */
 function Value({ item }: { item: ListItem }) {
   return item.value ? (
-    <span className="shrink-0 text-sm font-medium text-[var(--text)] tabular-nums">
+    <span
+      data-testid="block-list-value"
+      data-tone={item.valueTone ?? "neutral"}
+      className={`shrink-0 text-sm font-medium tabular-nums ${textTone(item.valueTone)}`}
+    >
       {item.valueLabel ? (
         <span className="sr-only">{`${item.valueLabel} `}</span>
       ) : null}
@@ -200,10 +213,10 @@ function Value({ item }: { item: ListItem }) {
 }
 
 /**
- * A row that opens a page: `PageRow` — its rank, its title, its chip, its
- * score; then its subtitle, its text and its address, in that order, each
- * under the title. The whole row is the press, so its address is its words
- * alone, never a second link.
+ * A row that opens a page: `PageRow`, flat inside the list's card — its
+ * rank, its title, its chip, its score; then its subtitle, its text and its
+ * address, in that order, each under the title. The whole row is the press,
+ * so its address is its words alone, never a second link.
  */
 function OpenRow({ item, href }: { item: ListItem; href: string }) {
   const more = Boolean(item.subtitle || item.text || item.url);
@@ -219,6 +232,7 @@ function OpenRow({ item, href }: { item: ListItem; href: string }) {
     <PageRow
       href={href}
       testId="block-list-row"
+      boxed={false}
       dim={item.muted === true}
       end={more ? undefined : <Value item={item} />}
     >
@@ -228,8 +242,8 @@ function OpenRow({ item, href }: { item: ListItem; href: string }) {
         </span>
       ) : null}
       {more ? (
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="flex min-w-0 items-center gap-3">
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className={`flex min-w-0 items-center ${SPACING.inner.gap}`}>
             <span className="flex min-w-0 flex-1">{title}</span>
             {item.badge ? <Chip badge={item.badge} /> : null}
             <Value item={item} />
@@ -266,8 +280,8 @@ function OpenRow({ item, href }: { item: ListItem; href: string }) {
 function Entry({ item }: { item: ListItem }) {
   const link = httpsLink(item.url);
   return (
-    <div data-testid="block-list-entry" className="min-w-0">
-      <div className="flex items-start gap-3">
+    <div data-testid="block-list-entry" className={`min-w-0 ${ROW}`}>
+      <div className={`flex items-start ${SPACING.inner.gap}`}>
         {item.lead ? (
           <span className="w-6 shrink-0 text-sm text-[var(--muted)] tabular-nums">
             {item.lead}
@@ -287,7 +301,9 @@ function Entry({ item }: { item: ListItem }) {
         </p>
       ) : null}
       {item.text ? (
-        <p className="mt-1 text-sm break-words whitespace-pre-line text-[var(--text)]">
+        <p
+          className={`${SPACING.inner.top} text-sm break-words whitespace-pre-line text-[var(--text)]`}
+        >
           {item.text}
         </p>
       ) : null}
@@ -297,12 +313,14 @@ function Entry({ item }: { item: ListItem }) {
             href={link.href}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-1 inline-block text-sm break-all text-[var(--link)] underline underline-offset-2"
+            className={`${SPACING.inner.top} inline-block text-sm break-all text-[var(--link)] underline underline-offset-2`}
           >
             {item.url}
           </a>
         ) : (
-          <p className="mt-1 text-sm break-all text-[var(--text)]">
+          <p
+            className={`${SPACING.inner.top} text-sm break-all text-[var(--text)]`}
+          >
             {item.url}
           </p>
         )
@@ -312,9 +330,11 @@ function Entry({ item }: { item: ListItem }) {
 }
 
 /**
- * list: each row that opens a page a `PageRow`, the rest entries; an empty
- * list its empty line (`EmptyRow`). A press to a target this build does not
- * know is drawn as an entry, with no press.
+ * list: one card, its rows divided (the table's rule: a group is one card),
+ * each row that opens a page a `PageRow`, the rest entries; an empty list
+ * its empty line (`EmptyRow`). A press to a target this build does not know
+ * is drawn as an entry, with no press. Its search, sort and pages are
+ * `Paged`'s, around it.
  */
 export function ListBlock({
   block,
@@ -324,16 +344,13 @@ export function ListBlock({
   context: BlockContext;
 }) {
   if (block.items.length === 0)
-    return block.empty ? <EmptyRow text={block.empty} /> : null;
+    return block.empty ? <EmptyRow band={false} text={block.empty} /> : null;
   const rows = block.items.map((item) => ({
     item,
     href: openHref(item.open, context),
   }));
   return (
-    <ol
-      data-testid="block-list"
-      className={`flex flex-col ${rows.some((row) => row.href) ? "gap-2" : "gap-3"}`}
-    >
+    <ol data-testid="block-list" className={LIST_CARD}>
       {rows.map(({ item, href }, index) => (
         <li key={`${item.title}-${index}`} className="min-w-0">
           {href ? <OpenRow item={item} href={href} /> : <Entry item={item} />}
@@ -343,28 +360,34 @@ export function ListBlock({
   );
 }
 
+/** A section as a group card or its own box draws it: what its bar and its body hold. */
+export type SectionShape = BlockOf<"section"> & { open?: boolean };
+
 /**
- * section: its own box (`SectionRows`' shell), closed unless `open`, that
- * opens on its own — its title, its subtitle muted under it, its chip and
- * the caret on its bar; in it, its blocks.
+ * A section's drop-down: its bar — its title, its subtitle muted under it,
+ * its chip and the caret — closed unless `open`, opening on its own; in it,
+ * its blocks. `boxed`, its own box (`SectionRows`' shell); else a row of a
+ * group's card (`GroupCard`).
  */
-export function SectionBlock({
+export function SectionDetails({
   block,
   inner,
+  boxed,
 }: {
-  block: BlockOf<"section">;
+  block: SectionShape;
   inner: DrawBlocks;
+  boxed: boolean;
 }) {
   return (
     <details
       data-testid="block-section"
       open={block.open === true}
-      className={`group ${SECTION_ROW}`}
+      className={boxed ? `group ${SECTION_ROW}` : "group"}
     >
       <summary
         className={`${SECTION_BAR} cursor-pointer list-none rounded-[var(--radius-md)] [&::-webkit-details-marker]:hidden`}
       >
-        <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="flex min-w-0 flex-col">
           <span className="text-sm font-medium break-words text-[var(--text)]">
             {block.title}
           </span>
@@ -374,7 +397,7 @@ export function SectionBlock({
             </span>
           ) : null}
         </span>
-        <span className="flex shrink-0 items-center gap-2">
+        <span className={`flex shrink-0 items-center ${SPACING.inner.gap}`}>
           {block.badge ? <Chip badge={block.badge} /> : null}
           <CaretDownIcon
             size={20}
@@ -383,11 +406,22 @@ export function SectionBlock({
           />
         </span>
       </summary>
-      <div className="border-t border-[var(--ring)] px-4 pt-3 pb-4">
+      <div className={`border-t border-[var(--ring)] ${CARD}`}>
         {inner(block.blocks)}
       </div>
     </details>
   );
+}
+
+/** section: its own box, a drop-down (`SectionDetails`). */
+export function SectionBlock({
+  block,
+  inner,
+}: {
+  block: BlockOf<"section">;
+  inner: DrawBlocks;
+}) {
+  return <SectionDetails block={block} inner={inner} boxed />;
 }
 
 /** file: its row (`PageRow`), its title alone; a target this build does not know, no press. */
@@ -410,7 +444,9 @@ export function FileBlock({
     </PageRow>
   ) : (
     <div data-testid="block-file" className={`${SECTION_ROW} ${SECTION_BAR}`}>
-      <span className="flex min-w-0 flex-1 items-center gap-3 text-sm">
+      <span
+        className={`flex min-w-0 flex-1 items-center ${SPACING.inner.gap} text-sm`}
+      >
         {title}
       </span>
     </div>
@@ -438,7 +474,7 @@ export function LinkBlock({ block }: { block: BlockOf<"link"> }) {
       rel="noopener noreferrer"
       className={`${SECTION_ROW} ${SECTION_BAR} transition hover:bg-[var(--surface-hover)]`}
     >
-      <span className="flex min-w-0 flex-col gap-0.5">
+      <span className="flex min-w-0 flex-col">
         <span className="text-sm font-medium break-words text-[var(--link)] underline underline-offset-2">
           {block.title}
         </span>
@@ -458,7 +494,10 @@ export function LinkBlock({ block }: { block: BlockOf<"link"> }) {
 /** timeline: the steps (`TrackerItem`), each its state's look; one this build does not know, "unknown"'s. */
 export function TimelineBlock({ block }: { block: BlockOf<"timeline"> }) {
   return (
-    <ol data-testid="block-timeline" className="flex flex-col gap-4">
+    <ol
+      data-testid="block-timeline"
+      className={`flex flex-col ${SPACING.group.gap}`}
+    >
       {block.items.map((item, index) => (
         <TrackerItem
           key={`${item.title}-${index}`}
@@ -490,18 +529,219 @@ export function QuestionsBlock({
   if (typeof kind !== "string" || !KNOWN_FORMS.includes(kind))
     return <Fallback />;
   const form = context.forms?.[kind as FormKind];
-  // Its title ("Add candidate") is drawn with the form: a page that offers no
-  // form, or whose form draws nothing (a member, a flow not live), draws neither.
+  // Its title ("Add candidate") is drawn with the form, `title` above it: a
+  // page that offers no form, or whose form draws nothing (a member, a flow
+  // not live), draws neither.
   const drawn = form ? form(block.form) : null;
   if (drawn === null || drawn === undefined || drawn === false) return null;
   return (
     <div data-testid={`block-form-${kind}`} data-block-form={kind}>
       {block.title ? (
-        <h2 data-testid="block-label" className={`${LABEL} pt-2 first:pt-0`}>
-          {block.title}
-        </h2>
-      ) : null}
-      {drawn}
+        <>
+          <SectionTitle testId="block-label">{block.title}</SectionTitle>
+          {/* The title gap, as a label block's over its list (F3). */}
+          <div className={SPACING.title.top}>{drawn}</div>
+        </>
+      ) : (
+        drawn
+      )}
+    </div>
+  );
+}
+
+/** A file a picture draws: a PDF in a frame, a JPEG or a PNG as an image; any other, none. */
+function pictureKind(file: BlockOf<"image">["file"]): "pdf" | "image" | null {
+  const type = file.contentType.toLowerCase();
+  if (type === "application/pdf") return "pdf";
+  if (type === "image/jpeg" || type === "image/png") return "image";
+  return null;
+}
+
+/**
+ * image: one of the run's own files, drawn in the page (`Picture`, read
+ * from its file page's own route; backend ADR-0048 amendment 1, decision 2).
+ * Its address is its typed target's alone (`openHref`), never a word of the
+ * block; a target this build does not know, or a file no browser draws in
+ * place, is its file's row instead. Its `alt` is read aloud only.
+ */
+export function ImageBlock({
+  block,
+  context,
+}: {
+  block: BlockOf<"image">;
+  context: BlockContext;
+}) {
+  const page = openHref(block.open, context);
+  const kind = pictureKind(block.file);
+  if (!page || !kind)
+    return (
+      <FileBlock
+        block={{
+          type: "file",
+          title: block.file.filename,
+          open: block.open,
+          file: block.file,
+        }}
+        context={context}
+      />
+    );
+  return (
+    <Picture
+      alt={block.alt}
+      page={page}
+      view={fileViewHref(page)}
+      pdf={kind === "pdf"}
+    />
+  );
+}
+
+type ChartPoint = BlockOf<"chart">["points"][number];
+
+/** The first point of the highest value, and of the lowest. */
+function extremes(points: readonly ChartPoint[]) {
+  let high = points[0]!;
+  let low = points[0]!;
+  for (const point of points) {
+    if (point.value > high.value) high = point;
+    if (point.value < low.value) low = point;
+  }
+  return { high, low };
+}
+
+/** The most dots a line draws: one at each point when there are this many or fewer. */
+const LINE_DOTS = 24;
+
+/**
+ * chart: a bar or a line chart (backend ADR-0048 amendment 1, decision 3),
+ * drawn here in SVG, with no library. Its box is an image read aloud as its
+ * `alt` (the platform's words: its title, its kind and every value), and the
+ * words inside it are text nodes a screen reader skips. A bar chart is a row
+ * a point: its label, a bar its `value` over the highest (`<rect width>`),
+ * then its `text`. A line chart is its points evenly spaced, the highest
+ * and lowest `text` on the left, the first and last label under it, a dot at
+ * each point when there are 24 or fewer. The colours are the theme's accent
+ * and ring; nothing moves, and no size is a `style`.
+ */
+export function ChartBlock({ block }: { block: BlockOf<"chart"> }) {
+  const points = block.points;
+  if (points.length === 0) return <Fallback />;
+  return (
+    <div
+      data-testid="block-chart"
+      data-kind={block.kind}
+      role="img"
+      aria-label={block.alt}
+      className={`flex flex-col ${SPACING.inner.gap} rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)] ${CARD}`}
+    >
+      <p
+        aria-hidden
+        className="text-sm font-medium break-words text-[var(--text)]"
+      >
+        {block.title}
+      </p>
+      {block.kind === "line" ? (
+        <LineChart points={points} />
+      ) : (
+        <BarChart points={points} />
+      )}
+    </div>
+  );
+}
+
+function BarChart({ points }: { points: readonly ChartPoint[] }) {
+  const max = Math.max(...points.map((point) => point.value));
+  return (
+    <div
+      aria-hidden
+      className={`grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)_auto] items-center ${SPACING.inner.x} ${SPACING.inner.y} text-sm`}
+    >
+      {points.map((point, at) => (
+        <div key={at} className="contents">
+          <span className="truncate text-[var(--text)]">{point.label}</span>
+          <svg
+            viewBox="0 0 100 8"
+            preserveAspectRatio="none"
+            className="h-2 w-full"
+          >
+            <rect
+              width="100"
+              height="8"
+              rx="4"
+              className="fill-[var(--ring)]"
+            />
+            {max > 0 ? (
+              <rect
+                data-testid="block-chart-bar"
+                width={String((point.value / max) * 100)}
+                height="8"
+                rx="4"
+                className="fill-[var(--accent)]"
+              />
+            ) : null}
+          </svg>
+          <span className="text-right font-medium text-[var(--text)] tabular-nums">
+            {point.text}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LineChart({ points }: { points: readonly ChartPoint[] }) {
+  const { high, low } = extremes(points);
+  const span = high.value - low.value;
+  // Evenly spaced, the highest at the top, a flat line through the middle.
+  const at = (index: number) =>
+    points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
+  const level = (value: number) =>
+    span === 0 ? 20 : 36 - ((value - low.value) / span) * 32;
+  const line = points
+    .map((point, index) => `${at(index)},${level(point.value)}`)
+    .join(" ");
+  return (
+    <div aria-hidden className={`flex flex-col ${SPACING.inner.gap}`}>
+      <div className={`flex ${SPACING.inner.gap}`}>
+        <div className="flex shrink-0 flex-col justify-between text-xs text-[var(--muted)] tabular-nums">
+          <span>{high.text}</span>
+          <span>{low.text}</span>
+        </div>
+        <svg
+          viewBox="0 0 100 40"
+          preserveAspectRatio="none"
+          className="h-32 w-full"
+        >
+          <polyline
+            points={line}
+            fill="none"
+            strokeWidth="2"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+            className="stroke-[var(--accent)]"
+          />
+          {points.length <= LINE_DOTS
+            ? points.map((point, index) => (
+                // A dot that stays round however the chart is stretched.
+                <line
+                  key={index}
+                  data-testid="block-chart-dot"
+                  x1={at(index)}
+                  y1={level(point.value)}
+                  x2={at(index)}
+                  y2={level(point.value)}
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke"
+                  className="stroke-[var(--accent)]"
+                />
+              ))
+            : null}
+        </svg>
+      </div>
+      <div className="flex justify-between text-xs text-[var(--muted)]">
+        <span>{points[0]!.label}</span>
+        <span>{points[points.length - 1]!.label}</span>
+      </div>
     </div>
   );
 }

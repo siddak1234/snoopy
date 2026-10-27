@@ -268,7 +268,7 @@ test("the flow page reads top to bottom: its name and status, Dashboard, Steps â
     at(/\{parts\.map\(part\)\}/u),
     at(/<AutomationActions\b/u),
   ];
-  const parts = [at(/>\s*Dashboard\s*<\/h2>/u), at(/>\s*Steps\s*<\/h2>/u)];
+  const parts = [at(/title="Dashboard"/u), at(/title="Steps"/u)];
   for (const order of [card, parts]) {
     assert.ok(
       order.every((index) => index > 0),
@@ -297,7 +297,7 @@ test("the flow page reads top to bottom: its name and status, Dashboard, Steps â
   assert.match(page, /<div id="run"/u);
   assert.match(
     page,
-    /\{row\.kind === "setting" && row\.fields\.length > 0 \? \(\s*<div className="mt-2">\{row\.fields\.map\(vendorRow\)\}<\/div>\s*\) : null\}\s*\{row\.kind === "email" \? emailRow : null\}/u,
+    /\{row\.kind === "setting" && row\.fields\.length > 0 \? \(\s*<div>\{row\.fields\.map\(vendorRow\)\}<\/div>\s*\) : null\}\s*\{row\.kind === "email" \? emailRow : null\}/u,
   );
   assert.match(page, /href=\{emailPath\(subscription\.id\)\}/u);
   // Unread, its address says Unavailable, and it still opens (S22).
@@ -324,12 +324,12 @@ test("the dashboard reads top to bottom: Today, the approvals banner while somet
   const home = read("app/account/page.tsx");
   const at = (pattern) => home.search(pattern);
   const order = [
-    at(/>\s*Today\s*<\/h2>/u),
+    at(/title="Today"/u),
     at(/<TodayTiles\b/u),
     at(/item needs" : "items need"\}\s*your review/u),
     at(/Exceptions your agents held for judgment/u),
     at(/data-testid="home-quick-actions"/u),
-    at(/>\s*Recent runs\s*<\/h2>/u),
+    at(/title="Recent runs"/u),
   ];
   assert.ok(
     order.every((index) => index > 0),
@@ -440,7 +440,7 @@ test("Activity is filtered only by a flow id shaped as one â€” a UUID, as the pl
   const activity = read("app/account/runs/page.tsx");
   assert.match(
     activity,
-    /const \{ flowId, outcome, since \} = activityFilter\(flow, status, from\);/u,
+    /const query = activityQuery\(await props\.searchParams\);\s*const \{ flowId, outcome, since \} = query;/u,
   );
   assert.doesNotMatch(activity, /typeof flow === "string"/u);
 });

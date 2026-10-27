@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/Button";
 
 export default function AccountDeletedPage() {
   return (
@@ -18,9 +19,7 @@ export default function AccountDeletedPage() {
             You can come back anytime with a new account.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link href="/login" className="btn-primary inline-flex px-5">
-              Continue to Autom8x
-            </Link>
+            <Button href="/login">Continue to Autom8x</Button>
           </div>
         </section>
       </div>

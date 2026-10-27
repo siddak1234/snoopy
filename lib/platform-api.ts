@@ -139,6 +139,17 @@ const UPLOAD_TIMEOUT_MS = 15 * 60_000;
  * platform call and never another origin.
  */
 export async function siteFileBlob(path: string): Promise<Blob> {
+  return (await siteFileNamed(path)).blob;
+}
+
+/**
+ * `siteFileBlob`, with the name the route gives the file
+ * (`content-disposition`), or null: the share sheet's name for a run
+ * package's document or the complete export (`app/account/share/route.ts`).
+ */
+export async function siteFileNamed(
+  path: string,
+): Promise<{ blob: Blob; filename: string | null }> {
   if (!path.startsWith("/account/"))
     throw new PlatformApiError("The file could not be read.", 0);
   let response: Response;
@@ -152,7 +163,10 @@ export async function siteFileBlob(path: string): Promise<Blob> {
   }
   if (!response.ok)
     throw new PlatformApiError("The file could not be read.", response.status);
-  return response.blob();
+  const named = /filename="([^"]+)"/u.exec(
+    response.headers.get("content-disposition") ?? "",
+  );
+  return { blob: await response.blob(), filename: named?.[1] ?? null };
 }
 
 /**

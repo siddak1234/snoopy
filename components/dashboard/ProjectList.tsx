@@ -39,7 +39,7 @@ export function ProjectList({ projects }: { projects: ProjectListItem[] }) {
     <ul className="divide-y divide-[var(--ring)]">
       {projects.map((project) => (
         <li key={project.id}>
-          <div className="flex items-start gap-3 rounded-xl px-2 py-3 transition hover:bg-[var(--surface-hover)]">
+          <div className="flex items-start gap-2 rounded-xl px-2 py-3 transition hover:bg-[var(--surface-hover)]">
             <Link
               prefetch={false}
               href={`/account/teams/${project.id}`}

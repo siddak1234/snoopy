@@ -8,6 +8,8 @@ import {
 } from "@/lib/tenancy";
 import { extractDomain, isPublicDomain } from "@/lib/domain-utils";
 import SectionCard from "@/components/dashboard/SectionCard";
+import { Group } from "@/components/dashboard/Group";
+import { SPACING } from "@/lib/spacing";
 import DeleteAccountButton from "@/components/account/DeleteAccountButton";
 import LinkedAccountsSection from "@/components/account/LinkedAccountsSection";
 import { SetupOrgForm } from "@/app/onboarding/setup-org/SetupOrgForm";
@@ -42,39 +44,33 @@ export default async function AccountSettingsPage() {
 
   return (
     <SectionCard title="Settings">
-      <div className="py-5 first:pt-0">
+      <Group>
         <p className="text-sm text-[var(--muted)]">
           Account and workspace settings. Connected accounts for flows are on
           the Connections page.
         </p>
-      </div>
+      </Group>
       <LinkedAccountsSection />
 
       {showOrgCreate ? (
-        <div className="border-t border-[var(--ring)] py-5">
-          <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-            Create organization workspace
-          </h2>
-          <p className="mt-2 text-sm text-[var(--muted)]">
+        <Group title="Create organization workspace">
+          <p className="text-sm text-[var(--muted)]">
             Your email uses{" "}
             <span className="font-mono font-medium text-[var(--text)]">
               {domain}
             </span>
             . Set up an organization workspace to collaborate with your company.
           </p>
-          <div className="mt-4">
+          <div className={SPACING.group.top}>
             <SetupOrgForm domain={domain} />
           </div>
-        </div>
+        </Group>
       ) : showOrgLink ? (
-        <div className="border-t border-[var(--ring)] py-5">
-          <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-            Organization
-          </h2>
-          <p className="mt-2 text-sm text-[var(--muted)]">
+        <Group title="Organization">
+          <p className="text-sm text-[var(--muted)]">
             You belong to an organization workspace.
           </p>
-          <div className="mt-3">
+          <div className={SPACING.inner.top}>
             <Link
               prefetch={false}
               href="/account/organization"
@@ -83,7 +79,7 @@ export default async function AccountSettingsPage() {
               Manage organization →
             </Link>
           </div>
-        </div>
+        </Group>
       ) : null}
 
       <WorkspaceExportSection
@@ -91,18 +87,15 @@ export default async function AccountSettingsPage() {
         workspaceId={workspaceId ?? ""}
       />
 
-      <div className="border-t border-[var(--ring)] pt-5">
-        <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-          Danger zone
-        </h2>
-        <p className="mt-2 text-sm text-[var(--muted)]">
+      <Group title="Danger zone">
+        <p className="text-sm text-[var(--muted)]">
           Permanently delete your account, your personal workspace, and every
           organization you alone own.
         </p>
-        <div className="mt-3">
+        <div className={SPACING.inner.top}>
           <DeleteAccountButton />
         </div>
-      </div>
+      </Group>
     </SectionCard>
   );
 }

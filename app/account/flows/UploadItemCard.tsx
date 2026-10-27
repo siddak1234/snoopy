@@ -25,6 +25,7 @@ import {
 } from "@/lib/flow-items";
 import { createItem } from "./actions";
 import { RunFileField } from "./RunFileField";
+import { SPACING } from "@/lib/spacing";
 
 /** Under a field the platform refused. */
 const CHECK_THIS = "Check this value.";
@@ -146,7 +147,7 @@ export function UploadItemCard({
         data-testid="item-upload"
         onSubmit={submit}
         onChange={newItemKey}
-        className="flex flex-col gap-4"
+        className={`flex flex-col ${SPACING.group.gap}`}
       >
         <h2 id={titleId} className="text-xl font-semibold text-[var(--text)]">
           {uploadLabel(declared.words)}
@@ -196,7 +197,7 @@ export function UploadItemCard({
           showTypes
         />
         <FormError message={error} />
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className={`flex flex-wrap justify-end ${SPACING.inner.gap}`}>
           <Button
             type="button"
             variant="ghost"
@@ -262,7 +263,7 @@ function SelectField({
       {/* Its own name, "Other", visible — never the select's, which a
           screen reader would say twice (as the app labels it). */}
       {other ? (
-        <div className="mt-3">
+        <div className={SPACING.inner.top}>
           <FormInput
             id={`${id}-other`}
             label={OTHER}
@@ -276,7 +277,10 @@ function SelectField({
         </div>
       ) : null}
       {error ? (
-        <p className="mt-1 text-sm text-[var(--error-text)]" role="alert">
+        <p
+          className={`${SPACING.inner.top} text-sm text-[var(--error-text)]`}
+          role="alert"
+        >
           {error}
         </p>
       ) : null}

@@ -93,15 +93,18 @@ the job reaches it while its page is open, as docs/ARCHITECTURE.md's "Screen
 standards" says; its body the platform's blocks
 (`shape=blocks`, backend ADR-0048), which the fixture builds by the
 platform's rules (`e2e/fixtures/page-bodies.ts`, held to the platform's
-bodies by `test/fixture-page-bodies.test.mjs`) and, for `blocks-{name}` runs,
+bodies by `test/fixture-page-bodies.test.mjs`; an item's runs searchable,
+each toned by its verdict, since block set 2) and, for `blocks-{name}` runs,
 serves as the platform's
 block fixtures hold them; each document it read a closed section of its own
 that opens in place, headed as "Screen standards" says; the
 package's buttons when the platform offers the package, then Run details,
 then View flow — and View package, Download PDF and Download Excel, each
 download to the platform's signed link, an https one only), the run
-package's page (the PDF itself, in a frame of the site's inline route that
-answers it `application/pdf` inline, a busy platform asked once more; its
+package's page (the PDF itself, read once from the site's inline route that
+answers it `application/pdf` inline and shown in a frame, Share handing on
+those bytes, a busy platform asked once more; Share reading nothing until it
+is pressed, there, on the run page and in Settings; its
 downloads, an https link only; a job with no package yet), Approvals (each
 row its flow and step, fewer words when those cannot be read; a decided row
 leaves, and the last one goes to Activity; a run page that keeps itself
@@ -124,20 +127,27 @@ complete export (its link followed only when https), account deletion, and the p
 without real accounts or credentials, and each test starts from the fixture's
 first state. Five specs: `e2e/accessibility.spec.ts`,
 `e2e/public-edge-fixture.spec.ts`, `e2e/account-surfaces.spec.ts` (every
-surface a change audit probed and no test asserted), `e2e/dialogs.spec.ts`
+surface a change audit probed and no test asserted — Round 21 v2's among them:
+the image block, a group of drop-downs, a long list's and table's search, sort
+and pages, Activity's search, sort and pages as the platform is asked for
+them, and Share refused), `e2e/dialogs.spec.ts`
 (every dialog's Escape, click outside, focus return and hold, one row each)
 and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: the Flows
 list by department A–Z; its items grouped A–Z under its group filter, the
 website's drop-down, on its page with no Dashboard, no Steps and no run start
-form; the upload card's drop-down, "Other" and the values typed before; an
-item's runs ranked in compact rows a closed section's height, its tiles and
+form, searched, and past 25 sorted and paged; the upload card's drop-down, "Other" and the values typed before; an
+item's runs ranked in one card of divided rows, each as tall as a closed section's bar, each score in
+its verdict's colour with its word as a chip, searched, its tiles and
 its file page — the file in place, its route for this site's pages alone,
 Download to its signed link, Share, then its reading's sections; a run
-headed by its title and score with View {file} and its file page, its
+headed by its title and its score in its verdict's colour with View {file}
+and its file page (a file no longer linked framed by this site's route), its
 sections under "{Run word} details" and its Run details page — every body
 the platform's blocks; Archive, an owner's buttons a member
 does not see and a member's presses refused in words, and an unanswered list
-said "Unavailable"), sharing `e2e/helpers.ts`. The playbook's human keyboard
+said "Unavailable"), sharing `e2e/helpers.ts`. The spacing table
+(`lib/spacing.ts`) is measured as drawn, from each box's edges: an item's
+titles and Settings' groups, and the page's edge at 390 and 900 px wide. The playbook's human keyboard
 traversal (NFR-35) has a hand-over test in the same suite:
 `KEYBOARD_JOURNEY=1 node scripts/run-browser-fixtures.mjs --headed --grep "keyboard journey"`
 opens the built site against the fixture, signed in, and pauses for the person
@@ -167,7 +177,7 @@ secret provisioning belongs to the deployment configuration round, not here.
 | `npm run test:contracts` | Public-contract and boundary behavior tests, and the common kit's own (`scripts/kit/kit.test.mjs`) |
 | `npm run check:docs` | Each changed area's doc changed with it, and each fact in one place (`docs/docs-map.json`) |
 | `npm run map` | Rebuild `docs/MAP.md` from the tree; `-- --check` fails when it is stale |
-| `npm run generate:platform-contracts` | Regenerate the typed client from `../snoopy-backend`'s published contracts |
+| `npm run generate:platform-contracts` | Regenerate the typed client from `../snoopy-backend`'s published contracts, its block fixtures and its block rules (`block-rules.ts`: the words, the spacing table and the search and sort cases) |
 | `npm run verify:platform-contracts` | Report a generated type that differs from its contract; changes nothing |
 | `npm run audit:boundaries` | Reject browser secrets, direct DB access, manual fetches, and raw hex colours |
 | `npm run test:browser` | Public accessibility in Chromium and Firefox (and WebKit in CI), and Chromium's visual baselines |

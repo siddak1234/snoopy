@@ -15,6 +15,7 @@ import {
   PlatformNotConfiguredError,
   PlatformServerError,
 } from "@/lib/platform-server";
+import { verdictNamesOf } from "@/lib/run-verdict";
 import { roleInWorkspace, type WorkspaceRole } from "@/lib/tenancy";
 import type { RunFlow } from "./RunLive";
 
@@ -115,10 +116,13 @@ export async function readRunPage(
   const fileFields = subscription?.runInput
     ?.filter((field) => field.control === "artifact")
     .map((field) => ({ control: field.control, title: field.title }));
+  // What the flow calls its verdicts: the score's chip and colour (F1, Q5).
+  const verdictNames = verdictNamesOf(subscription);
   const flow: RunFlow = entry
     ? {
         name: entry.name,
         ...(fileFields ? { fileFields } : {}),
+        ...(verdictNames ? { verdictNames } : {}),
         pipeline: entry.pipeline.map((step) => ({
           id: step.id,
           title: step.title,

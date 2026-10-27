@@ -22,6 +22,7 @@ import {
 } from "@/lib/platform-server";
 import { FILE_GONE, fileViewHref, itemFilePath } from "@/lib/run-files";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
+import { Group } from "@/components/dashboard/Group";
 
 /**
  * The file an item was made from (Round 19, build 28; the owner's item 4:
@@ -103,7 +104,7 @@ export default async function ItemFilePage(
     >
       {parts.map((part, at) =>
         part === "viewer" ? (
-          <div key={part} className="py-5 first:pt-0">
+          <Group key={part}>
             {typeof file === "string" ? (
               <EmptyRow text={file} />
             ) : (
@@ -113,25 +114,21 @@ export default async function ItemFilePage(
                 linkPath={`/v1/workspaces/${encodeURIComponent(workspaceId)}/items/${encodeURIComponent(item.id)}/file`}
               />
             )}
-          </div>
+          </Group>
         ) : part === "reading" ? (
           item.blocks && item.blocks.length > 0 ? (
-            <section
-              key={part}
-              aria-label={declared.file.title}
-              className="py-5 first:pt-0"
-            >
+            <Group key={part} label={declared.file.title}>
               <BlockList
                 blocks={item.blocks}
                 testId="item-reading"
                 context={{ subscriptionId }}
               />
-            </section>
+            </Group>
           ) : null
         ) : (
-          <div key={`unknown-${at}`} className="py-5 first:pt-0">
+          <Group key={`unknown-${at}`}>
             <Fallback />
-          </div>
+          </Group>
         ),
       )}
     </SectionCard>

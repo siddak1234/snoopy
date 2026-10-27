@@ -11,6 +11,7 @@ import {
   RUN_PACKAGE_MAXIMUM_BYTES,
   askPackageOnceMore,
 } from "@/lib/run-documents";
+import { siteOrigin } from "@/lib/file-view";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 
 /**
@@ -56,27 +57,6 @@ function said(status: number, words: string): Response {
       "cache-control": "private, no-store",
     },
   });
-}
-
-/**
- * This site's origin, as the page that asked names it — the frame's request
- * carries its page as `Referer` — else as this request reached the site.
- * Forwarded to the platform, which takes a cookie-carrying mutation only from
- * the site's own origin.
- */
-function siteOrigin(request: NextRequest): string {
-  const host = request.headers.get("host") ?? "";
-  const referer = request.headers.get("referer");
-  if (referer) {
-    try {
-      const page = new URL(referer);
-      if (page.host === host) return page.origin;
-    } catch {
-      // Not a URL: the request's own origin below.
-    }
-  }
-  const protocol = request.headers.get("x-forwarded-proto") ?? "https";
-  return `${protocol.split(",")[0]!.trim()}://${host}`;
 }
 
 export async function GET(

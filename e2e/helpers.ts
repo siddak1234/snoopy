@@ -27,6 +27,30 @@ export function observe(
   return seen;
 }
 
+/** The share sheet, stood in for: what it was handed is kept on the page. */
+export async function standInShareSheet(page: Page) {
+  await page.addInitScript(() => {
+    Object.assign(navigator, {
+      canShare: () => true,
+      share: async (data: ShareData) => {
+        const file = data.files?.[0];
+        Object.assign(window, {
+          shared: file
+            ? { name: file.name, type: file.type, size: file.size }
+            : null,
+        });
+      },
+    });
+  });
+}
+
+/** What the stand-in share sheet was handed: its name, type and size; undefined before. */
+export function shared(page: Page) {
+  return page.evaluate(
+    () => (window as unknown as { shared?: unknown }).shared,
+  );
+}
+
 // WCAG 2.2 AA on whatever the page shows now — an open dialog included. On a
 // settled document: a server action's re-render replaces the head, and a scan
 // that lands in that instant finds no <title> that is there before and after.
@@ -144,6 +168,38 @@ export function settledPage(page: Page) {
         .map((animation) => animation.finished.catch(() => undefined)),
     ),
   );
+}
+
+/**
+ * A spacing class's pixels as drawn — `mt-2`, `md:px-6` — at Tailwind's 4 px
+ * a step (`lib/spacing.ts`, whose numbers the screens are measured against).
+ */
+export function spacingPx(className: string): number {
+  const step = Number(className.split("-").at(-1));
+  if (!Number.isFinite(step))
+    throw new Error(`not a spacing step: ${className}`);
+  return step * 4;
+}
+
+/**
+ * The room drawn under an element, in whole pixels: from its bottom to the
+ * top of the next thing drawn after it in `main`, in document order, that has
+ * a box and starts below it. Null when nothing follows.
+ */
+export function drawnGapBelow(locator: Locator) {
+  return locator.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const main = element.closest("main") ?? document.body;
+    const walker = document.createTreeWalker(main, NodeFilter.SHOW_ELEMENT);
+    walker.currentNode = element;
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (element.contains(node)) continue;
+      const next = (node as Element).getBoundingClientRect();
+      if (next.height > 0 && next.top >= box.bottom - 0.5)
+        return Math.round(next.top - box.bottom);
+    }
+    return null;
+  });
 }
 
 /** Waits for an element's transitions to finish, so a state is read settled. */

@@ -25,6 +25,8 @@ import { platformApiJson } from "@/lib/platform-api";
 import { BLOCKS_SHAPE, RUN_REREAD_MS } from "@/lib/run-progress";
 import { archiveItem } from "../../../actions";
 import { RunStart } from "../../../RunStart";
+import { Group } from "@/components/dashboard/Group";
+import { SPACING } from "@/lib/spacing";
 
 /**
  * An item's page, live (Round 19, plan §5.3; backend ADR-0046). Its header:
@@ -118,7 +120,7 @@ export function ItemLive({
       subheader={itemSubheader(item, declared.groupField)}
       back={<BackLink href={flowPath(subscriptionId)} />}
     >
-      <div className="py-5 first:pt-0">
+      <Group>
         <BlockList
           blocks={detail.blocks}
           testId="item-blocks"
@@ -144,10 +146,10 @@ export function ItemLive({
             },
           }}
         />
-      </div>
+      </Group>
 
       {canManage && !archived ? (
-        <div className="py-5">
+        <Group>
           <ArchiveItem
             workspaceId={workspaceId}
             subscriptionId={subscriptionId}
@@ -156,7 +158,7 @@ export function ItemLive({
             label={archiveLabel(declared.words)}
             runsWord={declared.runWords.plural}
           />
-        </div>
+        </Group>
       ) : null}
     </SectionCard>
   );
@@ -233,12 +235,17 @@ function ArchiveItem({
           <h2 id={titleId} className="text-xl font-semibold text-[var(--text)]">
             Archive {title}?
           </h2>
-          <p id={descriptionId} className="mt-1 text-sm text-[var(--muted)]">
+          <p
+            id={descriptionId}
+            className={`${SPACING.title.top} text-sm text-[var(--muted)]`}
+          >
             It leaves the list and takes no new {inSentence(runsWord)}. Its{" "}
             {inSentence(runsWord)} stay.
           </p>
           <FormError message={error} />
-          <div className="mt-6 flex flex-wrap gap-2">
+          <div
+            className={`${SPACING.group.top} flex flex-wrap ${SPACING.inner.gap}`}
+          >
             <Button
               type="button"
               variant="ghost"
