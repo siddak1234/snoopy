@@ -48,7 +48,7 @@ export function OrgJoinLink({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant="secondary" size="sm" onClick={copy}>
           Copy join link
         </Button>

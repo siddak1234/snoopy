@@ -103,3 +103,53 @@ execFileSync(prettier, [fixtureOutput, "--write"], {
   cwd: root,
   stdio: "inherit",
 });
+
+// The block rules (backend ADR-0048 amendment 1, decision 8): the words for
+// search, sort and pages (`words.json`), the spacing table (`spacing.json`)
+// and the cases both clients' search and sort must pass (`search.json`,
+// `sort.json`). One file, headed by its own sha256 over the folder's files in
+// filename order — the fixtures' rule — so a client reads the platform's
+// words and numbers, never its own copy.
+const rulesDirectory = join(
+  backendRoot,
+  "packages/contracts/fixtures/block-rules",
+);
+if (!existsSync(rulesDirectory)) {
+  throw new Error(`Required block rules are unavailable: ${rulesDirectory}`);
+}
+const ruleFiles = readdirSync(rulesDirectory)
+  .filter((name) => name.endsWith(".json"))
+  .sort();
+const rulesHash = createHash("sha256");
+const rules = Object.fromEntries(
+  ruleFiles.map((name) => {
+    const bytes = readFileSync(join(rulesDirectory, name));
+    rulesHash.update(bytes);
+    return [name.replace(/\.json$/u, ""), JSON.parse(bytes.toString("utf8"))];
+  }),
+);
+for (const name of ["words", "spacing", "search", "sort"]) {
+  if (!rules[name])
+    throw new Error(`Required block rule is unavailable: ${name}.json`);
+}
+const rulesOutput = join(
+  root,
+  "lib/generated/platform-contracts/block-rules.ts",
+);
+writeFileSync(
+  rulesOutput,
+  `// From snoopy-backend ${relative(backendRoot, rulesDirectory)}/*.json, sha256 ${rulesHash.digest("hex")}.\n` +
+    "// Regenerate with `npm run generate:platform-contracts`; never edit by hand.\n" +
+    "/** Search, sort and pages' words (owner-words rows 1–16). */\n" +
+    `export const BLOCK_WORDS = ${JSON.stringify(rules.words.blockWords)} as const;\n\n` +
+    "/** The spacing table's names and numbers: pixels on this site. */\n" +
+    `export const BLOCK_SPACING = ${JSON.stringify(rules.spacing.blockSpacing)} as const;\n\n` +
+    "/** The cases a search must pass: its page size, the longest query and each case. */\n" +
+    `export const BLOCK_SEARCH = ${JSON.stringify(rules.search)} as const;\n\n` +
+    "/** The cases a sort must pass: each list or table, its choices and the order one gives. */\n" +
+    `export const BLOCK_SORT = ${JSON.stringify(rules.sort)} as const;\n`,
+);
+execFileSync(prettier, [rulesOutput, "--write"], {
+  cwd: root,
+  stdio: "inherit",
+});

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { getAppSession } from "@/lib/app-session";
 import {
@@ -11,10 +10,21 @@ import {
 } from "@/lib/automations";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
+import { Group } from "@/components/dashboard/Group";
+import { PageRow } from "@/components/dashboard/PageRow";
+import { LIST_CARD } from "@/components/dashboard/SectionRows";
 import { StatusPill } from "@/components/dashboard/StatusPill";
-import { activityFilter } from "@/lib/flow-steps";
+import { Button } from "@/components/ui/Button";
+import { fill } from "@/lib/block-sort";
+import { activityPages, activityQuery } from "@/lib/flow-steps";
+import {
+  BLOCK_SEARCH,
+  BLOCK_WORDS,
+} from "@/lib/generated/platform-contracts/block-rules";
 import { runLabel } from "@/lib/run-progress";
+import { SPACING } from "@/lib/spacing";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
+import { ActivityControls, ActivityPager } from "./ActivityControls";
 
 /**
  * Activity — every job this workspace has had, one entry each, by the job's
@@ -35,6 +45,13 @@ import { resolveActiveWorkspaceId } from "@/lib/tenancy";
  * (`&since=`, Build 22's W1; the session's S27), keeping the runs made since —
  * "Today", or "Today · Successes" / "Today · Failures". The subheader says
  * which.
+ *
+ * Its search box is always there ("Search runs"), and on more than 25 runs
+ * the sort and the pages (backend ADR-0048 amendment 1, decision 4): `q`,
+ * `sort` and `page` are kept in the address (`ActivityControls`) and sent
+ * on, with the outcome as `status` and the time as `since`, to the platform,
+ * which searches, filters and counts them (`runsQuery`) — so a page is never
+ * emptied by a filter here. The website has no "Needs review".
  */
 
 export const dynamic = "force-dynamic";
@@ -43,10 +60,10 @@ export const dynamic = "force-dynamic";
 const OUTCOMES = { succeeded: "Successes", failed: "Failures" } as const;
 
 export default async function RunsPage(props: PageProps<"/account/runs">) {
-  const { flow, status, since: from } = await props.searchParams;
+  const query = activityQuery(await props.searchParams);
+  const { flowId, outcome, since } = query;
   const session = await getAppSession();
   const workspaceId = await resolveActiveWorkspaceId(session);
-  const { flowId, outcome, since } = activityFilter(flow, status, from);
 
   if (!workspaceId) {
     return (
@@ -57,7 +74,7 @@ export default async function RunsPage(props: PageProps<"/account/runs">) {
   }
 
   const [listed, catalog, subscriptions] = await Promise.all([
-    emptyWhenUnavailable(() => listRuns(workspaceId, flowId), { runs: [] }),
+    emptyWhenUnavailable(() => listRuns(workspaceId, query), { runs: [] }),
     emptyWhenUnavailable(() => listAutomations(workspaceId), {
       automations: [],
       categories: [],
@@ -72,13 +89,18 @@ export default async function RunsPage(props: PageProps<"/account/runs">) {
   const nameFor = new Map(
     catalog.automations.map((entry) => [entry.templateId, entry.name]),
   );
-  const runs = {
-    runs: listed.runs.filter(
-      (run) =>
-        (!outcome || run.status === outcome) &&
-        (!since || Date.parse(run.createdAt) >= Date.parse(since)),
-    ),
-  };
+  // The platform searched, filtered and counted them (`total`). An answer
+  // without `total` — today's newest 100, from a platform before the search
+  // — is one page, its outcome and time kept here as before.
+  const counted = typeof listed.total === "number";
+  const runs = counted
+    ? listed.runs
+    : listed.runs.filter(
+        (run) =>
+          (!outcome || run.status === outcome) &&
+          (!since || Date.parse(run.createdAt) >= Date.parse(since)),
+      );
+  const { long, pages } = activityPages(listed.total, BLOCK_SEARCH.pageSize);
   // One flow's runs: its name, and the outcome its tile opened.
   const shown = subscriptions.subscriptions.find(
     (subscription) => subscription.id === flowId,
@@ -95,53 +117,63 @@ export default async function RunsPage(props: PageProps<"/account/runs">) {
 
   return (
     <SectionCard title="Activity" subheader={subheader}>
-      {runs.runs.length === 0 ? (
-        // The whole page is empty: the app's empty screen, with the way to a
-        // first flow (the owner, build 9).
-        <EmptyRow
-          icon={<CheckCircleIcon size={32} />}
-          title="No activity yet"
-          text="Every run lands here the moment your first agent goes live."
-          action={
-            <Link
-              prefetch={false}
-              href="/account/flows"
-              className="btn-primary inline-flex px-5"
-            >
-              Browse flows
-            </Link>
-          }
-        />
-      ) : (
-        runs.runs.map((run) => (
-          <RunRow
-            key={run.id}
-            run={run}
-            name={nameFor.get(run.templateId) ?? run.templateId}
-          />
-        ))
-      )}
+      <Group>
+        <div className={`flex flex-col ${SPACING.inner.gap}`}>
+          <ActivityControls query={query} long={long} />
+          {runs.length === 0 ? (
+            query.q ? (
+              <EmptyRow
+                band={false}
+                text={fill(BLOCK_WORDS.noMatch, { query: query.q })}
+              />
+            ) : (
+              // The whole page is empty: the app's empty screen, with the way
+              // to a first flow (the owner, build 9).
+              <EmptyRow
+                icon={<CheckCircleIcon size={32} />}
+                title="No activity yet"
+                text="Every run lands here the moment your first agent goes live."
+                action={
+                  <Button href="/account/flows" prefetch={false}>
+                    Browse flows
+                  </Button>
+                }
+              />
+            )
+          ) : (
+            <ul data-testid="activity-runs" className={LIST_CARD}>
+              {runs.map((run) => (
+                <li key={run.id}>
+                  <RunRow
+                    run={run}
+                    name={nameFor.get(run.templateId) ?? run.templateId}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+          {long ? <ActivityPager query={query} pages={pages} /> : null}
+        </div>
+      </Group>
     </SectionCard>
   );
 }
 
+/** A run's row (`PageRow`): its flow, then when and its full id; its status at its end. */
 function RunRow({ run, name }: { run: Run; name: string }) {
   return (
-    <Link
+    <PageRow
       href={`/account/runs/${run.id}`}
-      prefetch={false}
-      className="flex flex-col gap-2 py-4 transition first:pt-0 hover:opacity-80 sm:flex-row sm:items-center sm:justify-between"
-      aria-label={`Run of ${name}, ${run.status}`}
+      boxed={false}
+      label={`Run of ${name}, ${run.status}`}
+      end={<StatusPill status={run.status} />}
     >
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-[var(--text)]">
-          {name}
-        </p>
-        <p className="mt-0.5 text-xs break-all text-[var(--muted)]">
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate font-medium text-[var(--text)]">{name}</span>
+        <span className="text-xs break-all text-[var(--muted)]">
           {formatWhen(run.createdAt)} · {runLabel(run.id)}
-        </p>
-      </div>
-      <StatusPill status={run.status} />
-    </Link>
+        </span>
+      </span>
+    </PageRow>
   );
 }

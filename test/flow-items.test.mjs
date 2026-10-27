@@ -359,3 +359,112 @@ test("a refused item names its fields from the platform's problems, and nothing 
   assert.deepEqual(problemFields(undefined, fields), []);
   assert.deepEqual(problemFields({ path: "name" }, fields), []);
 });
+
+// A flow's items drawn (backend ADR-0048 amendment 1, decision 4): the search
+// box always, sort and pages past 25 — `FlowItemsList`, as the page holds it.
+const { loadModules, parse, elements, visibleWords } =
+  await import("./blocks-harness.mjs");
+const { renderToStaticMarkup } = await import("react-dom/server");
+const { createElement } = await import("react");
+
+async function drawItems(list, held = {}) {
+  const { modules, cleanup } = await loadModules([
+    "app/account/flows/FlowItems.tsx",
+  ]);
+  try {
+    const markup = renderToStaticMarkup(
+      createElement(modules["app/account/flows/FlowItems.tsx"].FlowItemsList, {
+        subscriptionId: "s1",
+        declared: {
+          words,
+          runWords,
+          titleField: "name",
+          fields: [name],
+          file: { key: "file", title: "Batch file" },
+        },
+        items: list,
+        query: "",
+        onQuery: () => {},
+        order: "az",
+        onOrder: () => {},
+        page: 1,
+        onPage: () => {},
+        chosen: "all",
+        onChoose: () => {},
+        ...held,
+      }),
+    );
+    return { markup, nodes: elements(parse(markup)) };
+  } finally {
+    cleanup();
+  }
+}
+
+const byTestId = (nodes, id) =>
+  nodes.filter((node) => node.attrs["data-testid"] === id);
+
+test("a flow's items: the search box with 3, finding by title; a miss says so; no sort or pages", async () => {
+  const three = [
+    item("Spring intake", undefined, "2026-08-12T10:00:00Z"),
+    item("Summer intake", undefined, "2026-08-12T09:00:00Z"),
+    item("Autumn list", undefined, "2026-08-12T08:00:00Z"),
+  ];
+  const all = await drawItems(three);
+  const [box] = byTestId(all.nodes, "flow-items-search");
+  assert.equal(box.attrs.placeholder, "Search batches");
+  assert.equal(byTestId(all.nodes, "flow-items-sort").length, 0);
+  assert.equal(byTestId(all.nodes, "flow-items-pager").length, 0);
+  const found = await drawItems(three, { query: "  INTAKE " });
+  assert.deepEqual(
+    byTestId(found.nodes, "flow-item-Spring intake").length +
+      byTestId(found.nodes, "flow-item-Summer intake").length,
+    2,
+  );
+  assert.equal(byTestId(found.nodes, "flow-item-Autumn list").length, 0);
+  const miss = await drawItems(three, { query: "winter" });
+  assert.ok(
+    visibleWords(miss.markup).includes('Nothing matches "winter".'),
+    visibleWords(miss.markup).join(" | "),
+  );
+  // Each row a PageRow of one card: the card's dividers, no box of its own.
+  const rows = all.nodes.filter((node) =>
+    (node.attrs["data-testid"] ?? "").startsWith("flow-item-"),
+  );
+  assert.equal(rows.length, 3);
+  assert.ok(rows.every((row) => !/\bborder\b/u.test(row.attrs.class)));
+});
+
+test("a flow's items: with 30, A to Z or Newest first and the pages, 25 a page", async () => {
+  const thirty = Array.from({ length: 30 }, (_, at) =>
+    item(
+      `Batch ${String(at + 1).padStart(2, "0")}`,
+      undefined,
+      `2026-08-12T10:${String(59 - at).padStart(2, "0")}:00Z`,
+    ),
+  );
+  const first = await drawItems(thirty);
+  assert.equal(byTestId(first.nodes, "flow-items-sort").length, 1);
+  const words = visibleWords(first.markup);
+  assert.ok(words.includes("A to Z"), words.join(" | "));
+  assert.ok(words.includes("Page 1 of 2"));
+  assert.equal(
+    first.nodes.filter((node) =>
+      (node.attrs["data-testid"] ?? "").startsWith("flow-item-Batch"),
+    ).length,
+    25,
+  );
+  const second = await drawItems(thirty, { page: 2, order: "newest" });
+  const secondWords = visibleWords(second.markup);
+  assert.ok(secondWords.includes("Newest first"));
+  assert.ok(secondWords.includes("Page 2 of 2"));
+  assert.deepEqual(
+    second.nodes
+      .filter((node) =>
+        (node.attrs["data-testid"] ?? "").startsWith("flow-item-Batch"),
+      )
+      .map((node) => node.attrs["data-testid"]),
+    ["Batch 26", "Batch 27", "Batch 28", "Batch 29", "Batch 30"].map(
+      (title) => `flow-item-${title}`,
+    ),
+  );
+});

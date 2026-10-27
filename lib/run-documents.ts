@@ -89,3 +89,20 @@ export function packageFileHref(
   const zone = timeZone ? `?timeZone=${encodeURIComponent(timeZone)}` : "";
   return `/account/runs/${encodeURIComponent(runId)}/package/file${zone}`;
 }
+
+/**
+ * A document's bytes for the share sheet (`app/account/share/route.ts`): a
+ * run package's PDF or Excel, in the browser's zone, or the complete export.
+ */
+export function shareHref(
+  of:
+    | { runId: string; format: "pdf" | "xlsx"; timeZone: string | null }
+    | { exportId: string },
+): string {
+  if ("exportId" in of)
+    return `/account/share?export=${encodeURIComponent(of.exportId)}`;
+  const zone = of.timeZone
+    ? `&timeZone=${encodeURIComponent(of.timeZone)}`
+    : "";
+  return `/account/share?run=${encodeURIComponent(of.runId)}&format=${of.format}${zone}`;
+}

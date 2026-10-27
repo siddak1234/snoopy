@@ -95,9 +95,8 @@ test("the Flows list is grouped by department, the departments A–Z, each keepi
   const page = code(read("app/account/flows/page.tsx"));
   assert.match(
     page,
-    /byDepartment\(catalog\.automations\)\.map\(\(\{ department, id, entries \}\) => \(\s*<section\s+key=\{id\}\s+aria-labelledby=\{id\}/u,
+    /byDepartment\(catalog\.automations\)\.map\(\(\{ department, id, entries \}\) => \(\s*<Group\s+key=\{id\}\s+title=\{department\}\s+titleId=\{id\}/u,
   );
-  assert.match(page, /<h2\s+id=\{id\}/u);
   assert.doesNotMatch(page, /department-\$\{department\}/u);
   assert.doesNotMatch(page, /\{automation\.category\}/u);
 });
@@ -111,10 +110,10 @@ test("a flow with items has no Dashboard and no Steps: its items are its page, T
     /pageParts\(\s*subscription\.pages\?\.flow,\s*\["dashboard", "steps", "items"\] as const,\s*declaredItems \? \["items"\] : \["dashboard", "steps"\],\s*\)/u,
   );
   const items = page.indexOf('if (name === "items")');
-  assert.ok(items > page.indexOf('aria-labelledby="flow-steps-title"'));
+  assert.ok(items > page.indexOf('titleId="flow-steps-title"'));
   assert.match(
     page.slice(items),
-    /\{!parts\.includes\("steps"\) &&\s*\(!live \|\| owed\.length > 0 \|\| notResponding\) \? \(\s*<div className="py-5 first:pt-0">\s*\{notResponding\}\s*\{stepOne\}/u,
+    /\{!parts\.includes\("steps"\) &&\s*\(!live \|\| owed\.length > 0 \|\| notResponding\) \? \(\s*<Group>\s*<div className=\{`flex flex-col \$\{SPACING\.inner\.gap\}`\}>\s*\{notResponding\}\s*\{stepOne\}/u,
   );
   assert.match(page, /\{parts\.map\(part\)\}/u);
 });
@@ -148,7 +147,10 @@ test("the website's drop-down is a select-only combobox over a listbox of glass,
   );
   const items = code(read("app/account/flows/FlowItems.tsx"));
   assert.match(items, /<Dropdown\s+id=\{filterId\}\s+look="pill"/u);
-  assert.match(items, /groupItems\(list\.items, groupField, shown\)/u);
+  assert.match(
+    items,
+    /groupItems\(found, groupField, shown, long \? order : "az"\)/u,
+  );
 });
 
 test("an item's page draws no sections, and its runs as rows the height of a section's (items 4 and 5)", () => {
@@ -163,13 +165,16 @@ test("an item's page draws no sections, and its runs as rows the height of a sec
     rows.map((node) => node.attrs.href),
     ["r1", "r2", "r3", "r4"].map((id) => `/account/runs/${id}`),
   );
-  for (const node of rows)
-    assert.match(
-      node.attrs.class,
-      /rounded-\[var\(--radius-md\)\][\s\S]*py-3/u,
-    );
+  // Rows of the list's one card (block set v2): a closed section's bar.
+  for (const node of rows) {
+    assert.match(node.attrs.class, /\bpy-3\b/u);
+    assert.match(node.attrs.class, /\bmin-h-11\b/u);
+  }
   const row = code(read("components/dashboard/PageRow.tsx"));
-  assert.match(row, /className=\{`\$\{SECTION_ROW\} \$\{SECTION_BAR\} /u);
+  assert.match(
+    row,
+    /className=\{`\$\{boxed \? `\$\{SECTION_ROW\} ` : ""\}\$\{SECTION_BAR\} /u,
+  );
   assert.match(
     code(read("components/blocks/renderers.tsx")),
     /className=\{`\$\{SECTION_BAR\} cursor-pointer/u,
@@ -220,7 +225,7 @@ test("Run details: its row on every run's page, after the package's buttons and 
   );
   assert.match(
     run.slice(row),
-    /^<PageRow href=\{runDetailsPath\(run\.id\)\} testId="run-details-row">[\s\S]*?<\/PageRow>\s*<div className="mt-5 flex flex-wrap items-center gap-2">\s*(?:\{\s*\}\s*)?\{going \? \(\s*<CancelRunButton/u,
+    /^<PageRow href=\{runDetailsPath\(run\.id\)\} testId="run-details-row">[\s\S]*?<\/PageRow>\s*<div\s+className=\{`\$\{SPACING\.group\.top\} flex flex-wrap items-center \$\{SPACING\.inner\.gap\}`\}\s*>\s*(?:\{\s*\}\s*)?\{going \? \(\s*<CancelRunButton/u,
   );
   assert.ok(run.indexOf("CancelRunButton") < run.indexOf("View flow"));
   assert.ok(
@@ -361,7 +366,11 @@ test("a file is handed on by this site's own route: inline only in a type a brow
   const view = code(read("lib/file-view.ts"));
   assert.match(
     view,
-    /if \(fetchSite !== "same-origin" && fetchSite !== "none"\)\s*return said\(403/u,
+    /return fetchSite === "same-origin" \|\| fetchSite === "none";/u,
+  );
+  assert.match(
+    view,
+    /if \(!askedHere\(request\)\) return said\(403, "Open the file from its page\."\);/u,
   );
   assert.match(
     view,
@@ -395,15 +404,27 @@ test("a file is handed on by this site's own route: inline only in a type a brow
   const file = code(read("components/dashboard/FileView.tsx"));
   assert.match(
     file,
-    /const link = await platformApiJson<RunFileLink>\(linkPath\);\s*if \(!followSignedLink\(link\.downloadUrl\)\) setError\(DOWNLOAD_FAILED\);/u,
+    /const link = await platformApiJson<RunFileLink>\(linkPath\);\s*return followSignedLink\(link\.downloadUrl\) \? null : DOWNLOAD_FAILED;/u,
   );
-  assert.match(file, /const blob = await siteFileBlob\(viewHref\);/u);
+  assert.match(
+    file,
+    /read: async \(\) => \(\{ blob: await siteFileBlob\(viewHref\) \}\),/u,
+  );
   assert.doesNotMatch(file, /\bfetch\(/u);
-  assert.match(file, /\{shownInPlace\(file\.contentType\) \? \(\s*<iframe/u);
+  // The frame shows the bytes the page read once (`usePageFile`), else the
+  // route itself.
+  assert.match(
+    file,
+    /const page = usePageFile\(inPlace \? viewHref : null\);/u,
+  );
+  assert.match(
+    file,
+    /\{inPlace \? \(\s*shown === null \? \([\s\S]*?\) : \(\s*<iframe\s+title=\{file\.filename\}\s+src=\{shown\}/u,
+  );
   const api = code(read("lib/platform-api.ts"));
   assert.match(
     api,
-    /export async function siteFileBlob\(path: string\): Promise<Blob> \{\s*if \(!path\.startsWith\("\/account\/"\)\)/u,
+    /export async function siteFileNamed\(\s*path: string,\s*\): Promise<\{ blob: Blob; filename: string \| null \}> \{\s*if \(!path\.startsWith\("\/account\/"\)\)/u,
   );
 });
 

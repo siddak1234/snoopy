@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Tile } from "@/components/dashboard/Tile";
 import type { RunStats } from "@/lib/automations";
 import { platformApiJson } from "@/lib/platform-api";
+import { SPACING } from "@/lib/spacing";
 import { FLOW_STATS_REREAD_MS } from "@/lib/run-progress";
 
 type Counts = RunStats["subscriptions"][number];
@@ -99,25 +100,24 @@ export function FlowDashboard({
   ];
 
   return (
-    <div data-testid="flow-dashboard" className="mt-3 grid grid-cols-3 gap-3">
+    <div
+      data-testid="flow-dashboard"
+      className={`grid grid-cols-3 ${SPACING.inner.gap}`}
+    >
       {tiles.map((tile) => (
-        <Link
+        <Tile
           key={tile.label}
-          prefetch={false}
+          label={tile.label}
+          value={tile.value}
+          testId={`flow-stat-${tile.label}`}
+          tone={
+            tile.value === "—"
+              ? "text-[var(--muted)]"
+              : tile.tone || "text-[var(--text)]"
+          }
           href={tile.href}
-          className="flex flex-col gap-1 rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)] px-4 py-3 transition hover:bg-[var(--surface-hover)]"
-        >
-          <span
-            data-testid={`flow-stat-${tile.label}`}
-            className={`text-2xl font-medium ${tile.value === "—" ? "text-[var(--muted)]" : tile.tone || "text-[var(--text)]"}`}
-          >
-            {tile.value}
-          </span>
-          <span className="text-xs text-[var(--muted)]">
-            {tile.label}
-            <span className="sr-only">, see these runs in Activity</span>
-          </span>
-        </Link>
+          hint=", see these runs in Activity"
+        />
       ))}
     </div>
   );

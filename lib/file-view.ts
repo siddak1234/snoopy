@@ -6,7 +6,11 @@ import {
   PlatformServerError,
   platformSignedFile,
 } from "@/lib/platform-server";
-import { RUN_FILE_MAXIMUM_BYTES, shownInPlace } from "@/lib/run-files";
+import {
+  COULD_NOT_SHOW,
+  RUN_FILE_MAXIMUM_BYTES,
+  shownInPlace,
+} from "@/lib/run-files";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 
 /**
@@ -23,9 +27,7 @@ import { resolveActiveWorkspaceId } from "@/lib/tenancy";
  * (`siteFileBlob`).
  */
 
-const COULD_NOT_SHOW = "Could not open the file. Try again.";
-
-function said(status: number, words: string): Response {
+export function said(status: number, words: string): Response {
   return new Response(words, {
     status,
     headers: {
@@ -35,8 +37,35 @@ function said(status: number, words: string): Response {
   });
 }
 
+/**
+ * This site's origin, as the page that asked names it — a frame's request
+ * carries its page as `Referer` — else as this request reached the site.
+ * Forwarded to the platform, which takes a cookie-carrying mutation only from
+ * the site's own origin (the package's routes).
+ */
+export function siteOrigin(request: NextRequest): string {
+  const host = request.headers.get("host") ?? "";
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try {
+      const page = new URL(referer);
+      if (page.host === host) return page.origin;
+    } catch {
+      // Not a URL: the request's own origin below.
+    }
+  }
+  const protocol = request.headers.get("x-forwarded-proto") ?? "https";
+  return `${protocol.split(",")[0]!.trim()}://${host}`;
+}
+
+/** Whether this site's own page asked, or the person opening it (`Sec-Fetch-Site`). */
+export function askedHere(request: NextRequest): boolean {
+  const fetchSite = request.headers.get("sec-fetch-site");
+  return fetchSite === "same-origin" || fetchSite === "none";
+}
+
 /** A filename safe in a header: the platform's, every other character made a dash. */
-function safeFilename(name: string): string {
+export function safeFilename(name: string): string {
   return name.replace(/[^A-Za-z0-9._-]/gu, "-").slice(0, 100) || "file";
 }
 
@@ -44,9 +73,7 @@ export async function fileViewResponse(
   request: NextRequest,
   read: (workspaceId: string) => Promise<RunFileLink>,
 ): Promise<Response> {
-  const fetchSite = request.headers.get("sec-fetch-site");
-  if (fetchSite !== "same-origin" && fetchSite !== "none")
-    return said(403, "Open the file from its page.");
+  if (!askedHere(request)) return said(403, "Open the file from its page.");
   try {
     const workspaceId = await resolveActiveWorkspaceId(await getAppSession());
     if (!workspaceId) return said(404, "Not found.");

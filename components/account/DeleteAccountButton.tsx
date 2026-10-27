@@ -50,7 +50,7 @@ type Outcome = null | Settled;
 // - Any 5xx, or no answer at all: the server did not complete the request, so
 //   whether the deletion ran is not known. That covers the Edge's own 502 —
 //   the contract's "deleted, but not revoked" 502 is raised only for a bearer
-//   caller (`apps/api/src/app.ts`: the throw needs `revoking`, undefined
+//   caller (`snoopy-backend/apps/api/src/app.ts`: the throw needs `revoking`, undefined
 //   without a bearer), so for this website it is the Access hop failing — and
 //   whatever stands between this page and the Edge: the standalone server's
 //   rewrite answers 500 when the Edge's answer is lost, a gateway 502 or 504.
@@ -177,8 +177,8 @@ export default function DeleteAccountButton() {
             account stays and you can try again; anything already removed stays
             removed. This cannot be undone.
           </p>
-          <FormError message={outcome?.message ?? null} className="mt-3" />
-          <div className="mt-6 flex flex-wrap gap-3">
+          <FormError message={outcome?.message ?? null} className="mt-2" />
+          <div className="mt-4 flex flex-wrap gap-2">
             {outcome?.kind === "expired" ? (
               <Button
                 ref={signInRef}
@@ -202,14 +202,16 @@ export default function DeleteAccountButton() {
                     : "Yes, delete my account"}
               </Button>
             )}
-            <button
+            <Button
               type="button"
               onClick={close}
               disabled={loading}
-              className="btn-secondary px-4 py-2 text-sm disabled:opacity-50"
+              variant="secondary"
+              size="sm"
+              className="disabled:opacity-50"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </Modal>
       ) : null}

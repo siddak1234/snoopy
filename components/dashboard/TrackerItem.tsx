@@ -68,7 +68,7 @@ export function TrackerItem({
     <li
       data-testid={`run-step-${row.key}`}
       data-state={state}
-      className="flex items-start gap-3"
+      className="flex items-start gap-2"
     >
       <Icon
         size={24}

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
 import { PlatformServerError } from "@/lib/platform-server";
@@ -17,6 +16,10 @@ import { ProjectMemberList } from "@/components/dashboard/ProjectMemberList";
 import type { MemberRow } from "@/components/dashboard/ProjectMemberList";
 import type { AvailableMember } from "@/components/dashboard/ProjectMemberPicker";
 import { TeamAccessRequests } from "@/components/dashboard/TeamAccessRequests";
+import { Button } from "@/components/ui/Button";
+import { Group } from "@/components/dashboard/Group";
+import { SectionTitle } from "@/components/dashboard/SectionTitle";
+import { GROUP_BAND, SPACING } from "@/lib/spacing";
 
 /** The requests, where the platform has them (404 before the SEVENTEENTH promotion). */
 async function requestsIfThere(
@@ -100,14 +103,15 @@ export default async function TeamDetailPage({
         ) : null
       }
       secondaryAction={
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
+        <div className={`flex flex-wrap items-center ${SPACING.inner.gap}`}>
+          <Button
             prefetch={false}
             href="/account/teams"
-            className="btn-secondary inline-flex !min-h-0 !px-4 !py-1.5 text-sm"
+            variant="secondary"
+            size="sm"
           >
             Back to departments
-          </Link>
+          </Button>
           {owner ? (
             <DeleteProjectButton
               projectId={project.id}
@@ -125,17 +129,16 @@ export default async function TeamDetailPage({
       }
     >
       {project.description ? (
-        <p className="pb-5 text-sm text-[var(--muted)]">
-          {project.description}
-        </p>
+        <Group>
+          <p className="text-sm text-[var(--muted)]">{project.description}</p>
+        </Group>
       ) : null}
 
       {organization ? (
-        <div className="border-t border-[var(--ring)] py-5 first:pt-0">
+        // Each list keeps its own title gap: the band and its title only.
+        <section className={GROUP_BAND}>
           <div className="flex items-center justify-between">
-            <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-              Members
-            </h2>
+            <SectionTitle>Members</SectionTitle>
             <span className="text-xs text-[var(--muted)]">
               {memberRows.length}{" "}
               {memberRows.length === 1 ? "member" : "members"}
@@ -148,21 +151,19 @@ export default async function TeamDetailPage({
             members={memberRows}
             leaveRedirect="/account/teams"
           />
-        </div>
+        </section>
       ) : null}
 
       {organization && canManage ? (
-        <div className="border-t border-[var(--ring)] py-5 pb-0">
+        <section className={GROUP_BAND}>
           <div className="flex items-center justify-between">
-            <h2 className="text-xs font-medium tracking-wide text-[var(--muted)] uppercase">
-              Asking to join
-            </h2>
+            <SectionTitle>Asking to join</SectionTitle>
             <span className="text-xs text-[var(--muted)]">
               {pending.length}
             </span>
           </div>
           <TeamAccessRequests projectId={project.id} requests={requests} />
-        </div>
+        </section>
       ) : null}
     </SectionCard>
   );

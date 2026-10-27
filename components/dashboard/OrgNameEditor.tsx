@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { updateWorkspaceNameAction } from "@/app/account/organization/actions";
 import { FormError } from "@/components/ui/FormError";
+import { Button } from "@/components/ui/Button";
 
 type Props = {
   workspaceId: string;
@@ -57,22 +58,24 @@ export function OrgNameEditor({ workspaceId, initialName }: Props) {
           className="w-full rounded-xl border border-[var(--ring)] bg-[var(--card)] px-4 py-2 text-sm text-[var(--text)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none disabled:opacity-60 sm:max-w-xs"
         />
         <div className="flex gap-2">
-          <button
+          <Button
             type="button"
             onClick={handleSave}
             disabled={saving || !value.trim()}
-            className="btn-primary inline-flex px-4 py-2 text-sm disabled:pointer-events-none disabled:opacity-50"
+            size="sm"
+            className="disabled:pointer-events-none disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save"}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={handleCancel}
             disabled={saving}
-            className="btn-secondary inline-flex px-4 py-2 text-sm"
+            variant="secondary"
+            size="sm"
           >
             Cancel
-          </button>
+          </Button>
         </div>
         <FormError message={error} />
       </div>
@@ -80,7 +83,7 @@ export function OrgNameEditor({ workspaceId, initialName }: Props) {
   }
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2">
       <span className="text-sm text-[var(--text)]">{value}</span>
       {saved ? (
         <span className="text-xs text-[var(--success-text)]">Saved</span>

@@ -18,7 +18,7 @@ import { loadBlocks, visibleWords } from "./blocks-harness.mjs";
  * item and file pages and `components/blocks` read none of the fields a page
  * once drew by kind — documents, sections, details, or a flow's document,
  * verdict or run words — but for the one Archive line, by its exact text;
- * the renderer draws the contract's ten types and the fallback for any
+ * the renderer draws the contract's thirteen types and the fallback for any
  * other; and no block is ever drawn as markup.
  */
 

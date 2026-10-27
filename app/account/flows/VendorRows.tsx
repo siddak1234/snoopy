@@ -17,6 +17,7 @@ import {
 } from "@/lib/connection-rows";
 import { NONE } from "@/lib/flow-steps";
 import { startConnect } from "@/app/account/connections/start-connect";
+import { SPACING } from "@/lib/spacing";
 
 /** One vendor a step may use: an optional connection its field names. */
 export type VendorOption = {
@@ -172,7 +173,7 @@ export function VendorRows({
               aria-disabled={!tappable || undefined}
               onClick={tappable ? () => tap(option) : undefined}
               data-testid={`vendor-${option.providerId}`}
-              className={`${CONNECTION_ROW} rounded-[var(--radius-md)] px-2 transition enabled:cursor-pointer enabled:hover:bg-[var(--surface-hover)]`}
+              className={`${CONNECTION_ROW} rounded-[var(--radius-md)] ${SPACING.rowX.x} transition enabled:cursor-pointer enabled:hover:bg-[var(--surface-hover)]`}
             >
               <ConnectionRowBody
                 mark={<ConnectionMark icon={option.icon} />}
@@ -186,7 +187,7 @@ export function VendorRows({
             {rowError?.providerId === option.providerId ? (
               <p
                 role="alert"
-                className="px-2 pb-3 text-xs text-[var(--error-text)]"
+                className={`${SPACING.rowX.x} ${SPACING.inner.pb} text-xs text-[var(--error-text)]`}
               >
                 {rowError.message}
               </p>
@@ -204,7 +205,7 @@ export function VendorRows({
         aria-disabled={readOnly || undefined}
         onClick={readOnly ? undefined : () => tap(null)}
         data-testid="vendor-none"
-        className={`${CONNECTION_ROW} rounded-[var(--radius-md)] px-2 transition enabled:cursor-pointer enabled:hover:bg-[var(--surface-hover)]`}
+        className={`${CONNECTION_ROW} rounded-[var(--radius-md)] ${SPACING.rowX.x} transition enabled:cursor-pointer enabled:hover:bg-[var(--surface-hover)]`}
       >
         <ConnectionRowBody
           mark={<NoneMark />}
@@ -217,7 +218,7 @@ export function VendorRows({
       {readOnly ? (
         <p
           data-testid="vendor-member-note"
-          className="px-2 pt-3 text-xs text-[var(--muted)]"
+          className={`${SPACING.rowX.x} ${SPACING.group.pt} text-xs text-[var(--muted)]`}
         >
           {VENDOR_MEMBER_NOTE}
         </p>

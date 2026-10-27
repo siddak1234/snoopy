@@ -20,6 +20,16 @@ export const SHARE_FAILED = "Could not share. Try again.";
 export const DOWNLOAD_TO_OPEN = "Download it to open it.";
 /** Said where the platform no longer keeps the file. */
 export const FILE_GONE = "This file is no longer kept.";
+/**
+ * Said where a file could not be read for any other reason: the file
+ * route's answer (`lib/file-view.ts`) and a picture's (`Picture.tsx`), the
+ * app's `FILE_NOT_OPENED` (`snoopy-mobile/lib/content/screen-states.ts`).
+ */
+export const COULD_NOT_SHOW = "Could not open the file. Try again.";
+/** Said in a picture's place while its file is read: the app's `FILE_OPENING`. */
+export const FILE_OPENING = "Opening the file…";
+/** The button that reads a file again: the app's `TRY_AGAIN_LABEL`. */
+export const TRY_AGAIN = "Try again";
 
 /** A run's file page, under the run's. */
 export function runFilePath(runId: string, fileId: string): string {
@@ -34,6 +44,23 @@ export function itemFilePath(subscriptionId: string, itemId: string): string {
 /** A file page's own route that hands the file on, shown in place. */
 export function fileViewHref(pagePath: string): string {
   return `${pagePath}/view`;
+}
+
+/** A file's type by its name's ending, for the share sheet: JSON, a ZIP, a PDF, a workbook, else bytes. */
+export function typeOfName(filename: string): string {
+  const ending = /\.([a-z0-9]+)$/iu.exec(filename)?.[1]?.toLowerCase();
+  switch (ending) {
+    case "json":
+      return "application/json";
+    case "zip":
+      return "application/zip";
+    case "pdf":
+      return "application/pdf";
+    case "xlsx":
+      return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    default:
+      return "application/octet-stream";
+  }
 }
 
 /** The types a browser draws in place; any other is downloaded to be opened. */

@@ -1000,7 +1000,7 @@ test("the run page draws the tracker's rows and words alone — never a step's s
   // The steps on the run's details page, before its facts (build 28, item
   // 9); the platform's body on the run's page.
   const details = live.indexOf('if (view === "details") {');
-  const steps = live.search(/>\s*Steps\s*<\/h2>/u);
+  const steps = live.search(/<Group title="Steps" titleId="run-steps-title">/u);
   const facts = live.indexOf("data-testid={`run-fact-${fact.label}`}");
   const runPage = live.indexOf("return (", live.indexOf("\n  }\n", details));
   assert.ok(

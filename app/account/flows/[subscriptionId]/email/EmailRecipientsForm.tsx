@@ -34,9 +34,9 @@ import {
   removeAddress,
 } from "@/lib/flow-email";
 import { saveEmailRecipients } from "../../actions";
-
-const HEADING =
-  "text-xs font-medium tracking-wide text-[var(--muted)] uppercase";
+import { Group } from "@/components/dashboard/Group";
+import { SectionTitle } from "@/components/dashboard/SectionTitle";
+import { SPACING } from "@/lib/spacing";
 
 /**
  * The email page's two lists and its one field (Build 22, P5; spec §4). **Each
@@ -147,12 +147,14 @@ export function EmailRecipientsForm({
   };
 
   return (
-    <div className="py-5 first:pt-0">
+    <Group>
       <section aria-labelledby="email-always-title" data-testid="email-always">
-        <h2 id="email-always-title" className={HEADING}>
+        <SectionTitle id="email-always-title">
           {EMAIL_ALWAYS_LABEL}
-        </h2>
-        <ul className="mt-1 flex flex-col divide-y divide-[var(--ring)]">
+        </SectionTitle>
+        <ul
+          className={`${SPACING.title.top} flex flex-col divide-y divide-[var(--ring)]`}
+        >
           {people.map((person) => (
             <li key={person.email}>
               <ConnectionRow
@@ -176,17 +178,14 @@ export function EmailRecipientsForm({
       <section
         aria-labelledby="email-also-title"
         data-testid="email-also"
-        className="pt-5"
+        className={SPACING.group.pt}
       >
-        <h2
-          id="email-also-title"
-          ref={headingRef}
-          tabIndex={-1}
-          className={HEADING}
-        >
+        <SectionTitle id="email-also-title" ref={headingRef} tabIndex={-1}>
           {EMAIL_ALSO_LABEL}
-        </h2>
-        <ul className="mt-1 flex flex-col divide-y divide-[var(--ring)]">
+        </SectionTitle>
+        <ul
+          className={`${SPACING.title.top} flex flex-col divide-y divide-[var(--ring)]`}
+        >
           {extra.length === 0 ? (
             <li>
               <ConnectionRow
@@ -224,7 +223,7 @@ export function EmailRecipientsForm({
           full ? (
             <p
               data-testid="email-limit"
-              className="mt-2 text-sm text-[var(--muted)]"
+              className={`${SPACING.inner.top} text-sm text-[var(--muted)]`}
             >
               {EMAIL_LIMIT_REACHED}
             </p>
@@ -235,7 +234,7 @@ export function EmailRecipientsForm({
                 event.preventDefault();
                 add();
               }}
-              className="mt-2 flex items-end gap-2"
+              className={`${SPACING.inner.top} flex items-end ${SPACING.inner.gap}`}
             >
               <div className="min-w-0 flex-1">
                 <FormInput
@@ -260,7 +259,7 @@ export function EmailRecipientsForm({
                 variant="primary"
                 size="sm"
                 disabled={writing}
-                className="inline-flex shrink-0 items-center gap-2"
+                className={`inline-flex shrink-0 items-center ${SPACING.inner.gap}`}
               >
                 <PlusIcon aria-hidden size={20} />
                 {adding ? EMAIL_ADDING : EMAIL_ADD}
@@ -270,13 +269,13 @@ export function EmailRecipientsForm({
         ) : (
           <p
             data-testid="email-ask-admin"
-            className="mt-2 text-sm text-[var(--muted)]"
+            className={`${SPACING.inner.top} text-sm text-[var(--muted)]`}
           >
             {EMAIL_ASK_ADMIN}
           </p>
         )}
-        <FormError message={error} className="mt-2" />
+        <FormError message={error} className={SPACING.inner.top} />
       </section>
-    </div>
+    </Group>
   );
 }

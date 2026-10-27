@@ -6,6 +6,8 @@ import { removeWorkspaceMemberAction } from "@/app/account/organization/actions"
 import Modal from "@/components/ui/Modal";
 import { FormError } from "@/components/ui/FormError";
 import { formatDateMediumUTC } from "@/lib/date";
+import { Button } from "@/components/ui/Button";
+import { ROW, SPACING } from "@/lib/spacing";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -80,7 +82,7 @@ export function OrgMemberList({
 
   return (
     <>
-      <ul className="mt-3 divide-y divide-[var(--ring)]">
+      <ul className="mt-2 divide-y divide-[var(--ring)]">
         {members.map((m) => {
           const isOwner = m.role === "owner";
           const isSelf = m.userId === viewerUserId;
@@ -89,7 +91,7 @@ export function OrgMemberList({
           return (
             <li
               key={m.userId}
-              className="flex flex-wrap items-center gap-3 py-3"
+              className={`flex flex-wrap items-center ${SPACING.inner.gap} ${ROW}`}
             >
               {/* Identity */}
               <div className="min-w-0 flex-1">
@@ -156,27 +158,28 @@ export function OrgMemberList({
             this organization. This cannot be undone.
           </p>
 
-          <FormError message={removeError} className="mt-3" />
+          <FormError message={removeError} className="mt-2" />
 
           {/* Red, as the Remove that opened it: it cannot be undone (the
               owner's build 12, #5). */}
-          <div className="mt-6 flex flex-wrap gap-2">
-            <button
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button
               type="button"
               onClick={handleConfirmRemove}
               disabled={removing}
-              className="btn-danger inline-flex px-5 disabled:opacity-60"
+              variant="danger"
+              className="disabled:opacity-60"
             >
               {removing ? "Removing…" : "Remove member"}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={closeConfirm}
               disabled={removing}
-              className="btn-secondary inline-flex px-5"
+              variant="secondary"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </Modal>
       ) : null}

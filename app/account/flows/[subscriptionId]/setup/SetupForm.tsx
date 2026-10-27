@@ -23,6 +23,8 @@ import { saveSetup } from "../../actions";
 import { SECTION_NAME, SetupFields } from "../../ManifestFields";
 import { setupProblem } from "../../setup-check";
 import { VendorRows, type VendorOption } from "../../VendorRows";
+import { Group } from "@/components/dashboard/Group";
+import { SPACING } from "@/lib/spacing";
 
 /** One step's vendor choice on Set up. */
 export type SetupVendorField = {
@@ -171,7 +173,7 @@ export function SetupForm({
   };
 
   return (
-    <div className="flex flex-col gap-6 py-5 first:pt-0">
+    <Group className={`flex flex-col ${SPACING.group.gap}`}>
       {callbackStatus === "connected" ? (
         <p role="status" className="text-sm text-[var(--success-text)]">
           Connection completed successfully.
@@ -187,14 +189,18 @@ export function SetupForm({
         <div
           role="group"
           aria-label={SECTION_NAME.connections}
-          className="space-y-4"
+          className={`flex flex-col ${SPACING.group.gap}`}
         >
           <NumberedStep index={1} title={SECTION_NAME.connections} />
           {vendorFields.map((field) => (
-            <div key={field.key} data-testid={`setup-vendor-${field.key}`}>
+            <div
+              key={field.key}
+              data-testid={`setup-vendor-${field.key}`}
+              className={`flex flex-col ${SPACING.inner.gap}`}
+            >
               {/* A flow that chooses a vendor for more than one step names each step's choice. */}
               {vendorFields.length > 1 ? (
-                <p className="mb-1 text-xs font-medium text-[var(--muted)]">
+                <p className="text-xs font-medium text-[var(--muted)]">
                   {field.title}
                 </p>
               ) : null}
@@ -229,7 +235,11 @@ export function SetupForm({
         </div>
       ) : null}
 
-      <form onSubmit={submit} noValidate className="flex flex-col gap-6">
+      <form
+        onSubmit={submit}
+        noValidate
+        className={`flex flex-col ${SPACING.group.gap}`}
+      >
         <input type="hidden" name="subscriptionId" value={subscriptionId} />
         <SetupFields
           setup={setup}
@@ -250,6 +260,6 @@ export function SetupForm({
           </Button>
         </div>
       </form>
-    </div>
+    </Group>
   );
 }

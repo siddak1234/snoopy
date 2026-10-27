@@ -1,4 +1,5 @@
 import SectionCard from "@/components/dashboard/SectionCard";
+import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { getAppSession } from "@/lib/app-session";
 import {
   emptyConnectionsWhenUnavailable,
@@ -27,9 +28,7 @@ export default async function ConnectionsPage({
         title="Connections"
         subheader="Connect the accounts your flows use"
       >
-        <p className="py-5 text-sm text-[var(--muted)]">
-          No workspace is active yet.
-        </p>
+        <EmptyRow text="No workspace is active yet." />
       </SectionCard>
     );
   }

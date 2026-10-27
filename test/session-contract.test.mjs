@@ -274,7 +274,9 @@ test("the Linked accounts lead is one line — Sign in with any of these. — an
     "utf8",
   ).replace(/\s+/gu, " ");
   const leads = [
-    ...prose.matchAll(/>\s*Linked accounts\s*<\/h2>\s*<p[^>]*>([^<]*)<\/p>/gu),
+    ...prose.matchAll(
+      /<Group title="Linked accounts">\s*<p[^>]*>([^<]*)<\/p>/gu,
+    ),
   ]
     .map(([, text]) => text.trim())
     .filter((text) => text !== "Loading…");

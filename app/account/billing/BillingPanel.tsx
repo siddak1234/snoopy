@@ -11,6 +11,8 @@ import {
   openBillingPortal,
   type BillingActionResult,
 } from "./actions";
+import { CHIP } from "@/components/blocks/look";
+import { CARD, SPACING } from "@/lib/spacing";
 
 /**
  * The billing surface: the plans, as cards, and the way to change one.
@@ -67,11 +69,15 @@ function PlanCard({
   // and whatever its status adds — no minimum height, nothing pushed to the
   // bottom.
   return (
-    <li className="bubble flex flex-col gap-1 p-4">
+    <li className={`bubble flex flex-col ${SPACING.inner.gap} ${CARD}`}>
       <p className="text-lg font-medium text-[var(--text)]">{name}</p>
       <p className="text-2xl font-semibold text-[var(--text)]">{price}</p>
       {children ? (
-        <div className="flex flex-col items-start gap-3 pt-3">{children}</div>
+        <div
+          className={`flex flex-col items-start ${SPACING.inner.gap} ${SPACING.inner.top}`}
+        >
+          {children}
+        </div>
       ) : null}
     </li>
   );
@@ -167,16 +173,18 @@ export function BillingPanel({
   // it renews or ends, and Manage billing.
   const enrolled = (paid: boolean) => (
     <>
-      <span className="inline-flex rounded-full bg-[var(--chip-bg)] px-2.5 py-0.5 text-xs font-medium text-[var(--chip-text)]">
+      <span className={`${CHIP} bg-[var(--chip-bg)] text-[var(--chip-text)]`}>
         Enrolled
       </span>
       {paid ? (
-        <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--muted)]">
+        <div
+          className={`flex flex-wrap items-center ${SPACING.inner.gap} text-sm text-[var(--muted)]`}
+        >
           {billing.status ? <StatusPill status={billing.status} /> : null}
           {/* A period line only while access lasts: once it has ended, the
               pill says so, and a period end can lie in the future. */}
           {periodEnd && !accessEnded ? (
-            <dl className="flex gap-1">
+            <dl className={`flex ${SPACING.inner.gap}`}>
               <dt>{billing.cancelAtPeriodEnd ? "Ends" : "Renews"}</dt>
               {/* A cancelled plan says where the workspace goes after it (the
                   owner's build 14 feedback #11, on the app: "it should be your
@@ -205,7 +213,7 @@ export function BillingPanel({
   );
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={`flex flex-col ${SPACING.group.gap}`}>
       {needsCheckout ? (
         <p className="text-sm text-[var(--muted)]">
           {plans.length > 0
@@ -215,7 +223,7 @@ export function BillingPanel({
       ) : null}
       {/* Side by side, each at its own height: a card is not stretched to
           the tallest in its row. */}
-      <ul className="grid gap-4 md:grid-cols-3 md:items-start">
+      <ul className={`grid ${SPACING.group.gap} md:grid-cols-3 md:items-start`}>
         <PlanCard name="Free" price={formatPlanPrice(FREE_PRICE) ?? ""}>
           {onFree ? (
             enrolled(false)
@@ -236,7 +244,9 @@ export function BillingPanel({
               </Button>
               {/* Not once the plan is cancelled: the move to Free is under way. */}
               {billing.cancelAtPeriodEnd ? null : (
-                <p className="mt-2 text-sm text-[var(--muted)]">
+                <p
+                  className={`${SPACING.inner.top} text-sm text-[var(--muted)]`}
+                >
                   To move to Free, cancel {billing.displayName} in Manage
                   billing.
                 </p>

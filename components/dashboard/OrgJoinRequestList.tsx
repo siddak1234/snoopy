@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { decideOrganizationJoinRequestAction } from "@/app/account/organization/actions";
 import { FormError } from "@/components/ui/FormError";
 import type { OrganizationJoinRequest } from "@/lib/tenancy";
+import { Button } from "@/components/ui/Button";
+import { ROW, SPACING } from "@/lib/spacing";
 
 export function OrgJoinRequestList({
   workspaceId,
@@ -38,19 +40,19 @@ export function OrgJoinRequestList({
 
   if (pendingRequests.length === 0) {
     return (
-      <p className="mt-3 text-sm text-[var(--muted)]">No pending requests.</p>
+      <p className="mt-2 text-sm text-[var(--muted)]">No pending requests.</p>
     );
   }
 
   return (
-    <div className="mt-3">
+    <div className="mt-2">
       <ul className="divide-y divide-[var(--ring)]">
         {pendingRequests.map((request) => {
           const busy = workingId === request.id;
           return (
             <li
               key={request.id}
-              className="flex flex-wrap items-center gap-3 py-3"
+              className={`flex flex-wrap items-center ${SPACING.inner.gap} ${ROW}`}
             >
               {/* The person asking, by name and address (backend 24.12.4):
                   an owner or admin approves a person, not an id. */}
@@ -70,27 +72,30 @@ export function OrgJoinRequestList({
                   {request.userId}
                 </span>
               )}
-              <button
+              <Button
                 type="button"
                 onClick={() => decide(request.id, "approve")}
                 disabled={busy}
-                className="btn-primary inline-flex px-3 py-1.5 text-xs disabled:opacity-60"
+                size="sm"
+                className="disabled:opacity-60"
               >
                 {busy ? "Updating…" : "Approve"}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="secondary"
+                size="sm"
                 onClick={() => decide(request.id, "reject")}
                 disabled={busy}
-                className="btn-secondary inline-flex px-3 py-1.5 text-xs disabled:opacity-60"
+                className="disabled:opacity-60"
               >
                 Reject
-              </button>
+              </Button>
             </li>
           );
         })}
       </ul>
-      <FormError message={error} className="mt-3" />
+      <FormError message={error} className="mt-2" />
     </div>
   );
 }

@@ -34,6 +34,8 @@ import {
   withCallbackStatus,
 } from "./pending-connect";
 import { startConnect } from "./start-connect";
+import { Group } from "@/components/dashboard/Group";
+import { SPACING } from "@/lib/spacing";
 
 function pendingConnect(): string | null {
   try {
@@ -235,19 +237,28 @@ export function ConnectionsPanel({
     );
 
   return (
-    <div className="py-5 first:pt-0">
+    <Group>
       {callbackStatus === "connected" ? (
-        <p role="status" className="mb-4 text-sm text-[var(--success-text)]">
+        <p
+          role="status"
+          className={`${SPACING.group.bottom} text-sm text-[var(--success-text)]`}
+        >
           Connection completed successfully.
         </p>
       ) : null}
       {notice ? (
-        <p role="status" className="mb-4 text-sm text-[var(--success-text)]">
+        <p
+          role="status"
+          className={`${SPACING.group.bottom} text-sm text-[var(--success-text)]`}
+        >
           {notice}
         </p>
       ) : null}
       {callbackStatus === "error" && returnedFor !== undefined ? (
-        <p role="alert" className="mb-4 text-sm text-[var(--error-text)]">
+        <p
+          role="alert"
+          className={`${SPACING.group.bottom} text-sm text-[var(--error-text)]`}
+        >
           {stillActive
             ? "The new authorization didn't complete, so nothing changed — your existing connection is still active. Try again or contact an owner."
             : "The connection could not be completed. Try again or contact an owner."}
@@ -307,7 +318,7 @@ export function ConnectionsPanel({
                 {failed ? (
                   <p
                     role="alert"
-                    className="pb-3 text-xs text-[var(--error-text)]"
+                    className={`${SPACING.inner.pb} text-xs text-[var(--error-text)]`}
                   >
                     {rowError.message}
                   </p>
@@ -318,7 +329,7 @@ export function ConnectionsPanel({
         </ul>
       )}
       {canManage || providers.length === 0 ? null : (
-        <p className="mt-3 text-sm text-[var(--muted)]">
+        <p className={`${SPACING.inner.top} text-sm text-[var(--muted)]`}>
           {CONNECTIONS_MANAGED_BY}
         </p>
       )}
@@ -340,14 +351,16 @@ export function ConnectionsPanel({
           </h2>
           <p
             id="disconnect-connection-description"
-            className="mt-1 text-sm text-[var(--muted)]"
+            className={`${SPACING.title.top} text-sm text-[var(--muted)]`}
           >
             {disconnectBody(
               connectionOf(disconnecting.providerId)?.usedByCount ?? 0,
             )}
           </p>
-          <FormError message={disconnectError} className="mt-3" />
-          <div className="mt-6 flex flex-wrap gap-2">
+          <FormError message={disconnectError} className={SPACING.inner.top} />
+          <div
+            className={`${SPACING.group.top} flex flex-wrap ${SPACING.inner.gap}`}
+          >
             <Button
               type="button"
               variant="ghost"
@@ -384,11 +397,14 @@ export function ConnectionsPanel({
           </h2>
           <p
             id="connect-provider-description"
-            className="mt-1 text-sm text-[var(--muted)]"
+            className={`${SPACING.title.top} text-sm text-[var(--muted)]`}
           >
             Provide the connection details supplied by this provider.
           </p>
-          <form onSubmit={submitKeyForm} className="mt-6 space-y-4">
+          <form
+            onSubmit={submitKeyForm}
+            className={`${SPACING.group.top} flex flex-col ${SPACING.group.gap}`}
+          >
             <input
               type="hidden"
               name="providerId"
@@ -419,7 +435,7 @@ export function ConnectionsPanel({
                 was not created.
               </p>
             ) : null}
-            <div className="flex flex-wrap gap-2 pt-2">
+            <div className={`flex flex-wrap ${SPACING.inner.gap}`}>
               <Button
                 type="button"
                 variant="ghost"
@@ -449,6 +465,6 @@ export function ConnectionsPanel({
           </form>
         </Modal>
       ) : null}
-    </div>
+    </Group>
   );
 }

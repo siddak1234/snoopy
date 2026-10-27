@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { safePlatformReturnTo } from "@/lib/platform-api";
 import { platformApiJson, platformApiPath } from "@/lib/platform-api";
 import type { operations } from "@/lib/generated/platform-contracts/platform";
+import { Button } from "@/components/ui/Button";
 
 type LoginProvidersResponse =
   operations["listLoginProviders"]["responses"][200]["content"]["application/json"];
@@ -62,16 +63,17 @@ export function OAuthButtons({
         <p role="alert" className="text-sm text-[var(--muted)]">
           Sign-in providers could not be loaded.
         </p>
-        <button
+        <Button
           type="button"
           onClick={() => {
             setFailed(false);
             setAttempt((current) => current + 1);
           }}
-          className="btn-secondary btn-sm"
+          variant="secondary"
+          size="sm"
         >
           Try again
-        </button>
+        </Button>
       </div>
     );
   }

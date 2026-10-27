@@ -8,14 +8,16 @@ import { PlatformServerError } from "@/lib/platform-server";
 import { PACKAGE_UNAVAILABLE } from "@/lib/run-documents";
 import { runLabel } from "@/lib/run-progress";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
-import { PackageActions, PackageFrame } from "../RunLive";
+import { PackageActions, PackageFile, PackageFrame } from "../RunLive";
+import { Group } from "@/components/dashboard/Group";
 
 /**
  * A job's run package (Build 24, P12; the owner's build 23 words: "View
  * button should take them to a page showing the package"): the A8X PDF itself
  * — cover, summary, subtotals, every invoice and the original files — in a
- * frame the page's height, through the site's own route (`file/route.ts`),
- * and Download PDF and Download Excel. A job the platform cannot package yet
+ * frame the page's height, read once through the site's own route
+ * (`file/route.ts`; `PackageFile`), and Download PDF and Download Excel, then
+ * Share, those same bytes. A job the platform cannot package yet
  * (no documents, or still going: `packageAvailable`) says so, with the way
  * back to its run.
  * ~~The package's content drawn as sections of this page~~ (the session's
@@ -44,7 +46,7 @@ export default async function RunPackagePage(
   // The platform says whether the job has a package (backend ADR-0048).
   const ready = detail.packageAvailable === true;
 
-  return (
+  const card = (
     <SectionCard
       title="Run package"
       subheader={runLabel(job)}
@@ -56,12 +58,14 @@ export default async function RunPackagePage(
       }
     >
       {ready ? (
-        <div className="py-5 first:pt-0">
-          <PackageFrame runId={job} />
-        </div>
+        <Group>
+          <PackageFrame />
+        </Group>
       ) : (
         <EmptyRow text={PACKAGE_UNAVAILABLE} />
       )}
     </SectionCard>
   );
+  // The PDF read once, for the frame and Share alike.
+  return ready ? <PackageFile runId={job}>{card}</PackageFile> : card;
 }

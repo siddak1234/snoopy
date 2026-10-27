@@ -6,6 +6,7 @@ import LogoMark from "@/components/branding/LogoMark";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 import { WorkspaceSwitcher } from "@/components/dashboard/WorkspaceSwitcher";
 import type { Workspace } from "@/lib/tenancy";
+import { Button } from "@/components/ui/Button";
 
 /**
  * Slim top bar for the account shell (the marketing header no longer wraps
@@ -40,13 +41,14 @@ export function AccountTopBar({
         />
         <ThemeToggle />
         {/* Red, as in the app: it ends the session (the owner's build 12, #5). */}
-        <button
+        <Button
           type="button"
           onClick={handleSignOut}
-          className="btn-danger btn-sm"
+          variant="danger"
+          size="sm"
         >
           Sign out
-        </button>
+        </Button>
       </div>
     </div>
   );

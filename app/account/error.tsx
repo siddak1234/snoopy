@@ -6,6 +6,7 @@ import {
   SessionEnded,
 } from "@/components/dashboard/PlatformUnavailable";
 import { platformApiJson, sessionEnded } from "@/lib/platform-api";
+import { PAGE_CARD, SPACING } from "@/lib/spacing";
 
 /**
  * A page in the account area that could not load its data — a refused or failed
@@ -44,7 +45,7 @@ export default function AccountError({ retry }: { retry: () => void }) {
     return (
       <section
         aria-busy="true"
-        className="bubble mx-auto mt-10 flex max-w-lg flex-col gap-3 p-6 sm:p-8"
+        className={`bubble mx-auto ${SPACING.group.top} flex max-w-lg flex-col ${SPACING.inner.gap} ${PAGE_CARD}`}
       >
         <p className="text-sm text-[var(--muted)]">Loading…</p>
       </section>

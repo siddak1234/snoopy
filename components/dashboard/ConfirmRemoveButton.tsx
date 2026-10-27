@@ -95,8 +95,8 @@ export function ConfirmRemoveButton({
           >
             {description}
           </p>
-          {error ? <FormError message={error} className="mt-3" /> : null}
-          <div className="mt-6 flex justify-end gap-2">
+          {error ? <FormError message={error} className="mt-2" /> : null}
+          <div className="mt-4 flex justify-end gap-2">
             <Button
               type="button"
               variant="secondary"

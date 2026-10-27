@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { setupPath } from "@/lib/flow-steps";
 import { subscribeToAutomation } from "./actions";
+import { SPACING } from "@/lib/spacing";
 
 /**
  * Add a flow to this workspace. No team is chosen (backend ADR-0036; the
@@ -63,7 +64,7 @@ export function AddAutomation({
   };
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className={`flex flex-col ${SPACING.inner.gap}`}>
       <div>
         <Button
           variant="primary"

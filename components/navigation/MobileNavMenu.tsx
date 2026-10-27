@@ -6,6 +6,7 @@ import { useAppSession } from "@/hooks/use-app-session";
 import { useEffect, useRef, useState } from "react";
 import { ListIcon, XIcon } from "@phosphor-icons/react";
 import { marketingNav } from "@/lib/nav";
+import { Button } from "@/components/ui/Button";
 
 const linkClass =
   "block rounded-[var(--radius-md)] px-4 py-3 text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-inset";
@@ -105,13 +106,13 @@ export default function MobileNavMenu() {
                 </button>
               </>
             ) : (
-              <Link
+              <Button
                 href="/login"
-                className="btn-primary mt-0.5 w-full"
+                className="mt-0.5 w-full"
                 onClick={closeMenu}
               >
                 Sign in
-              </Link>
+              </Button>
             )}
           </nav>
         </div>

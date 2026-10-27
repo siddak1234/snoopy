@@ -158,7 +158,7 @@ export function WorkspaceSwitcher({
                   aria-disabled={pending || undefined}
                   aria-current={isActive ? "true" : undefined}
                   onClick={() => void handleSelect(workspace.id)}
-                  className={`flex items-center justify-between gap-3 rounded-[var(--radius-md)] px-3 py-2 text-left text-sm transition aria-disabled:opacity-60 ${isActive ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"}`}
+                  className={`flex items-center justify-between gap-2 rounded-[var(--radius-md)] px-3 py-2 text-left text-sm transition aria-disabled:opacity-60 ${isActive ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text)]"}`}
                 >
                   <span className="min-w-0">
                     <span className="block truncate font-medium">

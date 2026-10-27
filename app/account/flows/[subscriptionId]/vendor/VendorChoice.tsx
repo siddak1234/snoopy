@@ -14,6 +14,8 @@ import { flowPath } from "@/lib/flow-steps";
 import { PENDING_CONNECT } from "@/app/account/connections/pending-connect";
 import { saveVendorChoice } from "../../actions";
 import { VendorRows, type VendorOption } from "../../VendorRows";
+import { Group } from "@/components/dashboard/Group";
+import { SPACING } from "@/lib/spacing";
 
 function pendingConnect(): string | null {
   try {
@@ -124,9 +126,12 @@ export function VendorChoice({
   }, [callbackStatus, returnedFor, options]);
 
   return (
-    <div className="py-5 first:pt-0">
+    <Group>
       {callbackStatus === "error" ? (
-        <p role="alert" className="mb-4 text-sm text-[var(--error-text)]">
+        <p
+          role="alert"
+          className={`${SPACING.group.bottom} text-sm text-[var(--error-text)]`}
+        >
           The connection could not be completed. Try again or contact an owner.
         </p>
       ) : null}
@@ -141,7 +146,7 @@ export function VendorChoice({
         returnTo={returnTo}
         onChoose={save}
       />
-      <FormError message={error} className="mt-4" />
-    </div>
+      <FormError message={error} className={SPACING.group.top} />
+    </Group>
   );
 }
