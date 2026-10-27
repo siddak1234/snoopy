@@ -39,7 +39,7 @@ function downloadExport(response: WorkspaceExportResponse) {
  * member's email, every project and every run, so it is an owner's or an
  * admin's (Access's `assertWorkspaceAdministrator`). A member is told who can
  * rather than offered a button the platform would refuse (register F8).
- * Download JSON, then Share, the same JSON file (`FileActions`; the owner's
+ * Download JSON, then Share, the same JSON file, the page's own (`FileActions`; the owner's
  * F4 and Q7).
  */
 export function WorkspaceExportSection({
@@ -104,7 +104,8 @@ export function WorkspaceExportSection({
               share={{
                 filename: exportFile(response).filename,
                 contentType: "application/json",
-                read: async () => exportFile(response),
+                // The page holds the summary itself: shared as it is.
+                held: exportFile(response),
               }}
             />
           ) : null}

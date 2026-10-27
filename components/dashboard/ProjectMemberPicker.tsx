@@ -7,6 +7,7 @@ import Modal from "@/components/ui/Modal";
 import { FormError } from "@/components/ui/FormError";
 import type { ProjectRole } from "@/lib/tenancy";
 import { Button } from "@/components/ui/Button";
+import { ROW, SPACING } from "@/lib/spacing";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -98,7 +99,10 @@ export function ProjectMemberPicker({
           ) : (
             <ul className="mt-4 max-h-80 divide-y divide-[var(--ring)] overflow-y-auto">
               {available.map((m) => (
-                <li key={m.userId} className="flex items-center gap-2 py-3">
+                <li
+                  key={m.userId}
+                  className={`flex items-center ${SPACING.inner.gap} ${ROW}`}
+                >
                   {/* Name + email */}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-[var(--text)]">

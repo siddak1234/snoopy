@@ -10,6 +10,7 @@ import { ConfirmRemoveButton } from "@/components/dashboard/ConfirmRemoveButton"
 import { FormError } from "@/components/ui/FormError";
 import type { TeamDirectoryEntry } from "@/lib/tenancy";
 import { Button } from "@/components/ui/Button";
+import { ROW, SPACING } from "@/lib/spacing";
 
 /**
  * The teams in an organization a person can ask to join (BUILD-PLAN 24.11.11,
@@ -50,7 +51,7 @@ export function AskToJoinList({
         {entries.map((entry) => (
           <li
             key={entry.id}
-            className="flex flex-wrap items-center justify-between gap-2 py-3"
+            className={`flex flex-wrap items-center justify-between ${SPACING.inner.gap} ${ROW}`}
           >
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-[var(--text)]">

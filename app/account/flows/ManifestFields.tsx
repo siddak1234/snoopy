@@ -205,7 +205,7 @@ function ManifestFieldInput({
         />
         <label
           htmlFor={fieldId}
-          className="flex items-center gap-2 text-sm text-[var(--text)]"
+          className={`flex items-center ${SPACING.inner.gap} text-sm text-[var(--text)]`}
         >
           <input
             id={fieldId}

@@ -1,11 +1,14 @@
 import { AxeBuilder } from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Download, type Page } from "@playwright/test";
 import {
   expectNoAxeViolations,
   fixtureControl,
   fixtureRead,
+  observe,
   presentSession,
   runForm,
+  shared,
+  standInShareSheet,
 } from "./helpers";
 
 /**
@@ -448,22 +451,12 @@ const ITEM_FILE_LINK =
 const ENTRY_FILE = "d2d2d2d2-d2d2-4d2d-8d2d-d2d2d2d2d2d2";
 const ENTRY_FILE_LINK = `https://127.0.0.1:3443/__fixture/run-file?id=${ENTRY_FILE}&name=ada-lane.pdf`;
 
-/** The share sheet, stood in for: what it was handed is kept on the page. */
-async function standInShareSheet(page: Page) {
-  await page.addInitScript(() => {
-    Object.assign(navigator, {
-      canShare: () => true,
-      share: async (data: ShareData) => {
-        const file = data.files?.[0];
-        Object.assign(window, {
-          shared: file
-            ? { name: file.name, type: file.type, size: file.size }
-            : null,
-        });
-      },
-    });
-  });
-}
+/**
+ * A download from the platform's signed link: a headless browser may save the
+ * file page's own frame (its PDF, from the page's read) as a download too.
+ */
+const fromSignedLink = (download: Download) =>
+  download.url().startsWith("https://127.0.0.1:3443/");
 
 /** WCAG 2.2 AA on a file's page; its frame holds the file, not this site's page. */
 async function expectNoAxeViolationsBesideTheFile(page: Page) {
@@ -522,6 +515,10 @@ test("an item's tiles: Total, then the flow's verdict words — green and red �
   ).toBe(true);
   await expectNoAxeViolations(page);
 
+  // Each read of the file page's route, from here on.
+  const views = observe(page, (request) =>
+    new URL(request.url()).pathname.endsWith("/file/view"),
+  );
   await page.getByRole("link", { name: "Batch file" }).click();
   await expect(page).toHaveURL(new RegExp(`${ITEM}/file$`, "u"));
   const main = page.locator("main");
@@ -533,12 +530,13 @@ test("an item's tiles: Total, then the flow's verdict words — green and red �
   await expect(page.getByTestId("file-line")).toHaveText(
     /^PDF · 1 page · \d+ bytes$/u,
   );
-  // The file itself, through this site's route: inline, its own type, for
-  // this site's pages alone.
+  // The file itself, read once from this site's route — inline, its own
+  // type, for this site's pages alone — and shown from those bytes.
   await expect(page.getByTestId("file-frame")).toHaveAttribute(
     "src",
-    `${ITEM}/file/view`,
+    /^blob:/u,
   );
+  expect(views).toHaveLength(1);
   const answers = await viewAnswers(page, `${ITEM}/file/view`);
   expect(answers.own).toEqual({
     status: 200,
@@ -557,17 +555,18 @@ test("an item's tiles: Total, then the flow's verdict words — green and red �
   await expectNoAxeViolationsBesideTheFile(page);
   // Download: the platform's signed link; Share: the file itself.
   const [download] = await Promise.all([
-    page.waitForEvent("download"),
+    page.waitForEvent("download", { predicate: fromSignedLink }),
     main.getByRole("button", { name: "Download" }).click(),
   ]);
   expect(download.url()).toBe(ITEM_FILE_LINK);
   await expect(page).toHaveURL(new RegExp(`${ITEM}/file$`, "u"));
+  // Share: the frame's own bytes, at the first press — never read again
+  // (the one more read is viewAnswers').
   await main.getByRole("button", { name: "Share" }).click();
   await expect
-    .poll(() =>
-      page.evaluate(() => (window as unknown as { shared?: unknown }).shared),
-    )
+    .poll(() => shared(page))
     .toMatchObject({ name: "spring-intake.pdf", type: "application/pdf" });
+  expect(views).toHaveLength(2);
   // Back goes to the item.
   await main.getByRole("link", { name: "Back" }).click();
   await expect(page).toHaveURL(new RegExp(`${ITEM}$`, "u"));
@@ -588,7 +587,7 @@ test("an item's file under another flow's path is not found, and a member reads 
   await presentSession(page, "member");
   await page.goto(`${ITEM}/file`);
   const [download] = await Promise.all([
-    page.waitForEvent("download"),
+    page.waitForEvent("download", { predicate: fromSignedLink }),
     page.locator("main").getByRole("button", { name: "Download" }).click(),
   ]);
   expect(download.url()).toBe(ITEM_FILE_LINK);
@@ -623,7 +622,7 @@ test("a run of an item: View {file} first, in the flow's word; its file page: th
   await expect(main).toContainText("Ada Lane");
   await expect(page.getByTestId("file-frame")).toHaveAttribute(
     "src",
-    `${filePage}/view`,
+    /^blob:/u,
   );
   const answers = await viewAnswers(page, `${filePage}/view`);
   expect(answers.own).toMatchObject({
@@ -634,7 +633,7 @@ test("a run of an item: View {file} first, in the flow's word; its file page: th
   expect(answers.elsewhere).toBe(403);
   await expectNoAxeViolationsBesideTheFile(page);
   const [download] = await Promise.all([
-    page.waitForEvent("download"),
+    page.waitForEvent("download", { predicate: fromSignedLink }),
     main.getByRole("button", { name: "Download" }).click(),
   ]);
   expect(download.url()).toBe(ENTRY_FILE_LINK);

@@ -40,7 +40,8 @@ const FAILURES: Record<string, string> = {
  * for a day. A link that is not https is never followed, and the page says it
  * could not download (`followSignedLink`; Build 25, the review's R5c 2).
  * Download file, then Share, the file itself, read through this site's own
- * route (`FileActions`; the owner's F4 and Q7).
+ * route when Share is first pressed — never before (`FileActions`; the
+ * owner's F4 and Q7).
  *
  * `workspaceId` is the workspace the page shows: every call is refused once
  * another tab has made a different one active (register F28).

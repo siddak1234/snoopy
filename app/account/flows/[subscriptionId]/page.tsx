@@ -309,7 +309,7 @@ export default async function FlowPage(
   // Step 1: the run's fields and Start run, or Turn on while the flow is off;
   // and what it is owed, each a link to where it is fixed.
   const stepOne = (
-    <div id="run" className="flex scroll-mt-6 flex-col gap-2">
+    <div id="run" className={`flex scroll-mt-6 flex-col ${SPACING.inner.gap}`}>
       <RunStart
         workspaceId={workspaceId}
         subscriptionId={subscription.id}

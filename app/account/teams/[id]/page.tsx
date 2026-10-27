@@ -19,7 +19,7 @@ import { TeamAccessRequests } from "@/components/dashboard/TeamAccessRequests";
 import { Button } from "@/components/ui/Button";
 import { Group } from "@/components/dashboard/Group";
 import { SectionTitle } from "@/components/dashboard/SectionTitle";
-import { GROUP_BAND } from "@/lib/spacing";
+import { GROUP_BAND, SPACING } from "@/lib/spacing";
 
 /** The requests, where the platform has them (404 before the SEVENTEENTH promotion). */
 async function requestsIfThere(
@@ -103,7 +103,7 @@ export default async function TeamDetailPage({
         ) : null
       }
       secondaryAction={
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={`flex flex-wrap items-center ${SPACING.inner.gap}`}>
           <Button
             prefetch={false}
             href="/account/teams"

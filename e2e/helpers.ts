@@ -27,6 +27,30 @@ export function observe(
   return seen;
 }
 
+/** The share sheet, stood in for: what it was handed is kept on the page. */
+export async function standInShareSheet(page: Page) {
+  await page.addInitScript(() => {
+    Object.assign(navigator, {
+      canShare: () => true,
+      share: async (data: ShareData) => {
+        const file = data.files?.[0];
+        Object.assign(window, {
+          shared: file
+            ? { name: file.name, type: file.type, size: file.size }
+            : null,
+        });
+      },
+    });
+  });
+}
+
+/** What the stand-in share sheet was handed: its name, type and size; undefined before. */
+export function shared(page: Page) {
+  return page.evaluate(
+    () => (window as unknown as { shared?: unknown }).shared,
+  );
+}
+
 // WCAG 2.2 AA on whatever the page shows now — an open dialog included. On a
 // settled document: a server action's re-render replaces the head, and a scan
 // that lands in that instant finds no <title> that is there before and after.

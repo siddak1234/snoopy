@@ -95,7 +95,7 @@ export function AutomationActions({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={`flex flex-col ${SPACING.group.gap}`}>
       {subscription.status === "live" ? (
         <div>
           <Button
@@ -122,7 +122,7 @@ export function AutomationActions({
               <Link
                 prefetch={false}
                 href={setupHref}
-                className="flex min-h-14 items-center gap-2 px-4 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)]"
+                className={`flex min-h-14 items-center ${SPACING.inner.gap} ${SPACING.rowX.x} ${SPACING.rowY.y} text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)]`}
               >
                 <SlidersHorizontalIcon
                   aria-hidden
@@ -142,7 +142,7 @@ export function AutomationActions({
               #91): only for a webhook-started version, and only for an owner
               or admin, as the platform allows no one else. */}
           {webhook ? (
-            <li className="px-4 py-3">
+            <li className={`${SPACING.rowX.x} ${SPACING.rowY.y}`}>
               <WebhookAddressButton
                 workspaceId={workspaceId}
                 subscriptionId={subscription.id}
@@ -194,7 +194,9 @@ export function AutomationActions({
             you can unarchive it later.
           </p>
           <FormError message={error} />
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div
+            className={`${SPACING.group.top} flex flex-wrap ${SPACING.inner.gap}`}
+          >
             <Button
               type="button"
               variant="ghost"

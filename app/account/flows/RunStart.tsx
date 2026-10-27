@@ -9,6 +9,7 @@ import { FormError } from "@/components/ui/FormError";
 import type { AutomationRunInputField } from "@/lib/automations";
 import { setSubscriptionStatus, startRun } from "./actions";
 import { RunInputFields } from "./ManifestFields";
+import { SPACING } from "@/lib/spacing";
 
 /**
  * Step 1 of a flow's page (Build 21, spec A6; the owner's D3: "it should be
@@ -148,7 +149,7 @@ export function RunStart({
       data-testid="run-form"
       onSubmit={submit}
       onChange={newRunKey}
-      className="flex flex-col gap-4"
+      className={`flex flex-col ${SPACING.group.gap}`}
     >
       <input type="hidden" name="subscriptionId" value={subscriptionId} />
       <input type="hidden" name="idempotencyKey" value={runKey} />
@@ -169,7 +170,7 @@ export function RunStart({
           <Button
             type="submit"
             disabled={pending || uploading}
-            className="inline-flex items-center gap-2"
+            className={`inline-flex items-center ${SPACING.inner.gap}`}
           >
             <PlayIcon size={20} aria-hidden />
             {pending
@@ -185,7 +186,7 @@ export function RunStart({
             type="button"
             disabled={pending || !canGoLive || !available}
             onClick={turnOn}
-            className="inline-flex items-center gap-2"
+            className={`inline-flex items-center ${SPACING.inner.gap}`}
           >
             <RocketLaunchIcon size={20} aria-hidden />
             {pending ? "Turning on…" : "Turn on"}

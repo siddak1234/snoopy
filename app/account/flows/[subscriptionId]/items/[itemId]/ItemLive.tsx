@@ -243,7 +243,9 @@ function ArchiveItem({
             {inSentence(runsWord)} stay.
           </p>
           <FormError message={error} />
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div
+            className={`${SPACING.group.top} flex flex-wrap ${SPACING.inner.gap}`}
+          >
             <Button
               type="button"
               variant="ghost"

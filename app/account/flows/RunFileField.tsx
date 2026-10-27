@@ -232,7 +232,9 @@ export function RunFileField({
           void choose(event.currentTarget.files?.[0], "chooser")
         }
       />
-      <div className="mt-2 flex flex-wrap items-center gap-2">
+      <div
+        className={`${SPACING.inner.top} flex flex-wrap items-center ${SPACING.inner.gap}`}
+      >
         {offersCamera ? (
           <>
             {/* The camera, opened by Take photo, as the chooser is. It has
@@ -255,7 +257,7 @@ export function RunFileField({
             <Button
               variant="secondary"
               size="sm"
-              className="inline-flex items-center gap-2"
+              className={`inline-flex items-center ${SPACING.inner.gap}`}
               disabled={state.kind === "uploading"}
               onClick={() => camera.current?.click()}
             >
@@ -267,7 +269,7 @@ export function RunFileField({
         <Button
           variant="secondary"
           size="sm"
-          className="inline-flex items-center gap-2"
+          className={`inline-flex items-center ${SPACING.inner.gap}`}
           disabled={state.kind === "uploading"}
           onClick={() => input.current?.click()}
           aria-describedby={showTypes ? typesId : undefined}

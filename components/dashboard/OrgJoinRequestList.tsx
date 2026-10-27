@@ -6,6 +6,7 @@ import { decideOrganizationJoinRequestAction } from "@/app/account/organization/
 import { FormError } from "@/components/ui/FormError";
 import type { OrganizationJoinRequest } from "@/lib/tenancy";
 import { Button } from "@/components/ui/Button";
+import { ROW, SPACING } from "@/lib/spacing";
 
 export function OrgJoinRequestList({
   workspaceId,
@@ -51,7 +52,7 @@ export function OrgJoinRequestList({
           return (
             <li
               key={request.id}
-              className="flex flex-wrap items-center gap-2 py-3"
+              className={`flex flex-wrap items-center ${SPACING.inner.gap} ${ROW}`}
             >
               {/* The person asking, by name and address (backend 24.12.4):
                   an owner or admin approves a person, not an id. */}
@@ -80,14 +81,16 @@ export function OrgJoinRequestList({
               >
                 {busy ? "Updating…" : "Approve"}
               </Button>
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="sm"
                 onClick={() => decide(request.id, "reject")}
                 disabled={busy}
-                className="btn-secondary inline-flex px-3 py-1.5 text-xs disabled:opacity-60"
+                className="disabled:opacity-60"
               >
                 Reject
-              </button>
+              </Button>
             </li>
           );
         })}

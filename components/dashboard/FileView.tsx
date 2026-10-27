@@ -6,7 +6,7 @@ import { DOWNLOAD_FAILED } from "@/lib/run-documents";
 import { DOWNLOAD_TO_OPEN, fileLine, shownInPlace } from "@/lib/run-files";
 import { followSignedLink } from "@/lib/signed-link";
 import { SPACING } from "@/lib/spacing";
-import { FileActions } from "./FileActions";
+import { FileActions, usePageFile } from "./FileActions";
 
 /** The word on a file page's Download. */
 export const DOWNLOAD = "Download";
@@ -21,9 +21,11 @@ export const DOWNLOAD = "Download";
  * pressed through `/api/platform` (`linkPath`) and followed only when https
  * (`followSignedLink`), an attachment, so no page is left — and Share, where
  * the browser can hand a file to the share sheet (`navigator.canShare`): the
- * file read from the page's own route (`siteFileBlob`) — both `FileActions`,
- * as every document's are. A refusal is said under the buttons; a share the
- * person closes is no refusal.
+ * bytes the frame shows, read once from the page's own route
+ * (`usePageFile`), else — a file not shown in place — read from it when
+ * Share is first pressed — both `FileActions`, as every document's are. A
+ * refusal is said under the buttons; a share the person closes is no
+ * refusal.
  */
 export function FileView({
   file,
@@ -37,7 +39,8 @@ export function FileView({
   linkPath: string;
 }) {
   // Download: the platform's signed link, asked when pressed, followed only
-  // when https. Share: the bytes from this page's own route.
+  // when https. Share: the bytes from this page's own route — the frame's,
+  // read once; else read at the press.
   const download = async () => {
     try {
       const link = await platformApiJson<RunFileLink>(linkPath);
@@ -47,15 +50,27 @@ export function FileView({
     }
   };
 
+  const inPlace = shownInPlace(file.contentType);
+  const page = usePageFile(inPlace ? viewHref : null);
+  const frame =
+    "block h-[calc(100dvh-20rem)] min-h-[24rem] w-full rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)]";
+  // The frame shows the bytes the page read; a read that failed, the route
+  // itself, which says why.
+  const shown = page.url ?? (page.failed ? viewHref : null);
+
   return (
     <div className={`flex flex-col ${SPACING.group.gap}`}>
-      {shownInPlace(file.contentType) ? (
-        <iframe
-          title={file.filename}
-          src={viewHref}
-          data-testid="file-frame"
-          className="block h-[calc(100dvh-20rem)] min-h-[24rem] w-full rounded-[var(--radius-md)] border border-[var(--ring)] bg-[var(--surface)]"
-        />
+      {inPlace ? (
+        shown === null ? (
+          <div aria-hidden data-testid="file-frame-waiting" className={frame} />
+        ) : (
+          <iframe
+            title={file.filename}
+            src={shown}
+            data-testid="file-frame"
+            className={frame}
+          />
+        )
       ) : (
         <p className="text-sm text-[var(--muted)]">{DOWNLOAD_TO_OPEN}</p>
       )}
@@ -69,11 +84,19 @@ export function FileView({
       </div>
       <FileActions
         downloads={[{ label: DOWNLOAD, run: download }]}
-        share={{
-          filename: file.filename,
-          contentType: file.contentType,
-          read: async () => ({ blob: await siteFileBlob(viewHref) }),
-        }}
+        share={
+          inPlace && !page.failed
+            ? {
+                filename: file.filename,
+                contentType: file.contentType,
+                held: page.held,
+              }
+            : {
+                filename: file.filename,
+                contentType: file.contentType,
+                read: async () => ({ blob: await siteFileBlob(viewHref) }),
+              }
+        }
       />
     </div>
   );

@@ -7,6 +7,7 @@ import Modal from "@/components/ui/Modal";
 import { FormError } from "@/components/ui/FormError";
 import { formatDateMediumUTC } from "@/lib/date";
 import { Button } from "@/components/ui/Button";
+import { ROW, SPACING } from "@/lib/spacing";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -90,7 +91,7 @@ export function OrgMemberList({
           return (
             <li
               key={m.userId}
-              className="flex flex-wrap items-center gap-2 py-3"
+              className={`flex flex-wrap items-center ${SPACING.inner.gap} ${ROW}`}
             >
               {/* Identity */}
               <div className="min-w-0 flex-1">

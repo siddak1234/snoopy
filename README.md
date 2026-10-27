@@ -101,8 +101,10 @@ that opens in place, headed as "Screen standards" says; the
 package's buttons when the platform offers the package, then Run details,
 then View flow — and View package, Download PDF and Download Excel, each
 download to the platform's signed link, an https one only), the run
-package's page (the PDF itself, in a frame of the site's inline route that
-answers it `application/pdf` inline, a busy platform asked once more; its
+package's page (the PDF itself, read once from the site's inline route that
+answers it `application/pdf` inline and shown in a frame, Share handing on
+those bytes, a busy platform asked once more; Share reading nothing until it
+is pressed, there, on the run page and in Settings; its
 downloads, an https link only; a job with no package yet), Approvals (each
 row its flow and step, fewer words when those cannot be read; a decided row
 leaves, and the last one goes to Activity; a run page that keeps itself

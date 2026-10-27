@@ -147,7 +147,7 @@ export function UploadItemCard({
         data-testid="item-upload"
         onSubmit={submit}
         onChange={newItemKey}
-        className="flex flex-col gap-4"
+        className={`flex flex-col ${SPACING.group.gap}`}
       >
         <h2 id={titleId} className="text-xl font-semibold text-[var(--text)]">
           {uploadLabel(declared.words)}
@@ -197,7 +197,7 @@ export function UploadItemCard({
           showTypes
         />
         <FormError message={error} />
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className={`flex flex-wrap justify-end ${SPACING.inner.gap}`}>
           <Button
             type="button"
             variant="ghost"
@@ -263,7 +263,7 @@ function SelectField({
       {/* Its own name, "Other", visible — never the select's, which a
           screen reader would say twice (as the app labels it). */}
       {other ? (
-        <div className="mt-2">
+        <div className={SPACING.inner.top}>
           <FormInput
             id={`${id}-other`}
             label={OTHER}

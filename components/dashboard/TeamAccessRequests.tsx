@@ -6,6 +6,7 @@ import { decideTeamAccessAction } from "@/app/account/teams/actions";
 import { FormError } from "@/components/ui/FormError";
 import type { AccessRequest } from "@/lib/tenancy";
 import { Button } from "@/components/ui/Button";
+import { ROW, SPACING } from "@/lib/spacing";
 
 /**
  * Who is asking to join a team (BUILD-PLAN 24.11.11, backend 24.11.2), for those
@@ -53,7 +54,7 @@ export function TeamAccessRequests({
           return (
             <li
               key={request.id}
-              className="flex flex-wrap items-center gap-2 py-3"
+              className={`flex flex-wrap items-center ${SPACING.inner.gap} ${ROW}`}
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-[var(--text)]">
@@ -74,14 +75,16 @@ export function TeamAccessRequests({
               >
                 {busy ? "Updating…" : "Approve"}
               </Button>
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="sm"
                 onClick={() => decide(request.id, "deny")}
                 disabled={busy}
-                className="btn-secondary inline-flex px-3 py-1.5 text-xs disabled:opacity-60"
+                className="disabled:opacity-60"
               >
                 Deny
-              </button>
+              </Button>
             </li>
           );
         })}

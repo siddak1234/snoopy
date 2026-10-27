@@ -50,10 +50,6 @@
     "components/dashboard/OrgJoinLink.tsx": {
       "px-3": 1
     },
-    "components/dashboard/OrgJoinRequestList.tsx": {
-      "px-3": 1,
-      "py-1.5": 1
-    },
     "components/dashboard/OrgMemberList.tsx": {
       "ml-1.5": 1,
       "px-2.5": 1,
@@ -84,10 +80,6 @@
     "components/dashboard/StatusPill.tsx": {
       "px-2.5": 2,
       "py-0.5": 2
-    },
-    "components/dashboard/TeamAccessRequests.tsx": {
-      "px-3": 1,
-      "py-1.5": 1
     },
     "components/dashboard/TrackerItem.tsx": {
       "gap-0.5": 1,

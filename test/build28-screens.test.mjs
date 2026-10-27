@@ -225,7 +225,7 @@ test("Run details: its row on every run's page, after the package's buttons and 
   );
   assert.match(
     run.slice(row),
-    /^<PageRow href=\{runDetailsPath\(run\.id\)\} testId="run-details-row">[\s\S]*?<\/PageRow>\s*<div className="mt-4 flex flex-wrap items-center gap-2">\s*(?:\{\s*\}\s*)?\{going \? \(\s*<CancelRunButton/u,
+    /^<PageRow href=\{runDetailsPath\(run\.id\)\} testId="run-details-row">[\s\S]*?<\/PageRow>\s*<div\s+className=\{`\$\{SPACING\.group\.top\} flex flex-wrap items-center \$\{SPACING\.inner\.gap\}`\}\s*>\s*(?:\{\s*\}\s*)?\{going \? \(\s*<CancelRunButton/u,
   );
   assert.ok(run.indexOf("CancelRunButton") < run.indexOf("View flow"));
   assert.ok(
@@ -411,7 +411,16 @@ test("a file is handed on by this site's own route: inline only in a type a brow
     /read: async \(\) => \(\{ blob: await siteFileBlob\(viewHref\) \}\),/u,
   );
   assert.doesNotMatch(file, /\bfetch\(/u);
-  assert.match(file, /\{shownInPlace\(file\.contentType\) \? \(\s*<iframe/u);
+  // The frame shows the bytes the page read once (`usePageFile`), else the
+  // route itself.
+  assert.match(
+    file,
+    /const page = usePageFile\(inPlace \? viewHref : null\);/u,
+  );
+  assert.match(
+    file,
+    /\{inPlace \? \(\s*shown === null \? \([\s\S]*?\) : \(\s*<iframe\s+title=\{file\.filename\}\s+src=\{shown\}/u,
+  );
   const api = code(read("lib/platform-api.ts"));
   assert.match(
     api,

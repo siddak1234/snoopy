@@ -239,17 +239,26 @@ export function ConnectionsPanel({
   return (
     <Group>
       {callbackStatus === "connected" ? (
-        <p role="status" className="mb-4 text-sm text-[var(--success-text)]">
+        <p
+          role="status"
+          className={`${SPACING.group.bottom} text-sm text-[var(--success-text)]`}
+        >
           Connection completed successfully.
         </p>
       ) : null}
       {notice ? (
-        <p role="status" className="mb-4 text-sm text-[var(--success-text)]">
+        <p
+          role="status"
+          className={`${SPACING.group.bottom} text-sm text-[var(--success-text)]`}
+        >
           {notice}
         </p>
       ) : null}
       {callbackStatus === "error" && returnedFor !== undefined ? (
-        <p role="alert" className="mb-4 text-sm text-[var(--error-text)]">
+        <p
+          role="alert"
+          className={`${SPACING.group.bottom} text-sm text-[var(--error-text)]`}
+        >
           {stillActive
             ? "The new authorization didn't complete, so nothing changed — your existing connection is still active. Try again or contact an owner."
             : "The connection could not be completed. Try again or contact an owner."}
@@ -320,7 +329,7 @@ export function ConnectionsPanel({
         </ul>
       )}
       {canManage || providers.length === 0 ? null : (
-        <p className="mt-2 text-sm text-[var(--muted)]">
+        <p className={`${SPACING.inner.top} text-sm text-[var(--muted)]`}>
           {CONNECTIONS_MANAGED_BY}
         </p>
       )}
@@ -349,7 +358,9 @@ export function ConnectionsPanel({
             )}
           </p>
           <FormError message={disconnectError} className={SPACING.inner.top} />
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div
+            className={`${SPACING.group.top} flex flex-wrap ${SPACING.inner.gap}`}
+          >
             <Button
               type="button"
               variant="ghost"
@@ -424,7 +435,7 @@ export function ConnectionsPanel({
                 was not created.
               </p>
             ) : null}
-            <div className="flex flex-wrap gap-2">
+            <div className={`flex flex-wrap ${SPACING.inner.gap}`}>
               <Button
                 type="button"
                 variant="ghost"

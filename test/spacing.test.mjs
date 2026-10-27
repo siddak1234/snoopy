@@ -200,3 +200,60 @@ test("a planted band or title fails the band check, and the reader takes only th
     [],
   );
 });
+
+/** The table's own classes (not `NONE`'s), as a screen would type them. */
+const TABLE = new Set(
+  Object.values(SPACING).flatMap((forms) => Object.values(forms)),
+);
+/** Where a screen under app/account types one of the table's classes itself, not by its name in `lib/spacing.ts`. */
+function literalTable(read = (path) => readFileSync(join(root, path), "utf8")) {
+  return spacingSources()
+    .filter((path) => path.startsWith("app/account/"))
+    .flatMap((path) =>
+      spacingTokens(read(path))
+        .filter((token) => TABLE.has(token))
+        .map((token) => `${path}: ${token}`),
+    );
+}
+
+test("no screen under app/account types the table's classes itself: each comes by its name from lib/spacing.ts, or through the parts (the review's finding 4)", () => {
+  assert.deepEqual(literalTable(), []);
+  // A planted mt-4 fails it; the same space by its name does not.
+  const read = (path) => readFileSync(join(root, path), "utf8");
+  const target = "app/account/runs/[runId]/CancelRunButton.tsx";
+  for (const [plant, found] of [
+    ['<div className="mt-4 flex">', [`${target}: mt-4`]],
+    ["<div className={`${SPACING.group.top} flex`}>", []],
+  ])
+    assert.deepEqual(
+      literalTable((path) =>
+        path === target
+          ? `${read(path)}\nconst planted = ${plant};\n`
+          : read(path),
+      ),
+      found,
+      plant,
+    );
+});
+
+test("a list's rows are the table's row — ROW, its sides, its 12 above and below, and at least 44 tall — and so is a section's bar (the review's finding 3)", () => {
+  const read = (path) => readFileSync(join(root, path), "utf8");
+  for (const name of [
+    "OrgMemberList",
+    "OrgJoinRequestList",
+    "TeamAccessRequests",
+    "AskToJoinList",
+    "ProjectMemberList",
+    "ProjectMemberPicker",
+  ]) {
+    const path = `components/dashboard/${name}.tsx`;
+    const rows = [...read(path).matchAll(/<li\b[^>]*>/gu)].map(([row]) => row);
+    assert.ok(rows.length > 0, path);
+    for (const row of rows)
+      assert.match(row, /className=\{`[^`]*\$\{ROW\}`\}/u, `${path}: ${row}`);
+  }
+  assert.match(
+    read("components/dashboard/SectionRows.tsx"),
+    /export const SECTION_BAR = `flex items-center justify-between \$\{SPACING\.inner\.gap\} \$\{ROW\}`;/u,
+  );
+});

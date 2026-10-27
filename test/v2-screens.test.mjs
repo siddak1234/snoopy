@@ -295,7 +295,7 @@ test("F4: Download, then Share, on all five places; with canShare false, no Shar
     ),
     ["Download"],
   );
-  // Share waits, disabled, until its file is read.
+  // Share waits, disabled and busy, while its file is read.
   const waiting = actionsView({
     downloads: [{ label: "Download", run: async () => null }],
     canShare: true,
@@ -305,6 +305,7 @@ test("F4: Download, then Share, on all five places; with canShare false, no Shar
     waiting.map((node) => node.attrs.disabled !== undefined),
     [false, true],
   );
+  assert.equal(waiting[1].attrs["aria-busy"], "true");
   // The five places: both file pages (FileView), the package's two
   // documents, and Settings › Data's two exports — each FileActions, with
   // its downloads first and a file to share.
@@ -329,7 +330,7 @@ test("F4: Download, then Share, on all five places; with canShare false, no Shar
     const source = read(path);
     assert.match(source, /<FileActions\b/u, path);
     assert.match(source, downloads, path);
-    assert.match(source, /share=\{\{/u, path);
+    assert.match(source, /share=\{/u, path);
   }
   for (const path of [
     "app/account/flows/[subscriptionId]/items/[itemId]/file/page.tsx",
@@ -342,7 +343,7 @@ test("F4: Share sends the file itself, a File of its bytes and type — never a 
   const sent = [];
   const sheet = { share: async (data) => sent.push(data) };
   const bytes = new Blob(["%PDF-1.4"], { type: "application/octet-stream" });
-  const { preparedShare, readShareFile, shareFile } = loaded.modules[ACTIONS];
+  const { pressShare, readShareFile, shareFile } = loaded.modules[ACTIONS];
   const file = await readShareFile({
     filename: "run.pdf",
     contentType: "application/pdf",
@@ -375,22 +376,46 @@ test("F4: Share sends the file itself, a File of its bytes and type — never a 
     },
   });
   assert.equal(closed, null);
-  const refused = await preparedShare({
-    filename: "a.pdf",
-    contentType: "application/pdf",
-    read: async () => {
-      throw new Error("no");
+  const refused = await pressShare(
+    {
+      filename: "a.pdf",
+      contentType: "application/pdf",
+      read: async () => {
+        throw new Error("no");
+      },
     },
-  }).press(sheet);
-  assert.equal(refused, "Could not share. Try again.");
-  // Each place reads the bytes from this site's own routes, never a signed link.
+    null,
+    sheet,
+  );
+  assert.deepEqual(refused, {
+    kept: null,
+    error: "Could not share. Try again.",
+  });
+  // Each place reads the bytes from this site's own routes, never a signed
+  // link: the file pages and the package page the bytes their frames show.
+  const view = read("components/dashboard/FileView.tsx");
   assert.match(
-    read("components/dashboard/FileView.tsx"),
+    view,
+    /const page = usePageFile\(inPlace \? viewHref : null\);/u,
+  );
+  assert.match(view, /held: page\.held,/u);
+  assert.match(
+    view,
     /read: async \(\) => \(\{ blob: await siteFileBlob\(viewHref\) \}\)/u,
   );
+  const run = read("app/account/runs/[runId]/RunLive.tsx");
   assert.match(
-    read("app/account/runs/[runId]/RunLive.tsx"),
-    /siteFileNamed\(\s*shareHref\(\{ runId, format: "pdf", timeZone: browserTimeZone\(\) \}\),?\s*\)/u,
+    run,
+    /siteFileNamed\(\s*shareHref\(\{\s*runId,\s*format: "pdf",\s*timeZone: browserTimeZone\(\),?\s*\}\),?\s*\)/u,
+  );
+  assert.match(run, /held: held\.held/u);
+  assert.match(
+    run,
+    /const read = usePageFile\(href\);\s*return \(\s*<PackageFileContext value=\{\{ \.\.\.read, href \}\}>/u,
+  );
+  assert.match(
+    read("app/account/runs/[runId]/package/page.tsx"),
+    /ready \? <PackageFile runId=\{job\}>\{card\}<\/PackageFile> : card/u,
   );
   assert.match(
     read("app/account/settings/CompleteExportSection.tsx"),
@@ -398,12 +423,12 @@ test("F4: Share sends the file itself, a File of its bytes and type — never a 
   );
   assert.match(
     read("app/account/settings/WorkspaceExportSection.tsx"),
-    /read: async \(\) => exportFile\(response\)/u,
+    /held: exportFile\(response\),/u,
   );
 });
 
-test("F4: Share opens the sheet in the press itself, its file read before — a slow read is no NotAllowedError", async () => {
-  const { preparedShare } = loaded.modules[ACTIONS];
+test("F4: Share reads nothing until it is pressed — the first press reads, the next opens the sheet in the press; the page's own bytes go at the first (the review's finding 1)", async () => {
+  const { pressShare } = loaded.modules[ACTIONS];
   // A browser's share sheet: open only while the press lasts (its user
   // activation), refused with NotAllowedError after.
   let pressing = false;
@@ -414,54 +439,65 @@ test("F4: Share opens the sheet in the press itself, its file read before — a 
       sent.push(data);
     },
   };
-  const press = (prepared) => {
+  const press = (share, kept) => {
     pressing = true;
-    const done = prepared.press(sheet);
+    const done = pressShare(share, kept, sheet);
     pressing = false;
     return done;
   };
-  const slow = (read) => ({
+  let reads = 0;
+  const lazy = {
     filename: "run.pdf",
     contentType: "application/pdf",
     read: () =>
-      new Promise((resolve, reject) =>
+      new Promise((resolve) =>
         setTimeout(() => {
-          try {
-            resolve(read());
-          } catch (thrown) {
-            reject(thrown);
-          }
+          reads += 1;
+          resolve({ blob: new Blob(["%PDF-1.4"]) });
         }, 30),
       ),
-  });
-  const bytes = () => ({ blob: new Blob(["%PDF-1.4"]) });
-  // Read as soon as Share can show; the press then shares at once.
-  const prepared = preparedShare(slow(bytes));
-  assert.equal(prepared.ready(), null);
-  assert.ok((await prepared.reading) instanceof File);
-  assert.equal(await press(prepared), null);
+  };
+  // Drawn, nothing is read: only a press reads.
+  assert.equal(reads, 0);
+  // The first press reads, and keeps the file; the sheet is not asked.
+  const first = await press(lazy, null);
+  assert.equal(reads, 1);
+  assert.equal(first.error, null);
+  assert.ok(first.kept instanceof File);
+  assert.equal(sent.length, 0);
+  // The next opens the sheet in the press, with the file kept: no read.
+  const second = await press(lazy, first.kept);
+  assert.equal(second.error, null);
+  assert.equal(reads, 1);
   assert.equal(sent.length, 1);
   assert.equal(sent[0].files[0].name, "run.pdf");
-  // A read that failed is read again in the press: the sheet then refuses,
-  // said as a refusal, never thrown.
-  let reads = 0;
-  const failing = preparedShare(
-    slow(() => {
-      reads += 1;
-      if (reads === 1) throw new Error("busy");
-      return bytes();
-    }),
+  // The bytes the page holds go at the first press, and nothing is read.
+  const held = await press(
+    {
+      filename: "a.pdf",
+      contentType: "application/pdf",
+      held: { blob: new Blob(["%PDF-1.4"]), filename: "b.pdf" },
+    },
+    null,
   );
-  assert.equal(await failing.reading, null);
-  assert.equal(await press(failing), "Could not share. Try again.");
-  assert.equal(sent.length, 1);
-  // The page asks it at once: Share waits for the read, and the press calls it.
+  assert.equal(held.error, null);
+  assert.equal(sent.length, 2);
+  assert.equal(sent[1].files[0].name, "b.pdf");
+  assert.equal(sent[1].files[0].type, "application/pdf");
+  // The page still reading its own: nothing is read and nothing asked.
+  assert.deepEqual(
+    await press(
+      { filename: "a.pdf", contentType: "application/pdf", held: null },
+      null,
+    ),
+    { kept: null, error: null },
+  );
+  assert.equal(sent.length, 2);
+  // The page reads nothing before a press: no effect reads, and the press
+  // calls pressShare.
   const source = read(ACTIONS);
-  assert.match(source, /const made = preparedShare\(latest\.current\);/u);
-  assert.match(
-    source,
-    /if \(ready && prepared\) void act\(\(\) => prepared\.share\.press\(\)\);/u,
-  );
+  assert.doesNotMatch(source, /preparedShare/u);
+  assert.match(source, /const pressed = await pressShare\(share, keptFile\);/u);
 });
 
 const request = (fetchSite, search = "?run=r1&format=pdf") => ({

@@ -177,7 +177,9 @@ export function BillingPanel({
         Enrolled
       </span>
       {paid ? (
-        <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--muted)]">
+        <div
+          className={`flex flex-wrap items-center ${SPACING.inner.gap} text-sm text-[var(--muted)]`}
+        >
           {billing.status ? <StatusPill status={billing.status} /> : null}
           {/* A period line only while access lasts: once it has ended, the
               pill says so, and a period end can lie in the future. */}
@@ -211,7 +213,7 @@ export function BillingPanel({
   );
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={`flex flex-col ${SPACING.group.gap}`}>
       {needsCheckout ? (
         <p className="text-sm text-[var(--muted)]">
           {plans.length > 0
@@ -221,7 +223,7 @@ export function BillingPanel({
       ) : null}
       {/* Side by side, each at its own height: a card is not stretched to
           the tallest in its row. */}
-      <ul className="grid gap-4 md:grid-cols-3 md:items-start">
+      <ul className={`grid ${SPACING.group.gap} md:grid-cols-3 md:items-start`}>
         <PlanCard name="Free" price={formatPlanPrice(FREE_PRICE) ?? ""}>
           {onFree ? (
             enrolled(false)
@@ -242,7 +244,9 @@ export function BillingPanel({
               </Button>
               {/* Not once the plan is cancelled: the move to Free is under way. */}
               {billing.cancelAtPeriodEnd ? null : (
-                <p className="mt-2 text-sm text-[var(--muted)]">
+                <p
+                  className={`${SPACING.inner.top} text-sm text-[var(--muted)]`}
+                >
                   To move to Free, cancel {billing.displayName} in Manage
                   billing.
                 </p>

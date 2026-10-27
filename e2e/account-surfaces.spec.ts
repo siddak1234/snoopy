@@ -19,6 +19,8 @@ import {
   observe,
   presentSession,
   settledAnimations,
+  shared,
+  standInShareSheet,
 } from "./helpers";
 
 /**
@@ -1687,9 +1689,66 @@ test.describe("the run package", () => {
     expect((await packageFiles()).length).toBe(4);
   });
 
-  test("P12 — View package opens the package page: the PDF itself in a frame of the site's inline route, Download PDF and Download Excel, Back to the run; axe clean", async ({
+  test("F4 — Share reads nothing until it is pressed: on the run page the first press reads the PDF, busy, and the next hands it to the sheet; the package page shares its frame's own bytes, read once (the review's finding 1)", async ({
     page,
   }) => {
+    await standInShareSheet(page);
+    const reads = observe(page, (request) => {
+      const { pathname } = new URL(request.url());
+      return (
+        pathname === "/account/share" || pathname.endsWith("/package/file")
+      );
+    });
+    await page.goto(job);
+    const main = page.locator("main");
+    const share = main.getByRole("button", { name: "Share" });
+    await expect(share).toBeEnabled();
+    await page.waitForLoadState("networkidle");
+    expect(reads).toEqual([]);
+    expect(await packageFiles()).toEqual([]);
+    // The first press reads it, through this site's share route; nothing
+    // is handed on yet.
+    await share.click();
+    await expect.poll(() => reads.length).toBe(1);
+    expect(new URL(reads[0]!).pathname).toBe("/account/share");
+    await expect(share).toBeEnabled();
+    expect(await shared(page)).toBeUndefined();
+    // The next hands the file kept to the sheet, and reads nothing.
+    await share.click();
+    await expect
+      .poll(() => shared(page))
+      .toMatchObject({
+        name: "run-fixture-run-invoice.pdf",
+        type: "application/pdf",
+      });
+    expect(reads).toHaveLength(1);
+    // The package page: its frame's read, the one; Share hands those bytes
+    // on at the first press.
+    reads.length = 0;
+    await page.goto(packagePage);
+    await expect(main.locator('iframe[title="Run package"]')).toHaveAttribute(
+      "src",
+      /^blob:/u,
+    );
+    await expect(share).toBeEnabled();
+    await share.click();
+    await expect
+      .poll(() => shared(page))
+      .toMatchObject({
+        name: "run-fixture-run-invoice.pdf",
+        type: "application/pdf",
+      });
+    expect(
+      reads.map((url) => new URL(url).pathname + new URL(url).search),
+    ).toEqual([inline]);
+  });
+
+  test("P12 — View package opens the package page: the PDF itself in a frame, read once from the site's inline route, Download PDF and Download Excel, Back to the run; axe clean", async ({
+    page,
+  }) => {
+    const reads = observe(page, (request) =>
+      new URL(request.url()).pathname.endsWith("/package/file"),
+    );
     await page.goto(job);
     await page
       .locator("main")
@@ -1702,7 +1761,10 @@ test.describe("the run package", () => {
     );
     await expect(main).toContainText("Run fixture-run-invoice");
     const frame = main.locator('iframe[title="Run package"]');
-    await expect(frame).toHaveAttribute("src", inline);
+    await expect(frame).toHaveAttribute("src", /^blob:/u);
+    expect(reads.map((url) => url.slice(url.indexOf("/account/")))).toEqual([
+      inline,
+    ]);
     await expect(
       main.getByRole("button", { name: "Download PDF" }),
     ).toBeVisible();

@@ -74,8 +74,8 @@ export function ApprovalDecision({
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
+    <div className={`flex flex-col ${SPACING.inner.gap}`}>
+      <div className={`flex items-center ${SPACING.inner.gap}`}>
         <Button
           variant="primary"
           size="sm"
@@ -211,7 +211,9 @@ export function ApprovalQueue({
       >
         <div className="min-h-0 overflow-hidden">
           <div className={`flex flex-col ${SPACING.inner.gap} ${ROW_BAND}`}>
-            <div className="flex flex-wrap items-start justify-between gap-2">
+            <div
+              className={`flex flex-wrap items-start justify-between ${SPACING.inner.gap}`}
+            >
               <div className="min-w-0">
                 <p className="text-sm text-[var(--text)]">{approval.reason}</p>
                 <p
@@ -232,7 +234,7 @@ export function ApprovalQueue({
               </span>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className={`flex flex-wrap items-center ${SPACING.inner.gap}`}>
               <ApprovalDecision
                 approvalId={approval.id}
                 canDecide={canDecide}

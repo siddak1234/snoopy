@@ -223,7 +223,7 @@ export function EmailRecipientsForm({
           full ? (
             <p
               data-testid="email-limit"
-              className="mt-2 text-sm text-[var(--muted)]"
+              className={`${SPACING.inner.top} text-sm text-[var(--muted)]`}
             >
               {EMAIL_LIMIT_REACHED}
             </p>
@@ -234,7 +234,7 @@ export function EmailRecipientsForm({
                 event.preventDefault();
                 add();
               }}
-              className="mt-2 flex items-end gap-2"
+              className={`${SPACING.inner.top} flex items-end ${SPACING.inner.gap}`}
             >
               <div className="min-w-0 flex-1">
                 <FormInput
@@ -259,7 +259,7 @@ export function EmailRecipientsForm({
                 variant="primary"
                 size="sm"
                 disabled={writing}
-                className="inline-flex shrink-0 items-center gap-2"
+                className={`inline-flex shrink-0 items-center ${SPACING.inner.gap}`}
               >
                 <PlusIcon aria-hidden size={20} />
                 {adding ? EMAIL_ADDING : EMAIL_ADD}
@@ -269,12 +269,12 @@ export function EmailRecipientsForm({
         ) : (
           <p
             data-testid="email-ask-admin"
-            className="mt-2 text-sm text-[var(--muted)]"
+            className={`${SPACING.inner.top} text-sm text-[var(--muted)]`}
           >
             {EMAIL_ASK_ADMIN}
           </p>
         )}
-        <FormError message={error} className="mt-2" />
+        <FormError message={error} className={SPACING.inner.top} />
       </section>
     </Group>
   );

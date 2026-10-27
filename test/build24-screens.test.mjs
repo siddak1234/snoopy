@@ -243,7 +243,9 @@ test("the package page shows the PDF itself: a frame the page's height of the si
     page,
     /ready \? \(\s*<PackageActions workspaceId=\{workspaceId\} runId=\{job\} view=\{false\} \/>/u,
   );
-  assert.match(page, /<PackageFrame runId=\{job\} \/>/u);
+  assert.match(page, /<PackageFrame \/>/u);
+  // Its PDF read once, for the frame and Share alike.
+  assert.match(page, /<PackageFile runId=\{job\}>\{card\}<\/PackageFile>/u);
   assert.match(page, /<EmptyRow text=\{PACKAGE_UNAVAILABLE\} \/>/u);
   assert.match(
     page,
@@ -252,9 +254,13 @@ test("the package page shows the PDF itself: a frame the page's height of the si
   const live = code(read(LIVE));
   assert.match(
     live,
-    /<iframe\s+title="Run package"\s+src=\{packageFileHref\(runId, zone \|\| null\)\}/u,
+    /const href = zone === null \? null : packageFileHref\(runId, zone \|\| null\);\s*const read = usePageFile\(href\);/u,
   );
-  // The frame waits for the browser's zone: the server draws none.
+  assert.match(
+    live,
+    /const shown = page\?\.url \?\? \(page\?\.failed \? page\.href : null\);\s*return shown \? \(\s*<iframe title="Run package" src=\{shown\} className=\{frame\} \/>/u,
+  );
+  // The read waits for the browser's zone: the server draws none.
   assert.match(
     live,
     /useSyncExternalStore\(\s*noSubscription,\s*browserTimeZone,\s*\(\) => null,?\s*\)/u,

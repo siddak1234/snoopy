@@ -10,6 +10,7 @@ import {
   leaveProjectAction,
 } from "@/app/account/teams/actions";
 import { formatDateMediumUTC } from "@/lib/date";
+import { ROW, SPACING } from "@/lib/spacing";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -180,7 +181,7 @@ function MemberRowItem({
   }
 
   return (
-    <li className="flex flex-wrap items-center gap-2 py-3">
+    <li className={`flex flex-wrap items-center ${SPACING.inner.gap} ${ROW}`}>
       {/* Name + email + joined date */}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-[var(--text)]">

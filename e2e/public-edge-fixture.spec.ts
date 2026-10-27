@@ -20,6 +20,8 @@ import {
   presentSession,
   runForm,
   settledAnimations,
+  shared,
+  standInShareSheet,
   worstContrast,
 } from "./helpers";
 
@@ -3741,6 +3743,37 @@ test.describe("the complete export (backend §12.1 #39)", () => {
     expect(file.suggestedFilename()).toBe("workspace-export.json");
     // The third read's link — asked for at the click, not kept from the second.
     expect(new URL(file.url()).searchParams.get("read")).toBe("3");
+  });
+
+  test("Share reads nothing until it is pressed: the first press reads the file, busy, and the next hands it to the sheet (F4; the review's finding 1)", async ({
+    page,
+  }) => {
+    await standInShareSheet(page);
+    const reads = observe(
+      page,
+      (request) => new URL(request.url()).pathname === "/account/share",
+    );
+    await page.goto("/account/settings");
+    await page.getByRole("button", { name: "Export everything" }).click();
+    await expect(
+      page.getByText("Ready. The file holds the whole workspace."),
+    ).toBeVisible({ timeout: 15_000 });
+    const share = page
+      .getByTestId("complete-export-actions")
+      .getByRole("button", { name: "Share" });
+    await expect(share).toBeEnabled();
+    await page.waitForLoadState("networkidle");
+    expect(reads).toEqual([]);
+    await share.click();
+    await expect.poll(() => reads.length).toBe(1);
+    await expect(share).toBeEnabled();
+    expect(await shared(page)).toBeUndefined();
+    await share.click();
+    await expect
+      .poll(() => shared(page))
+      // The file under the name the share route gives it.
+      .toMatchObject({ name: "workspace-export-2026-08-12.json" });
+    expect(reads).toHaveLength(1);
   });
 
   test("a link that is not https is never followed: Download file says it could not download, and the page stays (Build 25, the review's R5c 2)", async ({

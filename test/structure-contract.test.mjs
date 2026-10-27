@@ -271,20 +271,15 @@ test("what can be undone keeps its colour: Pause, Reject, Deny and Cancel reques
     [
       "components/dashboard/OrgJoinRequestList.tsx",
       "Reject",
+      "secondary",
       null,
-      "btn-secondary",
     ],
-    [
-      "components/dashboard/TeamAccessRequests.tsx",
-      "Deny",
-      null,
-      "btn-secondary",
-    ],
+    ["components/dashboard/TeamAccessRequests.tsx", "Deny", "secondary", null],
     [
       "app/onboarding/join-org/JoinOrgForm.tsx",
       "Cancel request",
+      "secondary",
       null,
-      "btn-secondary",
     ],
   ]) {
     const found = named(path, words);

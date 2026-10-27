@@ -71,22 +71,22 @@ page reuses:
   app/account (the public pages, the plain controls and the chips are left);
   and no screen there types a band or a section title of its own.
 - **Search, sort and pages** (ADR-0048 amendment 1, decision 4; the bar is
-  `components/blocks/ListTools.tsx`, the words the platform's
-  `BLOCK_WORDS`, never typed here — `test/block-words.test.mjs`): a search
-  box on every flow list whatever its length — a flow's items ("Search
-  {items}", `FlowItems`), an item's runs (`searchable`) and Activity
-  ("Search runs"); on more than 25 rows, the sort ("Default order", the
-  order sent, first) and the pages ("Previous", "Page {n} of {total}",
-  "Next"), 25 a page. A list or table in the blocks is wrapped in `Paged`
-  (searching, sorting and paging in the browser by `lib/block-sort.ts`'s
-  rules, which pass the platform's cases), a flow's items sort "A to Z" or
-  "Newest first", and Activity keeps `q`, `sort` and `page` in its address
-  (`ActivityControls`) and sends them, with the outcome as `status` and
-  the time as `since`, to the platform, which searches and counts
-  (`total`) — plain Activity too, its sort and page always sent
-  (`runsQuery`), while Home reads the newest 100; it never sends
-  `needsReview`. A search that finds nothing
-  says "Nothing matches "{query}".".
+  `components/blocks/ListTools.tsx`; its words and numbers are the
+  platform's, never typed here: `BLOCK_WORDS` and `BLOCK_SEARCH` in
+  [`block-rules.ts`](../lib/generated/platform-contracts/block-rules.ts),
+  held by `test/block-words.test.mjs`): a search box on every flow list
+  whatever its length — a flow's items (`FlowItems`), an item's runs
+  (`searchable`) and Activity; past one page of rows (`BLOCK_SEARCH`'s
+  page size), the sort, the order sent first, and the pages. A list or
+  table in the blocks is wrapped in `Paged` (searching, sorting and paging
+  in the browser by `lib/block-sort.ts`'s rules, which pass the platform's
+  cases), a flow's items sort by name or newest first, and Activity keeps
+  `q`, `sort` and `page` in its address (`ActivityControls`) and sends
+  them, with the outcome as `status` and the time as `since`, to the
+  platform, which searches and counts (`total`) — plain Activity too, its
+  sort and page always sent (`runsQuery`), while Home reads the newest
+  100; it never sends `needsReview`. A search that finds nothing says so,
+  in `BLOCK_WORDS`' words.
 - **Every run's page** ends with the package's buttons when it has them,
   then the Run details row, then Cancel run while it goes on and View flow;
   Duration, Steps done, the steps, Started, Ended, Trigger and the Run ID are
@@ -106,10 +106,11 @@ page reuses:
   unknown target no press; an answer with no blocks, the fallback alone.
   Since block set 2, thirteen types: an `image` is one of the run's own
   files drawn in the page (`Picture`, read once from its file page's view
-  route through `siteFileBlob`; a JPEG or PNG up to 480 px tall in its
-  page's link, a PDF in a frame; "Opening the file…", "This file is no
-  longer kept." or "Could not open the file. Try again." with Try again, the
-  file page's words in `lib/run-files.ts`); a `chart` a bar or line chart
+  route through `siteFileBlob`; a JPEG or PNG, at most its frame's height
+  (`components/blocks/Picture.tsx`), in its page's link, a PDF in a frame;
+  while it opens, a file no longer kept and one that could not open each
+  say so, with Try again, in the file page's words in
+  [`lib/run-files.ts`](../lib/run-files.ts)); a `chart` a bar or line chart
   in SVG, read aloud as its `alt`, its words text nodes; a `group`
   (`GroupCard`, the owner's F6 and Q6) its title, then one card of its
   sections as drop-downs, divided, the first open and several open at
@@ -125,11 +126,16 @@ page reuses:
 - **Download, then Share, on every document** (the owner's F4 and Q7):
   `FileActions` (`components/dashboard/FileActions.tsx`) on both file pages,
   a run package's PDF and Excel (Download PDF, Download Excel, then Share,
-  the PDF) and Settings › Data's two exports. Share sends the file itself
-  — its bytes, read from this site's own route as soon as Share shows, so
-  the press opens the share sheet at once (a browser allows it only for a
-  few seconds after a press), as a `File` — never its signed link, and
-  shows only where the browser takes that file (`navigator.canShare`). A package's documents and the complete export
+  the PDF) and Settings › Data's two exports. Share sends the file itself,
+  as a `File` — never its signed link — and reads nothing until it is
+  pressed, as the app: where the page already holds the bytes (a file
+  page's frame and the package page's, each read once by `usePageFile`;
+  the workspace summary's JSON) they go to the share sheet at the first
+  press; elsewhere (the run page, the complete export, a file not shown in
+  place) the first press reads them, Share busy, and the next opens the
+  sheet with the file kept (`pressShare`: a browser opens it only in a
+  press, never after a wait). It shows only where the browser takes that
+  file (`navigator.canShare`). A package's documents and the complete export
   are read through `app/account/share/route.ts` (`?run={id}&format=` or
   `?export={id}`): its ask and its signed link read on the server, the
   bytes an attachment of no type, never cached, `nosniff`, for this site's

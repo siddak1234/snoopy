@@ -144,7 +144,7 @@ test("Download PDF and Download Excel: the platform's link, asked through /api/p
   // in a row of their own over Run details (build 28's review, finding 2).
   assert.match(
     live,
-    /\{detail\.packageAvailable === true \? \(\s*<div className="mb-4 flex flex-wrap items-center gap-2">\s*<PackageActions workspaceId=\{workspaceId\} runId=\{run\.id\} view \/>/u,
+    /\{detail\.packageAvailable === true \? \(\s*<div\s+className=\{`\$\{SPACING\.group\.bottom\} flex flex-wrap items-center \$\{SPACING\.inner\.gap\}`\}\s*>\s*<PackageActions workspaceId=\{workspaceId\} runId=\{run\.id\} view \/>/u,
   );
   // Gone, but in the struck-through history of its comments.
   assert.doesNotMatch(

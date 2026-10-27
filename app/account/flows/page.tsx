@@ -123,7 +123,7 @@ export default async function FlowsPage() {
         <p
           role="status"
           data-testid="flows-over-plan"
-          className="mb-4 rounded-[var(--radius-md)] border border-[var(--warning-border)] bg-[var(--warning-bg)] px-4 py-3 text-sm text-[var(--warning-text)]"
+          className={`${SPACING.group.bottom} rounded-[var(--radius-md)] border border-[var(--warning-border)] bg-[var(--warning-bg)] ${SPACING.rowX.x} ${SPACING.rowY.y} text-sm text-[var(--warning-text)]`}
         >
           {overPlanSentence(overPlan.allowed, overPlan.live)}
         </p>
@@ -144,7 +144,7 @@ export default async function FlowsPage() {
             titleId={id}
             testId="flows-department"
           >
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className={`grid ${SPACING.group.gap} sm:grid-cols-2`}>
               {entries.map((automation) => (
                 <AutomationCard
                   key={`${automation.templateId}.v${automation.version}`}
@@ -164,7 +164,7 @@ export default async function FlowsPage() {
           <p className="text-xs text-[var(--muted)]">
             An archived flow keeps its history here. Unarchive it any time.
           </p>
-          <ul className="mt-2 divide-y divide-[var(--ring)]">
+          <ul className={`${SPACING.inner.top} divide-y divide-[var(--ring)]`}>
             {archived.map((subscription) => {
               const entry = catalogEntry.get(subscription.templateId);
               const name =
@@ -179,7 +179,7 @@ export default async function FlowsPage() {
               return (
                 <li
                   key={subscription.id}
-                  className="flex flex-wrap items-center justify-between gap-2 py-3"
+                  className={`flex flex-wrap items-center justify-between ${SPACING.inner.gap} ${SPACING.rowY.y}`}
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-[var(--text)]">
@@ -189,7 +189,9 @@ export default async function FlowsPage() {
                       {place(subscription)}
                     </p>
                   </div>
-                  <div className="flex flex-col items-end gap-2">
+                  <div
+                    className={`flex flex-col items-end ${SPACING.inner.gap}`}
+                  >
                     <span className="text-xs text-[var(--muted)]">
                       Archived {formatDay(subscription.updatedAt)}
                     </span>
@@ -240,7 +242,7 @@ function AutomationCard({
 
   return (
     <div className={`bubble flex flex-col ${SPACING.inner.gap} ${CARD}`}>
-      <div className="flex items-start justify-between gap-2">
+      <div className={`flex items-start justify-between ${SPACING.inner.gap}`}>
         <div className="min-w-0">
           {/* Its department is its group's header (build 28's item 1). */}
           <h3
@@ -277,7 +279,9 @@ function AutomationCard({
           tabIndex={-1}
           className={`flex flex-col ${SPACING.inner.gap} border-t border-[var(--ring)] ${SPACING.group.pt}`}
         >
-          <div className="flex items-center justify-between gap-2">
+          <div
+            className={`flex items-center justify-between ${SPACING.inner.gap}`}
+          >
             <p className="text-xs text-[var(--muted)]">{place(subscription)}</p>
             <StatusPill status={subscription.status} />
           </div>

@@ -77,14 +77,16 @@ export function JoinOrgForm({
           <p className="text-sm text-[var(--muted)]">
             Your request was sent for approval.
           </p>
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={handleCancelRequest}
             disabled={busy}
-            className="btn-secondary inline-flex w-full justify-center px-5 disabled:opacity-60"
+            className="w-full justify-center disabled:opacity-60"
           >
             {pending === "join" ? "Cancelling…" : "Cancel request"}
-          </button>
+          </Button>
         </>
       ) : (
         <Button
