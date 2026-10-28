@@ -14,6 +14,7 @@ import { TrackerItem } from "@/components/dashboard/TrackerItem";
 import type { Block } from "@/lib/automations";
 import { fileViewHref } from "@/lib/run-files";
 import { CARD, ROW, SPACING } from "@/lib/spacing";
+import { notDrawn } from "./drawable";
 import { Fallback } from "./Fallback";
 import {
   CHIP,
@@ -516,7 +517,7 @@ export function TimelineBlock({ block }: { block: BlockOf<"timeline"> }) {
 /**
  * questions: the page's own form for it, with its gates (`BlockForms`) —
  * nothing where the page offers none; a form this build does not know, the
- * fallback.
+ * fallback, logged by `notDrawn` as `form.kind`.
  */
 export function QuestionsBlock({
   block,
@@ -526,8 +527,10 @@ export function QuestionsBlock({
   context: BlockContext;
 }) {
   const kind: unknown = block.form?.kind;
-  if (typeof kind !== "string" || !KNOWN_FORMS.includes(kind))
+  if (typeof kind !== "string" || !KNOWN_FORMS.includes(kind)) {
+    notDrawn("questions", "form.kind");
     return <Fallback />;
+  }
   const form = context.forms?.[kind as FormKind];
   // Its title ("Add candidate") is drawn with the form, `title` above it: a
   // page that offers no form, or whose form draws nothing (a member, a flow
@@ -624,7 +627,11 @@ const LINE_DOTS = 24;
  */
 export function ChartBlock({ block }: { block: BlockOf<"chart"> }) {
   const points = block.points;
-  if (points.length === 0) return <Fallback />;
+  // The contract's `minItems: 1`, which the field check does not read.
+  if (points.length === 0) {
+    notDrawn("chart", "points");
+    return <Fallback />;
+  }
   return (
     <div
       data-testid="block-chart"

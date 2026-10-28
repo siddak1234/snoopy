@@ -6,6 +6,7 @@ import { BLOCK_FIXTURES } from "../lib/generated/platform-contracts/block-fixtur
 import {
   elements,
   loadBlocks,
+  loadModules,
   parse,
   visibleWords,
 } from "./blocks-harness.mjs";
@@ -534,7 +535,7 @@ test("the one fallback sentence is the owner's, held in one place", () => {
 });
 
 test("a copy of the renderer with its fallback taken out fails the unknown cases (ADR-0048 decision 11)", async () => {
-  const line = "  if (!render) return <Fallback />;\n";
+  const line = '  if (!render) return notShown(type, "unknown type");\n';
   assert.ok(
     read("components/blocks/BlockList.tsx").includes(line),
     "the fallback line",
@@ -765,4 +766,341 @@ test("list: one card of divided rows; each score toned by its valueTone — succ
       ["error", "Decline"],
     ],
   );
+});
+
+/*
+ * A known block without a field its schema requires (Round 21, design D2.6):
+ * checked before drawing, from the generated `BLOCK_REQUIRED`, so a server
+ * render — the item's file page — draws the fallback in its place and the
+ * next block, with no boundary in play; and each fallback is logged once with
+ * the block's type and the missing field, never its words.
+ */
+const notDrawnCalls = (calls) =>
+  calls
+    .filter((call) => call.arguments[0] === "block not drawn")
+    .map((call) => call.arguments[1]);
+
+test("a table without rows draws the fallback in its place on a server render, the next block still draws, and one console.error names type table (Round 21, D2.6)", (t) => {
+  const error = t.mock.method(console, "error", () => {});
+  const words = visibleWords(
+    draw([
+      { type: "table", columns: [{ title: "Field" }, { title: "Value" }] },
+      { type: "text", text: "Next block." },
+    ]),
+  );
+  assert.deepEqual(words, [blocks.FALLBACK, "Next block."]);
+  assert.equal(error.mock.callCount(), 1);
+  assert.deepEqual(error.mock.calls[0].arguments, [
+    "block not drawn",
+    { type: "table", error: "rows" },
+  ]);
+});
+
+test("a missing or mistyped required field anywhere in a block draws the fallback for that block alone, logged with the field's name and no value (Round 21, D2.6)", (t) => {
+  const error = t.mock.method(console, "error", () => {});
+  const cases = [
+    [{ type: "text" }, "text"],
+    [{ type: "text", text: 7 }, "text"],
+    [{ type: "table", columns: [{}, {}], rows: "Private row" }, "rows"],
+    [
+      { type: "table", columns: [{}, {}], rows: [{ cells: ["a"] }, {}] },
+      "rows[1].cells",
+    ],
+    [{ type: "list", items: [{ subtitle: "Private" }] }, "items[0].title"],
+    [{ type: "file", title: "Contract" }, "open"],
+    [{ type: "file", title: "Contract", open: {} }, "open.target"],
+    [
+      {
+        type: "chart",
+        kind: "bar",
+        title: "Scores",
+        alt: "Scores",
+        points: [{ label: "A", value: "9", text: "9" }],
+      },
+      "points[0].value",
+    ],
+    [
+      { type: "group", title: "Details", sections: [{ type: "section" }] },
+      "sections[0].title",
+    ],
+  ];
+  for (const [block, field] of cases) {
+    error.mock.resetCalls();
+    assert.deepEqual(
+      visibleWords(draw([block, { type: "text", text: "After." }])),
+      [blocks.FALLBACK, "After."],
+      JSON.stringify(block),
+    );
+    assert.deepEqual(notDrawnCalls(error.mock.calls), [
+      { type: block.type, error: field },
+    ]);
+    assert.ok(
+      !JSON.stringify(error.mock.calls).includes("Private"),
+      "no block value is logged",
+    );
+  }
+  // Inside a section, the section and its other blocks still draw.
+  error.mock.resetCalls();
+  assert.deepEqual(
+    visibleWords(
+      draw([
+        {
+          type: "section",
+          title: "Inside",
+          open: true,
+          blocks: [{ type: "badge" }, { type: "text", text: "Kept." }],
+        },
+      ]),
+    ),
+    ["Inside", blocks.FALLBACK, "Kept."],
+  );
+  assert.deepEqual(notDrawnCalls(error.mock.calls), [
+    { type: "badge", error: "text" },
+  ]);
+  // A block with no type at all: `unknown`.
+  error.mock.resetCalls();
+  assert.deepEqual(visibleWords(draw(["just text"])), [blocks.FALLBACK]);
+  assert.deepEqual(notDrawnCalls(error.mock.calls), [
+    { type: "unknown", error: "unknown type" },
+  ]);
+});
+
+test("every platform fixture body passes the field check: nothing is logged but its unknown parts (Round 21, D2.6)", (t) => {
+  const error = t.mock.method(console, "error", () => {});
+  for (const { name, blocks: list } of BLOCK_FIXTURES) {
+    error.mock.resetCalls();
+    draw(list);
+    const logged = notDrawnCalls(error.mock.calls);
+    // Its unknown parts: a type, or a form (the `unknown-form` fixture).
+    assert.ok(
+      logged.every(
+        (entry) =>
+          entry.error === "unknown type" ||
+          (entry.type === "questions" && entry.error === "form.kind"),
+      ),
+      `${name}: ${JSON.stringify(logged)}`,
+    );
+  }
+});
+
+test("the field check reads the generated table: one entry for each of the contract's thirteen types, a table's columns and rows among them", async () => {
+  const { modules, cleanup } = await loadModules([
+    "lib/generated/platform-contracts/block-required.ts",
+  ]);
+  try {
+    const { BLOCK_REQUIRED } =
+      modules["lib/generated/platform-contracts/block-required.ts"];
+    assert.deepEqual(
+      Object.keys(BLOCK_REQUIRED).sort(),
+      [...unionTypes()].sort(),
+    );
+    assert.deepEqual(Object.keys(BLOCK_REQUIRED.table), [
+      "type",
+      "columns",
+      "rows",
+    ]);
+  } finally {
+    cleanup();
+  }
+  assert.match(
+    read("components/blocks/drawable.ts"),
+    /from "@\/lib\/generated\/platform-contracts\/block-required";/u,
+  );
+});
+
+test("a block whose renderer throws in the browser: its boundary draws the fallback in its place, logged once with its type; every block, nested ones too, is wrapped (Round 21, D2.6)", async (t) => {
+  const ENTRY = "components/blocks/BlockBoundary.tsx";
+  const { modules, cleanup } = await loadModules([ENTRY]);
+  try {
+    const { BlockBoundary } = modules[ENTRY];
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    const thrown = new TypeError("Cannot read properties of undefined");
+    assert.deepEqual(BlockBoundary.getDerivedStateFromError(thrown), {
+      failed: true,
+    });
+    const boundary = new BlockBoundary({
+      type: "chart",
+      children: createElement("p", null, "Drawn."),
+    });
+    assert.deepEqual(visibleWords(renderToStaticMarkup(boundary.render())), [
+      "Drawn.",
+    ]);
+    const error = t.mock.method(console, "error", () => {});
+    boundary.componentDidCatch(thrown);
+    assert.deepEqual(notDrawnCalls(error.mock.calls), [
+      { type: "chart", error: thrown },
+    ]);
+    boundary.state = BlockBoundary.getDerivedStateFromError(thrown);
+    assert.deepEqual(visibleWords(renderToStaticMarkup(boundary.render())), [
+      blocks.FALLBACK,
+    ]);
+  } finally {
+    cleanup();
+  }
+  const source = read("components/blocks/BlockList.tsx");
+  assert.match(
+    source,
+    /<BlockBoundary type=\{typeOf\(block\)\} block=\{block\}>\s*\{drawBlock\(block, context, inner\)\}\s*<\/BlockBoundary>/u,
+  );
+  // Nested blocks are drawn by the same `Blocks`, so each is wrapped too.
+  assert.match(source, /<Blocks blocks=\{within\} context=\{context\} \/>/u);
+  assert.match(read(ENTRY), /^"use client";/u);
+});
+
+test("a caught block is reset by a re-read that sends another block in its place: the new block draws; the same block again stays the fallback (Round 21, D2.6)", async (t) => {
+  const ENTRY = "components/blocks/BlockBoundary.tsx";
+  const { modules, cleanup } = await loadModules([ENTRY]);
+  try {
+    const { BlockBoundary } = modules[ENTRY];
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    t.mock.method(console, "error", () => {});
+    const broken = { type: "chart", kind: "bar", title: "Scores", points: [] };
+    const fixed = { ...broken, points: [{ label: "A", value: 1 }] };
+    // React's own steps, in its order: mount, catch, then each new read's props.
+    const props = (block, words) => ({
+      type: "chart",
+      block,
+      children: createElement("p", null, words),
+    });
+    const boundary = new BlockBoundary(props(broken, "Broken."));
+    const step = (next) => {
+      const derived = BlockBoundary.getDerivedStateFromProps(
+        next,
+        boundary.state,
+      );
+      boundary.props = next;
+      if (derived) boundary.state = { ...boundary.state, ...derived };
+      return visibleWords(renderToStaticMarkup(boundary.render()));
+    };
+    boundary.state = {
+      ...boundary.state,
+      ...BlockBoundary.getDerivedStateFromError(new TypeError("x")),
+    };
+    assert.deepEqual(step(props(broken, "Broken.")), [blocks.FALLBACK]);
+    assert.deepEqual(
+      step(props(structuredClone(broken), "Broken.")),
+      [blocks.FALLBACK],
+      "the same block, read again, stays the fallback",
+    );
+    assert.deepEqual(step(props(fixed, "Drawn.")), ["Drawn."]);
+    assert.deepEqual(step(props({ type: "text", text: "Other." }, "Other.")), [
+      "Other.",
+    ]);
+  } finally {
+    cleanup();
+  }
+  assert.match(
+    read("components/blocks/BlockList.tsx"),
+    /<BlockBoundary type=\{typeOf\(block\)\} block=\{block\}>/u,
+  );
+});
+
+test("every block fallback is logged: an unknown form, a chart with no points, a group entry not a section, an absent body and a body that is not a list (Round 21, D2.6)", (t) => {
+  const error = t.mock.method(console, "error", () => {});
+  const cases = [
+    [
+      [{ type: "questions", form: { kind: "survey" } }],
+      { type: "questions", error: "form.kind" },
+    ],
+    [
+      [
+        {
+          type: "chart",
+          kind: "bar",
+          title: "Scores",
+          alt: "Scores",
+          points: [],
+        },
+      ],
+      { type: "chart", error: "points" },
+    ],
+    [
+      [
+        {
+          type: "group",
+          title: "Details",
+          sections: [{ type: "text", title: "Private", blocks: [] }],
+        },
+      ],
+      { type: "group", error: "sections[0].type" },
+    ],
+    [undefined, { type: "unknown", error: "no blocks" }],
+    [null, { type: "unknown", error: "not a list" }],
+    [{ blocks: [] }, { type: "unknown", error: "not a list" }],
+  ];
+  for (const [list, logged] of cases) {
+    error.mock.resetCalls();
+    assert.deepEqual(
+      visibleWords(draw(list)),
+      [blocks.FALLBACK],
+      String(JSON.stringify(list)),
+    );
+    assert.deepEqual(notDrawnCalls(error.mock.calls), [logged]);
+    assert.ok(
+      !JSON.stringify(error.mock.calls).includes("Private"),
+      "no block value is logged",
+    );
+  }
+});
+
+test("a group's own guard: an entry not a section, drawn by GroupCard itself, is the fallback logged as sections[n].type (Round 21, D2.6)", async (t) => {
+  const ENTRY = "components/blocks/GroupCard.tsx";
+  const { modules, cleanup } = await loadModules([ENTRY]);
+  try {
+    const { GroupCard } = modules[ENTRY];
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const error = t.mock.method(console, "error", () => {});
+    const markup = renderToStaticMarkup(
+      GroupCard({
+        block: {
+          type: "group",
+          title: "Details",
+          sections: [{ type: "section", title: "Kept", blocks: [] }, "x"],
+        },
+        inner: () => null,
+      }),
+    );
+    assert.deepEqual(visibleWords(markup), [
+      "Details",
+      "Kept",
+      blocks.FALLBACK,
+    ]);
+    assert.deepEqual(notDrawnCalls(error.mock.calls), [
+      { type: "group", error: "sections[1].type" },
+    ]);
+  } finally {
+    cleanup();
+  }
+});
+
+test("in a browser a fallback is logged once for each type and reason until the page loads again, though the page draws again at each poll; on the server, at each draw (Round 21, D2.6)", async (t) => {
+  const fresh = await loadBlocks();
+  const hadWindow = Object.hasOwn(globalThis, "window");
+  try {
+    const error = t.mock.method(console, "error", () => {});
+    const broken = [{ type: "table", columns: [] }];
+    fresh.render(broken);
+    fresh.render(broken);
+    assert.equal(
+      notDrawnCalls(error.mock.calls).length,
+      2,
+      "server: each draw",
+    );
+    error.mock.resetCalls();
+    globalThis.window = {};
+    fresh.render(broken);
+    fresh.render(broken);
+    fresh.render([{ type: "text" }]);
+    fresh.render([{ type: "text" }, { type: "badge" }]);
+    assert.deepEqual(notDrawnCalls(error.mock.calls), [
+      { type: "table", error: "rows" },
+      { type: "text", error: "text" },
+      { type: "badge", error: "text" },
+    ]);
+  } finally {
+    if (!hadWindow) delete globalThis.window;
+    fresh.cleanup();
+  }
 });

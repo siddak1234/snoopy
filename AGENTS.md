@@ -50,6 +50,7 @@ records by size. Then:
 | Find where something lives | the `explorer` agent ([.claude/agents/explorer.md](.claude/agents/explorer.md)) |
 | Review a branch before it lands | the `reviewer` agent ([.claude/agents/reviewer.md](.claude/agents/reviewer.md)) |
 | Build a lane from a brief | the `builder` agent ([.claude/agents/builder.md](.claude/agents/builder.md)) |
+| Research one lens of a flow idea on the web | the `researcher` agent ([.claude/agents/researcher.md](.claude/agents/researcher.md)); snoopy-automations' `/create-flow` runs it, never this repository's work |
 | A finding's history (F-numbers) | grep `docs/audits/` ("Records" below) |
 
 ## Rules

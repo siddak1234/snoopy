@@ -769,6 +769,39 @@ test("an item's tiles: Total, then the flow's verdict words — green and red �
   await expect(page).toHaveURL(new RegExp(`${ITEM}$`, "u"));
 });
 
+test("an item's file page whose reading holds a table the platform sent without its rows: the fallback in its place, the next block, never the error page (Round 21, design D2.6)", async ({
+  page,
+}) => {
+  await fixtureControl("item-reading-broken");
+  // Drawn on the server: the fallback is in the page as served, before any
+  // browser code runs — the field check's, since no boundary catches there.
+  const served = await (await page.request.get(`${ITEM}/file`)).text();
+  expect(served).toMatch(
+    /This part can(?:'|&#x27;|&#39;)t be shown here yet\./u,
+  );
+  await page.goto(`${ITEM}/file`);
+  const main = page.locator("main");
+  await expect(main.getByRole("heading", { level: 1 })).toHaveText(
+    "Batch file",
+  );
+  const reading = page.getByTestId("item-reading");
+  await expect(reading.getByTestId("block-fallback")).toHaveText(
+    "This part can't be shown here yet.",
+  );
+  // The fallback stands where the table was, and the sections after it draw.
+  const drawn = reading.locator(
+    '[data-testid="block-fallback"], [data-testid="block-section"]',
+  );
+  await expect(drawn.first()).toHaveAttribute("data-testid", "block-fallback");
+  await expect(reading.getByTestId("block-section").first()).toBeVisible();
+  await reading.getByTestId("block-section").first().locator("summary").click();
+  await expect(page.getByText("Three must-haves.")).toBeVisible();
+  await expect(
+    page.getByText("The platform could not answer just now"),
+  ).toHaveCount(0);
+  await expectNoAxeViolationsBesideTheFile(page);
+});
+
 test("an item's file under another flow's path is not found, and a member reads it and downloads it (build 28, item 4)", async ({
   page,
 }) => {
