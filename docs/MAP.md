@@ -185,7 +185,8 @@
 - agent `builder`: Builds one lane from its brief in a scratch clone, heavy steps under the gate lock, docs in the same commit. Returns a leftovers list and the path of a summary… ([.claude/agents/builder.md](../.claude/agents/builder.md))
 - agent `change-auditor`: Audits a pending change end to end before push — maps the blast radius of every changed export/env-var/route, builds a coverage table against the real test sui… ([.claude/agents/change-auditor.md](../.claude/agents/change-auditor.md))
 - agent `explorer`: Read-only search. Use to find where something lives or is described before reading or editing; returns path:line findings and what was not found. Never edits. ([.claude/agents/explorer.md](../.claude/agents/explorer.md))
-- agent `reviewer`: Single-pass review of a branch before it lands. Checks correctness, docs kept true (D) and leftovers (A); writes a PASS/FAIL verdict with 10 findings or fewer … ([.claude/agents/reviewer.md](../.claude/agents/reviewer.md))
+- agent `researcher`: Researches one lens of a flow idea on the web and in the given clones, read-only. Every finding is a URL, an exact quote and a source tier; "not found" is a va… ([.claude/agents/researcher.md](../.claude/agents/researcher.md))
+- agent `reviewer`: Single-pass review of a branch before it lands. Checks correctness, docs kept true (D) and leftovers (A); writes a PASS, FAIL or UNKNOWN verdict with 10 findin… ([.claude/agents/reviewer.md](../.claude/agents/reviewer.md))
 - hook `PreToolUse` (`Bash`): `node "$CLAUDE_PROJECT_DIR/scripts/hooks/require-change-audi…`
 - hook `PreToolUse` (`Bash`): `node "$CLAUDE_PROJECT_DIR/scripts/hooks/require-change-audi…`
 - hook `PreToolUse` (`Bash|Write|Edit|NotebookEdit`): `guard.mjs`
