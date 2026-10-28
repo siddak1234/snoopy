@@ -97,6 +97,9 @@ export function offeredDecisions(
   });
 }
 
+/** A saved review's count: how many changes were accepted and denied. */
+export type ReviewTally = { accepted: number; denied: number };
+
 /**
  * A saved review's count, "{a} accepted · {d} denied" (words.md section 3):
  * an approval decided `approved` whose offered rows carry their answers.
@@ -104,7 +107,7 @@ export function offeredDecisions(
  */
 export function reviewTally(
   approval: { status: string; decisions?: unknown } | undefined | null,
-): { accepted: number; denied: number } | null {
+): ReviewTally | null {
   if (!approval || approval.status !== "approved") return null;
   const list = approval.decisions;
   if (!Array.isArray(list) || list.length === 0) return null;

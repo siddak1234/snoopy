@@ -53,15 +53,15 @@ export function SetupFields({
   config,
   firstSection = 1,
   hideConnections = false,
-  missingChoice,
+  missingChoices,
 }: {
   setup: PendingSetupField[];
   config: Record<string, unknown>;
   firstSection?: number;
   /** Set up carries each vendor choice itself, as the page's choice. */
   hideConnections?: boolean;
-  /** The required drop-down the save found empty (`missingChoice`): "Choose at least one." under it. */
-  missingChoice?: string | null;
+  /** Every required drop-down the save found empty (`missingChoices`): "Choose at least one." under each. */
+  missingChoices?: ReadonlySet<string>;
 }) {
   const groups: Array<{
     section: PendingSetupField["section"];
@@ -120,7 +120,7 @@ export function SetupFields({
                 field={field}
                 value={config[field.key]}
                 prefix="config"
-                missing={missingChoice === field.key}
+                missing={missingChoices?.has(field.key) ?? false}
               />
             ))}
           </div>

@@ -45,22 +45,26 @@ export function setupProblem(
 }
 
 /**
- * The first required drop-down (`select`) with nothing chosen, by its key, or
- * `null`. Checked before `setupProblem`, and said under the field: "Choose at
- * least one." A several-choice field is required whatever its default, since
- * its choices can all be taken away; a list emptied is never sent as saved.
+ * Every required drop-down (`select`) with nothing chosen, by its key; empty
+ * when none is. Checked before `setupProblem`, and said under each such
+ * field: "Choose at least one." A several-choice field is required whatever
+ * its default, since its choices can all be taken away; a list emptied is
+ * never sent as saved.
  */
-export function missingChoice(
+export function missingChoices(
   setup: readonly SetupField[],
   form: FormData,
-): string | null {
-  const empty = setup.find(
-    (field) =>
-      field.control === "select" &&
-      field.required &&
-      !form
-        .getAll(`config:${field.key}`)
-        .some((value) => typeof value === "string" && value !== ""),
+): ReadonlySet<string> {
+  return new Set(
+    setup
+      .filter(
+        (field) =>
+          field.control === "select" &&
+          field.required &&
+          !form
+            .getAll(`config:${field.key}`)
+            .some((value) => typeof value === "string" && value !== ""),
+      )
+      .map((field) => field.key),
   );
-  return empty?.key ?? null;
 }

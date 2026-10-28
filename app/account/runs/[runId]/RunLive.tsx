@@ -149,7 +149,7 @@ export function RunLive({
   workspaceId: string;
   initial: RunDetail;
   flow: RunFlow;
-  /** A held job's approvals as the server read them: what became of them. */
+  /** The job's approvals as the server read them, once it waited: what became of them, and a saved review's count. */
   approvals: Approval[];
   /** This person's role in the workspace: whether the approval form offers Approve and Deny. */
   role: WorkspaceRole | undefined;

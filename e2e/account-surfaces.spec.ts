@@ -1304,7 +1304,7 @@ test("P6 — Deny on a held job's page: the result Denied, its waiting document 
   await expect(heldStep(page).getByRole("button")).toHaveCount(0);
 });
 
-test("Round 21 (F2) — a held run's review: each change a row with Accept and Deny, Deny red; Save review once every row is answered; the answers sent and the job goes on; Approvals' card says Review 2 changes and opens the run (the platform round's F2; ICD-10 Code Check's words.md section 3)", async ({
+test("Round 21 (F2) — a held run's review: each change a row with Accept and Deny, Deny red; Save review once every row is answered; the answers sent and the job goes on; Approvals' card says Review 2 changes and opens the run; the step that waited then says 1 accepted · 1 denied (the platform round's F2; ICD-10 Code Check's words.md section 3)", async ({
   page,
 }) => {
   await fixtureControl("invoice-review-pending");
@@ -1360,6 +1360,11 @@ test("Round 21 (F2) — a held run's review: each change a row with Accept and D
   ]);
   // Saved, the job goes on under its id, even with a change denied.
   await expect(page.locator("main").getByText(/^running$/iu)).toBeVisible();
+  // Its details page: the step that waited says the review's count while
+  // the job goes on.
+  await page.goto(heldJobDetails);
+  await expect(heldStep(page)).toContainText("1 accepted · 1 denied");
+  await expect(heldStep(page).getByRole("button")).toHaveCount(0);
 });
 
 test("Round 21 (F2) — a member reads a held run's changes and who may review them, with no pills", async ({

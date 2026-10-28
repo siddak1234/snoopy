@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { heldCopy } from "../lib/held-flow.ts";
 import { CHOOSE, CHOOSE_AT_LEAST_ONE, chosenLabel } from "../lib/choices.ts";
 import {
-  missingChoice,
+  missingChoices,
   setupProblem,
 } from "../app/account/flows/setup-check.ts";
 import {
@@ -1170,7 +1170,7 @@ test("a setup drop-down picks one or several: the glass drop-down, never the bro
     /if \(control === "select-multiple"\) \{\s*values\[key\] = \[\s*\.\.\.new Set\(\s*formData\s*\.getAll\(`\$\{prefix\}:\$\{key\}`\)/u,
   );
 
-  // Before anything is sent: the first required drop-down left empty, by key.
+  // Before anything is sent: every required drop-down left empty, by key.
   const setup = [
     { key: "limit", title: "Limit", control: "money", required: false },
     {
@@ -1180,6 +1180,7 @@ test("a setup drop-down picks one or several: the glass drop-down, never the bro
       required: true,
       defaultValue: ["Nephrology"],
     },
+    { key: "payers", title: "Payers", control: "select", required: true },
     { key: "area", title: "Area", control: "select", required: false },
   ];
   const form = (entries) => {
@@ -1187,14 +1188,20 @@ test("a setup drop-down picks one or several: the glass drop-down, never the bro
     for (const [name, value] of entries) data.append(name, value);
     return data;
   };
-  assert.equal(missingChoice(setup, form([])), "specialties");
-  assert.equal(
-    missingChoice(setup, form([["config:specialties", ""]])),
+  const missing = (entries) => [...missingChoices(setup, form(entries))];
+  // Two left empty: both named, so each says "Choose at least one." at once.
+  assert.deepEqual(missing([]), ["specialties", "payers"]);
+  assert.deepEqual(missing([["config:specialties", ""]]), [
     "specialties",
-  );
-  assert.equal(
-    missingChoice(setup, form([["config:specialties", "Cardiology"]])),
-    null,
+    "payers",
+  ]);
+  assert.deepEqual(missing([["config:specialties", "Cardiology"]]), ["payers"]);
+  assert.deepEqual(
+    missing([
+      ["config:specialties", "Cardiology"],
+      ["config:payers", "Medicare"],
+    ]),
+    [],
   );
   // A drop-down is never "Fill in": that is the line under it.
   assert.equal(
@@ -1206,7 +1213,12 @@ test("a setup drop-down picks one or several: the glass drop-down, never the bro
   );
   assert.match(
     setupForm,
-    /const empty = missingChoice\(setup, data\);\s*setMissing\(empty\);\s*if \(empty\) return;\s*const problem = setupProblem\(/u,
+    /const empty = missingChoices\(setup, data\);\s*setMissing\(empty\);\s*if \(empty\.size > 0\) return;\s*const problem = setupProblem\(/u,
   );
-  assert.match(setupForm, /missingChoice=\{missing\}/u);
+  assert.match(setupForm, /missingChoices=\{missing\}/u);
+  // Each field asks its own key of the set: every empty one is marked.
+  assert.match(
+    read("app/account/flows/ManifestFields.tsx"),
+    /missing=\{missingChoices\?\.has\(field\.key\) \?\? false\}/u,
+  );
 });

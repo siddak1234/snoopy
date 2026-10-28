@@ -12,6 +12,8 @@ import {
   REVIEW_NOT_SAVED,
   SAVE_REVIEW,
   changeLine,
+  newestApproval,
+  readsJobApprovals,
   rereadForApprovalForm,
   reviewAnswers,
   reviewChanges,
@@ -445,6 +447,58 @@ test("a held run's review: each change a row with Accept and Deny (Deny the dang
     "Waiting for approval: 2 changes need your review.",
   );
   assert.deepEqual(rows("running", null)[1], "Done · 10:01 AM");
+
+  // The page data for a job its saved review continued (running under its
+  // id): its approvals are read since a step waited, and the step that
+  // waited says the count from them — even while its group works on. A run
+  // that never waited reads none.
+  const continued = {
+    run: { id: "job-1", status: "running" },
+    steps,
+  };
+  assert.equal(readsJobApprovals(continued), true);
+  assert.equal(readsJobApprovals({ run: { status: "held" }, steps: [] }), true);
+  assert.equal(
+    readsJobApprovals({ run: { status: "running" }, steps: [steps[0]] }),
+    false,
+  );
+  const listed = [
+    { runId: "job-2", status: "pending", createdAt: "2026-10-28T10:02:00Z" },
+    {
+      runId: "job-1",
+      status: "approved",
+      createdAt: "2026-10-28T10:01:00Z",
+      decisions: [
+        { id: "a", label: "A", decision: "accepted" },
+        { id: "b", label: "B", decision: "denied" },
+      ],
+    },
+  ];
+  const tally = reviewTally(newestApproval(continued.run.id, listed));
+  assert.deepEqual(tally, { accepted: 1, denied: 1 });
+  const grouped = trackerRows(
+    steps,
+    [
+      { id: "read", title: "Read", group: "in" },
+      { id: "review", title: "Review", group: "out" },
+      { id: "save", title: "Save", group: "out" },
+    ],
+    [
+      { id: "in", title: "In" },
+      { id: "out", title: "Out" },
+    ],
+    continued.run,
+    clock,
+    undefined,
+    { review: tally },
+  );
+  assert.deepEqual(
+    grouped.map((row) => [row.state, row.sub]),
+    [
+      ["done", "Done · 10:01 AM"],
+      ["working", "1 accepted · 1 denied"],
+    ],
+  );
 
   // A held run's review form is read again for, as the approval form is.
   assert.equal(

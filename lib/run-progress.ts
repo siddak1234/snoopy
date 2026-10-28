@@ -18,6 +18,14 @@
  * Pure, and loaded by its unit test as it is: no React and no `@/` import.
  */
 
+// The review's shapes live in the one module the contract regeneration
+// replaces (Round 21's F2): never copied here.
+import type {
+  AnsweredDecision,
+  DecisionAnswer,
+  ReviewTally,
+} from "./pending-contract";
+
 export type ProgressStep = {
   stepId: string;
   outcome: "ok" | "held" | "failed";
@@ -105,9 +113,6 @@ export function reviewChanges(count: number): string {
   return `Review ${count} changes`;
 }
 
-/** A saved review's count: how many changes were accepted and denied. */
-export type ReviewTally = { accepted: number; denied: number };
-
 /** A saved review, on the run's steps: "{a} accepted · {d} denied". */
 export function reviewedLine(accepted: number, denied: number): string {
   return `${accepted} accepted · ${denied} denied`;
@@ -124,9 +129,7 @@ export function changeLine(change: { label: string; detail?: string }): string {
  * list is not that, so nothing is sent. The form answers every change it
  * offers; the platform checks that every offered id is answered once.
  */
-export function reviewAnswers(
-  posted: unknown,
-): { id: string; decision: "accepted" | "denied" }[] | null {
+export function reviewAnswers(posted: unknown): AnsweredDecision[] | null {
   if (typeof posted !== "string") return null;
   let list: unknown;
   try {
@@ -135,7 +138,7 @@ export function reviewAnswers(
     return null;
   }
   if (!Array.isArray(list) || list.length === 0) return null;
-  const answers = new Map<string, "accepted" | "denied">();
+  const answers = new Map<string, DecisionAnswer>();
   for (const row of list as unknown[]) {
     if (typeof row !== "object" || row === null) return null;
     const { id, decision } = row as { id?: unknown; decision?: unknown };
@@ -267,7 +270,9 @@ export function timeOfDay(iso: string): string {
  * What a row says of its state — never a step's own summary, never a step id.
  * A held step says why it waits until its approval is denied, then "Denied"
  * (Build 24, P6); once its review is saved, "{a} accepted · {d} denied"
- * (`review`, Round 21's F2), waiting still or gone on.
+ * (`review`, Round 21's F2), on the step that waited, whatever the job does
+ * next — so a group still working after the review says the count, not
+ * "Working…".
  */
 function trackerSub(
   state: TrackerState,
@@ -277,15 +282,15 @@ function trackerSub(
   decision?: HeldDecision | null,
   review?: ReviewTally | null,
 ): string {
+  const waited = steps.some((step) => step.outcome === "held");
+  // A saved review, on the step that waited for it (Round 21's F2).
+  if (review && waited && decision !== "rejected" && state !== "failed")
+    return reviewedLine(review.accepted, review.denied);
   if (state === "working") return WORKING;
   if (state === "waiting") return STEP_WAITING;
   if (state === "skipped") return STEP_SKIPPED;
   if (state === "stopped") return STEP_STOPPED;
   if (state === "failed") return run.failureReason ?? STEP_FAILED;
-  const waited = steps.some((step) => step.outcome === "held");
-  // A saved review, on the step that waited for it (Round 21's F2).
-  if (review && waited && decision !== "rejected")
-    return reviewedLine(review.accepted, review.denied);
   if (state === "held")
     return decision === "rejected"
       ? STEP_DENIED
@@ -555,6 +560,23 @@ export type HeldDecision =
 
 /** What a client needs of an approval to know which is a job's newest. */
 type ApprovalOf = { runId: string; status: string; createdAt?: string };
+
+/**
+ * Whether a run's page reads the job's approvals (Round 21's F2): while it
+ * is held, and once any step reported `held` — a saved review continues the
+ * job under its id, and the step that waited says the review's count
+ * (`reviewTally`) only from the approval. A run that never waited reads
+ * none.
+ */
+export function readsJobApprovals(detail: {
+  run: { status: RunStatus };
+  steps: readonly { outcome: string }[];
+}): boolean {
+  return (
+    detail.run.status === "held" ||
+    detail.steps.some((step) => step.outcome === "held")
+  );
+}
 
 /**
  * A job's newest approval, by when it was asked (Build 24, P9): a job is its

@@ -12,7 +12,7 @@ import { SPACING } from "@/lib/spacing";
  * hidden `<prefix>:<key>` per choice, in the order chosen, and its control
  * `select`, or `select-multiple` for several, so the action sends a list
  * (`declaredValues`). A required one left empty says "Choose at least one."
- * under it once the save found it (`missingChoice`).
+ * under it once the save found it (`missingChoices`).
  */
 export function SelectField({
   fieldKey,

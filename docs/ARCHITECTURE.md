@@ -61,7 +61,7 @@ page reuses:
   the panel open with a tick on each chosen row, and the closed box says
   "Choose", "{first}, {second}" or "{n} chosen" (`lib/choices.ts`); it is
   sent as the list chosen, and a required one left empty says "Choose at
-  least one." under it before anything is sent (`missingChoice`).
+  least one." under each before anything is sent (`missingChoices`).
 - **A row that opens a page** is `PageRow` (`components/dashboard/PageRow.tsx`):
   a closed section's box and height, the arrow at its end — or, `boxed`
   false, a row of one card of divided rows (`LIST_CARD`): a list block's
@@ -242,7 +242,13 @@ admin can review this." Saving sends every answer (`{decisions: [{id,
 decision}]}`) and the job always goes on; a refusal says "The review wasn't
 saved. Try again." On Approvals such a row says "Review {n} changes",
 opening the run, in place of the pair. Once saved, the step that waited
-says "{a} accepted · {d} denied" (`reviewTally`, `trackerRows`). A held run
+says "{a} accepted · {d} denied" on the run's details page, even while the
+job goes on (`reviewTally`, `trackerRows`): a run's page reads the job's
+approvals whenever a step reported `held`, not only while it is held
+(`readsJobApprovals`). A gap, named: words.md also puts the count in
+Approvals, but Approvals lists only what waits and a review is saved on the
+run's page, so no Approvals row ever holds a saved review; the default
+until the owner says otherwise is the count on the run alone. A held run
 without changes is unchanged. The words are ICD-10 Code Check's words.md
 section 3, the app's too.
 
