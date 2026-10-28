@@ -6,12 +6,7 @@ import { useRouter } from "next/navigation";
 import { StatusPill } from "@/components/dashboard/StatusPill";
 import { Button } from "@/components/ui/Button";
 import { decideApproval } from "@/app/account/flows/actions";
-import type { Approval } from "@/lib/automations";
-import {
-  offeredDecisions,
-  type DecisionAnswer,
-  type OfferedDecision,
-} from "@/lib/pending-contract";
+import type { Approval, HeldDecision, ReviewAnswer } from "@/lib/automations";
 import {
   ACCEPT,
   ANSWER_EACH,
@@ -20,6 +15,7 @@ import {
   REVIEW_NOT_SAVED,
   SAVE_REVIEW,
   changeLine,
+  offeredDecisions,
   reviewChanges,
   runLabel,
 } from "@/lib/run-progress";
@@ -66,7 +62,7 @@ export function ApprovalDecision({
   /** Told as the decision is sent, and again once it is saved or refused. */
   onDecision?: (decision: Decision, state: DecisionState) => void;
   /** The changes the held run offers; none is the plain pair. */
-  decisions?: readonly OfferedDecision[];
+  decisions?: readonly HeldDecision[];
   /** This person's role: a member is told who may review. */
   role?: string;
 }) {
@@ -191,11 +187,13 @@ function ReviewDecisions({
   eligibleRoles: readonly string[];
   workspaceId: string;
   onDecision?: (decision: Decision, state: DecisionState) => void;
-  decisions: readonly OfferedDecision[];
+  decisions: readonly HeldDecision[];
   role?: string;
 }) {
   const [pending, startTransition] = useTransition();
-  const [answers, setAnswers] = useState<Record<string, DecisionAnswer>>({});
+  const [answers, setAnswers] = useState<
+    Record<string, ReviewAnswer["decision"]>
+  >({});
   const [refused, setRefused] = useState(false);
   const answered = decisions.every((change) => answers[change.id]);
 
@@ -230,7 +228,7 @@ function ReviewDecisions({
       <ul className={`flex flex-col ${SPACING.inner.gap}`}>
         {decisions.map((change) => {
           const answer = answers[change.id];
-          const pick = (next: DecisionAnswer) =>
+          const pick = (next: ReviewAnswer["decision"]) =>
             setAnswers((current) => ({ ...current, [change.id]: next }));
           return (
             <li

@@ -18,11 +18,6 @@ import type {
   operations as ConnectionOperations,
 } from "../../lib/generated/platform-contracts/connections";
 
-import type {
-  PendingApproval,
-  PendingSetupField,
-} from "../../lib/pending-contract";
-
 // The page bodies' composer (ADR-0048), by its own path: Node runs this file
 // with its types stripped, which needs the `.ts`; the types are tsc's.
 const { itemBody, runBlocks } = (await import(
@@ -988,9 +983,9 @@ function invoiceSubscription(): Automations["Subscription"] {
 /**
  * Round 21 (the platform round's F1): ICD-10 Code Check's Specialties, a
  * required drop-down of several, on Invoice Processing's Set up when a test
- * asks. A `select` is the pending contract's until the regeneration.
+ * asks.
  */
-const specialtiesField: PendingSetupField = {
+const specialtiesField: Automations["AutomationSetupField"] = {
   section: "rules",
   key: "specialties",
   title: "Specialties",
@@ -1009,13 +1004,24 @@ const specialtiesField: PendingSetupField = {
   required: true,
 };
 
-/** Invoice Processing's settings, with the Specialties when asked for. */
+/**
+ * A drop-down of one choice beside it (`multiple` absent, the contract's
+ * default): one option, saved as a string.
+ */
+const placeOfCareField: Automations["AutomationSetupField"] = {
+  section: "rules",
+  key: "placeOfCare",
+  title: "Place of care",
+  description: "Where the visits this flow reads take place.",
+  control: "select",
+  options: ["Office", "Hospital", "Home"],
+  required: true,
+};
+
+/** Invoice Processing's settings, with the Specialties and Place of care when asked for. */
 function invoiceSetup(): Automations["AutomationSetupField"][] {
   return state.invoiceSpecialties
-    ? [
-        ...invoiceAutomation.setup,
-        specialtiesField as unknown as Automations["AutomationSetupField"],
-      ]
+    ? [...invoiceAutomation.setup, specialtiesField, placeOfCareField]
     : invoiceAutomation.setup;
 }
 
@@ -1818,12 +1824,11 @@ function pendingInvoiceApproval(): Automations["Approval"] {
 
 /**
  * The held job's approval as a review (Round 21, the platform round's F2;
- * the backend's draft): two changes to accept or deny one by one, in ICD-10
- * Code Check's words for them. The pending contract's until the
- * regeneration.
+ * two changes to accept or deny one by one, in ICD-10 Code Check's words
+ * for them.
  */
 function pendingInvoiceReview(): Automations["Approval"] {
-  const review: PendingApproval = {
+  const review: Automations["Approval"] = {
     ...pendingInvoiceApproval(),
     reason: "2 changes need your review.",
     decisions: [
@@ -2836,12 +2841,8 @@ const server = createServer(
         approvalStatuses: state.approvals.map((entry) => entry.status),
         // Round 21 (F2): each review's answers, as the approval keeps them.
         reviewAnswers: state.approvals.flatMap((entry) =>
-          (entry as PendingApproval).decisions
-            ? [
-                (entry as PendingApproval).decisions!.map(
-                  ({ id, decision }) => ({ id, decision }),
-                ),
-              ]
+          entry.decisions
+            ? [entry.decisions.map(({ id, decision }) => ({ id, decision }))]
             : [],
         ),
         // Every run package file asked for (Build 24, P12).
@@ -4222,9 +4223,15 @@ const server = createServer(
                 typeof choice !== "string" ||
                 !(specialtiesField.options ?? []).includes(choice),
             ));
+        // A one-choice value: one of its options, as a string.
+        const badChoice =
+          state.invoiceSpecialties &&
+          (typeof config?.placeOfCare !== "string" ||
+            !(placeOfCareField.options ?? []).includes(config.placeOfCare));
         if (
           !config ||
           badChoices ||
+          badChoice ||
           Object.keys(config).some((key) => !declared.has(key)) ||
           (config.vendor !== undefined &&
             config.vendor !== "none" &&
@@ -5255,11 +5262,11 @@ const server = createServer(
       };
       if (!request.headers["idempotency-key"])
         return respond(response, 400, problem(400, "Bad Request"));
-      // A review (Round 21, F2; the backend's draft): it takes `decisions`,
+      // A review (Round 21, F2): it takes `decisions`,
       // every offered change answered once, and never `decision`; saving it
       // always continues the job, even with every change denied. Any other
       // approval takes `decision` alone.
-      const offered = (approval as PendingApproval).decisions;
+      const offered = approval.decisions;
       if (offered) {
         const answers = Array.isArray(body.decisions) ? body.decisions : [];
         const ids = answers.map((answer) => answer.id);
@@ -5279,7 +5286,7 @@ const server = createServer(
           });
         for (const change of offered)
           change.decision = answers.find((answer) => answer.id === change.id)!
-            .decision as "accepted" | "denied";
+            .decision as Automations["ReviewAnswer"]["decision"];
         approval.status = "approved";
         approval.decidedAt = now;
         approval.decidedByUserId = userId;

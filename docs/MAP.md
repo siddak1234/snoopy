@@ -123,7 +123,6 @@
 - [lib/held-flow.ts](../lib/held-flow.ts): A workspace holds each flow once (the owner, build 12's #9): Personal is one
 - [lib/join-link.ts](../lib/join-link.ts): The line under Copy join link (the owner's build 9, decision 5): what the
 - [lib/nav.ts](../lib/nav.ts): Single source of truth for marketing navigation.
-- [lib/pending-contract.ts](../lib/pending-contract.ts): PENDING CONTRACT: the platform round for a setup dropdown and a review of
 - [lib/plan-limit.ts](../lib/plan-limit.ts): Over the plan's flow allowance — the owner's build 13 decision 7a3: while a
 - [lib/plan-price.ts](../lib/plan-price.ts): no header
 - [lib/platform-api.ts](../lib/platform-api.ts): no header

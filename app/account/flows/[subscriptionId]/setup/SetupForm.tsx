@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import { NumberedStep } from "@/components/ui/NumberedStep";
-import type { SubscriptionStatus } from "@/lib/automations";
+import type {
+  AutomationSetupField,
+  SubscriptionStatus,
+} from "@/lib/automations";
 import type { Connection, ConnectionProvider } from "@/lib/connections";
-import type { PendingSetupField } from "@/lib/pending-contract";
 import { connectionFor, connectionState } from "@/lib/connection-rows";
 import {
   NONE,
@@ -78,7 +80,7 @@ export function SetupForm({
   status: SubscriptionStatus;
   available: boolean;
   /** The settings of the version the flow runs. */
-  setup: PendingSetupField[];
+  setup: AutomationSetupField[];
   config: Record<string, unknown>;
   vendorFields: SetupVendorField[];
   /** The accounts the flow cannot run without. */

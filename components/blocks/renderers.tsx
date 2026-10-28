@@ -12,11 +12,8 @@ import {
 import { Tile } from "@/components/dashboard/Tile";
 import { TrackerItem } from "@/components/dashboard/TrackerItem";
 import type { Block } from "@/lib/automations";
-import {
-  PENDING_FORM_KINDS,
-  type PendingQuestionForm,
-} from "@/lib/pending-contract";
 import { fileViewHref } from "@/lib/run-files";
+import { offeredDecisions } from "@/lib/run-progress";
 import { CARD, ROW, SPACING } from "@/lib/spacing";
 import { notDrawn } from "./drawable";
 import { Fallback } from "./Fallback";
@@ -40,15 +37,14 @@ import { Picture } from "./Picture";
  */
 
 export type BlockOf<K extends Block["type"]> = Extract<Block, { type: K }>;
-/** A question form: the generated one, with the `review` form of the pending contract (`lib/pending-contract.ts`) until the regeneration. */
-type QuestionForm = PendingQuestionForm;
+/** A question form, as the generated contract names it: `approval`, `review` (Round 21's F2), `run`, `item` or `setup`. */
+export type QuestionForm = BlockOf<"questions">["form"];
 export type FormKind = QuestionForm["kind"];
 
 /**
  * The page's own forms, each drawn by the component that draws it today, with
  * the page's context and gates (decision 2). A form the page does not offer
- * draws nothing; a form this build does not know draws the fallback. A held
- * run's review (`review`, Round 21's F2) is the pending contract's.
+ * draws nothing; a form this build does not know draws the fallback.
  */
 export type BlockForms = Partial<
   Record<FormKind, (form: QuestionForm) => ReactNode>
@@ -64,8 +60,8 @@ const KNOWN_FORMS: readonly string[] = [
   "run",
   "item",
   "setup",
-  ...PENDING_FORM_KINDS,
-];
+  "review",
+] satisfies readonly FormKind[];
 
 /** A chip: a badge block, a section's, a list row's. */
 export function Chip({ badge }: { badge: { text: string; tone?: unknown } }) {
@@ -527,9 +523,37 @@ export function TimelineBlock({ block }: { block: BlockOf<"timeline"> }) {
 }
 
 /**
+ * A review's changes where no form is drawn for them (backend ADR-0048
+ * amendment 2): each one's label, then its detail, read by everyone (words.md
+ * section 3), with no pills. The " · " between them is drawn, not a word, so
+ * the label and the detail are each the flow's own words, as the block
+ * fixtures read them.
+ */
+function ReviewRows({ form }: { form: QuestionForm }) {
+  const changes = offeredDecisions(form);
+  if (changes.length === 0) return null;
+  return (
+    <ul
+      data-testid="block-review-rows"
+      className={`flex flex-col ${SPACING.inner.gap}`}
+    >
+      {changes.map((change) => (
+        <li key={change.id} className="min-w-0 text-sm text-[var(--text)]">
+          <span>{change.label}</span>
+          {change.detail ? (
+            <span className="before:content-['_·_']">{change.detail}</span>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
  * questions: the page's own form for it, with its gates (`BlockForms`) —
- * nothing where the page offers none; a form this build does not know, the
- * fallback, logged by `notDrawn` as `form.kind`.
+ * nothing where the page offers none, but a review's changes (`ReviewRows`);
+ * a form this build does not know, the fallback, logged by `notDrawn` as
+ * `form.kind`.
  */
 export function QuestionsBlock({
   block,
@@ -548,7 +572,8 @@ export function QuestionsBlock({
   // page that offers no form, or whose form draws nothing (a member, a flow
   // not live), draws neither.
   const drawn = form ? form(block.form) : null;
-  if (drawn === null || drawn === undefined || drawn === false) return null;
+  if (drawn === null || drawn === undefined || drawn === false)
+    return kind === "review" ? <ReviewRows form={block.form} /> : null;
   return (
     <div data-testid={`block-form-${kind}`} data-block-form={kind}>
       {block.title ? (

@@ -18,13 +18,13 @@
  * Pure, and loaded by its unit test as it is: no React and no `@/` import.
  */
 
-// The review's shapes live in the one module the contract regeneration
-// replaces (Round 21's F2): never copied here.
-import type {
-  AnsweredDecision,
-  DecisionAnswer,
-  ReviewTally,
-} from "./pending-contract";
+import type { components } from "./generated/platform-contracts/automations";
+
+type Schemas = components["schemas"];
+/** One change a held run offers for review (Round 21's F2), the contract's `HeldDecision`. */
+type OfferedChange = Schemas["HeldDecision"];
+/** One answer to an offered change, as the decision route takes it and the approval keeps it. */
+type ReviewAnswer = Schemas["ReviewAnswer"];
 
 export type ProgressStep = {
   stepId: string;
@@ -123,13 +123,56 @@ export function changeLine(change: { label: string; detail?: string }): string {
   return change.detail ? `${change.label} · ${change.detail}` : change.label;
 }
 
+/** The changes an approval or a review form offers, or none (a plain approval: Approve / Deny). Rows not shaped as the contract says are left out. */
+export function offeredDecisions(
+  holder: { decisions?: unknown } | undefined | null,
+): OfferedChange[] {
+  const list = holder?.decisions;
+  if (!Array.isArray(list)) return [];
+  return list.flatMap((row: unknown) => {
+    if (typeof row !== "object" || row === null) return [];
+    const { id, label, detail } = row as Record<string, unknown>;
+    if (typeof id !== "string" || typeof label !== "string") return [];
+    return [
+      typeof detail === "string" && detail !== ""
+        ? { id, label, detail }
+        : { id, label },
+    ];
+  });
+}
+
+/** A saved review's count: how many changes were accepted and denied. */
+export type ReviewTally = { accepted: number; denied: number };
+
+/**
+ * A saved review's count, "{a} accepted · {d} denied" (words.md section 3):
+ * an approval decided `approved` whose offered rows carry their answers.
+ * `null` for any other approval.
+ */
+export function reviewTally(
+  approval: { status: string; decisions?: unknown } | undefined | null,
+): ReviewTally | null {
+  if (!approval || approval.status !== "approved") return null;
+  const list = approval.decisions;
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const answers = list.map((row: unknown) =>
+    typeof row === "object" && row !== null
+      ? (row as { decision?: unknown }).decision
+      : undefined,
+  );
+  if (!answers.every((answer) => answer === "accepted" || answer === "denied"))
+    return null;
+  const accepted = answers.filter((answer) => answer === "accepted").length;
+  return { accepted, denied: answers.length - accepted };
+}
+
 /**
  * The answers a review form posted (`decisions`, JSON), as the decision
  * route takes them: each id once, `accepted` or `denied`. `null` when the
  * list is not that, so nothing is sent. The form answers every change it
  * offers; the platform checks that every offered id is answered once.
  */
-export function reviewAnswers(posted: unknown): AnsweredDecision[] | null {
+export function reviewAnswers(posted: unknown): ReviewAnswer[] | null {
   if (typeof posted !== "string") return null;
   let list: unknown;
   try {
@@ -138,7 +181,7 @@ export function reviewAnswers(posted: unknown): AnsweredDecision[] | null {
     return null;
   }
   if (!Array.isArray(list) || list.length === 0) return null;
-  const answers = new Map<string, DecisionAnswer>();
+  const answers = new Map<string, ReviewAnswer["decision"]>();
   for (const row of list as unknown[]) {
     if (typeof row !== "object" || row === null) return null;
     const { id, decision } = row as { id?: unknown; decision?: unknown };

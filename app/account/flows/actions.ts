@@ -23,7 +23,6 @@ import { VENDOR_MEMBER_NOTE } from "@/lib/connection-rows";
 import { EMAIL_SAVE_FAILED } from "@/lib/flow-email";
 import { problemFields } from "@/lib/flow-items";
 import { heldCopy } from "@/lib/held-flow";
-import type { ReviewBody } from "@/lib/pending-contract";
 import { overPlanRefusal } from "@/lib/plan-limit";
 import { reviewAnswers } from "@/lib/run-progress";
 import { subscriptionEntitlementState } from "@/lib/subscription-entitlements";
@@ -560,9 +559,7 @@ export async function setSubscriptionStatus(
 }
 
 /** What a decision sends: a review's answers, else Approve or Deny; `null` for neither. */
-function decisionBody(
-  formData: FormData,
-): DecideApprovalRequest | ReviewBody | null {
+function decisionBody(formData: FormData): DecideApprovalRequest | null {
   if (formData.has("decisions")) {
     const decisions = reviewAnswers(formData.get("decisions"));
     return decisions ? { decisions } : null;

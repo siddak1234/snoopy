@@ -3,7 +3,6 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { after, before, test } from "node:test";
 import { BLOCK_FIXTURES } from "../lib/generated/platform-contracts/block-fixtures.ts";
-import { offeredDecisions, reviewTally } from "../lib/pending-contract.ts";
 import {
   ACCEPT,
   ANSWER_EACH,
@@ -13,10 +12,12 @@ import {
   SAVE_REVIEW,
   changeLine,
   newestApproval,
+  offeredDecisions,
   readsJobApprovals,
   rereadForApprovalForm,
   reviewAnswers,
   reviewChanges,
+  reviewTally,
   reviewedLine,
   trackerRows,
 } from "../lib/run-progress.ts";
@@ -122,7 +123,7 @@ test("a held job's page offers the decision: RunLive draws the platform's approv
   );
   assert.match(
     live,
-    /const decisionForm = \(form: PendingQuestionForm\) =>\s*form\.approvalId \? \(\s*<div data-testid="run-decision">\s*<ApprovalDecision\s+approvalId=\{form\.approvalId\}\s+canDecide=\{mayDecide\(role, form\.eligibleRoles\)\}\s+eligibleRoles=\{form\.eligibleRoles \?\? \[\]\}/u,
+    /const decisionForm = \(form: QuestionForm\) =>\s*form\.approvalId \? \(\s*<div data-testid="run-decision">\s*<ApprovalDecision\s+approvalId=\{form\.approvalId\}\s+canDecide=\{mayDecide\(role, form\.eligibleRoles\)\}\s+eligibleRoles=\{form\.eligibleRoles \?\? \[\]\}/u,
   );
   // The approval form and a review's (Round 21's F2) are the one decision.
   assert.match(
@@ -555,6 +556,6 @@ test("a held run's review: each change a row with Accept and Deny (Deny the dang
   // An older build knows the review form: never the fallback.
   assert.match(
     code(read("components/blocks/renderers.tsx")),
-    /const KNOWN_FORMS: readonly string\[\] = \[[^\]]*\.\.\.PENDING_FORM_KINDS,?\s*\];/u,
+    /const KNOWN_FORMS: readonly string\[\] = \[[^\]]*"review",?\s*\] satisfies readonly FormKind\[\];/u,
   );
 });

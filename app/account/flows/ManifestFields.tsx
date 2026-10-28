@@ -6,7 +6,6 @@ import type {
   AutomationRunInputField,
   AutomationSetupField,
 } from "@/lib/automations";
-import type { PendingSetupField } from "@/lib/pending-contract";
 import { SPACING } from "@/lib/spacing";
 
 /**
@@ -27,7 +26,7 @@ import { SPACING } from "@/lib/spacing";
  * A notification switch's line stays: it says what the switch does.
  */
 
-type ManifestField = PendingSetupField | AutomationRunInputField;
+type ManifestField = AutomationSetupField | AutomationRunInputField;
 
 /**
  * A setup section's name (spec §3.B): numbered, in plain words — never the
@@ -55,7 +54,7 @@ export function SetupFields({
   hideConnections = false,
   missingChoices,
 }: {
-  setup: PendingSetupField[];
+  setup: AutomationSetupField[];
   config: Record<string, unknown>;
   firstSection?: number;
   /** Set up carries each vendor choice itself, as the page's choice. */
@@ -64,8 +63,8 @@ export function SetupFields({
   missingChoices?: ReadonlySet<string>;
 }) {
   const groups: Array<{
-    section: PendingSetupField["section"];
-    fields: PendingSetupField[];
+    section: AutomationSetupField["section"];
+    fields: AutomationSetupField[];
   }> = [];
 
   // `setup` is published in manifest order. The contract declares a field's

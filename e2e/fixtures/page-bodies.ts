@@ -9,7 +9,6 @@
  * the composer or its words that this copy misses fails there.
  */
 import type { components as AutomationSchemas } from "../../lib/generated/platform-contracts/automations";
-import type { PendingApproval } from "../../lib/pending-contract";
 
 type Automations = AutomationSchemas["schemas"];
 type Block = Automations["Block"];
@@ -312,9 +311,9 @@ export type RunPageInput = {
   details?: readonly Automations["RunDetailLine"][];
   documents?: readonly RunDocument[];
   sections?: readonly Automations["RunSection"][];
-  /** The job's newest approval, if it asked for one; a review's with its changes (the pending contract, Round 21's F2). */
+  /** The job's newest approval, if it asked for one; a review's with its changes (Round 21's F2). */
   approval?: Pick<
-    PendingApproval,
+    Automations["Approval"],
     "id" | "status" | "eligibleRoles" | "decisions"
   >;
   /** The flow's word for one of an item's runs ("Candidate"). */
@@ -373,8 +372,7 @@ export function runBlocks(input: RunPageInput): Block[] {
   const tone = LINE_TONES[run.status];
   if (line && !said)
     blocks.push({ type: "text", text: line, ...(tone ? { tone } : {}) });
-  // A review's form (the backend's draft `questions{review}`, Round 21's
-  // F2), the pending contract's until the regeneration: hence the cast.
+  // A review's form (`questions{review}`, Round 21's F2).
   if (approval?.status === "pending")
     blocks.push(
       approval.decisions
@@ -390,7 +388,7 @@ export function runBlocks(input: RunPageInput): Block[] {
                 ...(detail === undefined ? {} : { detail }),
               })),
             },
-          } as unknown as Block)
+          } satisfies Block)
         : {
             type: "questions",
             form: {

@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { FileTextIcon } from "@phosphor-icons/react/dist/ssr/FileText";
 import { FlowArrowIcon } from "@phosphor-icons/react/dist/ssr/FlowArrow";
 import { BlockList } from "@/components/blocks/BlockList";
+import type { QuestionForm } from "@/components/blocks/renderers";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { BackLink } from "@/components/dashboard/BackLink";
 import { FileActions, usePageFile } from "@/components/dashboard/FileActions";
@@ -54,8 +55,10 @@ import {
   heldDecision,
   mayDecide,
   newestApproval,
+  offeredDecisions,
   rereadForApproval,
   rereadForApprovalForm,
+  reviewTally,
   runDetailsPath,
   runDuration,
   runLabel,
@@ -65,11 +68,6 @@ import {
   type ProgressGroup,
   type TrackerFlow,
 } from "@/lib/run-progress";
-import {
-  offeredDecisions,
-  reviewTally,
-  type PendingQuestionForm,
-} from "@/lib/pending-contract";
 import { verdictChip, type VerdictNames } from "@/lib/run-verdict";
 import { followSignedLink } from "@/lib/signed-link";
 import type { WorkspaceRole } from "@/lib/tenancy";
@@ -236,7 +234,7 @@ export function RunLive({
   // finding 1: not one tap more): one press, or a review's Save review
   // (`review`, Round 21's F2), then the page is drawn again — running on, or
   // Denied.
-  const decisionForm = (form: PendingQuestionForm) =>
+  const decisionForm = (form: QuestionForm) =>
     form.approvalId ? (
       <div data-testid="run-decision">
         <ApprovalDecision

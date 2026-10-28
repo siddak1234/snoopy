@@ -1153,6 +1153,13 @@ test("a setup drop-down picks one or several: the glass drop-down, never the bro
   const select = readFileSync("app/account/flows/SelectField.tsx", "utf8");
   assert.doesNotMatch(select, /<select\b|<option\b/u);
   assert.match(select, /<Dropdown[\s\S]*?multiple\s+value=\{chosen\}/u);
+  // One choice (`multiple` absent, the contract's default): the single
+  // drop-down, its choice kept alone and posted under the `select` control,
+  // which the action sends as that one string.
+  assert.match(
+    select,
+    /value=\{chosen\[0\] \?\? ""\}\s+onChange=\{\(value\) => setChosen\(\[value\]\)\}/u,
+  );
   assert.match(select, /value=\{multiple \? "select-multiple" : "select"\}/u);
   assert.match(
     select,
@@ -1164,6 +1171,10 @@ test("a setup drop-down picks one or several: the glass drop-down, never the bro
   const values = actions.slice(
     actions.indexOf("function declaredValues"),
     actions.indexOf("export async function saveSetup"),
+  );
+  assert.match(
+    values,
+    /if \(typeof value !== "string" \|\| value\.trim\(\) === ""\) continue;\s*values\[key\] = control === "money" \? Number\(value\) : value;/u,
   );
   assert.match(
     values,

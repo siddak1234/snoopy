@@ -34,12 +34,12 @@ this origin holds.
   (`block-required.ts`: `BLOCK_REQUIRED`, from `automations.yaml`, headed
   by its sha256).
   A web change cannot invent a request, response, cursor interpretation, billing
-  flow, invite flow, or OAuth-provider policy. One exception, for one round:
-  `lib/pending-contract.ts` holds the narrowest local types of the platform
-  round's setup `select` and a held run's review (Round 21, F1 and F2), which
-  the backend's contracts add in the same round. It is deleted when
-  `npm run generate:platform-contracts` reads the backend's merged head, and
-  its importers then read the generated names.
+  flow, invite flow, or OAuth-provider policy. The platform round's setup
+  `select` and a held run's review (Round 21, F1 and F2) are the generated
+  names too (`AutomationSetupField`'s `options` and `multiple`, `HeldDecision`,
+  `ReviewAnswer`, `Approval.decisions`, the `review` question form, the
+  decision body's `decisions`); ~~a hand-written `lib/pending-contract.ts`~~
+  until the regeneration from backend PR #255.
 - No Prisma, direct database, Supabase SDK, object-store SDK, browser secret,
   manual password login, or provider credential belongs here.
 - Tenancy state comes from typed Edge responses. Mutations have unique
@@ -238,7 +238,10 @@ A held run that offers changes (its form `questions{review}` with
 a row, "{label} · {detail}", with Accept and Deny (Deny the danger pill) to
 a role the form names; Save review once every row has an answer, "Accept or
 deny each change." until then; a member reads the rows and "Only an owner or
-admin can review this." Saving sends every answer (`{decisions: [{id,
+admin can review this."; a page that draws no form for it reads the rows
+alone (`ReviewRows` in `components/blocks/renderers.tsx`), each label then
+its detail, as the block fixtures `review-held-*` read them, with no pills.
+Saving sends every answer (`{decisions: [{id,
 decision}]}`) and the job always goes on; a refusal says "The review wasn't
 saved. Try again." On Approvals such a row says "Review {n} changes",
 opening the run, in place of the pair. Once saved, the step that waited
