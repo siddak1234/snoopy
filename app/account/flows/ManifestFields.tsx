@@ -1,10 +1,12 @@
 import { FormInput } from "@/components/ui/FormInput";
 import { NumberedStep } from "@/components/ui/NumberedStep";
 import { RunFileField } from "./RunFileField";
+import { SelectField } from "./SelectField";
 import type {
   AutomationRunInputField,
   AutomationSetupField,
 } from "@/lib/automations";
+import type { PendingSetupField } from "@/lib/pending-contract";
 import { SPACING } from "@/lib/spacing";
 
 /**
@@ -12,7 +14,8 @@ import { SPACING } from "@/lib/spacing";
  *
  * Two declarations use this: a subscription's `setup`, and a manual run's
  * `runInput` (backend ADR-0030). They share the vocabulary `text`, `money` and
- * `toggle` (run input adds `artifact`, below), so they share one renderer, and
+ * `toggle` (run input adds `artifact`, below; setup adds `select`, a list of
+ * choices drawn as the website's drop-down, `SelectField`), so they share one renderer, and
  * the form posts each value under
  * `<prefix>:<key>` with its control under `<prefix>-control:<key>`, which is how
  * the server action converts it back to the type the platform checks.
@@ -24,7 +27,7 @@ import { SPACING } from "@/lib/spacing";
  * A notification switch's line stays: it says what the switch does.
  */
 
-type ManifestField = AutomationSetupField | AutomationRunInputField;
+type ManifestField = PendingSetupField | AutomationRunInputField;
 
 /**
  * A setup section's name (spec §3.B): numbered, in plain words — never the
@@ -50,16 +53,19 @@ export function SetupFields({
   config,
   firstSection = 1,
   hideConnections = false,
+  missingChoice,
 }: {
-  setup: AutomationSetupField[];
+  setup: PendingSetupField[];
   config: Record<string, unknown>;
   firstSection?: number;
   /** Set up carries each vendor choice itself, as the page's choice. */
   hideConnections?: boolean;
+  /** The required drop-down the save found empty (`missingChoice`): "Choose at least one." under it. */
+  missingChoice?: string | null;
 }) {
   const groups: Array<{
-    section: AutomationSetupField["section"];
-    fields: AutomationSetupField[];
+    section: PendingSetupField["section"];
+    fields: PendingSetupField[];
   }> = [];
 
   // `setup` is published in manifest order. The contract declares a field's
@@ -114,6 +120,7 @@ export function SetupFields({
                 field={field}
                 value={config[field.key]}
                 prefix="config"
+                missing={missingChoice === field.key}
               />
             ))}
           </div>
@@ -185,15 +192,32 @@ function ManifestFieldInput({
   field,
   value,
   prefix,
+  missing = false,
 }: {
   field: ManifestField;
   value: unknown;
   prefix: "config" | "input";
+  missing?: boolean;
 }) {
   const hasDefault = Object.hasOwn(field, "defaultValue");
   const initialValue = value ?? field.defaultValue;
   const required = field.required && !hasDefault;
   const fieldId = `${prefix}-${field.key}`;
+
+  if (field.control === "select") {
+    return (
+      <SelectField
+        fieldKey={field.key}
+        title={field.title}
+        options={field.options ?? []}
+        multiple={field.multiple === true}
+        initial={initialValue}
+        prefix={prefix}
+        missing={missing}
+        optional={<OptionalMark field={field} />}
+      />
+    );
+  }
 
   if (field.control === "toggle") {
     return (

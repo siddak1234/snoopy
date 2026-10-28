@@ -7,6 +7,7 @@ import {
 } from "@/lib/platform-server";
 import { formatDateTimeMediumUTC } from "@/lib/date";
 import { runsQuery, type ActivityQuery } from "@/lib/flow-steps";
+import type { ReviewBody } from "@/lib/pending-contract";
 import { BLOCKS_SHAPE } from "@/lib/run-progress";
 import type {
   components,
@@ -465,7 +466,8 @@ export function createRunPackageFile(
 export function decideApproval(
   workspaceId: string,
   approvalId: string,
-  body: DecideApprovalRequest,
+  /** Approve or Deny, or a review's answers (`ReviewBody`, the pending contract until the regeneration). */
+  body: DecideApprovalRequest | ReviewBody,
 ): Promise<DecideApprovalResponse> {
   return platformServerJson<DecideApprovalResponse>(
     `${scope(workspaceId)}/approvals/${encodeURIComponent(approvalId)}/decision`,

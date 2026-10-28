@@ -5,11 +5,9 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import { NumberedStep } from "@/components/ui/NumberedStep";
-import type {
-  AutomationSetupField,
-  SubscriptionStatus,
-} from "@/lib/automations";
+import type { SubscriptionStatus } from "@/lib/automations";
 import type { Connection, ConnectionProvider } from "@/lib/connections";
+import type { PendingSetupField } from "@/lib/pending-contract";
 import { connectionFor, connectionState } from "@/lib/connection-rows";
 import {
   NONE,
@@ -21,7 +19,7 @@ import { ConnectionsPanel } from "@/app/account/connections/ConnectionsPanel";
 import { PENDING_CONNECT } from "@/app/account/connections/pending-connect";
 import { saveSetup } from "../../actions";
 import { SECTION_NAME, SetupFields } from "../../ManifestFields";
-import { setupProblem } from "../../setup-check";
+import { missingChoice, setupProblem } from "../../setup-check";
 import { VendorRows, type VendorOption } from "../../VendorRows";
 import { Group } from "@/components/dashboard/Group";
 import { SPACING } from "@/lib/spacing";
@@ -80,7 +78,7 @@ export function SetupForm({
   status: SubscriptionStatus;
   available: boolean;
   /** The settings of the version the flow runs. */
-  setup: AutomationSetupField[];
+  setup: PendingSetupField[];
   config: Record<string, unknown>;
   vendorFields: SetupVendorField[];
   /** The accounts the flow cannot run without. */
@@ -94,6 +92,8 @@ export function SetupForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // The required drop-down the save found empty, said under it.
+  const [missing, setMissing] = useState<string | null>(null);
   const [picked, setPicked] = useState<Record<string, string>>({});
   // Read in the browser only: which vendor this tab's last connect left for.
   const returnedFor = useSyncExternalStore(
@@ -123,6 +123,9 @@ export function SetupForm({
     setError(null);
     const data = new FormData(event.currentTarget);
     data.set("workspaceId", workspaceId);
+    const empty = missingChoice(setup, data);
+    setMissing(empty);
+    if (empty) return;
     const problem = setupProblem(
       setup.filter((field) => field.control !== "connection"),
       data,
@@ -246,6 +249,7 @@ export function SetupForm({
           config={config}
           firstSection={hasConnect ? 2 : 1}
           hideConnections
+          missingChoice={missing}
         />
         <FormError message={error} />
         <div>

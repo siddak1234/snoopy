@@ -18,6 +18,11 @@ import type {
   operations as ConnectionOperations,
 } from "../../lib/generated/platform-contracts/connections";
 
+import type {
+  PendingApproval,
+  PendingSetupField,
+} from "../../lib/pending-contract";
+
 // The page bodies' composer (ADR-0048), by its own path: Node runs this file
 // with its types stripped, which needs the `.ts`; the types are tsc's.
 const { itemBody, runBlocks } = (await import(
@@ -329,6 +334,9 @@ function initialState() {
     invoiceStatus: "live" as "live" | "paused" | "draft",
     invoiceConfig: { vendor: "none", holdAboveAmount: 500 } as Json,
     invoiceSaves: [] as Json[],
+    // Round 21 (the platform round's F1): Invoice Processing's Set up with
+    // a required drop-down of several, its Specialties.
+    invoiceSpecialties: false,
     quickbooksConnected: false,
     // Build 23 (B3): a change of the flow's integration refused as a
     // member's is — 403 `integration_requires_admin`, the Edge's "Forbidden".
@@ -977,6 +985,40 @@ function invoiceSubscription(): Automations["Subscription"] {
   return invoiceV4Subscription();
 }
 
+/**
+ * Round 21 (the platform round's F1): ICD-10 Code Check's Specialties, a
+ * required drop-down of several, on Invoice Processing's Set up when a test
+ * asks. A `select` is the pending contract's until the regeneration.
+ */
+const specialtiesField: PendingSetupField = {
+  section: "rules",
+  key: "specialties",
+  title: "Specialties",
+  description:
+    "The specialties your clinic treats. Their codes are listed first when a code is picked.",
+  control: "select",
+  options: [
+    "Nephrology",
+    "Internal medicine",
+    "Cardiology",
+    "Endocrinology",
+    "Family practice",
+    "Geriatric medicine",
+  ],
+  multiple: true,
+  required: true,
+};
+
+/** Invoice Processing's settings, with the Specialties when asked for. */
+function invoiceSetup(): Automations["AutomationSetupField"][] {
+  return state.invoiceSpecialties
+    ? [
+        ...invoiceAutomation.setup,
+        specialtiesField as unknown as Automations["AutomationSetupField"],
+      ]
+    : invoiceAutomation.setup;
+}
+
 // On v4, the newest: the platform moves every flow there (backend ADR-0041).
 function invoiceV4Subscription(): Automations["Subscription"] {
   const vendor = state.invoiceConfig.vendor;
@@ -994,7 +1036,7 @@ function invoiceV4Subscription(): Automations["Subscription"] {
         ? [quickbooksProvider.providerId]
         : [],
     triggerKind: "manual",
-    setup: invoiceAutomation.setup,
+    setup: invoiceSetup(),
     runInput: [
       {
         key: "invoiceFile",
@@ -1774,6 +1816,29 @@ function pendingInvoiceApproval(): Automations["Approval"] {
   };
 }
 
+/**
+ * The held job's approval as a review (Round 21, the platform round's F2;
+ * the backend's draft): two changes to accept or deny one by one, in ICD-10
+ * Code Check's words for them. The pending contract's until the
+ * regeneration.
+ */
+function pendingInvoiceReview(): Automations["Approval"] {
+  const review: PendingApproval = {
+    ...pendingInvoiceApproval(),
+    reason: "2 changes need your review.",
+    decisions: [
+      {
+        id: "change-1",
+        label: "N18.4 → Remove",
+        detail:
+          "Kidney failure (N18.6) is coded, so no stage code goes beside it.",
+      },
+      { id: "change-2", label: "Add Z99.2" },
+    ],
+  };
+  return review;
+}
+
 /** The held job's approval as the platform holds it now: waiting or decided, else refused. */
 function invoiceApprovalNow(): Automations["Approval"] {
   return (
@@ -2401,6 +2466,17 @@ const server = createServer(
       },
       // Build 24 (P6, P7): the held Invoice Processing job's approval waits
       // too — beside any other that waits.
+      // Round 21 (F2): the held job's approval a review of two changes.
+      "/__fixture/invoice-review-pending": () => {
+        state.approvals = [
+          ...state.approvals.filter((entry) => entry.id !== invoiceApprovalId),
+          pendingInvoiceReview(),
+        ];
+      },
+      // Round 21 (F1): Set up draws a required drop-down of several.
+      "/__fixture/invoice-specialties": () => {
+        state.invoiceSpecialties = true;
+      },
       "/__fixture/invoice-approval-pending": () => {
         state.approvals = [
           ...state.approvals.filter((entry) => entry.id !== invoiceApprovalId),
@@ -2758,6 +2834,16 @@ const server = createServer(
         // Each approval's status: a decision leaves the page, and which it was
         // is read here.
         approvalStatuses: state.approvals.map((entry) => entry.status),
+        // Round 21 (F2): each review's answers, as the approval keeps them.
+        reviewAnswers: state.approvals.flatMap((entry) =>
+          (entry as PendingApproval).decisions
+            ? [
+                (entry as PendingApproval).decisions!.map(
+                  ({ id, decision }) => ({ id, decision }),
+                ),
+              ]
+            : [],
+        ),
         // Every run package file asked for (Build 24, P12).
         packageFiles: state.packageFiles,
         // Every read of the approvals list (Build 25, R5c 1), and every one
@@ -4122,11 +4208,23 @@ const server = createServer(
         return respond(response, 422, problem(422, "Unprocessable Entity"));
       const config = body.config;
       if (config !== undefined) {
-        const declared = new Set(
-          invoiceAutomation.setup.map((field) => field.key),
-        );
+        const declared = new Set(invoiceSetup().map((field) => field.key));
+        // A several-choice value: a list of its options, none twice, never
+        // empty when required (Round 21, F1; the backend's checks).
+        const choices = config?.specialties;
+        const badChoices =
+          state.invoiceSpecialties &&
+          (!Array.isArray(choices) ||
+            choices.length === 0 ||
+            new Set(choices).size !== choices.length ||
+            choices.some(
+              (choice) =>
+                typeof choice !== "string" ||
+                !(specialtiesField.options ?? []).includes(choice),
+            ));
         if (
           !config ||
+          badChoices ||
           Object.keys(config).some((key) => !declared.has(key)) ||
           (config.vendor !== undefined &&
             config.vendor !== "none" &&
@@ -5151,9 +5249,46 @@ const server = createServer(
       if (!role || !approval.eligibleRoles.includes(role)) {
         return respond(response, 403, problem(403, "Forbidden"));
       }
-      const body = (await requestJson(request)) as { decision?: string };
+      const body = (await requestJson(request)) as {
+        decision?: string;
+        decisions?: { id?: unknown; decision?: unknown }[];
+      };
+      if (!request.headers["idempotency-key"])
+        return respond(response, 400, problem(400, "Bad Request"));
+      // A review (Round 21, F2; the backend's draft): it takes `decisions`,
+      // every offered change answered once, and never `decision`; saving it
+      // always continues the job, even with every change denied. Any other
+      // approval takes `decision` alone.
+      const offered = (approval as PendingApproval).decisions;
+      if (offered) {
+        const answers = Array.isArray(body.decisions) ? body.decisions : [];
+        const ids = answers.map((answer) => answer.id);
+        if (
+          body.decision !== undefined ||
+          answers.length !== offered.length ||
+          new Set(ids).size !== ids.length ||
+          !offered.every((change) => ids.includes(change.id)) ||
+          answers.some(
+            (answer) =>
+              answer.decision !== "accepted" && answer.decision !== "denied",
+          )
+        )
+          return respond(response, 400, {
+            ...problem(400, "Bad Request"),
+            detail: "decisions must answer every change once",
+          });
+        for (const change of offered)
+          change.decision = answers.find((answer) => answer.id === change.id)!
+            .decision as "accepted" | "denied";
+        approval.status = "approved";
+        approval.decidedAt = now;
+        approval.decidedByUserId = userId;
+        return respond(response, 200, {
+          approval,
+        } satisfies AutomationOperations["decideApproval"]["responses"][200]["content"]["application/json"]);
+      }
       if (
-        !request.headers["idempotency-key"] ||
+        body.decisions !== undefined ||
         (body.decision !== "approved" && body.decision !== "rejected")
       ) {
         return respond(response, 400, problem(400, "Bad Request"));

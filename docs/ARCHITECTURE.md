@@ -34,7 +34,12 @@ this origin holds.
   (`block-required.ts`: `BLOCK_REQUIRED`, from `automations.yaml`, headed
   by its sha256).
   A web change cannot invent a request, response, cursor interpretation, billing
-  flow, invite flow, or OAuth-provider policy.
+  flow, invite flow, or OAuth-provider policy. One exception, for one round:
+  `lib/pending-contract.ts` holds the narrowest local types of the platform
+  round's setup `select` and a held run's review (Round 21, F1 and F2), which
+  the backend's contracts add in the same round. It is deleted when
+  `npm run generate:platform-contracts` reads the backend's merged head, and
+  its importers then read the generated names.
 - No Prisma, direct database, Supabase SDK, object-store SDK, browser secret,
   manual password login, or provider credential belongs here.
 - Tenancy state comes from typed Edge responses. Mutations have unique
@@ -48,10 +53,15 @@ page reuses:
 
 - **Flows by department**: the Flows list groups its cards under their
   department, the departments A–Z (`app/account/flows/departments.ts`).
-- **A choice is a drop-down**: a flow's `select` field and a list's filter
-  are the website's drop-down (`components/ui/Dropdown.tsx`) — a pill for a
-  filter, a field's box in a form, its panel glass — never a row of buttons
-  and never the browser's own `<select>`.
+- **A choice is a drop-down**: a flow's `select` field, a setup `select`
+  (`app/account/flows/SelectField.tsx`) and a list's filter are the website's
+  drop-down (`components/ui/Dropdown.tsx`) — a pill for a filter, a field's
+  box in a form, its panel glass — never a row of buttons and never the
+  browser's own `<select>`. A field that allows several (`multiple`) keeps
+  the panel open with a tick on each chosen row, and the closed box says
+  "Choose", "{first}, {second}" or "{n} chosen" (`lib/choices.ts`); it is
+  sent as the list chosen, and a required one left empty says "Choose at
+  least one." under it before anything is sent (`missingChoice`).
 - **A row that opens a page** is `PageRow` (`components/dashboard/PageRow.tsx`):
   a closed section's box and height, the arrow at its end — or, `boxed`
   false, a row of one card of divided rows (`LIST_CARD`): a list block's
@@ -222,6 +232,19 @@ that fails costs only itself: the page stays as it was, as the app's does. On Ap
 catalog cannot be read, the row loses those words and keeps its buttons. A
 decided row fades and folds away, its pill saying the decision, and the last
 one leaving goes to Activity; under reduced motion it leaves at once.
+
+A held run that offers changes (its form `questions{review}` with
+`decisions`, Round 21's F2) is a review, in the same component: each change
+a row, "{label} · {detail}", with Accept and Deny (Deny the danger pill) to
+a role the form names; Save review once every row has an answer, "Accept or
+deny each change." until then; a member reads the rows and "Only an owner or
+admin can review this." Saving sends every answer (`{decisions: [{id,
+decision}]}`) and the job always goes on; a refusal says "The review wasn't
+saved. Try again." On Approvals such a row says "Review {n} changes",
+opening the run, in place of the pair. Once saved, the step that waited
+says "{a} accepted · {d} denied" (`reviewTally`, `trackerRows`). A held run
+without changes is unchanged. The words are ICD-10 Code Check's words.md
+section 3, the app's too.
 
 A job that has documents and has ended or is held has a run package (backend
 ADR-0045; the platform says so, `RunDetail.packageAvailable`): View package, Download PDF and Download Excel replace Download

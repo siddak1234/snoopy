@@ -12,6 +12,10 @@ import {
 import { Tile } from "@/components/dashboard/Tile";
 import { TrackerItem } from "@/components/dashboard/TrackerItem";
 import type { Block } from "@/lib/automations";
+import {
+  PENDING_FORM_KINDS,
+  type PendingQuestionForm,
+} from "@/lib/pending-contract";
 import { fileViewHref } from "@/lib/run-files";
 import { CARD, ROW, SPACING } from "@/lib/spacing";
 import { notDrawn } from "./drawable";
@@ -36,13 +40,15 @@ import { Picture } from "./Picture";
  */
 
 export type BlockOf<K extends Block["type"]> = Extract<Block, { type: K }>;
-type QuestionForm = BlockOf<"questions">["form"];
+/** A question form: the generated one, with the `review` form of the pending contract (`lib/pending-contract.ts`) until the regeneration. */
+type QuestionForm = PendingQuestionForm;
 export type FormKind = QuestionForm["kind"];
 
 /**
  * The page's own forms, each drawn by the component that draws it today, with
  * the page's context and gates (decision 2). A form the page does not offer
- * draws nothing; a form this build does not know draws the fallback.
+ * draws nothing; a form this build does not know draws the fallback. A held
+ * run's review (`review`, Round 21's F2) is the pending contract's.
  */
 export type BlockForms = Partial<
   Record<FormKind, (form: QuestionForm) => ReactNode>
@@ -53,7 +59,13 @@ export type BlockContext = BlockPlace & { forms?: BlockForms };
 /** Draws a section's blocks: `BlockList`'s, handed down. */
 export type DrawBlocks = (blocks: readonly unknown[]) => ReactNode;
 
-const KNOWN_FORMS: readonly string[] = ["approval", "run", "item", "setup"];
+const KNOWN_FORMS: readonly string[] = [
+  "approval",
+  "run",
+  "item",
+  "setup",
+  ...PENDING_FORM_KINDS,
+];
 
 /** A chip: a badge block, a section's, a list row's. */
 export function Chip({ badge }: { badge: { text: string; tone?: unknown } }) {

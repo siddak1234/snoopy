@@ -5544,3 +5544,51 @@ test("keyboard journey — the owner's NFR-35 traversal, by hand", async ({
   await page.goto("/account");
   await page.pause();
 });
+
+test("Round 21 (F1) — Set up's drop-down of several: never the browser's select; Choose, then {first}, {second}, then {n} chosen; the panel stays open, a tick on each choice; left empty, Choose at least one. under it and nothing saved; saved as the list chosen (the platform round's F1; ICD-10 Code Check's words.md section 3)", async ({
+  page,
+}) => {
+  await fixtureControl("invoice-specialties");
+  const saves = async () =>
+    (await fixtureRead<{ invoiceSaves: unknown[] }>("counts")).invoiceSaves
+      .length;
+  await page.goto(`${FLOWS.invoice}/setup`);
+  const main = page.locator("main");
+  await expect(main.locator("select")).toHaveCount(0);
+  const trigger = main.getByRole("combobox", { name: "Specialties" });
+  await expect(trigger).toHaveText("Choose");
+  // Required and empty: said under the field, and nothing is sent.
+  const before = await saves();
+  await main.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(main.getByTestId("select-missing-specialties")).toHaveText(
+    "Choose at least one.",
+  );
+  expect(await saves()).toBe(before);
+  await trigger.click();
+  const menu = main.getByRole("listbox", { name: "Specialties" });
+  await expect(menu).toHaveAttribute("aria-multiselectable", "true");
+  await menu.getByRole("option", { name: "Nephrology" }).click();
+  await expect(menu).toBeVisible();
+  await expect(trigger).toHaveText("Nephrology");
+  await expect(main.getByTestId("select-missing-specialties")).toHaveCount(0);
+  await menu.getByRole("option", { name: "Cardiology" }).click();
+  await expect(trigger).toHaveText("Nephrology, Cardiology");
+  await menu.getByRole("option", { name: "Endocrinology" }).click();
+  await expect(trigger).toHaveText("3 chosen");
+  await expect(menu.getByRole("option", { selected: true })).toHaveCount(3);
+  // A second tap unticks it.
+  await menu.getByRole("option", { name: "Cardiology" }).click();
+  await expect(trigger).toHaveText("Nephrology, Endocrinology");
+  await expect(
+    menu.getByRole("option", { name: "Cardiology" }),
+  ).toHaveAttribute("aria-selected", "false");
+  await expectNoAxeViolations(page);
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await main.getByRole("button", { name: "Save", exact: true }).click();
+  await expect.poll(invoiceSettings).toEqual({
+    vendor: "none",
+    holdAboveAmount: 500,
+    specialties: ["Nephrology", "Endocrinology"],
+  });
+});

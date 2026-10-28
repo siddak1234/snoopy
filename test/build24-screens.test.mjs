@@ -3,6 +3,21 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { after, before, test } from "node:test";
 import { BLOCK_FIXTURES } from "../lib/generated/platform-contracts/block-fixtures.ts";
+import { offeredDecisions, reviewTally } from "../lib/pending-contract.ts";
+import {
+  ACCEPT,
+  ANSWER_EACH,
+  DENY,
+  REVIEW_MEMBER_NOTE,
+  REVIEW_NOT_SAVED,
+  SAVE_REVIEW,
+  changeLine,
+  rereadForApprovalForm,
+  reviewAnswers,
+  reviewChanges,
+  reviewedLine,
+  trackerRows,
+} from "../lib/run-progress.ts";
 import {
   elements,
   loadBlocks,
@@ -71,7 +86,11 @@ test("one Approve and Deny pair on both pages: Approve primary, Deny danger, App
   );
   assert.doesNotMatch(decision, /Reject|Working…/u);
   // Both wait while either saves.
-  assert.equal(decision.match(/disabled=\{pending\}/gu)?.length, 2);
+  const pair = decision.slice(
+    decision.indexOf("function DecisionPair"),
+    decision.indexOf("function MayNotDecide"),
+  );
+  assert.equal(pair.match(/disabled=\{pending\}/gu)?.length, 2);
   // The decision is sent from this one component (requests to join a team or
   // an organization are other things, with their own words).
   const deciders = runtimeFiles().filter((path) =>
@@ -101,7 +120,12 @@ test("a held job's page offers the decision: RunLive draws the platform's approv
   );
   assert.match(
     live,
-    /approval: \(form\) =>\s*form\.approvalId \? \(\s*<div data-testid="run-decision">\s*<ApprovalDecision\s+approvalId=\{form\.approvalId\}\s+canDecide=\{mayDecide\(role, form\.eligibleRoles\)\}\s+eligibleRoles=\{form\.eligibleRoles \?\? \[\]\}/u,
+    /const decisionForm = \(form: PendingQuestionForm\) =>\s*form\.approvalId \? \(\s*<div data-testid="run-decision">\s*<ApprovalDecision\s+approvalId=\{form\.approvalId\}\s+canDecide=\{mayDecide\(role, form\.eligibleRoles\)\}\s+eligibleRoles=\{form\.eligibleRoles \?\? \[\]\}/u,
+  );
+  // The approval form and a review's (Round 21's F2) are the one decision.
+  assert.match(
+    live,
+    /forms: \{ approval: decisionForm, review: decisionForm \}/u,
   );
   // One pair: no step of the details page draws its own.
   assert.equal(live.match(/<ApprovalDecision\b/gu)?.length, 1);
@@ -318,5 +342,165 @@ test("the package's inline route: the PDF asked for through lib/platform-server,
   assert.match(
     signed,
     /arrived \+= chunk\.byteLength;\s*if \(arrived > maximumBytes\)\s*controller\.error\(/u,
+  );
+});
+
+test("a held run's review: each change a row with Accept and Deny (Deny the danger pill), Save review once every row is answered, the answers sent as decisions; Approvals' card says Review {n} changes and opens the run; the steps say {a} accepted · {d} denied; a plain held run keeps Approve and Deny (Round 21, the platform round's F2; ICD-10 Code Check's words.md section 3)", () => {
+  // The words, word for word.
+  assert.equal(ACCEPT, "Accept");
+  assert.equal(DENY, "Deny");
+  assert.equal(SAVE_REVIEW, "Save review");
+  assert.equal(ANSWER_EACH, "Accept or deny each change.");
+  assert.equal(REVIEW_MEMBER_NOTE, "Only an owner or admin can review this.");
+  assert.equal(REVIEW_NOT_SAVED, "The review wasn't saved. Try again.");
+  assert.equal(reviewChanges(3), "Review 3 changes");
+  assert.equal(reviewedLine(2, 1), "2 accepted · 1 denied");
+  assert.equal(
+    changeLine({ label: "N18.4 → Remove", detail: "No stage code." }),
+    "N18.4 → Remove · No stage code.",
+  );
+  assert.equal(changeLine({ label: "Add Z99.2" }), "Add Z99.2");
+
+  // What an approval or a form offers; none is a plain approval.
+  assert.deepEqual(offeredDecisions({}), []);
+  assert.deepEqual(offeredDecisions(null), []);
+  assert.deepEqual(
+    offeredDecisions({
+      decisions: [
+        { id: "a", label: "A", detail: "why" },
+        { id: "b", label: "B" },
+        { id: 3, label: "bad" },
+      ],
+    }),
+    [
+      { id: "a", label: "A", detail: "why" },
+      { id: "b", label: "B" },
+    ],
+  );
+  // A saved review's count: approved, every row answered.
+  const offered = [
+    { id: "a", label: "A", decision: "accepted" },
+    { id: "b", label: "B", decision: "denied" },
+    { id: "c", label: "C", decision: "accepted" },
+  ];
+  assert.deepEqual(reviewTally({ status: "approved", decisions: offered }), {
+    accepted: 2,
+    denied: 1,
+  });
+  assert.equal(reviewTally({ status: "pending", decisions: offered }), null);
+  assert.equal(reviewTally({ status: "approved" }), null);
+  assert.equal(
+    reviewTally({ status: "approved", decisions: [{ id: "a", label: "A" }] }),
+    null,
+  );
+
+  // The answers the form posts, as the route takes them; anything else, nothing.
+  const answers = [
+    { id: "a", decision: "accepted" },
+    { id: "b", decision: "denied" },
+  ];
+  assert.deepEqual(reviewAnswers(JSON.stringify(answers)), answers);
+  for (const bad of [
+    undefined,
+    "not json",
+    "[]",
+    JSON.stringify([{ id: "a", decision: "approved" }]),
+    JSON.stringify([...answers, { id: "a", decision: "denied" }]),
+  ])
+    assert.equal(reviewAnswers(bad), null, String(bad));
+
+  // The steps: the step that waited says the count once the review is saved.
+  const pipeline = [
+    { id: "read", title: "Read" },
+    { id: "review", title: "Review" },
+    { id: "save", title: "Save" },
+  ];
+  const steps = [
+    {
+      stepId: "read",
+      outcome: "ok",
+      summary: "",
+      occurredAt: "2026-10-28T10:00:00Z",
+    },
+    {
+      stepId: "review",
+      outcome: "held",
+      summary: "",
+      heldReason: "2 changes need your review.",
+      occurredAt: "2026-10-28T10:01:00Z",
+    },
+  ];
+  const clock = () => "10:01 AM";
+  const rows = (status, review) =>
+    trackerRows(steps, pipeline, undefined, { status }, clock, pipeline, {
+      review,
+    }).map((row) => row.sub);
+  assert.deepEqual(rows("running", { accepted: 1, denied: 1 }), [
+    "Done · 10:01 AM",
+    "1 accepted · 1 denied",
+    "Working…",
+  ]);
+  assert.deepEqual(
+    rows("held", null)[1],
+    "Waiting for approval: 2 changes need your review.",
+  );
+  assert.deepEqual(rows("running", null)[1], "Done · 10:01 AM");
+
+  // A held run's review form is read again for, as the approval form is.
+  assert.equal(
+    rereadForApprovalForm(
+      { status: "held" },
+      [{ type: "questions", form: { kind: "review" } }],
+      0,
+    ),
+    false,
+  );
+
+  // The run's page: the review, in the one decision component.
+  const decision = code(read(DECISION));
+  assert.match(
+    decision,
+    /if \(decisions\.length > 0\)\s*return \(\s*<ReviewDecisions/u,
+  );
+  const review = decision.slice(
+    decision.indexOf("function ReviewDecisions"),
+    decision.indexOf("function keepLeaving"),
+  );
+  assert.match(
+    review,
+    /variant=\{answer === "accepted" \? "secondary" : "danger"\}[\s\S]*?\{DENY\}/u,
+  );
+  assert.match(review, /aria-pressed=\{answer === "accepted"\}/u);
+  assert.match(review, /disabled=\{!answered \|\| pending\}/u);
+  assert.match(
+    review,
+    /data\.append\(\s*"decisions",\s*JSON\.stringify\(\s*decisions\.map\(\(change\) => \(\{\s*id: change\.id,\s*decision: answers\[change\.id\],/u,
+  );
+  assert.match(review, /role === "member" \? \(/u);
+  assert.match(review, /if \(!result\.ok\) setRefused\(true\);/u);
+  // Approvals' card: Review {n} changes, to the run, for one who may decide.
+  assert.match(
+    decision,
+    /\{changes > 0 && canDecide \? \(\s*<Button\s+href=\{`\/account\/runs\/\$\{encodeURIComponent\(approval\.runId\)\}`\}[\s\S]*?\{reviewChanges\(changes\)\}/u,
+  );
+  // The action sends the review's answers, else the decision as before.
+  const actions = code(read("app/account/flows/actions.ts"));
+  assert.match(
+    actions,
+    /if \(formData\.has\("decisions"\)\) \{\s*const decisions = reviewAnswers\(formData\.get\("decisions"\)\);\s*return decisions \? \{ decisions \} : null;\s*\}/u,
+  );
+  assert.match(
+    actions,
+    /const body = decisionBody\(formData\);\s*if \(!body\) return \{ ok: false, error: "Unsupported decision" \};/u,
+  );
+  // The steps get the count from the job's newest approval.
+  assert.match(
+    code(read(LIVE)),
+    /const review = reviewTally\(newestApproval\(run\.id, listed\)\);/u,
+  );
+  // An older build knows the review form: never the fallback.
+  assert.match(
+    code(read("components/blocks/renderers.tsx")),
+    /const KNOWN_FORMS: readonly string\[\] = \[[^\]]*\.\.\.PENDING_FORM_KINDS,?\s*\];/u,
   );
 });
