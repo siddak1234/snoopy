@@ -10,7 +10,7 @@ import {
  * `sections[].type`, "section"), that value (Round 21, design D2.6):
  * `BLOCK_REQUIRED`, generated from
  * the contract's `Block` union, never typed here. A known type with a missing
- * field would throw in its renderer, and the item's file page is drawn on the
+ * field would throw in its renderer, and every page's first draw is on the
  * server, where no error boundary catches; so `BlockList` checks first and
  * draws `Fallback` in that block's place, and the next block still draws.
  * Uses no hooks. Returns `null` when the block can be drawn, else the first
@@ -74,11 +74,11 @@ const logged = new Set<string>();
  * and the missing field's name or the caught error — never the block's words
  * or values, which are the customer's. The platform checks every block at
  * its callback, so a line here means this build and the platform disagree.
- * On the item's file page it is the server's log (the Vercel project's
- * runtime logs), once each draw, which is once a request; on a live page,
- * that browser's console, once for each type and reason until the page is
- * loaded again, though the live pages draw again at each poll and React's
- * StrictMode draws twice.
+ * A page's first draw, on the server, logs to the Vercel project `snoopy`'s
+ * runtime logs at each request (the file, run and item pages). A boundary's
+ * catch, and a redraw in the browser, log only to that viewer's console, once
+ * for each type and reason until the page is loaded again, though the live
+ * pages draw again at each poll and React's StrictMode draws twice.
  */
 export function notDrawn(type: string, error: unknown): void {
   if (typeof window !== "undefined") {

@@ -129,7 +129,7 @@ function Blocks({
       {blocks.map((block, index) => (
         // A block that draws nothing (a form the page does not offer) takes no gap.
         <div key={index} className={`${gapAbove(blocks, index)} empty:hidden`}>
-          <BlockBoundary type={typeOf(block)}>
+          <BlockBoundary type={typeOf(block)} block={block}>
             {drawBlock(block, context, inner)}
           </BlockBoundary>
         </div>
@@ -143,11 +143,13 @@ function Blocks({
  * as sent and in order, by its type's renderer; a block, form or target this
  * build does not know drawn as the decision says (`Fallback`, no press). A
  * block missing a required field, or whose renderer throws in the browser
- * (`BlockBoundary`), is the fallback too, and the next block still draws. An
+ * (`BlockBoundary`), is the fallback too, and the next block still draws; a
+ * re-read that sends another block in a caught one's place draws it. An
  * answer with no blocks — a platform rolled back, or a flow it could not
- * read — draws the fallback alone, and a body that is not a list is the
- * fallback too, logged as `unknown`, `not a list`. Uses no hooks, so a server-drawn page
- * draws it as a live one does.
+ * read — draws the fallback alone, logged as `unknown`, `no blocks`, and a
+ * body that is not a list is the fallback too, logged as `unknown`,
+ * `not a list`. Uses no hooks, so a server-drawn page draws it as a live one
+ * does.
  */
 export function BlockList({
   blocks,
@@ -160,8 +162,8 @@ export function BlockList({
 }) {
   if (!Array.isArray(blocks)) {
     // Absent (`undefined`) is a platform rolled back, or a flow it could not
-    // read, and is not logged; anything else is a body this build cannot read.
-    if (blocks !== undefined) notDrawn("unknown", "not a list");
+    // read (`no blocks`); anything else is a body this build cannot read.
+    notDrawn("unknown", blocks === undefined ? "no blocks" : "not a list");
     return (
       <div data-testid={testId}>
         <Fallback />

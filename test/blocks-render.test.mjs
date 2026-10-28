@@ -941,14 +941,63 @@ test("a block whose renderer throws in the browser: its boundary draws the fallb
   const source = read("components/blocks/BlockList.tsx");
   assert.match(
     source,
-    /<BlockBoundary type=\{typeOf\(block\)\}>\s*\{drawBlock\(block, context, inner\)\}\s*<\/BlockBoundary>/u,
+    /<BlockBoundary type=\{typeOf\(block\)\} block=\{block\}>\s*\{drawBlock\(block, context, inner\)\}\s*<\/BlockBoundary>/u,
   );
   // Nested blocks are drawn by the same `Blocks`, so each is wrapped too.
   assert.match(source, /<Blocks blocks=\{within\} context=\{context\} \/>/u);
   assert.match(read(ENTRY), /^"use client";/u);
 });
 
-test("every block fallback is logged: an unknown form, a chart with no points, a group entry not a section and a body that is not a list; an absent body is not (Round 21, D2.6)", (t) => {
+test("a caught block is reset by a re-read that sends another block in its place: the new block draws; the same block again stays the fallback (Round 21, D2.6)", async (t) => {
+  const ENTRY = "components/blocks/BlockBoundary.tsx";
+  const { modules, cleanup } = await loadModules([ENTRY]);
+  try {
+    const { BlockBoundary } = modules[ENTRY];
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    t.mock.method(console, "error", () => {});
+    const broken = { type: "chart", kind: "bar", title: "Scores", points: [] };
+    const fixed = { ...broken, points: [{ label: "A", value: 1 }] };
+    // React's own steps, in its order: mount, catch, then each new read's props.
+    const props = (block, words) => ({
+      type: "chart",
+      block,
+      children: createElement("p", null, words),
+    });
+    const boundary = new BlockBoundary(props(broken, "Broken."));
+    const step = (next) => {
+      const derived = BlockBoundary.getDerivedStateFromProps(
+        next,
+        boundary.state,
+      );
+      boundary.props = next;
+      if (derived) boundary.state = { ...boundary.state, ...derived };
+      return visibleWords(renderToStaticMarkup(boundary.render()));
+    };
+    boundary.state = {
+      ...boundary.state,
+      ...BlockBoundary.getDerivedStateFromError(new TypeError("x")),
+    };
+    assert.deepEqual(step(props(broken, "Broken.")), [blocks.FALLBACK]);
+    assert.deepEqual(
+      step(props(structuredClone(broken), "Broken.")),
+      [blocks.FALLBACK],
+      "the same block, read again, stays the fallback",
+    );
+    assert.deepEqual(step(props(fixed, "Drawn.")), ["Drawn."]);
+    assert.deepEqual(step(props({ type: "text", text: "Other." }, "Other.")), [
+      "Other.",
+    ]);
+  } finally {
+    cleanup();
+  }
+  assert.match(
+    read("components/blocks/BlockList.tsx"),
+    /<BlockBoundary type=\{typeOf\(block\)\} block=\{block\}>/u,
+  );
+});
+
+test("every block fallback is logged: an unknown form, a chart with no points, a group entry not a section, an absent body and a body that is not a list (Round 21, D2.6)", (t) => {
   const error = t.mock.method(console, "error", () => {});
   const cases = [
     [
@@ -977,6 +1026,7 @@ test("every block fallback is logged: an unknown form, a chart with no points, a
       ],
       { type: "group", error: "sections[0].type" },
     ],
+    [undefined, { type: "unknown", error: "no blocks" }],
     [null, { type: "unknown", error: "not a list" }],
     [{ blocks: [] }, { type: "unknown", error: "not a list" }],
   ];
@@ -985,7 +1035,7 @@ test("every block fallback is logged: an unknown form, a chart with no points, a
     assert.deepEqual(
       visibleWords(draw(list)),
       [blocks.FALLBACK],
-      JSON.stringify(list),
+      String(JSON.stringify(list)),
     );
     assert.deepEqual(notDrawnCalls(error.mock.calls), [logged]);
     assert.ok(
@@ -993,9 +1043,6 @@ test("every block fallback is logged: an unknown form, a chart with no points, a
       "no block value is logged",
     );
   }
-  error.mock.resetCalls();
-  assert.deepEqual(visibleWords(draw(undefined)), [blocks.FALLBACK]);
-  assert.deepEqual(notDrawnCalls(error.mock.calls), [], "absent, not logged");
 });
 
 test("a group's own guard: an entry not a section, drawn by GroupCard itself, is the fallback logged as sections[n].type (Round 21, D2.6)", async (t) => {

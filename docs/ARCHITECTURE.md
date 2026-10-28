@@ -112,20 +112,23 @@ page reuses:
   next block still draws (Round 21, design D2.6): `BlockList` checks it before drawing
   (`components/blocks/drawable.ts`, reading `BLOCK_REQUIRED` in
   [`block-required.ts`](../lib/generated/platform-contracts/block-required.ts),
-  generated from `automations.yaml`'s `Block` union), so the item's file
-  page, drawn on the server where no boundary catches, keeps its page; and
-  each block is wrapped in `BlockBoundary`, which catches a renderer that
-  throws on the pages drawn in the browser. Every block fallback — those
-  two, an unknown type, an unknown form (`form.kind`), a chart with no points, a
-  group entry not a section and a body that is not a list (`unknown`,
-  `not a list`; an absent body is not logged) — logs
-  `console.error("block not drawn", { type, error })` (`notDrawn`): the
+  generated from `automations.yaml`'s `Block` union), so a page's first
+  draw, on the server where no boundary catches, keeps its page (the file,
+  run and item pages; RunLive and ItemLive are first drawn there with
+  `initial`); and each block is wrapped in `BlockBoundary`, which catches a
+  renderer that throws in a redraw in the browser, and draws a re-read's
+  other block in a caught one's place (`contentKey`). Every block fallback
+  — those two, an unknown type, an unknown form (`form.kind`), a chart with
+  no points, a group entry not a section, an absent body (`unknown`,
+  `no blocks`) and a body that is not a list (`unknown`, `not a list`) —
+  logs `console.error("block not drawn", { type, error })` (`notDrawn`): the
   block's type (or `unknown`) and the missing field's name or the caught
-  error, never a value. The file page's line is in the Vercel project
-  `snoopy`'s runtime logs, at each draw (once a request); a live page's, in
-  that viewer's browser console, once for each type and reason until the
-  page is loaded again, though it draws again at each poll. The site has no
-  other logging.
+  error, never a value. A page's first draw, on the server, logs to the
+  Vercel project `snoopy`'s runtime logs at each request (the file, run and
+  item pages). A boundary's catch, and a redraw in the browser, log only to
+  that viewer's console, once for each type and reason until the page is
+  loaded again, though the live pages draw again at each poll. The site has
+  no other logging.
   Since block set 2, thirteen types: an `image` is one of the run's own
   files drawn in the page (`Picture`, read once from its file page's view
   route through `siteFileBlob`; a JPEG or PNG, at most its frame's height
