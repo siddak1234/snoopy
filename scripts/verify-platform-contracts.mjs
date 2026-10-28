@@ -10,6 +10,7 @@ const outputs = [
   join(root, "lib/generated/platform-contracts/connections.d.ts"),
   join(root, "lib/generated/platform-contracts/block-fixtures.ts"),
   join(root, "lib/generated/platform-contracts/block-rules.ts"),
+  join(root, "lib/generated/platform-contracts/block-required.ts"),
 ];
 
 for (const output of outputs) {

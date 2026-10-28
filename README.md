@@ -139,7 +139,9 @@ form, searched, and past 25 sorted and paged; the upload card's drop-down, "Othe
 item's runs ranked in one card of divided rows, each as tall as a closed section's bar, each score in
 its verdict's colour with its word as a chip, searched, its tiles and
 its file page — the file in place, its route for this site's pages alone,
-Download to its signed link, Share, then its reading's sections; a run
+Download to its signed link, Share, then its reading's sections, and a
+reading's table sent without its rows drawn as the fallback with the
+sections after it, never the error page (Round 21, D2.6); a run
 headed by its title and its score in its verdict's colour with View {file}
 and its file page (a file no longer linked framed by this site's route), its
 sections under "{Run word} details" and its Run details page — every body
@@ -177,7 +179,7 @@ secret provisioning belongs to the deployment configuration round, not here.
 | `npm run test:contracts` | Public-contract and boundary behavior tests, and the common kit's own (`scripts/kit/kit.test.mjs`) |
 | `npm run check:docs` | Each changed area's doc changed with it, and each fact in one place (`docs/docs-map.json`) |
 | `npm run map` | Rebuild `docs/MAP.md` from the tree; `-- --check` fails when it is stale |
-| `npm run generate:platform-contracts` | Regenerate the typed client from `../snoopy-backend`'s published contracts, its block fixtures and its block rules (`block-rules.ts`: the words, the spacing table and the search and sort cases) |
+| `npm run generate:platform-contracts` | Regenerate the typed client from `../snoopy-backend`'s published contracts, its block fixtures, its block rules (`block-rules.ts`: the words, the spacing table and the search and sort cases) and each block type's required fields (`block-required.ts`) |
 | `npm run verify:platform-contracts` | Report a generated type that differs from its contract; changes nothing |
 | `npm run audit:boundaries` | Reject browser secrets, direct DB access, manual fetches, and raw hex colours |
 | `npm run test:browser` | Public accessibility in Chromium and Firefox (and WebKit in CI), and Chromium's visual baselines |

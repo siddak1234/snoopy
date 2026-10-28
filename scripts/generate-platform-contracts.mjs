@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseYaml } from "@redocly/openapi-core";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // SNOOPY_BACKEND_ROOT points at another checkout; scripts/verify.mjs and the
@@ -150,6 +151,88 @@ writeFileSync(
     `export const BLOCK_SORT = ${JSON.stringify(rules.sort)} as const;\n`,
 );
 execFileSync(prettier, [rulesOutput, "--write"], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+// The blocks' required fields (Round 21, design D2.6): for each block type,
+// each field its schema requires and that field's basic JSON type, and the
+// same for each array's items and each object's own required fields, read
+// from `automations.yaml`'s `Block` union — never typed here. A block held in
+// a block (a section's `blocks`) is checked when it is drawn, so it is only an
+// object here. `components/blocks/drawable.ts` reads it to draw `Fallback` in
+// place of a block the platform sent without a required field, on a server
+// render as in a browser. Headed by the contract's sha256, as the types are.
+const automationsInput = join(backendRoot, "docs/openapi/automations.yaml");
+const automationsBytes = readFileSync(automationsInput);
+// `parseYaml` is openapi-typescript's own reader: its dependency, installed with it.
+const schemas = parseYaml(automationsBytes.toString("utf8")).components.schemas;
+const BASIC = new Map([
+  ["string", "string"],
+  ["integer", "number"],
+  ["number", "number"],
+  ["boolean", "boolean"],
+  ["object", "object"],
+  ["array", "array"],
+  ["null", "null"],
+]);
+function basic(name, where) {
+  const kind = BASIC.get(name);
+  if (!kind) throw new Error(`Unsupported type ${name} at ${where}`);
+  return kind;
+}
+function shapeOf(node, where) {
+  if (node.$ref) {
+    const name = node.$ref.replace("#/components/schemas/", "");
+    if (name === "Block") return { kinds: ["object"] };
+    if (!schemas[name]) throw new Error(`Unknown schema ${name} at ${where}`);
+    return shapeOf(schemas[name], `${where} (${name})`);
+  }
+  const kinds =
+    node.const !== undefined
+      ? [basic(typeof node.const, where)]
+      : Array.isArray(node.type)
+        ? node.type.map((name) => basic(name, where))
+        : node.type
+          ? [basic(node.type, where)]
+          : null;
+  if (!kinds) throw new Error(`No type at ${where}`);
+  const shape = { kinds };
+  if (kinds.includes("object") && node.required?.length) {
+    shape.fields = Object.fromEntries(
+      node.required.map((field) => [
+        field,
+        shapeOf(node.properties[field], `${where}.${field}`),
+      ]),
+    );
+  }
+  if (kinds.includes("array") && node.items)
+    shape.items = shapeOf(node.items, `${where}[]`);
+  return shape;
+}
+const blockRequired = Object.fromEntries(
+  schemas.Block.oneOf.map((variant) => {
+    const type = variant.properties.type.const;
+    const { fields } = shapeOf(variant, `Block ${type}`);
+    return [type, fields];
+  }),
+);
+const requiredOutput = join(
+  root,
+  "lib/generated/platform-contracts/block-required.ts",
+);
+writeFileSync(
+  requiredOutput,
+  `// From snoopy-backend ${relative(backendRoot, automationsInput)}, sha256 ${createHash("sha256").update(automationsBytes).digest("hex")}.\n` +
+    "// Regenerate with `npm run generate:platform-contracts`; never edit by hand.\n" +
+    '/** A JSON value\'s basic type, as `typeof` names it, with "array" and "null" told apart. */\n' +
+    'export type BlockKind = "string" | "number" | "boolean" | "object" | "array" | "null";\n\n' +
+    "/** A required field: the basic types it may have; an object's own required fields; an array's items. */\n" +
+    "export type BlockField = {\n  kinds: readonly BlockKind[];\n  fields?: { readonly [name: string]: BlockField };\n  items?: BlockField;\n};\n\n" +
+    "/** Each block type's required fields, `type` among them (the `Block` union's `required`). */\n" +
+    `export const BLOCK_REQUIRED: { readonly [type: string]: { readonly [name: string]: BlockField } } = ${JSON.stringify(blockRequired)};\n`,
+);
+execFileSync(prettier, [requiredOutput, "--write"], {
   cwd: root,
   stdio: "inherit",
 });

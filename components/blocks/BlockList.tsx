@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import type { Block } from "@/lib/automations";
 import { SPACING } from "@/lib/spacing";
+import { BlockBoundary } from "./BlockBoundary";
+import { drawable, notDrawn } from "./drawable";
 import { Fallback } from "./Fallback";
 import { GroupCard } from "./GroupCard";
 import { Paged } from "./Paged";
@@ -75,21 +77,38 @@ function gapAbove(blocks: readonly unknown[], index: number): string {
   return isLabel(blocks[index - 1]) ? SPACING.title.top : SPACING.group.top;
 }
 
-/** One block by its type's renderer; a type this build does not know, the fallback. */
+/** A block's `type`, or `unknown` when it has none: what a fallback is logged with. */
+const typeOf = (block: unknown): string => {
+  const type =
+    typeof block === "object" && block !== null
+      ? (block as { type?: unknown }).type
+      : undefined;
+  return typeof type === "string" ? type : "unknown";
+};
+
+/** The fallback in a block's place, logged with its type and why (`notDrawn`). */
+function notShown(type: string, error: string): ReactNode {
+  notDrawn(type, error);
+  return <Fallback />;
+}
+
+/**
+ * One block by its type's renderer; a type this build does not know, or a
+ * known one without a field its schema requires (`drawable`, Round 21), the
+ * fallback — checked before drawing, so a server-drawn page is kept too.
+ */
 function drawBlock(
   block: unknown,
   context: BlockContext,
   inner: DrawBlocks,
 ): ReactNode {
-  const type =
-    typeof block === "object" && block !== null
-      ? (block as { type?: unknown }).type
-      : undefined;
-  const render =
-    typeof type === "string" && Object.hasOwn(RENDERERS, type)
-      ? (RENDERERS[type as Block["type"]] as Renderer<Block["type"]>)
-      : undefined;
-  if (!render) return <Fallback />;
+  const type = typeOf(block);
+  const render = Object.hasOwn(RENDERERS, type)
+    ? (RENDERERS[type as Block["type"]] as Renderer<Block["type"]>)
+    : undefined;
+  if (!render) return notShown(type, "unknown type");
+  const missing = drawable(type, block as object);
+  if (missing) return notShown(type, missing);
   return render(block as Block, context, inner);
 }
 
@@ -110,7 +129,9 @@ function Blocks({
       {blocks.map((block, index) => (
         // A block that draws nothing (a form the page does not offer) takes no gap.
         <div key={index} className={`${gapAbove(blocks, index)} empty:hidden`}>
-          {drawBlock(block, context, inner)}
+          <BlockBoundary type={typeOf(block)}>
+            {drawBlock(block, context, inner)}
+          </BlockBoundary>
         </div>
       ))}
     </div>
@@ -120,7 +141,9 @@ function Blocks({
 /**
  * A page body as the platform sent it (backend ADR-0048): every block drawn
  * as sent and in order, by its type's renderer; a block, form or target this
- * build does not know drawn as the decision says (`Fallback`, no press). An
+ * build does not know drawn as the decision says (`Fallback`, no press). A
+ * block missing a required field, or whose renderer throws in the browser
+ * (`BlockBoundary`), is the fallback too, and the next block still draws. An
  * answer with no blocks — a platform rolled back, or a flow it could not
  * read — draws the fallback alone. Uses no hooks, so a server-drawn page
  * draws it as a live one does.

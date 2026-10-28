@@ -30,7 +30,9 @@ this origin holds.
   fixtures' bytes in filename order — the rule both clients share), and its
   block rules the same way (`block-rules.ts`: `BLOCK_WORDS`,
   `BLOCK_SPACING` and the search and sort cases, its own sha256 over
-  `fixtures/block-rules/`).
+  `fixtures/block-rules/`), and each block type's required fields
+  (`block-required.ts`: `BLOCK_REQUIRED`, from `automations.yaml`, headed
+  by its sha256).
   A web change cannot invent a request, response, cursor interpretation, billing
   flow, invite flow, or OAuth-provider policy.
 - No Prisma, direct database, Supabase SDK, object-store SDK, browser secret,
@@ -104,6 +106,20 @@ page reuses:
   build does not know draws `FALLBACK` (`components/blocks/Fallback.tsx`),
   an unknown tone neutral, an unknown step state the "unknown" look, an
   unknown target no press; an answer with no blocks, the fallback alone.
+  A known type without a field its schema requires, or of another basic
+  type, is the fallback in that block's place, and the next block still
+  draws (Round 21, design D2.6): `BlockList` checks it before drawing
+  (`components/blocks/drawable.ts`, reading `BLOCK_REQUIRED` in
+  [`block-required.ts`](../lib/generated/platform-contracts/block-required.ts),
+  generated from `automations.yaml`'s `Block` union), so the item's file
+  page, drawn on the server where no boundary catches, keeps its page; and
+  each block is wrapped in `BlockBoundary`, which catches a renderer that
+  throws on the pages drawn in the browser. Every such fallback logs one
+  `console.error("block not drawn", { type, error })`: the block's type
+  (or `unknown`) and the missing field's name or the caught error, never a
+  value. The file page's line is in the Vercel project `snoopy`'s runtime
+  logs; a live page's, in that viewer's browser console. The site has no
+  other logging.
   Since block set 2, thirteen types: an `image` is one of the run's own
   files drawn in the page (`Picture`, read once from its file page's view
   route through `siteFileBlob`; a JPEG or PNG, at most its frame's height
