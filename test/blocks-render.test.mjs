@@ -871,8 +871,13 @@ test("every platform fixture body passes the field check: nothing is logged but 
     error.mock.resetCalls();
     draw(list);
     const logged = notDrawnCalls(error.mock.calls);
+    // Its unknown parts: a type, or a form (the `unknown-form` fixture).
     assert.ok(
-      logged.every((entry) => entry.error === "unknown type"),
+      logged.every(
+        (entry) =>
+          entry.error === "unknown type" ||
+          (entry.type === "questions" && entry.error === "form.kind"),
+      ),
       `${name}: ${JSON.stringify(logged)}`,
     );
   }
@@ -941,4 +946,114 @@ test("a block whose renderer throws in the browser: its boundary draws the fallb
   // Nested blocks are drawn by the same `Blocks`, so each is wrapped too.
   assert.match(source, /<Blocks blocks=\{within\} context=\{context\} \/>/u);
   assert.match(read(ENTRY), /^"use client";/u);
+});
+
+test("every block fallback is logged: an unknown form, a chart with no points, a group entry not a section and a body that is not a list; an absent body is not (Round 21, D2.6)", (t) => {
+  const error = t.mock.method(console, "error", () => {});
+  const cases = [
+    [
+      [{ type: "questions", form: { kind: "survey" } }],
+      { type: "questions", error: "form.kind" },
+    ],
+    [
+      [
+        {
+          type: "chart",
+          kind: "bar",
+          title: "Scores",
+          alt: "Scores",
+          points: [],
+        },
+      ],
+      { type: "chart", error: "points" },
+    ],
+    [
+      [
+        {
+          type: "group",
+          title: "Details",
+          sections: [{ type: "text", title: "Private", blocks: [] }],
+        },
+      ],
+      { type: "group", error: "sections[0].type" },
+    ],
+    [null, { type: "unknown", error: "not a list" }],
+    [{ blocks: [] }, { type: "unknown", error: "not a list" }],
+  ];
+  for (const [list, logged] of cases) {
+    error.mock.resetCalls();
+    assert.deepEqual(
+      visibleWords(draw(list)),
+      [blocks.FALLBACK],
+      JSON.stringify(list),
+    );
+    assert.deepEqual(notDrawnCalls(error.mock.calls), [logged]);
+    assert.ok(
+      !JSON.stringify(error.mock.calls).includes("Private"),
+      "no block value is logged",
+    );
+  }
+  error.mock.resetCalls();
+  assert.deepEqual(visibleWords(draw(undefined)), [blocks.FALLBACK]);
+  assert.deepEqual(notDrawnCalls(error.mock.calls), [], "absent, not logged");
+});
+
+test("a group's own guard: an entry not a section, drawn by GroupCard itself, is the fallback logged as sections[n].type (Round 21, D2.6)", async (t) => {
+  const ENTRY = "components/blocks/GroupCard.tsx";
+  const { modules, cleanup } = await loadModules([ENTRY]);
+  try {
+    const { GroupCard } = modules[ENTRY];
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const error = t.mock.method(console, "error", () => {});
+    const markup = renderToStaticMarkup(
+      GroupCard({
+        block: {
+          type: "group",
+          title: "Details",
+          sections: [{ type: "section", title: "Kept", blocks: [] }, "x"],
+        },
+        inner: () => null,
+      }),
+    );
+    assert.deepEqual(visibleWords(markup), [
+      "Details",
+      "Kept",
+      blocks.FALLBACK,
+    ]);
+    assert.deepEqual(notDrawnCalls(error.mock.calls), [
+      { type: "group", error: "sections[1].type" },
+    ]);
+  } finally {
+    cleanup();
+  }
+});
+
+test("in a browser a fallback is logged once for each type and reason until the page loads again, though the page draws again at each poll; on the server, at each draw (Round 21, D2.6)", async (t) => {
+  const fresh = await loadBlocks();
+  const hadWindow = Object.hasOwn(globalThis, "window");
+  try {
+    const error = t.mock.method(console, "error", () => {});
+    const broken = [{ type: "table", columns: [] }];
+    fresh.render(broken);
+    fresh.render(broken);
+    assert.equal(
+      notDrawnCalls(error.mock.calls).length,
+      2,
+      "server: each draw",
+    );
+    error.mock.resetCalls();
+    globalThis.window = {};
+    fresh.render(broken);
+    fresh.render(broken);
+    fresh.render([{ type: "text" }]);
+    fresh.render([{ type: "text" }, { type: "badge" }]);
+    assert.deepEqual(notDrawnCalls(error.mock.calls), [
+      { type: "table", error: "rows" },
+      { type: "text", error: "text" },
+      { type: "badge", error: "text" },
+    ]);
+  } finally {
+    if (!hadWindow) delete globalThis.window;
+    fresh.cleanup();
+  }
 });

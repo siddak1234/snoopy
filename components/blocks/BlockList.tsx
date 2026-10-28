@@ -145,7 +145,8 @@ function Blocks({
  * block missing a required field, or whose renderer throws in the browser
  * (`BlockBoundary`), is the fallback too, and the next block still draws. An
  * answer with no blocks — a platform rolled back, or a flow it could not
- * read — draws the fallback alone. Uses no hooks, so a server-drawn page
+ * read — draws the fallback alone, and a body that is not a list is the
+ * fallback too, logged as `unknown`, `not a list`. Uses no hooks, so a server-drawn page
  * draws it as a live one does.
  */
 export function BlockList({
@@ -157,11 +158,15 @@ export function BlockList({
   context?: BlockContext;
   testId?: string;
 }) {
-  if (!Array.isArray(blocks))
+  if (!Array.isArray(blocks)) {
+    // Absent (`undefined`) is a platform rolled back, or a flow it could not
+    // read, and is not logged; anything else is a body this build cannot read.
+    if (blocks !== undefined) notDrawn("unknown", "not a list");
     return (
       <div data-testid={testId}>
         <Fallback />
       </div>
     );
+  }
   return <Blocks blocks={blocks} context={context} testId={testId} />;
 }
