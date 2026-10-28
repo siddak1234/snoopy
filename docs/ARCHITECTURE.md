@@ -30,7 +30,9 @@ this origin holds.
   fixtures' bytes in filename order — the rule both clients share), and its
   block rules the same way (`block-rules.ts`: `BLOCK_WORDS`,
   `BLOCK_SPACING` and the search and sort cases, its own sha256 over
-  `fixtures/block-rules/`).
+  `fixtures/block-rules/`), and each block type's required fields
+  (`block-required.ts`: `BLOCK_REQUIRED`, from `automations.yaml`, headed
+  by its sha256).
   A web change cannot invent a request, response, cursor interpretation, billing
   flow, invite flow, or OAuth-provider policy.
 - No Prisma, direct database, Supabase SDK, object-store SDK, browser secret,
@@ -104,6 +106,29 @@ page reuses:
   build does not know draws `FALLBACK` (`components/blocks/Fallback.tsx`),
   an unknown tone neutral, an unknown step state the "unknown" look, an
   unknown target no press; an answer with no blocks, the fallback alone.
+  A known type without a field its schema requires, or of another basic
+  type, or of another value where the schema gives a `const` (a group's
+  entry not a `section`), is the fallback in that block's place, and the
+  next block still draws (Round 21, design D2.6): `BlockList` checks it before drawing
+  (`components/blocks/drawable.ts`, reading `BLOCK_REQUIRED` in
+  [`block-required.ts`](../lib/generated/platform-contracts/block-required.ts),
+  generated from `automations.yaml`'s `Block` union), so a page's first
+  draw, on the server where no boundary catches, keeps its page (the file,
+  run and item pages; RunLive and ItemLive are first drawn there with
+  `initial`); and each block is wrapped in `BlockBoundary`, which catches a
+  renderer that throws in a redraw in the browser, and draws a re-read's
+  other block in a caught one's place (`contentKey`). Every block fallback
+  — those two, an unknown type, an unknown form (`form.kind`), a chart with
+  no points, a group entry not a section, an absent body (`unknown`,
+  `no blocks`) and a body that is not a list (`unknown`, `not a list`) —
+  logs `console.error("block not drawn", { type, error })` (`notDrawn`): the
+  block's type (or `unknown`) and the missing field's name or the caught
+  error, never a value. A page's first draw, on the server, logs to the
+  Vercel project `snoopy`'s runtime logs at each request (the file, run and
+  item pages). A boundary's catch, and a redraw in the browser, log only to
+  that viewer's console, once for each type and reason until the page is
+  loaded again, though the live pages draw again at each poll. The site has
+  no other logging.
   Since block set 2, thirteen types: an `image` is one of the run's own
   files drawn in the page (`Picture`, read once from its file page's view
   route through `siteFileBlob`; a JPEG or PNG, at most its frame's height

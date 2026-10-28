@@ -397,6 +397,9 @@ function initialState() {
     // website sent to make an item or start a run of one.
     itemsFlow: false,
     itemsFailing: false,
+    // Round 21 (design D2.6): an item's reading led by a table the platform
+    // sent without its rows, as a client older or newer than it might meet.
+    itemReadingBroken: false,
     items: [] as Automations["Item"][],
     itemChoices: [] as string[],
     itemRuns: new Map<string, Automations["Run"][]>(),
@@ -2220,8 +2223,18 @@ function itemPageBody(answer: Json): Json {
     declared: itemsDeclared,
     runFile: itemsRunInput.some((field) => field.control === "artifact"),
   });
+  const reading =
+    page.reading && state.itemReadingBroken
+      ? [
+          {
+            type: "table",
+            columns: [{ title: "Field" }, { title: "Value" }],
+          } as unknown as Block,
+          ...page.reading,
+        ]
+      : page.reading;
   return {
-    item: page.reading ? { ...item, blocks: page.reading } : item,
+    item: reading ? { ...item, blocks: reading } : item,
     runs: [],
     blocks: page.blocks,
     going: page.going,
@@ -2628,6 +2641,11 @@ const server = createServer(
         state.items = fixtureItems();
         state.itemChoices = ["Coastal", "Inland"];
         state.itemRuns = new Map([[readyItemId, readyItemRuns()]]);
+      },
+      // Round 21 (design D2.6): the ready item's reading led by a table
+      // with no rows — a block missing a field its schema requires.
+      "/__fixture/item-reading-broken": () => {
+        state.itemReadingBroken = true;
       },
       // The flow's item list, unanswered (503).
       "/__fixture/items-failing": () => {

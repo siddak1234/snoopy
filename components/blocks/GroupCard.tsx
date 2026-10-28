@@ -1,6 +1,7 @@
 import { SectionTitle } from "@/components/dashboard/SectionTitle";
 import { LIST_CARD } from "@/components/dashboard/SectionRows";
 import { SPACING } from "@/lib/spacing";
+import { notDrawn } from "./drawable";
 import { Fallback } from "./Fallback";
 import {
   SectionDetails,
@@ -15,9 +16,17 @@ import {
  * F6 and Q6: "Candidate details" as one card of drop-downs). Each opens on
  * its own — no shared `name`, so several may be open at once — and the one
  * the platform marks `open`, the first, starts open. A group holds sections
- * only; anything else in it is the fallback sentence. No hooks, so a
- * server-drawn page draws it as a live one does.
+ * only; anything else in it is the fallback sentence, logged by `notDrawn` as
+ * `sections[n].type` (`drawable` checks the contract's `const` first, so this
+ * is the last guard). No hooks, so a server-drawn page draws it as a live one
+ * does.
  */
+/** A group entry that is not a section: the fallback, logged with its place. */
+function notShownEntry(at: number) {
+  notDrawn("group", `sections[${at}].type`);
+  return <Fallback />;
+}
+
 export function GroupCard({
   block,
   inner,
@@ -43,7 +52,7 @@ export function GroupCard({
             />
           ) : (
             <div key={at} className={SPACING.card.all}>
-              <Fallback />
+              {notShownEntry(at)}
             </div>
           ),
         )}

@@ -32,6 +32,7 @@ const generated = [
   ["platform.d.ts", "docs/openapi.yaml"],
   ["automations.d.ts", "docs/openapi/automations.yaml"],
   ["connections.d.ts", "docs/openapi/connections.yaml"],
+  ["block-required.ts", "docs/openapi/automations.yaml"],
 ];
 const sibling = generated.every(([, input]) =>
   existsSync(join(backendRoot, input)),
@@ -103,6 +104,13 @@ test(
       );
       const stale = `${readFileSync(stalePath, "utf8")}\n// edited by hand\n`;
       writeFileSync(stalePath, stale);
+      // The blocks' required fields (Round 21, D2.6) are checked the same way.
+      const requiredPath = join(
+        copy,
+        "lib/generated/platform-contracts/block-required.ts",
+      );
+      const requiredStale = `${readFileSync(requiredPath, "utf8")}\n// edited by hand\n`;
+      writeFileSync(requiredPath, requiredStale);
 
       const run = spawnSync(
         process.execPath,
@@ -116,8 +124,9 @@ test(
       assert.equal(run.status, 1, "a stale file must fail the check");
       assert.match(
         run.stderr,
-        /Generated platform types are stale: lib\/generated\/platform-contracts\/automations\.d\.ts\./u,
+        /Generated platform types are stale: lib\/generated\/platform-contracts\/automations\.d\.ts, lib\/generated\/platform-contracts\/block-required\.ts\./u,
       );
+      assert.equal(readFileSync(requiredPath, "utf8"), requiredStale);
       assert.equal(
         readFileSync(stalePath, "utf8"),
         stale,
