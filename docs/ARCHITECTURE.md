@@ -38,7 +38,7 @@ this origin holds.
   `select` and a held run's review (Round 21, F1 and F2) are the generated
   names too (`AutomationSetupField`'s `options` and `multiple`, `HeldDecision`,
   `ReviewAnswer`, `Approval.decisions`, the `review` question form, the
-  decision body's `decisions`); ~~a hand-written `lib/pending-contract.ts`~~
+  decision body's `decisions`); ~~a hand-written interim contract module (on the PR branch only, never on main)~~
   until the regeneration from backend PR #255.
 - No Prisma, direct database, Supabase SDK, object-store SDK, browser secret,
   manual password login, or provider credential belongs here.
