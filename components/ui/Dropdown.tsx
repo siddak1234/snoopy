@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { CaretDownIcon } from "@phosphor-icons/react/dist/ssr/CaretDown";
 import { CheckIcon } from "@phosphor-icons/react/dist/ssr/Check";
+import { CHOOSE, chosenLabel } from "@/lib/choices";
 
 /** One choice: what the page holds, and what it says. */
 export type DropdownOption = { value: string; label: string };
@@ -29,39 +30,68 @@ const TRIGGER: Record<Look, string> = {
  * closes it alone — never the dialog it is in — and returns focus to the
  * trigger, as a press outside closes it. Never a row of buttons, never the
  * browser's own select.
+ *
+ * **Several** (`multiple`; Round 21, the platform round's F1): the listbox is
+ * `aria-multiselectable`, a choice ticks or unticks its row and the panel
+ * stays open, and the closed trigger says the choices in the order they were
+ * chosen: "Choose", "{first}, {second}", "{n} chosen" (`chosenLabel`).
  */
-export function Dropdown({
-  id,
-  options,
-  value,
-  onChange,
-  labelledBy,
-  placeholder = "Choose",
-  look = "field",
-  disabled = false,
-  testId,
-}: {
-  /** The trigger's id: a `<label htmlFor>` names it too. */
-  id: string;
-  options: readonly DropdownOption[];
-  /** The chosen value; one no option holds shows the placeholder. */
-  value: string;
-  onChange: (value: string) => void;
-  /** The element that names it: its visible label. */
-  labelledBy: string;
-  /** Said while nothing is chosen. */
-  placeholder?: string;
-  look?: Look;
-  disabled?: boolean;
-  /** The trigger is `testId`, the panel `${testId}-menu`. */
-  testId?: string;
-}) {
+export function Dropdown(
+  props: {
+    /** The trigger's id: a `<label htmlFor>` names it too. */
+    id: string;
+    options: readonly DropdownOption[];
+    /** The element that names it: its visible label. */
+    labelledBy: string;
+    /** Said while nothing is chosen. */
+    placeholder?: string;
+    look?: Look;
+    disabled?: boolean;
+    /** The trigger is `testId`, the panel `${testId}-menu`. */
+    testId?: string;
+  } & (
+    | {
+        multiple?: false;
+        /** The chosen value; one no option holds shows the placeholder. */
+        value: string;
+        onChange: (value: string) => void;
+      }
+    | {
+        multiple: true;
+        /** The chosen values, in the order chosen; one no option holds is not shown. */
+        value: readonly string[];
+        onChange: (value: string[]) => void;
+      }
+  ),
+) {
+  const {
+    id,
+    options,
+    labelledBy,
+    placeholder = CHOOSE,
+    look = "field",
+    disabled = false,
+    testId,
+  } = props;
   const listId = useId();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-  const chosen = options.find((option) => option.value === value);
+  const chosenValues: readonly string[] = props.multiple
+    ? props.value
+    : [props.value];
+  const chosen = chosenValues.flatMap((value) => {
+    const option = options.find((each) => each.value === value);
+    return option ? [option] : [];
+  });
+  const isChosen = (value: string) => chosenValues.includes(value);
+  const shown = props.multiple
+    ? chosenLabel(
+        chosen.map((option) => option.label),
+        placeholder,
+      )
+    : (chosen[0]?.label ?? placeholder);
 
   // A press outside closes it; Escape closes it, and only it: a capture on the
   // document, before a dialog's own Escape (`Modal`) hears it.
@@ -100,9 +130,18 @@ export function Dropdown({
   }, [open]);
 
   const choose = (next: string) => {
+    if (props.multiple) {
+      // Several: the row ticks or unticks, and the panel stays open.
+      props.onChange(
+        props.value.includes(next)
+          ? props.value.filter((value) => value !== next)
+          : [...props.value, next],
+      );
+      return;
+    }
     setOpen(false);
     triggerRef.current?.focus();
-    if (next !== value) onChange(next);
+    if (next !== props.value) props.onChange(next);
   };
 
   const onListKeyDown = (event: React.KeyboardEvent<HTMLUListElement>) => {
@@ -149,9 +188,9 @@ export function Dropdown({
         className={TRIGGER[look]}
       >
         <span
-          className={`truncate ${chosen ? "" : "text-[var(--muted)]"}`.trim()}
+          className={`truncate ${chosen.length > 0 ? "" : "text-[var(--muted)]"}`.trim()}
         >
-          {chosen?.label ?? placeholder}
+          {shown}
         </span>
         <CaretDownIcon
           size={16}
@@ -165,12 +204,13 @@ export function Dropdown({
           id={listId}
           role="listbox"
           aria-labelledby={labelledBy}
+          aria-multiselectable={props.multiple ? true : undefined}
           data-testid={testId ? `${testId}-menu` : undefined}
           onKeyDown={onListKeyDown}
           className="absolute top-full left-0 z-50 mt-2 flex max-h-[min(22rem,70vh)] min-w-full flex-col gap-0.5 overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--ring)] bg-[color-mix(in_srgb,var(--color-surface)_80%,transparent)] p-2 shadow-[var(--shadow-md)] backdrop-blur-[8px] sm:min-w-[14rem]"
         >
           {options.map((option) => {
-            const selected = option.value === value;
+            const selected = isChosen(option.value);
             return (
               <li
                 key={option.value}

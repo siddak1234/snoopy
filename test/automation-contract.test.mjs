@@ -3,6 +3,11 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
 import { heldCopy } from "../lib/held-flow.ts";
+import { CHOOSE, CHOOSE_AT_LEAST_ONE, chosenLabel } from "../lib/choices.ts";
+import {
+  missingChoices,
+  setupProblem,
+} from "../app/account/flows/setup-check.ts";
 import {
   flowsOverPlan,
   overPlanRefusal,
@@ -1106,4 +1111,125 @@ test("over the plan's flow allowance, a run's start and the Flows page say so in
   const page = readFileSync("app/account/flows/page.tsx", "utf8");
   assert.match(page, /flowsOverPlan\(subscriptions\.flowAllowance\)/u);
   assert.match(page, /overPlanSentence\(overPlan\.allowed, overPlan\.live\)/u);
+});
+
+test("a setup drop-down picks one or several: the glass drop-down, never the browser's select; its words; a list sent in the order chosen; a required one left empty says so under it and sends nothing (Round 21, the platform round's F1; ICD-10 Code Check's words.md section 3)", () => {
+  // The closed drop-down's words, word for word.
+  assert.equal(CHOOSE, "Choose");
+  assert.equal(chosenLabel([]), "Choose");
+  assert.equal(chosenLabel(["Nephrology"]), "Nephrology");
+  assert.equal(
+    chosenLabel(["Nephrology", "Cardiology"]),
+    "Nephrology, Cardiology",
+  );
+  assert.equal(
+    chosenLabel(["Nephrology", "Cardiology", "Endocrinology"]),
+    "3 chosen",
+  );
+  assert.equal(CHOOSE_AT_LEAST_ONE, "Choose at least one.");
+
+  // The several-choice mode of the one drop-down: a multiselectable listbox
+  // that stays open, a tick on each chosen row, the trigger saying the choices.
+  const dropdown = readFileSync("components/ui/Dropdown.tsx", "utf8");
+  assert.match(
+    dropdown,
+    /aria-multiselectable=\{props\.multiple \? true : undefined\}/u,
+  );
+  assert.match(
+    dropdown,
+    /props\.value\.includes\(next\)\s*\? props\.value\.filter\(\(value\) => value !== next\)\s*: \[\.\.\.props\.value, next\]/u,
+  );
+  assert.match(dropdown, /const selected = isChosen\(option\.value\);/u);
+  assert.match(
+    dropdown,
+    /chosenLabel\(\s*chosen\.map\(\(option\) => option\.label\),\s*placeholder,?\s*\)/u,
+  );
+
+  // Set up draws a `select` as SelectField, the drop-down of its options.
+  assert.match(
+    fields,
+    /if \(field\.control === "select"\) \{\s*return \(\s*<SelectField/u,
+  );
+  const select = readFileSync("app/account/flows/SelectField.tsx", "utf8");
+  assert.doesNotMatch(select, /<select\b|<option\b/u);
+  assert.match(select, /<Dropdown[\s\S]*?multiple\s+value=\{chosen\}/u);
+  // One choice (`multiple` absent, the contract's default): the single
+  // drop-down, its choice kept alone and posted under the `select` control,
+  // which the action sends as that one string.
+  assert.match(
+    select,
+    /value=\{chosen\[0\] \?\? ""\}\s+onChange=\{\(value\) => setChosen\(\[value\]\)\}/u,
+  );
+  assert.match(select, /value=\{multiple \? "select-multiple" : "select"\}/u);
+  assert.match(
+    select,
+    /\{chosen\.map\(\(value\) => \(\s*<input\s+key=\{value\}\s+type="hidden"/u,
+  );
+  assert.match(select, /\{missing && chosen\.length === 0 \? \(/u);
+
+  // The action sends several as their list, none twice, an empty one as [].
+  const values = actions.slice(
+    actions.indexOf("function declaredValues"),
+    actions.indexOf("export async function saveSetup"),
+  );
+  assert.match(
+    values,
+    /if \(typeof value !== "string" \|\| value\.trim\(\) === ""\) continue;\s*values\[key\] = control === "money" \? Number\(value\) : value;/u,
+  );
+  assert.match(
+    values,
+    /if \(control === "select-multiple"\) \{\s*values\[key\] = \[\s*\.\.\.new Set\(\s*formData\s*\.getAll\(`\$\{prefix\}:\$\{key\}`\)/u,
+  );
+
+  // Before anything is sent: every required drop-down left empty, by key.
+  const setup = [
+    { key: "limit", title: "Limit", control: "money", required: false },
+    {
+      key: "specialties",
+      title: "Specialties",
+      control: "select",
+      required: true,
+      defaultValue: ["Nephrology"],
+    },
+    { key: "payers", title: "Payers", control: "select", required: true },
+    { key: "area", title: "Area", control: "select", required: false },
+  ];
+  const form = (entries) => {
+    const data = new FormData();
+    for (const [name, value] of entries) data.append(name, value);
+    return data;
+  };
+  const missing = (entries) => [...missingChoices(setup, form(entries))];
+  // Two left empty: both named, so each says "Choose at least one." at once.
+  assert.deepEqual(missing([]), ["specialties", "payers"]);
+  assert.deepEqual(missing([["config:specialties", ""]]), [
+    "specialties",
+    "payers",
+  ]);
+  assert.deepEqual(missing([["config:specialties", "Cardiology"]]), ["payers"]);
+  assert.deepEqual(
+    missing([
+      ["config:specialties", "Cardiology"],
+      ["config:payers", "Medicare"],
+    ]),
+    [],
+  );
+  // A drop-down is never "Fill in": that is the line under it.
+  assert.equal(
+    setupProblem(
+      [{ key: "area", title: "Area", control: "select", required: true }],
+      form([]),
+    ),
+    null,
+  );
+  assert.match(
+    setupForm,
+    /const empty = missingChoices\(setup, data\);\s*setMissing\(empty\);\s*if \(empty\.size > 0\) return;\s*const problem = setupProblem\(/u,
+  );
+  assert.match(setupForm, /missingChoices=\{missing\}/u);
+  // Each field asks its own key of the set: every empty one is marked.
+  assert.match(
+    read("app/account/flows/ManifestFields.tsx"),
+    /missing=\{missingChoices\?\.has\(field\.key\) \?\? false\}/u,
+  );
 });

@@ -24,6 +24,7 @@ import { EMAIL_SAVE_FAILED } from "@/lib/flow-email";
 import { problemFields } from "@/lib/flow-items";
 import { heldCopy } from "@/lib/held-flow";
 import { overPlanRefusal } from "@/lib/plan-limit";
+import { reviewAnswers } from "@/lib/run-progress";
 import { subscriptionEntitlementState } from "@/lib/subscription-entitlements";
 import { activeWorkspaceIfShown, WORKSPACE_CHANGED } from "@/lib/tenancy";
 import { uploadRefusalMessage } from "./upload-refusals";
@@ -174,13 +175,16 @@ export async function subscribeToAutomation(
  * promises — the one conversion both the setup form and the run form need
  * (`ManifestFields.tsx` names every value `<prefix>:<key>` and its control
  * `<prefix>-control:<key>`). An empty text or money field is left out, so the
- * platform applies the manifest's own default or refuses a required one.
+ * platform applies the manifest's own default or refuses a required one. A
+ * drop-down of several (`select-multiple`, `SelectField`) is sent as its list
+ * of choices in the order chosen, an empty one as `[]`; one of one choice
+ * (`select`) as text (Round 21, the platform round's F1).
  */
 function declaredValues(
   formData: FormData,
   prefix: "config" | "input",
-): Record<string, string | number | boolean> {
-  const values: Record<string, string | number | boolean> = {};
+): Record<string, string | number | boolean | string[]> {
+  const values: Record<string, string | number | boolean | string[]> = {};
   for (const [name, control] of formData.entries()) {
     if (!name.startsWith(`${prefix}-control:`) || typeof control !== "string")
       continue;
@@ -189,6 +193,19 @@ function declaredValues(
     const value = formData.get(`${prefix}:${key}`);
     if (control === "toggle") {
       values[key] = value === "true";
+      continue;
+    }
+    if (control === "select-multiple") {
+      values[key] = [
+        ...new Set(
+          formData
+            .getAll(`${prefix}:${key}`)
+            .filter(
+              (choice): choice is string =>
+                typeof choice === "string" && choice !== "",
+            ),
+        ),
+      ];
       continue;
     }
     if (typeof value !== "string" || value.trim() === "") continue;
@@ -541,16 +558,30 @@ export async function setSubscriptionStatus(
   return result;
 }
 
+/** What a decision sends: a review's answers, else Approve or Deny; `null` for neither. */
+function decisionBody(formData: FormData): DecideApprovalRequest | null {
+  if (formData.has("decisions")) {
+    const decisions = reviewAnswers(formData.get("decisions"));
+    return decisions ? { decisions } : null;
+  }
+  const decision = String(formData.get("decision") ?? "");
+  if (decision !== "approved" && decision !== "rejected") return null;
+  const body: DecideApprovalRequest = { decision };
+  return body;
+}
+
+/**
+ * Decides an approval: `{decision}`, Approve or Deny; or, for an approval
+ * that offers changes (Round 21, the platform round's F2), the review's
+ * answers, `{decisions: [{id, decision}]}`, posted as JSON under `decisions`
+ * by `ReviewDecisions`. A review saved always continues the job.
+ */
 export async function decideApproval(
   formData: FormData,
 ): Promise<ActionResult> {
   const approvalId = String(formData.get("approvalId") ?? "");
-  const decision = String(formData.get("decision") ?? "");
-  if (decision !== "approved" && decision !== "rejected") {
-    return { ok: false, error: "Unsupported decision" };
-  }
-
-  const body: DecideApprovalRequest = { decision };
+  const body = decisionBody(formData);
+  if (!body) return { ok: false, error: "Unsupported decision" };
   // The job the decision answers, by the platform's own word: its run page is
   // drawn again too, where step 4 offered the decision (Build 24, P6). The
   // approval names the job's id (backend ADR-0044).

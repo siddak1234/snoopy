@@ -976,7 +976,7 @@ test("the run page draws the tracker's rows and words alone — never a step's s
   assert.doesNotMatch(live, /templateVersion|declaredFor/u);
   assert.match(
     live,
-    /trackerRows\(\s*steps,\s*flow\?\.pipeline,\s*flow\?\.groups,\s*run,\s*undefined,\s*flow\?\.pipeline,\s*\{ flow: flow\?\.tracker, email: detail\.email, decision: decided \},\s*\);/u,
+    /trackerRows\(\s*steps,\s*flow\?\.pipeline,\s*flow\?\.groups,\s*run,\s*undefined,\s*flow\?\.pipeline,\s*\{\s*flow: flow\?\.tracker,\s*email: detail\.email,\s*decision: decided,\s*review,?\s*\},?\s*\);/u,
   );
   const page = read("app/account/runs/[runId]/run-page-data.ts");
   assert.match(page, /stepTitle\(group, setup, subscription\.config\)/u);

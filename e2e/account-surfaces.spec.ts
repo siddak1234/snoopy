@@ -1304,6 +1304,85 @@ test("P6 — Deny on a held job's page: the result Denied, its waiting document 
   await expect(heldStep(page).getByRole("button")).toHaveCount(0);
 });
 
+test("Round 21 (F2) — a held run's review: each change a row with Accept and Deny, Deny red; Save review once every row is answered; the answers sent and the job goes on; Approvals' card says Review 2 changes and opens the run; the step that waited then says 1 accepted · 1 denied (the platform round's F2; ICD-10 Code Check's words.md section 3)", async ({
+  page,
+}) => {
+  await fixtureControl("invoice-review-pending");
+  // Approvals: the card opens the run, with no pair of its own.
+  await page.goto("/account/approvals");
+  const card = page
+    .locator("main")
+    .getByRole("link", { name: "Review 2 changes" });
+  await expect(card).toBeVisible();
+  await expect(
+    page.locator("main").getByRole("button", { name: "Approve" }),
+  ).toHaveCount(0);
+  await card.click();
+  await expect(page).toHaveURL(new RegExp(`${heldJob}$`, "u"));
+  const decision = heldDecision(page);
+  await expect(decision.getByTestId("review-change-change-1")).toContainText(
+    "N18.4 → Remove · Kidney failure (N18.6) is coded, so no stage code goes beside it.",
+  );
+  await expect(decision.getByTestId("review-change-change-2")).toContainText(
+    "Add Z99.2",
+  );
+  await expect(decision.getByRole("button", { name: "Approve" })).toHaveCount(
+    0,
+  );
+  const save = decision.getByRole("button", { name: "Save review" });
+  await expect(save).toBeDisabled();
+  await expect(decision).toContainText("Accept or deny each change.");
+  const deny = decision.getByRole("button", { name: "Deny: Add Z99.2" });
+  await expect(deny).toHaveClass(/(?:^|\s)btn-danger(?:\s|$)/u);
+  await decision
+    .getByRole("button", { name: "Accept: N18.4 → Remove" })
+    .click();
+  await expect(save).toBeDisabled();
+  await deny.click();
+  await expect(deny).toHaveAttribute("aria-pressed", "true");
+  await expect(save).toBeEnabled();
+  await expect(decision).not.toContainText("Accept or deny each change.");
+  await expectNoAxeViolations(page);
+  await save.click();
+  await expect(decision).toHaveCount(0);
+  expect(await approvalStatuses()).toEqual(["approved"]);
+  expect(
+    (
+      await fixtureRead<{
+        reviewAnswers: { id: string; decision: string }[][];
+      }>("counts")
+    ).reviewAnswers,
+  ).toEqual([
+    [
+      { id: "change-1", decision: "accepted" },
+      { id: "change-2", decision: "denied" },
+    ],
+  ]);
+  // Saved, the job goes on under its id, even with a change denied.
+  await expect(page.locator("main").getByText(/^running$/iu)).toBeVisible();
+  // Its details page: the step that waited says the review's count while
+  // the job goes on.
+  await page.goto(heldJobDetails);
+  await expect(heldStep(page)).toContainText("1 accepted · 1 denied");
+  await expect(heldStep(page).getByRole("button")).toHaveCount(0);
+});
+
+test("Round 21 (F2) — a member reads a held run's changes and who may review them, with no pills", async ({
+  page,
+}) => {
+  await fixtureControl("invoice-review-pending");
+  await presentSession(page, "member");
+  await page.goto(heldJob);
+  const decision = heldDecision(page);
+  await expect(decision.getByTestId("review-change-change-2")).toContainText(
+    "Add Z99.2",
+  );
+  await expect(decision).toContainText(
+    "Only an owner or admin can review this.",
+  );
+  await expect(decision.getByRole("button")).toHaveCount(0);
+});
+
 test("P6 — a member is told who can decide, and offered no button", async ({
   page,
 }) => {

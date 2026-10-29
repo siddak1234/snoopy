@@ -88,7 +88,8 @@ ten; a member reads them), a run's details page, opened from the Run details
 row on every run's page (every step from the start — its
 integration and its email among them, the running one spinning — read again
 while it goes on, a held job's step 4 its state alone), a run's page (a held
-job's Approve and Deny under its result line, appearing with no reload when
+job's Approve and Deny under its result line, or a review's Accept and
+Deny for each change then Save review, appearing with no reload when
 the job reaches it while its page is open, as docs/ARCHITECTURE.md's "Screen
 standards" says; its body the platform's blocks
 (`shape=blocks`, backend ADR-0048), which the fixture builds by the
@@ -130,7 +131,9 @@ first state. Five specs: `e2e/accessibility.spec.ts`,
 surface a change audit probed and no test asserted — Round 21 v2's among them:
 the image block, a group of drop-downs, a long list's and table's search, sort
 and pages, Activity's search, sort and pages as the platform is asked for
-them, and Share refused), `e2e/dialogs.spec.ts`
+them, and Share refused; Round 21's review of each change and Approvals'
+"Review {n} changes"; and Set up's drop-down of several in
+`e2e/public-edge-fixture.spec.ts`), `e2e/dialogs.spec.ts`
 (every dialog's Escape, click outside, focus return and hold, one row each)
 and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: the Flows
 list by department A–Z; its items grouped A–Z under its group filter, the

@@ -15,6 +15,7 @@ import {
   PlatformNotConfiguredError,
   PlatformServerError,
 } from "@/lib/platform-server";
+import { readsJobApprovals } from "@/lib/run-progress";
 import { verdictNamesOf } from "@/lib/run-verdict";
 import { roleInWorkspace, type WorkspaceRole } from "@/lib/tenancy";
 import type { RunFlow } from "./RunLive";
@@ -30,7 +31,9 @@ import type { RunFlow } from "./RunLive";
  * of state transitions. The run names no flow (`Run.templateId`'s own words: a
  * screen joins the catalog), so its name, steps' titles and groups come from
  * there; its file page's word is its version's file fields (`runFileRows`).
- * A held run's approvals are read too, for step 4 on its details page. The
+ * A held run's approvals are read too, for step 4 on its details page, and
+ * a run's that waited and went on, for its saved review's count (Round 21's
+ * F2; `readsJobApprovals`). The
  * role goes with every run, held or not: the approval form in a run's blocks
  * offers Approve and Deny to a role it names (Build 24, P6; the role read as
  * Approvals reads it, from the workspace list the layout read already), and
@@ -86,13 +89,13 @@ export async function readRunPage(
     throw error;
   }
 
-  const held = detail.run.status === "held";
+  const waited = readsJobApprovals(detail);
   const [catalog, approvals, subscription, role] = await Promise.all([
     emptyWhenUnavailable(() => listAutomations(workspaceId), {
       automations: [],
       categories: [],
     }),
-    held
+    waited
       ? emptyWhenUnavailable(() => listApprovals(workspaceId), {
           approvals: [],
         })

@@ -36,9 +36,35 @@ export function setupProblem(
       field.required &&
       !Object.hasOwn(field, "defaultValue") &&
       field.control !== "toggle" &&
+      field.control !== "select" &&
       blank(field),
   );
   if (missing.length > 0)
     return `Fill in: ${missing.map((field) => field.title).join(", ")}.`;
   return null;
+}
+
+/**
+ * Every required drop-down (`select`) with nothing chosen, by its key; empty
+ * when none is. Checked before `setupProblem`, and said under each such
+ * field: "Choose at least one." A several-choice field is required whatever
+ * its default, since its choices can all be taken away; a list emptied is
+ * never sent as saved.
+ */
+export function missingChoices(
+  setup: readonly SetupField[],
+  form: FormData,
+): ReadonlySet<string> {
+  return new Set(
+    setup
+      .filter(
+        (field) =>
+          field.control === "select" &&
+          field.required &&
+          !form
+            .getAll(`config:${field.key}`)
+            .some((value) => typeof value === "string" && value !== ""),
+      )
+      .map((field) => field.key),
+  );
 }

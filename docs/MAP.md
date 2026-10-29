@@ -106,6 +106,7 @@
 - [lib/billing.ts](../lib/billing.ts): no header
 - [lib/block-sort.ts](../lib/block-sort.ts): Search, sort and pages on a list or a table (backend ADR-0048 amendment 1,
 - [lib/brand-logos.ts](../lib/brand-logos.ts): A vendor's mark on the one connection row, by the icon name the platform
+- [lib/choices.ts](../lib/choices.ts): A drop-down's words for what it holds (Round 21, the platform round's F1;
 - [lib/connection-rows.ts](../lib/connection-rows.ts): The one connection row (Build 21, spec A4; the owner's build 20 items 6 and
 - [lib/connections.ts](../lib/connections.ts): no header
 - [lib/cookie-header.ts](../lib/cookie-header.ts): The request's cookies as a `Cookie` header — `name=value` pairs and nothing

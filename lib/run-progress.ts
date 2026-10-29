@@ -18,6 +18,14 @@
  * Pure, and loaded by its unit test as it is: no React and no `@/` import.
  */
 
+import type { components } from "./generated/platform-contracts/automations";
+
+type Schemas = components["schemas"];
+/** One change a held run offers for review (Round 21's F2), the contract's `HeldDecision`. */
+type OfferedChange = Schemas["HeldDecision"];
+/** One answer to an offered change, as the decision route takes it and the approval keeps it. */
+type ReviewAnswer = Schemas["ReviewAnswer"];
+
 export type ProgressStep = {
   stepId: string;
   outcome: "ok" | "held" | "failed";
@@ -81,6 +89,107 @@ export const STEP_DENIED = "Denied";
 
 export function stepHeld(reason: string | undefined): string {
   return reason ? `Waiting for approval: ${reason}` : "Waiting for approval";
+}
+
+/**
+ * A held run's review of each change (Round 21, the platform round's F2;
+ * ICD-10 Code Check's words.md section 3, word for word, the app's too): each
+ * change a row, "{label} · {detail}", with Accept and Deny; Save review once
+ * every row has an answer. A held run that offers no changes keeps Approve
+ * and Deny.
+ */
+export const ACCEPT = "Accept";
+export const DENY = "Deny";
+export const SAVE_REVIEW = "Save review";
+/** Under the rows until every one has an answer. */
+export const ANSWER_EACH = "Accept or deny each change.";
+/** To a member, in place of the pills. */
+export const REVIEW_MEMBER_NOTE = "Only an owner or admin can review this.";
+/** The platform refused the review, or did not answer. */
+export const REVIEW_NOT_SAVED = "The review wasn't saved. Try again.";
+
+/** Approvals' card for a review: it opens the run. */
+export function reviewChanges(count: number): string {
+  return `Review ${count} changes`;
+}
+
+/** A saved review, on the run's steps: "{a} accepted · {d} denied". */
+export function reviewedLine(accepted: number, denied: number): string {
+  return `${accepted} accepted · ${denied} denied`;
+}
+
+/** One change's row: "{label} · {detail}", or its label alone. */
+export function changeLine(change: { label: string; detail?: string }): string {
+  return change.detail ? `${change.label} · ${change.detail}` : change.label;
+}
+
+/** The changes an approval or a review form offers, or none (a plain approval: Approve / Deny). Rows not shaped as the contract says are left out. */
+export function offeredDecisions(
+  holder: { decisions?: unknown } | undefined | null,
+): OfferedChange[] {
+  const list = holder?.decisions;
+  if (!Array.isArray(list)) return [];
+  return list.flatMap((row: unknown) => {
+    if (typeof row !== "object" || row === null) return [];
+    const { id, label, detail } = row as Record<string, unknown>;
+    if (typeof id !== "string" || typeof label !== "string") return [];
+    return [
+      typeof detail === "string" && detail !== ""
+        ? { id, label, detail }
+        : { id, label },
+    ];
+  });
+}
+
+/** A saved review's count: how many changes were accepted and denied. */
+export type ReviewTally = { accepted: number; denied: number };
+
+/**
+ * A saved review's count, "{a} accepted · {d} denied" (words.md section 3):
+ * an approval decided `approved` whose offered rows carry their answers.
+ * `null` for any other approval.
+ */
+export function reviewTally(
+  approval: { status: string; decisions?: unknown } | undefined | null,
+): ReviewTally | null {
+  if (!approval || approval.status !== "approved") return null;
+  const list = approval.decisions;
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const answers = list.map((row: unknown) =>
+    typeof row === "object" && row !== null
+      ? (row as { decision?: unknown }).decision
+      : undefined,
+  );
+  if (!answers.every((answer) => answer === "accepted" || answer === "denied"))
+    return null;
+  const accepted = answers.filter((answer) => answer === "accepted").length;
+  return { accepted, denied: answers.length - accepted };
+}
+
+/**
+ * The answers a review form posted (`decisions`, JSON), as the decision
+ * route takes them: each id once, `accepted` or `denied`. `null` when the
+ * list is not that, so nothing is sent. The form answers every change it
+ * offers; the platform checks that every offered id is answered once.
+ */
+export function reviewAnswers(posted: unknown): ReviewAnswer[] | null {
+  if (typeof posted !== "string") return null;
+  let list: unknown;
+  try {
+    list = JSON.parse(posted);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const answers = new Map<string, ReviewAnswer["decision"]>();
+  for (const row of list as unknown[]) {
+    if (typeof row !== "object" || row === null) return null;
+    const { id, decision } = row as { id?: unknown; decision?: unknown };
+    if (typeof id !== "string" || answers.has(id)) return null;
+    if (decision !== "accepted" && decision !== "denied") return null;
+    answers.set(id, decision);
+  }
+  return [...answers].map(([id, decision]) => ({ id, decision }));
 }
 
 /**
@@ -203,7 +312,10 @@ export function timeOfDay(iso: string): string {
 /**
  * What a row says of its state — never a step's own summary, never a step id.
  * A held step says why it waits until its approval is denied, then "Denied"
- * (Build 24, P6).
+ * (Build 24, P6); once its review is saved, "{a} accepted · {d} denied"
+ * (`review`, Round 21's F2), on the step that waited, whatever the job does
+ * next — so a group still working after the review says the count, not
+ * "Working…".
  */
 function trackerSub(
   state: TrackerState,
@@ -211,7 +323,12 @@ function trackerSub(
   run: RunState,
   clock: (iso: string) => string,
   decision?: HeldDecision | null,
+  review?: ReviewTally | null,
 ): string {
+  const waited = steps.some((step) => step.outcome === "held");
+  // A saved review, on the step that waited for it (Round 21's F2).
+  if (review && waited && decision !== "rejected" && state !== "failed")
+    return reviewedLine(review.accepted, review.denied);
   if (state === "working") return WORKING;
   if (state === "waiting") return STEP_WAITING;
   if (state === "skipped") return STEP_SKIPPED;
@@ -311,6 +428,8 @@ export function trackerRows(
     flow?: TrackerFlow;
     email?: RunEmailState;
     decision?: HeldDecision | null;
+    /** A saved review's count (`reviewTally`, Round 21's F2). */
+    review?: ReviewTally | null;
   } = {},
 ): TrackerRow[] {
   const known = new Set((declared ?? []).map((step) => step.id));
@@ -319,7 +438,14 @@ export function trackerRows(
     declared.length > 0 &&
     steps.every((step) => known.has(step.stepId));
   if (!covered)
-    return reportedRows(steps, titles, run, clock, context.decision);
+    return reportedRows(
+      steps,
+      titles,
+      run,
+      clock,
+      context.decision,
+      context.review,
+    );
   const pipeline = declared;
   const states = stepStates(pipeline, steps, run);
   const row = (key: string, title: string, members: number[]): TrackerRow => {
@@ -331,7 +457,14 @@ export function trackerRows(
       key,
       title,
       state,
-      sub: trackerSub(state, reported, run, clock, context.decision),
+      sub: trackerSub(
+        state,
+        reported,
+        run,
+        clock,
+        context.decision,
+        context.review,
+      ),
     };
   };
   if (groups && groups.length > 0) {
@@ -372,6 +505,7 @@ function reportedRows(
   run: RunState,
   clock: (iso: string) => string,
   decision?: HeldDecision | null,
+  review?: ReviewTally | null,
 ): TrackerRow[] {
   const titles = new Map((declared ?? []).map((step) => [step.id, step.title]));
   const ordered = [...steps].sort(
@@ -392,7 +526,7 @@ function reportedRows(
       key: `reported:${index}:${step.stepId}`,
       title: `${index + 1} · ${titles.get(step.stepId) ?? `Step ${index + 1}`}`,
       state,
-      sub: trackerSub(state, [step], run, clock, decision),
+      sub: trackerSub(state, [step], run, clock, decision, review),
     };
   });
   if (run.status === "pending" || run.status === "running") {
@@ -469,6 +603,23 @@ export type HeldDecision =
 
 /** What a client needs of an approval to know which is a job's newest. */
 type ApprovalOf = { runId: string; status: string; createdAt?: string };
+
+/**
+ * Whether a run's page reads the job's approvals (Round 21's F2): while it
+ * is held, and once any step reported `held` — a saved review continues the
+ * job under its id, and the step that waited says the review's count
+ * (`reviewTally`) only from the approval. A run that never waited reads
+ * none.
+ */
+export function readsJobApprovals(detail: {
+  run: { status: RunStatus };
+  steps: readonly { outcome: string }[];
+}): boolean {
+  return (
+    detail.run.status === "held" ||
+    detail.steps.some((step) => step.outcome === "held")
+  );
+}
 
 /**
  * A job's newest approval, by when it was asked (Build 24, P9): a job is its
@@ -569,7 +720,7 @@ export function rereadForApproval(
 /**
  * Whether a held run's page reads it again for its decision (backend
  * ADR-0048): the run is held, its blocks hold no approval form
- * (`questions{approval}`) yet, and fewer than `HELD_APPROVAL_REREADS` such
+ * (`questions{approval}`, or a review's `questions{review}`, Round 21's F2) yet, and fewer than `HELD_APPROVAL_REREADS` such
  * reads were made. That is a run that turned held while its page was open,
  * or one read before its approval was asked. The form appearing, or the run
  * leaving held, ends it; so does the tenth read. Only the run is read: the
@@ -588,7 +739,9 @@ export function rereadForApprovalForm(
         typeof block === "object" &&
         block !== null &&
         (block as { type?: unknown }).type === "questions" &&
-        (block as { form?: { kind?: unknown } }).form?.kind === "approval",
+        ["approval", "review"].includes(
+          String((block as { form?: { kind?: unknown } }).form?.kind),
+        ),
     )
   );
 }

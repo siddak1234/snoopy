@@ -296,6 +296,14 @@ export function sectionBlocks(
   }));
 }
 
+/** A saved review's result line (the backend's `reviewedLine`): "{a} accepted · {d} denied". */
+function reviewed(decisions: readonly { decision?: string }[]): string {
+  const accepted = decisions.filter(
+    (each) => each.decision === "accepted",
+  ).length;
+  return `${accepted} accepted · ${decisions.length - accepted} denied`;
+}
+
 /** What a run's page is built from: its answer, its newest approval, its flow's words. */
 export type RunPageInput = {
   run: Run;
@@ -303,8 +311,11 @@ export type RunPageInput = {
   details?: readonly Automations["RunDetailLine"][];
   documents?: readonly RunDocument[];
   sections?: readonly Automations["RunSection"][];
-  /** The job's newest approval, if it asked for one. */
-  approval?: Pick<Automations["Approval"], "id" | "status" | "eligibleRoles">;
+  /** The job's newest approval, if it asked for one; a review's with its changes (Round 21's F2). */
+  approval?: Pick<
+    Automations["Approval"],
+    "id" | "status" | "eligibleRoles" | "decisions"
+  >;
   /** The flow's word for one of an item's runs ("Candidate"). */
   runWord?: string;
   /** The flow's word for one document ("Invoice"). */
@@ -349,25 +360,44 @@ export function runBlocks(input: RunPageInput): Block[] {
           ? null
           : !approval || approval.status === "pending"
             ? WORDS.waiting
-            : approval.status === "approved"
-              ? WORDS.decided.approved
-              : approval.status === "rejected"
-                ? WORDS.decided.rejected
-                : WORDS.decided.closed;
+            : approval.status === "approved" && approval.decisions
+              ? reviewed(approval.decisions)
+              : approval.status === "approved"
+                ? WORDS.decided.approved
+                : approval.status === "rejected"
+                  ? WORDS.decided.rejected
+                  : WORDS.decided.closed;
   const sections = input.sections ?? [];
   const said = run.status === "succeeded" && sections.length > 0;
   const tone = LINE_TONES[run.status];
   if (line && !said)
     blocks.push({ type: "text", text: line, ...(tone ? { tone } : {}) });
+  // A review's form (`questions{review}`, Round 21's F2).
   if (approval?.status === "pending")
-    blocks.push({
-      type: "questions",
-      form: {
-        kind: "approval",
-        approvalId: approval.id,
-        eligibleRoles: approval.eligibleRoles,
-      },
-    });
+    blocks.push(
+      approval.decisions
+        ? ({
+            type: "questions",
+            form: {
+              kind: "review",
+              approvalId: approval.id,
+              eligibleRoles: approval.eligibleRoles,
+              decisions: approval.decisions.map(({ id, label, detail }) => ({
+                id,
+                label,
+                ...(detail === undefined ? {} : { detail }),
+              })),
+            },
+          } satisfies Block)
+        : {
+            type: "questions",
+            form: {
+              kind: "approval",
+              approvalId: approval.id,
+              eligibleRoles: approval.eligibleRoles,
+            },
+          },
+    );
   // result: the run's sections, documents or details (the adapter).
   if (sections.length > 0)
     blocks.push(
