@@ -43,6 +43,10 @@ export type RunStep = components["schemas"]["RunStep"];
 export type RunEvent = components["schemas"]["RunEvent"];
 export type RunDetail = components["schemas"]["RunDetail"];
 export type Approval = components["schemas"]["Approval"];
+/** One change a held run offers for review (Round 21's F2). */
+export type HeldDecision = components["schemas"]["HeldDecision"];
+/** One answer to an offered change: `accepted` or `denied`. */
+export type ReviewAnswer = components["schemas"]["ReviewAnswer"];
 export type ListSubscriptionsResponse =
   operations["listSubscriptions"]["responses"][200]["content"]["application/json"];
 export type ListRunsResponse =
@@ -465,6 +469,7 @@ export function createRunPackageFile(
 export function decideApproval(
   workspaceId: string,
   approvalId: string,
+  /** `{decision}`, Approve or Deny; or a review's answers, `{decisions}`. */
   body: DecideApprovalRequest,
 ): Promise<DecideApprovalResponse> {
   return platformServerJson<DecideApprovalResponse>(

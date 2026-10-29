@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { FileTextIcon } from "@phosphor-icons/react/dist/ssr/FileText";
 import { FlowArrowIcon } from "@phosphor-icons/react/dist/ssr/FlowArrow";
 import { BlockList } from "@/components/blocks/BlockList";
+import type { QuestionForm } from "@/components/blocks/renderers";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { BackLink } from "@/components/dashboard/BackLink";
 import { FileActions, usePageFile } from "@/components/dashboard/FileActions";
@@ -53,8 +54,11 @@ import {
   RUN_REREAD_MS,
   heldDecision,
   mayDecide,
+  newestApproval,
+  offeredDecisions,
   rereadForApproval,
   rereadForApprovalForm,
+  reviewTally,
   runDetailsPath,
   runDuration,
   runLabel,
@@ -143,7 +147,7 @@ export function RunLive({
   workspaceId: string;
   initial: RunDetail;
   flow: RunFlow;
-  /** A held job's approvals as the server read them: what became of them. */
+  /** The job's approvals as the server read them, once it waited: what became of them, and a saved review's count. */
   approvals: Approval[];
   /** This person's role in the workspace: whether the approval form offers Approve and Deny. */
   role: WorkspaceRole | undefined;
@@ -226,6 +230,27 @@ export function RunLive({
 
   const name = headed && run.title ? run.title : runLabel(run.id);
 
+  // The decision where the job waits (Build 24, P6; build 28's review,
+  // finding 1: not one tap more): one press, or a review's Save review
+  // (`review`, Round 21's F2), then the page is drawn again — running on, or
+  // Denied.
+  const decisionForm = (form: QuestionForm) =>
+    form.approvalId ? (
+      <div data-testid="run-decision">
+        <ApprovalDecision
+          approvalId={form.approvalId}
+          canDecide={mayDecide(role, form.eligibleRoles)}
+          eligibleRoles={form.eligibleRoles ?? []}
+          workspaceId={workspaceId}
+          decisions={offeredDecisions(form)}
+          role={role}
+          onDecision={(_, state) => {
+            if (state === "saved") router.refresh();
+          }}
+        />
+      </div>
+    ) : null;
+
   if (view === "details") {
     // Every step from the start (spec A7; S14): by the catalog's groups, the
     // newest version's, for any run whose every reported step they still
@@ -234,6 +259,8 @@ export function RunLive({
     // the steps it reported. Step 2 says the flow's integration, step 4's
     // title follows it, step 5 is the run's email.
     const decided = heldDecision(run, listed);
+    // A saved review's count on the step that waited (Round 21's F2).
+    const review = reviewTally(newestApproval(run.id, listed));
     const tracker = trackerRows(
       steps,
       flow?.pipeline,
@@ -241,7 +268,7 @@ export function RunLive({
       run,
       undefined,
       flow?.pipeline,
-      { flow: flow?.tracker, email: detail.email, decision: decided },
+      { flow: flow?.tracker, email: detail.email, decision: decided, review },
     );
     const facts = [
       {
@@ -329,25 +356,7 @@ export function RunLive({
           testId="run-blocks"
           context={{
             subscriptionId: run.subscriptionId,
-            forms: {
-              // The decision where the job waits (Build 24, P6; build 28's
-              // review, finding 1: not one tap more): one press, then the
-              // page is drawn again — running on, or Denied.
-              approval: (form) =>
-                form.approvalId ? (
-                  <div data-testid="run-decision">
-                    <ApprovalDecision
-                      approvalId={form.approvalId}
-                      canDecide={mayDecide(role, form.eligibleRoles)}
-                      eligibleRoles={form.eligibleRoles ?? []}
-                      workspaceId={workspaceId}
-                      onDecision={(_, state) => {
-                        if (state === "saved") router.refresh();
-                      }}
-                    />
-                  </div>
-                ) : null,
-            },
+            forms: { approval: decisionForm, review: decisionForm },
           }}
         />
       </Group>
