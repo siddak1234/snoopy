@@ -5720,6 +5720,26 @@ test.describe("Round 21, platform round 2 (B2, as the batch addendum amends it) 
     ]);
   });
 
+  test("one file in a field that takes several is a list of one: its run opens", async ({
+    page,
+  }) => {
+    await fixtureControl("manual-several");
+    const dialog = await openFilledRun(page);
+    await dialog.getByLabel("Invoice file").setInputFiles([pdf("a.pdf")]);
+    await expect(dialog.getByText(/^Ready: a\.pdf/u)).toBeVisible();
+    await expect(dialog.locator('input[name="input:artifactId"]')).toHaveCount(
+      1,
+    );
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/u);
+    const starts = await runStarts();
+    expect(starts).toHaveLength(1);
+    const { artifactId } = starts[0]!.input;
+    expect(Array.isArray(artifactId)).toBe(true);
+    expect(artifactId as string[]).toHaveLength(1);
+    expect(typeof (artifactId as string[])[0]).toBe("string");
+  });
+
   test("past the field's maxFiles nothing is sent and it says 'Add up to {max} files at a time.'; with none declared, the platform's 50", async ({
     page,
   }) => {
@@ -5733,6 +5753,16 @@ test.describe("Round 21, platform round 2 (B2, as the batch addendum amends it) 
     );
     await expect(dialog.getByText(/files selected/u)).toHaveCount(0);
     expect(await storedObjects()).toEqual([]);
+    // Exactly maxFiles is taken.
+    await dialog
+      .getByLabel("Invoice file")
+      .setInputFiles([pdf("a.pdf"), pdf("b.pdf")]);
+    await expect(dialog.getByText("2 files selected")).toBeVisible();
+    await expect(dialog.getByRole("alert")).toHaveCount(0);
+    expect((await storedObjects()).map(({ filename }) => filename)).toEqual([
+      "a.pdf",
+      "b.pdf",
+    ]);
 
     await fixtureControl("reset");
     await fixtureControl("manual-several");
@@ -5816,6 +5846,41 @@ test.describe("Round 21, platform round 2 (B2, as the batch addendum amends it) 
         dialog.locator('input[name="input:artifactId"]'),
       ).toHaveCount(3);
     });
+
+    test("a photo past the field's maxFiles says 'Add up to {max} files at a time.' and the files held are kept", async ({
+      page,
+      browserName,
+    }) => {
+      test.skip(
+        browserName !== "chromium",
+        "Chromium's touch emulation makes the primary pointer coarse",
+      );
+      await fixtureControl("manual-several?maxFiles=2");
+      const dialog = await openFilledRun(page);
+      await dialog
+        .getByLabel("Invoice file")
+        .setInputFiles([pdf("a.pdf"), pdf("b.pdf")]);
+      await expect(dialog.getByText("2 files selected")).toBeVisible();
+      const [camera] = await Promise.all([
+        page.waitForEvent("filechooser"),
+        dialog
+          .getByRole("button", { name: "Take photo for Invoice file" })
+          .click(),
+      ]);
+      await camera.setFiles({
+        name: "image.jpg",
+        mimeType: "image/jpeg",
+        buffer: await sidewaysPhoto(page),
+      });
+      await expect(dialog.getByRole("alert")).toHaveText(
+        "Add up to 2 files at a time.",
+      );
+      await expect(dialog.getByText("2 files selected")).toBeVisible();
+      expect(await storedObjects()).toHaveLength(2);
+      await expect(
+        dialog.locator('input[name="input:artifactId"]'),
+      ).toHaveCount(2);
+    });
   });
 });
 
@@ -5834,7 +5899,7 @@ test.describe("Round 21, platform round 2 (B5) — a public app the platform lis
     await expect(row.getByRole("button")).toHaveCount(0);
   });
 
-  test("Set up: a flow whose requiredConnections names it draws no Connect step for it", async ({
+  test("Set up: a flow that requires it draws no Connect step for it; a step that offers it as a choice says Connected and chooses it in place", async ({
     page,
   }) => {
     await page.goto(`${FLOWS.invoice}/setup`);
@@ -5846,9 +5911,20 @@ test.describe("Round 21, platform round 2 (B5) — a public app the platform lis
       }),
     ).toBeVisible();
     await expect(main.getByTestId("connection-nppes")).toHaveCount(0);
-    await expect(
-      main.getByRole("button", { name: /NPI Registry/u }),
-    ).toHaveCount(0);
+    // Named as a step's choice instead: its row says Connected, a tap
+    // chooses it in place, and Save keeps it with no "connect first".
+    await fixtureControl("public-providers?optional=1");
+    await page.reload();
+    const nppes = main.getByTestId("vendor-nppes");
+    await expect(nppes).toContainText("Connected");
+    await expect(nppes).not.toContainText("Not connected");
+    await expect(nppes).toHaveAttribute("aria-checked", "false");
+    await nppes.click();
+    await expect(nppes).toHaveAttribute("aria-checked", "true");
+    await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
+    await main.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
+    expect((await invoiceSettings()).vendor).toBe("nppes");
   });
 
   test("the flow page: a step that chose it says Connected, and the flow is owed nothing for it", async ({

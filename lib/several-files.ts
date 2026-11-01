@@ -5,8 +5,7 @@
  * its value the list of upload ids, under the one key. The field posts each
  * file's id under its `input:<key>` with the control `artifact-multiple`
  * (`RunFileField`), and the start-run action sends them as that list
- * (`declaredValues`). ~~One run per file and "{n} runs started"~~ until the
- * batch addendum.
+ * (`declaredValues`).
  *
  * Pure, and loaded by its unit test as it is: no React and no `@/` import. (`run-files.ts` is the files a run made; this is the files a run is given.)
  */

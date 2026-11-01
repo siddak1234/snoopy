@@ -248,8 +248,10 @@ function initialState() {
     // makes are refused because the flow's queue is full (`queue_full`).
     queueFull: 0,
     // Platform round 2's B5: the platform lists the NPI Registry in
-    // `publicProviders`; Invoice Processing requires it, its step chose it.
+    // `publicProviders`; Invoice Processing requires it, its step chose it —
+    // or, with `?optional=1`, names it as a step's choice, unchosen.
     publicProviders: false,
+    publicProviderOptional: false,
     // Backend §12.1 #39: the complete export, read as running once then ready.
     exportJobReads: 0,
     exportJobStarted: false,
@@ -1188,7 +1190,7 @@ function fixtureCatalog(): Automations["AutomationCatalogResponse"] {
                   providerId: nppesProvider.providerId,
                   displayName: nppesProvider.displayName,
                   purpose: "Looks up the clinician.",
-                  optional: false,
+                  optional: state.publicProviderOptional,
                 },
               ],
               setup: invoiceSetup(),
@@ -2816,7 +2818,12 @@ const server = createServer(
       },
       "/__fixture/public-providers": () => {
         state.publicProviders = true;
-        state.invoiceConfig = { ...state.invoiceConfig, vendor: "nppes" };
+        state.publicProviderOptional = url.searchParams.get("optional") === "1";
+        // A required one its step chose; a choice is left unchosen.
+        state.invoiceConfig = {
+          ...state.invoiceConfig,
+          vendor: state.publicProviderOptional ? "none" : "nppes",
+        };
       },
       // FR-14: opening an upload, or completing one, refused with a reason —
       // and a completion answered 429, which the contract documents for it
@@ -4398,7 +4405,11 @@ const server = createServer(
           Object.keys(config).some((key) => !declared.has(key)) ||
           (config.vendor !== undefined &&
             config.vendor !== "none" &&
-            config.vendor !== quickbooksProvider.providerId) ||
+            config.vendor !== quickbooksProvider.providerId &&
+            !(
+              state.publicProviders &&
+              config.vendor === nppesProvider.providerId
+            )) ||
           (config.holdAboveAmount !== undefined &&
             typeof config.holdAboveAmount !== "number")
         ) {
