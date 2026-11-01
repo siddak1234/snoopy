@@ -39,7 +39,12 @@ this origin holds.
   names too (`AutomationSetupField`'s `options` and `multiple`, `HeldDecision`,
   `ReviewAnswer`, `Approval.decisions`, the `review` question form, the
   decision body's `decisions`); ~~a hand-written interim contract module (on the PR branch only, never on main)~~
-  until the regeneration from backend PR #255.
+  until the regeneration from backend PR #255. Platform round 2's B1–B4
+  are generated too (`AutomationSelectOption`, the run input's `multiple`,
+  `HeldDecision.group`, the `Healthcare` category, block set 4). B5's
+  `authType` `none` is not yet in the backend's contract here: until it is
+  regenerated, `PendingProviderAuthType` in `lib/connection-rows.ts` is the
+  narrowest local type for it, and goes with that regeneration.
 - No Prisma, direct database, Supabase SDK, object-store SDK, browser secret,
   manual password login, or provider credential belongs here.
 - Tenancy state comes from typed Edge responses. Mutations have unique
@@ -53,6 +58,9 @@ page reuses:
 
 - **Flows by department**: the Flows list groups its cards under their
   department, the departments A–Z (`app/account/flows/departments.ts`).
+  The departments are the platform's seventeen team kinds, Healthcare the
+  newest (platform round 2's B4, `lib/team-types.ts`); the website names a
+  department in words and draws no icon for one.
 - **A choice is a drop-down**: a flow's `select` field, a setup `select`
   (`app/account/flows/SelectField.tsx`) and a list's filter are the website's
   drop-down (`components/ui/Dropdown.tsx`) — a pill for a filter, a field's
@@ -61,7 +69,23 @@ page reuses:
   the panel open with a tick on each chosen row, and the closed box says
   "Choose", "{first}, {second}" or "{n} chosen" (`lib/choices.ts`); it is
   sent as the list chosen, and a required one left empty says "Choose at
-  least one." under each before anything is sent (`missingChoices`).
+  least one." under each before anything is sent (`missingChoices`). A
+  field's options are strings or `{value, label, group}` (platform round
+  2's B1, `choicesOf`): the form sends the `value`, the drop-down and its
+  closed box say the `label`, never the value. Holding more than 10 choices
+  the panel opens on a search box, "Search", which keeps the rows whose
+  label holds what is typed and otherwise says "No matches."; choices with
+  a `group` are drawn under its heading, the headings in the order they
+  first appear (`choiceGroups`). One of 10 or fewer without groups is drawn
+  as before.
+- **Several files at once**: a run's file field that declares `multiple`
+  (`RunFileField`) lets the chooser take several files and the camera add
+  each photo, sends each as one file alone is sent, and says "{n} files
+  selected"; Start run then starts one run per file with the same other
+  inputs, the one start-run action once per file (`perFileForms` in
+  `lib/several-files.ts`, each run its own key), and says "{n} runs
+  started". More than 200 at once says "Add up to 200 files at a time." and
+  sends nothing. A field of one file is unchanged.
 - **A row that opens a page** is `PageRow` (`components/dashboard/PageRow.tsx`):
   a closed section's box and height, the arrow at its end — or, `boxed`
   false, a row of one card of divided rows (`LIST_CARD`): a list block's
@@ -196,7 +220,11 @@ and a flow step's vendor rows start a connect the same way
 (`app/account/connections/start-connect.ts`). A member sees a flow's
 integration and does not change it, with one exception: on a newly added
 flow's Set up, the member makes its first choice, a connected vendor or None
-(backend ADR-0043 §2), as the app's Set up allows.
+(backend ADR-0043 §2), as the app's Set up allows. A provider whose
+`authType` is `none` (a public service, platform round 2's B5) has no
+connect step: it is connected for every workspace (`isKeyless`), its row
+says "Connected" with no Connect or Disconnect, Set up draws no Connect
+step for it, and it never holds a flow back.
 
 ## Runs and approvals
 
@@ -241,6 +269,10 @@ deny each change." until then; a member reads the rows and "Only an owner or
 admin can review this."; a page that draws no form for it reads the rows
 alone (`ReviewRows` in `components/blocks/renderers.tsx`), each label then
 its detail, as the block fixtures `review-held-*` read them, with no pills.
+Changes that carry a `group` (platform round 2's B3) are drawn under its
+heading, in both places, the groups in the order first sent and every one
+open, up to 400 changes (`reviewGroups`, `offeredDecisions`); Save review
+still waits for every answer. A review without groups is drawn as before.
 Saving sends every answer (`{decisions: [{id,
 decision}]}`) and the job always goes on; a refusal says "The review wasn't
 saved. Try again." On Approvals such a row says "Review {n} changes",

@@ -5607,3 +5607,62 @@ test("Round 21 (F1) — Set up's drop-down of several: never the browser's selec
     placeOfCare: "Hospital",
   });
 });
+
+test("Round 21, platform round 2 (B1) — a drop-down of more than 10 choices opens on Search, keeps the labels that hold what is typed, says No matches. for none, draws its headings in the manifest's order, says the label chosen and saves its value", async ({
+  page,
+}) => {
+  await fixtureControl("invoice-specialties");
+  await page.goto(`${FLOWS.invoice}/setup`);
+  const main = page.locator("main");
+  const trigger = main.getByRole("combobox", { name: "Taxonomy" });
+  await trigger.click();
+  const search = main.getByRole("searchbox", { name: "Search" });
+  await expect(search).toBeFocused();
+  await expect(search).toHaveAttribute("placeholder", "Search");
+  const menu = main.getByRole("listbox", { name: "Taxonomy" });
+  await expect(menu.getByRole("option")).toHaveCount(12);
+  await expect(menu.getByRole("group")).toHaveCount(2);
+  await expect(menu.getByRole("group").first()).toHaveAccessibleName(
+    "Internal medicine",
+  );
+  await expect(menu.getByRole("group").last()).toHaveAccessibleName(
+    "Psychiatry & neurology",
+  );
+  await expectNoAxeViolations(page);
+  await search.fill("zzz");
+  await expect(main.getByText("No matches.")).toBeVisible();
+  await expect(menu.getByRole("option")).toHaveCount(0);
+  await search.fill("PSYCH");
+  await expect(menu.getByRole("option")).toHaveCount(2);
+  await expect(menu.getByRole("group")).toHaveCount(1);
+  // Enter in the search box never sends the form; the down arrow goes to a row.
+  await search.press("Enter");
+  await expect(menu).toBeVisible();
+  await search.press("ArrowDown");
+  await expect(
+    menu.getByRole("option", { name: "Psychiatry", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(menu).toHaveCount(0);
+  await expect(trigger).toHaveText("Psychiatry");
+  // Set up's other required choices, then saved: the value, never the label.
+  await main.getByRole("combobox", { name: "Specialties" }).click();
+  await main
+    .getByRole("listbox", { name: "Specialties" })
+    .getByRole("option", { name: "Nephrology" })
+    .click();
+  await page.keyboard.press("Escape");
+  await main.getByRole("combobox", { name: "Place of care" }).click();
+  await main
+    .getByRole("listbox", { name: "Place of care" })
+    .getByRole("option", { name: "Office" })
+    .click();
+  await main.getByRole("button", { name: "Save", exact: true }).click();
+  await expect.poll(invoiceSettings).toEqual({
+    vendor: "none",
+    holdAboveAmount: 500,
+    specialties: ["Nephrology"],
+    placeOfCare: "Office",
+    taxonomy: "2084P0800X",
+  });
+});

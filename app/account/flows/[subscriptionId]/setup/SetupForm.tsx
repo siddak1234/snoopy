@@ -10,7 +10,11 @@ import type {
   SubscriptionStatus,
 } from "@/lib/automations";
 import type { Connection, ConnectionProvider } from "@/lib/connections";
-import { connectionFor, connectionState } from "@/lib/connection-rows";
+import {
+  connectionFor,
+  connectionState,
+  type PendingProviderAuthType,
+} from "@/lib/connection-rows";
 import {
   NONE,
   connectFirst,
@@ -105,8 +109,23 @@ export function SetupForm({
   );
   // A draft is turned on by this page; a flow on or paused keeps its status.
   const turnOn = status === "draft";
+  // A public service (`authType` none) is connected for every workspace
+  // (platform round 2's B5).
+  const authTypes = new Map<string, PendingProviderAuthType | undefined>([
+    ...required.map(
+      (provider) => [provider.providerId, provider.authType] as const,
+    ),
+    ...vendorFields.flatMap((field) =>
+      field.options.map(
+        (option) => [option.providerId, option.authType] as const,
+      ),
+    ),
+  ]);
   const connected = (providerId: string) =>
-    connectionState(connectionFor(connections, providerId)) === "connected";
+    connectionState(
+      connectionFor(connections, providerId),
+      authTypes.get(providerId),
+    ) === "connected";
 
   const choiceOf = (field: SetupVendorField) => {
     if (picked[field.key] !== undefined) return picked[field.key]!;

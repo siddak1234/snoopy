@@ -178,7 +178,12 @@ export async function subscribeToAutomation(
  * platform applies the manifest's own default or refuses a required one. A
  * drop-down of several (`select-multiple`, `SelectField`) is sent as its list
  * of choices in the order chosen, an empty one as `[]`; one of one choice
- * (`select`) as text (Round 21, the platform round's F1).
+ * (`select`) as text (Round 21, the platform round's F1). A choice is its
+ * option's `value`, never its label, whether the manifest's options are
+ * strings or `{value, label, group}` (platform round 2's B1). A file field
+ * of several (`artifact-multiple`) never reaches here whole: Start run sends
+ * one form per file, each the plain `artifact` control (`perFileForms`,
+ * platform round 2's B2).
  */
 function declaredValues(
   formData: FormData,

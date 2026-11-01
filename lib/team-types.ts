@@ -29,6 +29,7 @@ export const TEAM_TYPES = [
   "Procurement",
   "Administration",
   "Research",
+  "Healthcare",
 ] as const satisfies readonly TeamKind[];
 
 /** A team kind, as the platform publishes the catalog's categories. */

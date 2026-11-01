@@ -1018,10 +1018,51 @@ const placeOfCareField: Automations["AutomationSetupField"] = {
   required: true,
 };
 
-/** Invoice Processing's settings, with the Specialties and Place of care when asked for. */
+/**
+ * A bigger drop-down (platform round 2's B1): twelve `{value, label, group}`
+ * options under two headings, so the panel opens on a search box; optional,
+ * one choice, saved as its value.
+ */
+const taxonomyField: Automations["AutomationSetupField"] = {
+  section: "rules",
+  key: "taxonomy",
+  title: "Taxonomy",
+  description: "The provider's taxonomy.",
+  control: "select",
+  options: [
+    ...[
+      ["207RN0300X", "Nephrology"],
+      ["207RC0000X", "Cardiology"],
+      ["207RE0101X", "Endocrinology"],
+      ["207RG0300X", "Geriatric medicine"],
+      ["207RI0200X", "Infectious disease"],
+      ["207RP1001X", "Pulmonary disease"],
+    ].map(([value, label]) => ({ value, label, group: "Internal medicine" })),
+    ...[
+      ["2084N0400X", "Neurology"],
+      ["2084P0800X", "Psychiatry"],
+      ["2084S0010X", "Sports medicine"],
+      ["2084V0102X", "Forensic psychiatry"],
+      ["2084B0002X", "Obesity medicine"],
+      ["2084A0401X", "Addiction medicine"],
+    ].map(([value, label]) => ({
+      value,
+      label,
+      group: "Psychiatry & neurology",
+    })),
+  ],
+  required: false,
+};
+
+/** Invoice Processing's settings, with the Specialties, Place of care and Taxonomy when asked for. */
 function invoiceSetup(): Automations["AutomationSetupField"][] {
   return state.invoiceSpecialties
-    ? [...invoiceAutomation.setup, specialtiesField, placeOfCareField]
+    ? [
+        ...invoiceAutomation.setup,
+        specialtiesField,
+        placeOfCareField,
+        taxonomyField,
+      ]
     : invoiceAutomation.setup;
 }
 
@@ -4228,10 +4269,18 @@ const server = createServer(
           state.invoiceSpecialties &&
           (typeof config?.placeOfCare !== "string" ||
             !(placeOfCareField.options ?? []).includes(config.placeOfCare));
+        // An object option's value, never its label (platform round 2's B1).
+        const badTaxonomy =
+          config?.taxonomy !== undefined &&
+          !(taxonomyField.options ?? []).some(
+            (option) =>
+              typeof option === "object" && option.value === config.taxonomy,
+          );
         if (
           !config ||
           badChoices ||
           badChoice ||
+          badTaxonomy ||
           Object.keys(config).some((key) => !declared.has(key)) ||
           (config.vendor !== undefined &&
             config.vendor !== "none" &&

@@ -891,14 +891,16 @@ test("a run's file goes straight to the store, and the run carries only its id (
   // before.
   assert.match(fields, /field\.control === "artifact" \? \(\s*<RunFileField/u);
   // The form carries the file's id under the same `input:<key>` name every
-  // other control uses, so the run's input is built one way.
+  // other control uses, so the run's input is built one way — one id under
+  // `artifact`, or with `multiple` each id under `artifact-multiple`, which
+  // Start run sends one run per file (platform round 2's B2).
   assert.match(
     fileField,
-    /name=\{`input-control:\$\{field\.key\}`\}\s*value="artifact"/u,
+    /name=\{`input-control:\$\{field\.key\}`\}\s*value=\{several \? SEVERAL_FILES : "artifact"\}/u,
   );
   assert.match(
     fileField,
-    /name=\{`input:\$\{field\.key\}`\}\s*value=\{state\.artifactId\}/u,
+    /name=\{`input:\$\{field\.key\}`\}\s*value=\{file\.artifactId\}/u,
   );
   // The bytes go to the URL the platform signed — never through the website
   // or the platform's API, and with no cookie.

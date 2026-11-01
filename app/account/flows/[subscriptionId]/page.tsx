@@ -215,8 +215,10 @@ export default async function FlowPage(
     providers.providers.map((provider) => [provider.providerId, provider]),
   );
   const connected = (providerId: string) =>
-    connectionState(connectionFor(connections.connections, providerId)) ===
-    "connected";
+    connectionState(
+      connectionFor(connections.connections, providerId),
+      providerById.get(providerId)?.authType,
+    ) === "connected";
 
   // Each step's vendor choice (backend ADR-0040), from the version the flow
   // RUNS — none when it declares none — never the catalog's newer one

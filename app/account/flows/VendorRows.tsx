@@ -12,6 +12,7 @@ import {
 import {
   connectionLine,
   connectionState,
+  type PendingProviderAuthType,
   type RowConnection,
   VENDOR_MEMBER_NOTE,
 } from "@/lib/connection-rows";
@@ -27,6 +28,8 @@ export type VendorOption = {
   icon: string | null;
   /** Whether it connects through the vendor's consent page, here. */
   connectable: boolean;
+  /** The provider's `authType`: `none` is a public service, always connected (platform round 2's B5). */
+  authType?: PendingProviderAuthType;
   /** The workspace's connection to it, or none. */
   connection: RowConnection | null;
 };
@@ -128,7 +131,10 @@ export function VendorRows({
       onChoose(NONE);
       return;
     }
-    if (connectionState(option.connection ?? undefined) === "connected") {
+    if (
+      connectionState(option.connection ?? undefined, option.authType) ===
+      "connected"
+    ) {
       onChoose(option.providerId);
       return;
     }
@@ -148,7 +154,8 @@ export function VendorRows({
     >
       {options.map((option) => {
         const connection = option.connection ?? undefined;
-        const connected = connectionState(connection) === "connected";
+        const connected =
+          connectionState(connection, option.authType) === "connected";
         const isChosen = chosen === option.providerId;
         // Connected, or connectable by this person: the row is the choice —
         // never when read-only.
@@ -158,7 +165,7 @@ export function VendorRows({
             ? { text: VENDOR_SAVING, tone: "muted" as const }
             : !connected && !canManage
               ? { text: VENDOR_ASK_ADMIN, tone: "muted" as const }
-              : connectionLine(connection);
+              : connectionLine(connection, option.authType);
         return (
           <div key={option.providerId}>
             <button

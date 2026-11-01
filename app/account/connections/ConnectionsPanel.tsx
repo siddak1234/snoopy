@@ -25,6 +25,7 @@ import {
   connectionState,
   disconnectBody,
   disconnectTitle,
+  isKeyless,
 } from "@/lib/connection-rows";
 import type { Connection, ConnectionProvider } from "@/lib/connections";
 import { connectProviderWithKey, disconnectConnection } from "./actions";
@@ -273,8 +274,11 @@ export function ConnectionsPanel({
         <ul className="flex flex-col divide-y divide-[var(--ring)]">
           {providers.map((provider) => {
             const connection = connectionOf(provider.providerId);
-            const state = connectionState(connection);
-            const line = connectionLine(connection);
+            // A public service (`authType` none) is connected, with no
+            // button: nothing to connect or disconnect (platform round 2's B5).
+            const keyless = isKeyless(provider.authType);
+            const state = connectionState(connection, provider.authType);
+            const line = connectionLine(connection, provider.authType);
             const action = connectionAction(state);
             const failed = rowError?.providerId === provider.providerId;
             return (
@@ -286,7 +290,8 @@ export function ConnectionsPanel({
                   line={line.text}
                   lineTone={line.tone}
                   right={
-                    !canManage ? null : action === DISCONNECT_LABEL ? (
+                    !canManage || keyless ? null : action ===
+                      DISCONNECT_LABEL ? (
                       // Red: it ends the connection every flow here acts
                       // through (the owner's build 12, #5).
                       <Button

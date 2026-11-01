@@ -53,9 +53,30 @@ export type RowConnection = {
  */
 export type ConnectionRowState = "connected" | "attention" | "not-connected";
 
+/**
+ * A provider's `authType`, with platform round 2's B5 `none` (a public
+ * service that needs no key). PendingProviderAuthType: the narrowest local
+ * type until the backend's B5 contract is regenerated here; then it is the
+ * generated `ConnectionProvider["authType"]` and this alias goes.
+ */
+export type PendingProviderAuthType = "oauth2" | "api-key" | "none";
+
+/**
+ * A public service (`authType` `none`, platform round 2's B5): it has no
+ * connect step, and counts as connected for every workspace — no Connect, no
+ * Disconnect, its line "Connected".
+ */
+export function isKeyless(
+  authType: PendingProviderAuthType | undefined | null,
+): boolean {
+  return authType === "none";
+}
+
 export function connectionState(
   connection: RowConnection | undefined,
+  authType?: PendingProviderAuthType | null,
 ): ConnectionRowState {
+  if (isKeyless(authType)) return "connected";
   if (!connection) return "not-connected";
   if (connection.status === "reauthorization-required") return "attention";
   if (connection.status === "connected")
@@ -86,12 +107,17 @@ export function connectionFor<C extends RowConnection>(
 /**
  * Line 2 of the row: the account's email when the platform holds one —
  * `externalAccount.displayName` carrying an `@` — else the state in a word;
- * "Needs attention" in the warning colour.
+ * "Needs attention" in the warning colour; a public service (`isKeyless`),
+ * "Connected".
  */
-export function connectionLine(connection: RowConnection | undefined): {
+export function connectionLine(
+  connection: RowConnection | undefined,
+  authType?: PendingProviderAuthType | null,
+): {
   text: string;
   tone: "muted" | "warn";
 } {
+  if (isKeyless(authType)) return { text: CONNECTION_CONNECTED, tone: "muted" };
   const state = connectionState(connection);
   const name = connection?.externalAccount.displayName ?? "";
   if (state !== "not-connected" && name.includes("@"))
