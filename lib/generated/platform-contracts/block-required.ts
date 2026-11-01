@@ -1,4 +1,4 @@
-// From snoopy-backend docs/openapi/automations.yaml, sha256 d07d6d5a481f2b1afd9d19d0697a48ee97a78ffc740e45e5e5b64f9fa488a5ce.
+// From snoopy-backend docs/openapi/automations.yaml, sha256 c161927f8a484eb4d3efafe47a6ae57d23eace1f2a0807664f30564b4ea76a9e.
 // Regenerate with `npm run generate:platform-contracts`; never edit by hand.
 /** A JSON value's basic type, as `typeof` names it, with "array" and "null" told apart. */
 export type BlockKind =

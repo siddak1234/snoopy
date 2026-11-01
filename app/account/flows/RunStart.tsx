@@ -10,7 +10,6 @@ import type { AutomationRunInputField } from "@/lib/automations";
 import { setSubscriptionStatus, startRun } from "./actions";
 import { RunInputFields } from "./ManifestFields";
 import { SPACING } from "@/lib/spacing";
-import { perFileForms, runsStarted } from "@/lib/several-files";
 
 /**
  * Step 1 of a flow's page (Build 21, spec A6; the owner's D3: "it should be
@@ -37,13 +36,6 @@ import { perFileForms, runsStarted } from "@/lib/several-files";
  * words beside it, and Start. A run started there stays on the item's page
  * (`onStarted`), where it joins the ranked list as "Reading…", and the form
  * empties for the next file.
- *
- * **Several files** (platform round 2's B2): a file field that declares
- * `multiple` holds several, and Start run starts one run per file with the
- * same other inputs — `startRun` once per file (`perFileForms`), one after
- * another — then stays here, the fields emptied, saying "{n} runs started";
- * a run refused stops the rest and says why, with the count of those already
- * started. One file is a run started as before.
  */
 export function RunStart({
   workspaceId,
@@ -79,8 +71,6 @@ export function RunStart({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  // How many runs the last several-file start started.
-  const [started, setStarted] = useState<number | null>(null);
   const [runKey, setRunKey] = useState(initialKey);
   const newRunKey = () => setRunKey(`run-${crypto.randomUUID()}`);
   // A file field uploads as soon as a file is chosen; the run waits for every
@@ -112,36 +102,8 @@ export function RunStart({
     const data = new FormData(event.currentTarget);
     data.set("workspaceId", workspaceId);
     setError(null);
-    setStarted(null);
-    const forms = perFileForms(data);
-    if (forms.length > 1) {
-      startTransition(async () => {
-        let count = 0;
-        for (const form of forms) {
-          const result = await startRun(form);
-          if (!result.ok) {
-            setError(result.error);
-            if (result.state === "file-unavailable") {
-              setFileRound((round) => round + 1);
-              newRunKey();
-            }
-            break;
-          }
-          count += 1;
-          if (result.runId) onStarted?.(result.runId);
-        }
-        if (count === 0) return;
-        setStarted(count);
-        if (count === forms.length) {
-          setFileRound((round) => round + 1);
-          newRunKey();
-        }
-        if (!onStarted) router.refresh();
-      });
-      return;
-    }
     startTransition(async () => {
-      const result = await startRun(forms[0]!);
+      const result = await startRun(data);
       if (!result.ok) {
         setError(result.error);
         // A file already used, or gone: its field is emptied to choose again,
@@ -203,15 +165,6 @@ export function RunStart({
         />
       ) : null}
       <FormError message={error} />
-      {started !== null ? (
-        <p
-          role="status"
-          data-testid="runs-started"
-          className="text-sm text-[var(--success-text)]"
-        >
-          {runsStarted(started)}
-        </p>
-      ) : null}
       <div>
         {live ? (
           <Button

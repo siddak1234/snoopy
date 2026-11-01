@@ -242,8 +242,14 @@ function initialState() {
     // every start of it the platform answered, in order; after how many
     // starts the next is refused at capacity (null: none is).
     manualSeveral: false,
+    manualMaxFiles: undefined as number | undefined,
     manualRunStarts: [] as { key: string; input: Json; status: number }[],
-    runStartsBeforeCapacity: null as number | null,
+    // The batch addendum's P3: how many of the next run starts or item
+    // makes are refused because the flow's queue is full (`queue_full`).
+    queueFull: 0,
+    // Platform round 2's B5: the platform lists the NPI Registry in
+    // `publicProviders`; Invoice Processing requires it, its step chose it.
+    publicProviders: false,
     // Backend §12.1 #39: the complete export, read as running once then ready.
     exportJobReads: 0,
     exportJobStarted: false,
@@ -675,6 +681,15 @@ const quickbooksProvider = {
 } satisfies Connections["ConnectionProvider"];
 const quickbooksConnectionId = "d1d1d1d1-d1d1-4d1d-8d1d-d1d1d1d1d1d1";
 
+// A public service (platform round 2's B5): listed in `publicProviders`,
+// never in `providers`, with nothing to connect.
+const nppesProvider = {
+  providerId: "nppes",
+  displayName: "NPI Registry",
+  description: "Looks up a clinician by NPI.",
+  icon: "IdentificationCard",
+} satisfies Connections["PublicConnectionProvider"];
+
 // Google, connected as an account with an email (Build 21, spec A4: "Google
 // row: glyph · Google · person@example.com · Disconnect"; a reserved example
 // address, never a real one in this public repository).
@@ -1062,14 +1077,19 @@ const taxonomyField: Automations["AutomationSetupField"] = {
 
 /** Invoice Processing's settings, with the Specialties, Place of care and Taxonomy when asked for. */
 function invoiceSetup(): Automations["AutomationSetupField"][] {
-  return state.invoiceSpecialties
-    ? [
-        ...invoiceAutomation.setup,
-        specialtiesField,
-        placeOfCareField,
-        taxonomyField,
-      ]
+  const setup = state.publicProviders
+    ? invoiceAutomation.setup.map((field) =>
+        field.control === "connection"
+          ? {
+              ...field,
+              providers: [...(field.providers ?? []), nppesProvider.providerId],
+            }
+          : field,
+      )
     : invoiceAutomation.setup;
+  return state.invoiceSpecialties
+    ? [...setup, specialtiesField, placeOfCareField, taxonomyField]
+    : setup;
 }
 
 // On v4, the newest: the platform moves every flow there (backend ADR-0041).
@@ -1160,6 +1180,20 @@ function fixtureCatalog(): Automations["AutomationCatalogResponse"] {
           ? invoiceAutomation
           : wordlessInvoice()),
         subscribed: state.invoiceAdded,
+        ...(state.publicProviders
+          ? {
+              requiredConnections: [
+                ...invoiceAutomation.requiredConnections,
+                {
+                  providerId: nppesProvider.providerId,
+                  displayName: nppesProvider.displayName,
+                  purpose: "Looks up the clinician.",
+                  optional: false,
+                },
+              ],
+              setup: invoiceSetup(),
+            }
+          : {}),
       },
       ...(state.itemsFlow ? [itemsAutomation] : []),
     ],
@@ -2281,6 +2315,29 @@ function jobApprovals(runId: string): Automations["Approval"][] {
   );
 }
 
+/** A batch run, and its three children in the order its units were sent. */
+const batchRunId = "fixture-batch-run";
+const batchChildren = [
+  ["Visit 1 — A. Patel", "Success", "success", "fixture-batch-child-1"],
+  ["Visit 2 — B. Okafor", "Running", "neutral", "fixture-batch-child-2"],
+  ["Visit 3 — C. Ruiz", "Queued", "neutral", "fixture-batch-child-3"],
+] as const;
+function batchPart(): Block[] {
+  return [
+    { type: "text", text: "Visits", style: "label" },
+    { type: "text", text: "3 visits queued", style: "muted" },
+    {
+      type: "list",
+      searchable: true,
+      items: batchChildren.map(([title, text, tone, runId]) => ({
+        title,
+        badge: { text, tone },
+        open: { target: "run", runId },
+      })),
+    },
+  ];
+}
+
 /** A run's page body, from its answer: files, outcome, result (`pages.run`). */
 function runBody(detail: Json): Json {
   const named = /^blocks-(.+)$/u.exec(String((detail.run as Json).id));
@@ -2289,6 +2346,15 @@ function runBody(detail: Json): Json {
   const { details, documents, sections, ...rest } =
     detail as Automations["RunDetail"] & Json;
   if (fixture) return { ...rest, blocks: fixture, packageAvailable: false };
+  // A batch run (ADR-0048 amendment 4): its own blocks, then the platform's
+  // `batch` part as its composer sends it (backend `batchBlocks`).
+  if (run.id === batchRunId)
+    return {
+      ...rest,
+      run: { ...run, batch: true },
+      blocks: [...(publishedBlocks("v2-details") ?? []), ...batchPart()],
+      packageAvailable: false,
+    };
   const subscription = [
     invoiceSubscription(),
     ...(state.itemsFlow ? [itemsSubscription()] : []),
@@ -2737,13 +2803,20 @@ const server = createServer(
       "/__fixture/run-at-capacity-once": () => {
         state.runsAtCapacity = 1;
       },
-      // Platform round 2's B2: the manual flow's file field takes several
-      // files; and the second start of several refused at capacity.
+      // Platform round 2's B2 (the batch addendum): the manual flow's file
+      // field takes several files into one run, at most `maxFiles` when
+      // given; and the next start or item refused with the queue full.
       "/__fixture/manual-several": () => {
         state.manualSeveral = true;
+        const max = url.searchParams.get("maxFiles");
+        state.manualMaxFiles = max === null ? undefined : Number(max);
       },
-      "/__fixture/run-at-capacity-after-one": () => {
-        state.runStartsBeforeCapacity = 1;
+      "/__fixture/run-queue-full-once": () => {
+        state.queueFull = 1;
+      },
+      "/__fixture/public-providers": () => {
+        state.publicProviders = true;
+        state.invoiceConfig = { ...state.invoiceConfig, vendor: "nppes" };
       },
       // FR-14: opening an upload, or completing one, refused with a reason —
       // and a completion answered 429, which the contract documents for it
@@ -3953,6 +4026,7 @@ const server = createServer(
           quickbooksProvider,
           googleProvider,
         ],
+        ...(state.publicProviders ? { publicProviders: [nppesProvider] } : {}),
       } satisfies ConnectionOperations["listConnectionProviders"]["responses"][200]["content"]["application/json"]);
     }
     if (method === "GET" && isWorkspacePath(pathname, "/connections")) {
@@ -4169,7 +4243,13 @@ const server = createServer(
               ? {
                   runInput: manualSubscription.runInput.map((field) =>
                     field.control === "artifact"
-                      ? { ...field, multiple: true }
+                      ? {
+                          ...field,
+                          multiple: true,
+                          ...(state.manualMaxFiles === undefined
+                            ? {}
+                            : { maxFiles: state.manualMaxFiles }),
+                        }
                       : field,
                   ),
                 }
@@ -4602,6 +4682,14 @@ const server = createServer(
           file?: string;
         };
         state.itemCreates.push(body as Json);
+        // The batch addendum's P3: making an item starts its run.
+        if (state.queueFull > 0) {
+          state.queueFull -= 1;
+          return respond(response, 429, {
+            ...problem(429, "The flow's queue is full"),
+            details: { reason: "queue_full", limit: "500" },
+          } satisfies Platform["ApiProblem"]);
+        }
         const fields = body.fields ?? {};
         const problems: { path: string; message: string }[] = [];
         const area = fields.area ?? "North";
@@ -5071,12 +5159,25 @@ const server = createServer(
       };
       const input = body.input ?? {};
       const { artifactId, ...typed } = input;
-      // FR-14: a file field names a completed upload, given to this run once.
-      const file =
-        typeof artifactId === "string"
-          ? state.files.get(artifactId)
-          : undefined;
-      if (artifactId !== undefined && (!file || file.runId)) {
+      // FR-14: a file field names a completed upload, given to this run once;
+      // a field of several (the batch addendum) its list, 1 to `maxFiles`,
+      // all into this one run.
+      const ids = Array.isArray(artifactId)
+        ? artifactId
+        : artifactId === undefined
+          ? []
+          : [artifactId];
+      const files = ids.map((id) =>
+        typeof id === "string" ? state.files.get(id) : undefined,
+      );
+      if (
+        (Array.isArray(artifactId) &&
+          (!state.manualSeveral ||
+            ids.length === 0 ||
+            ids.length > (state.manualMaxFiles ?? 50) ||
+            new Set(ids).size !== ids.length)) ||
+        files.some((file) => !file || file.runId)
+      ) {
         return respond(response, 422, {
           ...problem(422, "The request could not be processed"),
           details: { reason: "artifact_unavailable" },
@@ -5096,11 +5197,14 @@ const server = createServer(
         );
       }
       const key = String(request.headers["idempotency-key"]);
-      if (state.runStartsBeforeCapacity !== null) {
-        if (state.runStartsBeforeCapacity === 0) {
-          state.runStartsBeforeCapacity = null;
-          state.runsAtCapacity += 1;
-        } else state.runStartsBeforeCapacity -= 1;
+      // The batch addendum's P3: 500 runs of the flow wait in this workspace.
+      if (state.queueFull > 0) {
+        state.queueFull -= 1;
+        state.manualRunStarts.push({ key, input, status: 429 });
+        return respond(response, 429, {
+          ...problem(429, "The flow's queue is full"),
+          details: { reason: "queue_full", limit: "500" },
+        } satisfies Platform["ApiProblem"]);
       }
       // Backend BUILD-PLAN 25.2.10: at capacity a run is held back `pending`;
       // only with its queue full as well is the start refused, and nothing is
@@ -5117,7 +5221,7 @@ const server = createServer(
           },
         } satisfies Platform["ApiProblem"]);
       }
-      if (file) file.runId = startedRunId;
+      for (const file of files) if (file) file.runId = startedRunId;
       state.manualRunStarts.push({ key, input, status: 201 });
       return respond(response, 201, {
         run: { ...fixtureRun(startedRunId), status: "pending" },

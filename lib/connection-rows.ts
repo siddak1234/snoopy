@@ -11,8 +11,10 @@
  *
  * Used by Connections, a flow page's Connections and vendor row, Set up and
  * the vendor page. Pure, and loaded by its unit test as it is: no React and no
- * `@/` import.
+ * `@/` import; its contract types arrive by a type-only import.
  */
+
+import type { components } from "./generated/platform-contracts/connections";
 
 export const CONNECTION_CONNECTED = "Connected";
 export const CONNECTION_NOT_CONNECTED = "Not connected";
@@ -59,15 +61,11 @@ export type ConnectionRowState = "connected" | "attention" | "not-connected";
  * platform lists in `publicProviders`, never in `providers` (the
  * backend's connections contract), and `keylessProviders` gives `none`.
  */
-export type ProviderAuthType = "oauth2" | "api-key" | "none";
+export type ProviderAuthType =
+  components["schemas"]["ConnectionProvider"]["authType"] | "none";
 
 /** A public service as the platform lists it in `publicProviders`. */
-export type PublicProvider = {
-  providerId: string;
-  displayName: string;
-  description: string;
-  icon: string;
-};
+export type PublicProvider = components["schemas"]["PublicConnectionProvider"];
 
 /**
  * The platform's `publicProviders` as rows of the one provider list, each

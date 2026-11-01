@@ -4,6 +4,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { after, before, test } from "node:test";
 import { BLOCK_FIXTURES } from "../lib/generated/platform-contracts/block-fixtures.ts";
+import { offeredDecisions, reviewGroups } from "../lib/run-progress.ts";
 import { spacingClasses } from "../lib/spacing.ts";
 import {
   elements,
@@ -107,10 +108,31 @@ test(
   },
 );
 
+/**
+ * The words a fixture is drawn as: its `text` — but `review-held-grouped`'s
+ * `text` names no heading while its rows are drawn under them (B3; its
+ * `about` says "drawn under each heading"). Open for the backend, as on the
+ * app (`expectedWords` in its parity test): until its `text` holds the
+ * headings, each is expected before its group's first row; once it does, the
+ * `text` is expected as it is.
+ */
+function expectedWords(fixture) {
+  const words = [...fixture.text];
+  if (fixture.name !== "review-held-grouped") return words;
+  const review = fixture.blocks.find((block) => block.type === "questions");
+  const groups = reviewGroups(offeredDecisions(review?.form));
+  if (groups.every(({ group }) => group === null || words.includes(group)))
+    return words;
+  for (const { group, changes } of groups)
+    if (group !== null) words.splice(words.indexOf(changes[0].label), 0, group);
+  return words;
+}
+
 for (const fixture of BLOCK_FIXTURES) {
   test(`${fixture.name}: ${fixture.about} — drawn, it says exactly its text`, () => {
-    assert.deepEqual(visibleWords(blocks.render(fixture.blocks)), [
-      ...fixture.text,
-    ]);
+    assert.deepEqual(
+      visibleWords(blocks.render(fixture.blocks)),
+      expectedWords(fixture),
+    );
   });
 }

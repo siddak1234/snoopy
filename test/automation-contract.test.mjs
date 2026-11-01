@@ -893,7 +893,7 @@ test("a run's file goes straight to the store, and the run carries only its id (
   // The form carries the file's id under the same `input:<key>` name every
   // other control uses, so the run's input is built one way — one id under
   // `artifact`, or with `multiple` each id under `artifact-multiple`, which
-  // Start run sends one run per file (platform round 2's B2).
+  // Start run sends as one run's list of ids (the batch addendum).
   assert.match(
     fileField,
     /name=\{`input-control:\$\{field\.key\}`\}\s*value=\{several \? SEVERAL_FILES : "artifact"\}/u,
@@ -1180,7 +1180,13 @@ test("a setup drop-down picks one or several: the glass drop-down, never the bro
   );
   assert.match(
     values,
-    /if \(control === "select-multiple"\) \{\s*values\[key\] = \[\s*\.\.\.new Set\(\s*formData\s*\.getAll\(`\$\{prefix\}:\$\{key\}`\)/u,
+    /if \(control === "select-multiple" \|\| control === "artifact-multiple"\) \{\s*const list = \[\s*\.\.\.new Set\(\s*formData\s*\.getAll\(`\$\{prefix\}:\$\{key\}`\)/u,
+  );
+  // An empty drop-down of several is `[]`; a file field of several holding
+  // none is left out (the batch addendum: its list is 1 to maxFiles).
+  assert.match(
+    values,
+    /if \(control === "select-multiple" \|\| list\.length > 0\) values\[key\] = list;/u,
   );
 
   // Before anything is sent: every required drop-down left empty, by key.

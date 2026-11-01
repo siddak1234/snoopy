@@ -27,10 +27,10 @@ import { completeRunUpload, openRunUpload } from "./upload-actions";
 import { completeWhenMeasured } from "./upload-completion";
 import { SPACING } from "@/lib/spacing";
 import {
-  FILES_AT_ONCE,
+  DEFAULT_MAX_FILES,
   SEVERAL_FILES,
-  TOO_MANY_FILES,
   filesSelected,
+  tooManyFiles,
 } from "@/lib/several-files";
 
 /**
@@ -74,14 +74,16 @@ const unknownOnServer = () => false;
  * With `showTypes`, the accepted types in words beside it ("PDF, Word file or
  * photo"), as an item's file and its runs' show them (plan §5.2, §5.3).
  *
- * **Several** (`multiple`, platform round 2's B2): the chooser takes several
- * files at once and replaces what the field held; each photo the camera
- * takes is added to it. Each file is sent as one alone is, one after another;
- * the field then says "{n} files selected" (one file, its "Ready:" line), and
- * posts each file's id under its key with the control `artifact-multiple`,
- * from which Start run starts one run per file (`perFileForms`). More than
- * 200 at once: "Add up to 200 files at a time.", and nothing is sent; a file
- * refused, or one that fails, empties the field as one alone does.
+ * **Several** (`multiple`, platform round 2's B2 as the batch addendum
+ * amends it): the chooser takes several files at once and replaces what the
+ * field held; each photo the camera takes is added to it. Each file is sent
+ * as one alone is, one after another; the field then says "{n} files
+ * selected" (one file, its "Ready:" line), and posts each file's id under its
+ * key with the control `artifact-multiple`, every one into ONE run. More than
+ * the field's `maxFiles` (absent, the platform's 50): "Add up to {max} files
+ * at a time.", and nothing is sent — a choice past it empties the field, a
+ * photo past it keeps the files held; a file refused, or one that fails,
+ * empties the field as one alone does.
  *
  * An upload belongs to the field that started it: its busy state is reported
  * under the field's key, it stops when the field goes (the form closed), and an
@@ -126,6 +128,7 @@ export function RunFileField({
     };
   }, [field.key]);
   const several = field.multiple === true;
+  const maxFiles = field.maxFiles ?? DEFAULT_MAX_FILES;
   const [state, setState] = useState<
     | { kind: "empty" }
     | { kind: "uploading"; name: string }
@@ -249,10 +252,10 @@ export function RunFileField({
       if (input.current) input.current.value = "";
       setError(message);
     };
-    // More than 200: nothing is sent; a photo past them keeps the 200 held.
-    if (kept.length + chosen.length > FILES_AT_ONCE) {
-      if (source === "camera") setError(TOO_MANY_FILES);
-      else empty(TOO_MANY_FILES);
+    // More than the field takes: nothing is sent; a photo past it keeps the files held.
+    if (kept.length + chosen.length > maxFiles) {
+      if (source === "camera") setError(tooManyFiles(maxFiles));
+      else empty(tooManyFiles(maxFiles));
       return;
     }
     const plans = chosen.map((file) =>

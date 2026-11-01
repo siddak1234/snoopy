@@ -23,11 +23,9 @@ import {
   reviewGroups,
 } from "../lib/run-progress.ts";
 import {
-  FILES_AT_ONCE,
-  TOO_MANY_FILES,
+  DEFAULT_MAX_FILES,
   filesSelected,
-  perFileForms,
-  runsStarted,
+  tooManyFiles,
 } from "../lib/several-files.ts";
 import { TEAM_TYPES } from "../lib/team-types.ts";
 import {
@@ -240,61 +238,13 @@ test("B1: the closed trigger says labels, never values", async () => {
   );
 });
 
-test('B2: several files are one form per file, the same other inputs, one key each; one file, none or a plain form is the one form as before; "{n} files selected", "{n} runs started", at most 200', () => {
-  const form = new FormData();
-  form.append("subscriptionId", "s1");
-  form.append("idempotencyKey", "run-0123456789abcdef");
-  form.append("input-control:note", "text");
-  form.append("input:note", "same");
-  form.append("input-control:scans", "artifact-multiple");
-  form.append("input:scans", "f1");
-  form.append("input:scans", "f2");
-  form.append("input:scans", "f3");
-  const forms = perFileForms(form);
-  assert.equal(forms.length, 3);
-  assert.deepEqual(
-    forms.map((one) => [
-      one.get("idempotencyKey"),
-      one.getAll("input:scans"),
-      one.get("input-control:scans"),
-      one.get("input:note"),
-      one.get("subscriptionId"),
-    ]),
-    [1, 2, 3].map((n) => [
-      `run-0123456789abcdef.${n}`,
-      [`f${n}`],
-      "artifact",
-      "same",
-      "s1",
-    ]),
-  );
-  // Each key the start-run action takes.
-  for (const one of forms)
-    assert.match(one.get("idempotencyKey"), /^[A-Za-z0-9._~:-]{16,128}$/u);
-
-  const single = new FormData();
-  single.append("idempotencyKey", "run-0123456789abcdef");
-  single.append("input-control:scan", "artifact");
-  single.append("input:scan", "f1");
-  assert.deepEqual(perFileForms(single), [single]);
-
-  const oneOfSeveral = new FormData();
-  oneOfSeveral.append("idempotencyKey", "run-0123456789abcdef");
-  oneOfSeveral.append("input-control:scans", "artifact-multiple");
-  oneOfSeveral.append("input:scans", "f1");
-  const [only, ...rest] = perFileForms(oneOfSeveral);
-  assert.equal(rest.length, 0);
-  assert.equal(only.get("idempotencyKey"), "run-0123456789abcdef");
-  assert.equal(only.get("input-control:scans"), "artifact");
-  assert.deepEqual(only.getAll("input:scans"), ["f1"]);
-
+test('B2 (batch addendum): "{n} files selected"; "Add up to {max} files at a time."; the platform\'s default of 50', () => {
   assert.equal(filesSelected(3), "3 files selected");
-  assert.equal(runsStarted(3), "3 runs started");
-  assert.equal(FILES_AT_ONCE, 200);
-  assert.equal(TOO_MANY_FILES, "Add up to 200 files at a time.");
+  assert.equal(tooManyFiles(3), "Add up to 3 files at a time.");
+  assert.equal(DEFAULT_MAX_FILES, 50);
 });
 
-test("B2: a field of several files lets the chooser take several and posts artifact-multiple; a field of one is drawn as before; Start run calls startRun once per file", async () => {
+test("B2: a field of several files lets the chooser take several and posts artifact-multiple; a field of one is drawn as before; Start run starts one run", async () => {
   const { RunFileField } = await load(FILE_FIELD);
   const field = (extra) => ({
     key: "scans",
@@ -328,20 +278,10 @@ test("B2: a field of several files lets the chooser take several and posts artif
     "artifact",
   );
 
-  // More than 200 is refused before anything is sent.
-  const source = read(FILE_FIELD);
-  assert.match(
-    source,
-    /if \(kept\.length \+ chosen\.length > FILES_AT_ONCE\) \{[\s\S]*?TOO_MANY_FILES/u,
-  );
-  // Start run: one startRun per file's form, the count said once started.
+  // Start run: the one form, one startRun (the batch addendum).
   const start = read("app/account/flows/RunStart.tsx");
-  assert.match(start, /const forms = perFileForms\(data\);/u);
-  assert.match(
-    start,
-    /for \(const form of forms\) \{\s*const result = await startRun\(form\);/u,
-  );
-  assert.match(start, /\{runsStarted\(started\)\}/u);
+  assert.match(start, /const result = await startRun\(data\);/u);
+  assert.doesNotMatch(start, /perFileForms|runsStarted/u);
 });
 
 const groupedFixture = BLOCK_FIXTURES.find(

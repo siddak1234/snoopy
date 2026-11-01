@@ -5667,7 +5667,7 @@ test("Round 21, platform round 2 (B1) — a drop-down of more than 10 choices op
   });
 });
 
-test.describe("Round 21, platform round 2 (B2) — several files in one upload", () => {
+test.describe("Round 21, platform round 2 (B2, as the batch addendum amends it) — several files in one upload", () => {
   // The browser PUTs each file straight to the fixture's object store, whose
   // certificate is the fixture's own.
   test.use({ ignoreHTTPSErrors: true });
@@ -5678,7 +5678,7 @@ test.describe("Round 21, platform round 2 (B2) — several files in one upload",
       { key: string; input: Record<string, unknown>; status: number }[]
     >("run-starts");
 
-  test("three files chosen at once: each sent, '3 files selected', then one run each with the same other inputs, its key .1 to .3, and '3 runs started'", async ({
+  test("three files chosen at once: each sent, '3 files selected', then ONE run under the one key, its input the three upload ids with the same other inputs, and its page opened", async ({
     page,
   }) => {
     await fixtureControl("manual-several");
@@ -5697,56 +5697,64 @@ test.describe("Round 21, platform round 2 (B2) — several files in one upload",
       "c.pdf",
     ]);
     await dialog.getByRole("button", { name: "Start run" }).click();
-    await expect(dialog.getByTestId("runs-started")).toHaveText(
-      "3 runs started",
-    );
+    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/u);
     const starts = await runStarts();
-    expect(starts.map(({ key: sent }) => sent)).toEqual([
-      `${key}.1`,
-      `${key}.2`,
-      `${key}.3`,
+    expect(starts.map(({ key: sent, status }) => [sent, status])).toEqual([
+      [key, 201],
     ]);
-    expect(starts.map(({ status }) => status)).toEqual([201, 201, 201]);
-    const files = await fixtureFiles();
-    for (const [at, { input }] of starts.entries()) {
-      const { artifactId, ...others } = input;
-      expect(others).toEqual({
-        vendor: "Acme Supplies",
-        amount: 120.5,
-        reference: "INV-1001",
-      });
-      expect(typeof artifactId).toBe("string");
-      expect(files[at]).toMatchObject({
-        filename: ["a.pdf", "b.pdf", "c.pdf"][at],
-      });
-    }
-    expect(new Set(starts.map(({ input }) => input.artifactId)).size).toBe(3);
+    const { artifactId, ...others } = starts[0]!.input;
+    expect(others).toEqual({
+      vendor: "Acme Supplies",
+      amount: 120.5,
+      reference: "INV-1001",
+    });
+    // The list of the three upload ids, each given to this one run.
+    expect(Array.isArray(artifactId)).toBe(true);
+    expect(new Set(artifactId as string[]).size).toBe(3);
+    expect(
+      (await fixtureFiles()).map(({ filename, runId }) => [filename, runId]),
+    ).toEqual([
+      ["a.pdf", "fixture-run-started"],
+      ["b.pdf", "fixture-run-started"],
+      ["c.pdf", "fixture-run-started"],
+    ]);
   });
 
-  test("201 files at once send nothing and say 'Add up to 200 files at a time.'", async ({
+  test("past the field's maxFiles nothing is sent and it says 'Add up to {max} files at a time.'; with none declared, the platform's 50", async ({
     page,
   }) => {
-    await fixtureControl("manual-several");
+    await fixtureControl("manual-several?maxFiles=2");
     const dialog = await openFilledRun(page);
     await dialog
       .getByLabel("Invoice file")
-      .setInputFiles(
-        Array.from({ length: 201 }, (_, at) => pdf(`file-${at + 1}.pdf`)),
-      );
+      .setInputFiles([pdf("a.pdf"), pdf("b.pdf"), pdf("c.pdf")]);
     await expect(dialog.getByRole("alert")).toHaveText(
-      "Add up to 200 files at a time.",
+      "Add up to 2 files at a time.",
     );
     await expect(dialog.getByText(/files selected/u)).toHaveCount(0);
     expect(await storedObjects()).toEqual([]);
-    await dialog.getByRole("button", { name: "Start run" }).click();
-    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
-    // Started with no file: none of the 201 was sent.
+
+    await fixtureControl("reset");
+    await fixtureControl("manual-several");
+    const again = await openFilledRun(page);
+    await again
+      .getByLabel("Invoice file")
+      .setInputFiles(
+        Array.from({ length: 51 }, (_, at) => pdf(`file-${at + 1}.pdf`)),
+      );
+    await expect(again.getByRole("alert")).toHaveText(
+      "Add up to 50 files at a time.",
+    );
+    expect(await storedObjects()).toEqual([]);
+    await again.getByRole("button", { name: "Start run" }).click();
+    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/u);
+    // Started with no file: none of the 51 was sent.
     const starts = await runStarts();
     expect(starts).toHaveLength(1);
     expect(starts[0]!.input).not.toHaveProperty("artifactId");
   });
 
-  test("a run refused part way through: the runs already started are said, the refusal in the flow's words, and the files and the key kept", async ({
+  test("a run refused because the flow's queue is full says 'Your queue is full. Wait for these to finish.', and keeps the files and the key", async ({
     page,
   }) => {
     await fixtureControl("manual-several");
@@ -5757,20 +5765,14 @@ test.describe("Round 21, platform round 2 (B2) — several files in one upload",
       .setInputFiles([pdf("a.pdf"), pdf("b.pdf")]);
     await expect(dialog.getByText("2 files selected")).toBeVisible();
     const key = await keyField.inputValue();
-    await fixtureControl("run-at-capacity-after-one");
+    await fixtureControl("run-queue-full-once");
     await dialog.getByRole("button", { name: "Start run" }).click();
     await expect(dialog.getByRole("alert")).toHaveText(
-      "This flow is busy and its queue is full, so the run was not started. Try again once one of its runs has ended.",
-    );
-    await expect(dialog.getByTestId("runs-started")).toHaveText(
-      "1 runs started",
+      "Your queue is full. Wait for these to finish.",
     );
     expect(
       (await runStarts()).map(({ key: sent, status }) => [sent, status]),
-    ).toEqual([
-      [`${key}.1`, 201],
-      [`${key}.2`, 429],
-    ]);
+    ).toEqual([[key, 429]]);
     await expect(page).toHaveURL(new RegExp(`${FLOWS.manual}$`, "u"));
     await expect(dialog.getByText("2 files selected")).toBeVisible();
     await expect(keyField).toHaveValue(key);
@@ -5815,4 +5817,81 @@ test.describe("Round 21, platform round 2 (B2) — several files in one upload",
       ).toHaveCount(3);
     });
   });
+});
+
+test.describe("Round 21, platform round 2 (B5) — a public app the platform lists in publicProviders", () => {
+  test.beforeEach(async () => {
+    await fixtureControl("public-providers");
+  });
+
+  test("Connections: the NPI Registry row says Connected, with no Connect and no Disconnect", async ({
+    page,
+  }) => {
+    await page.goto("/account/connections");
+    const row = page.getByTestId("connection-nppes");
+    await expect(row).toContainText("NPI Registry");
+    await expect(row).toContainText("Connected");
+    await expect(row.getByRole("button")).toHaveCount(0);
+  });
+
+  test("Set up: a flow whose requiredConnections names it draws no Connect step for it", async ({
+    page,
+  }) => {
+    await page.goto(`${FLOWS.invoice}/setup`);
+    const main = page.locator("main");
+    await expect(
+      main.getByRole("heading", {
+        name: "Set up Invoice Processing",
+        level: 1,
+      }),
+    ).toBeVisible();
+    await expect(main.getByTestId("connection-nppes")).toHaveCount(0);
+    await expect(
+      main.getByRole("button", { name: /NPI Registry/u }),
+    ).toHaveCount(0);
+  });
+
+  test("the flow page: a step that chose it says Connected, and the flow is owed nothing for it", async ({
+    page,
+  }) => {
+    await page.goto(FLOWS.invoice);
+    const vendor = page.getByTestId("flow-vendor-vendor");
+    await expect(vendor).toContainText("NPI Registry");
+    await expect(vendor).toContainText("Connected");
+    await expect(page.getByText(/Connect NPI Registry/u)).toHaveCount(0);
+  });
+});
+
+test("a batch run's page: the batch's own blocks, then '{unit plural}', '{n} {unit plural} queued' and each child in order — its label, its status and a link to its run (ADR-0048 amendment 4)", async ({
+  page,
+}) => {
+  await page.goto("/account/runs/fixture-batch-run");
+  const body = page.getByTestId("run-blocks");
+  await expect(body.getByText("Visits", { exact: true })).toBeVisible();
+  // Its words as sent: a label's case is the style's, not the text's.
+  const text = ((await body.textContent()) ?? "").replace(/\s+/gu, " ");
+  const at = (words: string) => text.indexOf(words);
+  for (const words of [
+    "Saved the bill.",
+    "Visits",
+    "3 visits queued",
+    "Visit 1 — A. Patel",
+    "Visit 2 — B. Okafor",
+    "Visit 3 — C. Ruiz",
+  ])
+    expect([words, at(words) >= 0]).toEqual([words, true]);
+  expect(at("Saved the bill.")).toBeLessThan(at("Visits"));
+  expect(at("Visits")).toBeLessThan(at("3 visits queued"));
+  expect(at("3 visits queued")).toBeLessThan(at("Visit 1 — A. Patel"));
+  expect(at("Visit 1 — A. Patel")).toBeLessThan(at("Visit 2 — B. Okafor"));
+  expect(at("Visit 2 — B. Okafor")).toBeLessThan(at("Visit 3 — C. Ruiz"));
+  for (const [label, status, runId] of [
+    ["Visit 1 — A. Patel", "Success", "fixture-batch-child-1"],
+    ["Visit 2 — B. Okafor", "Running", "fixture-batch-child-2"],
+    ["Visit 3 — C. Ruiz", "Queued", "fixture-batch-child-3"],
+  ]) {
+    const child = body.getByRole("link", { name: new RegExp(label, "u") });
+    await expect(child).toContainText(status);
+    await expect(child).toHaveAttribute("href", `/account/runs/${runId}`);
+  }
 });

@@ -970,3 +970,20 @@ test("Archive refused for a member says only an owner or admin can", async ({
   await dialog.getByRole("button", { name: "Archive" }).click();
   await expect(dialog.getByText(OWNERS_AND_ADMINS)).toBeVisible();
 });
+
+test("Upload refused because the flow's queue is full says so in the owner's words, and the card keeps its file (the batch addendum, 429 queue_full)", async ({
+  page,
+}) => {
+  await page.goto(FLOW);
+  await page.getByRole("button", { name: "Upload batch" }).click();
+  const card = page.getByTestId("item-upload");
+  await card.getByLabel("Name").fill("Queued list");
+  await card.getByLabel("Batch file").setInputFiles(entryPdf);
+  await expect(card.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
+  await fixtureControl("run-queue-full-once");
+  await card.getByRole("button", { name: "Upload", exact: true }).click();
+  await expect(
+    card.getByText("Your queue is full. Wait for these to finish."),
+  ).toBeVisible();
+  await expect(card.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
+});

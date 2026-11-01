@@ -45,8 +45,12 @@ this origin holds.
   `publicProviders` (`PublicConnectionProvider`): the platform never lists a
   public service in `providers`, so `listConnectionProviders` in
   `lib/connections.ts` adds each to the one provider list as `authType`
-  `none` (`keylessProviders`, `ProviderAuthType` in `lib/connection-rows.ts`),
-  the keyless set Connections, Set up, a flow page and its vendor page read.
+  `none` (`keylessProviders` in `lib/connection-rows.ts`, whose
+  `PublicProvider` and `ProviderAuthType` are the generated types, the
+  latter with `none` added), the keyless set Connections, Set up, a flow
+  page and its vendor page read. The batch addendum (ADR-0048 amendment 4)
+  is generated too: the run input's `maxFiles`, `Run.batch` and `Run.unit`,
+  the run page's `batch` part, and 429 `queue_full`.
 - No Prisma, direct database, Supabase SDK, object-store SDK, browser secret,
   manual password login, or provider credential belongs here.
 - Tenancy state comes from typed Edge responses. Mutations have unique
@@ -80,17 +84,22 @@ page reuses:
   a `group` are drawn under its heading, the headings in the order they
   first appear (`choiceGroups`). One of 10 or fewer without groups is drawn
   as before.
-- **Several files at once**: a run's file field that declares `multiple`
-  (`RunFileField`) lets the chooser take several files and the camera add
-  each photo, sends each as one file alone is sent, and says "{n} files
-  selected"; Start run then starts one run per file with the same other
-  inputs, the one start-run action once per file (`perFileForms` in
-  `lib/several-files.ts`, each run its own key), and says "{n} runs
-  started". More than 200 at once says "Add up to 200 files at a time." and
-  sends nothing. Holding one file, a field of several says its "Ready:"
-  line and Start run opens that one run, as a field of one file does (the
-  session's default; the spec names only the count lines). A field of one
-  file is unchanged.
+- **Several files at once** (platform round 2's B2 as the batch addendum
+  amends it): a run's file field that declares `multiple` (`RunFileField`)
+  lets the chooser take several files and the camera add each photo, sends
+  each as one file alone is sent, and says "{n} files selected"; Start run
+  then starts ONE run, its input that field's list of upload ids under the
+  one key (`declaredValues` in `app/account/flows/actions.ts`), and opens
+  it. More than the field's `maxFiles` (absent, the platform's 50) says
+  "Add up to {max} files at a time." and sends nothing: a choice past it
+  empties the field, a photo past it keeps the files held. Holding one
+  file, a field of several says its "Ready:" line (the session's default;
+  the spec names only the count line). A field of one file is unchanged.
+- **A full queue**: a run start, or an item made (which starts its run),
+  refused 429 with `details.reason` `queue_full` says "Your queue is full.
+  Wait for these to finish." and keeps the form, files and key; the older
+  `max_concurrent_runs` keeps its flow-busy sentence (`queueFull` in
+  `app/account/flows/actions.ts`).
 - **A row that opens a page** is `PageRow` (`components/dashboard/PageRow.tsx`):
   a closed section's box and height, the arrow at its end — or, `boxed`
   false, a row of one card of divided rows (`LIST_CARD`): a list block's
@@ -246,7 +255,10 @@ platform's composer words it (backend `apps/runs/src/pages`), and no page
 holds code for one flow (`test/no-flow-code.test.mjs`).
 
 A run's page and its details page ("Screen standards") are one `RunLive`,
-read alike (`app/account/runs/[runId]/run-page-data.ts`). A held job is
+read alike (`app/account/runs/[runId]/run-page-data.ts`). A batch run's page
+(ADR-0048 amendment 4) is drawn as the platform sends it: the batch's own
+blocks, then its `batch` part — "{unit plural}", "{n} {unit plural} queued"
+and each child run in order, its label, its status and a link to its run. A held job is
 decided on its page: under the result line, "Waiting for approval.", the
 platform's approval form (`questions{approval}`), drawn as the one Approve
 and Deny pair (`app/account/approvals/ApprovalDecision.tsx`, Deny the danger
@@ -274,7 +286,9 @@ deny each change." until then; a member reads the rows and "Only an owner or
 admin can review this."; a page that draws no form for it reads the rows
 alone (`ReviewRows` in `components/blocks/renderers.tsx`), each label then
 its detail, with no pills; the block fixtures `review-held-*` read a
-review's labels and details, not its group headings.
+review's labels and details, not its group headings, so until the platform's
+`review-held-grouped` names them the parity test expects each heading before
+its group's first row, as the app's does.
 Changes that carry a `group` (platform round 2's B3) are drawn under its
 heading, in both places, the groups in the order first sent and every one
 open, up to 400 changes (`reviewGroups`, `offeredDecisions`); Save review

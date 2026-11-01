@@ -134,7 +134,7 @@
 - [lib/run-progress.ts](../lib/run-progress.ts): A run's STEPS (Build 21, spec A7; the session's S14; the owner's build 20
 - [lib/run-verdict.ts](../lib/run-verdict.ts): A run's verdict, as its page names and colours it (the owner's F1 and Q5,
 - [lib/session-contract.ts](../lib/session-contract.ts): no header
-- [lib/several-files.ts](../lib/several-files.ts): Several files in one upload (Round 21, platform round 2's B2; backend
+- [lib/several-files.ts](../lib/several-files.ts): Several files in one upload (Round 21, platform round 2's B2 as the batch
 - [lib/signed-link.ts](../lib/signed-link.ts): A signed link the browser goes to (Build 25, the review's R5c 2): the run
 - [lib/site.ts](../lib/site.ts): no header
 - [lib/spacing.ts](../lib/spacing.ts): The spacing table (backend `BLOCK_SPACING`, ADR-0048 amendment 1; the
