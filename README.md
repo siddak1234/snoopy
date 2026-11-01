@@ -134,7 +134,9 @@ and pages, Activity's search, sort and pages as the platform is asked for
 them, and Share refused; Round 21's review of each change and Approvals'
 "Review {n} changes"; Set up's drop-down of several, and platform round
 2's bigger drop-down (Search, "No matches.", its headings, the label said
-and the value saved) in `e2e/public-edge-fixture.spec.ts`), `e2e/dialogs.spec.ts`
+and the value saved) and several files in one upload (one run each, its key
+`.1` to `.n`; more than 200 refused; a run refused part way; a photo
+added) in `e2e/public-edge-fixture.spec.ts`), `e2e/dialogs.spec.ts`
 (every dialog's Escape, click outside, focus return and hold, one row each)
 and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: the Flows
 list by department A–Z; its items grouped A–Z under its group filter, the

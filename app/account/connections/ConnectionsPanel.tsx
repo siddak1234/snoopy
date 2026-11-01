@@ -27,7 +27,7 @@ import {
   disconnectTitle,
   isKeyless,
 } from "@/lib/connection-rows";
-import type { Connection, ConnectionProvider } from "@/lib/connections";
+import type { Connection, OfferedProvider } from "@/lib/connections";
 import { connectProviderWithKey, disconnectConnection } from "./actions";
 import {
   PENDING_CONNECT,
@@ -80,7 +80,7 @@ export function ConnectionsPanel({
 }: {
   connections: Connection[];
   /** The providers to list, in order: every one on Connections, a flow's own on its page. */
-  providers: ConnectionProvider[];
+  providers: OfferedProvider[];
   canManage: boolean;
   /** Back from a vendor's sign-in, as the platform's callback said it ended. */
   callbackStatus: "connected" | "error" | null;
@@ -91,7 +91,7 @@ export function ConnectionsPanel({
 }) {
   const router = useRouter();
   const [selectedProvider, setSelectedProvider] =
-    useState<ConnectionProvider | null>(null);
+    useState<OfferedProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
   // A connect's answer, under its row.
   const [rowError, setRowError] = useState<{
@@ -105,7 +105,7 @@ export function ConnectionsPanel({
   const [pending, startTransition] = useTransition();
   const [busyProvider, setBusyProvider] = useState<string | null>(null);
   // The provider whose disconnect is being confirmed, and its refusal.
-  const [disconnecting, setDisconnecting] = useState<ConnectionProvider | null>(
+  const [disconnecting, setDisconnecting] = useState<OfferedProvider | null>(
     null,
   );
   const [disconnectError, setDisconnectError] = useState<string | null>(null);
@@ -137,7 +137,7 @@ export function ConnectionsPanel({
   const connectionOf = (providerId: string) =>
     connectionFor(connections, providerId);
 
-  const authorize = (provider: ConnectionProvider) => {
+  const authorize = (provider: OfferedProvider) => {
     setBusyProvider(provider.providerId);
     startTransition(async () => {
       const started = await startConnect(
@@ -164,7 +164,7 @@ export function ConnectionsPanel({
   };
 
   /** The row's one button. What the last one came back with goes as the next is pressed. */
-  const press = (provider: ConnectionProvider) => {
+  const press = (provider: OfferedProvider) => {
     setError(null);
     setRowError(null);
     setNotice(null);
@@ -212,7 +212,7 @@ export function ConnectionsPanel({
     setDisconnectError(null);
   };
 
-  const confirmDisconnect = (provider: ConnectionProvider) => {
+  const confirmDisconnect = (provider: OfferedProvider) => {
     const connection = connectionOf(provider.providerId);
     if (!connection) return;
     setDisconnectError(null);

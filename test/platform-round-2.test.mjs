@@ -15,6 +15,7 @@ import {
   connectionLine,
   connectionState,
   isKeyless,
+  keylessProviders,
 } from "../lib/connection-rows.ts";
 import {
   REVIEW_LIMIT,
@@ -501,6 +502,26 @@ test("B5: a connected app whose authType is none is connected for every workspac
     read("app/account/flows/[subscriptionId]/vendor/page.tsx"),
   ])
     assert.match(page, /authType: provider\?\.authType,/u);
+});
+
+test("B5: the platform's publicProviders join the one provider list as keyless rows, which every page reads as connected", () => {
+  const nppes = {
+    providerId: "nppes",
+    displayName: "NPI Registry",
+    description: "Looks up a clinician by NPI.",
+    icon: "IdentificationCard",
+  };
+  assert.deepEqual(keylessProviders([nppes]), [
+    { ...nppes, scopes: [], authType: "none" },
+  ]);
+  assert.deepEqual(keylessProviders(undefined), []);
+  const [row] = keylessProviders([nppes]);
+  assert.equal(connectionState(undefined, row.authType), "connected");
+  const connections = read("lib/connections.ts");
+  assert.match(
+    connections,
+    /\.\.\.body\.providers,\s*\.\.\.keylessProviders\(body\.publicProviders\),?\s*\]/u,
+  );
 });
 
 /** A parsed node's words, in reading order, as `visibleWords` reads them: words only a screen reader hears left out. */

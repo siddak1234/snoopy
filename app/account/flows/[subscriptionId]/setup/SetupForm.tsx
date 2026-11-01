@@ -9,11 +9,11 @@ import type {
   AutomationSetupField,
   SubscriptionStatus,
 } from "@/lib/automations";
-import type { Connection, ConnectionProvider } from "@/lib/connections";
+import type { Connection, OfferedProvider } from "@/lib/connections";
 import {
   connectionFor,
   connectionState,
-  type PendingProviderAuthType,
+  type ProviderAuthType,
 } from "@/lib/connection-rows";
 import {
   NONE,
@@ -88,7 +88,7 @@ export function SetupForm({
   config: Record<string, unknown>;
   vendorFields: SetupVendorField[];
   /** The accounts the flow cannot run without. */
-  required: ConnectionProvider[];
+  required: OfferedProvider[];
   connections: Connection[];
   canManage: boolean;
   /** This page, for a connect's way back. */
@@ -111,7 +111,7 @@ export function SetupForm({
   const turnOn = status === "draft";
   // A public service (`authType` none) is connected for every workspace
   // (platform round 2's B5).
-  const authTypes = new Map<string, PendingProviderAuthType | undefined>([
+  const authTypes = new Map<string, ProviderAuthType | undefined>([
     ...required.map(
       (provider) => [provider.providerId, provider.authType] as const,
     ),

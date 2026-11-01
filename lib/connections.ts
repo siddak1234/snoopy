@@ -3,16 +3,25 @@ import {
   PlatformNotConfiguredError,
   workspacePath as scope,
 } from "@/lib/platform-server";
+import { keylessProviders, type ProviderAuthType } from "@/lib/connection-rows";
 import type {
   components,
   operations,
 } from "./generated/platform-contracts/connections";
 
 export type ConnectionProvider = components["schemas"]["ConnectionProvider"];
+/**
+ * A provider as every page reads it: the contract's, or a public service
+ * from `publicProviders` with `authType` `none` (`keylessProviders`).
+ */
+export type OfferedProvider = Omit<ConnectionProvider, "authType"> & {
+  authType: ProviderAuthType;
+};
 export type ConnectionStatus = components["schemas"]["ConnectionStatus"];
 export type Connection = components["schemas"]["Connection"];
-export type ConnectionProvidersResponse =
+type WireConnectionProvidersResponse =
   operations["listConnectionProviders"]["responses"][200]["content"]["application/json"];
+export type ConnectionProvidersResponse = { providers: OfferedProvider[] };
 export type ConnectionsResponse =
   operations["listConnections"]["responses"][200]["content"]["application/json"];
 export type ConnectionAuthorizationResponse =
@@ -26,8 +35,18 @@ export type DisconnectConnectionResponse =
 export type ConnectionAuthorizationRequest =
   operations["beginConnectionAuthorization"]["requestBody"]["content"]["application/json"];
 
-export function listConnectionProviders(): Promise<ConnectionProvidersResponse> {
-  return platformServerJson("/v1/connections/providers");
+/**
+ * Every provider on offer, one list: the platform's `providers`, then its
+ * `publicProviders` (platform round 2's B5) as keyless rows, so each page
+ * that reads `providers` draws a public service as connected.
+ */
+export async function listConnectionProviders(): Promise<ConnectionProvidersResponse> {
+  const body = await platformServerJson<WireConnectionProvidersResponse>(
+    "/v1/connections/providers",
+  );
+  return {
+    providers: [...body.providers, ...keylessProviders(body.publicProviders)],
+  };
 }
 
 export function listConnections(

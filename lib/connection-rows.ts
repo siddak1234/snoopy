@@ -54,12 +54,40 @@ export type RowConnection = {
 export type ConnectionRowState = "connected" | "attention" | "not-connected";
 
 /**
- * A provider's `authType`, with platform round 2's B5 `none` (a public
- * service that needs no key). PendingProviderAuthType: the narrowest local
- * type until the backend's B5 contract is regenerated here; then it is the
- * generated `ConnectionProvider["authType"]` and this alias goes.
+ * A provider's `authType` as the client reads it: the contract's `oauth2` or
+ * `api-key`, or `none` — a public service (platform round 2's B5), which the
+ * platform lists in `publicProviders`, never in `providers` (the
+ * backend's connections contract), and `keylessProviders` gives `none`.
  */
-export type PendingProviderAuthType = "oauth2" | "api-key" | "none";
+export type ProviderAuthType = "oauth2" | "api-key" | "none";
+
+/** A public service as the platform lists it in `publicProviders`. */
+export type PublicProvider = {
+  providerId: string;
+  displayName: string;
+  description: string;
+  icon: string;
+};
+
+/**
+ * The platform's `publicProviders` as rows of the one provider list, each
+ * `authType` `none` with no scopes, so Connections, Set up, a flow page and
+ * its vendor page read a public service through `isKeyless` as connected.
+ */
+export function keylessProviders(
+  publicProviders: readonly PublicProvider[] | undefined,
+): (PublicProvider & { scopes: string[]; authType: "none" })[] {
+  return (publicProviders ?? []).map(
+    ({ providerId, displayName, description, icon }) => ({
+      providerId,
+      displayName,
+      description,
+      icon,
+      scopes: [],
+      authType: "none",
+    }),
+  );
+}
 
 /**
  * A public service (`authType` `none`, platform round 2's B5): it has no
@@ -67,14 +95,14 @@ export type PendingProviderAuthType = "oauth2" | "api-key" | "none";
  * Disconnect, its line "Connected".
  */
 export function isKeyless(
-  authType: PendingProviderAuthType | undefined | null,
+  authType: ProviderAuthType | undefined | null,
 ): boolean {
   return authType === "none";
 }
 
 export function connectionState(
   connection: RowConnection | undefined,
-  authType?: PendingProviderAuthType | null,
+  authType?: ProviderAuthType | null,
 ): ConnectionRowState {
   if (isKeyless(authType)) return "connected";
   if (!connection) return "not-connected";
@@ -112,7 +140,7 @@ export function connectionFor<C extends RowConnection>(
  */
 export function connectionLine(
   connection: RowConnection | undefined,
-  authType?: PendingProviderAuthType | null,
+  authType?: ProviderAuthType | null,
 ): {
   text: string;
   tone: "muted" | "warn";

@@ -12,7 +12,7 @@ import {
 import {
   connectionLine,
   connectionState,
-  type PendingProviderAuthType,
+  type ProviderAuthType,
   type RowConnection,
   VENDOR_MEMBER_NOTE,
 } from "@/lib/connection-rows";
@@ -29,7 +29,7 @@ export type VendorOption = {
   /** Whether it connects through the vendor's consent page, here. */
   connectable: boolean;
   /** The provider's `authType`: `none` is a public service, always connected (platform round 2's B5). */
-  authType?: PendingProviderAuthType;
+  authType?: ProviderAuthType;
   /** The workspace's connection to it, or none. */
   connection: RowConnection | null;
 };

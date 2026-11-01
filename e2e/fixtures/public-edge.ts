@@ -238,6 +238,12 @@ function initialState() {
     // Backend BUILD-PLAN 25.2.10: how many of the next run starts are refused
     // because the flow is at capacity and its queue is full.
     runsAtCapacity: 0,
+    // Platform round 2's B2: the manual flow's file field takes several, and
+    // every start of it the platform answered, in order; after how many
+    // starts the next is refused at capacity (null: none is).
+    manualSeveral: false,
+    manualRunStarts: [] as { key: string; input: Json; status: number }[],
+    runStartsBeforeCapacity: null as number | null,
     // Backend §12.1 #39: the complete export, read as running once then ready.
     exportJobReads: 0,
     exportJobStarted: false,
@@ -2731,6 +2737,14 @@ const server = createServer(
       "/__fixture/run-at-capacity-once": () => {
         state.runsAtCapacity = 1;
       },
+      // Platform round 2's B2: the manual flow's file field takes several
+      // files; and the second start of several refused at capacity.
+      "/__fixture/manual-several": () => {
+        state.manualSeveral = true;
+      },
+      "/__fixture/run-at-capacity-after-one": () => {
+        state.runStartsBeforeCapacity = 1;
+      },
       // FR-14: opening an upload, or completing one, refused with a reason —
       // and a completion answered 429, which the contract documents for it
       // alone (backend BUILD-PLAN 25.2.39, `measurement_busy`).
@@ -3014,6 +3028,14 @@ const server = createServer(
         creates: state.itemCreates,
         runStarts: state.itemRunStarts,
       });
+    }
+    // Platform round 2's B2: each start of the manual flow, its key and input.
+    if (request.method === "GET" && url.pathname === "/__fixture/run-starts") {
+      response.writeHead(200, {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+      });
+      return response.end(JSON.stringify(state.manualRunStarts));
     }
     if (request.method === "GET" && url.pathname === "/__fixture/files") {
       response.writeHead(200, {
@@ -4140,7 +4162,19 @@ const server = createServer(
           ...state.projectAutomationScopes.map(projectAutomationSubscription),
           ...(state.invoiceAdded ? [invoiceSubscription()] : []),
           ...(state.itemsFlow ? [itemsSubscription()] : []),
-          { ...manualSubscription, status: state.manualStatus },
+          {
+            ...manualSubscription,
+            status: state.manualStatus,
+            ...(state.manualSeveral
+              ? {
+                  runInput: manualSubscription.runInput.map((field) =>
+                    field.control === "artifact"
+                      ? { ...field, multiple: true }
+                      : field,
+                  ),
+                }
+              : {}),
+          },
           webhookSubscription(),
           ...(state.archivableArchived ? [] : [archivableSubscription]),
           {
@@ -5061,11 +5095,19 @@ const server = createServer(
           problem(422, "The request could not be processed"),
         );
       }
+      const key = String(request.headers["idempotency-key"]);
+      if (state.runStartsBeforeCapacity !== null) {
+        if (state.runStartsBeforeCapacity === 0) {
+          state.runStartsBeforeCapacity = null;
+          state.runsAtCapacity += 1;
+        } else state.runStartsBeforeCapacity -= 1;
+      }
       // Backend BUILD-PLAN 25.2.10: at capacity a run is held back `pending`;
       // only with its queue full as well is the start refused, and nothing is
       // created.
       if (state.runsAtCapacity > 0) {
         state.runsAtCapacity -= 1;
+        state.manualRunStarts.push({ key, input, status: 429 });
         return respond(response, 429, {
           ...problem(429, "The automation is at capacity"),
           details: {
@@ -5076,6 +5118,7 @@ const server = createServer(
         } satisfies Platform["ApiProblem"]);
       }
       if (file) file.runId = startedRunId;
+      state.manualRunStarts.push({ key, input, status: 201 });
       return respond(response, 201, {
         run: { ...fixtureRun(startedRunId), status: "pending" },
       } satisfies AutomationOperations["createRun"]["responses"][201]["content"]["application/json"]);

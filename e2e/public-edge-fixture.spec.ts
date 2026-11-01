@@ -5666,3 +5666,153 @@ test("Round 21, platform round 2 (B1) — a drop-down of more than 10 choices op
     taxonomy: "2084P0800X",
   });
 });
+
+test.describe("Round 21, platform round 2 (B2) — several files in one upload", () => {
+  // The browser PUTs each file straight to the fixture's object store, whose
+  // certificate is the fixture's own.
+  test.use({ ignoreHTTPSErrors: true });
+
+  const pdf = (name: string) => ({ ...invoicePdf, name });
+  const runStarts = () =>
+    fixtureRead<
+      { key: string; input: Record<string, unknown>; status: number }[]
+    >("run-starts");
+
+  test("three files chosen at once: each sent, '3 files selected', then one run each with the same other inputs, its key .1 to .3, and '3 runs started'", async ({
+    page,
+  }) => {
+    await fixtureControl("manual-several");
+    const dialog = await openFilledRun(page);
+    await dialog
+      .getByLabel("Invoice file")
+      .setInputFiles([pdf("a.pdf"), pdf("b.pdf"), pdf("c.pdf")]);
+    await expect(dialog.getByText("3 files selected")).toBeVisible();
+    // The key the press sends: a changed input is a new run, with a new key.
+    const key = await dialog
+      .locator('input[name="idempotencyKey"]')
+      .inputValue();
+    expect((await storedObjects()).map(({ filename }) => filename)).toEqual([
+      "a.pdf",
+      "b.pdf",
+      "c.pdf",
+    ]);
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await expect(dialog.getByTestId("runs-started")).toHaveText(
+      "3 runs started",
+    );
+    const starts = await runStarts();
+    expect(starts.map(({ key: sent }) => sent)).toEqual([
+      `${key}.1`,
+      `${key}.2`,
+      `${key}.3`,
+    ]);
+    expect(starts.map(({ status }) => status)).toEqual([201, 201, 201]);
+    const files = await fixtureFiles();
+    for (const [at, { input }] of starts.entries()) {
+      const { artifactId, ...others } = input;
+      expect(others).toEqual({
+        vendor: "Acme Supplies",
+        amount: 120.5,
+        reference: "INV-1001",
+      });
+      expect(typeof artifactId).toBe("string");
+      expect(files[at]).toMatchObject({
+        filename: ["a.pdf", "b.pdf", "c.pdf"][at],
+      });
+    }
+    expect(new Set(starts.map(({ input }) => input.artifactId)).size).toBe(3);
+  });
+
+  test("201 files at once send nothing and say 'Add up to 200 files at a time.'", async ({
+    page,
+  }) => {
+    await fixtureControl("manual-several");
+    const dialog = await openFilledRun(page);
+    await dialog
+      .getByLabel("Invoice file")
+      .setInputFiles(
+        Array.from({ length: 201 }, (_, at) => pdf(`file-${at + 1}.pdf`)),
+      );
+    await expect(dialog.getByRole("alert")).toHaveText(
+      "Add up to 200 files at a time.",
+    );
+    await expect(dialog.getByText(/files selected/u)).toHaveCount(0);
+    expect(await storedObjects()).toEqual([]);
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/);
+    // Started with no file: none of the 201 was sent.
+    const starts = await runStarts();
+    expect(starts).toHaveLength(1);
+    expect(starts[0]!.input).not.toHaveProperty("artifactId");
+  });
+
+  test("a run refused part way through: the runs already started are said, the refusal in the flow's words, and the files and the key kept", async ({
+    page,
+  }) => {
+    await fixtureControl("manual-several");
+    const dialog = await openFilledRun(page);
+    const keyField = dialog.locator('input[name="idempotencyKey"]');
+    await dialog
+      .getByLabel("Invoice file")
+      .setInputFiles([pdf("a.pdf"), pdf("b.pdf")]);
+    await expect(dialog.getByText("2 files selected")).toBeVisible();
+    const key = await keyField.inputValue();
+    await fixtureControl("run-at-capacity-after-one");
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await expect(dialog.getByRole("alert")).toHaveText(
+      "This flow is busy and its queue is full, so the run was not started. Try again once one of its runs has ended.",
+    );
+    await expect(dialog.getByTestId("runs-started")).toHaveText(
+      "1 runs started",
+    );
+    expect(
+      (await runStarts()).map(({ key: sent, status }) => [sent, status]),
+    ).toEqual([
+      [`${key}.1`, 201],
+      [`${key}.2`, 429],
+    ]);
+    await expect(page).toHaveURL(new RegExp(`${FLOWS.manual}$`, "u"));
+    await expect(dialog.getByText("2 files selected")).toBeVisible();
+    await expect(keyField).toHaveValue(key);
+  });
+
+  test.describe("on a phone or a tablet", () => {
+    test.use({ hasTouch: true });
+
+    test("a photo the camera takes is added to the files held", async ({
+      page,
+      browserName,
+    }) => {
+      test.skip(
+        browserName !== "chromium",
+        "Chromium's touch emulation makes the primary pointer coarse",
+      );
+      await fixtureControl("manual-several");
+      const dialog = await openFilledRun(page);
+      await dialog
+        .getByLabel("Invoice file")
+        .setInputFiles([pdf("a.pdf"), pdf("b.pdf")]);
+      await expect(dialog.getByText("2 files selected")).toBeVisible();
+      const [camera] = await Promise.all([
+        page.waitForEvent("filechooser"),
+        dialog
+          .getByRole("button", { name: "Take photo for Invoice file" })
+          .click(),
+      ]);
+      await camera.setFiles({
+        name: "image.jpg",
+        mimeType: "image/jpeg",
+        buffer: await sidewaysPhoto(page),
+      });
+      await expect(dialog.getByText("3 files selected")).toBeVisible();
+      expect((await storedObjects()).map(({ filename }) => filename)).toEqual([
+        "a.pdf",
+        "b.pdf",
+        "image.jpg",
+      ]);
+      await expect(
+        dialog.locator('input[name="input:artifactId"]'),
+      ).toHaveCount(3);
+    });
+  });
+});

@@ -41,10 +41,12 @@ this origin holds.
   decision body's `decisions`); ~~a hand-written interim contract module (on the PR branch only, never on main)~~
   until the regeneration from backend PR #255. Platform round 2's B1–B4
   are generated too (`AutomationSelectOption`, the run input's `multiple`,
-  `HeldDecision.group`, the `Healthcare` category, block set 4). B5's
-  `authType` `none` is not yet in the backend's contract here: until it is
-  regenerated, `PendingProviderAuthType` in `lib/connection-rows.ts` is the
-  narrowest local type for it, and goes with that regeneration.
+  `HeldDecision.group`, the `Healthcare` category, block set 4), and B5's
+  `publicProviders` (`PublicConnectionProvider`): the platform never lists a
+  public service in `providers`, so `listConnectionProviders` in
+  `lib/connections.ts` adds each to the one provider list as `authType`
+  `none` (`keylessProviders`, `ProviderAuthType` in `lib/connection-rows.ts`),
+  the keyless set Connections, Set up, a flow page and its vendor page read.
 - No Prisma, direct database, Supabase SDK, object-store SDK, browser secret,
   manual password login, or provider credential belongs here.
 - Tenancy state comes from typed Edge responses. Mutations have unique
@@ -85,7 +87,10 @@ page reuses:
   inputs, the one start-run action once per file (`perFileForms` in
   `lib/several-files.ts`, each run its own key), and says "{n} runs
   started". More than 200 at once says "Add up to 200 files at a time." and
-  sends nothing. A field of one file is unchanged.
+  sends nothing. Holding one file, a field of several says its "Ready:"
+  line and Start run opens that one run, as a field of one file does (the
+  session's default; the spec names only the count lines). A field of one
+  file is unchanged.
 - **A row that opens a page** is `PageRow` (`components/dashboard/PageRow.tsx`):
   a closed section's box and height, the arrow at its end — or, `boxed`
   false, a row of one card of divided rows (`LIST_CARD`): a list block's
@@ -268,7 +273,8 @@ a role the form names; Save review once every row has an answer, "Accept or
 deny each change." until then; a member reads the rows and "Only an owner or
 admin can review this."; a page that draws no form for it reads the rows
 alone (`ReviewRows` in `components/blocks/renderers.tsx`), each label then
-its detail, as the block fixtures `review-held-*` read them, with no pills.
+its detail, with no pills; the block fixtures `review-held-*` read a
+review's labels and details, not its group headings.
 Changes that carry a `group` (platform round 2's B3) are drawn under its
 heading, in both places, the groups in the order first sent and every one
 open, up to 400 changes (`reviewGroups`, `offeredDecisions`); Save review
