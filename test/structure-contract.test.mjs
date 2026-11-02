@@ -725,8 +725,7 @@ test("every action is pinned by commit with its version, the image's base by dig
       ecosystem,
     );
   }
-  // No npm version updates: the website's dependency bumps are a deliberate
-  // step each round (backend §12.1 #278).
+  // No npm entry (README "Verification", "Pinned, and kept current").
   assert.deepEqual(
     [...dependabot.matchAll(/^ {2}- package-ecosystem: (\S+)$/gmu)].map(
       (m) => m[1],

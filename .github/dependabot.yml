@@ -1,14 +1,6 @@
-# Version updates, weekly (the owner's choice 2026-11-01: weekly on the public
-# repositories). The workflows pin every action by commit with a `# vX.Y.Z`
-# comment, and the Dockerfile pins node:22-alpine by index digest with its tag;
-# without these entries those pins would never move. One pull request per
-# ecosystem a week: every action in one group, the image in one group. The
-# image's Node major stays .nvmrc's (test/structure-contract.test.mjs), so a
-# new major is ignored here and moves by hand with .nvmrc. No npm entry: the
-# website's dependency bumps are a deliberate step each round (backend §12.1
-# #278); Dependabot's security updates stay on in the repository's settings.
-# The docs check lets a Dependabot commit that touches only bump files through
-# (the kit's exemption, scripts/kit/check-docs.mjs). README "Verification".
+# Version updates, weekly (the owner's choice 2026-11-01), for the pinned
+# actions and the Dockerfile's image. What moves here, what moves by hand and
+# why there is no npm entry: README "Verification", "Pinned, and kept current".
 version: 2
 updates:
   - package-ecosystem: github-actions
