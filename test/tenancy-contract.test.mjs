@@ -190,10 +190,11 @@ test("a page offers owner-or-admin controls by the platform's own rule (register
     "utf8",
   );
   // Every control that changes the connection sits behind the gate: the
-  // row's one button (Build 21, spec A4) — Disconnect, or Connect/Reconnect.
+  // row's one button (Build 21, spec A4) — Disconnect, or Connect/Reconnect;
+  // none for a public service (`keyless`, platform round 2's B5).
   assert.match(
     panel,
-    /right=\{\s*!canManage \? null : action === DISCONNECT_LABEL \? \(/u,
+    /right=\{\s*!canManage \|\| keyless \? null : action ===\s*DISCONNECT_LABEL \? \(/u,
     "the row's button is behind canManage",
   );
   assert.equal(

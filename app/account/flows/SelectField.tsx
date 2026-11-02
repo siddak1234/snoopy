@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Dropdown } from "@/components/ui/Dropdown";
-import { CHOOSE_AT_LEAST_ONE } from "@/lib/choices";
+import { CHOOSE_AT_LEAST_ONE, type Choice } from "@/lib/choices";
 import { SPACING } from "@/lib/spacing";
 
 /**
@@ -13,6 +13,10 @@ import { SPACING } from "@/lib/spacing";
  * `select`, or `select-multiple` for several, so the action sends a list
  * (`declaredValues`). A required one left empty says "Choose at least one."
  * under it once the save found it (`missingChoices`).
+ *
+ * Its choices are the manifest's `options` read by `choicesOf` (platform
+ * round 2's B1): strings, or `{value, label, group}` — the form posts the
+ * `value`, the drop-down says the `label` under its `group`'s heading.
  */
 export function SelectField({
   fieldKey,
@@ -26,7 +30,7 @@ export function SelectField({
 }: {
   fieldKey: string;
   title: string;
-  options: readonly string[];
+  options: readonly Choice[];
   multiple: boolean;
   /** What the flow holds now, else the field's default: only its known options are kept. */
   initial: unknown;
@@ -37,7 +41,8 @@ export function SelectField({
   optional: ReactNode;
 }) {
   const known = (value: unknown): value is string =>
-    typeof value === "string" && options.includes(value);
+    typeof value === "string" &&
+    options.some((option) => option.value === value);
   const start = (
     Array.isArray(initial) ? initial : initial === undefined ? [] : [initial]
   ).filter(known);
@@ -46,7 +51,6 @@ export function SelectField({
   );
   const id = `${prefix}-${fieldKey}`;
   const labelId = `${id}-label`;
-  const choices = options.map((option) => ({ value: option, label: option }));
   return (
     <div>
       <input
@@ -74,7 +78,7 @@ export function SelectField({
         <Dropdown
           id={id}
           labelledBy={labelId}
-          options={choices}
+          options={options}
           multiple
           value={chosen}
           onChange={setChosen}
@@ -84,7 +88,7 @@ export function SelectField({
         <Dropdown
           id={id}
           labelledBy={labelId}
-          options={choices}
+          options={options}
           value={chosen[0] ?? ""}
           onChange={(value) => setChosen([value])}
           testId={`select-${fieldKey}`}

@@ -26,6 +26,12 @@ import {
 import { completeRunUpload, openRunUpload } from "./upload-actions";
 import { completeWhenMeasured } from "./upload-completion";
 import { SPACING } from "@/lib/spacing";
+import {
+  DEFAULT_MAX_FILES,
+  SEVERAL_FILES,
+  filesSelected,
+  tooManyFiles,
+} from "@/lib/several-files";
 
 /**
  * A phone or a tablet: its primary pointer is a finger, "a pointing device of
@@ -67,6 +73,17 @@ const unknownOnServer = () => false;
  * also offers Take photo, the camera (spec §3.D: icons 20 inside a button).
  * With `showTypes`, the accepted types in words beside it ("PDF, Word file or
  * photo"), as an item's file and its runs' show them (plan §5.2, §5.3).
+ *
+ * **Several** (`multiple`, platform round 2's B2 as the batch addendum
+ * amends it): the chooser takes several files at once and replaces what the
+ * field held; each photo the camera takes is added to it. Each file is sent
+ * as one alone is, one after another; the field then says "{n} files
+ * selected" (one file, its "Ready:" line), and posts each file's id under its
+ * key with the control `artifact-multiple`, every one into ONE run. More than
+ * the field's `maxFiles` (absent, the platform's 50): "Add up to {max} files
+ * at a time.", and nothing is sent — a choice past it empties the field, a
+ * photo past it keeps the files held; a file refused, or one that fails,
+ * empties the field as one alone does.
  *
  * An upload belongs to the field that started it: its busy state is reported
  * under the field's key, it stops when the field goes (the form closed), and an
@@ -110,12 +127,47 @@ export function RunFileField({
       report.current(key, false);
     };
   }, [field.key]);
+  const several = field.multiple === true;
+  const maxFiles = field.maxFiles ?? DEFAULT_MAX_FILES;
   const [state, setState] = useState<
     | { kind: "empty" }
     | { kind: "uploading"; name: string }
     | { kind: "ready"; artifactId: string; name: string; sizeBytes: number }
+    | { kind: "several"; files: SentFile[] }
   >({ kind: "empty" });
   const [error, setError] = useState<string | null>(null);
+
+  // One file sent: the platform's signed URL, the PUT, then completed —
+  // nothing (`undefined`) once the upload it belongs to was aborted.
+  const sendFile = async (
+    file: File,
+    upload: AbortController,
+  ): Promise<SentFile | undefined> => {
+    const opened = await openRunUpload({
+      workspaceId,
+      subscriptionId,
+      filename: file.name,
+      contentType: file.type,
+      sizeBytes: file.size,
+    });
+    if (upload.signal.aborted) return;
+    if (!opened.ok) throw new Error(opened.error);
+    await putFileToSignedUrl(opened.ticket.uploadUrl, file, upload.signal);
+    // A file with no place yet to be measured is completed again by itself
+    // (`upload-completion.ts`), the field still uploading meanwhile.
+    const { uploadSessionId } = opened.ticket;
+    const completed = await completeWhenMeasured(
+      () => completeRunUpload(workspaceId, uploadSessionId),
+      upload.signal,
+    );
+    if (upload.signal.aborted) return;
+    if (!completed.ok) throw new Error(completed.error);
+    return {
+      artifactId: completed.file.artifactId,
+      name: completed.file.filename,
+      sizeBytes: completed.file.sizeBytes,
+    };
+  };
 
   const choose = async (chosen: File | undefined, source: RunFileSource) => {
     setError(null);
@@ -152,31 +204,9 @@ export function RunFileField({
       // is the size of what is sent.
       const file = plan === "re-encode" ? await reencodeImage(chosen) : chosen;
       if (upload.signal.aborted) return;
-      const opened = await openRunUpload({
-        workspaceId,
-        subscriptionId,
-        filename: file.name,
-        contentType: file.type,
-        sizeBytes: file.size,
-      });
-      if (upload.signal.aborted) return;
-      if (!opened.ok) throw new Error(opened.error);
-      await putFileToSignedUrl(opened.ticket.uploadUrl, file, upload.signal);
-      // A file with no place yet to be measured is completed again by itself
-      // (`upload-completion.ts`), the field still uploading meanwhile.
-      const { uploadSessionId } = opened.ticket;
-      const completed = await completeWhenMeasured(
-        () => completeRunUpload(workspaceId, uploadSessionId),
-        upload.signal,
-      );
-      if (upload.signal.aborted) return;
-      if (!completed.ok) throw new Error(completed.error);
-      setState({
-        kind: "ready",
-        artifactId: completed.file.artifactId,
-        name: completed.file.filename,
-        sizeBytes: completed.file.sizeBytes,
-      });
+      const sent = await sendFile(file, upload);
+      if (!sent) return;
+      setState({ kind: "ready", ...sent });
     } catch (failure) {
       if (upload.signal.aborted) return;
       setState({ kind: "empty" });
@@ -196,20 +226,100 @@ export function RunFileField({
     }
   };
 
+  // The files the field holds: one alone (`ready`), or several.
+  const files: readonly SentFile[] =
+    state.kind === "several"
+      ? state.files
+      : state.kind === "ready"
+        ? [state]
+        : [];
+
+  // Several files: each sent as one alone is, one after another, under the
+  // one in-flight upload.
+  const chooseSeveral = async (
+    chosen: readonly File[],
+    source: RunFileSource,
+  ) => {
+    setError(null);
+    // A photo is added to the files held; a choice replaces them.
+    const kept = source === "camera" ? files : [];
+    if (chosen.length === 0) {
+      if (source === "chooser") setState({ kind: "empty" });
+      return;
+    }
+    const empty = (message: string) => {
+      setState({ kind: "empty" });
+      if (input.current) input.current.value = "";
+      setError(message);
+    };
+    // More than the field takes: nothing is sent; a photo past it keeps the files held.
+    if (kept.length + chosen.length > maxFiles) {
+      if (source === "camera") setError(tooManyFiles(maxFiles));
+      else empty(tooManyFiles(maxFiles));
+      return;
+    }
+    const plans = chosen.map((file) =>
+      planRunFile(file.type, source, accepted),
+    );
+    inFlight.current?.abort();
+    if (plans.includes("refuse")) {
+      if (inFlight.current) {
+        inFlight.current = null;
+        onBusyChange(field.key, false);
+      }
+      empty(notAcceptedLine(accepted));
+      return;
+    }
+    const upload = new AbortController();
+    inFlight.current = upload;
+    onBusyChange(field.key, true);
+    const sent: SentFile[] = [...kept];
+    try {
+      for (const [at, chosenFile] of chosen.entries()) {
+        const plan = plans[at];
+        setState({
+          kind: "uploading",
+          name:
+            plan === "re-encode" ? jpegName(chosenFile.name) : chosenFile.name,
+        });
+        const file =
+          plan === "re-encode" ? await reencodeImage(chosenFile) : chosenFile;
+        if (upload.signal.aborted) return;
+        const one = await sendFile(file, upload);
+        if (!one) return;
+        sent.push(one);
+      }
+      setState({ kind: "several", files: sent });
+    } catch (failure) {
+      if (upload.signal.aborted) return;
+      empty(
+        failure instanceof Error
+          ? failure.message
+          : "The file could not be sent.",
+      );
+    } finally {
+      if (inFlight.current === upload) {
+        inFlight.current = null;
+        onBusyChange(field.key, false);
+      }
+    }
+  };
+
   return (
     <div>
       <input
         type="hidden"
         name={`input-control:${field.key}`}
-        value="artifact"
+        value={several ? SEVERAL_FILES : "artifact"}
       />
-      {state.kind === "ready" ? (
+      {files.map((file) => (
         <input
+          key={file.artifactId}
           type="hidden"
           name={`input:${field.key}`}
-          value={state.artifactId}
+          value={file.artifactId}
         />
-      ) : null}
+      ))}
       {/* The manifest's title alone (spec A6, Step 1: titles only — no line
           under it, Build 21); a file field says nothing about being
           optional. */}
@@ -226,10 +336,16 @@ export function RunFileField({
         id={inputId}
         type="file"
         accept={fileAccept(accepted)}
+        multiple={several}
         hidden
         disabled={state.kind === "uploading"}
         onChange={(event) =>
-          void choose(event.currentTarget.files?.[0], "chooser")
+          several
+            ? void chooseSeveral(
+                Array.from(event.currentTarget.files ?? []),
+                "chooser",
+              )
+            : void choose(event.currentTarget.files?.[0], "chooser")
         }
       />
       <div
@@ -245,13 +361,16 @@ export function RunFileField({
               accept="image/*"
               capture="environment"
               hidden
+              multiple={several}
               disabled={state.kind === "uploading"}
               onChange={(event) => {
-                const photo = event.currentTarget.files?.[0];
+                const photos = Array.from(event.currentTarget.files ?? []);
                 // Emptied at once: every photo is a new choice. Closing the
                 // camera keeps whatever the field already held.
                 event.currentTarget.value = "";
-                if (photo) void choose(photo, "camera");
+                if (several) {
+                  if (photos.length > 0) void chooseSeveral(photos, "camera");
+                } else if (photos[0]) void choose(photos[0], "camera");
               }}
             />
             <Button
@@ -289,14 +408,19 @@ export function RunFileField({
       >
         {state.kind === "uploading"
           ? `Uploading ${state.name}…`
-          : state.kind === "ready"
-            ? `Ready: ${state.name} (${formatSize(state.sizeBytes)})`
-            : null}
+          : files.length === 1
+            ? `Ready: ${files[0]!.name} (${formatSize(files[0]!.sizeBytes)})`
+            : files.length > 1
+              ? filesSelected(files.length)
+              : null}
       </p>
       <FormError message={error} className={`${SPACING.inner.top} text-xs`} />
     </div>
   );
 }
+
+/** A file sent, as the field holds it. */
+type SentFile = { artifactId: string; name: string; sizeBytes: number };
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} bytes`;

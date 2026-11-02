@@ -132,8 +132,12 @@ surface a change audit probed and no test asserted — Round 21 v2's among them:
 the image block, a group of drop-downs, a long list's and table's search, sort
 and pages, Activity's search, sort and pages as the platform is asked for
 them, and Share refused; Round 21's review of each change and Approvals'
-"Review {n} changes"; and Set up's drop-down of several in
-`e2e/public-edge-fixture.spec.ts`), `e2e/dialogs.spec.ts`
+"Review {n} changes"; Set up's drop-down of several, and platform round
+2's bigger drop-down (Search, "No matches.", its headings, the label said
+and the value saved) and several files in one upload (all into one run, one file a list of one; exactly
+`maxFiles` taken, past it refused, a photo past it keeping the files held; a
+full queue said; a photo added), a public app connected with no
+Connect step and, as a step's choice, Connected and chosen in place, and a batch run's page in `e2e/public-edge-fixture.spec.ts`), `e2e/dialogs.spec.ts`
 (every dialog's Escape, click outside, focus return and hold, one row each)
 and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: the Flows
 list by department A–Z; its items grouped A–Z under its group filter, the
@@ -149,8 +153,9 @@ headed by its title and its score in its verdict's colour with View {file}
 and its file page (a file no longer linked framed by this site's route), its
 sections under "{Run word} details" and its Run details page — every body
 the platform's blocks; Archive, an owner's buttons a member
-does not see and a member's presses refused in words, and an unanswered list
-said "Unavailable"), sharing `e2e/helpers.ts`. The spacing table
+does not see and a member's presses refused in words, an unanswered list
+said "Unavailable", and an upload refused with the queue full said in the
+owner's words, its file kept), sharing `e2e/helpers.ts`. The spacing table
 (`lib/spacing.ts`) is measured as drawn, from each box's edges: an item's
 titles and Settings' groups, and the page's edge at 390 and 900 px wide. The playbook's human keyboard
 traversal (NFR-35) has a hand-over test in the same suite:

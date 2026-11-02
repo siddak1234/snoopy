@@ -25,8 +25,9 @@ import {
   connectionState,
   disconnectBody,
   disconnectTitle,
+  isKeyless,
 } from "@/lib/connection-rows";
-import type { Connection, ConnectionProvider } from "@/lib/connections";
+import type { Connection, OfferedProvider } from "@/lib/connections";
 import { connectProviderWithKey, disconnectConnection } from "./actions";
 import {
   PENDING_CONNECT,
@@ -79,7 +80,7 @@ export function ConnectionsPanel({
 }: {
   connections: Connection[];
   /** The providers to list, in order: every one on Connections, a flow's own on its page. */
-  providers: ConnectionProvider[];
+  providers: OfferedProvider[];
   canManage: boolean;
   /** Back from a vendor's sign-in, as the platform's callback said it ended. */
   callbackStatus: "connected" | "error" | null;
@@ -90,7 +91,7 @@ export function ConnectionsPanel({
 }) {
   const router = useRouter();
   const [selectedProvider, setSelectedProvider] =
-    useState<ConnectionProvider | null>(null);
+    useState<OfferedProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
   // A connect's answer, under its row.
   const [rowError, setRowError] = useState<{
@@ -104,7 +105,7 @@ export function ConnectionsPanel({
   const [pending, startTransition] = useTransition();
   const [busyProvider, setBusyProvider] = useState<string | null>(null);
   // The provider whose disconnect is being confirmed, and its refusal.
-  const [disconnecting, setDisconnecting] = useState<ConnectionProvider | null>(
+  const [disconnecting, setDisconnecting] = useState<OfferedProvider | null>(
     null,
   );
   const [disconnectError, setDisconnectError] = useState<string | null>(null);
@@ -136,7 +137,7 @@ export function ConnectionsPanel({
   const connectionOf = (providerId: string) =>
     connectionFor(connections, providerId);
 
-  const authorize = (provider: ConnectionProvider) => {
+  const authorize = (provider: OfferedProvider) => {
     setBusyProvider(provider.providerId);
     startTransition(async () => {
       const started = await startConnect(
@@ -163,7 +164,7 @@ export function ConnectionsPanel({
   };
 
   /** The row's one button. What the last one came back with goes as the next is pressed. */
-  const press = (provider: ConnectionProvider) => {
+  const press = (provider: OfferedProvider) => {
     setError(null);
     setRowError(null);
     setNotice(null);
@@ -211,7 +212,7 @@ export function ConnectionsPanel({
     setDisconnectError(null);
   };
 
-  const confirmDisconnect = (provider: ConnectionProvider) => {
+  const confirmDisconnect = (provider: OfferedProvider) => {
     const connection = connectionOf(provider.providerId);
     if (!connection) return;
     setDisconnectError(null);
@@ -273,8 +274,11 @@ export function ConnectionsPanel({
         <ul className="flex flex-col divide-y divide-[var(--ring)]">
           {providers.map((provider) => {
             const connection = connectionOf(provider.providerId);
-            const state = connectionState(connection);
-            const line = connectionLine(connection);
+            // A public service (`authType` none) is connected, with no
+            // button: nothing to connect or disconnect (platform round 2's B5).
+            const keyless = isKeyless(provider.authType);
+            const state = connectionState(connection, provider.authType);
+            const line = connectionLine(connection, provider.authType);
             const action = connectionAction(state);
             const failed = rowError?.providerId === provider.providerId;
             return (
@@ -286,7 +290,8 @@ export function ConnectionsPanel({
                   line={line.text}
                   lineTone={line.tone}
                   right={
-                    !canManage ? null : action === DISCONNECT_LABEL ? (
+                    !canManage || keyless ? null : action ===
+                      DISCONNECT_LABEL ? (
                       // Red: it ends the connection every flow here acts
                       // through (the owner's build 12, #5).
                       <Button

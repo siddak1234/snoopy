@@ -7,14 +7,17 @@ import type {
   AutomationSetupField,
 } from "@/lib/automations";
 import { SPACING } from "@/lib/spacing";
+import { choicesOf } from "@/lib/choices";
 
 /**
  * Form fields a manifest declares, rendered as the manifest orders them.
  *
  * Two declarations use this: a subscription's `setup`, and a manual run's
  * `runInput` (backend ADR-0030). They share the vocabulary `text`, `money` and
- * `toggle` (run input adds `artifact`, below; setup adds `select`, a list of
- * choices drawn as the website's drop-down, `SelectField`), so they share one renderer, and
+ * `toggle` (run input adds `artifact`, below, one file or with `multiple`
+ * several; setup adds `select`, a list of choices — strings or `{value,
+ * label, group}` — drawn as the website's drop-down, `SelectField`), so they
+ * share one renderer, and
  * the form posts each value under
  * `<prefix>:<key>` with its control under `<prefix>-control:<key>`, which is how
  * the server action converts it back to the type the platform checks.
@@ -208,7 +211,7 @@ function ManifestFieldInput({
       <SelectField
         fieldKey={field.key}
         title={field.title}
-        options={field.options ?? []}
+        options={choicesOf(field.options)}
         multiple={field.multiple === true}
         initial={initialValue}
         prefix={prefix}

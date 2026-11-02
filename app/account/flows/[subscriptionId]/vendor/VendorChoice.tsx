@@ -111,7 +111,8 @@ export function VendorChoice({
     );
     if (
       !option ||
-      connectionState(option.connection ?? undefined) !== "connected"
+      connectionState(option.connection ?? undefined, option.authType) !==
+        "connected"
     )
       return;
     // Saved once the page has settled, and only once.

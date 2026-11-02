@@ -123,22 +123,54 @@ export function changeLine(change: { label: string; detail?: string }): string {
   return change.detail ? `${change.label} · ${change.detail}` : change.label;
 }
 
-/** The changes an approval or a review form offers, or none (a plain approval: Approve / Deny). Rows not shaped as the contract says are left out. */
+/** The most changes a held run offers, and a review draws (backend ADR-0048 amendment 3; 40 until then). */
+export const REVIEW_LIMIT = 400;
+
+/** The changes an approval or a review form offers, or none (a plain approval: Approve / Deny), at most `REVIEW_LIMIT`, each with its `group` when it has one. Rows not shaped as the contract says are left out. */
 export function offeredDecisions(
   holder: { decisions?: unknown } | undefined | null,
 ): OfferedChange[] {
   const list = holder?.decisions;
   if (!Array.isArray(list)) return [];
-  return list.flatMap((row: unknown) => {
-    if (typeof row !== "object" || row === null) return [];
-    const { id, label, detail } = row as Record<string, unknown>;
-    if (typeof id !== "string" || typeof label !== "string") return [];
-    return [
-      typeof detail === "string" && detail !== ""
-        ? { id, label, detail }
-        : { id, label },
-    ];
-  });
+  return list
+    .flatMap((row: unknown): OfferedChange[] => {
+      if (typeof row !== "object" || row === null) return [];
+      const { id, label, detail, group } = row as Record<string, unknown>;
+      if (typeof id !== "string" || typeof label !== "string") return [];
+      return [
+        {
+          id,
+          label,
+          ...(typeof detail === "string" && detail !== "" ? { detail } : {}),
+          ...(typeof group === "string" && group !== "" ? { group } : {}),
+        },
+      ];
+    })
+    .slice(0, REVIEW_LIMIT);
+}
+
+/**
+ * A review's changes under their headings (platform round 2's B3, backend
+ * ADR-0048 amendment 3): each `group` once, in the order it is first sent,
+ * its changes in the order sent; changes without a group are one run with no
+ * heading (`group: null`). Every group is drawn open.
+ */
+export function reviewGroups<T extends { group?: string }>(
+  changes: readonly T[],
+): { group: string | null; changes: T[] }[] {
+  const groups: { group: string | null; changes: T[] }[] = [];
+  const byName = new Map<string | null, T[]>();
+  for (const change of changes) {
+    const name = change.group ?? null;
+    let list = byName.get(name);
+    if (!list) {
+      list = [];
+      byName.set(name, list);
+      groups.push({ group: name, changes: list });
+    }
+    list.push(change);
+  }
+  return groups;
 }
 
 /** A saved review's count: how many changes were accepted and denied. */

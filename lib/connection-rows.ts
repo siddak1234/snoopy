@@ -11,8 +11,10 @@
  *
  * Used by Connections, a flow page's Connections and vendor row, Set up and
  * the vendor page. Pure, and loaded by its unit test as it is: no React and no
- * `@/` import.
+ * `@/` import; its contract types arrive by a type-only import.
  */
+
+import type { components } from "./generated/platform-contracts/connections";
 
 export const CONNECTION_CONNECTED = "Connected";
 export const CONNECTION_NOT_CONNECTED = "Not connected";
@@ -53,9 +55,54 @@ export type RowConnection = {
  */
 export type ConnectionRowState = "connected" | "attention" | "not-connected";
 
+/**
+ * A provider's `authType` as the client reads it: the contract's `oauth2` or
+ * `api-key`, or `none` — a public service (platform round 2's B5), which the
+ * platform lists in `publicProviders`, never in `providers` (the
+ * backend's connections contract), and `keylessProviders` gives `none`.
+ */
+export type ProviderAuthType =
+  components["schemas"]["ConnectionProvider"]["authType"] | "none";
+
+/** A public service as the platform lists it in `publicProviders`. */
+export type PublicProvider = components["schemas"]["PublicConnectionProvider"];
+
+/**
+ * The platform's `publicProviders` as rows of the one provider list, each
+ * `authType` `none` with no scopes, so Connections, Set up, a flow page and
+ * its vendor page read a public service through `isKeyless` as connected.
+ */
+export function keylessProviders(
+  publicProviders: readonly PublicProvider[] | undefined,
+): (PublicProvider & { scopes: string[]; authType: "none" })[] {
+  return (publicProviders ?? []).map(
+    ({ providerId, displayName, description, icon }) => ({
+      providerId,
+      displayName,
+      description,
+      icon,
+      scopes: [],
+      authType: "none",
+    }),
+  );
+}
+
+/**
+ * A public service (`authType` `none`, platform round 2's B5): it has no
+ * connect step, and counts as connected for every workspace — no Connect, no
+ * Disconnect, its line "Connected".
+ */
+export function isKeyless(
+  authType: ProviderAuthType | undefined | null,
+): boolean {
+  return authType === "none";
+}
+
 export function connectionState(
   connection: RowConnection | undefined,
+  authType?: ProviderAuthType | null,
 ): ConnectionRowState {
+  if (isKeyless(authType)) return "connected";
   if (!connection) return "not-connected";
   if (connection.status === "reauthorization-required") return "attention";
   if (connection.status === "connected")
@@ -86,12 +133,17 @@ export function connectionFor<C extends RowConnection>(
 /**
  * Line 2 of the row: the account's email when the platform holds one —
  * `externalAccount.displayName` carrying an `@` — else the state in a word;
- * "Needs attention" in the warning colour.
+ * "Needs attention" in the warning colour; a public service (`isKeyless`),
+ * "Connected".
  */
-export function connectionLine(connection: RowConnection | undefined): {
+export function connectionLine(
+  connection: RowConnection | undefined,
+  authType?: ProviderAuthType | null,
+): {
   text: string;
   tone: "muted" | "warn";
 } {
+  if (isKeyless(authType)) return { text: CONNECTION_CONNECTED, tone: "muted" };
   const state = connectionState(connection);
   const name = connection?.externalAccount.displayName ?? "";
   if (state !== "not-connected" && name.includes("@"))

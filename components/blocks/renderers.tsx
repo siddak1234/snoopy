@@ -13,7 +13,7 @@ import { Tile } from "@/components/dashboard/Tile";
 import { TrackerItem } from "@/components/dashboard/TrackerItem";
 import type { Block } from "@/lib/automations";
 import { fileViewHref } from "@/lib/run-files";
-import { offeredDecisions } from "@/lib/run-progress";
+import { offeredDecisions, reviewGroups } from "@/lib/run-progress";
 import { CARD, ROW, SPACING } from "@/lib/spacing";
 import { notDrawn } from "./drawable";
 import { Fallback } from "./Fallback";
@@ -527,17 +527,16 @@ export function TimelineBlock({ block }: { block: BlockOf<"timeline"> }) {
  * amendment 2): each one's label, then its detail, read by everyone (words.md
  * section 3), with no pills. The " · " between them is drawn, not a word, so
  * the label and the detail are each the flow's own words, as the block
- * fixtures read them.
+ * fixtures read them. Changes that carry a `group` are drawn under its
+ * heading, each group open, in the order sent (`reviewGroups`; platform round
+ * 2's B3), up to 400 (`offeredDecisions`).
  */
 function ReviewRows({ form }: { form: QuestionForm }) {
   const changes = offeredDecisions(form);
   if (changes.length === 0) return null;
-  return (
-    <ul
-      data-testid="block-review-rows"
-      className={`flex flex-col ${SPACING.inner.gap}`}
-    >
-      {changes.map((change) => (
+  const rows = (list: typeof changes, testId?: string) => (
+    <ul data-testid={testId} className={`flex flex-col ${SPACING.inner.gap}`}>
+      {list.map((change) => (
         <li key={change.id} className="min-w-0 text-sm text-[var(--text)]">
           <span>{change.label}</span>
           {change.detail ? (
@@ -546,6 +545,29 @@ function ReviewRows({ form }: { form: QuestionForm }) {
         </li>
       ))}
     </ul>
+  );
+  const groups = reviewGroups(changes);
+  // No group: the one list, as before amendment 3.
+  if (groups.every(({ group }) => group === null))
+    return rows(changes, "block-review-rows");
+  return (
+    <div
+      data-testid="block-review-rows"
+      className={`flex flex-col ${SPACING.inner.gap}`}
+    >
+      {groups.map(({ group, changes: list }, at) => (
+        <section
+          key={`group-${at}`}
+          data-testid="block-review-group"
+          className={`flex flex-col ${SPACING.inner.gap}`}
+        >
+          {group === null ? null : (
+            <h3 className="text-xs font-medium text-[var(--muted)]">{group}</h3>
+          )}
+          {rows(list)}
+        </section>
+      ))}
+    </div>
   );
 }
 

@@ -3,10 +3,22 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { CaretDownIcon } from "@phosphor-icons/react/dist/ssr/CaretDown";
 import { CheckIcon } from "@phosphor-icons/react/dist/ssr/Check";
-import { CHOOSE, chosenLabel } from "@/lib/choices";
+import {
+  CHOOSE,
+  NO_MATCHES,
+  SEARCH,
+  SEARCH_ABOVE,
+  choiceGroups,
+  chosenLabel,
+  type Choice,
+} from "@/lib/choices";
+import { SPACING } from "@/lib/spacing";
 
-/** One choice: what the page holds, and what it says. */
-export type DropdownOption = { value: string; label: string };
+/** One choice: what the page holds, what it says, and the heading it is under. */
+export type DropdownOption = Choice;
+
+/** A row's side padding in the panel: its choices, its headings, its search box and "No matches.". */
+const ROW_SIDE = "px-3";
 
 /** The trigger's look: the switcher's pill (a filter), or a form field's box. */
 type Look = "pill" | "field";
@@ -35,6 +47,13 @@ const TRIGGER: Record<Look, string> = {
  * `aria-multiselectable`, a choice ticks or unticks its row and the panel
  * stays open, and the closed trigger says the choices in the order they were
  * chosen: "Choose", "{first}, {second}", "{n} chosen" (`chosenLabel`).
+ *
+ * **Bigger** (Round 21, platform round 2's B1): holding more than 10
+ * choices, the panel opens on a search box ("Search") over the list, which
+ * keeps the rows whose label holds what is typed, else says "No matches.";
+ * choices that carry a `group` are drawn under its heading, the headings in
+ * the order they first appear (`choiceGroups`). The trigger says labels,
+ * never values. One of 10 or fewer, without groups, is drawn as before.
  */
 export function Dropdown(
   props: {
@@ -77,7 +96,11 @@ export function Dropdown(
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const searchable = options.length > SEARCH_ABOVE;
+  const [query, setQuery] = useState("");
+  const groups = choiceGroups(options, searchable ? query : "");
   const chosenValues: readonly string[] = props.multiple
     ? props.value
     : [props.value];
@@ -118,9 +141,14 @@ export function Dropdown(
     };
   }, [open]);
 
-  // Opening puts focus on the chosen row, else the first.
+  // Opening puts focus on the search box where there is one, else on the
+  // chosen row, else the first; it opens with nothing typed.
   useEffect(() => {
     if (!open) return;
+    if (searchRef.current) {
+      searchRef.current.focus();
+      return;
+    }
     const list = listRef.current;
     (
       list?.querySelector<HTMLElement>(
@@ -144,12 +172,27 @@ export function Dropdown(
     if (next !== props.value) props.onChange(next);
   };
 
-  const onListKeyDown = (event: React.KeyboardEvent<HTMLUListElement>) => {
+  const onListKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
     const rows = Array.from(
       listRef.current?.querySelectorAll<HTMLElement>('[role="option"]') ?? [],
     );
+    // In the search box: Enter never sends the form it is in, and the down
+    // arrow goes to the first row; every other key types.
+    if (event.target === searchRef.current) {
+      if (event.key === "Enter") event.preventDefault();
+      if (event.key === "ArrowDown" && rows[0]) {
+        event.preventDefault();
+        rows[0].focus();
+      }
+      return;
+    }
     if (rows.length === 0) return;
     const at = rows.indexOf(document.activeElement as HTMLElement);
+    if (event.key === "ArrowUp" && at === 0 && searchRef.current) {
+      event.preventDefault();
+      searchRef.current.focus();
+      return;
+    }
     let next: number;
     if (event.key === "ArrowDown") next = Math.min(at + 1, rows.length - 1);
     else if (event.key === "ArrowUp") next = Math.max(at - 1, 0);
@@ -165,6 +208,26 @@ export function Dropdown(
     rows[next]?.focus();
   };
 
+  const row = (option: DropdownOption) => {
+    const selected = isChosen(option.value);
+    return (
+      <div
+        key={option.value}
+        role="option"
+        aria-selected={selected}
+        tabIndex={-1}
+        data-value={option.value}
+        onClick={() => choose(option.value)}
+        className={`flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-[var(--radius-md)] ${ROW_SIDE} py-2 text-sm text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus:bg-[var(--surface-hover)] ${selected ? "font-medium" : ""}`.trim()}
+      >
+        <span className="min-w-0 truncate">{option.label}</span>
+        {selected ? (
+          <CheckIcon size={16} aria-hidden className="shrink-0" />
+        ) : null}
+      </div>
+    );
+  };
+
   return (
     <div ref={containerRef} className="relative">
       <button
@@ -178,10 +241,14 @@ export function Dropdown(
         aria-labelledby={labelledBy}
         disabled={disabled}
         data-testid={testId}
-        onClick={() => setOpen((was) => !was)}
+        onClick={() => {
+          setQuery("");
+          setOpen((was) => !was);
+        }}
         onKeyDown={(event) => {
           if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
+            setQuery("");
             setOpen(true);
           }
         }}
@@ -199,36 +266,64 @@ export function Dropdown(
         />
       </button>
       {open ? (
-        <ul
-          ref={listRef}
-          id={listId}
-          role="listbox"
-          aria-labelledby={labelledBy}
-          aria-multiselectable={props.multiple ? true : undefined}
+        <div
           data-testid={testId ? `${testId}-menu` : undefined}
           onKeyDown={onListKeyDown}
-          className="absolute top-full left-0 z-50 mt-2 flex max-h-[min(22rem,70vh)] min-w-full flex-col gap-0.5 overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--ring)] bg-[color-mix(in_srgb,var(--color-surface)_80%,transparent)] p-2 shadow-[var(--shadow-md)] backdrop-blur-[8px] sm:min-w-[14rem]"
+          className={`absolute top-full left-0 z-50 mt-2 flex max-h-[min(22rem,70vh)] min-w-full flex-col ${SPACING.inner.gap} overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--ring)] bg-[color-mix(in_srgb,var(--color-surface)_80%,transparent)] p-2 shadow-[var(--shadow-md)] backdrop-blur-[8px] sm:min-w-[14rem]`}
         >
-          {options.map((option) => {
-            const selected = isChosen(option.value);
-            return (
-              <li
-                key={option.value}
-                role="option"
-                aria-selected={selected}
-                tabIndex={-1}
-                data-value={option.value}
-                onClick={() => choose(option.value)}
-                className={`flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--text)] transition hover:bg-[var(--surface-hover)] focus:bg-[var(--surface-hover)] ${selected ? "font-medium" : ""}`.trim()}
-              >
-                <span className="min-w-0 truncate">{option.label}</span>
-                {selected ? (
-                  <CheckIcon size={16} aria-hidden className="shrink-0" />
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
+          {searchable ? (
+            <input
+              ref={searchRef}
+              type="search"
+              value={query}
+              placeholder={SEARCH}
+              aria-label={SEARCH}
+              aria-controls={listId}
+              autoComplete="off"
+              data-testid={testId ? `${testId}-search` : undefined}
+              onChange={(event) => setQuery(event.currentTarget.value)}
+              className={`w-full rounded-[var(--radius-md)] border border-[var(--color-divider)] bg-[var(--color-surface)] ${ROW_SIDE} py-2 text-sm text-[var(--text)] focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--accent-strong)] focus:outline-none`}
+            />
+          ) : null}
+          <div
+            ref={listRef}
+            id={listId}
+            role="listbox"
+            aria-labelledby={labelledBy}
+            aria-multiselectable={props.multiple ? true : undefined}
+            className="flex flex-col gap-0.5"
+          >
+            {groups.map(({ group, choices }, at) =>
+              group === null ? (
+                choices.map(row)
+              ) : (
+                <div
+                  key={`group-${at}`}
+                  role="group"
+                  aria-labelledby={`${listId}-group-${at}`}
+                  className="flex flex-col"
+                >
+                  <div
+                    id={`${listId}-group-${at}`}
+                    role="presentation"
+                    className={`${ROW_SIDE} py-2 text-xs font-medium text-[var(--muted)]`}
+                  >
+                    {group}
+                  </div>
+                  {choices.map(row)}
+                </div>
+              ),
+            )}
+          </div>
+          {groups.length === 0 ? (
+            <p
+              role="status"
+              className={`${ROW_SIDE} py-2 text-sm text-[var(--muted)]`}
+            >
+              {NO_MATCHES}
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

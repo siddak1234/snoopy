@@ -11,7 +11,7 @@ import {
   listConnectionProviders,
   listConnections,
 } from "@/lib/connections";
-import { connectionFor } from "@/lib/connection-rows";
+import { connectionFor, isKeyless } from "@/lib/connection-rows";
 import {
   chosenVendor,
   connectionFields,
@@ -125,6 +125,7 @@ export default async function SetupPage(
         displayName: provider?.displayName ?? connection.displayName,
         icon: provider?.icon ?? null,
         connectable: provider?.authType === "oauth2",
+        authType: provider?.authType,
         connection:
           connectionFor(connections.connections, connection.providerId) ?? null,
       };
@@ -144,7 +145,8 @@ export default async function SetupPage(
     ]),
   ].flatMap((providerId) => {
     const provider = providerById.get(providerId);
-    return provider ? [provider] : [];
+    // A public service needs no connect step (platform round 2's B5).
+    return provider && !isKeyless(provider.authType) ? [provider] : [];
   });
 
   return (
