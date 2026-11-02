@@ -4303,7 +4303,9 @@ const server = createServer(
       } satisfies AutomationOperations["listSubscriptions"]["responses"][200]["content"]["application/json"]);
     }
     // Backend §12.1 #319 step 1: one flow by its id, with its setup, in any
-    // status; one this workspace does not hold is 404, as the Edge answers.
+    // status; one this workspace does not hold is 404, as the Edge answers,
+    // and an id that is not a UUID is 400, as the Edge's check answers it
+    // (the backend's UUID_PATTERN, automations routes.ts).
     const oneFlow =
       method === "GET" &&
       new RegExp(
@@ -4312,6 +4314,16 @@ const server = createServer(
       ).exec(pathname);
     if (oneFlow) {
       state.subscriptionReads.push(oneFlow[1]);
+      if (
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+          oneFlow[1],
+        )
+      )
+        return respond(
+          response,
+          400,
+          problem(400, "subscriptionId must be a UUID"),
+        );
       const subscription = [
         ...liveSubscriptions(),
         ...archivedSubscriptions(),

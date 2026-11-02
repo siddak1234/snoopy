@@ -134,7 +134,8 @@ export type ReadSubscriptionResponse =
  * summary a list row carries, with its `setup`, read from the version the flow
  * pins, in any status, archived too. `null` when the platform answers 404 — an
  * unknown id, another workspace's, or a flow on a team this person cannot see
- * — which each page draws as the "not found" a flow that does not exist is.
+ * — or 400, its answer to an id that is not a UUID (a mistyped address), which
+ * each page draws as the "not found" a flow that does not exist is.
  * The flow page, Set up, Connect integration, the vendor save and a run's
  * page read their flow here; the list may still carry `setup` (builds before
  * 34 read it), but no page reads it from there (#319 step 2).
@@ -149,7 +150,10 @@ export async function readSubscription(
     );
     return subscription;
   } catch (error) {
-    if (error instanceof PlatformServerError && error.status === 404)
+    if (
+      error instanceof PlatformServerError &&
+      (error.status === 404 || error.status === 400)
+    )
       return null;
     throw error;
   }

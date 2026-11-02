@@ -199,7 +199,7 @@ and the value saved) and several files in one upload (all into one run, one file
 `maxFiles` taken, past it refused, a photo past it keeping the files held; a
 full queue said; a photo added), a public app connected with no
 Connect step and, as a step's choice, Connected and chosen in place, a batch run's page, and a flow
-whose list row carries no settings still drawn and saved from its one-flow read (backend §12.1 #319) in `e2e/public-edge-fixture.spec.ts`), `e2e/dialogs.spec.ts`
+whose list row carries no settings still drawn and saved from its one-flow read (backend §12.1 #319), and a flow id that is not a UUID "not found", in `e2e/public-edge-fixture.spec.ts`), `e2e/dialogs.spec.ts`
 (every dialog's Escape, click outside, focus return and hold, one row each)
 and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: the Flows
 list by department A–Z; its items grouped A–Z under its group filter, the

@@ -1228,10 +1228,11 @@ test("a flow's page, Set up, Connect integration, the integration's save and a r
     client,
     /`\$\{scope\(workspaceId\)\}\/subscriptions\/\$\{encodeURIComponent\(subscriptionId\)\}`,\s*\);\s*return subscription;/u,
   );
-  // 404 is the pages' "not found", never an error page.
+  // 404 is the pages' "not found", never an error page; so is 400, the
+  // platform's answer to an id that is not a UUID (the contract's '400').
   assert.match(
     client,
-    /return subscription;\s*\} catch \(error\) \{\s*if \(error instanceof PlatformServerError && error\.status === 404\)\s*return null;/u,
+    /return subscription;\s*\} catch \(error\) \{\s*if \(\s*error instanceof PlatformServerError &&\s*\(error\.status === 404 \|\| error\.status === 400\)\s*\)\s*return null;/u,
   );
   assert.ok(
     /getSubscription: \{/u.test(readFileSync(GENERATED_PATH, "utf8")),

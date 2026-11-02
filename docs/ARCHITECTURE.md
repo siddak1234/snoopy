@@ -57,7 +57,8 @@ this origin holds.
   `lib/automations.ts`, `GET …/subscriptions/{id}`; backend §12.1 #319 step
   2): the flow's page, its Set up and Connect integration pages, the
   integration's save and a run's page. It carries the flow's `setup` from the
-  version it pins, archived included; a 404 is the page's "not found". The
+  version it pins, archived included; a 404, or the 400 the platform answers
+  for an id that is not a UUID, is the page's "not found". The
   list still carries `setup` for builds before 34, but no page reads it there;
   adding a flow's duplicate check reads the list.
 - No Prisma, direct database, Supabase SDK, object-store SDK, browser secret,

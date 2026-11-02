@@ -5981,3 +5981,25 @@ test("backend §12.1 #319 step 2 — a flow whose list row carries no setup stil
   await expect(main.getByRole("link", { name: "Run details" })).toBeVisible();
   expect((await reads()).slice(before)).toContain(invoiceId);
 });
+
+test('backend §12.1 #319 step 2 — an address whose flow id is not a UUID, which the platform answers 400, is the flow\'s "not found" on its page, Set up and Connect integration, never the error page (Round 21 hardening, W-3)', async ({
+  page,
+}) => {
+  for (const path of [
+    "/account/flows/not-a-uuid",
+    "/account/flows/not-a-uuid/setup",
+    "/account/flows/not-a-uuid/vendor?field=vendor",
+  ]) {
+    const before = (
+      await fixtureRead<{ subscriptionReads: string[] }>("counts")
+    ).subscriptionReads.length;
+    const response = await page.goto(path);
+    expect([path, response?.status()]).toEqual([path, 404]);
+    // The platform was asked, and answered 400 (the fixture, as the Edge).
+    expect(
+      (
+        await fixtureRead<{ subscriptionReads: string[] }>("counts")
+      ).subscriptionReads.slice(before),
+    ).toContain("not-a-uuid");
+  }
+});
