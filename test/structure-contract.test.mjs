@@ -808,7 +808,9 @@ test("the nightly is its own workflow: it calls ci.yml on main, and its own job,
     report,
     /^ {8}env:\n {10}GH_TOKEN: \$\{\{ github\.token \}\}$/mu,
   );
-  assert.match(report, /gh issue list .*--search 'in:title "Nightly red"'/u);
+  // Only the bot's own issue is reused: anyone can open one with that title here.
+  assert.match(report, /gh issue list .*--author 'github-actions\[bot\]'/u);
+  assert.match(report, /select\(\.title == "Nightly red"\)/u);
   assert.match(report, /gh issue comment "\$n"/u);
   assert.match(report, /gh issue create .*--title 'Nightly red'/u);
   // Every other workflow is read-only on its grants: only this job writes.
