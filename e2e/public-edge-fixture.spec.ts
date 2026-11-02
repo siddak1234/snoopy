@@ -1674,15 +1674,10 @@ test.describe("a photo or an image for a run (backend BUILD-PLAN 25.8.5)", () =>
 
     test("Take photo opens the camera, and the photo — held sideways — is sent upright as a JPEG whose long side is 2,576 px, in place of the file chosen before", async ({
       page,
-      browserName,
     }) => {
       const dialog = await openFilledRun(page);
       const coarse = await page.evaluate(
         () => matchMedia("(pointer: coarse)").matches,
-      );
-      test.skip(
-        !coarse && browserName === "webkit",
-        "this WebKit's touch emulation leaves the primary pointer fine",
       );
       expect(coarse).toBe(true);
       const file = dialog.getByLabel("Invoice file");
@@ -5526,25 +5521,6 @@ test("a crafted return target cannot leave the site — signed in, the login pag
   );
 });
 
-test("keyboard journey — the owner's NFR-35 traversal, by hand", async ({
-  page,
-}) => {
-  // Not an automated assertion: the playbook's Round 5 gate asks for a human
-  // keyboard traversal of the core journey. This opens the built site against
-  // the loopback fixture, signed in as the owner, and hands the browser over.
-  // Run it alone, headed:
-  //   KEYBOARD_JOURNEY=1 node scripts/run-browser-fixtures.mjs --headed --grep "keyboard journey"
-  // Resume in the Playwright Inspector ends it. The route list is in the Round 5
-  // audit (docs/audits/2026-08-11-round-5-phase-1-status.md).
-  test.skip(
-    process.env.KEYBOARD_JOURNEY !== "1",
-    "the owner's traversal, run on purpose with KEYBOARD_JOURNEY=1",
-  );
-  test.setTimeout(0);
-  await page.goto("/account");
-  await page.pause();
-});
-
 test("Round 21 (F1) — Set up's drop-down of several: never the browser's select; Choose, then {first}, {second}, then {n} chosen; the panel stays open, a tick on each choice; left empty, Choose at least one. under it and nothing saved; saved as the list chosen; a drop-down of one closes on its choice and is saved as that one (the platform round's F1; ICD-10 Code Check's words.md section 3)", async ({
   page,
 }) => {
@@ -5811,76 +5787,71 @@ test.describe("Round 21, platform round 2 (B2, as the batch addendum amends it) 
   test.describe("on a phone or a tablet", () => {
     test.use({ hasTouch: true });
 
-    test("a photo the camera takes is added to the files held", async ({
-      page,
-      browserName,
-    }) => {
-      test.skip(
-        browserName !== "chromium",
-        "Chromium's touch emulation makes the primary pointer coarse",
-      );
-      await fixtureControl("manual-several");
-      const dialog = await openFilledRun(page);
-      await dialog
-        .getByLabel("Invoice file")
-        .setInputFiles([pdf("a.pdf"), pdf("b.pdf")]);
-      await expect(dialog.getByText("2 files selected")).toBeVisible();
-      const [camera] = await Promise.all([
-        page.waitForEvent("filechooser"),
-        dialog
-          .getByRole("button", { name: "Take photo for Invoice file" })
-          .click(),
-      ]);
-      await camera.setFiles({
-        name: "image.jpg",
-        mimeType: "image/jpeg",
-        buffer: await sidewaysPhoto(page),
-      });
-      await expect(dialog.getByText("3 files selected")).toBeVisible();
-      expect((await storedObjects()).map(({ filename }) => filename)).toEqual([
-        "a.pdf",
-        "b.pdf",
-        "image.jpg",
-      ]);
-      await expect(
-        dialog.locator('input[name="input:artifactId"]'),
-      ).toHaveCount(3);
-    });
+    // Chromium alone: its touch emulation makes the primary pointer coarse.
+    // Left out of the other engines by project (@chromium-only,
+    // playwright.config.ts), not skipped in them.
+    test(
+      "a photo the camera takes is added to the files held",
+      { tag: "@chromium-only" },
+      async ({ page }) => {
+        await fixtureControl("manual-several");
+        const dialog = await openFilledRun(page);
+        await dialog
+          .getByLabel("Invoice file")
+          .setInputFiles([pdf("a.pdf"), pdf("b.pdf")]);
+        await expect(dialog.getByText("2 files selected")).toBeVisible();
+        const [camera] = await Promise.all([
+          page.waitForEvent("filechooser"),
+          dialog
+            .getByRole("button", { name: "Take photo for Invoice file" })
+            .click(),
+        ]);
+        await camera.setFiles({
+          name: "image.jpg",
+          mimeType: "image/jpeg",
+          buffer: await sidewaysPhoto(page),
+        });
+        await expect(dialog.getByText("3 files selected")).toBeVisible();
+        expect((await storedObjects()).map(({ filename }) => filename)).toEqual(
+          ["a.pdf", "b.pdf", "image.jpg"],
+        );
+        await expect(
+          dialog.locator('input[name="input:artifactId"]'),
+        ).toHaveCount(3);
+      },
+    );
 
-    test("a photo past the field's maxFiles says 'Add up to {max} files at a time.' and the files held are kept", async ({
-      page,
-      browserName,
-    }) => {
-      test.skip(
-        browserName !== "chromium",
-        "Chromium's touch emulation makes the primary pointer coarse",
-      );
-      await fixtureControl("manual-several?maxFiles=2");
-      const dialog = await openFilledRun(page);
-      await dialog
-        .getByLabel("Invoice file")
-        .setInputFiles([pdf("a.pdf"), pdf("b.pdf")]);
-      await expect(dialog.getByText("2 files selected")).toBeVisible();
-      const [camera] = await Promise.all([
-        page.waitForEvent("filechooser"),
-        dialog
-          .getByRole("button", { name: "Take photo for Invoice file" })
-          .click(),
-      ]);
-      await camera.setFiles({
-        name: "image.jpg",
-        mimeType: "image/jpeg",
-        buffer: await sidewaysPhoto(page),
-      });
-      await expect(dialog.getByRole("alert")).toHaveText(
-        "Add up to 2 files at a time.",
-      );
-      await expect(dialog.getByText("2 files selected")).toBeVisible();
-      expect(await storedObjects()).toHaveLength(2);
-      await expect(
-        dialog.locator('input[name="input:artifactId"]'),
-      ).toHaveCount(2);
-    });
+    test(
+      "a photo past the field's maxFiles says 'Add up to {max} files at a time.' and the files held are kept",
+      { tag: "@chromium-only" },
+      async ({ page }) => {
+        await fixtureControl("manual-several?maxFiles=2");
+        const dialog = await openFilledRun(page);
+        await dialog
+          .getByLabel("Invoice file")
+          .setInputFiles([pdf("a.pdf"), pdf("b.pdf")]);
+        await expect(dialog.getByText("2 files selected")).toBeVisible();
+        const [camera] = await Promise.all([
+          page.waitForEvent("filechooser"),
+          dialog
+            .getByRole("button", { name: "Take photo for Invoice file" })
+            .click(),
+        ]);
+        await camera.setFiles({
+          name: "image.jpg",
+          mimeType: "image/jpeg",
+          buffer: await sidewaysPhoto(page),
+        });
+        await expect(dialog.getByRole("alert")).toHaveText(
+          "Add up to 2 files at a time.",
+        );
+        await expect(dialog.getByText("2 files selected")).toBeVisible();
+        expect(await storedObjects()).toHaveLength(2);
+        await expect(
+          dialog.locator('input[name="input:artifactId"]'),
+        ).toHaveCount(2);
+      },
+    );
   });
 });
 
@@ -5969,5 +5940,66 @@ test("a batch run's page: the batch's own blocks, then '{unit plural}', '{n} {un
     const child = body.getByRole("link", { name: new RegExp(label, "u") });
     await expect(child).toContainText(status);
     await expect(child).toHaveAttribute("href", `/account/runs/${runId}`);
+  }
+});
+
+test("backend §12.1 #319 step 2 — a flow whose list row carries no setup still draws its settings on its page, Set up and Connect integration, saves its integration, and its run's page reads it by its id", async ({
+  page,
+}) => {
+  // The list's rows without `setup`, as the platform's list will answer once
+  // step 3 lands: each page reads the flow by its id, which carries it.
+  await fixtureControl("list-without-setup");
+  const invoiceId = FLOWS.invoice.split("/").at(-1);
+  const reads = async () =>
+    (await fixtureRead<{ subscriptionReads: string[] }>("counts"))
+      .subscriptionReads;
+  const main = page.locator("main");
+  const quickbooks = main.getByRole("radio", { name: "QuickBooks Online" });
+
+  await page.goto(FLOWS.invoice);
+  await expect(main.getByTestId("flow-vendor-vendor")).toContainText("None");
+  await expect(main.getByRole("link", { name: "Edit setup" })).toHaveAttribute(
+    "href",
+    `${FLOWS.invoice}/setup`,
+  );
+
+  await page.goto(`${FLOWS.invoice}/setup`);
+  await expect(quickbooks).toBeVisible();
+  await expect(main.getByRole("radio", { name: "None" })).toBeVisible();
+
+  await page.goto(`${FLOWS.invoice}/vendor?field=vendor`);
+  await expect(quickbooks).toBeEnabled();
+  await quickbooks.click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
+  expect(
+    (await fixtureRead<{ invoiceConfig: Record<string, unknown> }>("counts"))
+      .invoiceConfig,
+  ).toMatchObject({ vendor: "quickbooks" });
+
+  const before = (await reads()).length;
+  await page.goto("/account/runs/fixture-run-invoice");
+  await expect(main.getByRole("link", { name: "Run details" })).toBeVisible();
+  expect((await reads()).slice(before)).toContain(invoiceId);
+});
+
+test('backend §12.1 #319 step 2 — an address whose flow id is not a UUID, which the platform answers 400, is the flow\'s "not found" on its page, Set up and Connect integration, never the error page (Round 21 hardening, W-3)', async ({
+  page,
+}) => {
+  for (const path of [
+    "/account/flows/not-a-uuid",
+    "/account/flows/not-a-uuid/setup",
+    "/account/flows/not-a-uuid/vendor?field=vendor",
+  ]) {
+    const before = (
+      await fixtureRead<{ subscriptionReads: string[] }>("counts")
+    ).subscriptionReads.length;
+    const response = await page.goto(path);
+    expect([path, response?.status()]).toEqual([path, 404]);
+    // The platform was asked, and answered 400 (the fixture, as the Edge).
+    expect(
+      (
+        await fixtureRead<{ subscriptionReads: string[] }>("counts")
+      ).subscriptionReads.slice(before),
+    ).toContain("not-a-uuid");
   }
 });

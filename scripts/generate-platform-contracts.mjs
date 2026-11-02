@@ -1,18 +1,29 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join, relative } from "node:path";
 import { parseYaml } from "@redocly/openapi-core";
-
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-// SNOOPY_BACKEND_ROOT points at another checkout; scripts/verify.mjs and the
-// contract tests read the same variable and resolve it from the repository
-// root as this does, so every reader agrees. Empty means unset.
-const backendRoot = resolve(
+import {
+  backendRoot as resolveBackendRoot,
+  COPY,
+  inputFiles,
   root,
-  process.env.SNOOPY_BACKEND_ROOT || "../snoopy-backend",
-);
+  SUMS,
+  sumsText,
+} from "./backend-contract.mjs";
+
+// SNOOPY_BACKEND_ROOT, else ../snoopy-backend, else the committed copy
+// (scripts/backend-contract.mjs): the contract tests and the check read the
+// same root, so every reader agrees.
+const backendRoot = resolveBackendRoot();
 const generator = join(root, "node_modules/.bin/openapi-typescript");
 const prettier = join(root, "node_modules/.bin/prettier");
 
@@ -241,3 +252,18 @@ execFileSync(prettier, [requiredOutput, "--write"], {
   cwd: root,
   stdio: "inherit",
 });
+
+// The copy (Round 21 hardening, W1): generated from a real backend checkout,
+// the six inputs are copied byte for byte to lib/generated/snoopy-backend
+// under the same paths, the copy's old files removed first, and SHA256SUMS
+// written over them, so the tests and the check read exactly what these
+// files were generated from. Generated FROM the copy, nothing is copied.
+if (backendRoot !== COPY) {
+  const files = inputFiles(backendRoot);
+  rmSync(COPY, { recursive: true, force: true });
+  for (const path of files) {
+    mkdirSync(dirname(join(COPY, path)), { recursive: true });
+    copyFileSync(join(backendRoot, path), join(COPY, path));
+  }
+  writeFileSync(SUMS, sumsText(COPY));
+}

@@ -2,10 +2,9 @@ import { notFound } from "next/navigation";
 import {
   emptyWhenUnavailable,
   listApprovals,
-  listArchivedSubscriptions,
   listAutomations,
-  listSubscriptions,
   readRun,
+  readSubscription,
   type Approval,
   type RunDetail,
   type Subscription,
@@ -43,9 +42,10 @@ import type { RunFlow } from "./RunLive";
  * And its flow, as it is now (Build 22, the session's S23): a setting step's
  * line — the integration the flow has chosen — and a title by connection
  * ("QuickBooks updated") follow the flow's settings, since a run does not
- * record its own choice (backend §12.1 #290). The live list first, the
- * archived one only when the run's flow is not in it (the app's M6); a flow
- * that cannot be read costs those two their words, never the page.
+ * record its own choice (backend §12.1 #290). Read by its id, in any status,
+ * archived too (backend §12.1 #319; it was the live list, then the archived
+ * one, the app's M6); a flow that cannot be read costs those two their words,
+ * never the page.
  */
 export type RunPageData = {
   detail: RunDetail;
@@ -54,16 +54,13 @@ export type RunPageData = {
   role: WorkspaceRole | undefined;
 };
 
-/** The run's flow as the platform lists it now, or `undefined` when it cannot be read or is gone. */
+/** The run's flow as the platform holds it now, or `undefined` when it cannot be read or is gone. */
 async function readFlow(
   workspaceId: string,
   subscriptionId: string,
 ): Promise<Subscription | undefined> {
-  const own = (rows: readonly Subscription[]) =>
-    rows.find((row) => row.id === subscriptionId);
   try {
-    const live = own((await listSubscriptions(workspaceId)).subscriptions);
-    return live ?? own(await listArchivedSubscriptions(workspaceId));
+    return (await readSubscription(workspaceId, subscriptionId)) ?? undefined;
   } catch (error) {
     if (
       error instanceof PlatformServerError ||

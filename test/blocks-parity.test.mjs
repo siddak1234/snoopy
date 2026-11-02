@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { after, before, test } from "node:test";
 import { BLOCK_FIXTURES } from "../lib/generated/platform-contracts/block-fixtures.ts";
@@ -28,10 +28,7 @@ import { spacingTokens } from "./spacing-scan.mjs";
  */
 
 const root = resolve(import.meta.dirname, "..");
-const backendRoot = resolve(
-  root,
-  process.env.SNOOPY_BACKEND_ROOT || "../snoopy-backend",
-);
+const backendRoot = resolve(root, "lib/generated/snoopy-backend");
 const RULES = join(backendRoot, "packages/contracts/fixtures/block-rules");
 
 let blocks;
@@ -84,29 +81,21 @@ test("the renderers use only the spacing table's classes", () => {
   }
 });
 
-test(
-  "the generated block rules name the sha256 of the platform's block-rules folder, its files in name order",
-  {
-    skip: existsSync(RULES)
-      ? false
-      : "snoopy-backend is not checked out beside this repository",
-  },
-  () => {
-    const hash = createHash("sha256");
-    for (const name of readdirSync(RULES)
-      .filter((file) => file.endsWith(".json"))
-      .sort())
-      hash.update(readFileSync(join(RULES, name)));
-    const first = readFileSync(
-      join(root, "lib/generated/platform-contracts/block-rules.ts"),
-      "utf8",
-    ).split("\n")[0];
-    assert.equal(
-      first,
-      `// From snoopy-backend packages/contracts/fixtures/block-rules/*.json, sha256 ${hash.digest("hex")}.`,
-    );
-  },
-);
+test("the generated block rules name the sha256 of the platform's block-rules folder, its files in name order", () => {
+  const hash = createHash("sha256");
+  for (const name of readdirSync(RULES)
+    .filter((file) => file.endsWith(".json"))
+    .sort())
+    hash.update(readFileSync(join(RULES, name)));
+  const first = readFileSync(
+    join(root, "lib/generated/platform-contracts/block-rules.ts"),
+    "utf8",
+  ).split("\n")[0];
+  assert.equal(
+    first,
+    `// From snoopy-backend packages/contracts/fixtures/block-rules/*.json, sha256 ${hash.digest("hex")}.`,
+  );
+});
 
 /**
  * The words a fixture is drawn as: its `text` — but `review-held-grouped`'s

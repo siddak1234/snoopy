@@ -44,7 +44,14 @@ delete bare.TEST_WORKER_INDEX;
 function listSpec(spec, extra, ...args) {
   const run = spawnSync(
     process.execPath,
-    ["node_modules/@playwright/test/cli.js", "test", spec, "--list", ...args],
+    [
+      "node_modules/@playwright/test/cli.js",
+      "test",
+      spec,
+      "--list",
+      "--reporter=list",
+      ...args,
+    ],
     { cwd: root, encoding: "utf8", env: { ...bare, ...extra } },
   );
   const output = `${run.stdout ?? ""}${run.stderr ?? ""}`;

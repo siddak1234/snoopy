@@ -48,8 +48,9 @@ such as `test/build22-screens.test.mjs`, and `e2e/account-surfaces.spec.ts`.
 4. Linked from the side menu: add its link and its small-screen title to
    `components/dashboard/DashboardNav.tsx` (register F56).
 5. The spec: add `e2e/$SLUG.spec.ts` to the fixture list in
-   `scripts/run-browser-fixtures.mjs` and to that list's copy in
-   `test/verify-gate.test.mjs`, which fails until both agree; if the fixture
+   `scripts/run-browser-fixtures.mjs`, to that list's copy in
+   `test/verify-gate.test.mjs` and to `fixtureOnly` in `playwright.config.ts`
+   (the test fails until all three agree); if the fixture
    Edge (`e2e/fixtures/public-edge.ts`) does not serve the operation yet, add
    it there.
 6. Check the plain-words rule and mobile parity with `templates/checklist.md`.
@@ -64,8 +65,8 @@ such as `test/build22-screens.test.mjs`, and `e2e/account-surfaces.spec.ts`.
    # ALSO: each of these that steps 4, 5 and 7 changed, space-separated:
    # components/dashboard/DashboardNav.tsx e2e/fixtures/public-edge.ts docs/ARCHITECTURE.md
    git add "app$ROUTE/page.tsx" "test/$SLUG.test.mjs" "e2e/$SLUG.spec.ts" \
-     scripts/run-browser-fixtures.mjs test/verify-gate.test.mjs docs/MAP.md \
-     README.md $ALSO && git commit
+     scripts/run-browser-fixtures.mjs test/verify-gate.test.mjs playwright.config.ts \
+     docs/MAP.md README.md $ALSO && git commit
    git status --short        # nothing of this page's left behind
    npm run verify
    ```

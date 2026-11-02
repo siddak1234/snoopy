@@ -189,3 +189,33 @@ export function assertPlatformRewrite(root) {
   );
   if (!hit) throw new Error("build output contains no /api/platform rewrite");
 }
+
+/**
+ * No silent skips (Round 21 hardening, W-5), as CI's gates job and main's
+ * smoke read them: `test:contracts` prints TAP, and a `# skipped N` or
+ * `# todo N` above 0 is a check that did not run.
+ */
+export function assertNoSkippedTests(tap) {
+  const counted = /^# (skipped|todo) ([1-9]\d*)/mu.exec(tap);
+  if (counted) {
+    throw new Error(
+      `a contract test did not run (${counted[1]} ${counted[2]})`,
+    );
+  }
+}
+
+/**
+ * And the browser suite's, as CI's browser job reads it: Playwright's JSON
+ * report (written under CI=1, which both runners set) must count 0 skipped
+ * (scripts/no-skipped-browser-tests.mjs, which says why it fails).
+ */
+export function assertNoSkippedBrowserTests(root) {
+  const run = spawnSync(
+    process.execPath,
+    ["scripts/no-skipped-browser-tests.mjs"],
+    { cwd: root, stdio: "inherit" },
+  );
+  if (run.status !== 0) {
+    throw new Error("a browser test did not run, or there is no report");
+  }
+}

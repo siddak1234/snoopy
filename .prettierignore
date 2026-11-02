@@ -6,6 +6,9 @@ next-env.d.ts
 
 # Generated
 package-lock.json
+# The backend's contract files, copied byte for byte with their SHA256SUMS
+# (scripts/backend-contract.mjs): formatting the copy would break its hashes
+lib/generated/snoopy-backend/
 
 # The common kit, byte-identical in all four repositories (the engineering
 # standard's §0, linked from AGENTS.md): formatting a copy would make it drift

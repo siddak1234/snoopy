@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import {
   existsSync,
@@ -73,25 +73,11 @@ test("verify also runs format:check (CI's Lint job does; the audit runner does n
   }
 });
 
-test("verify skips the sibling-dependent gate out loud rather than failing on a missing checkout", () => {
-  // generate-platform-contracts.mjs throws on the FIRST missing input, so the
-  // skip must check all three, and it must say why (§12.2 #78's class).
-  for (const input of [
-    "docs/openapi.yaml",
-    "docs/openapi/automations.yaml",
-    "docs/openapi/connections.yaml",
-  ]) {
-    assert.ok(
-      verify.includes(`"${input}"`),
-      `verify.mjs does not check ${input}`,
-    );
-  }
-  assert.match(verify, /SKIP \$\{gate\.name\}/u);
-  assert.match(
-    verify,
-    /accepted dependency \(§12\.2 #78\)/u,
-    "the SKIP line itself must say why the dependency is accepted",
-  );
+test("verify never skips a gate: verify:platform-contracts reads the committed copy when there is no sibling checkout (Round 21 hardening, W1)", () => {
+  // It was skipped out loud with no sibling (§12.2 #78); the copy
+  // (lib/generated/snoopy-backend) makes it run everywhere.
+  assert.doesNotMatch(verify, /\bskip\b|SKIP/u);
+  assert.match(verify, /\{ name: "verify:platform-contracts" \}/u);
 });
 
 test("verify pins the build origin, defeats server reuse, and asserts the gateway rewrite", () => {
@@ -109,11 +95,11 @@ test("verify pins the build origin, defeats server reuse, and asserts the gatewa
 test("verify and the change audit share one preflight, one lock and one rewrite check (register F24)", () => {
   assert.match(
     verify,
-    /import \{ assertPlatformRewrite, preflight \} from "\.\/audit\/preflight\.mjs";/u,
+    /import \{\s*assertNoSkippedBrowserTests,\s*assertNoSkippedTests,\s*assertPlatformRewrite,\s*preflight,\s*\} from "\.\/audit\/preflight\.mjs";/u,
   );
   assert.match(
     runGates,
-    /import \{ assertPlatformRewrite, preflight \} from "\.\/preflight\.mjs";/u,
+    /import \{\s*assertNoSkippedBrowserTests,\s*assertNoSkippedTests,\s*assertPlatformRewrite,\s*preflight,\s*\} from "\.\/preflight\.mjs";/u,
   );
   for (const [name, source] of [
     ["verify.mjs", verify],
@@ -135,6 +121,88 @@ test("verify and the change audit share one preflight, one lock and one rewrite 
       `${name} takes a lock itself`,
     );
     assert.doesNotMatch(source, /function assertPlatformRewrite/u, name);
+  }
+});
+
+test("verify and the change audit fail on a skipped or todo contract test and on a skipped browser test, as CI does (Round 21 hardening, W-5)", async () => {
+  // Wired to the gates they read: test:contracts's TAP, handed back, and the
+  // browser suite's JSON report after test:browser. Each runner passes a
+  // gate's stdout to its check.
+  assert.match(
+    verify,
+    /name: "test:contracts",\s*capture: true,\s*after: \(stdout\) => assertNoSkippedTests\(stdout\),/u,
+  );
+  assert.match(
+    verify,
+    /stdio: gate\.capture \? \["inherit", "pipe", "inherit"\] : "inherit",/u,
+  );
+  assert.match(
+    runGates,
+    /name: "test:contracts",\s*command: \["npm", "run", "test:contracts"\],\s*after: \(stdout\) => assertNoSkippedTests\(stdout\),/u,
+  );
+  for (const [name, source] of [
+    ["verify.mjs", verify],
+    ["run-gates.mjs", runGates],
+  ]) {
+    assert.match(
+      source,
+      /name: "test:browser",[\s\S]{0,320}after: \(\) => assertNoSkippedBrowserTests\(root\),/u,
+      name,
+    );
+    assert.match(source, /gate\.after\(run\.stdout \?\? ""\);/u, name);
+  }
+
+  const { assertNoSkippedTests, assertNoSkippedBrowserTests } =
+    await import("../scripts/audit/preflight.mjs");
+  const tap = (skipped, todo) =>
+    `ok 1 - a\n1..1\n# tests 3\n# pass 3\n# fail 0\n# skipped ${skipped}\n# todo ${todo}\n`;
+  assert.doesNotThrow(() => assertNoSkippedTests(tap(0, 0)));
+  assert.throws(() => assertNoSkippedTests(tap(1, 0)), /skipped 1/u);
+  assert.throws(() => assertNoSkippedTests(tap(0, 2)), /todo 2/u);
+  assert.throws(() => assertNoSkippedTests(tap(10, 0)), /skipped 10/u);
+
+  // Over the real command: package.json's test:contracts on a file with one
+  // skipped test prints the TAP the check reads.
+  const dir = mkdtempSync(join(tmpdir(), "verify-skips-"));
+  try {
+    const spec = join(dir, "one.test.mjs");
+    writeFileSync(
+      spec,
+      'import { test } from "node:test";\ntest("runs", () => {});\ntest("skips", { skip: true }, () => {});\n',
+    );
+    const command = JSON.parse(
+      readFileSync(resolve(import.meta.dirname, "../package.json"), "utf8"),
+    ).scripts["test:contracts"].replace("test/*.test.mjs", spec);
+    // NODE_TEST_CONTEXT would make the child report to this run.
+    const env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT;
+    const real = spawnSync("sh", ["-c", command], { env, encoding: "utf8" });
+    assert.throws(() => assertNoSkippedTests(real.stdout), /skipped 1/u);
+
+    // The browser check reads <root>/test-results/playwright-report.json
+    // with this repository's script: red on a skip and with no report.
+    mkdirSync(join(dir, "scripts"));
+    writeFileSync(
+      join(dir, "scripts/no-skipped-browser-tests.mjs"),
+      readFileSync(
+        resolve(import.meta.dirname, "../scripts/no-skipped-browser-tests.mjs"),
+      ),
+    );
+    const report = (stats) => {
+      mkdirSync(join(dir, "test-results"), { recursive: true });
+      writeFileSync(
+        join(dir, "test-results/playwright-report.json"),
+        JSON.stringify({ stats }),
+      );
+    };
+    assert.throws(() => assertNoSkippedBrowserTests(dir), /no report/u);
+    const clean = { expected: 4, skipped: 0, unexpected: 0, flaky: 0 };
+    report(clean);
+    assert.doesNotThrow(() => assertNoSkippedBrowserTests(dir));
+    report({ ...clean, skipped: 1 });
+    assert.throws(() => assertNoSkippedBrowserTests(dir), /did not run/u);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 
@@ -396,8 +464,12 @@ test("the browser fixture run passes every spec that needs the fixture Edge, and
     "e2e/account-surfaces.spec.ts",
     "e2e/dialogs.spec.ts",
     "e2e/flow-items.spec.ts",
+    "e2e/accessibility-authenticated.spec.ts",
+    "e2e/keyboard-journey.spec.ts",
   ]);
-  // And derived: every spec that reads the fixture's switch is one of them.
+  // And derived: every spec that reads the fixture's switch is one of them,
+  // and so is e2e/accessibility.spec.ts, whose /login scan needs the
+  // fixture's provider list and whose other scans run in both.
   const e2e = resolve(import.meta.dirname, "../e2e");
   const needFixture = readdirSync(e2e)
     .filter((name) => name.endsWith(".spec.ts"))
@@ -405,7 +477,24 @@ test("the browser fixture run passes every spec that needs the fixture Edge, and
       readFileSync(join(e2e, name), "utf8").includes("E2E_PUBLIC_EDGE_FIXTURE"),
     )
     .map((name) => `e2e/${name}`);
-  assert.deepEqual([...listed].sort(), needFixture.sort());
+  assert.deepEqual(
+    [...listed].sort(),
+    [...needFixture, "e2e/accessibility.spec.ts"].sort(),
+  );
+  // And playwright.config.ts collects each of those only against the fixture
+  // (Round 21 hardening, W14): no run without it lists them as skipped.
+  const config = readFileSync(
+    resolve(import.meta.dirname, "../playwright.config.ts"),
+    "utf8",
+  );
+  const fixtureOnly = config.slice(
+    config.indexOf("const fixtureOnly"),
+    config.indexOf("const notCollected"),
+  );
+  const ignored = [...fixtureOnly.matchAll(/\/([\w-]+)\\\.spec\\\.ts\//gu)]
+    .map((match) => `e2e/${match[1]}.spec.ts`)
+    .sort();
+  assert.deepEqual(ignored, needFixture.sort());
 });
 
 test("verify emits the facts file only after the last gate", () => {
@@ -419,13 +508,6 @@ test("verify emits the facts file only after the last gate", () => {
     verify,
     /process\.exit\(exit\)/u,
     "a red gate must stop the run before any emission",
-  );
-  // A run that skipped the sibling gate is green for what ran and emits
-  // nothing: the file must not be indistinguishable from a full run's.
-  const guard = verify.indexOf("facts NOT emitted");
-  assert.ok(
-    guard > 0 && guard < emit,
-    "a run that skipped a gate must refuse to emit before the emission",
   );
 });
 

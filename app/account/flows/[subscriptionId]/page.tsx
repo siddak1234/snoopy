@@ -7,7 +7,7 @@ import {
   emptyWhenUnavailable,
   listAutomations,
   listItems,
-  listSubscriptions,
+  readSubscription,
   readFlowEmailRecipients,
   readRunStats,
   type AutomationSetupField,
@@ -160,7 +160,7 @@ export default async function FlowPage(
   if (!workspaceId) notFound();
 
   const [
-    subscriptions,
+    subscription,
     catalog,
     stats,
     providers,
@@ -169,9 +169,10 @@ export default async function FlowPage(
     role,
     recipients,
   ] = await Promise.all([
-    emptyWhenUnavailable(() => listSubscriptions(workspaceId), {
-      subscriptions: [],
-    }),
+    emptyWhenUnavailable(
+      () => readSubscription(workspaceId, subscriptionId),
+      null,
+    ),
     emptyWhenUnavailable(() => listAutomations(workspaceId), {
       automations: [],
       categories: [],
@@ -188,13 +189,10 @@ export default async function FlowPage(
     readRecipients(workspaceId, subscriptionId),
   ]);
 
-  // A flow this person can see and has not archived; any other id is the same
-  // "not found" a flow that does not exist is.
-  const subscription = subscriptions.subscriptions.find(
-    (candidate) =>
-      candidate.id === subscriptionId && candidate.status !== "archived",
-  );
-  if (!subscription) notFound();
+  // A flow this person can see and has not archived, read by its id (backend
+  // §12.1 #319); any other id is the same "not found" a flow that does not
+  // exist is.
+  if (!subscription || subscription.status === "archived") notFound();
   const entry = catalog.automations.find(
     (candidate) => candidate.templateId === subscription.templateId,
   );

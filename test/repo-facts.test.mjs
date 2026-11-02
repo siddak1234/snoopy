@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
@@ -9,15 +9,16 @@ import { writeRepoFacts } from "../scripts/repo-facts.mjs";
  * The facts file `npm run verify` emits is what snoopy-backend commits and
  * asserts (docs/repo-facts/snoopy.json against docs/repo-facts.schema.json).
  * The shape is asserted here so a drift is caught by the repository that emits
- * it, not by the one that quotes it. The schema is read from the backend
- * checkout beside this one when present; when absent those tests skip, as the
- * other contract tests do.
+ * it, not by the one that quotes it. The schema is read from the committed
+ * copy of the backend's contract files (lib/generated/snoopy-backend, checked
+ * against its SHA256SUMS by npm run verify:platform-contracts), so the test
+ * always runs.
  */
 
 const BACKEND_ROOT = resolve(
   import.meta.dirname,
   "..",
-  process.env.SNOOPY_BACKEND_ROOT || "../snoopy-backend",
+  "lib/generated/snoopy-backend",
 );
 const SCHEMA_PATH = resolve(BACKEND_ROOT, "docs/repo-facts.schema.json");
 // Every count reads one tree: the working tree minus what .gitignore excludes.
@@ -104,29 +105,21 @@ test("§9.2's four component rows sum to the components count (backend §12.2 #8
   );
 });
 
-test(
-  "the facts file validates against the backend's schema",
-  {
-    skip: existsSync(SCHEMA_PATH)
-      ? false
-      : "snoopy-backend is not checked out beside this repository",
-  },
-  () => {
-    const schema = JSON.parse(readFileSync(SCHEMA_PATH, "utf8"));
-    const { written } = emit();
-    for (const key of schema.required)
-      assert.ok(key in written, `missing ${key}`);
-    for (const key of Object.keys(written)) {
-      assert.ok(key in schema.properties, `${key} is not a schema property`);
-    }
-    assert.equal(written.schemaVersion, schema.properties.schemaVersion.const);
-    assert.ok(schema.properties.repository.enum.includes(written.repository));
-    assert.match(written.head, new RegExp(schema.properties.head.pattern, "u"));
-    const entryKeys = Object.keys(
-      schema.properties.counts.additionalProperties.properties,
-    ).sort();
-    for (const [unit, entry] of Object.entries(written.counts)) {
-      assert.deepEqual(Object.keys(entry).sort(), entryKeys, unit);
-    }
-  },
-);
+test("the facts file validates against the backend's schema", () => {
+  const schema = JSON.parse(readFileSync(SCHEMA_PATH, "utf8"));
+  const { written } = emit();
+  for (const key of schema.required)
+    assert.ok(key in written, `missing ${key}`);
+  for (const key of Object.keys(written)) {
+    assert.ok(key in schema.properties, `${key} is not a schema property`);
+  }
+  assert.equal(written.schemaVersion, schema.properties.schemaVersion.const);
+  assert.ok(schema.properties.repository.enum.includes(written.repository));
+  assert.match(written.head, new RegExp(schema.properties.head.pattern, "u"));
+  const entryKeys = Object.keys(
+    schema.properties.counts.additionalProperties.properties,
+  ).sort();
+  for (const [unit, entry] of Object.entries(written.counts)) {
+    assert.deepEqual(Object.keys(entry).sort(), entryKeys, unit);
+  }
+});

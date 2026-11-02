@@ -11,7 +11,7 @@
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
     "audit:boundaries": "node scripts/audit-boundaries.mjs",
-    "test:contracts": "node --experimental-strip-types --test test/*.test.mjs",
+    "test:contracts": "node --experimental-strip-types --test --test-reporter=tap test/*.test.mjs",
     "generate:platform-contracts": "node scripts/generate-platform-contracts.mjs",
     "verify:platform-contracts": "node scripts/verify-platform-contracts.mjs",
     "test:visual": "playwright test e2e/marketing.visual.spec.ts",

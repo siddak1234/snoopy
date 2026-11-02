@@ -21,16 +21,16 @@ import {
  * A generated file that is stale or a facade that points at the wrong schema
  * would otherwise render a renamed field as blank, so both are asserted here.
  *
- * The specification is read from the backend repository beside this one. When it
- * is absent, the test skips rather than fails: a checkout of `snoopy` alone is a
- * legitimate way to work on the website, and a test that cannot run is not the
- * same as one that failed.
+ * The specification is read from the committed copy of the backend's contract
+ * files (lib/generated/snoopy-backend, checked against its SHA256SUMS by
+ * npm run verify:platform-contracts), so every test here runs in CI and in a
+ * checkout of `snoopy` alone, never a skip (Round 21 hardening, W3, W9).
  */
 
 const SPEC_PATH = resolve(
   import.meta.dirname,
   "..",
-  process.env.SNOOPY_BACKEND_ROOT || "../snoopy-backend",
+  "lib/generated/snoopy-backend",
   "docs/openapi/automations.yaml",
 );
 const CLIENT_PATH = resolve(import.meta.dirname, "../lib/automations.ts");
@@ -96,8 +96,7 @@ function sourceFiles() {
   return files;
 }
 
-const available = existsSync(SPEC_PATH);
-const spec = available ? readFileSync(SPEC_PATH, "utf8") : "";
+const spec = readFileSync(SPEC_PATH, "utf8");
 const client = readFileSync(CLIENT_PATH, "utf8");
 const generated = existsSync(GENERATED_PATH)
   ? readFileSync(GENERATED_PATH, "utf8")
@@ -280,55 +279,39 @@ function facadeAliases(typeName) {
   );
 }
 
-test(
-  "every field the website reads is one the server promises",
-  {
-    skip: available
-      ? false
-      : "snoopy-backend is not checked out beside this repository",
-  },
-  () => {
-    for (const [schema, type] of [
-      ["AutomationCatalogEntry", "AutomationCatalogEntry"],
-      ["Subscription", "Subscription"],
-      ["Run", "Run"],
-      ["Approval", "Approval"],
-    ]) {
-      const promised = requiredFields(schema);
-      const declared = new Set(generatedFields(type));
-      const missing = promised.filter((field) => !declared.has(field));
-      assert.deepEqual(
-        missing,
-        [],
-        `${type} omits fields the server always sends: ${missing.join(", ")}`,
-      );
-    }
-  },
-);
+test("every field the website reads is one the server promises", () => {
+  for (const [schema, type] of [
+    ["AutomationCatalogEntry", "AutomationCatalogEntry"],
+    ["Subscription", "Subscription"],
+    ["Run", "Run"],
+    ["Approval", "Approval"],
+  ]) {
+    const promised = requiredFields(schema);
+    const declared = new Set(generatedFields(type));
+    const missing = promised.filter((field) => !declared.has(field));
+    assert.deepEqual(
+      missing,
+      [],
+      `${type} omits fields the server always sends: ${missing.join(", ")}`,
+    );
+  }
+});
 
-test(
-  "status vocabularies match the server exactly",
-  {
-    skip: available
-      ? false
-      : "snoopy-backend is not checked out beside this repository",
-  },
-  () => {
-    // A status the server can send and the website does not know renders as an
-    // unstyled neutral chip — visible, but wrong. A status the website knows and
-    // the server never sends is dead code that outlives its reason.
-    assert.deepEqual(
-      generatedUnion("SubscriptionStatus"),
-      specEnum("SubscriptionStatus"),
-    );
-    assert.deepEqual(generatedUnion("RunStatus"), specEnum("RunStatus"));
-    assert.deepEqual(
-      generatedUnion("ApprovalStatus"),
-      specEnum("ApprovalStatus"),
-    );
-    assert.deepEqual(generatedUnion("RunOrigin"), specEnum("RunOrigin"));
-  },
-);
+test("status vocabularies match the server exactly", () => {
+  // A status the server can send and the website does not know renders as an
+  // unstyled neutral chip — visible, but wrong. A status the website knows and
+  // the server never sends is dead code that outlives its reason.
+  assert.deepEqual(
+    generatedUnion("SubscriptionStatus"),
+    specEnum("SubscriptionStatus"),
+  );
+  assert.deepEqual(generatedUnion("RunStatus"), specEnum("RunStatus"));
+  assert.deepEqual(
+    generatedUnion("ApprovalStatus"),
+    specEnum("ApprovalStatus"),
+  );
+  assert.deepEqual(generatedUnion("RunOrigin"), specEnum("RunOrigin"));
+});
 
 test("every status the website can receive has a tone", () => {
   // StatusPill maps status to tone. An unmapped one is not a crash — it renders
@@ -933,16 +916,14 @@ test("a run's file goes straight to the store, and the run carries only its id (
     uploads,
     /const known = uploadRefusalMessage\(error\.details\?\.reason, error\.details\);/u,
   );
-  if (available) {
-    assert.deepEqual(
-      refusalKeys(uploadRefusals, "UPLOAD_REFUSALS"),
-      [
-        ...operationReasons("openUpload"),
-        ...operationReasons("completeUpload"),
-      ].sort(),
-      "every refusal the two upload operations name is said in words, and no other",
-    );
-  }
+  assert.deepEqual(
+    refusalKeys(uploadRefusals, "UPLOAD_REFUSALS"),
+    [
+      ...operationReasons("openUpload"),
+      ...operationReasons("completeUpload"),
+    ].sort(),
+    "every refusal the two upload operations name is said in words, and no other",
+  );
 });
 
 test("a run refused for its file says so and empties the file field to choose again, and no other refusal does (backend FR-14)", () => {
@@ -957,13 +938,11 @@ test("a run refused for its file says so and empties the file field to choose ag
     /if \(result\.state === "file-unavailable"\) \{\s*setFileRound\(\(round\) => round \+ 1\);\s*newRunKey\(\);/u,
   );
   assert.match(fields, /key=\{`\$\{field\.key\}:\$\{fileRound\}`\}/u);
-  if (available) {
-    assert.deepEqual(
-      refusalKeys(actions, "RUN_REFUSALS"),
-      specReasons("createRun"),
-      "every reason createRun names is said in words, and no other",
-    );
-  }
+  assert.deepEqual(
+    refusalKeys(actions, "RUN_REFUSALS"),
+    specReasons("createRun"),
+    "every reason createRun names is said in words, and no other",
+  );
 });
 
 test("no client moves a flow: the update sends no version and names no move refusal, and the platform's update names none of the move's reasons any more (Build 22, P4; backend ADR-0041; the owner's build 21 item 7)", () => {
@@ -983,22 +962,18 @@ test("no client moves a flow: the update sends no version and names no move refu
     false,
   );
   assert.doesNotMatch(actionsUi, /archive it and add it again/u);
-  if (available) {
-    // The refusals an update names now are Set up's, said by its own words.
-    const reasons = specReasons("updateSubscription");
-    for (const gone of [
-      "approvals_pending",
-      "runs_in_flight",
-      "version_unavailable",
-    ])
-      assert.ok(!reasons.includes(gone), gone);
-    // And the contract takes no version on an update.
-    const update = spec.slice(
-      spec.indexOf("operationId: updateSubscription\n"),
-    );
-    const body = update.slice(0, update.search(/\n {6}responses:/u));
-    assert.doesNotMatch(body, /templateVersion:/u);
-  }
+  // The refusals an update names now are Set up's, said by its own words.
+  const reasons = specReasons("updateSubscription");
+  for (const gone of [
+    "approvals_pending",
+    "runs_in_flight",
+    "version_unavailable",
+  ])
+    assert.ok(!reasons.includes(gone), gone);
+  // And the contract takes no version on an update.
+  const update = spec.slice(spec.indexOf("operationId: updateSubscription\n"));
+  const body = update.slice(0, update.search(/\n {6}responses:/u));
+  assert.doesNotMatch(body, /templateVersion:/u);
 });
 
 test("a webhook address is offered for a webhook-started automation to an owner or admin only, and its secret is never kept (backend §12.1 #91, #109)", () => {
@@ -1044,12 +1019,10 @@ test("a webhook address is offered for a webhook-started automation to an owner 
     client,
     /error instanceof PlatformServerError && error\.status === 404\)\s*return null;/u,
   );
-  if (available) {
-    assert.deepEqual(
-      refusalKeys(webhook, "ISSUE_REFUSALS"),
-      specReasons("issueWebhookEndpoint"),
-    );
-  }
+  assert.deepEqual(
+    refusalKeys(webhook, "ISSUE_REFUSALS"),
+    specReasons("issueWebhookEndpoint"),
+  );
 });
 
 test("archived flows are read by name, and only rows that are archived are kept (backend §12.1 #203, BUILD-PLAN 24.11.11)", () => {
@@ -1240,4 +1213,80 @@ test("a setup drop-down picks one or several: the glass drop-down, never the bro
     read("app/account/flows/ManifestFields.tsx"),
     /missing=\{missingChoices\?\.has\(field\.key\) \?\? false\}/u,
   );
+});
+
+test("a flow's page, Set up, Connect integration, the integration's save and a run's page read the flow by its id, never from the list (backend §12.1 #319 step 2)", () => {
+  // The list keeps `setup` only for builds before 34 (#319 step 3 drops it);
+  // a page that found its flow in the list would lose its settings then.
+  const read = (path) =>
+    readFileSync(resolve(import.meta.dirname, "..", path), "utf8");
+  assert.match(
+    client,
+    /export async function readSubscription\(\s*workspaceId: string,\s*subscriptionId: string,\s*\): Promise<Subscription \| null>/u,
+  );
+  assert.match(
+    client,
+    /`\$\{scope\(workspaceId\)\}\/subscriptions\/\$\{encodeURIComponent\(subscriptionId\)\}`,\s*\);\s*return subscription;/u,
+  );
+  // 404 is the pages' "not found", never an error page; so is 400, the
+  // platform's answer to an id that is not a UUID (the contract's '400').
+  assert.match(
+    client,
+    /return subscription;\s*\} catch \(error\) \{\s*if \(\s*error instanceof PlatformServerError &&\s*\(error\.status === 404 \|\| error\.status === 400\)\s*\)\s*return null;/u,
+  );
+  assert.ok(
+    /getSubscription: \{/u.test(readFileSync(GENERATED_PATH, "utf8")),
+    "the contract names getSubscription",
+  );
+  for (const path of [
+    "app/account/flows/[subscriptionId]/page.tsx",
+    "app/account/flows/[subscriptionId]/setup/page.tsx",
+    "app/account/flows/[subscriptionId]/vendor/page.tsx",
+    "app/account/runs/[runId]/run-page-data.ts",
+  ]) {
+    const source = read(path);
+    assert.match(
+      source,
+      /readSubscription\(workspaceId, (?:subscriptionId|detail\.run\.subscriptionId)\)|readSubscription\(workspaceId, subscriptionId\)/u,
+      path,
+    );
+    assert.doesNotMatch(
+      source,
+      /listSubscriptions|listArchivedSubscriptions/u,
+      path,
+    );
+  }
+  const actions = read("app/account/flows/actions.ts");
+  const save = actions.slice(
+    actions.indexOf("export async function saveVendorChoice"),
+  );
+  const body = save.slice(0, save.indexOf("\n}\n"));
+  assert.match(body, /await readSubscription\(workspaceId, subscriptionId\)/u);
+  assert.doesNotMatch(body, /listSubscriptions/u);
+
+  // The read by id answers archived flows too; only these lines keep an
+  // archived flow's page, Set up and Connect integration "not found" and its
+  // save refused.
+  for (const path of [
+    "app/account/flows/[subscriptionId]/page.tsx",
+    "app/account/flows/[subscriptionId]/setup/page.tsx",
+  ])
+    assert.match(
+      read(path),
+      /if \(!subscription \|\| subscription\.status === "archived"\) notFound\(\);/u,
+      path,
+    );
+  const archivedIsNone =
+    /const found = await readSubscription\(workspaceId, subscriptionId\);[\s\S]{0,200}const subscription = found\?\.status === "archived" \? null : found;/u;
+  assert.match(
+    read("app/account/flows/[subscriptionId]/vendor/page.tsx"),
+    /const subscription = found\?\.status === "archived" \? null : found;/u,
+    "vendor page",
+  );
+  assert.match(
+    read("app/account/flows/[subscriptionId]/vendor/page.tsx"),
+    /\[found, [\s\S]{0,400}readSubscription\(workspaceId, subscriptionId\)/u,
+    "vendor page reads `found` by id",
+  );
+  assert.match(body, archivedIsNone, "saveVendorChoice");
 });

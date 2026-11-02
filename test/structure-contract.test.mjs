@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { test } from "node:test";
 import ts from "typescript";
@@ -431,12 +441,29 @@ test("every launch configuration runs a script that exists (register F13)", () =
   }
 });
 
-test("one Node major everywhere — .nvmrc, CI, the image and package.json engines (register F17)", () => {
-  const major = read(".nvmrc").trim();
-  const ci = read(".github/workflows/ci.yml");
-  const versions = [...ci.matchAll(/node-version: (\S+)/gu)].map((m) => m[1]);
-  assert.ok(versions.length > 0, "CI no longer names a Node version");
-  for (const version of versions) assert.equal(version, major, "CI");
+test("one Node everywhere — .nvmrc's exact version in CI, its major in the image and package.json engines (register F17; Round 21 hardening, PIN-8)", () => {
+  // .nvmrc names one exact Node (the setup-node cache otherwise keeps
+  // whichever 22.x a runner has), and every setup-node reads it: no workflow
+  // names a version of its own.
+  const pinned = read(".nvmrc").trim();
+  assert.match(pinned, /^\d+\.\d+\.\d+$/u, ".nvmrc names an exact version");
+  const major = pinned.split(".")[0];
+  for (const file of [
+    ".github/workflows/ci.yml",
+    ".github/workflows/main.yml",
+  ]) {
+    const workflow = read(file);
+    assert.doesNotMatch(workflow, /node-version: /u, `${file} names a Node`);
+    const setups = [
+      ...workflow.matchAll(
+        /- uses: actions\/setup-node@\S+.*\n {8}with:\n((?: {10}.*\n?)+)/gu,
+      ),
+    ];
+    assert.ok(setups.length > 0, `${file} sets up no Node`);
+    for (const [, inputs] of setups) {
+      assert.match(inputs, /^ {10}node-version-file: \.nvmrc$/mu, file);
+    }
+  }
   for (const from of read("Dockerfile").matchAll(/^FROM node:(\d+)/gmu)) {
     assert.equal(from[1], major, "Dockerfile");
   }
@@ -484,7 +511,7 @@ test("every CI job in the Playwright image runs with a HOME that root owns (regi
     .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
     .slice(1);
   const inImage = jobs.filter((job) =>
-    job.includes("image: mcr.microsoft.com/playwright@"),
+    job.includes("image: mcr.microsoft.com/playwright:"),
   );
   assert.ok(inImage.length > 0, "no CI job runs in the Playwright image");
   for (const job of inImage) {
@@ -567,6 +594,7 @@ test("the fixture legs leave out exactly the accessibility tests the browser job
         "test",
         ...specs,
         "--list",
+        "--reporter=list",
         "--grep",
         declared[1],
       ],
@@ -656,11 +684,157 @@ test("CI's contract tests read the whole history, so a struck document path is c
     .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
     .find((entry) => entry.startsWith("gates:"));
   assert.ok(job, "CI has no gates job");
-  assert.match(job, /- run: npm run test:contracts$/mu);
+  assert.match(job, /^ {10}npm run test:contracts \| tee /mu);
   assert.match(
     job,
-    /- uses: actions\/checkout@v7\n(?: {8}#.*\n)*? {8}with:\n {10}fetch-depth: 0$/mu,
+    /- uses: actions\/checkout@[0-9a-f]{40} # v\d+\.\d+\.\d+\n(?: {8}#.*\n)*? {8}with:\n {10}fetch-depth: 0$/mu,
   );
+});
+
+test("every action is pinned by commit with its version, the image's base by digest with its tag, and Dependabot moves them weekly (Round 21 hardening, PIN-1..3, PIN-7, PIN-9)", () => {
+  // A tag is a promise its owner can rewrite; a commit is not. The comment is
+  // the version that commit is, and the line Dependabot rewrites with it.
+  for (const file of readdirSync(".github/workflows")) {
+    const workflow = read(`.github/workflows/${file}`);
+    for (const [line, ref] of workflow.matchAll(
+      /^\s+(?:- )?uses: (\S+.*)$/gmu,
+    )) {
+      if (ref.startsWith("./")) continue;
+      assert.match(
+        ref,
+        /^[\w.-]+\/[\w.-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$/u,
+        `${file}: ${line.trim()}`,
+      );
+    }
+  }
+  const froms = [...read("Dockerfile").matchAll(/^FROM (\S+)/gmu)].map(
+    (m) => m[1],
+  );
+  assert.ok(froms.length > 0, "the Dockerfile has no FROM");
+  for (const from of froms) {
+    assert.match(from, /^node:[\w.-]+@sha256:[0-9a-f]{64}$/u, from);
+  }
+  const dependabot = read(".github/dependabot.yml");
+  for (const ecosystem of ["github-actions", "docker"]) {
+    assert.match(
+      dependabot,
+      new RegExp(
+        `- package-ecosystem: ${ecosystem}\\n {4}directory: /\\n {4}schedule:\\n {6}interval: weekly\\n`,
+        "u",
+      ),
+      ecosystem,
+    );
+  }
+  // No npm entry (README "Verification", "Pinned, and kept current").
+  assert.deepEqual(
+    [...dependabot.matchAll(/^ {2}- package-ecosystem: (\S+)$/gmu)].map(
+      (m) => m[1],
+    ),
+    ["github-actions", "docker"],
+  );
+  // The image's Node major is .nvmrc's (the test above), so Dependabot never
+  // offers a new one: that pull request would sit red, and hold the one slot
+  // the digest's refresh needs.
+  const docker = dependabot.slice(
+    dependabot.indexOf("- package-ecosystem: docker"),
+  );
+  assert.match(
+    docker,
+    /^ {4}ignore:\n {6}- dependency-name: node\n {8}update-types: \["version-update:semver-major"\]$/mu,
+  );
+});
+
+test("the Playwright image CI's browser jobs run in is named by its tag and pinned by digest, and the tag is the lockfile's @playwright/test (Round 21 hardening, W-1)", () => {
+  // Nothing moves this image but a hand, so the tag says which version the
+  // digest is, and a bump of @playwright/test without the image is red here.
+  const images = [
+    ...read(".github/workflows/ci.yml").matchAll(
+      /^ {6}image: (mcr\.microsoft\.com\/playwright\S*)$/gmu,
+    ),
+  ].map((m) => m[1]);
+  assert.ok(images.length > 0, "no CI job runs in the Playwright image");
+  const locked = JSON.parse(read("package-lock.json")).packages[
+    "node_modules/@playwright/test"
+  ].version;
+  for (const image of images) {
+    const pinned =
+      /^mcr\.microsoft\.com\/playwright:v(\d+\.\d+\.\d+)-noble@sha256:[0-9a-f]{64}$/u.exec(
+        image,
+      );
+    assert.ok(pinned, `${image} is not tag@digest`);
+    assert.equal(pinned[1], locked, "the image's tag is not the lockfile's");
+  }
+});
+
+test("the nightly is its own workflow: it calls ci.yml on main, and its own job, the only one that may write issues, opens or comments on one issue when the run is not green (Round 21 hardening, NIGHT-6, NIGHT-9; W-2, D3)", () => {
+  // The schedule is nightly.yml's, never ci.yml's (README "Nightly" says why).
+  const ci = read(".github/workflows/ci.yml");
+  const ciTriggers = ci.slice(ci.indexOf("\non:\n"), ci.indexOf("\njobs:\n"));
+  assert.doesNotMatch(ciTriggers, /schedule:/u, "ci.yml runs on a schedule");
+  // Read-only at the top, whoever triggers or calls it (W-2): a called
+  // workflow's jobs otherwise take whatever their caller grants.
+  assert.match(ci, /^permissions:\n {2}contents: read\n\n/mu);
+  for (const file of [".github/workflows/ci.yml", ".github/workflows/main.yml"])
+    assert.doesNotMatch(read(file), /issues: write/u, `${file} writes issues`);
+
+  const nightly = read(".github/workflows/nightly.yml");
+  assert.match(
+    nightly,
+    /^on:\n {2}schedule:\n {4}- cron: "27 9 \* \* \*"\n\n/mu,
+    "the nightly runs on its schedule alone",
+  );
+  assert.match(nightly, /^permissions:\n {2}contents: read\n\n/mu);
+  const jobs = nightly
+    .slice(nightly.indexOf("\njobs:\n"))
+    .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
+    .slice(1);
+  assert.deepEqual(
+    jobs.map((job) => job.slice(0, job.indexOf(":"))),
+    ["ci", "report"],
+  );
+  const [called, report] = jobs;
+  assert.match(called, /^ {4}uses: \.\/\.github\/workflows\/ci\.yml$/mu);
+  assert.match(called, /^ {4}permissions:\n {6}contents: read\n {4}uses:/mu);
+  assert.match(report, /^ {4}needs: ci$/mu);
+  // Whatever ci did, and only when it was not "success".
+  assert.match(
+    report,
+    /^ {4}if: always\(\) && needs\.ci\.result != 'success'$/mu,
+  );
+  assert.match(report, /^ {4}permissions:\n {6}issues: write\n {4}steps:/mu);
+  assert.doesNotMatch(report, /actions\/checkout/u);
+  // Block-style env: `${{` inside a flow mapping does not parse.
+  assert.match(
+    report,
+    /^ {8}env:\n {10}GH_TOKEN: \$\{\{ github\.token \}\}$/mu,
+  );
+  // Only the bot's own issue is reused: anyone can open one with that title here.
+  assert.match(report, /gh issue list .*--author 'github-actions\[bot\]'/u);
+  assert.match(report, /select\(\.title == "Nightly red"\)/u);
+  assert.match(report, /gh issue comment "\$n"/u);
+  assert.match(report, /gh issue create .*--title 'Nightly red'/u);
+  // Every other workflow is read-only on its grants: only this job writes.
+  assert.equal(
+    readdirSync(".github/workflows")
+      .map((file) => read(`.github/workflows/${file}`))
+      .join("\n")
+      .match(/issues: write/gu)?.length,
+    1,
+  );
+});
+
+test("every CI job stops at its own timeout, not GitHub's default of 360 minutes (Round 21 hardening, W-9)", () => {
+  const ci = read(".github/workflows/ci.yml");
+  const jobs = ci
+    .slice(ci.indexOf("\njobs:\n"))
+    .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
+    .slice(1);
+  assert.ok(jobs.length > 0, "ci.yml has no jobs");
+  for (const job of jobs) {
+    const minutes = /^ {4}timeout-minutes: (\d+)$/mu.exec(job);
+    assert.ok(minutes, `${job.slice(0, job.indexOf(":"))} has no timeout`);
+    assert.ok(Number(minutes[1]) <= 30, `${job.slice(0, job.indexOf(":"))}`);
+  }
 });
 
 test("CI builds the site with no backend, as a Vercel preview does (register F62)", () => {
@@ -757,15 +931,13 @@ test("main runs a smoke on the tree its pull request's all-green proved, and the
   assert.match(smoke, /^ {4}timeout-minutes: 5$/mu);
   assert.match(
     smoke,
-    new RegExp(
-      `^ {6}- uses: actions/setup-node@v7\\n {8}with:\\n {10}node-version: ${read(".nvmrc").trim()}\\n {10}cache: npm$`,
-      "mu",
-    ),
+    /^ {6}- uses: actions\/setup-node@[0-9a-f]{40} # v\d+\.\d+\.\d+\n {8}with:\n {10}node-version-file: \.nvmrc\n {10}cache: npm$/mu,
   );
   assert.match(smoke, /^ {6}- run: npm ci$/mu);
-  for (const gate of ["lint", "format:check", "typecheck", "test:contracts"]) {
+  for (const gate of ["lint", "format:check", "typecheck"]) {
     assert.match(smoke, new RegExp(`^ {6}- run: npm run ${gate}$`, "mu"), gate);
   }
+  assert.match(smoke, /^ {10}npm run test:contracts \| tee /mu);
   assert.doesNotMatch(smoke, /npm run build|test:browser|docker /u);
 
   // Otherwise the whole of ci.yml, as a reusable workflow.
@@ -910,4 +1082,151 @@ test("the signed-in pages and onboarding say department and flow, never team, pr
     visit(source);
   }
   assert.deepEqual(found, []);
+});
+
+test("no silent skips in CI: a skipped or todo contract test fails gates and smoke, the regeneration check runs, and the browser job fails on a skip (Round 21 hardening, W12, W13, W17)", () => {
+  const jobOf = (file, id) =>
+    read(file)
+      .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
+      .find((entry) => entry.startsWith(`${id}:`));
+  const gates = jobOf(".github/workflows/ci.yml", "gates");
+  assert.match(gates, /^ {6}- run: npm run verify:platform-contracts$/mu);
+  const browser = jobOf(".github/workflows/ci.yml", "browser");
+  assert.match(
+    browser,
+    /^ {6}- run: npm run test:browser\n(?: {6}#.*\n)* {6}- run: node scripts\/no-skipped-browser-tests\.mjs$/mu,
+  );
+  // The guard itself, run as the runner runs it (bash -e), with an `npm` that
+  // prints the TAP summary it is handed: red on a skip or a todo, and red when
+  // the tests fail (pipefail), green only on a clean run.
+  const dir = mkdtempSync(join(tmpdir(), "skip-guard-"));
+  try {
+    writeFileSync(
+      join(dir, "npm"),
+      '#!/bin/sh\nprintf "%b" "$TAP"\nexit "${NPM_EXIT:-0}"\n',
+    );
+    chmodSync(join(dir, "npm"), 0o755);
+    for (const [file, id] of [
+      [".github/workflows/ci.yml", "gates"],
+      [".github/workflows/main.yml", "smoke"],
+    ]) {
+      const job = jobOf(file, id);
+      const block =
+        /- name: Contract tests, none skipped\n {8}run: \|\n((?: {10}.*\n?)+)/u.exec(
+          job,
+        );
+      assert.ok(block, `${file} ${id} has no skip guard`);
+      const script = block[1].replace(/^ {10}/gmu, "");
+      const run = (tap, npmExit = "0") =>
+        spawnSync("bash", ["-e", "-c", script], {
+          env: {
+            ...process.env,
+            PATH: `${dir}:${process.env.PATH}`,
+            RUNNER_TEMP: dir,
+            TAP: tap,
+            NPM_EXIT: npmExit,
+          },
+          encoding: "utf8",
+        }).status;
+      const clean = "# tests 3\\n# pass 3\\n# skipped 0\\n# todo 0\\n";
+      assert.equal(run(clean), 0, `${file} ${id}: a clean run`);
+      assert.notEqual(
+        run("# tests 3\\n# pass 2\\n# skipped 1\\n# todo 0\\n"),
+        0,
+        `${file} ${id}: a skip`,
+      );
+      assert.notEqual(
+        run("# tests 3\\n# pass 2\\n# skipped 0\\n# todo 1\\n"),
+        0,
+        `${file} ${id}: a todo`,
+      );
+      assert.notEqual(run(clean, "1"), 0, `${file} ${id}: a failing run`);
+
+      // The guard over the real command: package.json's test:contracts on a
+      // file with one skipped test, piped as on the runner. It must print TAP
+      // on any Node (Node 24's default reporter prints `ℹ skipped 1`, which
+      // the guard would not see), so it names the TAP reporter itself.
+      const real = mkdtempSync(join(tmpdir(), "skip-guard-real-"));
+      try {
+        writeFileSync(
+          join(real, "npm"),
+          '#!/bin/sh\nexec sh -c "$CONTRACTS"\n',
+        );
+        chmodSync(join(real, "npm"), 0o755);
+        const command = JSON.parse(read("package.json")).scripts[
+          "test:contracts"
+        ];
+        const runReal = (body) => {
+          const spec = join(real, "one.test.mjs");
+          writeFileSync(spec, `import { test } from "node:test";\n${body}`);
+          // NODE_TEST_CONTEXT would make the child report to this run.
+          const env = { ...process.env };
+          delete env.NODE_TEST_CONTEXT;
+          return spawnSync("bash", ["-e", "-c", script], {
+            env: {
+              ...env,
+              PATH: `${real}:${process.env.PATH}`,
+              RUNNER_TEMP: real,
+              CONTRACTS: command.replace("test/*.test.mjs", spec),
+            },
+            encoding: "utf8",
+          }).status;
+        };
+        assert.equal(
+          runReal('test("runs", () => {});\n'),
+          0,
+          `${file} ${id}: the real command, clean`,
+        );
+        assert.notEqual(
+          runReal(
+            'test("runs", () => {});\ntest("skips", { skip: true }, () => {});\n',
+          ),
+          0,
+          `${file} ${id}: the real command, one skip`,
+        );
+      } finally {
+        rmSync(real, { recursive: true, force: true });
+      }
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a browser run with any test skipped, or no report, fails; forbidOnly and the JSON report are on under CI (Round 21 hardening, W17)", () => {
+  const config = read("playwright.config.ts");
+  assert.match(config, /forbidOnly: Boolean\(process\.env\.CI\)/u);
+  assert.match(
+    config,
+    /\["json", \{ outputFile: "test-results\/playwright-report\.json" \}\]/u,
+  );
+  // Each run empties test-results/ first: no report outlives its run.
+  assert.match(read(".gitignore"), /^\/test-results\/$/mu);
+  assert.match(
+    read("scripts/no-skipped-browser-tests.mjs"),
+    /process\.argv\[2\] \?\? "test-results\/playwright-report\.json"/u,
+  );
+  assert.match(
+    read("scripts/run-browser-fixtures.mjs"),
+    /execFileSync\(process\.execPath, \["scripts\/no-skipped-browser-tests\.mjs"\]/u,
+  );
+  const dir = mkdtempSync(join(tmpdir(), "no-skips-"));
+  try {
+    const check = (stats) => {
+      const report = join(dir, "report.json");
+      if (stats) writeFileSync(report, JSON.stringify({ stats }));
+      else rmSync(report, { force: true });
+      return spawnSync(
+        process.execPath,
+        ["scripts/no-skipped-browser-tests.mjs", report],
+        { encoding: "utf8" },
+      ).status;
+    };
+    const clean = { expected: 48, skipped: 0, unexpected: 0, flaky: 0 };
+    assert.equal(check(clean), 0);
+    assert.equal(check({ ...clean, skipped: 1 }), 1);
+    assert.equal(check(null), 1, "no report is red");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

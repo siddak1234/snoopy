@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 import {
@@ -25,7 +25,7 @@ const COMPLETE_UI_PATH = resolve(
 const SPEC_PATH = resolve(
   import.meta.dirname,
   "..",
-  process.env.SNOOPY_BACKEND_ROOT || "../snoopy-backend",
+  "lib/generated/snoopy-backend",
   "docs/openapi.yaml",
 );
 const generated = readFileSync(GENERATED_PATH, "utf8");
@@ -136,26 +136,24 @@ test("the complete export is started once, followed, and its link asked for agai
     ui,
     /\{canExport \? \(\s*<CompleteExportSection workspaceId=\{workspaceId\} \/>/u,
   );
-  if (existsSync(SPEC_PATH)) {
-    const spec = readFileSync(SPEC_PATH, "utf8");
-    const described =
-      /failureReason:\s*\n\s*type: string\s*\n\s*description: >-([\s\S]*?)\n\s{8}\w/u.exec(
-        spec,
-      );
-    assert.ok(described, "failureReason is missing from the specification");
-    const named = new Set(
-      [...described[1].matchAll(/`([a-z_]+)`/gu)].map((match) => match[1]),
+  const spec = readFileSync(SPEC_PATH, "utf8");
+  const described =
+    /failureReason:\s*\n\s*type: string\s*\n\s*description: >-([\s\S]*?)\n\s{8}\w/u.exec(
+      spec,
     );
-    const said =
-      /const FAILURES: Record<string, string> = \{([\s\S]*?)\n\};/u.exec(
-        complete,
-      );
-    assert.ok(said, "FAILURES not found");
-    for (const [, reason] of said[1].matchAll(/^\s{2}(\w+):/gmu)) {
-      assert.ok(
-        named.has(reason),
-        `${reason} is not a reason the platform names`,
-      );
-    }
+  assert.ok(described, "failureReason is missing from the specification");
+  const named = new Set(
+    [...described[1].matchAll(/`([a-z_]+)`/gu)].map((match) => match[1]),
+  );
+  const said =
+    /const FAILURES: Record<string, string> = \{([\s\S]*?)\n\};/u.exec(
+      complete,
+    );
+  assert.ok(said, "FAILURES not found");
+  for (const [, reason] of said[1].matchAll(/^\s{2}(\w+):/gmu)) {
+    assert.ok(
+      named.has(reason),
+      `${reason} is not a reason the platform names`,
+    );
   }
 });

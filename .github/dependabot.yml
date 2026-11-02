@@ -1,0 +1,24 @@
+# Version updates, weekly (the owner's choice 2026-11-01), for the pinned
+# actions and the Dockerfile's image. What moves here, what moves by hand and
+# why there is no npm entry: README "Verification", "Pinned, and kept current".
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 1
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 1
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
+    groups:
+      images:
+        patterns: ["*"]

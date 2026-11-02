@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 
@@ -12,14 +12,14 @@ import { formatPlanPrice } from "../lib/plan-price.ts";
  * hand-offs as URL navigations, no return URLs, no idempotency key, owner or
  * admin before any billing read, and no identifier that is not this platform's.
  *
- * The specification is read from the backend repository beside this one and the
- * tests that need it skip when it is absent, as the other contract tests do.
+ * The specification is read from the committed copy of the backend's contract
+ * files (lib/generated/snoopy-backend), so every test here runs (W4).
  */
 
 const SPEC_PATH = resolve(
   import.meta.dirname,
   "..",
-  process.env.SNOOPY_BACKEND_ROOT || "../snoopy-backend",
+  "lib/generated/snoopy-backend",
   "docs/openapi.yaml",
 );
 const FACADE_PATH = resolve(import.meta.dirname, "../lib/billing.ts");
@@ -40,8 +40,7 @@ const PAGE_PATH = resolve(
   "../app/account/billing/page.tsx",
 );
 
-const available = existsSync(SPEC_PATH);
-const spec = available ? readFileSync(SPEC_PATH, "utf8") : "";
+const spec = readFileSync(SPEC_PATH, "utf8");
 const facade = readFileSync(FACADE_PATH, "utf8");
 const generated = readFileSync(GENERATED_PATH, "utf8");
 const actions = readFileSync(ACTIONS_PATH, "utf8");
@@ -479,17 +478,9 @@ test("every billing status the contract names has a tone in StatusPill", () => {
   assert.match(pill, /status\.replace\(\/\[-_\]\/g, " "\)/u);
 });
 
-test(
-  "the billing status vocabulary matches the server exactly",
-  {
-    skip: available
-      ? false
-      : "snoopy-backend is not checked out beside this repository",
-  },
-  () => {
-    assert.deepEqual(
-      generatedUnion("WorkspaceBillingResponse"),
-      specStatusEnum("WorkspaceBillingResponse"),
-    );
-  },
-);
+test("the billing status vocabulary matches the server exactly", () => {
+  assert.deepEqual(
+    generatedUnion("WorkspaceBillingResponse"),
+    specStatusEnum("WorkspaceBillingResponse"),
+  );
+});

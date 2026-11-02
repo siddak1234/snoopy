@@ -3,7 +3,7 @@ import { getAppSession } from "@/lib/app-session";
 import {
   emptyWhenUnavailable,
   listAutomations,
-  listSubscriptions,
+  readSubscription,
 } from "@/lib/automations";
 import {
   emptyConnectionsWhenUnavailable,
@@ -58,30 +58,28 @@ export default async function VendorPage(
   const workspaceId = await resolveActiveWorkspaceId(session);
   if (!workspaceId) notFound();
 
-  const [subscriptions, catalog, providers, connections, role] =
-    await Promise.all([
-      emptyWhenUnavailable(() => listSubscriptions(workspaceId), {
-        subscriptions: [],
-      }),
-      emptyWhenUnavailable(() => listAutomations(workspaceId), {
-        automations: [],
-        categories: [],
-      }),
-      emptyConnectionsWhenUnavailable(listConnectionProviders, {
-        providers: [],
-      }),
-      emptyConnectionsWhenUnavailable(() => listConnections(workspaceId), {
-        connections: [],
-      }),
-      roleInWorkspace(workspaceId),
-    ]);
+  const [found, catalog, providers, connections, role] = await Promise.all([
+    emptyWhenUnavailable(
+      () => readSubscription(workspaceId, subscriptionId),
+      null,
+    ),
+    emptyWhenUnavailable(() => listAutomations(workspaceId), {
+      automations: [],
+      categories: [],
+    }),
+    emptyConnectionsWhenUnavailable(listConnectionProviders, {
+      providers: [],
+    }),
+    emptyConnectionsWhenUnavailable(() => listConnections(workspaceId), {
+      connections: [],
+    }),
+    roleInWorkspace(workspaceId),
+  ]);
 
   // A flow this person can see, with the choice the link names — or its only
   // one; any other id is the same "not found" a flow that does not exist is.
-  const subscription = subscriptions.subscriptions.find(
-    (candidate) =>
-      candidate.id === subscriptionId && candidate.status !== "archived",
-  );
+  // Read by its id, with its setup (backend §12.1 #319).
+  const subscription = found?.status === "archived" ? null : found;
   const fields = connectionFields(subscription?.setup ?? []);
   const field =
     typeof fieldKey === "string"

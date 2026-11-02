@@ -28,7 +28,10 @@ suite covers is README "Verification" ([README.md](../README.md)).
   in with a cookie-only session and scans every signed-in page with axe.
 - A new fixture spec joins the runner's list in `scripts/run-browser-fixtures.mjs`,
   that list's copy in `test/verify-gate.test.mjs` (which fails until both
-  agree) and README's spec count.
+  agree), `fixtureOnly` in `playwright.config.ts` and README's spec count.
+- No runtime skips: a run collects only what it runs, and a skip fails it
+  (`scripts/no-skipped-browser-tests.mjs`). One engine only is a tag the
+  others' `grepInvert` leaves out (`@chromium-only`).
 
 ## Writing a fixture spec
 

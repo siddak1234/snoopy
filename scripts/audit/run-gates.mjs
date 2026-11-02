@@ -5,7 +5,12 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { realpathSync, renameSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { assertPlatformRewrite, preflight } from "./preflight.mjs";
+import {
+  assertNoSkippedBrowserTests,
+  assertNoSkippedTests,
+  assertPlatformRewrite,
+  preflight,
+} from "./preflight.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 const auditDir = join(root, ".git/autom8x-audit");
@@ -98,9 +103,11 @@ async function runGates() {
   // `npm run verify`'s list, in its order (register F15: this omitted
   // format:check and verify:platform-contracts). The fixture suite rebuilds .next
   // with its own origin, so it runs LAST or it would invalidate the build gate's
-  // output. verify:platform-contracts reads the backend checkout beside this one;
-  // an audit without it cannot say the client matches the contract, so it fails
-  // rather than skipping.
+  // output. verify:platform-contracts reads SNOOPY_BACKEND_ROOT, else the
+  // backend checkout beside this one, else the committed copy of its contract
+  // files (scripts/backend-contract.mjs), so it always runs. A skipped or todo
+  // contract test, or a skipped browser test, fails its gate, as in verify and
+  // CI (no silent skips).
   const fullGates = [
     { name: "format:check", command: ["npm", "run", "format:check"] },
     { name: "check:docs", command: ["npm", "run", "check:docs"] },
@@ -108,7 +115,11 @@ async function runGates() {
     { name: "lint", command: ["npm", "run", "lint"] },
     { name: "typecheck", command: ["npm", "run", "typecheck"] },
     { name: "audit:boundaries", command: ["npm", "run", "audit:boundaries"] },
-    { name: "test:contracts", command: ["npm", "run", "test:contracts"] },
+    {
+      name: "test:contracts",
+      command: ["npm", "run", "test:contracts"],
+      after: (stdout) => assertNoSkippedTests(stdout),
+    },
     {
       name: "verify:platform-contracts",
       command: ["npm", "run", "verify:platform-contracts"],
@@ -133,6 +144,7 @@ async function runGates() {
       // CI=1 defeats reuseExistingServer, which could silently test a stale
       // local server instead of this tree's build.
       env: { CI: "1" },
+      after: () => assertNoSkippedBrowserTests(root),
     },
     {
       name: "test:browser:fixtures",
@@ -179,7 +191,7 @@ async function runGates() {
     let stderr = run.stderr ?? "";
     if (exit === 0 && gate.after) {
       try {
-        gate.after();
+        gate.after(run.stdout ?? "");
       } catch (error) {
         exit = 1;
         stderr += `\nassertion failed: ${error.message}`;
