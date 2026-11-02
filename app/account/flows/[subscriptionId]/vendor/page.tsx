@@ -106,6 +106,7 @@ export default async function VendorPage(
       icon: provider?.icon ?? null,
       // OAuth only on this page: a pasted key is connected on Connections.
       connectable: provider?.authType === "oauth2",
+      authType: provider?.authType,
       connection:
         connectionFor(connections.connections, connection.providerId) ?? null,
     };

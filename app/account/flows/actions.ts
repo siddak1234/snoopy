@@ -178,7 +178,11 @@ export async function subscribeToAutomation(
  * platform applies the manifest's own default or refuses a required one. A
  * drop-down of several (`select-multiple`, `SelectField`) is sent as its list
  * of choices in the order chosen, an empty one as `[]`; one of one choice
- * (`select`) as text (Round 21, the platform round's F1).
+ * (`select`) as text (Round 21, the platform round's F1). A choice is its
+ * option's `value`, never its label, whether the manifest's options are
+ * strings or `{value, label, group}` (platform round 2's B1). A file field
+ * of several (`artifact-multiple`, the batch addendum) is sent as its list of
+ * upload ids, all into one run, none twice; one holding none is left out.
  */
 function declaredValues(
   formData: FormData,
@@ -195,8 +199,8 @@ function declaredValues(
       values[key] = value === "true";
       continue;
     }
-    if (control === "select-multiple") {
-      values[key] = [
+    if (control === "select-multiple" || control === "artifact-multiple") {
+      const list = [
         ...new Set(
           formData
             .getAll(`${prefix}:${key}`)
@@ -206,6 +210,7 @@ function declaredValues(
             ),
         ),
       ];
+      if (control === "select-multiple" || list.length > 0) values[key] = list;
       continue;
     }
     if (typeof value !== "string" || value.trim() === "") continue;
@@ -400,16 +405,29 @@ const RUN_REFUSALS: Record<string, string> = {
 const OWNERS_AND_ADMINS = "Only an owner or admin can do this.";
 
 /**
- * A run refused because its flow is at capacity AND its queue is full (backend
- * BUILD-PLAN 25.2.10): a flow at capacity holds a new run back, `pending`, until
- * a run of it ends, and only once as many wait as it runs at once is a start
- * refused — 429, `details.reason` `max_concurrent_runs`. Nothing was created,
- * and only a run of this flow ending makes room, so it is said as the flow's
- * and not as the platform's "busy right now". Every other 429 keeps the
- * platform's words and the wait it stated.
+ * A run refused because its flow's queue is full: 429, nothing created, and
+ * only runs of this flow ending make room, so it is said as the flow's and not
+ * as the platform's "busy right now". `queue_full` (the batch addendum's P3):
+ * 500 runs of the flow already wait in this workspace, single runs and a
+ * batch's units alike — the owner's words, on both clients. A platform before
+ * the cap sent `max_concurrent_runs` (backend BUILD-PLAN 25.2.10), still read.
+ * Every other 429 keeps the platform's words and the wait it stated. Making an
+ * item starts its run, so it is refused the same way.
  */
-const FLOW_QUEUE_FULL =
-  "This flow is busy and its queue is full, so the run was not started. Try again once one of its runs has ended.";
+const QUEUE_FULL: Record<string, string> = {
+  queue_full: "Your queue is full. Wait for these to finish.",
+  max_concurrent_runs:
+    "This flow is busy and its queue is full, so the run was not started. Try again once one of its runs has ended.",
+};
+
+function queueFull(error: PlatformServerError): string | undefined {
+  const reason = error.details?.reason;
+  return error.status === 429 &&
+    typeof reason === "string" &&
+    Object.hasOwn(QUEUE_FULL, reason)
+    ? QUEUE_FULL[reason]
+    : undefined;
+}
 
 /**
  * Start a run of a manual automation — backend §12.1 #162, ADR-0030.
@@ -487,9 +505,8 @@ export async function startRun(formData: FormData): Promise<ActionResult> {
     if (error.status === 403 && error.details?.requiredRole) {
       return { ok: false, error: OWNERS_AND_ADMINS, state: "forbidden" };
     }
-    if (error.status === 429 && reason === "max_concurrent_runs") {
-      return { ok: false, error: FLOW_QUEUE_FULL };
-    }
+    const full = queueFull(error);
+    if (full) return { ok: false, error: full };
     // Over the plan (the owner's build 13 decision 7a3): no flow starts a run
     // until the workspace archives down. The same two reasons as the subscribe
     // path's, and only on a 403; every other 403 is authorization.
@@ -725,6 +742,8 @@ export async function createItem(input: {
       };
     }
     if (error.status === 409) return { ok: false, error: FLOW_CHANGED };
+    const full = queueFull(error);
+    if (full) return { ok: false, error: full };
     const entitlement = subscriptionEntitlementState(
       error.status,
       error.details,

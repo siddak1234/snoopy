@@ -9,8 +9,12 @@ import type {
   AutomationSetupField,
   SubscriptionStatus,
 } from "@/lib/automations";
-import type { Connection, ConnectionProvider } from "@/lib/connections";
-import { connectionFor, connectionState } from "@/lib/connection-rows";
+import type { Connection, OfferedProvider } from "@/lib/connections";
+import {
+  connectionFor,
+  connectionState,
+  type ProviderAuthType,
+} from "@/lib/connection-rows";
 import {
   NONE,
   connectFirst,
@@ -84,7 +88,7 @@ export function SetupForm({
   config: Record<string, unknown>;
   vendorFields: SetupVendorField[];
   /** The accounts the flow cannot run without. */
-  required: ConnectionProvider[];
+  required: OfferedProvider[];
   connections: Connection[];
   canManage: boolean;
   /** This page, for a connect's way back. */
@@ -105,8 +109,23 @@ export function SetupForm({
   );
   // A draft is turned on by this page; a flow on or paused keeps its status.
   const turnOn = status === "draft";
+  // A public service (`authType` none) is connected for every workspace
+  // (platform round 2's B5).
+  const authTypes = new Map<string, ProviderAuthType | undefined>([
+    ...required.map(
+      (provider) => [provider.providerId, provider.authType] as const,
+    ),
+    ...vendorFields.flatMap((field) =>
+      field.options.map(
+        (option) => [option.providerId, option.authType] as const,
+      ),
+    ),
+  ]);
   const connected = (providerId: string) =>
-    connectionState(connectionFor(connections, providerId)) === "connected";
+    connectionState(
+      connectionFor(connections, providerId),
+      authTypes.get(providerId),
+    ) === "connected";
 
   const choiceOf = (field: SetupVendorField) => {
     if (picked[field.key] !== undefined) return picked[field.key]!;

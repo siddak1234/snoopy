@@ -17,6 +17,7 @@ import {
   changeLine,
   offeredDecisions,
   reviewChanges,
+  reviewGroups,
   runLabel,
 } from "@/lib/run-progress";
 import { ROW_BAND, SPACING } from "@/lib/spacing";
@@ -171,7 +172,10 @@ function MayNotDecide({ eligibleRoles }: { eligibleRoles: readonly string[] }) {
  * even with every change denied. While it saves the pills and the save wait;
  * a refusal, or no answer, says "The review wasn't saved. Try again." and
  * keeps the answers. A member reads the rows and "Only an owner or admin can
- * review this."; anyone else not named, who may.
+ * review this."; anyone else not named, who may. Changes that carry a
+ * `group` are drawn under its heading, every group open, in the order sent
+ * (`reviewGroups`; platform round 2's B3), up to 400 — and "Save review"
+ * still waits for every one.
  */
 function ReviewDecisions({
   approvalId,
@@ -220,57 +224,80 @@ function ReviewDecisions({
     });
   };
 
+  // One change's row: its line, and to one who may decide, Accept and Deny.
+  const changeRow = (change: HeldDecision) => {
+    const answer = answers[change.id];
+    const pick = (next: ReviewAnswer["decision"]) =>
+      setAnswers((current) => ({ ...current, [change.id]: next }));
+    return (
+      <li
+        key={change.id}
+        data-testid={`review-change-${change.id}`}
+        className={`flex flex-wrap items-center justify-between ${SPACING.inner.gap}`}
+      >
+        <p className="min-w-0 text-sm text-[var(--text)]">
+          {changeLine(change)}
+        </p>
+        {canDecide ? (
+          <div
+            role="group"
+            aria-label={change.label}
+            className={`flex items-center ${SPACING.inner.gap}`}
+          >
+            <Button
+              variant={answer === "denied" ? "secondary" : "primary"}
+              size="sm"
+              aria-pressed={answer === "accepted"}
+              aria-label={`${ACCEPT}: ${change.label}`}
+              disabled={pending}
+              onClick={() => pick("accepted")}
+            >
+              {ACCEPT}
+            </Button>
+            <Button
+              variant={answer === "accepted" ? "secondary" : "danger"}
+              size="sm"
+              aria-pressed={answer === "denied"}
+              aria-label={`${DENY}: ${change.label}`}
+              disabled={pending}
+              onClick={() => pick("denied")}
+            >
+              {DENY}
+            </Button>
+          </div>
+        ) : null}
+      </li>
+    );
+  };
+  const groups = reviewGroups(decisions);
+
   return (
     <div
       data-testid="review-decisions"
       className={`flex flex-col ${SPACING.inner.gap}`}
     >
-      <ul className={`flex flex-col ${SPACING.inner.gap}`}>
-        {decisions.map((change) => {
-          const answer = answers[change.id];
-          const pick = (next: ReviewAnswer["decision"]) =>
-            setAnswers((current) => ({ ...current, [change.id]: next }));
-          return (
-            <li
-              key={change.id}
-              data-testid={`review-change-${change.id}`}
-              className={`flex flex-wrap items-center justify-between ${SPACING.inner.gap}`}
-            >
-              <p className="min-w-0 text-sm text-[var(--text)]">
-                {changeLine(change)}
-              </p>
-              {canDecide ? (
-                <div
-                  role="group"
-                  aria-label={change.label}
-                  className={`flex items-center ${SPACING.inner.gap}`}
-                >
-                  <Button
-                    variant={answer === "denied" ? "secondary" : "primary"}
-                    size="sm"
-                    aria-pressed={answer === "accepted"}
-                    aria-label={`${ACCEPT}: ${change.label}`}
-                    disabled={pending}
-                    onClick={() => pick("accepted")}
-                  >
-                    {ACCEPT}
-                  </Button>
-                  <Button
-                    variant={answer === "accepted" ? "secondary" : "danger"}
-                    size="sm"
-                    aria-pressed={answer === "denied"}
-                    aria-label={`${DENY}: ${change.label}`}
-                    disabled={pending}
-                    onClick={() => pick("denied")}
-                  >
-                    {DENY}
-                  </Button>
-                </div>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
+      {groups.every(({ group }) => group === null) ? (
+        <ul className={`flex flex-col ${SPACING.inner.gap}`}>
+          {decisions.map(changeRow)}
+        </ul>
+      ) : (
+        groups.map(({ group, changes }, at) => (
+          <section
+            key={`group-${at}`}
+            data-testid="review-group"
+            className={`flex flex-col ${SPACING.inner.gap}`}
+          >
+            {group === null ? null : (
+              <h3 className="text-xs font-medium text-[var(--muted)]">
+                {group}
+              </h3>
+            )}
+            <ul className={`flex flex-col ${SPACING.inner.gap}`}>
+              {changes.map(changeRow)}
+            </ul>
+          </section>
+        ))
+      )}
       {canDecide ? (
         <div className={`flex flex-wrap items-center ${SPACING.inner.gap}`}>
           <Button
