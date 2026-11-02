@@ -1262,4 +1262,30 @@ test("a flow's page, Set up, Connect integration, the integration's save and a r
   const body = save.slice(0, save.indexOf("\n}\n"));
   assert.match(body, /await readSubscription\(workspaceId, subscriptionId\)/u);
   assert.doesNotMatch(body, /listSubscriptions/u);
+
+  // The read by id answers archived flows too; only these lines keep an
+  // archived flow's page, Set up and Connect integration "not found" and its
+  // save refused.
+  for (const path of [
+    "app/account/flows/[subscriptionId]/page.tsx",
+    "app/account/flows/[subscriptionId]/setup/page.tsx",
+  ])
+    assert.match(
+      read(path),
+      /if \(!subscription \|\| subscription\.status === "archived"\) notFound\(\);/u,
+      path,
+    );
+  const archivedIsNone =
+    /const found = await readSubscription\(workspaceId, subscriptionId\);[\s\S]{0,200}const subscription = found\?\.status === "archived" \? null : found;/u;
+  assert.match(
+    read("app/account/flows/[subscriptionId]/vendor/page.tsx"),
+    /const subscription = found\?\.status === "archived" \? null : found;/u,
+    "vendor page",
+  );
+  assert.match(
+    read("app/account/flows/[subscriptionId]/vendor/page.tsx"),
+    /\[found, [\s\S]{0,400}readSubscription\(workspaceId, subscriptionId\)/u,
+    "vendor page reads `found` by id",
+  );
+  assert.match(body, archivedIsNone, "saveVendorChoice");
 });

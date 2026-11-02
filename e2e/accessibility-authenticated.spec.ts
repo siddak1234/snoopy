@@ -14,7 +14,7 @@ test.skip(
 );
 test.use({ storageState: process.env.PLAYWRIGHT_AUTH_STORAGE_STATE });
 
-// Every page behind sign-in (register F37) — eighteen, found by
+// Every page behind sign-in (register F37), found by
 // `find app/account app/onboarding -name page.tsx` — with the run page read
 // four times: a run that saved details, one of three receipts (Build 21),
 // and the platform's v7 and v2 bodies as its block fixtures hold them. The

@@ -56,7 +56,7 @@ are Chromium's baselines alone. A run in
 which every gate ran green ends by emitting
 this repository's facts file to `.autom8x/repo-facts/snoopy.json` (gitignored;
 `snoopy-backend` commits it as `snoopy-backend/docs/repo-facts/snoopy.json`). Run it on the
-Node `.nvmrc` names exactly (22.23.2): every CI job reads that file, and the container's
+exact Node version `.nvmrc` names: every CI job reads that file, and the container's
 `node:22-alpine` is the same major. Running it while `/audit-change` runs, or the reverse,
 is refused — both build into `.next` and serve on ports 3001 and 3443, so they
 share one lock, and a port anything already listens on is refused before either
@@ -81,13 +81,15 @@ The YAMLs stay tied to production by the Deployed contract job.
 
 **No silent skips.** CI's gates job runs `verify:platform-contracts`, and the
 contract tests fail when any test is skipped or left todo (TAP's `# skipped`
-and `# todo`, read with `set -o pipefail`), there and in main's smoke. The
+and `# todo`, read with `set -o pipefail`; `test:contracts` asks for TAP by
+name, so a Node whose default reporter changes keeps it), there and in main's smoke. The
 browser suites collect only what they run (`playwright.config.ts`): the
 fixture specs only with the fixture Edge, the keyboard journey only with
 `KEYBOARD_JOURNEY=1`, the two touch-camera tests in Chromium alone by their
 `@chromium-only` tag. Under CI a committed `test.only` fails (`forbidOnly`),
 and `scripts/no-skipped-browser-tests.mjs` fails the browser job and each
-fixture leg when Playwright's JSON report counts a skip. The scan job's
+fixture leg when Playwright's JSON report (`test-results/`, emptied by each
+run) counts a skip. The scan job's
 dev-dependency audit and its report of vulnerabilities with no fix stay
 report-only by design; the runtime audit and the fixable CRITICAL/HIGH scan block.
 

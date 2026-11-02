@@ -77,9 +77,14 @@ export default defineConfig({
   // A committed test.only would run the focused tests alone, green.
   forbidOnly: Boolean(process.env.CI),
   // `github` stays: scripts/audit/run-gates.mjs reads its summary line. The
-  // JSON report is what scripts/no-skipped-browser-tests.mjs reads.
+  // JSON report is what scripts/no-skipped-browser-tests.mjs reads; it lives in
+  // test-results/, which each run empties first, so a report is never one a
+  // run before left behind. A `--list` passes `--reporter=list` and writes none.
   reporter: process.env.CI
-    ? [["github"], ["json", { outputFile: "playwright-report.json" }]]
+    ? [
+        ["github"],
+        ["json", { outputFile: "test-results/playwright-report.json" }],
+      ]
     : "list",
   // The visual baselines are Chromium's and keep the names they had before the
   // other engines joined — no project in the name — so they are not re-recorded.

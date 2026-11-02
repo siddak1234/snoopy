@@ -6,7 +6,9 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const report = resolve(process.argv[2] ?? "playwright-report.json");
+const report = resolve(
+  process.argv[2] ?? "test-results/playwright-report.json",
+);
 let stats;
 try {
   ({ stats } = JSON.parse(readFileSync(report, "utf8")));

@@ -48,7 +48,7 @@
 - `npm run test:a11y`: `playwright test e2e/accessibility.spec.ts`
 - `npm run test:browser`: `playwright test`
 - `npm run test:browser:fixtures`: `node scripts/run-browser-fixtures.mjs`
-- `npm run test:contracts`: `node --experimental-strip-types --test test/*.test.mjs`
+- `npm run test:contracts`: `node --experimental-strip-types --test --test-reporter=tap test/*.test.mjs`
 - `npm run test:visual`: `playwright test e2e/marketing.visual.spec.ts`
 - `npm run typecheck`: `next typegen && tsc --noEmit`
 - `npm run verify`: `node scripts/verify.mjs`

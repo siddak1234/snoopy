@@ -66,6 +66,3 @@ _salvage/
 # The facts file `npm run verify` emits (scripts/repo-facts.mjs). Never committed
 # here: it would restate this repository's own HEAD. snoopy-backend commits it.
 /.autom8x/
-
-# The Playwright JSON report a CI-mode run writes (playwright.config.ts)
-/playwright-report.json

@@ -36,7 +36,6 @@ const environment = {
   FIXTURE_EDGE_PORT: "3443",
   FIXTURE_EDGE_CERT: certificate,
   FIXTURE_EDGE_KEY: privateKey,
-  E2E_AUTHENTICATED_AUDIT: "1",
   PLAYWRIGHT_AUTH_STORAGE_STATE: storageState,
   E2E_PUBLIC_EDGE_FIXTURE: "1",
   CI: "1",

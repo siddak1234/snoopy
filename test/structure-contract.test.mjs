@@ -594,6 +594,7 @@ test("the fixture legs leave out exactly the accessibility tests the browser job
         "test",
         ...specs,
         "--list",
+        "--reporter=list",
         "--grep",
         declared[1],
       ],
@@ -1067,6 +1068,52 @@ test("no silent skips in CI: a skipped or todo contract test fails gates and smo
         `${file} ${id}: a todo`,
       );
       assert.notEqual(run(clean, "1"), 0, `${file} ${id}: a failing run`);
+
+      // The guard over the real command: package.json's test:contracts on a
+      // file with one skipped test, piped as on the runner. It must print TAP
+      // on any Node (Node 24's default reporter prints `ℹ skipped 1`, which
+      // the guard would not see), so it names the TAP reporter itself.
+      const real = mkdtempSync(join(tmpdir(), "skip-guard-real-"));
+      try {
+        writeFileSync(
+          join(real, "npm"),
+          '#!/bin/sh\nexec sh -c "$CONTRACTS"\n',
+        );
+        chmodSync(join(real, "npm"), 0o755);
+        const command = JSON.parse(read("package.json")).scripts[
+          "test:contracts"
+        ];
+        const runReal = (body) => {
+          const spec = join(real, "one.test.mjs");
+          writeFileSync(spec, `import { test } from "node:test";\n${body}`);
+          // NODE_TEST_CONTEXT would make the child report to this run.
+          const env = { ...process.env };
+          delete env.NODE_TEST_CONTEXT;
+          return spawnSync("bash", ["-e", "-c", script], {
+            env: {
+              ...env,
+              PATH: `${real}:${process.env.PATH}`,
+              RUNNER_TEMP: real,
+              CONTRACTS: command.replace("test/*.test.mjs", spec),
+            },
+            encoding: "utf8",
+          }).status;
+        };
+        assert.equal(
+          runReal('test("runs", () => {});\n'),
+          0,
+          `${file} ${id}: the real command, clean`,
+        );
+        assert.notEqual(
+          runReal(
+            'test("runs", () => {});\ntest("skips", { skip: true }, () => {});\n',
+          ),
+          0,
+          `${file} ${id}: the real command, one skip`,
+        );
+      } finally {
+        rmSync(real, { recursive: true, force: true });
+      }
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -1078,9 +1125,14 @@ test("a browser run with any test skipped, or no report, fails; forbidOnly and t
   assert.match(config, /forbidOnly: Boolean\(process\.env\.CI\)/u);
   assert.match(
     config,
-    /\[\["github"\], \["json", \{ outputFile: "playwright-report\.json" \}\]\]/u,
+    /\["json", \{ outputFile: "test-results\/playwright-report\.json" \}\]/u,
   );
-  assert.match(read(".gitignore"), /^\/playwright-report\.json$/mu);
+  // Each run empties test-results/ first: no report outlives its run.
+  assert.match(read(".gitignore"), /^\/test-results\/$/mu);
+  assert.match(
+    read("scripts/no-skipped-browser-tests.mjs"),
+    /process\.argv\[2\] \?\? "test-results\/playwright-report\.json"/u,
+  );
   assert.match(
     read("scripts/run-browser-fixtures.mjs"),
     /execFileSync\(process\.execPath, \["scripts\/no-skipped-browser-tests\.mjs"\]/u,
