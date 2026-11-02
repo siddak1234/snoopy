@@ -24,7 +24,7 @@ import {
 /**
  * Who gets a flow's run email (Build 22, P1 and P5; spec §4; backend
  * ADR-0041): the flow page's step 5 and its email page, in the app's words and
- * by its rules (snoopy-mobile `lib/view/flow-email.ts`). The workspace's owners
+ * by its rules (`snoopy-mobile/lib/view/flow-email.ts`). The workspace's owners
  * and admins and the person who starts the run always get it — the session's
  * D1, approved by the owner — and an owner or admin adds more addresses.
  * Example addresses only, never a real one in this public repository.

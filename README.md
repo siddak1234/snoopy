@@ -63,10 +63,12 @@ share one lock, and a port anything already listens on is refused before either
 starts (the preflight binds each one; `lsof` cannot see a renamed `next-server`).
 
 **The backend's contract, copied.** The generator, its check and the
-contract tests read six backend paths — `docs/openapi.yaml`,
-`docs/openapi/automations.yaml`, `docs/openapi/connections.yaml`,
-`docs/repo-facts.schema.json` and the `packages/contracts/fixtures/blocks/`
-and `block-rules/` folders — from a byte-for-byte copy committed at
+contract tests read six backend paths — `snoopy-backend/docs/openapi.yaml`,
+`snoopy-backend/docs/openapi/automations.yaml`,
+`snoopy-backend/docs/openapi/connections.yaml`,
+`snoopy-backend/docs/repo-facts.schema.json` and the
+`packages/contracts/fixtures/blocks/` and `block-rules/` folders — from a
+byte-for-byte copy committed at
 `lib/generated/snoopy-backend/<the same paths>`, with `SHA256SUMS` beside it
 (`scripts/backend-contract.mjs`). `npm run generate:platform-contracts` writes
 the copy whenever it runs from a backend checkout (`SNOOPY_BACKEND_ROOT`, else
