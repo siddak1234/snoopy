@@ -511,7 +511,7 @@ test("every CI job in the Playwright image runs with a HOME that root owns (regi
     .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
     .slice(1);
   const inImage = jobs.filter((job) =>
-    job.includes("image: mcr.microsoft.com/playwright@"),
+    job.includes("image: mcr.microsoft.com/playwright:"),
   );
   assert.ok(inImage.length > 0, "no CI job runs in the Playwright image");
   for (const job of inImage) {
@@ -715,7 +715,7 @@ test("every action is pinned by commit with its version, the image's base by dig
     assert.match(from, /^node:[\w.-]+@sha256:[0-9a-f]{64}$/u, from);
   }
   const dependabot = read(".github/dependabot.yml");
-  for (const ecosystem of ["github-actions", "npm", "docker"]) {
+  for (const ecosystem of ["github-actions", "docker"]) {
     assert.match(
       dependabot,
       new RegExp(
@@ -725,8 +725,46 @@ test("every action is pinned by commit with its version, the image's base by dig
       ecosystem,
     );
   }
-  // npm's minor and patch updates come as one pull request.
-  assert.match(dependabot, /update-types: \[minor, patch\]/u);
+  // No npm version updates: the website's dependency bumps are a deliberate
+  // step each round (backend §12.1 #278).
+  assert.deepEqual(
+    [...dependabot.matchAll(/^ {2}- package-ecosystem: (\S+)$/gmu)].map(
+      (m) => m[1],
+    ),
+    ["github-actions", "docker"],
+  );
+  // The image's Node major is .nvmrc's (the test above), so Dependabot never
+  // offers a new one: that pull request would sit red, and hold the one slot
+  // the digest's refresh needs.
+  const docker = dependabot.slice(
+    dependabot.indexOf("- package-ecosystem: docker"),
+  );
+  assert.match(
+    docker,
+    /^ {4}ignore:\n {6}- dependency-name: node\n {8}update-types: \["version-update:semver-major"\]$/mu,
+  );
+});
+
+test("the Playwright image CI's browser jobs run in is named by its tag and pinned by digest, and the tag is the lockfile's @playwright/test (Round 21 hardening, W-1)", () => {
+  // Nothing moves this image but a hand, so the tag says which version the
+  // digest is, and a bump of @playwright/test without the image is red here.
+  const images = [
+    ...read(".github/workflows/ci.yml").matchAll(
+      /^ {6}image: (mcr\.microsoft\.com\/playwright\S*)$/gmu,
+    ),
+  ].map((m) => m[1]);
+  assert.ok(images.length > 0, "no CI job runs in the Playwright image");
+  const locked = JSON.parse(read("package-lock.json")).packages[
+    "node_modules/@playwright/test"
+  ].version;
+  for (const image of images) {
+    const pinned =
+      /^mcr\.microsoft\.com\/playwright:v(\d+\.\d+\.\d+)-noble@sha256:[0-9a-f]{64}$/u.exec(
+        image,
+      );
+    assert.ok(pinned, `${image} is not tag@digest`);
+    assert.equal(pinned[1], locked, "the image's tag is not the lockfile's");
+  }
 });
 
 test("CI runs nightly on main, and a red nightly opens or comments on one issue from all-green (Round 21 hardening, NIGHT-6, NIGHT-9)", () => {

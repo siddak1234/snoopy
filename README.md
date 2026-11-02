@@ -57,7 +57,9 @@ which every gate ran green ends by emitting
 this repository's facts file to `.autom8x/repo-facts/snoopy.json` (gitignored;
 `snoopy-backend` commits it as `snoopy-backend/docs/repo-facts/snoopy.json`). Run it on the
 exact Node version `.nvmrc` names: every CI job reads that file, and the container's
-`node:22-alpine` is the same major. Running it while `/audit-change` runs, or the reverse,
+`node:22-alpine` is the same major. Vercel builds and serves production on its
+own latest 22.x (`engines` `22.x`; it offers majors only), so the Node CI tests
+and the Node production runs can differ by a patch. Running it while `/audit-change` runs, or the reverse,
 is refused — both build into `.next` and serve on ports 3001 and 3443, so they
 share one lock, and a port anything already listens on is refused before either
 starts (the preflight binds each one; `lsof` cannot see a renamed `next-server`).
@@ -95,10 +97,16 @@ report-only by design; the runtime audit and the fixable CRITICAL/HIGH scan bloc
 
 **Pinned, and kept current.** Every action in the workflows is pinned by commit
 with its `# vX.Y.Z`, the Dockerfile's `node:22-alpine` by index digest with its
-tag, and Node by `.nvmrc`. `.github/dependabot.yml` moves them weekly: one
-pull request for the actions, one for npm's minor and patch updates (a major
-comes alone), one for the image; the docs check lets a Dependabot commit that
-touches only those files through (`scripts/kit/check-docs.mjs`).
+tag, the Playwright image the browser jobs run in by its tag and digest, and
+Node by `.nvmrc`. `.github/dependabot.yml` moves two of them weekly: one pull
+request for the actions, one for the Dockerfile's image (a new Node major is
+ignored); the docs check lets a Dependabot commit that touches only bump files
+through (`scripts/kit/check-docs.mjs`). The rest move by hand, in the round's
+deliberate dependency step (backend §12.1 #278), which also carries the npm
+bumps Dependabot does not make (its security updates stay on): `.nvmrc`, with
+each Node 22 security release, and the Playwright image, whose tag must be
+`package-lock.json`'s `@playwright/test` (`test/structure-contract.test.mjs`),
+so the two move in one commit.
 
 **Nightly.** `ci.yml` also runs at 09:27 UTC on `main`. A red nightly opens
 one "Nightly red" issue, or comments the run on the open one, from

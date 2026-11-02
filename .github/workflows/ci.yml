@@ -161,8 +161,10 @@ jobs:
   browser:
     name: Browser regression and accessibility
     runs-on: ubuntu-24.04
+    # The image's tag is package-lock.json's @playwright/test, and both move
+    # together by hand (README "Verification"); the digest is that tag's.
     container:
-      image: mcr.microsoft.com/playwright@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
       options: --ipc=host
     # Firefox will not start as root under a HOME another user owns, and a
     # container job's HOME is /github/home, owned by the image's pwuser.
@@ -203,7 +205,7 @@ jobs:
       matrix:
         project: [chromium, firefox, webkit]
     container:
-      image: mcr.microsoft.com/playwright@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
       options: --ipc=host
     # Firefox needs a HOME that root owns, as in `browser`.
     env:
