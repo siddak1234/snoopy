@@ -2,10 +2,8 @@ name: Nightly
 
 # Every job ci.yml runs, on main's tip each night (the owner's Go 2026-11-01,
 # nightly LEAN), so a platform deploy that moved the contract, or a moved
-# image, shows the next morning. The schedule lives here, not in ci.yml:
-# GitHub switches a public repository's scheduled workflow off after 60 days
-# with no activity, and that switches off only this file, never the merge
-# gate (README "Nightly"). A red night opens one "Nightly red" issue, or
+# image, shows the next morning. The schedule lives here, never in ci.yml
+# (README "Nightly" says why). A red night opens one "Nightly red" issue, or
 # comments the run on the open one, from this file's own report job.
 on:
   schedule:

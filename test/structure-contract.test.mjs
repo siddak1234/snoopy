@@ -768,8 +768,7 @@ test("the Playwright image CI's browser jobs run in is named by its tag and pinn
 });
 
 test("the nightly is its own workflow: it calls ci.yml on main, and its own job, the only one that may write issues, opens or comments on one issue when the run is not green (Round 21 hardening, NIGHT-6, NIGHT-9; W-2, D3)", () => {
-  // A public repository's scheduled workflow is switched off after 60 days
-  // with no activity: on ci.yml that would switch off the merge gate too.
+  // The schedule is nightly.yml's, never ci.yml's (README "Nightly" says why).
   const ci = read(".github/workflows/ci.yml");
   const ciTriggers = ci.slice(ci.indexOf("\non:\n"), ci.indexOf("\njobs:\n"));
   assert.doesNotMatch(ciTriggers, /schedule:/u, "ci.yml runs on a schedule");

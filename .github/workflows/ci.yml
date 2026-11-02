@@ -6,9 +6,8 @@ name: CI
 # main's tip each night. The jobs read nothing event-specific, so they run the
 # same under any trigger, but for the gates job's DOCS_BASE: the pull request's
 # base branch, and main when called, where the docs check's range is then
-# empty. The schedule is nightly.yml's, not this file's: GitHub switches a
-# public repository's scheduled workflow off after 60 days with no activity,
-# and that must never switch off the merge gate (README "Nightly").
+# empty. The schedule is nightly.yml's, never this file's (README "Nightly"
+# says why).
 on:
   pull_request:
   workflow_call:

@@ -59,7 +59,7 @@ this repository's facts file to `.autom8x/repo-facts/snoopy.json` (gitignored;
 exact Node version `.nvmrc` names: every CI job reads that file, and the container's
 `node:22-alpine` is the same major. Vercel builds and serves production on its
 own latest 22.x (`engines` `22.x`; it offers majors only), so the Node CI tests
-and the Node production runs can differ by a patch. Running it while `/audit-change` runs, or the reverse,
+and the Node production runs can differ within 22.x (a minor or a patch). Running it while `/audit-change` runs, or the reverse,
 is refused — both build into `.next` and serve on ports 3001 and 3443, so they
 share one lock, and a port anything already listens on is refused before either
 starts (the preflight binds each one; `lsof` cannot see a renamed `next-server`).
@@ -113,8 +113,10 @@ so the two move in one commit.
 **Nightly.** `.github/workflows/nightly.yml` runs every job of `ci.yml` at
 09:27 UTC on `main`'s tip, calling it as main.yml's `full` does. When that
 run is not green, its own `Nightly red` job opens one "Nightly red" issue, or
-comments the run on the open one; that job alone may write issues, and
-`ci.yml` and `main.yml` are read-only (`contents: read`). GitHub's limits
+comments the run on the open one; that job alone may write issues.
+`ci.yml` grants `contents: read`; `main.yml` writes nothing: its `full` job is
+`contents: read`, and its other jobs use the repository's read-only default
+token. GitHub's limits
 stand: a night can start late, or be dropped at high load. In a public
 repository a scheduled workflow is switched off after 60 days with no
 activity; then no night runs and no issue opens until
