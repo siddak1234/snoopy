@@ -2,23 +2,30 @@ name: CI
 
 # Every pull request, and main only through main.yml, which calls this whole
 # workflow when a push to main is not the tree its pull request's all-green
-# already proved (register F92). The jobs read nothing event-specific, so they
-# run the same under either trigger, but for the gates job's DOCS_BASE: the
-# pull request's base branch, and main when called from main.yml, where the
-# docs check's range is then empty. And nightly on main (the owner's Go
-# 2026-11-01, nightly LEAN): the same jobs on main's tip, so a platform deploy
-# that moved the contract, or a moved image, shows the next morning; a red
-# nightly opens (or comments on) one "Nightly red" issue, from all-green.
+# already proved (register F92), and through nightly.yml, which calls it on
+# main's tip each night. The jobs read nothing event-specific, so they run the
+# same under any trigger, but for the gates job's DOCS_BASE: the pull request's
+# base branch, and main when called, where the docs check's range is then
+# empty. The schedule is nightly.yml's, not this file's: GitHub switches a
+# public repository's scheduled workflow off after 60 days with no activity,
+# and that must never switch off the merge gate (README "Nightly").
 on:
   pull_request:
   workflow_call:
-  schedule:
-    - cron: "27 9 * * *"
 
+# Read-only, whoever triggers or calls this workflow: no job here writes.
+permissions:
+  contents: read
+
+# Each job's timeout-minutes is about twice its longest of ten green pull
+# request runs (2026-10-24 to 11-01; a fixture leg 13 minutes, the scan 4, the
+# browser job 3, the rest 2 or less), and never under 5: a hung job fails in
+# minutes, not after GitHub's default of 360.
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -32,6 +39,7 @@ jobs:
   gates:
     name: Architecture gates
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     env:
       # The docs check reads the pull request's commits since its base
       # (README "Verification"); on main, called by main.yml, the range is empty.
@@ -95,6 +103,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     env:
       # Required at BUILD time, not runtime: Next bakes rewrites into
       # routes-manifest.json. Without this, next.config.ts emits no
@@ -135,6 +144,7 @@ jobs:
   build-no-backend:
     name: Build with no backend
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -149,6 +159,7 @@ jobs:
   typecheck:
     name: Typecheck
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -161,6 +172,7 @@ jobs:
   browser:
     name: Browser regression and accessibility
     runs-on: ubuntu-24.04
+    timeout-minutes: 8
     # The image's tag is package-lock.json's @playwright/test, and both move
     # together by hand (README "Verification"); the digest is that tag's.
     container:
@@ -200,6 +212,7 @@ jobs:
   fixtures:
     name: Authenticated fixture suite (${{ matrix.project }})
     runs-on: ubuntu-24.04
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -229,6 +242,7 @@ jobs:
   scan:
     name: Dependency and image scan
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -336,11 +350,6 @@ jobs:
       - contract-deployed
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    # The nightly's report below writes an issue. main.yml's `full` job grants
-    # the same, since a called workflow can only keep or lower its caller's.
-    permissions:
-      contents: read
-      issues: write
     steps:
       - name: Every job succeeded
         env:
@@ -353,18 +362,3 @@ jobs:
             exit 1
           fi
           echo "all-green: every job succeeded"
-      # A red nightly reports itself: one open "Nightly red" issue, commented
-      # on each further red night, so a failure leaves a record in the
-      # repository and not only an email.
-      - name: A red nightly reports itself
-        if: failure() && github.event_name == 'schedule'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          n=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search 'in:title "Nightly red"' --json number --jq '.[0].number')
-          if [ -n "$n" ]; then
-            gh issue comment "$n" --repo "$GITHUB_REPOSITORY" --body "$RUN"
-          else
-            gh issue create --repo "$GITHUB_REPOSITORY" --title 'Nightly red' --body "$RUN"
-          fi

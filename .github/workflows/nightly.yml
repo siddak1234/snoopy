@@ -1,0 +1,49 @@
+name: Nightly
+
+# Every job ci.yml runs, on main's tip each night (the owner's Go 2026-11-01,
+# nightly LEAN), so a platform deploy that moved the contract, or a moved
+# image, shows the next morning. The schedule lives here, not in ci.yml:
+# GitHub switches a public repository's scheduled workflow off after 60 days
+# with no activity, and that switches off only this file, never the merge
+# gate (README "Nightly"). A red night opens one "Nightly red" issue, or
+# comments the run on the open one, from this file's own report job.
+on:
+  schedule:
+    - cron: "27 9 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: CI
+    # A called workflow gets at most what its caller grants; ci.yml is
+    # read-only on its own too.
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  # A red night reports itself, so a failure leaves a record in the repository
+  # and not only an email. It runs whatever ci did (`always()`), and only when
+  # that was not "success": a cancelled or skipped night is red too. The one
+  # job that may write issues, and it checks nothing out.
+  report:
+    name: Nightly red
+    needs: ci
+    if: always() && needs.ci.result != 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: A red nightly reports itself
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          n=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search 'in:title "Nightly red"' --json number --jq '.[0].number')
+          if [ -n "$n" ]; then
+            gh issue comment "$n" --repo "$GITHUB_REPOSITORY" --body "$RUN"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title 'Nightly red' --body "$RUN"
+          fi

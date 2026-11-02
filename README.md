@@ -108,9 +108,19 @@ each Node 22 security release, and the Playwright image, whose tag must be
 `package-lock.json`'s `@playwright/test` (`test/structure-contract.test.mjs`),
 so the two move in one commit.
 
-**Nightly.** `ci.yml` also runs at 09:27 UTC on `main`. A red nightly opens
-one "Nightly red" issue, or comments the run on the open one, from
-`all-green` (its job, and main.yml's `full`, may write issues).
+**Nightly.** `.github/workflows/nightly.yml` runs every job of `ci.yml` at
+09:27 UTC on `main`'s tip, calling it as main.yml's `full` does. When that
+run is not green, its own `Nightly red` job opens one "Nightly red" issue, or
+comments the run on the open one; that job alone may write issues, and
+`ci.yml` and `main.yml` are read-only (`contents: read`). GitHub's limits
+stand: a night can start late, or be dropped at high load. In a public
+repository a scheduled workflow is switched off after 60 days with no
+activity; then no night runs and no issue opens until
+`gh workflow enable nightly.yml`. The schedule has its own file so that this
+never switches off `ci.yml`, the merge gate. And GitHub emails a scheduled
+run's failure only to whoever last changed its cron line, as their Settings →
+Notifications → Actions allow: whether a red night reaches the owner by email
+is that setting's.
 
 `npm run test:browser:fixtures` starts a loopback-only HTTPS Edge fixture with
 a temporary certificate and scans every authenticated page with axe. Here it

@@ -767,39 +767,74 @@ test("the Playwright image CI's browser jobs run in is named by its tag and pinn
   }
 });
 
-test("CI runs nightly on main, and a red nightly opens or comments on one issue from all-green (Round 21 hardening, NIGHT-6, NIGHT-9)", () => {
+test("the nightly is its own workflow: it calls ci.yml on main, and its own job, the only one that may write issues, opens or comments on one issue when the run is not green (Round 21 hardening, NIGHT-6, NIGHT-9; W-2, D3)", () => {
+  // A public repository's scheduled workflow is switched off after 60 days
+  // with no activity: on ci.yml that would switch off the merge gate too.
   const ci = read(".github/workflows/ci.yml");
-  const triggers = ci.slice(ci.indexOf("\non:\n"), ci.indexOf("\njobs:\n"));
-  assert.match(triggers, /^ {2}schedule:\n {4}- cron: "27 9 \* \* \*"$/mu);
-  const green = ci
+  const ciTriggers = ci.slice(ci.indexOf("\non:\n"), ci.indexOf("\njobs:\n"));
+  assert.doesNotMatch(ciTriggers, /schedule:/u, "ci.yml runs on a schedule");
+  // Read-only at the top, whoever triggers or calls it (W-2): a called
+  // workflow's jobs otherwise take whatever their caller grants.
+  assert.match(ci, /^permissions:\n {2}contents: read\n\n/mu);
+  for (const file of [".github/workflows/ci.yml", ".github/workflows/main.yml"])
+    assert.doesNotMatch(read(file), /issues: write/u, `${file} writes issues`);
+
+  const nightly = read(".github/workflows/nightly.yml");
+  assert.match(
+    nightly,
+    /^on:\n {2}schedule:\n {4}- cron: "27 9 \* \* \*"\n\n/mu,
+    "the nightly runs on its schedule alone",
+  );
+  assert.match(nightly, /^permissions:\n {2}contents: read\n\n/mu);
+  const jobs = nightly
+    .slice(nightly.indexOf("\njobs:\n"))
     .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
-    .find((entry) => entry.startsWith("all-green:"));
-  assert.ok(green, "CI has no all-green job");
+    .slice(1);
+  assert.deepEqual(
+    jobs.map((job) => job.slice(0, job.indexOf(":"))),
+    ["ci", "report"],
+  );
+  const [called, report] = jobs;
+  assert.match(called, /^ {4}uses: \.\/\.github\/workflows\/ci\.yml$/mu);
+  assert.match(called, /^ {4}permissions:\n {6}contents: read\n {4}uses:/mu);
+  assert.match(report, /^ {4}needs: ci$/mu);
+  // Whatever ci did, and only when it was not "success".
   assert.match(
-    green,
-    /^ {4}permissions:\n {6}contents: read\n {6}issues: write\n/mu,
+    report,
+    /^ {4}if: always\(\) && needs\.ci\.result != 'success'$/mu,
   );
-  const step = green.slice(
-    green.indexOf("- name: A red nightly reports itself"),
-  );
-  assert.match(
-    step,
-    /^ {8}if: failure\(\) && github\.event_name == 'schedule'$/mu,
-  );
+  assert.match(report, /^ {4}permissions:\n {6}issues: write\n {4}steps:/mu);
+  assert.doesNotMatch(report, /actions\/checkout/u);
   // Block-style env: `${{` inside a flow mapping does not parse.
-  assert.match(step, /^ {8}env:\n {10}GH_TOKEN: \$\{\{ github\.token \}\}$/mu);
-  assert.match(step, /gh issue comment "\$n"/u);
-  assert.match(step, /gh issue create .*--title 'Nightly red'/u);
-  // A called workflow can only keep or lower its caller's permissions, so
-  // main.yml's full suite grants what all-green asks for.
-  const full = read(".github/workflows/main.yml")
-    .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
-    .find((entry) => entry.startsWith("full:"));
-  assert.ok(full, "main.yml has no full job");
   assert.match(
-    full,
-    /^ {4}permissions:\n {6}contents: read\n {6}issues: write\n/mu,
+    report,
+    /^ {8}env:\n {10}GH_TOKEN: \$\{\{ github\.token \}\}$/mu,
   );
+  assert.match(report, /gh issue list .*--search 'in:title "Nightly red"'/u);
+  assert.match(report, /gh issue comment "\$n"/u);
+  assert.match(report, /gh issue create .*--title 'Nightly red'/u);
+  // Every other workflow is read-only on its grants: only this job writes.
+  assert.equal(
+    readdirSync(".github/workflows")
+      .map((file) => read(`.github/workflows/${file}`))
+      .join("\n")
+      .match(/issues: write/gu)?.length,
+    1,
+  );
+});
+
+test("every CI job stops at its own timeout, not GitHub's default of 360 minutes (Round 21 hardening, W-9)", () => {
+  const ci = read(".github/workflows/ci.yml");
+  const jobs = ci
+    .slice(ci.indexOf("\njobs:\n"))
+    .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
+    .slice(1);
+  assert.ok(jobs.length > 0, "ci.yml has no jobs");
+  for (const job of jobs) {
+    const minutes = /^ {4}timeout-minutes: (\d+)$/mu.exec(job);
+    assert.ok(minutes, `${job.slice(0, job.indexOf(":"))} has no timeout`);
+    assert.ok(Number(minutes[1]) <= 30, `${job.slice(0, job.indexOf(":"))}`);
+  }
 });
 
 test("CI builds the site with no backend, as a Vercel preview does (register F62)", () => {

@@ -102,11 +102,10 @@ jobs:
     name: Full suite
     needs: verdict
     if: needs.verdict.outputs.suite == 'full'
-    # ci.yml's all-green asks for these (its nightly report); a called
-    # workflow gets at most what its caller grants.
+    # Read-only: a called workflow gets at most what its caller grants, and
+    # ci.yml asks for no more.
     permissions:
       contents: read
-      issues: write
     uses: ./.github/workflows/ci.yml
 
   # all-green's shape, for main: runs whatever the others did, and passes only
