@@ -983,7 +983,7 @@ test("the run page draws the tracker's rows and words alone — never a step's s
   assert.match(page, /const line = settingLine\(/u);
   assert.match(
     page,
-    /return live \?\? own\(await listArchivedSubscriptions\(workspaceId\)\);/u,
+    /return \(await readSubscription\(workspaceId, subscriptionId\)\) \?\? undefined;/u,
   );
   const item = read("components/dashboard/TrackerItem.tsx");
   assert.match(live, /<TrackerItem key=\{row\.key\} row=\{row\} \/>/u);

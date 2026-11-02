@@ -343,6 +343,8 @@ function initialState() {
     invoiceStatus: "live" as "live" | "paused" | "draft",
     invoiceConfig: { vendor: "none", holdAboveAmount: 500 } as Json,
     invoiceSaves: [] as Json[],
+    // Backend §12.1 #319: every flow read by its id, in order.
+    subscriptionReads: [] as string[],
     // Round 21 (the platform round's F1): Invoice Processing's Set up with
     // a required drop-down of several, its Specialties.
     invoiceSpecialties: false,
@@ -404,6 +406,11 @@ function initialState() {
     // declares no word for its documents.
     documentWordsDeclared: true,
     subscriptionsFailing: false,
+    // Backend §12.1 #319 step 2: the list's rows without `setup`, as the
+    // platform's list will answer once step 3 lands; the one-flow read
+    // (`GET …/subscriptions/{id}`) still carries it, and every page that draws
+    // a flow's settings reads that.
+    listWithoutSetup: false,
     catalogFailing: false,
     // Build 25 (the review's R5c 2): signed links answered with another
     // scheme than https — the package's and the complete export's.
@@ -2463,7 +2470,7 @@ function publishedBlocks(name: string): Block[] | undefined {
 /** What a response answers as: a page body, the flows with their pages, or itself. */
 const shapes = new WeakMap<
   import("node:http").ServerResponse,
-  "run" | "item" | "subscriptions"
+  "run" | "item" | "subscriptions" | "subscription"
 >();
 
 function respond(
@@ -2482,7 +2489,9 @@ function respond(
               ...answer,
               subscriptions: (answer.subscriptions as Json[]).map(withPages),
             }
-          : answer;
+          : shape === "subscription" && answer.subscription
+            ? { subscription: withPages(answer.subscription as Json) }
+            : answer;
   response.writeHead(status, {
     "content-type":
       status >= 400 ? "application/problem+json" : "application/json",
@@ -2529,6 +2538,10 @@ const server = createServer(
         shapes.set(response, "item");
       else if (/^\/v1\/workspaces\/[^/]+\/subscriptions$/u.test(url.pathname))
         shapes.set(response, "subscriptions");
+      else if (
+        /^\/v1\/workspaces\/[^/]+\/subscriptions\/[^/]+$/u.test(url.pathname)
+      )
+        shapes.set(response, "subscription");
     }
     // The fixture's own control, never the published API: each test starts from
     // the same state (register F30, F48).
@@ -2645,6 +2658,9 @@ const server = createServer(
       },
       "/__fixture/subscriptions-failing": () => {
         state.subscriptionsFailing = true;
+      },
+      "/__fixture/list-without-setup": () => {
+        state.listWithoutSetup = true;
       },
       "/__fixture/catalog-failing": () => {
         state.catalogFailing = true;
@@ -3020,6 +3036,8 @@ const server = createServer(
         emailSaves: state.emailSaves,
         // Round 21 v2: every runs list's query, as sent.
         runsQueries: state.runsQueries,
+        // Backend §12.1 #319: every flow read by its id.
+        subscriptionReads: state.subscriptionReads,
       });
     }
     if (
@@ -3812,6 +3830,10 @@ const server = createServer(
       if (/^\/subscriptions\/[^/]+\/webhook$/u.test(read)) {
         return respond(response, 404, problem(404, "Not Found"));
       }
+      // Nor any flow: one read by its id (backend §12.1 #319) is 404 here.
+      if (/^\/subscriptions\/[^/]+$/u.test(read) && method === "GET") {
+        return respond(response, 404, problem(404, "Not Found"));
+      }
     }
     if (method === "GET" && isWorkspacePath(pathname, "/members")) {
       return respond(response, 200, {
@@ -4222,57 +4244,95 @@ const server = createServer(
     ) {
       return respond(response, 503, problem(503, "Service Unavailable"));
     }
+    // The live flows and the archived ones, as the platform holds them now.
+    const liveSubscriptions = () => [
+      // The newest first, as the platform lists them.
+      ...(state.archivableAgain ? [state.archivableAgain] : []),
+      ...state.projectAutomationScopes.map(projectAutomationSubscription),
+      ...(state.invoiceAdded ? [invoiceSubscription()] : []),
+      ...(state.itemsFlow ? [itemsSubscription()] : []),
+      {
+        ...manualSubscription,
+        status: state.manualStatus,
+        ...(state.manualSeveral
+          ? {
+              runInput: manualSubscription.runInput.map((field) =>
+                field.control === "artifact"
+                  ? {
+                      ...field,
+                      multiple: true,
+                      ...(state.manualMaxFiles === undefined
+                        ? {}
+                        : { maxFiles: state.manualMaxFiles }),
+                    }
+                  : field,
+              ),
+            }
+          : {}),
+      },
+      webhookSubscription(),
+      ...(state.archivableArchived ? [] : [archivableSubscription]),
+      {
+        ...projectDraftSubscription,
+        unmetConnections: state.draftNeedsConnection
+          ? [oauthProvider.providerId]
+          : [],
+      },
+    ];
+    const archivedSubscriptions = () =>
+      state.archivableArchived
+        ? [
+            {
+              ...archivableSubscription,
+              status: "archived" as const,
+              updatedAt: "2026-09-30T12:00:00.000Z",
+            },
+          ]
+        : [];
     if (method === "GET" && isWorkspacePath(pathname, "/subscriptions")) {
       // Backend §12.1 #203: the archived ones, asked for by name.
       if (url.searchParams.get("status") === "archived")
         return respond(response, 200, {
-          subscriptions: state.archivableArchived
-            ? [
-                {
-                  ...archivableSubscription,
-                  status: "archived",
-                  updatedAt: "2026-09-30T12:00:00.000Z",
-                },
-              ]
-            : [],
+          subscriptions: archivedSubscriptions(),
         } satisfies AutomationOperations["listSubscriptions"]["responses"][200]["content"]["application/json"]);
       return respond(response, 200, {
-        subscriptions: [
-          // The newest first, as the platform lists them.
-          ...(state.archivableAgain ? [state.archivableAgain] : []),
-          ...state.projectAutomationScopes.map(projectAutomationSubscription),
-          ...(state.invoiceAdded ? [invoiceSubscription()] : []),
-          ...(state.itemsFlow ? [itemsSubscription()] : []),
-          {
-            ...manualSubscription,
-            status: state.manualStatus,
-            ...(state.manualSeveral
-              ? {
-                  runInput: manualSubscription.runInput.map((field) =>
-                    field.control === "artifact"
-                      ? {
-                          ...field,
-                          multiple: true,
-                          ...(state.manualMaxFiles === undefined
-                            ? {}
-                            : { maxFiles: state.manualMaxFiles }),
-                        }
-                      : field,
-                  ),
-                }
-              : {}),
-          },
-          webhookSubscription(),
-          ...(state.archivableArchived ? [] : [archivableSubscription]),
-          {
-            ...projectDraftSubscription,
-            unmetConnections: state.draftNeedsConnection
-              ? [oauthProvider.providerId]
-              : [],
-          },
-        ],
+        subscriptions: state.listWithoutSetup
+          ? liveSubscriptions().map((row) => ({ ...row, setup: undefined }))
+          : liveSubscriptions(),
         ...(state.overPlan ? { flowAllowance: { allowed: 2, live: 4 } } : {}),
       } satisfies AutomationOperations["listSubscriptions"]["responses"][200]["content"]["application/json"]);
+    }
+    // Backend §12.1 #319 step 1: one flow by its id, with its setup, in any
+    // status; one this workspace does not hold is 404, as the Edge answers,
+    // and an id that is not a UUID is 400, as the Edge's check answers it
+    // (the backend's UUID_PATTERN, automations routes.ts).
+    const oneFlow =
+      method === "GET" &&
+      new RegExp(
+        `^/v1/workspaces/${workspaceId}/subscriptions/([^/]+)$`,
+        "u",
+      ).exec(pathname);
+    if (oneFlow) {
+      state.subscriptionReads.push(oneFlow[1]);
+      if (
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+          oneFlow[1],
+        )
+      )
+        return respond(
+          response,
+          400,
+          problem(400, "subscriptionId must be a UUID"),
+        );
+      const subscription = [
+        ...liveSubscriptions(),
+        ...archivedSubscriptions(),
+      ].find(({ id }) => id === oneFlow[1]);
+      if (!subscription)
+        return respond(response, 404, problem(404, "Not Found"));
+      return respond(response, 200, {
+        subscription,
+      } satisfies AutomationOperations["getSubscription"]["responses"][200]["content"]["application/json"]);
     }
     // Build 22 (P4; backend ADR-0041): no client chooses a version — a flow's
     // update naming one is refused, as the Edge refuses it, naming the field

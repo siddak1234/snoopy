@@ -48,7 +48,7 @@
 - `npm run test:a11y`: `playwright test e2e/accessibility.spec.ts`
 - `npm run test:browser`: `playwright test`
 - `npm run test:browser:fixtures`: `node scripts/run-browser-fixtures.mjs`
-- `npm run test:contracts`: `node --experimental-strip-types --test test/*.test.mjs`
+- `npm run test:contracts`: `node --experimental-strip-types --test --test-reporter=tap test/*.test.mjs`
 - `npm run test:visual`: `playwright test e2e/marketing.visual.spec.ts`
 - `npm run typecheck`: `next typegen && tsc --noEmit`
 - `npm run verify`: `node scripts/verify.mjs`
@@ -144,11 +144,13 @@
 
 ### e2e specs
 
+- [e2e/accessibility-authenticated.spec.ts](../e2e/accessibility-authenticated.spec.ts): The authenticated accessibility baselines, against the fixture Edge only
 - [e2e/accessibility.spec.ts](../e2e/accessibility.spec.ts): no header
 - [e2e/account-surfaces.spec.ts](../e2e/account-surfaces.spec.ts): no header
 - [e2e/connection-callback.spec.ts](../e2e/connection-callback.spec.ts): no header
 - [e2e/dialogs.spec.ts](../e2e/dialogs.spec.ts): no header
 - [e2e/flow-items.spec.ts](../e2e/flow-items.spec.ts): no header
+- [e2e/keyboard-journey.spec.ts](../e2e/keyboard-journey.spec.ts): The owner's NFR-35 keyboard traversal, by hand — not an automated assertion:
 - [e2e/marketing.visual.spec.ts](../e2e/marketing.visual.spec.ts): Marketing is intentionally static and design-owned. These snapshots protect
 - [e2e/public-edge-fixture.spec.ts](../e2e/public-edge-fixture.spec.ts): no header
 
@@ -160,11 +162,13 @@
 - [scripts/audit/preflight.mjs](../scripts/audit/preflight.mjs): What the website's two gate runners share — `npm run verify`
 - [scripts/audit/record-pass.mjs](../scripts/audit/record-pass.mjs): The ONLY writer of the change-audit PASS marker. Run by the main session,
 - [scripts/audit/run-gates.mjs](../scripts/audit/run-gates.mjs): Deterministic gate runner for the change audit. Runs the same gates CI runs
+- [scripts/backend-contract.mjs](../scripts/backend-contract.mjs): Where the backend's contract files are read from (Round 21 hardening, W1,
 - [scripts/generate-platform-contracts.mjs](../scripts/generate-platform-contracts.mjs): no header
 - [scripts/hooks/require-change-audit.mjs](../scripts/hooks/require-change-audit.mjs): PreToolUse gate for Claude Code sessions: blocks a `git push` (or
 - [scripts/kit/check-docs.mjs](../scripts/kit/check-docs.mjs): D, docs always updated (STANDARD (e)): `npm run check:docs` reads
 - [scripts/kit/kit.test.mjs](../scripts/kit/kit.test.mjs): The kit's own tests (node:test, Node built-ins only). Every cases.json row runs
 - [scripts/kit/map.mjs](../scripts/kit/map.mjs): `npm run map` (STANDARD (c)): builds docs/MAP.md from the `map` and `rules`
+- [scripts/no-skipped-browser-tests.mjs](../scripts/no-skipped-browser-tests.mjs): No silent skips in the browser suites (Round 21 hardening, W17): after a
 - [scripts/probe-no-backend.mjs](../scripts/probe-no-backend.mjs): Serves the build `npm run build:no-backend` left in `.next`, with no
 - [scripts/repo-facts.mjs](../scripts/repo-facts.mjs): What this repository reports about itself, in the shape snoopy-backend's
 - [scripts/run-browser-fixtures.mjs](../scripts/run-browser-fixtures.mjs): no header
