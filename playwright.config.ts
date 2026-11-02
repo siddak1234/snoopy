@@ -22,26 +22,65 @@ if (!webkitRuns && process.env.TEST_WORKER_INDEX === undefined) {
   );
 }
 
+// No silent skips (Round 21 hardening, W14-W17): a run collects only what it
+// runs, so its "skipped" count is 0 and a real skip fails the run
+// (scripts/no-skipped-browser-tests.mjs). The specs that need the fixture Edge
+// are not collected without it (scripts/run-browser-fixtures.mjs sets
+// E2E_PUBLIC_EDGE_FIXTURE=1 and lists them); the owner's keyboard journey is
+// collected only with KEYBOARD_JOURNEY=1.
+const fixtureOnly =
+  process.env.E2E_PUBLIC_EDGE_FIXTURE === "1"
+    ? []
+    : [
+        /public-edge-fixture\.spec\.ts/,
+        /account-surfaces\.spec\.ts/,
+        /dialogs\.spec\.ts/,
+        /flow-items\.spec\.ts/,
+        /accessibility-authenticated\.spec\.ts/,
+        /keyboard-journey\.spec\.ts/,
+      ];
+const notCollected = [
+  ...fixtureOnly,
+  ...(process.env.KEYBOARD_JOURNEY === "1"
+    ? []
+    : [/keyboard-journey\.spec\.ts/]),
+];
+
 // NFR-36: the functional and accessibility suites run in all three engines in
 // CI; the marketing baselines are one engine's pixels, so they stay Chromium's.
+// A test tagged @chromium-only needs Chromium's touch emulation, whose primary
+// pointer is coarse; the other engines leave it out by project, never by a
+// skip decided while the test runs.
 const projects: Project[] = [
-  { name: "chromium", use: { browserName: "chromium" } },
+  {
+    name: "chromium",
+    use: { browserName: "chromium" },
+    testIgnore: notCollected,
+  },
   {
     name: "firefox",
     use: { browserName: "firefox" },
-    testIgnore: /marketing\.visual\.spec\.ts/,
+    testIgnore: [/marketing\.visual\.spec\.ts/, ...notCollected],
+    grepInvert: /@chromium-only/,
   },
   {
     name: "webkit",
     use: { browserName: "webkit" },
-    testIgnore: /marketing\.visual\.spec\.ts/,
+    testIgnore: [/marketing\.visual\.spec\.ts/, ...notCollected],
+    grepInvert: /@chromium-only/,
   },
 ];
 
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
-  reporter: process.env.CI ? "github" : "list",
+  // A committed test.only would run the focused tests alone, green.
+  forbidOnly: Boolean(process.env.CI),
+  // `github` stays: scripts/audit/run-gates.mjs reads its summary line. The
+  // JSON report is what scripts/no-skipped-browser-tests.mjs reads.
+  reporter: process.env.CI
+    ? [["github"], ["json", { outputFile: "playwright-report.json" }]]
+    : "list",
   // The visual baselines are Chromium's and keep the names they had before the
   // other engines joined — no project in the name — so they are not re-recorded.
   snapshotPathTemplate:

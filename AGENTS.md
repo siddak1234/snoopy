@@ -99,7 +99,7 @@ records by size. Then:
 
 - Work in a scratch clone, never a synced folder. Installs, `npm run verify`,
   Playwright and builds run one at a time, under the session's gate lock when
-  it has one. Node 22 (`.nvmrc`).
+  it has one. Node 22.23.2, exactly as `.nvmrc` names it; CI reads that file.
 - Commit first, then run `npm run verify` on the committed tree.
 - The push (the owner's option C, 2026-10-15):
   1. Review: `/audit-change` runs the `change-auditor` agent

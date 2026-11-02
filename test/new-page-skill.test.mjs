@@ -23,6 +23,7 @@ test("the new-page skill adds a spec to the fixture runner's list and to that li
   const step = /^5\. The spec:[\s\S]*?(?=^6\. )/mu.exec(skill)?.[0] ?? "";
   assert.match(step, /`scripts\/run-browser-fixtures\.mjs`/u);
   assert.match(step, /`test\/verify-gate\.test\.mjs`/u);
+  assert.match(step, /`fixtureOnly` in `playwright\.config\.ts`/u);
 });
 
 test("the new-page skill's commit stages every file its steps change", () => {
@@ -36,6 +37,7 @@ test("the new-page skill's commit stages every file its steps change", () => {
     '"e2e/$SLUG.spec.ts"',
     "scripts/run-browser-fixtures.mjs",
     "test/verify-gate.test.mjs",
+    "playwright.config.ts",
     "docs/MAP.md",
     specCount,
     "$ALSO",

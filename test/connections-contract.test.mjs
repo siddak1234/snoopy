@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 
 const SPEC_PATH = resolve(
   import.meta.dirname,
   "..",
-  process.env.SNOOPY_BACKEND_ROOT || "../snoopy-backend",
+  "lib/generated/snoopy-backend",
   "docs/openapi/connections.yaml",
 );
 const GENERATED_PATH = resolve(
@@ -27,8 +27,7 @@ const PILL_PATH = resolve(
   "../components/dashboard/StatusPill.tsx",
 );
 
-const available = existsSync(SPEC_PATH);
-const spec = available ? readFileSync(SPEC_PATH, "utf8") : "";
+const spec = readFileSync(SPEC_PATH, "utf8");
 const generated = readFileSync(GENERATED_PATH, "utf8");
 const facade = readFileSync(FACADE_PATH, "utf8");
 const actions = readFileSync(ACTIONS_PATH, "utf8");
@@ -86,20 +85,12 @@ test("connection mutations consume generated operation response types", () => {
   );
 });
 
-test(
-  "the connection UI renders only contract-declared auth modes and credential fields",
-  {
-    skip: available
-      ? false
-      : "snoopy-backend is not checked out beside this repository",
-  },
-  () => {
-    assert.match(spec, /enum:\s*\[oauth2, api-key\]/);
-    assert.match(spec, /credentialFields:/);
-    assert.match(generated, /authType:\s*"oauth2" \| "api-key"/);
-    assert.match(generated, /credentialFields\?:/);
-  },
-);
+test("the connection UI renders only contract-declared auth modes and credential fields", () => {
+  assert.match(spec, /enum:\s*\[oauth2, api-key\]/);
+  assert.match(spec, /credentialFields:/);
+  assert.match(generated, /authType:\s*"oauth2" \| "api-key"/);
+  assert.match(generated, /credentialFields\?:/);
+});
 
 test("pasted-key retries preserve one client intent and send its key as a header", () => {
   assert.match(
@@ -134,28 +125,18 @@ test("provider help is rendered from declared credential fields without scope cl
   );
 });
 
-test(
-  "every connection status has a dashboard tone",
-  {
-    skip: available
-      ? false
-      : "snoopy-backend is not checked out beside this repository",
-  },
-  () => {
-    const statuses =
-      /enum:\s*\[(authorizing, connected, reauthorization-required, disconnected)\]/.exec(
-        spec,
-      );
-    assert.ok(statuses, "ConnectionStatus is missing from the public contract");
-    const pill = readFileSync(PILL_PATH, "utf8");
-    for (const status of statuses[1].split(",").map((entry) => entry.trim())) {
-      assert.match(
-        pill,
-        new RegExp(
-          `"?${status}"?:\\s*"(?:success|warning|error|info|neutral)"`,
-        ),
-        `${status} has no StatusPill tone`,
-      );
-    }
-  },
-);
+test("every connection status has a dashboard tone", () => {
+  const statuses =
+    /enum:\s*\[(authorizing, connected, reauthorization-required, disconnected)\]/.exec(
+      spec,
+    );
+  assert.ok(statuses, "ConnectionStatus is missing from the public contract");
+  const pill = readFileSync(PILL_PATH, "utf8");
+  for (const status of statuses[1].split(",").map((entry) => entry.trim())) {
+    assert.match(
+      pill,
+      new RegExp(`"?${status}"?:\\s*"(?:success|warning|error|info|neutral)"`),
+      `${status} has no StatusPill tone`,
+    );
+  }
+});

@@ -3,7 +3,7 @@ import { getAppSession } from "@/lib/app-session";
 import {
   emptyWhenUnavailable,
   listAutomations,
-  listSubscriptions,
+  readSubscription,
   type AutomationSetupField,
 } from "@/lib/automations";
 import {
@@ -64,11 +64,12 @@ export default async function SetupPage(
   const workspaceId = await resolveActiveWorkspaceId(session);
   if (!workspaceId) notFound();
 
-  const [subscriptions, catalog, providers, connections, projects, role] =
+  const [subscription, catalog, providers, connections, projects, role] =
     await Promise.all([
-      emptyWhenUnavailable(() => listSubscriptions(workspaceId), {
-        subscriptions: [],
-      }),
+      emptyWhenUnavailable(
+        () => readSubscription(workspaceId, subscriptionId),
+        null,
+      ),
       emptyWhenUnavailable(() => listAutomations(workspaceId), {
         automations: [],
         categories: [],
@@ -83,11 +84,9 @@ export default async function SetupPage(
       roleInWorkspace(workspaceId),
     ]);
 
-  const subscription = subscriptions.subscriptions.find(
-    (candidate) =>
-      candidate.id === subscriptionId && candidate.status !== "archived",
-  );
-  if (!subscription) notFound();
+  // The flow by its id, with the settings of the version it pins (backend
+  // §12.1 #319); archived or not this person's is "not found".
+  if (!subscription || subscription.status === "archived") notFound();
   const entry = catalog.automations.find(
     (candidate) => candidate.templateId === subscription.templateId,
   );

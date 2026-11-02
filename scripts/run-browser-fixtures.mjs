@@ -16,11 +16,12 @@ const playwrightSelectors = process.argv.slice(2);
 // buttons' pixel contrast were identical (register F91) — so they run once,
 // there, not again in each of the three legs. /login stays: its provider list
 // is the platform's, and only the fixture can show the page with one. The
-// eighteen authenticated baselines run only here. Matched on Playwright's grep
+// authenticated baselines run only here. Matched on Playwright's grep
 // title — "<project> <file, relative to testDir> <describe…> <title>", e.g.
 // "chromium accessibility.spec.ts public accessibility baseline: /" — anchored
 // to the project, this spec's file and the title's end, so /login, the
-// authenticated baselines and the other specs' own button tests are untouched;
+// authenticated baselines (e2e/accessibility-authenticated.spec.ts) and the
+// other specs' own button tests are untouched;
 // Playwright reads a plain --grep-invert string with the flags gi.
 const browserJobOnly = String.raw`^[a-z]+ accessibility\.spec\.ts (public accessibility baseline: /(solutions|contact|automation-builder|privacy|terms)?|a ghost button keeps AA contrast at rest, hovered and pressed: .*)$`;
 const fixtureDirectory = mkdtempSync(join(tmpdir(), "autom8x-public-edge-"));
@@ -149,6 +150,9 @@ try {
       "e2e/account-surfaces.spec.ts",
       "e2e/dialogs.spec.ts",
       "e2e/flow-items.spec.ts",
+      "e2e/accessibility-authenticated.spec.ts",
+      // Collected only with KEYBOARD_JOURNEY=1 (playwright.config.ts).
+      "e2e/keyboard-journey.spec.ts",
       // One worker: every test here talks to ONE fixture process whose state is
       // global (the active workspace, billing, exports), and some tests move it
       // and put it back. With two workers the other file's scans could land
@@ -161,6 +165,12 @@ try {
     ],
     { cwd: root, env: environment, stdio: "inherit" },
   );
+  // A skip is a test that did not run (playwright.config.ts collects only what
+  // a run runs): 0 skipped, or this run fails.
+  execFileSync(process.execPath, ["scripts/no-skipped-browser-tests.mjs"], {
+    cwd: root,
+    stdio: "inherit",
+  });
 } finally {
   await stopFixture();
   rmSync(fixtureDirectory, { recursive: true, force: true });

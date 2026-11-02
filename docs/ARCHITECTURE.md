@@ -24,7 +24,9 @@ this origin holds.
 
 - Browser calls use `lib/platform-api.ts`; server calls use
   `lib/platform-server.ts`; proxy session rotation uses `lib/platform-proxy.ts`.
-- Public response types are generated from the three published OpenAPI inputs,
+- Public response types are generated from the three published OpenAPI inputs
+  (read, with the fixtures, rules and repo-facts schema below, from their
+  hash-checked copy in `lib/generated/snoopy-backend/`; README "Verification"),
   and the platform's block fixtures beside them
   (`lib/generated/platform-contracts/block-fixtures.ts`, one sha256 over the
   fixtures' bytes in filename order — the rule both clients share), and its
@@ -51,6 +53,13 @@ this origin holds.
   page and its vendor page read. The batch addendum (ADR-0048 amendment 4)
   is generated too: the run input's `maxFiles`, `Run.batch` and `Run.unit`,
   the run page's `batch` part, and 429 `queue_full`.
+- A page that shows one flow reads it by its id (`readSubscription` in
+  `lib/automations.ts`, `GET …/subscriptions/{id}`; backend §12.1 #319 step
+  2): the flow's page, its Set up and Connect integration pages, the
+  integration's save and a run's page. It carries the flow's `setup` from the
+  version it pins, archived included; a 404 is the page's "not found". The
+  list still carries `setup` for builds before 34, but no page reads it there;
+  adding a flow's duplicate check reads the list.
 - No Prisma, direct database, Supabase SDK, object-store SDK, browser secret,
   manual password login, or provider credential belongs here.
 - Tenancy state comes from typed Edge responses. Mutations have unique

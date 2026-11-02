@@ -126,6 +126,35 @@ export function listSubscriptions(
   );
 }
 
+export type ReadSubscriptionResponse =
+  operations["getSubscription"]["responses"][200]["content"]["application/json"];
+
+/**
+ * One flow, by its id (backend §12.1 #319 step 1, `getSubscription`): the
+ * summary a list row carries, with its `setup`, read from the version the flow
+ * pins, in any status, archived too. `null` when the platform answers 404 — an
+ * unknown id, another workspace's, or a flow on a team this person cannot see
+ * — which each page draws as the "not found" a flow that does not exist is.
+ * The flow page, Set up, Connect integration, the vendor save and a run's
+ * page read their flow here; the list may still carry `setup` (builds before
+ * 34 read it), but no page reads it from there (#319 step 2).
+ */
+export async function readSubscription(
+  workspaceId: string,
+  subscriptionId: string,
+): Promise<Subscription | null> {
+  try {
+    const { subscription } = await platformServerJson<ReadSubscriptionResponse>(
+      `${scope(workspaceId)}/subscriptions/${encodeURIComponent(subscriptionId)}`,
+    );
+    return subscription;
+  } catch (error) {
+    if (error instanceof PlatformServerError && error.status === 404)
+      return null;
+    throw error;
+  }
+}
+
 /**
  * The archived flows, asked for by name (backend §12.1 #203): the list above
  * never holds them. A platform from before the SEVENTEENTH promotion ignores the

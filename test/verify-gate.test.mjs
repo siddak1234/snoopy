@@ -73,25 +73,11 @@ test("verify also runs format:check (CI's Lint job does; the audit runner does n
   }
 });
 
-test("verify skips the sibling-dependent gate out loud rather than failing on a missing checkout", () => {
-  // generate-platform-contracts.mjs throws on the FIRST missing input, so the
-  // skip must check all three, and it must say why (§12.2 #78's class).
-  for (const input of [
-    "docs/openapi.yaml",
-    "docs/openapi/automations.yaml",
-    "docs/openapi/connections.yaml",
-  ]) {
-    assert.ok(
-      verify.includes(`"${input}"`),
-      `verify.mjs does not check ${input}`,
-    );
-  }
-  assert.match(verify, /SKIP \$\{gate\.name\}/u);
-  assert.match(
-    verify,
-    /accepted dependency \(§12\.2 #78\)/u,
-    "the SKIP line itself must say why the dependency is accepted",
-  );
+test("verify never skips a gate: verify:platform-contracts reads the committed copy when there is no sibling checkout (Round 21 hardening, W1)", () => {
+  // It was skipped out loud with no sibling (§12.2 #78); the copy
+  // (lib/generated/snoopy-backend) makes it run everywhere.
+  assert.doesNotMatch(verify, /\bskip\b|SKIP/u);
+  assert.match(verify, /\{ name: "verify:platform-contracts" \}/u);
 });
 
 test("verify pins the build origin, defeats server reuse, and asserts the gateway rewrite", () => {
@@ -396,8 +382,12 @@ test("the browser fixture run passes every spec that needs the fixture Edge, and
     "e2e/account-surfaces.spec.ts",
     "e2e/dialogs.spec.ts",
     "e2e/flow-items.spec.ts",
+    "e2e/accessibility-authenticated.spec.ts",
+    "e2e/keyboard-journey.spec.ts",
   ]);
-  // And derived: every spec that reads the fixture's switch is one of them.
+  // And derived: every spec that reads the fixture's switch is one of them,
+  // and so is e2e/accessibility.spec.ts, whose /login scan needs the
+  // fixture's provider list and whose other scans run in both.
   const e2e = resolve(import.meta.dirname, "../e2e");
   const needFixture = readdirSync(e2e)
     .filter((name) => name.endsWith(".spec.ts"))
@@ -405,7 +395,24 @@ test("the browser fixture run passes every spec that needs the fixture Edge, and
       readFileSync(join(e2e, name), "utf8").includes("E2E_PUBLIC_EDGE_FIXTURE"),
     )
     .map((name) => `e2e/${name}`);
-  assert.deepEqual([...listed].sort(), needFixture.sort());
+  assert.deepEqual(
+    [...listed].sort(),
+    [...needFixture, "e2e/accessibility.spec.ts"].sort(),
+  );
+  // And playwright.config.ts collects each of those only against the fixture
+  // (Round 21 hardening, W14): no run without it lists them as skipped.
+  const config = readFileSync(
+    resolve(import.meta.dirname, "../playwright.config.ts"),
+    "utf8",
+  );
+  const fixtureOnly = config.slice(
+    config.indexOf("const fixtureOnly"),
+    config.indexOf("const notCollected"),
+  );
+  const ignored = [...fixtureOnly.matchAll(/\/([\w-]+)\\\.spec\\\.ts\//gu)]
+    .map((match) => `e2e/${match[1]}.spec.ts`)
+    .sort();
+  assert.deepEqual(ignored, needFixture.sort());
 });
 
 test("verify emits the facts file only after the last gate", () => {
@@ -419,13 +426,6 @@ test("verify emits the facts file only after the last gate", () => {
     verify,
     /process\.exit\(exit\)/u,
     "a red gate must stop the run before any emission",
-  );
-  // A run that skipped the sibling gate is green for what ran and emits
-  // nothing: the file must not be indistinguishable from a full run's.
-  const guard = verify.indexOf("facts NOT emitted");
-  assert.ok(
-    guard > 0 && guard < emit,
-    "a run that skipped a gate must refuse to emit before the emission",
   );
 });
 

@@ -40,8 +40,7 @@ place, and every file a changed doc names exists: `docs/docs-map.json`),
 `map -- --check` (`docs/MAP.md` is what `npm run map` builds from the tree),
 `lint`, `typecheck`, `audit:boundaries`, `test:contracts`, `verify:platform-contracts`
 (the generated contract types and the platform's block fixtures match the
-backend's; skipped out loud when `../snoopy-backend` is not checked out beside this
-repository), `build:no-backend` (the site with no backend, as a Vercel preview
+backend's), `build:no-backend` (the site with no backend, as a Vercel preview
 builds it), `probe:no-backend` (that build served as a preview serves it: the
 public pages load, the account area sends a visitor to sign in, and readiness
 says "not configured"), `build` with `BACKEND_API_ORIGIN=https://backend.invalid` plus the
@@ -56,12 +55,50 @@ even on unchanged `main`, so it was left to CI (the owner's decision of
 are Chromium's baselines alone. A run in
 which every gate ran green ends by emitting
 this repository's facts file to `.autom8x/repo-facts/snoopy.json` (gitignored;
-`snoopy-backend` commits it as `snoopy-backend/docs/repo-facts/snoopy.json`); a run that had to
-skip the sibling gate says so and emits nothing. Run it on Node 22 (`.nvmrc`), the version
-CI and the container use. Running it while `/audit-change` runs, or the reverse,
+`snoopy-backend` commits it as `snoopy-backend/docs/repo-facts/snoopy.json`). Run it on the
+Node `.nvmrc` names exactly (22.23.2): every CI job reads that file, and the container's
+`node:22-alpine` is the same major. Running it while `/audit-change` runs, or the reverse,
 is refused — both build into `.next` and serve on ports 3001 and 3443, so they
 share one lock, and a port anything already listens on is refused before either
 starts (the preflight binds each one; `lsof` cannot see a renamed `next-server`).
+
+**The backend's contract, copied.** The generator, its check and the
+contract tests read six backend paths — `docs/openapi.yaml`,
+`docs/openapi/automations.yaml`, `docs/openapi/connections.yaml`,
+`docs/repo-facts.schema.json` and the `packages/contracts/fixtures/blocks/`
+and `block-rules/` folders — from a byte-for-byte copy committed at
+`lib/generated/snoopy-backend/<the same paths>`, with `SHA256SUMS` beside it
+(`scripts/backend-contract.mjs`). `npm run generate:platform-contracts` writes
+the copy whenever it runs from a backend checkout (`SNOOPY_BACKEND_ROOT`, else
+`../snoopy-backend`), and copies nothing when it runs from the copy itself.
+`npm run verify:platform-contracts` reads `SNOOPY_BACKEND_ROOT`, else the
+sibling, else the copy, so it runs everywhere: the copy against `SHA256SUMS`,
+each generated header against the copy's bytes, then a regeneration compared
+with what is committed — a stale file or copy is reported and left as found.
+The YAMLs stay tied to production by the Deployed contract job.
+
+**No silent skips.** CI's gates job runs `verify:platform-contracts`, and the
+contract tests fail when any test is skipped or left todo (TAP's `# skipped`
+and `# todo`, read with `set -o pipefail`), there and in main's smoke. The
+browser suites collect only what they run (`playwright.config.ts`): the
+fixture specs only with the fixture Edge, the keyboard journey only with
+`KEYBOARD_JOURNEY=1`, the two touch-camera tests in Chromium alone by their
+`@chromium-only` tag. Under CI a committed `test.only` fails (`forbidOnly`),
+and `scripts/no-skipped-browser-tests.mjs` fails the browser job and each
+fixture leg when Playwright's JSON report counts a skip. The scan job's
+dev-dependency audit and its report of vulnerabilities with no fix stay
+report-only by design; the runtime audit and the fixable CRITICAL/HIGH scan block.
+
+**Pinned, and kept current.** Every action in the workflows is pinned by commit
+with its `# vX.Y.Z`, the Dockerfile's `node:22-alpine` by index digest with its
+tag, and Node by `.nvmrc`. `.github/dependabot.yml` moves them weekly: one
+pull request for the actions, one for npm's minor and patch updates (a major
+comes alone), one for the image; the docs check lets a Dependabot commit that
+touches only those files through (`scripts/kit/check-docs.mjs`).
+
+**Nightly.** `ci.yml` also runs at 09:27 UTC on `main`. A red nightly opens
+one "Nightly red" issue, or comments the run on the open one, from
+`all-green` (its job, and main.yml's `full`, may write issues).
 
 `npm run test:browser:fixtures` starts a loopback-only HTTPS Edge fixture with
 a temporary certificate and scans every authenticated page with axe. Here it
@@ -126,7 +163,9 @@ billing (Free, Plus and Pro — the platform's, or the one the website draws
 while the platform lists none — and a second plan refused), the quick and the
 complete export (its link followed only when https), account deletion, and the platform's refusals —
 without real accounts or credentials, and each test starts from the fixture's
-first state. Five specs: `e2e/accessibility.spec.ts`,
+first state. Seven specs: `e2e/accessibility.spec.ts`,
+`e2e/accessibility-authenticated.spec.ts` (every page behind sign-in,
+scanned with axe), `e2e/keyboard-journey.spec.ts` (below),
 `e2e/public-edge-fixture.spec.ts`, `e2e/account-surfaces.spec.ts` (every
 surface a change audit probed and no test asserted — Round 21 v2's among them:
 the image block, a group of drop-downs, a long list's and table's search, sort
@@ -137,7 +176,8 @@ them, and Share refused; Round 21's review of each change and Approvals'
 and the value saved) and several files in one upload (all into one run, one file a list of one; exactly
 `maxFiles` taken, past it refused, a photo past it keeping the files held; a
 full queue said; a photo added), a public app connected with no
-Connect step and, as a step's choice, Connected and chosen in place, and a batch run's page in `e2e/public-edge-fixture.spec.ts`), `e2e/dialogs.spec.ts`
+Connect step and, as a step's choice, Connected and chosen in place, a batch run's page, and a flow
+whose list row carries no settings still drawn and saved from its one-flow read (backend §12.1 #319) in `e2e/public-edge-fixture.spec.ts`), `e2e/dialogs.spec.ts`
 (every dialog's Escape, click outside, focus return and hold, one row each)
 and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: the Flows
 list by department A–Z; its items grouped A–Z under its group filter, the
@@ -161,7 +201,7 @@ titles and Settings' groups, and the page's edge at 390 and 900 px wide. The pla
 traversal (NFR-35) has a hand-over test in the same suite:
 `KEYBOARD_JOURNEY=1 node scripts/run-browser-fixtures.mjs --headed --grep "keyboard journey"`
 opens the built site against the fixture, signed in, and pauses for the person
-at the keyboard; it is skipped otherwise.
+at the keyboard; no other run collects it.
 
 ## Container
 

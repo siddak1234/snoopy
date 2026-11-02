@@ -10,6 +10,7 @@ import {
   createSubscription,
   decideApproval as decideWorkspaceApproval,
   listSubscriptions,
+  readSubscription,
   updateFlowEmailRecipients,
   updateSubscription,
   type CreateRunRequest,
@@ -289,10 +290,10 @@ export async function saveVendorChoice(
   try {
     const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
     if (!workspaceId) return { ok: false, error: WORKSPACE_CHANGED };
-    const { subscriptions } = await listSubscriptions(workspaceId);
-    const subscription = subscriptions.find(
-      (candidate) => candidate.id === subscriptionId,
-    );
+    // The flow by its id, with its setup (backend §12.1 #319); archived is
+    // refused as a flow that is not there.
+    const found = await readSubscription(workspaceId, subscriptionId);
+    const subscription = found?.status === "archived" ? null : found;
     const fields = (subscription?.setup ?? []).filter(
       (candidate) => candidate.control === "connection",
     );

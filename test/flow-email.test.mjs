@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 import {
@@ -33,12 +33,13 @@ import {
 const read = (path) =>
   readFileSync(resolve(import.meta.dirname, "..", path), "utf8");
 
-// The contract the generated types came from, beside this repository (or at
-// SNOOPY_BACKEND_ROOT), whose FlowEmailAddress pattern the types do not carry.
+// The contract the generated types came from, its committed copy
+// (lib/generated/snoopy-backend), whose FlowEmailAddress pattern the types do
+// not carry.
 const SPEC_PATH = resolve(
   import.meta.dirname,
   "..",
-  process.env.SNOOPY_BACKEND_ROOT || "../snoopy-backend",
+  "lib/generated/snoopy-backend",
   "docs/openapi/automations.yaml",
 );
 
@@ -77,20 +78,18 @@ test("an address is one the platform takes: FlowEmailAddress's pattern, 3–254 
   }
   // The contract's own pattern answers every sample as this one does: the
   // generated types drop `pattern`, so it is restated here and held to it.
-  if (existsSync(SPEC_PATH)) {
-    const spec = readFileSync(SPEC_PATH, "utf8");
-    const declared = spec
-      .slice(spec.indexOf("    FlowEmailAddress:\n"))
-      .match(/\n\s+pattern: '([^']+)'/u)?.[1];
-    assert.ok(declared, "FlowEmailAddress has a pattern in the contract");
-    const contract = new RegExp(declared, "u");
-    for (const sample of [...goodAddresses, ...badAddresses]) {
-      assert.equal(
-        FLOW_EMAIL_PATTERN.test(sample.trim()),
-        contract.test(sample.trim()),
-        sample,
-      );
-    }
+  const spec = readFileSync(SPEC_PATH, "utf8");
+  const declared = spec
+    .slice(spec.indexOf("    FlowEmailAddress:\n"))
+    .match(/\n\s+pattern: '([^']+)'/u)?.[1];
+  assert.ok(declared, "FlowEmailAddress has a pattern in the contract");
+  const contract = new RegExp(declared, "u");
+  for (const sample of [...goodAddresses, ...badAddresses]) {
+    assert.equal(
+      FLOW_EMAIL_PATTERN.test(sample.trim()),
+      contract.test(sample.trim()),
+      sample,
+    );
   }
 });
 

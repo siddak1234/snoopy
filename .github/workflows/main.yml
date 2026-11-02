@@ -27,7 +27,7 @@ jobs:
     outputs:
       suite: ${{ steps.decide.outputs.suite }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: The pull request that landed this commit proved this tree
         id: decide
         env:
@@ -75,25 +75,38 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         # The contract tests read the whole history, as in ci.yml's gates job.
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run lint
       - run: npm run format:check
       - run: npm run typecheck
-      - run: npm run test:contracts
+      # As ci.yml's gates job: a skipped or todo contract test fails.
+      - name: Contract tests, none skipped
+        run: |
+          set -o pipefail
+          npm run test:contracts | tee "$RUNNER_TEMP/contracts.tap"
+          if grep -qE '^# (skipped|todo) [1-9]' "$RUNNER_TEMP/contracts.tap"; then
+            echo 'FAIL: a contract test skipped'
+            exit 1
+          fi
 
   # Every job ci.yml runs on a pull request, unchanged, on this push.
   full:
     name: Full suite
     needs: verdict
     if: needs.verdict.outputs.suite == 'full'
+    # ci.yml's all-green asks for these (its nightly report); a called
+    # workflow gets at most what its caller grants.
+    permissions:
+      contents: read
+      issues: write
     uses: ./.github/workflows/ci.yml
 
   # all-green's shape, for main: runs whatever the others did, and passes only

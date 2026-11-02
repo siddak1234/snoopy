@@ -5,20 +5,25 @@ name: CI
 # already proved (register F92). The jobs read nothing event-specific, so they
 # run the same under either trigger, but for the gates job's DOCS_BASE: the
 # pull request's base branch, and main when called from main.yml, where the
-# docs check's range is then empty.
+# docs check's range is then empty. And nightly on main (the owner's Go
+# 2026-11-01, nightly LEAN): the same jobs on main's tip, so a platform deploy
+# that moved the contract, or a moved image, shows the next morning; a red
+# nightly opens (or comments on) one "Nightly red" issue, from all-green.
 on:
   pull_request:
   workflow_call:
+  schedule:
+    - cron: "27 9 * * *"
 
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run lint
@@ -32,15 +37,15 @@ jobs:
       # (README "Verification"); on main, called by main.yml, the range is empty.
       DOCS_BASE: origin/${{ github.base_ref || 'main' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         # The document check believes a struck path only when a commit once
         # added it, and the docs check reads every commit since the base; a
         # one-commit clone has no history to show.
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       # Fails when a changed area's doc did not change with it, a fact is
@@ -52,8 +57,21 @@ jobs:
       # Fails if a browser secret, storage, manual-login, or direct-database
       # path returns.
       - run: npm run audit:boundaries
-      # Fails if the backend session wire contract drifts.
-      - run: npm run test:contracts
+      # Fails when a committed lib/generated file is not what the generator
+      # makes from the hash-checked copy of the backend's contract files
+      # (lib/generated/snoopy-backend, its SHA256SUMS; README "Verification").
+      - run: npm run verify:platform-contracts
+      # Fails if the backend session wire contract drifts, and when any
+      # contract test skipped or was left todo: a skip is a check that did
+      # not run (README "Verification").
+      - name: Contract tests, none skipped
+        run: |
+          set -o pipefail
+          npm run test:contracts | tee "$RUNNER_TEMP/contracts.tap"
+          if grep -qE '^# (skipped|todo) [1-9]' "$RUNNER_TEMP/contracts.tap"; then
+            echo 'FAIL: a contract test skipped'
+            exit 1
+          fi
       - name: No salvaged client data
         run: |
           # `_salvage/` lives in the workspace folder, outside every repository. It
@@ -84,10 +102,10 @@ jobs:
       # while the build still exits 0. Asserted below.
       BACKEND_API_ORIGIN: https://backend.invalid
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run build
@@ -118,10 +136,10 @@ jobs:
     name: Build with no backend
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run build:no-backend
@@ -132,10 +150,10 @@ jobs:
     name: Typecheck
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run typecheck
@@ -153,16 +171,19 @@ jobs:
     env:
       HOME: /root
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run build
         env:
           BACKEND_API_ORIGIN: https://backend.invalid
       - run: npm run test:browser
+      # Every collected test ran: this job collects no fixture spec
+      # (playwright.config.ts), so a skip is a test that stopped running.
+      - run: node scripts/no-skipped-browser-tests.mjs
 
   # The authenticated suite against the loopback fixture Edge (backend BUILD-PLAN
   # 22.6.6): every account page, every refusal the website must survive, in all
@@ -188,10 +209,10 @@ jobs:
     env:
       HOME: /root
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       # Builds with the fixture's origin, serves the standalone bundle, and
@@ -207,10 +228,10 @@ jobs:
     name: Dependency and image scan
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
       - name: Audit runtime dependencies
         run: npm audit --omit=dev --audit-level=high
@@ -263,7 +284,7 @@ jobs:
 
       - name: Retain the SBOM
         if: ${{ !cancelled() && steps.image.outcome == 'success' }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sbom
           path: sbom-web.cdx.json
@@ -285,10 +306,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version-file: .nvmrc
       - run: node scripts/verify-deployed-contracts.mjs
 
   # Green only when every job above succeeded. The ruleset names four jobs; the
@@ -313,6 +334,11 @@ jobs:
       - contract-deployed
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    # The nightly's report below writes an issue. main.yml's `full` job grants
+    # the same, since a called workflow can only keep or lower its caller's.
+    permissions:
+      contents: read
+      issues: write
     steps:
       - name: Every job succeeded
         env:
@@ -325,3 +351,18 @@ jobs:
             exit 1
           fi
           echo "all-green: every job succeeded"
+      # A red nightly reports itself: one open "Nightly red" issue, commented
+      # on each further red night, so a failure leaves a record in the
+      # repository and not only an email.
+      - name: A red nightly reports itself
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          n=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search 'in:title "Nightly red"' --json number --jq '.[0].number')
+          if [ -n "$n" ]; then
+            gh issue comment "$n" --repo "$GITHUB_REPOSITORY" --body "$RUN"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title 'Nightly red' --body "$RUN"
+          fi

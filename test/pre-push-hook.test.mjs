@@ -227,7 +227,7 @@ test("the fast gates are verify's seven before its builds (all but the map's che
   assert.ok(!existsSync(join(repo, ".autom8x")));
 });
 
-test("a sibling checkout that is absent skips verify:platform-contracts out loud, as verify does", (t) => {
+test("with no sibling checkout every fast gate still runs, verify:platform-contracts too: it reads the committed copy (Round 21 hardening, W1)", (t) => {
   const { base, repo } = makeRepo({ sibling: false });
   t.after(() => rmSync(base, { recursive: true, force: true }));
   const sha = git(repo, "rev-parse", "HEAD");
@@ -238,11 +238,8 @@ test("a sibling checkout that is absent skips verify:platform-contracts out loud
     `refs/heads/main ${sha} refs/heads/main ${ZERO}\n`,
   );
   assert.equal(passed.exit, 0);
-  assert.match(
-    passed.stderr,
-    /verify:platform-contracts skipped — sibling checkout not present/,
-  );
-  assert.deepEqual(ran(repo), FAST_GATES.slice(0, -1));
+  assert.doesNotMatch(passed.stderr, /skipped/u);
+  assert.deepEqual(ran(repo), FAST_GATES);
 });
 
 test("a push from a linked worktree runs the gates without git's repository variables, so the gates' own git calls cannot touch this repository", (t) => {
