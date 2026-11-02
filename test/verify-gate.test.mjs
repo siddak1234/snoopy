@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import {
   existsSync,
@@ -95,11 +95,11 @@ test("verify pins the build origin, defeats server reuse, and asserts the gatewa
 test("verify and the change audit share one preflight, one lock and one rewrite check (register F24)", () => {
   assert.match(
     verify,
-    /import \{ assertPlatformRewrite, preflight \} from "\.\/audit\/preflight\.mjs";/u,
+    /import \{\s*assertNoSkippedBrowserTests,\s*assertNoSkippedTests,\s*assertPlatformRewrite,\s*preflight,\s*\} from "\.\/audit\/preflight\.mjs";/u,
   );
   assert.match(
     runGates,
-    /import \{ assertPlatformRewrite, preflight \} from "\.\/preflight\.mjs";/u,
+    /import \{\s*assertNoSkippedBrowserTests,\s*assertNoSkippedTests,\s*assertPlatformRewrite,\s*preflight,\s*\} from "\.\/preflight\.mjs";/u,
   );
   for (const [name, source] of [
     ["verify.mjs", verify],
@@ -121,6 +121,88 @@ test("verify and the change audit share one preflight, one lock and one rewrite 
       `${name} takes a lock itself`,
     );
     assert.doesNotMatch(source, /function assertPlatformRewrite/u, name);
+  }
+});
+
+test("verify and the change audit fail on a skipped or todo contract test and on a skipped browser test, as CI does (Round 21 hardening, W-5)", async () => {
+  // Wired to the gates they read: test:contracts's TAP, handed back, and the
+  // browser suite's JSON report after test:browser. Each runner passes a
+  // gate's stdout to its check.
+  assert.match(
+    verify,
+    /name: "test:contracts",\s*capture: true,\s*after: \(stdout\) => assertNoSkippedTests\(stdout\),/u,
+  );
+  assert.match(
+    verify,
+    /stdio: gate\.capture \? \["inherit", "pipe", "inherit"\] : "inherit",/u,
+  );
+  assert.match(
+    runGates,
+    /name: "test:contracts",\s*command: \["npm", "run", "test:contracts"\],\s*after: \(stdout\) => assertNoSkippedTests\(stdout\),/u,
+  );
+  for (const [name, source] of [
+    ["verify.mjs", verify],
+    ["run-gates.mjs", runGates],
+  ]) {
+    assert.match(
+      source,
+      /name: "test:browser",[\s\S]{0,320}after: \(\) => assertNoSkippedBrowserTests\(root\),/u,
+      name,
+    );
+    assert.match(source, /gate\.after\(run\.stdout \?\? ""\);/u, name);
+  }
+
+  const { assertNoSkippedTests, assertNoSkippedBrowserTests } =
+    await import("../scripts/audit/preflight.mjs");
+  const tap = (skipped, todo) =>
+    `ok 1 - a\n1..1\n# tests 3\n# pass 3\n# fail 0\n# skipped ${skipped}\n# todo ${todo}\n`;
+  assert.doesNotThrow(() => assertNoSkippedTests(tap(0, 0)));
+  assert.throws(() => assertNoSkippedTests(tap(1, 0)), /skipped 1/u);
+  assert.throws(() => assertNoSkippedTests(tap(0, 2)), /todo 2/u);
+  assert.throws(() => assertNoSkippedTests(tap(10, 0)), /skipped 10/u);
+
+  // Over the real command: package.json's test:contracts on a file with one
+  // skipped test prints the TAP the check reads.
+  const dir = mkdtempSync(join(tmpdir(), "verify-skips-"));
+  try {
+    const spec = join(dir, "one.test.mjs");
+    writeFileSync(
+      spec,
+      'import { test } from "node:test";\ntest("runs", () => {});\ntest("skips", { skip: true }, () => {});\n',
+    );
+    const command = JSON.parse(
+      readFileSync(resolve(import.meta.dirname, "../package.json"), "utf8"),
+    ).scripts["test:contracts"].replace("test/*.test.mjs", spec);
+    // NODE_TEST_CONTEXT would make the child report to this run.
+    const env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT;
+    const real = spawnSync("sh", ["-c", command], { env, encoding: "utf8" });
+    assert.throws(() => assertNoSkippedTests(real.stdout), /skipped 1/u);
+
+    // The browser check reads <root>/test-results/playwright-report.json
+    // with this repository's script: red on a skip and with no report.
+    mkdirSync(join(dir, "scripts"));
+    writeFileSync(
+      join(dir, "scripts/no-skipped-browser-tests.mjs"),
+      readFileSync(
+        resolve(import.meta.dirname, "../scripts/no-skipped-browser-tests.mjs"),
+      ),
+    );
+    const report = (stats) => {
+      mkdirSync(join(dir, "test-results"), { recursive: true });
+      writeFileSync(
+        join(dir, "test-results/playwright-report.json"),
+        JSON.stringify({ stats }),
+      );
+    };
+    assert.throws(() => assertNoSkippedBrowserTests(dir), /no report/u);
+    const clean = { expected: 4, skipped: 0, unexpected: 0, flaky: 0 };
+    report(clean);
+    assert.doesNotThrow(() => assertNoSkippedBrowserTests(dir));
+    report({ ...clean, skipped: 1 });
+    assert.throws(() => assertNoSkippedBrowserTests(dir), /did not run/u);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

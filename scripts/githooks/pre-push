@@ -63,6 +63,13 @@ started="$(date +%s)"
 for gate in format:check check:docs lint typecheck audit:boundaries test:contracts verify:platform-contracts; do
   begun="$(date +%s)"
   if npm run --silent "$gate" >"$output" 2>&1 </dev/null; then
+    # A skipped or todo contract test is a check that did not run: red here,
+    # as in CI's gates job (README "Verification", no silent skips).
+    if [ "$gate" = "test:contracts" ] && grep -qE '^# (skipped|todo) [1-9]' "$output"; then
+      grep -E '^# (skipped|todo) ' "$output" >&2
+      echo "pre-push: test:contracts skipped a test or left one todo — refused before CI. Fix it, or bypass deliberately with git push --no-verify." >&2
+      exit 1
+    fi
     echo "pre-push: $gate ok ($(( $(date +%s) - begun ))s)" >&2
   else
     tail -n 30 "$output" >&2

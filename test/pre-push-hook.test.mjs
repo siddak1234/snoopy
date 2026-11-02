@@ -46,9 +46,15 @@ function git(cwd, ...args) {
 }
 
 // A repository whose fast gates are stubs — each writes `ran-<gate>` and exits
-// red or green as asked — with the sibling checkout the last reads planted
-// beside it, or not.
-function makeRepo({ red = [], sibling = true, recordGitDir = false } = {}) {
+// red or green as asked, after printing what `print` gives it (printf's
+// escapes) — with the sibling checkout the last reads planted beside it, or
+// not.
+function makeRepo({
+  red = [],
+  sibling = true,
+  recordGitDir = false,
+  print = {},
+} = {}) {
   const base = mkdtempSync(join(tmpdir(), "pre-push-"));
   const repo = join(base, "snoopy");
   mkdirSync(repo);
@@ -56,7 +62,7 @@ function makeRepo({ red = [], sibling = true, recordGitDir = false } = {}) {
   const scripts = Object.fromEntries(
     FAST_GATES.map((gate) => [
       gate,
-      `${recordGitDir ? `printf %s "\${GIT_DIR-unset}" > seen-git-dir-${gate.replace(":", "-")} && ` : ""}touch ran-${gate.replace(":", "-")} && exit ${red.includes(gate) ? 1 : 0}`,
+      `${recordGitDir ? `printf %s "\${GIT_DIR-unset}" > seen-git-dir-${gate.replace(":", "-")} && ` : ""}${gate in print ? `printf '${print[gate]}\\n' && ` : ""}touch ran-${gate.replace(":", "-")} && exit ${red.includes(gate) ? 1 : 0}`,
     ]),
   );
   writeFileSync(
@@ -240,6 +246,42 @@ test("with no sibling checkout every fast gate still runs, verify:platform-contr
   assert.equal(passed.exit, 0);
   assert.doesNotMatch(passed.stderr, /skipped/u);
   assert.deepEqual(ran(repo), FAST_GATES);
+});
+
+test("a skipped or todo contract test refuses the push, as CI's gates job does, and a run with none skipped passes (Round 21 hardening, W-5)", (t) => {
+  for (const [summary, refused] of [
+    ["# skipped 1\\n# todo 0", true],
+    ["# skipped 0\\n# todo 2", true],
+    ["# skipped 0\\n# todo 0", false],
+  ]) {
+    const { base, repo } = makeRepo({
+      print: { "test:contracts": `# tests 3\\n# pass 3\\n${summary}` },
+    });
+    t.after(() => rmSync(base, { recursive: true, force: true }));
+    const sha = git(repo, "rev-parse", "HEAD");
+    mark(repo, git(repo, "rev-parse", "HEAD^{tree}"), inAnHour());
+    const run = runHook(
+      repo,
+      SNOOPY_URL,
+      `refs/heads/main ${sha} refs/heads/main ${ZERO}\n`,
+    );
+    if (refused) {
+      assert.equal(run.exit, 1, summary);
+      assert.match(
+        run.stderr,
+        /pre-push: test:contracts skipped a test or left one todo/u,
+      );
+      assert.match(run.stderr, /git push --no-verify/u);
+      assert.deepEqual(
+        ran(repo),
+        FAST_GATES.slice(0, FAST_GATES.indexOf("test:contracts") + 1),
+        "the gates after it did not run",
+      );
+    } else {
+      assert.equal(run.exit, 0, summary);
+      assert.deepEqual(ran(repo), FAST_GATES);
+    }
+  }
 });
 
 test("a push from a linked worktree runs the gates without git's repository variables, so the gates' own git calls cannot touch this repository", (t) => {

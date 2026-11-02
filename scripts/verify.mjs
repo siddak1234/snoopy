@@ -15,7 +15,12 @@
 import { spawnSync } from "node:child_process";
 import { constants as osConstants } from "node:os";
 import { join, resolve } from "node:path";
-import { assertPlatformRewrite, preflight } from "./audit/preflight.mjs";
+import {
+  assertNoSkippedBrowserTests,
+  assertNoSkippedTests,
+  assertPlatformRewrite,
+  preflight,
+} from "./audit/preflight.mjs";
 import { FACTS_PATH, writeRepoFacts } from "./repo-facts.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -43,7 +48,13 @@ const gates = [
   { name: "lint" },
   { name: "typecheck" },
   { name: "audit:boundaries" },
-  { name: "test:contracts" },
+  // A skipped or todo contract test fails, as in CI's gates job: its TAP is
+  // read as well as printed (README "Verification", no silent skips).
+  {
+    name: "test:contracts",
+    capture: true,
+    after: (stdout) => assertNoSkippedTests(stdout),
+  },
   { name: "verify:platform-contracts" },
   // The site with no backend, as a Vercel preview builds it (register F62).
   // Before `build`, whose output the browser suite serves.
@@ -61,6 +72,8 @@ const gates = [
     // CI=1 defeats reuseExistingServer, which would test a stale local server
     // instead of this build; the origin pin keeps `next start` on the build's.
     env: { CI: "1", BACKEND_API_ORIGIN: buildOrigin },
+    // Every collected test ran, as CI's browser job checks after it.
+    after: () => assertNoSkippedBrowserTests(root),
   },
   // Last: it rebuilds .next with the loopback fixture origin.
   { name: "test:browser:fixtures" },
@@ -71,9 +84,14 @@ for (const gate of gates) {
   const begun = Date.now();
   const run = spawnSync("npm", ["run", gate.name, ...(gate.args ?? [])], {
     cwd: root,
-    stdio: "inherit",
+    // A gate whose output is checked hands its stdout back; it is printed
+    // as soon as the gate ends.
+    stdio: gate.capture ? ["inherit", "pipe", "inherit"] : "inherit",
+    maxBuffer: 64 * 1024 * 1024,
+    encoding: "utf8",
     env: { ...process.env, ...(gate.env ?? {}) },
   });
+  if (gate.capture && run.stdout) process.stdout.write(run.stdout);
   let exit = run.status ?? 1;
   if (run.status === null && run.error) {
     // A child that never ran (npm not on PATH, say) is an environment error,
@@ -91,7 +109,7 @@ for (const gate of gates) {
   }
   if (exit === 0 && gate.after) {
     try {
-      gate.after();
+      gate.after(run.stdout ?? "");
     } catch (error) {
       console.error(`verify: ${error.message}`);
       exit = 1;
