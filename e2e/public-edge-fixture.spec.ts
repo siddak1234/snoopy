@@ -3286,9 +3286,7 @@ test("a figure the platform cannot answer reads Unavailable — once, in Today's
     await unavailable.evaluate((line) => line.scrollWidth - line.clientWidth),
   ).toBe(0);
   await expect(page.getByTestId("home-quick-actions")).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Run of Manual input automation, running" }),
-  ).toBeVisible();
+  await expect(page.getByTestId("home-your-flows")).toBeVisible();
   await expect(
     page.getByRole("heading", {
       name: /The platform (is busy|could not answer)/,
@@ -3320,7 +3318,7 @@ test("Cancel on a run whose workspace was switched away in another tab says so, 
   await expect(page.locator("main").getByText(/^running$/i)).toBeVisible();
 });
 
-test("the dashboard reads top to bottom — Today's three tiles, Add a flow and Flows, Recent runs and See all — with no Run a flow, Quick actions, Workspace overview, Get started, View teams or Connect integration (Build 22, W1; the owner's build 21 item 1; D4, D5)", async ({
+test("the dashboard reads top to bottom — Today's three tiles, Add a flow and Flows, YOUR FLOWS — with no Recent runs, Run a flow, Quick actions, Workspace overview, Get started, View teams or Connect integration (Build 22, W1; the owner's build 21 item 1; D4, D5; build 34's F5)", async ({
   page,
 }) => {
   const runStats = observe(page, (request) =>
@@ -3333,14 +3331,14 @@ test("the dashboard reads top to bottom — Today's three tiles, Add a flow and 
   );
   await expect(main.getByRole("heading", { level: 2 })).toHaveText([
     "Today",
-    "Recent runs",
+    "Your flows",
   ]);
   const at = async (locator: ReturnType<Page["locator"]>) =>
     (await locator.boundingBox())?.y ?? Number.NaN;
   const order = [
     await at(main.getByTestId("home-stats")),
     await at(main.getByTestId("home-quick-actions")),
-    await at(main.getByTestId("home-recent-runs")),
+    await at(main.getByTestId("home-your-flows")),
   ];
   expect([...order].sort((a, b) => a - b)).toEqual(order);
   for (const gone of [
@@ -3390,19 +3388,20 @@ test("the dashboard reads top to bottom — Today's three tiles, Add a flow and 
     "href",
     `/account/runs?status=failed&${sinceQuery}`,
   );
-  // Recent runs: each its flow, its status and the run by its full id (A8).
-  const recent = main.getByTestId("home-recent-runs");
-  await expect(
-    recent.getByRole("link", {
-      name: "Run of Manual input automation, running",
-    }),
-  ).toBeVisible();
-  await expect(recent).toContainText("Run fixture-run-running");
-  await expect(main).not.toContainText("fixture-manual-input");
-  await expect(recent.getByRole("link", { name: "See all" })).toHaveAttribute(
-    "href",
-    "/account/runs",
-  );
+  // YOUR FLOWS (build 34's F5): the live flows by department A–Z, A–Z in
+  // each; no recent runs.
+  const flows = main.getByTestId("home-your-flows");
+  await expect(flows.getByRole("heading", { level: 3 })).toHaveText([
+    "Accounting",
+    "Operations",
+  ]);
+  await expect(flows.getByRole("listitem")).toHaveText([
+    "Invoice Processing",
+    "Archivable automation",
+    "Manual input automation",
+    "Webhook automation",
+  ]);
+  await expect(main).not.toContainText(/Recent runs|See all|fixture-run-/u);
   await expectNoAxeViolations(page);
 });
 
@@ -3426,7 +3425,7 @@ test("the dashboard's approvals banner, right after Today, while something waits
   await expectNoAxeViolations(page);
 });
 
-test("the dashboard of a workspace with no flow yet: Today, then the first run's words and its one Add a flow — no buttons, no Recent runs (W1; the app's HomeFirstRun)", async ({
+test("the dashboard of a workspace with no flow yet: Today, then the first run's words and its one Add a flow — no buttons, no YOUR FLOWS (W1; the app's HomeFirstRun)", async ({
   page,
 }) => {
   await page.goto("/account");
@@ -3447,7 +3446,7 @@ test("the dashboard of a workspace with no flow yet: Today, then the first run's
   );
   await expect(main.getByTestId("home-stats")).toBeVisible();
   await expect(main.getByTestId("home-quick-actions")).toHaveCount(0);
-  await expect(main.getByTestId("home-recent-runs")).toHaveCount(0);
+  await expect(main.getByTestId("home-your-flows")).toHaveCount(0);
   await expectNoAxeViolations(page);
 });
 
@@ -4335,7 +4334,7 @@ test('the dashboard lists no teams — Teams stay on their own page (the owner\'
 }) => {
   await page.goto("/account");
   const main = page.locator("main");
-  await expect(main.getByTestId("home-recent-runs")).toBeVisible();
+  await expect(main.getByTestId("home-your-flows")).toBeVisible();
   await expect(
     main.getByRole("heading", { name: "Departments", exact: true }),
   ).toHaveCount(0);

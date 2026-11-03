@@ -193,3 +193,122 @@ test("F1: the box says what is chosen and draws each pick as a chip; a select wh
   const field = read("app/account/flows/SelectField.tsx");
   assert.match(field, /\{carriesGroups\(options\) \? \(/u);
 });
+
+const HOME_FLOWS = "app/account/home-flows.ts";
+
+const entry = (templateId, name, category, extra = {}) => ({
+  templateId,
+  name,
+  category,
+  available: true,
+  ...extra,
+});
+const flow = (id, templateId, extra = {}) => ({
+  id,
+  templateId,
+  status: "live",
+  runInput: [{ key: "file", title: "File", control: "artifact" }],
+  ...extra,
+});
+const jobs = {
+  words: { singular: "Job", plural: "Jobs" },
+  groupField: "department",
+};
+
+test("F5: YOUR FLOWS is the live flows, in sections by department A–Z and A–Z in each, from the one list Home reads; a flow with items starts here only for an owner or admin", async () => {
+  const { homeFlows, YOUR_FLOWS } = await load(HOME_FLOWS);
+  assert.equal(YOUR_FLOWS, "Your flows");
+  let keys = 0;
+  const catalog = [
+    entry("resume", "Resume Screening", "HR"),
+    entry("invoice", "Invoice Processing", "Accounting"),
+    entry("icd", "ICD-10 Code Check", "Healthcare"),
+    entry("audit", "Audit Prep", "Accounting", { available: false }),
+    entry("hook", "Webhook flow", "Accounting"),
+  ];
+  const subscriptions = [
+    flow("s-resume", "resume", { items: jobs }),
+    flow("s-invoice", "invoice"),
+    flow("s-icd", "icd", { status: "paused" }),
+    flow("s-audit", "audit"),
+    flow("s-hook", "hook", { runInput: undefined }),
+    flow("s-gone", "not-in-catalog"),
+  ];
+  const owner = homeFlows(subscriptions, catalog, true, () => `run-${++keys}`);
+  assert.deepEqual(
+    owner.map(({ department, entries }) => [
+      department,
+      entries.map((one) => [one.name, one.startable]),
+    ]),
+    [
+      [
+        "Accounting",
+        [
+          ["Audit Prep", false],
+          ["Invoice Processing", true],
+          ["Webhook flow", false],
+        ],
+      ],
+      ["HR", [["Resume Screening", true]]],
+    ],
+  );
+  assert.equal(owner[1].entries[0].items, jobs);
+  assert.match(owner[0].entries[1].initialKey, /^run-\d+$/u);
+  const member = homeFlows(subscriptions, catalog, false, () => "run-x");
+  assert.equal(member[1].entries[0].startable, false);
+  assert.equal(member[0].entries[1].startable, true);
+});
+
+test("F5: the job drop-down offers the ready jobs, not archived, under their department A–Z, A–Z in each", async () => {
+  const { jobChoices } = await load(HOME_FLOWS);
+  const item = (id, title, department, extra = {}) => ({
+    id,
+    title,
+    fields: department ? { department } : {},
+    status: "ready",
+    runCount: 0,
+    topScore: null,
+    createdAt: "2026-11-01T00:00:00.000Z",
+    archivedAt: null,
+    ...extra,
+  });
+  assert.deepEqual(
+    jobChoices(
+      [
+        item("1", "Payroll Lead", "Finance"),
+        item("2", "Accountant", "Finance"),
+        item("3", "Nurse", "Clinic"),
+        item("4", "Reading", "Clinic", { status: "reading" }),
+        item("5", "Old", "Clinic", { archivedAt: "2026-10-01T00:00:00.000Z" }),
+        item("6", "Intern", undefined),
+      ],
+      "department",
+    ),
+    [
+      { value: "3", label: "Nurse", group: "Clinic" },
+      { value: "2", label: "Accountant", group: "Finance" },
+      { value: "1", label: "Payroll Lead", group: "Finance" },
+      { value: "6", label: "Intern" },
+    ],
+  );
+  assert.deepEqual(jobChoices([item("7", "Solo", "X")], undefined), [
+    { value: "7", label: "Solo" },
+  ]);
+});
+
+test("F5: a flow opens in place to its run's first step; a flow with items reads them only when opened, and a run of the job chosen there says Start run", () => {
+  const rows = read("app/account/YourFlows.tsx");
+  // The items' read is the opened panel's own, never the list's.
+  const panel = rows.slice(rows.indexOf("function ItemRunStart("));
+  assert.match(
+    panel,
+    /\/subscriptions\/\$\{encodeURIComponent\(flow\.id\)\}\/items/u,
+  );
+  assert.doesNotMatch(
+    rows.slice(0, rows.indexOf("function ItemRunStart(")),
+    /platformApiJson\(/u,
+  );
+  assert.match(rows, /\{open \? \(/u);
+  const start = read("app/account/flows/RunStart.tsx");
+  assert.match(start, /: itemPage\s*\? "Start"\s*: "Start run"/u);
+});

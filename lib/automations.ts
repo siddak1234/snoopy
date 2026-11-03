@@ -177,8 +177,8 @@ export async function listArchivedSubscriptions(
 }
 
 /**
- * The workspace's jobs, newest first: with no query (Home), today's newest
- * 100; with Activity's query (`runsQuery`, which always sends a sort and a
+ * The workspace's jobs, newest first: with no query, today's newest 100
+ * (Home's until build 34's F5); with Activity's query (`runsQuery`, which always sends a sort and a
  * page), one page of 25 and `total` (backend ADR-0048 amendment 1).
  */
 export function listRuns(

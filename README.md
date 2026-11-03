@@ -134,8 +134,9 @@ a flow and the archived ones, adding a flow (it goes to the department of its
 category, which the platform makes when there is none, and its Set up opens;
 a catalog with nothing to add), the dashboard (Today's three tiles, counted
 from the browser's midnight and each opening Activity from it; the approvals
-banner while something waits; Add a flow and Flows; Recent runs; and a
-workspace with no flow yet), a flow's page (its live Dashboard, its five
+banner while something waits; Add a flow and Flows; YOUR FLOWS, a flow
+opened to its run's fields and Start run, a flow with items read only when
+opened and its item chosen first; and a workspace with no flow yet), a flow's page (its live Dashboard, its five
 Steps — titles only, Step 1 holding the run's fields and Start run, step 2 its
 integration, step 4 titled by the flow's choice, step 5 who gets the email —
 and Edit setup; no Connections and no move to another version), its Set up

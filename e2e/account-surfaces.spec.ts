@@ -67,35 +67,44 @@ async function switchInAnotherTab(page: Page, to: RegExp) {
   }
 }
 
-test("1 — the home's recent-run link opens that run's page", async ({
+test("1 — Home's YOUR FLOWS: a flow opens in place to its run's fields, and Start run starts the run and opens its page; a flow that cannot start here opens its own page (build 34's F5; ~~the recent-run link~~)", async ({
   page,
 }) => {
   await page.goto("/account");
-  await page
-    .getByRole("link", { name: "Run of Manual input automation, failed" })
-    .click();
-  await expect(page).toHaveURL(/\/account\/runs\/fixture-run-failed$/);
+  const flows = page.getByTestId("home-your-flows");
+  const manual = flows.getByRole("button", { name: "Manual input automation" });
+  await expect(manual).toHaveAttribute("aria-expanded", "false");
+  await expect(flows.getByTestId("run-form")).toHaveCount(0);
+  await manual.click();
+  await expect(manual).toHaveAttribute("aria-expanded", "true");
+  const form = flows.getByTestId("run-form");
+  await expect(form.getByLabel("Vendor")).toBeVisible();
+  await expect(form.getByLabel("Invoice file")).toHaveAttribute("type", "file");
+  await expectNoAxeViolations(page);
+  await form.getByLabel("Vendor").fill("Acme Supplies");
+  await form.getByLabel("Amount").fill("120.50");
+  await form.getByLabel("Invoice reference").fill("INV-1001");
+  await form.getByRole("button", { name: "Start run" }).click();
+  await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/u);
+  // A live flow with no run input: its row is its page.
+  await page.goto("/account");
   await expect(
-    page.getByText("input must carry vendor, amount, and reference").first(),
-  ).toBeVisible();
+    flows.getByRole("link", { name: "Webhook automation" }),
+  ).toHaveAttribute("href", FLOWS.webhook);
 });
 
-test("2 — recent activity says when it could not be read, and says when there is none", async ({
+test("2 — YOUR FLOWS says Unavailable when the flows cannot be read, and the rest of the dashboard still shows (build 34's F5)", async ({
   page,
 }) => {
-  await fixtureControl("runs-failing");
+  await fixtureControl("subscriptions-failing");
   await page.goto("/account");
-  await expect(
-    page.getByText("Recent activity could not be read just now."),
-  ).toBeVisible();
+  await expect(page.getByTestId("home-your-flows")).toContainText(
+    "Unavailable",
+  );
   // One read failing takes nothing else with it: Today's tiles, and Add a
   // flow and Flows (Build 22, W1).
   await expect(page.getByTestId("today-stat-Runs")).toHaveText("3");
   await expect(page.getByTestId("home-quick-actions")).toBeVisible();
-  await fixtureControl("reset");
-  await fixtureControl("runs-empty");
-  await page.reload();
-  await expect(page.getByText("No activity yet.")).toBeVisible();
 });
 
 test("Activity with no run is the app's empty screen, with the way to Flows (the owner's build 9)", async ({

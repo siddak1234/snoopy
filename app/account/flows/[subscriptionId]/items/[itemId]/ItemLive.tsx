@@ -139,6 +139,7 @@ export function ItemLive({
                       canGoLive={canGoLive}
                       initialKey={initialKey}
                       itemId={form.itemId ?? item.id}
+                      itemPage
                       onStarted={() => router.refresh()}
                     />
                   </div>

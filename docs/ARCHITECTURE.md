@@ -121,7 +121,16 @@ page reuses:
 - **A row that opens a page** is `PageRow` (`components/dashboard/PageRow.tsx`):
   a closed section's box and height, the arrow at its end — or, `boxed`
   false, a row of one card of divided rows (`LIST_CARD`): a list block's
-  rows, a flow's items, Activity's runs and Home's recent runs.
+  rows, a flow's items, Activity's runs and Home's flows that start no run
+  there.
+- **Home's YOUR FLOWS** (the owner's build 34 F5; `app/account/YourFlows.tsx`,
+  `home-flows.ts`), in Recent runs' place: the live flows by department
+  A–Z, A–Z in each, from the one subscriptions list Home reads. A flow whose
+  run can start there opens in place to its `runInput` and Start run
+  (`RunStart`), which opens the new run's page; a flow with items reads them
+  only when opened, and its run starts on the ready item chosen in a
+  drop-down, for an owner or admin, as an item's page offers it. Any other
+  flow's row opens its page.
 - **The spacing table** (backend `BLOCK_SPACING`, ADR-0048 amendment 1; the
   owner's Q8), the same names on the app: the numbers are the platform's
   (`lib/generated/platform-contracts/block-rules.ts`), and their classes
@@ -152,8 +161,7 @@ page reuses:
   `q`, `sort` and `page` in its address (`ActivityControls`) and sends
   them, with the outcome as `status` and the time as `since`, to the
   platform, which searches and counts (`total`) — plain Activity too, its
-  sort and page always sent (`runsQuery`), while Home reads the newest
-  100; it never sends `needsReview`. A search that finds nothing says so,
+  sort and page always sent (`runsQuery`); it never sends `needsReview`. A search that finds nothing says so,
   in `BLOCK_WORDS`' words.
 - **Every run's page** ends with the package's buttons when it has them,
   then the Run details row, then Cancel run while it goes on and View flow;

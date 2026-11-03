@@ -987,3 +987,62 @@ test("Upload refused because the flow's queue is full says so in the owner's wor
   ).toBeVisible();
   await expect(card.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
 });
+
+test("build 34's F5 — Home's YOUR FLOWS: a flow with items reads them only when opened; its ready batches in the drop-down under their area; one chosen, its file and Start run start a run of that batch and open the run's page", async ({
+  page,
+}) => {
+  const itemReads = observe(page, (request) =>
+    request
+      .url()
+      .includes("/subscriptions/b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1/items"),
+  );
+  await page.goto("/account");
+  const flows = page.getByTestId("home-your-flows");
+  await expect(flows.getByRole("heading", { level: 3 })).toHaveText([
+    "Accounting",
+    "Customer Support",
+    "Operations",
+  ]);
+  const flow = flows.getByRole("button", { name: "Item automation" });
+  await expect(flow).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  expect(itemReads).toEqual([]);
+  await flow.click();
+  const pick = flows.getByRole("combobox", { name: "Batch" });
+  await expect(pick).toHaveText("Choose");
+  expect(itemReads).toHaveLength(1);
+  // No form until a batch is chosen: a run of this flow needs one.
+  await expect(flows.getByTestId("run-form")).toHaveCount(0);
+  await pick.click();
+  const menu = flows.getByRole("listbox", { name: "Batch" });
+  await expect(menu.getByRole("group")).toHaveText([
+    "NorthAutumn intake",
+    "SouthSpring intake",
+  ]);
+  await menu.getByRole("option", { name: "Spring intake" }).click();
+  await expect(pick).toHaveText("Spring intake");
+  const form = flows.getByTestId("run-form");
+  await form.getByLabel("Entry file").setInputFiles(entryPdf);
+  await expect(form.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
+  await expectNoAxeViolations(page);
+  await form.getByRole("button", { name: "Start run" }).click();
+  await expect(page).toHaveURL(/\/account\/runs\/[0-9a-f-]{36}$/u);
+  const started = await fixtureRead<{ runStarts: Record<string, unknown>[] }>(
+    "items",
+  );
+  expect(started.runStarts).toHaveLength(1);
+  expect(started.runStarts[0]).toMatchObject({ itemId: READY_ITEM });
+  expect(itemReads).toHaveLength(1);
+});
+
+test("build 34's F5 — a member's YOUR FLOWS: a flow with items is not started there, its row opens the flow's page", async ({
+  page,
+}) => {
+  await presentSession(page, "member");
+  await page.goto("/account");
+  await expect(
+    page
+      .getByTestId("home-your-flows")
+      .getByRole("link", { name: "Item automation" }),
+  ).toHaveAttribute("href", FLOW);
+});
