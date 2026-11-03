@@ -190,6 +190,17 @@ function OptionalMark({ field }: { field: ManifestField }) {
   );
 }
 
+/**
+ * A `text` setup field's `example` (backend ADR-0048 amendment 5, the owner's
+ * build 34 F2): the box's placeholder. Any other control, or none, has no
+ * placeholder; "Optional" stays beside the title.
+ */
+function exampleOf(field: ManifestField): string | undefined {
+  return field.control === "text" && "example" in field && field.example
+    ? field.example
+    : undefined;
+}
+
 function ManifestFieldInput({
   field,
   value,
@@ -275,6 +286,7 @@ function ManifestFieldInput({
           </>
         }
         required={required}
+        placeholder={exampleOf(field)}
         defaultValue={
           initialValue === undefined || initialValue === null
             ? undefined

@@ -102,6 +102,11 @@ page reuses:
   every choice; step 2 one group's choices with a "Search" box; Back a step
   back; one choice closes it, several tick and untick; the box says what is
   chosen as the drop-down's does, and each pick is a chip under it.
+- **A setup text field's example** (backend ADR-0048 amendment 5, the
+  owner's build 34 F2): a `text` field's `example` is its box's placeholder
+  (`app/account/flows/ManifestFields.tsx`); "Optional" stays beside the
+  title of a field that may be left empty, where the website has always
+  drawn it.
 - **Several files at once** (platform round 2's B2 as the batch addendum
   amends it): a run's file field that declares `multiple` (`RunFileField`)
   lets the chooser take several files and the camera add each photo, sends
