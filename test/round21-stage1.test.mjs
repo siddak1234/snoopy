@@ -7,9 +7,16 @@ import {
   OPTIONS_LIMIT,
   OTHER_CODE,
   changedTo,
+  expiredByDisconnect,
   offeredDecisions,
   reviewAnswers,
 } from "../lib/run-progress.ts";
+import {
+  connectionAction,
+  connectionLine,
+  connectionState,
+  disconnectedAtProvider,
+} from "../lib/connection-rows.ts";
 import { EMAIL_STATUS, addressStatus } from "../lib/flow-email.ts";
 import {
   elements,
@@ -32,9 +39,11 @@ const SETUP = "app/account/flows/[subscriptionId]/setup/SetupForm.tsx";
 const DECISION = "app/account/approvals/ApprovalDecision.tsx";
 const EMAIL =
   "app/account/flows/[subscriptionId]/email/EmailRecipientsForm.tsx";
+const RUN = "app/account/runs/[runId]/RunLive.tsx";
+const DISCONNECTED = "app/(auth)/quickbooks/disconnected/page.tsx";
 const STUBS = {
   "@/app/account/flows/actions":
-    "export const decideApproval = async () => ({ ok: true });",
+    "export const decideApproval = async () => ({ ok: true }); export const cancelRun = async () => ({ ok: true });",
   "../../actions":
     "export const saveSetup = async () => ({ ok: true }); export const saveEmailRecipients = async () => ({ ok: true });",
   "./actions":
@@ -448,4 +457,131 @@ test('S1-7: each extra address says its consent — "Waiting for confirmation", 
   ]);
   assert.deepEqual(row("odd@example.test"), ["odd@example.test"]);
   assert.deepEqual(row("bare@example.test"), ["bare@example.test"]);
+});
+
+const RUN_ID = "0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a";
+
+/** A held run's page, its job's newest approval expired with `approval`'s fields. */
+async function heldRunPage(approval) {
+  const { RunLive } = await load(RUN);
+  return tree(
+    draw(RunLive, {
+      view: "run",
+      workspaceId: "w",
+      initial: {
+        run: {
+          id: RUN_ID,
+          workspaceId: "w",
+          subscriptionId: "s",
+          templateId: "invoice-processing",
+          status: "held",
+          origin: "manual",
+          createdAt: "2026-11-03T10:00:00Z",
+        },
+        steps: [],
+        events: [],
+        blocks: [{ type: "text", text: "Waiting for approval." }],
+      },
+      flow: {
+        name: "Invoice Processing",
+        providerNames: { quickbooks: "QuickBooks" },
+        pipeline: [],
+      },
+      approvals: [
+        {
+          id: "a",
+          runId: RUN_ID,
+          status: "expired",
+          eligibleRoles: ["owner"],
+          createdAt: "2026-11-03T10:01:00Z",
+          ...approval,
+        },
+      ],
+      role: "owner",
+    }),
+  );
+}
+
+test('S1-8: an approval a disconnect expired says "Expired · QuickBooks was disconnected" and "Reconnect QuickBooks, then start the run again." over the run\'s body; a plain expiry, or a reason this build does not know, says nothing more', async () => {
+  const names = (id) => ({ quickbooks: "QuickBooks" })[id] ?? id;
+  const expired = {
+    status: "expired",
+    expiredBy: { reason: "connection-disconnected", providerId: "quickbooks" },
+  };
+  assert.deepEqual(expiredByDisconnect(expired, names), {
+    title: "Expired · QuickBooks was disconnected",
+    next: "Reconnect QuickBooks, then start the run again.",
+  });
+  assert.equal(expiredByDisconnect({ status: "expired" }, names), null);
+  assert.equal(
+    expiredByDisconnect(
+      { ...expired, expiredBy: { reason: "later", providerId: "quickbooks" } },
+      names,
+    ),
+    null,
+  );
+  assert.equal(
+    expiredByDisconnect({ ...expired, status: "pending" }, names),
+    null,
+  );
+
+  const page = await heldRunPage({ expiredBy: expired.expiredBy });
+  const [notice] = page.filter(
+    (node) => node.attrs["data-testid"] === "run-expired",
+  );
+  assert.equal(notice.attrs.role, "status");
+  assert.deepEqual(textsOf(notice), [
+    "Expired · QuickBooks was disconnected",
+    "Reconnect QuickBooks, then start the run again.",
+  ]);
+  const plain = await heldRunPage({});
+  assert.equal(
+    plain.filter((node) => node.attrs["data-testid"] === "run-expired").length,
+    0,
+  );
+});
+
+test('S1-8: a connection disconnected at the provider (disconnected, with the errorCode the platform retires it with) says "Disconnected in {provider}" with Reconnect; one disconnected here is Not connected with Connect, as before', () => {
+  const connection = (status, extra = {}) => ({
+    id: "c",
+    providerId: "quickbooks",
+    status,
+    externalAccount: { displayName: "books@example.test" },
+    usedByCount: 1,
+    ...extra,
+  });
+  const retired = connection("disconnected", { errorCode: "invalid_grant" });
+  assert.equal(disconnectedAtProvider(retired), true);
+  assert.equal(connectionState(retired), "attention");
+  assert.equal(connectionAction(connectionState(retired)), "Reconnect");
+  assert.deepEqual(connectionLine(retired, "oauth2", "QuickBooks"), {
+    text: "Disconnected in QuickBooks",
+    tone: "warn",
+  });
+  const ours = connection("disconnected");
+  assert.equal(disconnectedAtProvider(ours), false);
+  assert.equal(connectionState(ours), "not-connected");
+  assert.equal(connectionAction(connectionState(ours)), "Connect");
+  assert.deepEqual(connectionLine(ours, "oauth2", "QuickBooks"), {
+    text: "Not connected",
+    tone: "muted",
+  });
+  assert.deepEqual(
+    connectionLine(connection("connected"), "oauth2", "QuickBooks"),
+    { text: "books@example.test", tone: "muted" },
+  );
+});
+
+test('S1-8: the website\'s Disconnect page says "QuickBooks is disconnected", and "Reconnect QuickBooks" opens Connections; it reads nothing', async () => {
+  const { default: Page } = await load(DISCONNECTED);
+  const nodes = tree(draw(Page, {}));
+  const [heading] = nodes.filter((node) => node.tag === "h1");
+  assert.deepEqual(textsOf(heading), ["QuickBooks is disconnected"]);
+  const [button] = nodes.filter((node) => node.tag === "a");
+  assert.deepEqual(textsOf(button), ["Reconnect QuickBooks"]);
+  assert.equal(button.attrs.href, "/account/connections");
+  assert.doesNotMatch(
+    read(DISCONNECTED),
+    /platform-server|platform-api|fetch\(/u,
+  );
 });

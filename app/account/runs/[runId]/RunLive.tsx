@@ -53,6 +53,7 @@ import {
   BLOCKS_SHAPE,
   RUN_DETAILS,
   RUN_REREAD_MS,
+  expiredByDisconnect,
   heldDecision,
   mayDecide,
   newestApproval,
@@ -92,6 +93,8 @@ const ORIGIN_LABEL: Record<RunOrigin, string> = {
  */
 export type RunFlow = {
   name: string;
+  /** Each connection's name by its `providerId`, as the catalog lists it: what an approval a disconnect expired names. */
+  providerNames?: Readonly<Record<string, string>>;
   /** The file fields of the version the flow runs, in order: what names a run's files ("Resume"). */
   fileFields?: { control: string; title: string }[];
   /** What the flow calls its verdicts ("Advance", "Decline"): the score's chip (`verdictChip`). */
@@ -234,6 +237,12 @@ export function RunLive({
   }, [owed, approvalReads, workspaceId, run.id, view]);
 
   const name = headed && run.title ? run.title : runLabel(run.id);
+  // The job's approval, expired because its connection was disconnected at
+  // the provider (§12.1 #252): its words, in the catalog's name for it.
+  const expired = expiredByDisconnect(
+    newestApproval(run.id, listed),
+    (providerId) => flow?.providerNames?.[providerId] ?? providerId,
+  );
 
   // The decision where the job waits (Build 24, P6; build 28's review,
   // finding 1: not one tap more): one press, or a review's Save review
@@ -362,8 +371,21 @@ export function RunLive({
       }
     >
       {/* The body, as the platform sent it: the run's files, its result
-          line and what is to decide, then what it read (ADR-0048). */}
+          line and what is to decide, then what it read (ADR-0048). Over it,
+          an approval a disconnect expired says so (§12.1 #252). */}
       <Group>
+        {expired ? (
+          <div
+            data-testid="run-expired"
+            role="status"
+            className={`${SPACING.group.bottom} flex flex-col ${SPACING.inner.gap}`}
+          >
+            <p className="text-sm font-medium text-[var(--warning-text)]">
+              {expired.title}
+            </p>
+            <p className="text-sm text-[var(--muted)]">{expired.next}</p>
+          </div>
+        ) : null}
         <BlockList
           blocks={detail.blocks}
           testId="run-blocks"

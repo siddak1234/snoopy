@@ -48,10 +48,27 @@ export type RowConnection = {
 };
 
 /**
+ * A connection the platform retired because the provider would not renew it
+ * (backend §12.1 #252): `disconnected`, with the `errorCode` the refresh loop
+ * sets when it retires one. One disconnected here carries no `errorCode`.
+ */
+export function disconnectedAtProvider(
+  connection: RowConnection | undefined,
+): boolean {
+  return connection?.status === "disconnected" && Boolean(connection.errorCode);
+}
+
+/** Line 2 of a connection disconnected at the provider. */
+export function disconnectedIn(provider: string): string {
+  return `Disconnected in ${provider}`;
+}
+
+/**
  * A connection's state, as the row says it: connected; needing attention —
  * the platform asks for a new sign-in (`reauthorization-required`, backend
- * §12.1 #175) or holds an `errorCode`; or not connected — no connection, one
- * disconnected, or one still authorizing.
+ * §12.1 #175), holds an `errorCode`, or was disconnected at the provider
+ * (`disconnectedAtProvider`); or not connected — no connection, one
+ * disconnected here, or one still authorizing.
  */
 export type ConnectionRowState = "connected" | "attention" | "not-connected";
 
@@ -104,7 +121,11 @@ export function connectionState(
 ): ConnectionRowState {
   if (isKeyless(authType)) return "connected";
   if (!connection) return "not-connected";
-  if (connection.status === "reauthorization-required") return "attention";
+  if (
+    connection.status === "reauthorization-required" ||
+    disconnectedAtProvider(connection)
+  )
+    return "attention";
   if (connection.status === "connected")
     return connection.errorCode ? "attention" : "connected";
   return "not-connected";
@@ -134,16 +155,20 @@ export function connectionFor<C extends RowConnection>(
  * Line 2 of the row: the account's email when the platform holds one —
  * `externalAccount.displayName` carrying an `@` — else the state in a word;
  * "Needs attention" in the warning colour; a public service (`isKeyless`),
- * "Connected".
+ * "Connected"; one disconnected at the provider, "Disconnected in
+ * {provider}" in the warning colour, its button Reconnect.
  */
 export function connectionLine(
   connection: RowConnection | undefined,
   authType?: ProviderAuthType | null,
+  provider = "",
 ): {
   text: string;
   tone: "muted" | "warn";
 } {
   if (isKeyless(authType)) return { text: CONNECTION_CONNECTED, tone: "muted" };
+  if (disconnectedAtProvider(connection) && provider)
+    return { text: disconnectedIn(provider), tone: "warn" };
   const state = connectionState(connection);
   const name = connection?.externalAccount.displayName ?? "";
   if (state !== "not-connected" && name.includes("@"))

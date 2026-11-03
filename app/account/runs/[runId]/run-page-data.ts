@@ -121,6 +121,12 @@ export async function readRunPage(
   const flow: RunFlow = entry
     ? {
         name: entry.name,
+        providerNames: Object.fromEntries(
+          entry.requiredConnections.map((connection) => [
+            connection.providerId,
+            connection.displayName,
+          ]),
+        ),
         ...(fileFields ? { fileFields } : {}),
         ...(verdictNames ? { verdictNames } : {}),
         pipeline: entry.pipeline.map((step) => ({

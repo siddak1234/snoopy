@@ -165,7 +165,7 @@ export function VendorRows({
             ? { text: VENDOR_SAVING, tone: "muted" as const }
             : !connected && !canManage
               ? { text: VENDOR_ASK_ADMIN, tone: "muted" as const }
-              : connectionLine(connection, option.authType);
+              : connectionLine(connection, option.authType, option.displayName);
         return (
           <div key={option.providerId}>
             <button

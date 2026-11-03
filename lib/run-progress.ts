@@ -120,6 +120,32 @@ export function changedTo(code: string): string {
 /** The most other values one change offers (`HELD_DECISION_LIMITS.options`). */
 export const OPTIONS_LIMIT = 3;
 
+/**
+ * A held job's approval a disconnect expired before its time (backend §12.1
+ * #252, `Approval.expiredBy`): the connection its held run was built on was
+ * disconnected at the provider. Its two lines, in the provider's name; `null`
+ * for any other approval, and for a reason this build does not know, which
+ * reads as a plain expiry.
+ */
+export function expiredByDisconnect(
+  approval:
+    | { status: string; expiredBy?: { reason: string; providerId: string } }
+    | undefined
+    | null,
+  providerName: (providerId: string) => string,
+): { title: string; next: string } | null {
+  if (
+    approval?.status !== "expired" ||
+    approval.expiredBy?.reason !== "connection-disconnected"
+  )
+    return null;
+  const provider = providerName(approval.expiredBy.providerId);
+  return {
+    title: `Expired · ${provider} was disconnected`,
+    next: `Reconnect ${provider}, then start the run again.`,
+  };
+}
+
 /** Approvals' card for a review: it opens the run. */
 export function reviewChanges(count: number): string {
   return `Review ${count} changes`;

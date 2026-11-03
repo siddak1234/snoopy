@@ -290,7 +290,16 @@ flow's Set up, the member makes its first choice, a connected vendor or None
 `authType` is `none` (a public service, platform round 2's B5) has no
 connect step: it is connected for every workspace (`isKeyless`), its row
 says "Connected" with no Connect or Disconnect, Set up draws no Connect
-step for it, and it never holds a flow back.
+step for it, and it never holds a flow back. A connection the platform
+retired because the provider would not renew it (backend §12.1 #252:
+`disconnected`, with the `errorCode` the refresh loop sets when it retires
+one) says "Disconnected in {provider}" in the warning colour, with
+Reconnect, on Connections and a step's vendor rows (`disconnectedAtProvider`
+in `lib/connection-rows.ts`); one disconnected here carries no `errorCode`
+and stays "Not connected" with Connect. QuickBooks' Disconnect URL is the
+static `/quickbooks/disconnected` ("QuickBooks is disconnected", its
+"Reconnect QuickBooks" opening Connections), which the owner sets at
+Intuit; it reads nothing.
 
 ## Runs and approvals
 
@@ -366,6 +375,14 @@ run's page, so no Approvals row ever holds a saved review; the default
 until the owner says otherwise is the count on the run alone. A held run
 without changes is unchanged. The words are ICD-10 Code Check's words.md
 section 3, the app's too.
+
+A held job whose approval a disconnect expired (backend §12.1 #252,
+`Approval.expiredBy` with `connection-disconnected`) says so over its run
+page's body: "Expired · {provider} was disconnected", then "Reconnect
+{provider}, then start the run again." — the provider named as the catalog
+lists the flow's connections (`expiredByDisconnect` in
+`lib/run-progress.ts`). A plain expiry, or a reason this build does not
+know, adds nothing.
 
 A job that has documents and has ended or is held has a run package (backend
 ADR-0045; the platform says so, `RunDetail.packageAvailable`): View package, Download PDF and Download Excel replace Download
