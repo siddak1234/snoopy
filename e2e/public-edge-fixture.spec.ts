@@ -6003,3 +6003,147 @@ test('backend §12.1 #319 step 2 — an address whose flow id is not a UUID, whi
     ).toContain("not-a-uuid");
   }
 });
+
+// Backend §12.1 #319 step 2's debt: the six surfaces the hardening change
+// audit drove by hand and left UNCOVERED, each now a spec (its
+// `required_tests`, carried to the next website change).
+const flowReads = async () =>
+  (await fixtureRead<{ subscriptionReads: string[] }>("counts"))
+    .subscriptionReads;
+
+test("backend §12.1 #319 step 2 — a well-formed flow id the platform answers 404 (unknown, or another workspace's) is the flow's \"not found\" on its page, Set up and Connect integration, read by its id", async ({
+  page,
+}) => {
+  const unknown = "12345678-1234-4123-8123-123456789abc";
+  for (const path of [
+    `/account/flows/${unknown}`,
+    `/account/flows/${unknown}/setup`,
+    `/account/flows/${unknown}/vendor?field=vendor`,
+  ]) {
+    const before = (await flowReads()).length;
+    const response = await page.goto(path);
+    expect([path, response?.status()]).toEqual([path, 404]);
+    expect((await flowReads()).slice(before)).toContain(unknown);
+  }
+});
+
+test('backend §12.1 #319 step 2 — a flow archived from its page, which the platform still answers by its id as archived, is "not found" on its page and Set up, with no flow controls', async ({
+  page,
+}) => {
+  const archivableId = FLOWS.archivable.split("/").at(-1);
+  await page.goto(FLOWS.archivable);
+  await page.getByRole("button", { name: "Archive flow" }).click();
+  await page
+    .getByRole("dialog", { name: "Archive Archivable automation?" })
+    .getByRole("button", { name: "Archive", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/account\/flows$/u);
+  for (const path of [FLOWS.archivable, `${FLOWS.archivable}/setup`]) {
+    const before = (await flowReads()).length;
+    const response = await page.goto(path);
+    expect([path, response?.status()]).toEqual([path, 404]);
+    expect((await flowReads()).slice(before)).toContain(archivableId);
+    await expect(
+      page.locator("main").getByRole("button", { name: "Archive flow" }),
+    ).toHaveCount(0);
+  }
+});
+
+test('backend §12.1 #319 step 2 — a flow the platform answers by its id as archived, though its list still holds it, is "not found" on its page, Set up and Connect integration', async ({
+  page,
+}) => {
+  const paths = [
+    FLOWS.invoice,
+    `${FLOWS.invoice}/setup`,
+    `${FLOWS.invoice}/vendor?field=vendor`,
+  ];
+  // The control: live, each answers.
+  for (const path of paths)
+    expect([path, (await page.goto(path))?.status()]).toEqual([path, 200]);
+  await fixtureControl("invoice-archived");
+  for (const path of paths)
+    expect([path, (await page.goto(path))?.status()]).toEqual([path, 404]);
+});
+
+test("backend §12.1 #319 step 2 — Connect integration's save for a flow archived after its page was drawn is refused in words, saves nothing and stays on the page", async ({
+  page,
+}) => {
+  // QuickBooks connected, so the tap saves at once rather than going to sign in.
+  await fixtureControl("quickbooks-connected");
+  const vendor = `${FLOWS.invoice}/vendor?field=vendor`;
+  await page.goto(vendor);
+  const main = page.locator("main");
+  const quickbooks = main.getByRole("radio", { name: "QuickBooks Online" });
+  await expect(quickbooks).toBeEnabled();
+  const saves = async () =>
+    (await fixtureRead<{ invoiceSaves: unknown[] }>("counts")).invoiceSaves
+      .length;
+  const before = await saves();
+  await fixtureControl("invoice-archived");
+  await quickbooks.click();
+  await expect(main.getByRole("alert")).toHaveText(
+    "Could not save. Try again.",
+  );
+  await expect(page).toHaveURL(/\/vendor\?field=vendor$/u);
+  expect(await saves()).toBe(before);
+  expect(
+    (await fixtureRead<{ invoiceConfig: Record<string, unknown> }>("counts"))
+      .invoiceConfig,
+  ).toMatchObject({ vendor: "none" });
+});
+
+test.describe("backend §12.1 #319 step 2 — a run's details page and its flow's one read", () => {
+  test.beforeEach(async ({ page }) => {
+    // QuickBooks chosen for Invoice Processing, then a run of it on step 3.
+    await fixtureControl("quickbooks-connected");
+    await page.goto(`${FLOWS.invoice}/vendor?field=vendor`);
+    await page
+      .locator("main")
+      .getByRole("radio", { name: "QuickBooks Online" })
+      .click();
+    await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
+    await fixtureControl("invoice-run-started");
+    await fixtureControl("invoice-run-advance");
+  });
+
+  test("a run of a flow now archived keeps its flow's words: step 2 QuickBooks Online, step 4 QuickBooks updated", async ({
+    page,
+  }) => {
+    await fixtureControl("invoice-archived");
+    const before = (await flowReads()).length;
+    const response = await page.goto(
+      "/account/runs/fixture-run-invoice-started/details",
+    );
+    expect(response?.status()).toBe(200);
+    const rows = page.locator("main").getByTestId("run-steps").locator("li");
+    await expect(rows.nth(1).locator("p:not(.font-medium)")).toHaveText(
+      "QuickBooks Online",
+    );
+    await expect(rows.nth(3).locator("p.font-medium")).toHaveText(
+      "4 · QuickBooks updated",
+    );
+    expect((await flowReads()).slice(before)).toContain(
+      FLOWS.invoice.split("/").at(-1),
+    );
+  });
+
+  test("a run whose flow cannot be read (503) still draws its details page, every step, losing only the flow's two words", async ({
+    page,
+  }) => {
+    await fixtureControl("subscription-read-failing");
+    const response = await page.goto(
+      "/account/runs/fixture-run-invoice-started/details",
+    );
+    expect(response?.status()).toBe(200);
+    const rows = page.locator("main").getByTestId("run-steps").locator("li");
+    await expect(rows).toHaveCount(5);
+    await expect(rows.locator("p.font-medium")).toHaveCount(5);
+    await expect(rows.locator("p:not(.font-medium)")).toHaveCount(5);
+    await expect(rows.nth(1).locator("p:not(.font-medium)")).not.toHaveText(
+      "QuickBooks Online",
+    );
+    await expect(rows.nth(3).locator("p.font-medium")).not.toHaveText(
+      "4 · QuickBooks updated",
+    );
+  });
+});

@@ -406,6 +406,12 @@ function initialState() {
     // declares no word for its documents.
     documentWordsDeclared: true,
     subscriptionsFailing: false,
+    // Backend §12.1 #319 step 2's debt (the hardening audit's required
+    // tests): the one-flow read (`GET …/subscriptions/{id}`) answering
+    // Invoice Processing as archived while the list still holds it live — a
+    // flow archived after its page was drawn — or refused (503).
+    invoiceArchivedOnRead: false,
+    subscriptionReadFailing: false,
     // Backend §12.1 #319 step 2: the list's rows without `setup`, as the
     // platform's list will answer once step 3 lands; the one-flow read
     // (`GET …/subscriptions/{id}`) still carries it, and every page that draws
@@ -2659,6 +2665,12 @@ const server = createServer(
       "/__fixture/subscriptions-failing": () => {
         state.subscriptionsFailing = true;
       },
+      "/__fixture/invoice-archived": () => {
+        state.invoiceArchivedOnRead = true;
+      },
+      "/__fixture/subscription-read-failing": () => {
+        state.subscriptionReadFailing = true;
+      },
       "/__fixture/list-without-setup": () => {
         state.listWithoutSetup = true;
       },
@@ -4324,12 +4336,16 @@ const server = createServer(
           400,
           problem(400, "subscriptionId must be a UUID"),
         );
-      const subscription = [
-        ...liveSubscriptions(),
-        ...archivedSubscriptions(),
-      ].find(({ id }) => id === oneFlow[1]);
-      if (!subscription)
-        return respond(response, 404, problem(404, "Not Found"));
+      if (state.subscriptionReadFailing)
+        return respond(response, 503, problem(503, "Service Unavailable"));
+      const held = [...liveSubscriptions(), ...archivedSubscriptions()].find(
+        ({ id }) => id === oneFlow[1],
+      );
+      if (!held) return respond(response, 404, problem(404, "Not Found"));
+      const subscription =
+        state.invoiceArchivedOnRead && held.id === invoiceSubscriptionId
+          ? { ...held, status: "archived" as const }
+          : held;
       return respond(response, 200, {
         subscription,
       } satisfies AutomationOperations["getSubscription"]["responses"][200]["content"]["application/json"]);
