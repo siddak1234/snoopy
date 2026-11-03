@@ -454,16 +454,16 @@ test("a member sees the integration and never changes it: no row is a choice —
     rows,
     /\{readOnly \? \([\s\S]*?\{VENDOR_MEMBER_NOTE\}[\s\S]*?\) : null\}/u,
   );
-  // Read-only for a member on Connect integration, and on the Set up of a
-  // flow already on; a new flow's Set up is a member's to choose (backend
-  // ADR-0043 §2; the app's `readOnly={!canManage && editing}`).
+  // Read-only for a member on Connect integration and on Set up (backend
+  // §12.1 #180: only an owner or admin changes a flow; ~~a new flow's Set up
+  // is a member's to choose, ADR-0043 §2~~ until Round 21's stage 1).
   assert.match(
     read("app/account/flows/[subscriptionId]/vendor/VendorChoice.tsx"),
     /canManage=\{canManage\}\s*readOnly=\{!canManage\}/u,
   );
   assert.match(
     read("app/account/flows/[subscriptionId]/setup/SetupForm.tsx"),
-    /readOnly=\{!canManage && !turnOn\}/u,
+    /readOnly=\{!canManage\}/u,
   );
   // A vendor not connected still says who connects it.
   assert.match(

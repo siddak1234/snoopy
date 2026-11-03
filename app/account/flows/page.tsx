@@ -223,8 +223,8 @@ export default async function FlowsPage() {
                         templateId={subscription.templateId}
                         name={name}
                         available={entry.available}
-                        unarchive
                         canManage={canManage}
+                        unarchive
                       />
                     )}
                   </div>
