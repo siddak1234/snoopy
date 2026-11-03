@@ -113,7 +113,8 @@ records by size. Then:
   its body is final. The owner merges.
 - Hooks (`.claude/settings.json`): `guard.mjs` refuses `--no-verify`, a forced
   recursive `rm` outside the repo or scratch, and installs or builds in a
-  synced folder; `session-start.mjs` prints the repo's state; `stop-check.mjs`
+  synced folder (any npm script that runs one, e.g. `npm run release:ios`,
+  too); `session-start.mjs` prints the repo's state; `stop-check.mjs`
   warns of processes left behind. The cases: `.claude/hooks/cases.json`.
 
 ## Docs always updated
