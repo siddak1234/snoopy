@@ -348,6 +348,9 @@ function initialState() {
     // Round 21 (the platform round's F1): Invoice Processing's Set up with
     // a required drop-down of several, its Specialties.
     invoiceSpecialties: false,
+    // The owner's build 34 F1: the Taxonomy, whose choices carry groups, of
+    // several, as ICD-10 Code Check's Specialties are.
+    taxonomySeveral: false,
     quickbooksConnected: false,
     // Build 23 (B3): a change of the flow's integration refused as a
     // member's is — 403 `integration_requires_admin`, the Edge's "Forbidden".
@@ -1103,7 +1106,14 @@ function invoiceSetup(): Automations["AutomationSetupField"][] {
       )
     : invoiceAutomation.setup;
   return state.invoiceSpecialties
-    ? [...setup, specialtiesField, placeOfCareField, taxonomyField]
+    ? [
+        ...setup,
+        specialtiesField,
+        placeOfCareField,
+        state.taxonomySeveral
+          ? { ...taxonomyField, multiple: true }
+          : taxonomyField,
+      ]
     : setup;
 }
 
@@ -2615,6 +2625,10 @@ const server = createServer(
       // Round 21 (F1): Set up draws a required drop-down of several.
       "/__fixture/invoice-specialties": () => {
         state.invoiceSpecialties = true;
+      },
+      "/__fixture/taxonomy-several": () => {
+        state.invoiceSpecialties = true;
+        state.taxonomySeveral = true;
       },
       "/__fixture/invoice-approval-pending": () => {
         state.approvals = [
@@ -4466,13 +4480,18 @@ const server = createServer(
           state.invoiceSpecialties &&
           (typeof config?.placeOfCare !== "string" ||
             !(placeOfCareField.options ?? []).includes(config.placeOfCare));
-        // An object option's value, never its label (platform round 2's B1).
+        // An object option's value, never its label (platform round 2's B1);
+        // of several, a list of them (build 34's F1).
+        const isTaxonomy = (value: unknown) =>
+          (taxonomyField.options ?? []).some(
+            (option) => typeof option === "object" && option.value === value,
+          );
         const badTaxonomy =
           config?.taxonomy !== undefined &&
-          !(taxonomyField.options ?? []).some(
-            (option) =>
-              typeof option === "object" && option.value === config.taxonomy,
-          );
+          (state.taxonomySeveral
+            ? !Array.isArray(config.taxonomy) ||
+              !config.taxonomy.every(isTaxonomy)
+            : !isTaxonomy(config.taxonomy));
         if (
           !config ||
           badChoices ||

@@ -5582,43 +5582,65 @@ test("Round 21 (F1) — Set up's drop-down of several: never the browser's selec
   });
 });
 
-test("Round 21, platform round 2 (B1) — a drop-down of more than 10 choices opens on Search, keeps the labels that hold what is typed, says No matches. for none, draws its headings in the manifest's order, says the label chosen and saves its value", async ({
+test("build 34's F1 — a select whose choices carry groups is a sheet the page's height: Category lists its groups, Search all finds a choice in any of them, a group's choices are searched alone, Back goes a step back, one choice closes it, the box says its label and a chip, and its value is saved", async ({
   page,
 }) => {
   await fixtureControl("invoice-specialties");
   await page.goto(`${FLOWS.invoice}/setup`);
   const main = page.locator("main");
-  const trigger = main.getByRole("combobox", { name: "Taxonomy" });
+  const trigger = main.getByTestId("select-taxonomy");
+  await expect(trigger).toHaveText("Choose");
+  await expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
   await trigger.click();
-  const search = main.getByRole("searchbox", { name: "Search" });
-  await expect(search).toBeFocused();
-  await expect(search).toHaveAttribute("placeholder", "Search");
-  const menu = main.getByRole("listbox", { name: "Taxonomy" });
-  await expect(menu.getByRole("option")).toHaveCount(12);
-  await expect(menu.getByRole("group")).toHaveCount(2);
-  await expect(menu.getByRole("group").first()).toHaveAccessibleName(
+  const sheet = page.getByRole("dialog", { name: /Taxonomy/u });
+  await expect(sheet.getByRole("heading", { level: 2 })).toHaveText("Taxonomy");
+  await expect(sheet.getByRole("heading", { level: 3 })).toHaveText("Category");
+  // Step 1: the groups, in the manifest's order, and no choice yet.
+  await expect(sheet.getByRole("listitem")).toHaveText([
     "Internal medicine",
-  );
-  await expect(menu.getByRole("group").last()).toHaveAccessibleName(
+    "Psychiatry & neurology",
+  ]);
+  await expect(sheet.getByRole("option")).toHaveCount(0);
+  const searchAll = sheet.getByRole("searchbox", { name: "Search all" });
+  await expect(searchAll).toHaveAttribute("placeholder", "Search all");
+  await expectNoAxeViolations(page);
+  // Search all: every group's choices, under their headings.
+  await searchAll.fill("PSYCH");
+  await expect(sheet.getByRole("option")).toHaveText([
+    "Psychiatry",
+    "Forensic psychiatry",
+  ]);
+  await expect(sheet.getByRole("group")).toHaveAccessibleName(
     "Psychiatry & neurology",
   );
-  await expectNoAxeViolations(page);
-  await search.fill("zzz");
-  await expect(main.getByText("No matches.")).toBeVisible();
-  await expect(menu.getByRole("option")).toHaveCount(0);
-  await search.fill("PSYCH");
-  await expect(menu.getByRole("option")).toHaveCount(2);
-  await expect(menu.getByRole("group")).toHaveCount(1);
-  // Enter in the search box never sends the form; the down arrow goes to a row.
-  await search.press("Enter");
-  await expect(menu).toBeVisible();
-  await search.press("ArrowDown");
-  await expect(
-    menu.getByRole("option", { name: "Psychiatry", exact: true }),
-  ).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(menu).toHaveCount(0);
+  await searchAll.fill("zzz");
+  await expect(sheet.getByText("No matches.")).toBeVisible();
+  await searchAll.fill("");
+  // Step 2: one group's choices, searched alone; Back goes to step 1.
+  await sheet.getByRole("button", { name: "Psychiatry & neurology" }).click();
+  await expect(sheet.getByRole("heading", { level: 2 })).toHaveText(
+    "Psychiatry & neurology",
+  );
+  await expect(sheet.getByRole("option")).toHaveCount(6);
+  const search = sheet.getByRole("searchbox", { name: "Search" });
+  await search.fill("sport");
+  await expect(sheet.getByRole("option")).toHaveText(["Sports medicine"]);
+  await search.fill("");
+  await sheet.getByRole("button", { name: "Back" }).click();
+  await expect(sheet.getByRole("heading", { level: 3 })).toHaveText("Category");
+  // Back from step 1 closes it, focus back on the box.
+  await sheet.getByRole("button", { name: "Back" }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  // One choice closes it: the box says its label, a chip under it.
+  await trigger.click();
+  await sheet.getByRole("button", { name: "Psychiatry & neurology" }).click();
+  await sheet.getByRole("option", { name: "Psychiatry", exact: true }).click();
+  await expect(sheet).toHaveCount(0);
   await expect(trigger).toHaveText("Psychiatry");
+  await expect(main.getByTestId("select-taxonomy-chips")).toHaveText(
+    "Psychiatry",
+  );
   // Set up's other required choices, then saved: the value, never the label.
   await main.getByRole("combobox", { name: "Specialties" }).click();
   await main
@@ -5638,6 +5660,57 @@ test("Round 21, platform round 2 (B1) — a drop-down of more than 10 choices op
     specialties: ["Nephrology"],
     placeOfCare: "Office",
     taxonomy: "2084P0800X",
+  });
+});
+
+test("build 34's F1 — a sheet of several stays open: a choice found by Search all and one in a group each tick, a second press unticks, each pick is a chip, and the list is saved in the order chosen", async ({
+  page,
+}) => {
+  await fixtureControl("taxonomy-several");
+  await page.goto(`${FLOWS.invoice}/setup`);
+  const main = page.locator("main");
+  const trigger = main.getByTestId("select-taxonomy");
+  await trigger.click();
+  const sheet = page.getByRole("dialog", { name: /Taxonomy/u });
+  await sheet.getByRole("searchbox", { name: "Search all" }).fill("nephro");
+  await sheet.getByRole("option", { name: "Nephrology" }).click();
+  await expect(sheet).toBeVisible();
+  await expect(
+    sheet.getByRole("listbox", { name: "Taxonomy" }),
+  ).toHaveAttribute("aria-multiselectable", "true");
+  await sheet.getByRole("searchbox", { name: "Search all" }).fill("");
+  await sheet.getByRole("button", { name: "Psychiatry & neurology" }).click();
+  await sheet.getByRole("option", { name: "Neurology", exact: true }).click();
+  await sheet.getByRole("option", { name: "Obesity medicine" }).click();
+  await expect(trigger).toHaveText("3 chosen");
+  await sheet.getByRole("option", { name: "Obesity medicine" }).click();
+  await expect(
+    sheet.getByRole("option", { name: "Obesity medicine" }),
+  ).toHaveAttribute("aria-selected", "false");
+  await expect(trigger).toHaveText("Nephrology, Neurology");
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  await expect(main.getByTestId("select-taxonomy-chips")).toHaveText(
+    "NephrologyNeurology",
+  );
+  await main.getByRole("combobox", { name: "Specialties" }).click();
+  await main
+    .getByRole("listbox", { name: "Specialties" })
+    .getByRole("option", { name: "Nephrology" })
+    .click();
+  await page.keyboard.press("Escape");
+  await main.getByRole("combobox", { name: "Place of care" }).click();
+  await main
+    .getByRole("listbox", { name: "Place of care" })
+    .getByRole("option", { name: "Office" })
+    .click();
+  await main.getByRole("button", { name: "Save", exact: true }).click();
+  await expect.poll(invoiceSettings).toEqual({
+    vendor: "none",
+    holdAboveAmount: 500,
+    specialties: ["Nephrology"],
+    placeOfCare: "Office",
+    taxonomy: ["207RN0300X", "2084N0400X"],
   });
 });
 

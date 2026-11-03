@@ -96,7 +96,12 @@ page reuses:
   label holds what is typed and otherwise says "No matches."; choices with
   a `group` are drawn under its heading, the headings in the order they
   first appear (`choiceGroups`). One of 10 or fewer without groups is drawn
-  as before.
+  as before. A setup `select` whose choices carry groups is a sheet the
+  page's height instead (`components/ui/ChoiceSheet.tsx`; the owner's build
+  34 F1): step 1 its groups under "Category", with a "Search all" box over
+  every choice; step 2 one group's choices with a "Search" box; Back a step
+  back; one choice closes it, several tick and untick; the box says what is
+  chosen as the drop-down's does, and each pick is a chip under it.
 - **Several files at once** (platform round 2's B2 as the batch addendum
   amends it): a run's file field that declares `multiple` (`RunFileField`)
   lets the chooser take several files and the camera add each photo, sends
