@@ -703,13 +703,14 @@ test("S1-9: \"Only an owner or admin can change this flow.\" — a member's Add,
   assert.ok(button(ownerSetup, "Save"));
   assert.ok(!textsOf(ownerSetup[0]).includes(FLOW_CHANGE_ADMIN_ONLY));
 
-  // A refusal says it: adding, a set-up save and any other change.
+  // A refusal says it: adding, Set up's save, a vendor's save and any other
+  // change.
   const flowActions = read("app/account/flows/actions.ts");
   assert.equal(
     flowActions.match(
       /if \(flowChangeRefused\(error\.status, error\.details\)\)\s*return \{ ok: false, error: FLOW_CHANGE_ADMIN_ONLY, state: "forbidden" \};/gu,
     )?.length,
-    3,
+    4,
   );
 });
 

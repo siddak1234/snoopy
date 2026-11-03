@@ -266,6 +266,9 @@ export async function saveSetup(formData: FormData): Promise<ActionResult> {
     if (!(error instanceof PlatformServerError)) throw error;
     if (error.status === 422 && error.details?.reason === "unmet_connections")
       return { ok: false, error: refused, state: "vendor-not-connected" };
+    // Only an owner or admin changes a flow (§12.1 #180).
+    if (flowChangeRefused(error.status, error.details))
+      return { ok: false, error: FLOW_CHANGE_ADMIN_ONLY, state: "forbidden" };
     if (turnOn) {
       const entitlement = subscriptionEntitlementState(
         error.status,
