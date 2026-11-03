@@ -782,3 +782,65 @@ test('S1-11: a domain-only organization refusing a sign-in outside its domains a
     plain.some((node) => node.attrs.id === "platform-unavailable-title"),
   );
 });
+
+test('S1-14: "Or export every record. A large workspace comes as several files, each kept for a day."; a ready export of several files offers "Download file {n} of {N}" for each, in order, and no Share; one file "Download file" and Share, as before', async () => {
+  const { COMPLETE_EXPORT_INTRO, downloadFileLabel, exportFiles } =
+    await import("../lib/export-contract.ts");
+  assert.equal(
+    COMPLETE_EXPORT_INTRO,
+    "Or export every record. A large workspace comes as several files, each kept for a day.",
+  );
+  assert.equal(downloadFileLabel(2, 3), "Download file 2 of 3");
+  assert.equal(downloadFileLabel(1, 1), "Download file");
+  const part = (n) => ({
+    artifactId: `0000000${n}-0000-4000-8000-000000000000`,
+    filename: `workspace-export-${n}.json`,
+    sizeBytes: 10,
+    downloadUrl: `https://store.example.test/${n}`,
+    expiresAt: "2026-11-04T10:00:00Z",
+  });
+  const ready = {
+    id: "e",
+    status: "ready",
+    createdAt: "2026-11-03T10:00:00Z",
+    complete: true,
+  };
+  assert.deepEqual(exportFiles({ ...ready, files: [part(1), part(2)] }), [
+    part(1),
+    part(2),
+  ]);
+  assert.deepEqual(exportFiles({ ...ready, file: part(1) }), [part(1)]);
+  assert.deepEqual(exportFiles({ ...ready, status: "running" }), []);
+
+  const section = async (job) => {
+    const { CompleteExportSection } = await load(
+      "app/account/settings/CompleteExportSection.tsx",
+      (source) =>
+        source.replace(
+          "useState<WorkspaceExportJob | null>(null)",
+          `useState<WorkspaceExportJob | null>(${JSON.stringify(job)})`,
+        ),
+    );
+    return tree(draw(CompleteExportSection, { workspaceId: "w" }));
+  };
+  const buttons = (nodes) =>
+    nodes
+      .filter((node) => node.tag === "button")
+      .map((node) => textsOf(node).join(""));
+  const several = await section({
+    ...ready,
+    files: [part(1), part(2), part(3)],
+  });
+  assert.ok(textsOf(several[0]).includes(COMPLETE_EXPORT_INTRO));
+  assert.deepEqual(buttons(several), [
+    "Export everything",
+    "Download file 1 of 3",
+    "Download file 2 of 3",
+    "Download file 3 of 3",
+  ]);
+  const one = await section({ ...ready, file: part(1) });
+  assert.deepEqual(buttons(one).slice(0, 2), [
+    "Export everything",
+    "Download file",
+  ]);
+});

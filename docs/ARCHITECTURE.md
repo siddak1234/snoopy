@@ -265,7 +265,13 @@ page reuses:
   `?export={id}`): its ask and its signed link read on the server, the
   bytes an attachment of no type, never cached, `nosniff`, for this site's
   pages alone (`Sec-Fetch-Site`, `lib/file-view.ts`'s `askedHere`); the
-  workspace summary shares its own JSON.
+  workspace summary shares its own JSON. A complete export of a large
+  workspace comes in parts (backend §12.1 #181, `WorkspaceExportJob.files`):
+  "Download file {n} of {N}" for each, in order, each link asked for at the
+  press, and no Share, which reads the one-file export alone
+  (`exportFiles` in `lib/export-contract.ts`); its line says "Or export
+  every record. A large workspace comes as several files, each kept for a
+  day."
 - **A run's score** is in its verdict's colour (the owner's F1 and Q5):
   the positive green and the negative red, with the flow's word for it as a
   chip ("Advance", "Decline"; `RunScore`, `lib/run-verdict.ts`, the one

@@ -321,7 +321,7 @@ test("F4: Download, then Share, on all five places; with canShare false, no Shar
     ],
     [
       "app/account/settings/CompleteExportSection.tsx",
-      /\{ label: "Download file", run: download, disabled: pending \},/u,
+      /label: downloadFileLabel\(index \+ 1, files\.length\),\s*run: download\(index\),\s*disabled: pending,/u,
     ],
     [
       "app/account/settings/WorkspaceExportSection.tsx",
