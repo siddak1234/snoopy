@@ -480,9 +480,10 @@ test("a manual run is started only from the pinned version's declared input — 
   assert.match(flowPage, /initialKey=\{newIdempotencyKey\("run"\)\}/);
   assert.match(actions, /formData\.get\("idempotencyKey"\)/);
   assert.doesNotMatch(actions, /newIdempotencyKey\("run"\)/);
+  // A started run opens its page — from the item on an item's page (G4).
   assert.match(
     runStart,
-    /router\.push\(`\/account\/runs\/\$\{result\.runId\}`\)/,
+    /router\.push\(runPagePath\(result\.runId, itemPage\)\)/,
   );
 });
 
