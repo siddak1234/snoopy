@@ -21,7 +21,12 @@ import { flowPath } from "@/lib/flow-steps";
 import { AddAutomation } from "./AddAutomation";
 import { byDepartment } from "./departments";
 import { placeOf } from "./place";
-import { listWorkspaceProjects, resolveActiveWorkspaceId } from "@/lib/tenancy";
+import {
+  administers,
+  listWorkspaceProjects,
+  resolveActiveWorkspaceId,
+  roleInWorkspace,
+} from "@/lib/tenancy";
 
 /**
  * The catalog, and what this workspace has done with it.
@@ -86,7 +91,7 @@ export default async function FlowsPage() {
     );
   }
 
-  const [catalog, subscriptions, archived, projects] = await Promise.all([
+  const [catalog, subscriptions, archived, projects, role] = await Promise.all([
     emptyWhenUnavailable(() => listAutomations(workspaceId), {
       automations: [],
       categories: [],
@@ -96,7 +101,10 @@ export default async function FlowsPage() {
     }),
     emptyWhenUnavailable(() => listArchivedSubscriptions(workspaceId), []),
     emptyWhenUnavailable(() => listWorkspaceProjects(workspaceId), []),
+    roleInWorkspace(workspaceId),
   ]);
+  // Only an owner or admin adds a flow (backend §12.1 #180).
+  const canManage = administers(role);
   // Over the plan's flow allowance, the whole workspace's (decision 7a3).
   const overPlan = flowsOverPlan(subscriptions.flowAllowance);
 
@@ -156,6 +164,7 @@ export default async function FlowsPage() {
                   automation={automation}
                   subscriptions={byTemplate.get(automation.templateId) ?? []}
                   workspaceId={workspaceId}
+                  canManage={canManage}
                 />
               ))}
             </div>
@@ -215,6 +224,7 @@ export default async function FlowsPage() {
                         name={name}
                         available={entry.available}
                         unarchive
+                        canManage={canManage}
                       />
                     )}
                   </div>
@@ -232,11 +242,14 @@ function AutomationCard({
   automation,
   subscriptions,
   workspaceId,
+  canManage,
 }: {
   automation: AutomationCatalogEntry;
   subscriptions: Subscription[];
   /** The workspace this page shows; Add is refused once it is not active. */
   workspaceId: string;
+  /** An owner or admin: a member's Add is read-only. */
+  canManage: boolean;
 }) {
   // Held anywhere in the workspace, the flow is added once (the owner, build
   // 12's #9): "Added ✓" goes to it, and Add is not drawn.
@@ -303,6 +316,7 @@ function AutomationCard({
             templateId={automation.templateId}
             name={automation.name}
             available={automation.available}
+            canManage={canManage}
           />
         )}
       </div>

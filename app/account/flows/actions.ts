@@ -26,7 +26,11 @@ import { problemFields } from "@/lib/flow-items";
 import { heldCopy } from "@/lib/held-flow";
 import { overPlanRefusal } from "@/lib/plan-limit";
 import { reviewAnswers } from "@/lib/run-progress";
-import { subscriptionEntitlementState } from "@/lib/subscription-entitlements";
+import {
+  FLOW_CHANGE_ADMIN_ONLY,
+  flowChangeRefused,
+  subscriptionEntitlementState,
+} from "@/lib/subscription-entitlements";
 import { activeWorkspaceIfShown, WORKSPACE_CHANGED } from "@/lib/tenancy";
 import { uploadRefusalMessage } from "./upload-refusals";
 
@@ -90,6 +94,9 @@ async function attempt(
     return { ok: true };
   } catch (error) {
     if (error instanceof PlatformServerError) {
+      // A member's change of a flow (§12.1 #180): said in the clients' words.
+      if (flowChangeRefused(error.status, error.details))
+        return { ok: false, error: FLOW_CHANGE_ADMIN_ONLY, state: "forbidden" };
       return { ok: false, error: error.message };
     }
     throw error;
@@ -98,6 +105,9 @@ async function attempt(
 
 function subscriptionFailure(error: unknown): ActionResult {
   if (!(error instanceof PlatformServerError)) throw error;
+  // Only an owner or admin adds a flow (§12.1 #180).
+  if (flowChangeRefused(error.status, error.details))
+    return { ok: false, error: FLOW_CHANGE_ADMIN_ONLY, state: "forbidden" };
 
   // The automation contract intentionally exposes only these two reason tokens
   // for a subscription entitlement refusal. Every other 403 is authorization,
@@ -370,6 +380,9 @@ async function saveConfig(
     if (!(error instanceof PlatformServerError)) throw error;
     if (error.status === 422 && error.details?.reason === "unmet_connections")
       return { ok: false, error: SAVE_REFUSED, state: "vendor-not-connected" };
+    // Only an owner or admin changes a flow (§12.1 #180).
+    if (flowChangeRefused(error.status, error.details))
+      return { ok: false, error: FLOW_CHANGE_ADMIN_ONLY, state: "forbidden" };
     // A member's change, refused (Build 23's B3): the platform's 403 names
     // only its reason (the Edge's title is "Forbidden"), so it is said in the
     // clients' own words, the same as the member's note. Any other 403 is

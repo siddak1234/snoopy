@@ -4364,6 +4364,20 @@ const server = createServer(
         subscription,
       } satisfies AutomationOperations["getSubscription"]["responses"][200]["content"]["application/json"]);
     }
+    // Backend §12.1 #180: only an owner or admin changes a flow — adds it,
+    // sets it up, pauses or resumes it, archives it — refused to a member at
+    // the Edge, before anything is read, as 403 `flow_change_requires_admin`.
+    if (
+      fixtureSession === "member" &&
+      ((method === "POST" && isWorkspacePath(pathname, "/subscriptions")) ||
+        (method === "PATCH" &&
+          /^\/v1\/workspaces\/[^/]+\/subscriptions\/[^/]+$/u.test(pathname)))
+    ) {
+      return respond(response, 403, {
+        ...problem(403, "Forbidden"),
+        details: { reason: "flow_change_requires_admin" },
+      } satisfies Platform["ApiProblem"]);
+    }
     // Build 22 (P4; backend ADR-0041): no client chooses a version — a flow's
     // update naming one is refused, as the Edge refuses it, naming the field
     // (the session's S37).

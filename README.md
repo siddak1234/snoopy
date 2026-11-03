@@ -140,8 +140,9 @@ opened and its item chosen first; and a workspace with no flow yet), a flow's pa
 Steps — titles only, Step 1 holding the run's fields and Start run, step 2 its
 integration, step 4 titled by the flow's choice, step 5 who gets the email —
 and Edit setup; no Connections and no move to another version), its Set up
-(Turn on, or Save; a member makes a newly added flow's first choice there, a
-connected vendor or None, and on a flow already on sees it read-only), its
+(Turn on, or Save; a member sees it read-only under "Only an owner or admin
+can change this flow.", as Add, Pause and Archive flow are, and a save refused
+as a member's says it), its
 Connect integration page (a tap saves and goes back; a vendor connected from
 it comes back chosen, one connected meanwhile is reused, and a refused
 connect is said under its row; a member sees the integration and no row is a

@@ -283,10 +283,15 @@ separate, confirmed owner-or-admin intent that names the exact connection it
 replaces (backend ADR-0019 §4, ADR-0026). A grant that already holds what the
 provider asks for is reused without consent, and the page says so. Connections
 and a flow step's vendor rows start a connect the same way
-(`app/account/connections/start-connect.ts`). A member sees a flow's
-integration and does not change it, with one exception: on a newly added
-flow's Set up, the member makes its first choice, a connected vendor or None
-(backend ADR-0043 §2), as the app's Set up allows. A provider whose
+(`app/account/connections/start-connect.ts`). Only an owner or admin
+changes a flow (backend §12.1 #180): a member sees Add on Flows, a flow's
+Set up (its integration and settings, no Turn on or Save), and its Turn on,
+Pause and Archive flow read-only, under "Only an owner or admin can change
+this flow." (`FLOW_CHANGE_ADMIN_ONLY` in `lib/subscription-entitlements.ts`),
+and a change the platform refuses as a member's (403
+`flow_change_requires_admin`) says the same; a member still starts runs.
+~~On a newly added flow's Set up, the member makes its first choice (backend
+ADR-0043 §2)~~ until Round 21's stage 1. A provider whose
 `authType` is `none` (a public service, platform round 2's B5) has no
 connect step: it is connected for every workspace (`isKeyless`), its row
 says "Connected" with no Connect or Disconnect, Set up draws no Connect

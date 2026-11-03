@@ -30,6 +30,7 @@ import { missingChoices, setupProblem } from "../../setup-check";
 import { VendorRows, type VendorOption } from "../../VendorRows";
 import { Group } from "@/components/dashboard/Group";
 import { SPACING } from "@/lib/spacing";
+import { FLOW_CHANGE_ADMIN_ONLY } from "@/lib/subscription-entitlements";
 
 /** One step's vendor choice on Set up. */
 export type SetupVendorField = {
@@ -64,6 +65,12 @@ const UNAVAILABLE = "This flow is not responding, so it cannot run yet.";
  *
  * Back from a vendor's sign-in that connected the vendor the connect left for,
  * that vendor is its step's choice, until another is picked.
+ *
+ * Only an owner or admin changes a flow (backend §12.1 #180): to a member the
+ * page is read-only — the vendor rows and the settings drawn as they are, no
+ * Turn on or Save — under "Only an owner or admin can change this flow.".
+ * ~~A member makes a newly added flow's first choice~~ until Round 21's stage
+ * 1 (it was ADR-0043 §2's).
  */
 export function SetupForm({
   workspaceId,
@@ -221,9 +228,8 @@ export function SetupForm({
         options={field.options}
         chosen={choiceOf(field)}
         canManage={canManage}
-        // A member changes no flow already on; a new flow's first
-        // choice is theirs (ADR-0043 §2; the app's Set up).
-        readOnly={!canManage && !turnOn}
+        // A member changes no flow (§12.1 #180).
+        readOnly={!canManage}
         workspaceId={workspaceId}
         saving={null}
         returnTo={returnTo}
@@ -275,30 +281,44 @@ export function SetupForm({
         className={`flex flex-col ${SPACING.group.gap}`}
       >
         <input type="hidden" name="subscriptionId" value={subscriptionId} />
-        <SetupFields
-          setup={setup}
-          config={config}
-          sections={sections}
-          firstSection={hasConnect ? 2 : 1}
-          hideConnections
-          vendors={(key) => {
-            const field = vendorFields.find((one) => one.key === key);
-            return field ? vendorRows(field) : null;
-          }}
-          missingChoices={missing}
-        />
+        <fieldset
+          disabled={!canManage}
+          className={`flex min-w-0 flex-col ${SPACING.group.gap}`}
+        >
+          <SetupFields
+            setup={setup}
+            config={config}
+            sections={sections}
+            firstSection={hasConnect ? 2 : 1}
+            hideConnections
+            vendors={(key) => {
+              const field = vendorFields.find((one) => one.key === key);
+              return field ? vendorRows(field) : null;
+            }}
+            missingChoices={missing}
+          />
+        </fieldset>
         <FormError message={error} />
-        <div>
-          <Button type="submit" disabled={pending}>
-            {turnOn
-              ? pending
-                ? "Turning on…"
-                : "Turn on"
-              : pending
-                ? "Saving…"
-                : "Save"}
-          </Button>
-        </div>
+        {canManage ? (
+          <div>
+            <Button type="submit" disabled={pending}>
+              {turnOn
+                ? pending
+                  ? "Turning on…"
+                  : "Turn on"
+                : pending
+                  ? "Saving…"
+                  : "Save"}
+            </Button>
+          </div>
+        ) : (
+          <p
+            data-testid="flow-change-admin-only"
+            className="text-xs text-[var(--muted)]"
+          >
+            {FLOW_CHANGE_ADMIN_ONLY}
+          </p>
+        )}
       </form>
     </Group>
   );

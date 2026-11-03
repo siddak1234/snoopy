@@ -46,8 +46,9 @@ const STUBS = {
     "export const decideApproval = async () => ({ ok: true }); export const cancelRun = async () => ({ ok: true });",
   "../../actions":
     "export const saveSetup = async () => ({ ok: true }); export const saveEmailRecipients = async () => ({ ok: true });",
+  // Connections' actions and the flows' own, each module's "./actions".
   "./actions":
-    "export const beginConnectionAuthorization = async () => ({ ok: false }); export const connectProviderWithKey = async () => ({ ok: false }); export const disconnectConnection = async () => ({ ok: false });",
+    "export const beginConnectionAuthorization = async () => ({ ok: false }); export const connectProviderWithKey = async () => ({ ok: false }); export const disconnectConnection = async () => ({ ok: false }); export const subscribeToAutomation = async () => ({ ok: true }); export const archiveSubscription = async () => ({ ok: true }); export const setSubscriptionStatus = async () => ({ ok: true }); export const startRun = async () => ({ ok: true });",
   "./upload-actions":
     "export const openRunUpload = async () => ({ ok: false, error: 'x' }); export const completeRunUpload = async () => ({ ok: false, error: 'x' });",
 };
@@ -583,5 +584,126 @@ test('S1-8: the website\'s Disconnect page says "QuickBooks is disconnected", an
   assert.doesNotMatch(
     read(DISCONNECTED),
     /platform-server|platform-api|fetch\(/u,
+  );
+});
+
+test("S1-9: \"Only an owner or admin can change this flow.\" — a member's Add, Pause, Archive flow and Turn on are read-only under it, and Set up draws no Turn on or Save; an owner's are as before", async () => {
+  const { FLOW_CHANGE_ADMIN_ONLY, flowChangeRefused } =
+    await import("../lib/subscription-entitlements.ts");
+  assert.equal(
+    FLOW_CHANGE_ADMIN_ONLY,
+    "Only an owner or admin can change this flow.",
+  );
+  assert.equal(
+    flowChangeRefused(403, { reason: "flow_change_requires_admin" }),
+    true,
+  );
+  assert.equal(
+    flowChangeRefused(403, { reason: "integration_requires_admin" }),
+    false,
+  );
+  assert.equal(
+    flowChangeRefused(409, { reason: "flow_change_requires_admin" }),
+    false,
+  );
+
+  const button = (nodes, name) =>
+    nodes.find(
+      (node) => node.tag === "button" && textsOf(node).join("") === name,
+    );
+  const { AddAutomation } = await load("app/account/flows/AddAutomation.tsx");
+  const add = (canManage) =>
+    tree(
+      draw(AddAutomation, {
+        templateId: "t",
+        name: "Invoice Processing",
+        available: true,
+        workspaceId: "w",
+        canManage,
+      }),
+    );
+  const memberAdd = add(false);
+  assert.ok("disabled" in button(memberAdd, "Add").attrs);
+  assert.ok(textsOf(memberAdd[0]).includes(FLOW_CHANGE_ADMIN_ONLY));
+  const ownerAdd = add(true);
+  assert.ok(!("disabled" in button(ownerAdd, "Add").attrs));
+  assert.ok(!textsOf(ownerAdd[0]).includes(FLOW_CHANGE_ADMIN_ONLY));
+
+  const { AutomationActions } = await load(
+    "app/account/flows/AutomationActions.tsx",
+  );
+  const actions = (canManage) =>
+    tree(
+      draw(AutomationActions, {
+        workspaceId: "w",
+        name: "Invoice Processing",
+        subscription: { id: "s", status: "live" },
+        setupHref: "/account/flows/s/setup",
+        webhook: false,
+        canManage,
+      }),
+    );
+  const memberActions = actions(false);
+  for (const name of ["Pause", "Archive flow"])
+    assert.ok("disabled" in button(memberActions, name).attrs, name);
+  assert.ok(textsOf(memberActions[0]).includes(FLOW_CHANGE_ADMIN_ONLY));
+  const ownerActions = actions(true);
+  for (const name of ["Pause", "Archive flow"])
+    assert.ok(!("disabled" in button(ownerActions, name).attrs), name);
+  assert.ok(!textsOf(ownerActions[0]).includes(FLOW_CHANGE_ADMIN_ONLY));
+
+  const { RunStart } = await load("app/account/flows/RunStart.tsx");
+  const memberStart = tree(
+    draw(RunStart, {
+      workspaceId: "w",
+      subscriptionId: "s",
+      runInput: [],
+      live: false,
+      available: true,
+      canGoLive: true,
+      initialKey: "k",
+      canChange: false,
+    }),
+  );
+  assert.ok("disabled" in button(memberStart, "Turn on").attrs);
+  assert.ok(textsOf(memberStart[0]).includes(FLOW_CHANGE_ADMIN_ONLY));
+
+  const { SetupForm } = await load(SETUP);
+  const setup = (canManage) =>
+    tree(
+      draw(SetupForm, {
+        workspaceId: "w",
+        subscriptionId: "s",
+        status: "live",
+        available: true,
+        setup: [field("npi", "text")],
+        config: {},
+        vendorFields: [],
+        required: [],
+        connections: [],
+        canManage,
+        returnTo: "/account/flows/s/setup",
+        callbackStatus: null,
+      }),
+    );
+  const memberSetup = setup(false);
+  const [fieldset] = memberSetup.filter((node) => node.tag === "fieldset");
+  assert.ok("disabled" in fieldset.attrs);
+  assert.equal(button(memberSetup, "Save"), undefined);
+  assert.ok(textsOf(memberSetup[0]).includes(FLOW_CHANGE_ADMIN_ONLY));
+  const ownerSetup = setup(true);
+  assert.ok(
+    !("disabled" in ownerSetup.find((node) => node.tag === "fieldset").attrs),
+  );
+  assert.ok(button(ownerSetup, "Save"));
+  assert.ok(!textsOf(ownerSetup[0]).includes(FLOW_CHANGE_ADMIN_ONLY));
+
+  // A refusal says it: adding, a set-up save and any other change.
+  const flowActions = read("app/account/flows/actions.ts");
+  assert.equal(
+    flowActions.match(
+      /if \(flowChangeRefused\(error\.status, error\.details\)\)\s*return \{ ok: false, error: FLOW_CHANGE_ADMIN_ONLY, state: "forbidden" \};/gu,
+    )?.length,
+    3,
   );
 });

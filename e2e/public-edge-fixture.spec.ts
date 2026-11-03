@@ -2010,11 +2010,10 @@ test("an Add the platform refuses — a team it could not find or make, or its t
   expect(await createdTeams()).toEqual([]);
 });
 
-test("with no team yet, anyone in the workspace adds a flow and its team is made — no Create a team, no Ask to join (backend ADR-0036; the owner, 2026-10-14)", async ({
+test("with no team yet, an owner adds a flow and its team is made — no Create a team, no Ask to join (backend ADR-0036; the owner, 2026-10-14; only an owner or admin adds one since backend §12.1 #180)", async ({
   page,
 }) => {
   await fixtureControl("org-without-projects");
-  await presentSession(page, "member");
   await page.goto("/account/flows");
   const main = page.locator("main");
   for (const gone of [
@@ -2216,80 +2215,56 @@ test("a member on the Connect integration page sees the integration and never ch
   );
 });
 
-test("a member who adds a flow makes its first integration choice on its Set up — a connected vendor, or None — and on a flow already on its rows are read-only (backend ADR-0043 §2; the app's Set up; Build 25, the review's R5c 3)", async ({
+test("a member changes no flow (backend §12.1 #180): on Flows, Add is read-only under the line; a flow's Set up draws its integration and settings read-only, with no Turn on or Save; its page offers Pause and Archive flow read-only", async ({
   page,
 }) => {
+  const line = "Only an owner or admin can change this flow.";
   await fixtureControl("quickbooks-connected");
   await fixtureControl("invoice-not-added");
   await presentSession(page, "member");
   await page.goto("/account/flows");
-  await automationCard(page, "Invoice Processing")
-    .getByRole("button", { name: "Add" })
-    .click();
-  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
-  const main = page.locator("main");
-  const quickbooks = main.getByRole("radio", { name: "QuickBooks Online" });
-  const none = main.getByRole("radio", { name: "None" });
-  await expect(quickbooks).toBeEnabled();
-  await expect(none).toBeEnabled();
-  await expect(main.getByTestId("vendor-member-note")).toHaveCount(0);
-  await quickbooks.click();
-  await expect(quickbooks).toHaveAttribute("aria-checked", "true");
-  await expect(none).toHaveAttribute("aria-checked", "false");
-  await main.getByRole("button", { name: "Turn on" }).click();
-  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
-  expect(await invoiceSettings()).toEqual({
-    vendor: "quickbooks",
-    holdAboveAmount: 500,
-  });
-  // On now: the member's Set up shows the integration and changes nothing.
-  await page.goto(`${FLOWS.invoice}/setup`);
-  await expect(quickbooks).toHaveAttribute("aria-checked", "true");
-  await expect(quickbooks).toBeDisabled();
-  await expect(none).toBeDisabled();
-  await expect(main.getByTestId("vendor-member-note")).toHaveText(
-    "Only an owner or admin can change the integration.",
-  );
+  const card = automationCard(page, "Invoice Processing");
+  await expect(card.getByRole("button", { name: "Add" })).toBeDisabled();
+  await expect(card).toContainText(line);
+  await expectNoAxeViolations(page);
 });
 
-test("a member on a newly added flow's Set up is offered no vendor that is not connected — its row says who connects it, and a tap goes nowhere — and None is theirs to choose and turn on with (Build 25's audit; the review's R5c 3)", async ({
+test("a member's Set up and flow page are read-only under the line, and a change refused as a member's says it (backend §12.1 #180)", async ({
   page,
 }) => {
-  const left = observe(
-    page,
-    (request) =>
-      request.isNavigationRequest() &&
-      /\/connections(?:\?|$)|^https:\/\/oauth\.invalid\//u.test(request.url()),
-  );
-  await fixtureControl("invoice-not-added");
+  const line = "Only an owner or admin can change this flow.";
+  await fixtureControl("quickbooks-connected");
   await presentSession(page, "member");
-  await page.goto("/account/flows");
-  await automationCard(page, "Invoice Processing")
-    .getByRole("button", { name: "Add" })
-    .click();
-  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
+  await page.goto(`${FLOWS.invoice}/setup`);
   const main = page.locator("main");
-  const quickbooks = main.getByRole("radio", { name: "QuickBooks Online" });
-  const none = main.getByRole("radio", { name: "None" });
-  await expect(quickbooks).toBeDisabled();
-  await expect(quickbooks).toHaveAccessibleDescription(
-    "Ask an owner or admin to connect it.",
-  );
-  await expect(none).toBeEnabled();
-  await expect(main.getByTestId("vendor-member-note")).toHaveCount(0);
-  // A tap on it, forced past its disabled state, chooses nothing and stays.
-  await quickbooks.click({ force: true });
-  await expect(quickbooks).toHaveAttribute("aria-checked", "false");
-  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
-  await none.click();
-  await expect(none).toHaveAttribute("aria-checked", "true");
-  await main.getByRole("button", { name: "Turn on" }).click();
-  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
-  expect(await invoiceSettings()).toEqual({
-    vendor: "none",
-    holdAboveAmount: 500,
-  });
-  expect(left).toEqual([]);
+  await expect(
+    main.getByRole("radio", { name: "QuickBooks Online" }),
+  ).toBeDisabled();
+  await expect(main.getByRole("radio", { name: "None" })).toBeDisabled();
+  await expect(
+    main.getByRole("spinbutton", { name: "Approval limit" }),
+  ).toBeDisabled();
+  await expect(
+    main.getByRole("button", { name: /^(Save|Turn on)$/u }),
+  ).toHaveCount(0);
+  await expect(main.getByTestId("flow-change-admin-only")).toHaveText(line);
+  await expectNoAxeViolations(page);
+
+  await page.goto(FLOWS.invoice);
+  await expect(main.getByRole("button", { name: "Pause" })).toBeDisabled();
+  await expect(
+    main.getByRole("button", { name: "Archive flow" }),
+  ).toBeDisabled();
+  await expect(main.getByTestId("flow-change-admin-only")).toHaveText(line);
+
+  // Drawn for an owner, then refused as a member's: the platform's 403.
+  const before = await invoiceSettings();
+  await presentSession(page, "owner");
+  await page.goto(`${FLOWS.invoice}/setup`);
+  await presentSession(page, "member");
+  await main.getByRole("button", { name: "Save" }).click();
+  await expect(main.getByRole("alert").filter({ hasText: line })).toBeVisible();
+  expect(await invoiceSettings()).toEqual(before);
 });
 
 test("a vendor connected since its Connect integration page was read is reused at the tap — chosen, saved and back to the flow — with no consent asked (Build 25's audit; the review's R5c 5)", async ({
