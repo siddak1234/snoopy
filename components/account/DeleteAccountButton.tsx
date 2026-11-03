@@ -177,6 +177,11 @@ export default function DeleteAccountButton() {
             account stays and you can try again; anything already removed stays
             removed. This cannot be undone.
           </p>
+          {/* The platform signs this account out everywhere once it is
+              deleted (backend §12.1 #248, S1-10). */}
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            You&apos;ll be signed out on all devices.
+          </p>
           <FormError message={outcome?.message ?? null} className="mt-2" />
           <div className="mt-4 flex flex-wrap gap-2">
             {outcome?.kind === "expired" ? (

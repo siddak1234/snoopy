@@ -306,6 +306,10 @@ static `/quickbooks/disconnected` ("QuickBooks is disconnected", its
 "Reconnect QuickBooks" opening Connections), which the owner sets at
 Intuit; it reads nothing.
 
+Deleting the account (Settings, `components/account/DeleteAccountButton.tsx`)
+says what the route removes, and "You'll be signed out on all devices.": the
+platform ends every session of the account it deletes (backend §12.1 #248).
+
 ## Runs and approvals
 
 A job is its first run (backend ADR-0044): the platform lists each job once,

@@ -40,6 +40,8 @@ test("the confirmation says what the route removes, and promises no more", () =>
     "your account stays and you can try again",
     "anything already removed stays removed",
     "This cannot be undone",
+    // Every session ends with the account (backend §12.1 #248, S1-10).
+    "You&apos;ll be signed out on all devices.",
   ]) {
     assert.ok(
       prose.includes(sentence),
