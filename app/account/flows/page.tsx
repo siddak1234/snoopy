@@ -35,8 +35,9 @@ import { listWorkspaceProjects, resolveActiveWorkspaceId } from "@/lib/tenancy";
  * 2026-10-14: "theres no choose a team. there will be pre existing teams
  * depending on which flows are added"): Add sends no team, and the platform
  * puts the flow in the team of its kind — the card's category — making it when
- * the workspace has none. Every flow says its team, "Team: Accounting"; one
- * added to the whole workspace before teams says that instead.
+ * the workspace has none. The department is its group's header, so the card
+ * no longer says it (the owner's build 34 F4; ~~"Department: Accounting", or
+ * "Whole workspace", on each flow's row~~ until then).
  *
  * **A workspace holds each flow once** (the owner, build 12's #9; register
  * F87): Personal is one workspace and each organization another. A flow is
@@ -48,14 +49,18 @@ import { listWorkspaceProjects, resolveActiveWorkspaceId } from "@/lib/tenancy";
  *
  * **A flow is opened, not worked on its card** (Build 21, spec A6; the
  * owner's AM4: "after that flow page is the run page"): each flow the
- * workspace holds shows its team, its status and Open — its page, where it is
- * run, set up again, paused, moved and archived. Add adds the flow and opens
+ * workspace holds shows its status and Open — its page, where it is run, set
+ * up again, paused, moved and archived. Add adds the flow and opens
  * its Set up, once. ~~Run, Set up, Turn on / Pause, Archive flow, the move and
  * the webhook address on the card~~ until Build 21.
  *
  * **By department** (plan §3; the owner's build 28 item 1): the cards are
  * grouped under their department, the catalog's `category`, the departments
- * A–Z (`byDepartment`) — the header says it, so the card no longer does.
+ * A–Z (`byDepartment`) — the header says it, so the card no longer does. A
+ * card is its name, its description, each flow added and Add or Added ✓
+ * (the owner's build 34 F4: "we do not need words like HR included and
+ * Department: healthcare inside the flow component"; ~~its price,
+ * "Included"~~ until then).
  *
  * Archived flows are read by name (`status=archived`, backend §12.1 #203) and
  * listed last, each with the day it was archived (BUILD-PLAN 24.11.11) and
@@ -150,7 +155,6 @@ export default async function FlowsPage() {
                   key={`${automation.templateId}.v${automation.version}`}
                   automation={automation}
                   subscriptions={byTemplate.get(automation.templateId) ?? []}
-                  place={place}
                   workspaceId={workspaceId}
                 />
               ))}
@@ -227,12 +231,10 @@ export default async function FlowsPage() {
 function AutomationCard({
   automation,
   subscriptions,
-  place,
   workspaceId,
 }: {
   automation: AutomationCatalogEntry;
   subscriptions: Subscription[];
-  place: (subscription: Subscription) => string;
   /** The workspace this page shows; Add is refused once it is not active. */
   workspaceId: string;
 }) {
@@ -256,13 +258,6 @@ function AutomationCard({
 
       <p className="text-sm text-[var(--muted)]">{automation.description}</p>
 
-      {/* The price; the version is not the card's to say (spec §3.A, S9). */}
-      <p className="text-xs text-[var(--text)]">
-        {automation.monthlyPriceUsd === 0
-          ? "Included"
-          : `$${automation.monthlyPriceUsd}/mo`}
-      </p>
-
       {/* `available` is evidence from a reachability probe. Saying so beats an
           Add button that fails at the first run. */}
       {!automation.available ? (
@@ -272,37 +267,29 @@ function AutomationCard({
       ) : null}
 
       {subscriptions.map((subscription) => (
-        // Where "Added ✓" below goes: the flow, its team, status and Open.
+        // Where "Added ✓" below goes: the flow, its status and Open.
         <div
           key={subscription.id}
           id={`flow-${subscription.id}`}
           tabIndex={-1}
-          className={`flex flex-col ${SPACING.inner.gap} border-t border-[var(--ring)] ${SPACING.group.pt}`}
+          className={`flex items-center justify-between ${SPACING.inner.gap} border-t border-[var(--ring)] ${SPACING.group.pt}`}
         >
-          <div
-            className={`flex items-center justify-between ${SPACING.inner.gap}`}
+          <Button
+            href={flowPath(subscription.id)}
+            variant="secondary"
+            size="sm"
+            prefetch={false}
+            aria-label={`Open ${automation.name}`}
           >
-            <p className="text-xs text-[var(--muted)]">{place(subscription)}</p>
-            <StatusPill status={subscription.status} />
-          </div>
-
-          <div>
-            <Button
-              href={flowPath(subscription.id)}
-              variant="secondary"
-              size="sm"
-              prefetch={false}
-              aria-label={`Open ${automation.name}`}
-            >
-              Open
-            </Button>
-          </div>
+            Open
+          </Button>
+          <StatusPill status={subscription.status} />
         </div>
       ))}
 
       <div className="mt-auto">
-        {/* Held, it says so and goes to it (the owner, build 12's #9); its
-            team is on its row above. */}
+        {/* Held, it says so and goes to it (the owner, build 12's #9): its
+            row above. */}
         {held ? (
           <a
             href={`#flow-${held.id}`}

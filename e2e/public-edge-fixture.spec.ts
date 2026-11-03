@@ -1821,16 +1821,15 @@ test("a danger button keeps AA contrast at rest, hovered and pressed: Archive fl
   await page.mouse.up();
 });
 
-test("a flow is held once per workspace: its row says its team, and its card says Added ✓, going to it, with no Add (the owner's build 12, #9; spec §3.A)", async ({
+test("a flow is held once per workspace: its row says its status and Open, no department, and its card says Added ✓, going to it, with no Add (the owner's build 12, #9; spec §3.A; build 34's F4)", async ({
   page,
 }) => {
   await page.goto("/account/flows");
-  // In the general team, as a draft: its row says where, and the card offers
-  // no Add but says it is added, going to its row.
+  // In the general team, as a draft: its group's header says the department,
+  // so the card does not (F4); the card offers no Add but says it is added,
+  // going to its row.
   const draft = automationCard(page, "Team draft automation");
-  await expect(
-    draft.locator("p", { hasText: "Department: general" }),
-  ).toBeVisible();
+  await expect(draft).not.toContainText("Department");
   await expect(draft.getByRole("combobox")).toHaveCount(0);
   await expect(draft.getByRole("button", { name: "Add" })).toHaveCount(0);
   const held = draft.getByRole("link", { name: "Added ✓" });
@@ -1842,8 +1841,8 @@ test("a flow is held once per workspace: its row says its team, and its card say
   await held.click();
   await expect(page).toHaveURL(/#flow-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb$/u);
   const row = page.locator("#flow-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
-  await expect(row).toContainText("Department: general");
-  // Its team, its status and Open — its page, where it is turned on.
+  await expect(row).toContainText(/draft/iu);
+  // Its status and Open — its page, where it is turned on.
   await expect(
     row.getByRole("link", { name: "Open Team draft automation" }),
   ).toHaveAttribute(
@@ -1862,15 +1861,14 @@ test("Add sends no team: the flow goes to the team of its category, which the pl
     }),
   ).toBeVisible();
   const card = automationCard(page, "Project automation");
-  // Under its category's header (build 28's item 1), its price, and no
-  // version (spec §3.A, S9).
+  // Under its category's header (build 28's item 1), with no price and no
+  // version (spec §3.A, S9; build 34's F4).
   await expect(
     page
       .getByTestId("flows-department")
       .filter({ has: page.getByRole("heading", { name: "Operations" }) }),
   ).toContainText("Project automation");
-  await expect(card).toContainText("Included");
-  await expect(card).not.toContainText("Version");
+  await expect(card).not.toContainText(/Included|Version/u);
   await expect(card.getByRole("combobox")).toHaveCount(0);
   await expect(card.getByRole("link", { name: "Added ✓" })).toHaveCount(0);
   await card.getByRole("button", { name: "Add" }).click();
@@ -1886,8 +1884,9 @@ test("Add sends no team: the flow goes to the team of its category, which the pl
   await expect(main.getByRole("button", { name: "Turn on" })).toBeVisible();
   await page.goto("/account/flows");
   await expect(
-    card.locator("p", { hasText: "Department: Operations" }),
+    card.getByRole("link", { name: "Open Project automation" }),
   ).toBeVisible();
+  await expect(card).not.toContainText("Department");
   await expect(card.getByRole("link", { name: "Added ✓" })).toBeVisible();
   await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
   await expect(card.getByRole("alert")).toHaveCount(0);
@@ -1928,22 +1927,22 @@ test("Add on a page drawn before another tab added that flow is refused in words
   // Nothing was sent: read again, the flow is in its team once.
   await page.reload();
   await expect(
-    card.locator("p", { hasText: "Department: Operations" }),
+    card.getByRole("link", { name: "Open Project automation" }),
   ).toHaveCount(1);
   await expect(card.getByRole("link", { name: "Added ✓" })).toBeVisible();
   await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
 });
 
-test("a flow held twice from before one flow per workspace keeps both copies listed, each under its place, and its card says Added ✓ once (the owner's build 12, #9; register F87)", async ({
+test("a flow held twice from before one flow per workspace keeps both copies listed, each its status and Open, and its card says Added ✓ once (the owner's build 12, #9; register F87; build 34's F4)", async ({
   page,
 }) => {
   await fixtureControl("flow-held-twice");
   await page.goto("/account/flows");
   const card = automationCard(page, "Project automation");
   await expect(
-    card.locator("p", { hasText: "Department: general" }),
-  ).toBeVisible();
-  await expect(card.locator("p", { hasText: "Whole workspace" })).toBeVisible();
+    card.getByRole("link", { name: "Open Project automation" }),
+  ).toHaveCount(2);
+  await expect(card).not.toContainText(/Department|Whole workspace/u);
   await expect(card.getByRole("link", { name: "Added ✓" })).toHaveCount(1);
   await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
 });
@@ -1985,7 +1984,7 @@ test("Unarchive adds an archived flow afresh by its card's own Add, to the team 
   );
   await expect(row.getByRole("button")).toHaveCount(0);
   await expect(
-    card.locator("p", { hasText: "Department: Operations" }),
+    card.getByRole("link", { name: "Open Archivable automation" }),
   ).toBeVisible();
   await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
   await added.click();
@@ -2047,7 +2046,7 @@ async function invoiceSettings() {
   ).invoiceConfig;
 }
 
-test("Invoice Processing: its card says its category, Included and its team; Add opens Set up — one page: 1 · Connect, its vendors and None; 2 · Settings, the Approval limit, no line under it — and Turn on turns it on and opens its page (the owner's AM4; spec A6)", async ({
+test("Invoice Processing: its card, under its department, says neither it nor a price (build 34's F4); Add opens Set up — one page: 1 · Connect, its vendors and None; 2 · Settings, the Approval limit, no line under it — and Turn on turns it on and opens its page (the owner's AM4; spec A6)", async ({
   page,
 }) => {
   await fixtureControl("invoice-not-added");
@@ -2058,8 +2057,7 @@ test("Invoice Processing: its card says its category, Included and its team; Add
       .getByTestId("flows-department")
       .filter({ has: page.getByRole("heading", { name: "Accounting" }) }),
   ).toContainText("Invoice Processing");
-  await expect(card).toContainText("Included");
-  await expect(card).not.toContainText(/Version|v3/u);
+  await expect(card).not.toContainText(/Included|Department|Version|v3/u);
   await card.getByRole("button", { name: "Add" }).click();
   await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
   const main = page.locator("main");

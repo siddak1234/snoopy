@@ -74,6 +74,9 @@ page reuses:
 
 - **Flows by department**: the Flows list groups its cards under their
   department, the departments A–Z (`app/account/flows/departments.ts`).
+  The header names the department, so a card says neither it nor a price:
+  its name, its description, each flow added (its status and Open) and Add
+  or Added ✓ (the owner's build 34 F4).
   The departments are the platform's seventeen team kinds, Healthcare the
   newest (platform round 2's B4, `lib/team-types.ts`); the website names a
   department in words and draws no icon for one.
