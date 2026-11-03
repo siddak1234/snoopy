@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
+import { FROM_ITEM } from "@/lib/run-progress";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 import { RunLive } from "../RunLive";
 import { readRunPage } from "../run-page-data";
@@ -13,7 +14,8 @@ import { readRunPage } from "../run-page-data";
  * Trigger and the full Run ID.
  * Every run's, whatever its flow: the standard row at the foot of a run's
  * page opens it. Read as the run's page is (`readRunPage`), kept live by the
- * same `RunLive`; another workspace's run is the same "not found".
+ * same `RunLive`; another workspace's run is the same "not found". Opened
+ * from a run that came from its job (`?from=item`, G1), back keeps that.
  */
 
 export const dynamic = "force-dynamic";
@@ -22,6 +24,7 @@ export default async function RunDetailsPage(
   props: PageProps<"/account/runs/[runId]/details">,
 ) {
   const { runId } = await props.params;
+  const { from } = await props.searchParams;
   const session = await getAppSession();
   const workspaceId = await resolveActiveWorkspaceId(session);
   if (!workspaceId) notFound();
@@ -38,6 +41,7 @@ export default async function RunDetailsPage(
       approvals={approvals}
       role={role}
       view="details"
+      fromItem={from === FROM_ITEM}
     />
   );
 }

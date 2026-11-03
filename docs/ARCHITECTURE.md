@@ -167,7 +167,10 @@ page reuses:
   then the Run details row, then Cancel run while it goes on and View flow;
   Duration, Steps done, the steps, Started, Ended, Trigger and the Run ID are
   on its details page, `/account/runs/[runId]/details`. What a run read comes
-  first, under "{Run word} details", in its result line's place.
+  first, under "{Run word} details", in its result line's place. Its back
+  goes to Activity; opened from its job's page — a ranked row there
+  (`?from=item`, `runPagePath`) — to that job, by the run's own `itemId`,
+  and its details page back to it on the way (the owner's G1).
 - **A page body is the platform's blocks** (backend ADR-0048): the run, item
   and file pages draw their fixed header and footer, then the blocks the
   one-run and one-item reads send with `shape=blocks` (`BLOCKS_SHAPE`), each

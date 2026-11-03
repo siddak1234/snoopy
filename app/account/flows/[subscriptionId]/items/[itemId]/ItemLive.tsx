@@ -126,6 +126,8 @@ export function ItemLive({
           testId="item-blocks"
           context={{
             subscriptionId,
+            // Its runs open so their back is this item (G1).
+            fromItem: true,
             forms: {
               run: (form) =>
                 canAdd ? (

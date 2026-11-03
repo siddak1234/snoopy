@@ -624,9 +624,27 @@ export function runLabel(id: string): string {
  */
 export const RUN_DETAILS = "Run details";
 
-/** A run's details page, under its own. */
-export function runDetailsPath(runId: string): string {
-  return `/account/runs/${encodeURIComponent(runId)}/details`;
+/**
+ * A run's page and its details page opened from its job's — an item's page
+ * (the owner's G1, build 31: "Why is it that when i go back from the
+ * candidate page it goes back to the activity"): `?from=item`, so their
+ * back goes to that job, found by the run's own `itemId`, never by an id the
+ * address names, as the app's back does. Opened anywhere else, a run's back
+ * is Activity.
+ */
+export const FROM_ITEM = "item";
+
+const fromItemQuery = (fromItem: boolean) =>
+  fromItem ? `?from=${FROM_ITEM}` : "";
+
+/** A run's page; from its job's, so its back goes there. */
+export function runPagePath(runId: string, fromItem = false): string {
+  return `/account/runs/${encodeURIComponent(runId)}${fromItemQuery(fromItem)}`;
+}
+
+/** A run's details page, under its own; from its job's, as its page was. */
+export function runDetailsPath(runId: string, fromItem = false): string {
+  return `/account/runs/${encodeURIComponent(runId)}/details${fromItemQuery(fromItem)}`;
 }
 
 /** What became of a held run's approval, as the run's page says it (the app's `heldDecision`). */

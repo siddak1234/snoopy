@@ -1046,3 +1046,28 @@ test("build 34's F5 — a member's YOUR FLOWS: a flow with items is not started 
       .getByRole("link", { name: "Item automation" }),
   ).toHaveAttribute("href", FLOW);
 });
+
+test("G1 — a run opened from its job's page goes back to that job, and its Run details back to it on the way; a run opened anywhere else goes back to Activity (the owner's build 31 G1)", async ({
+  page,
+}) => {
+  await page.goto(ITEM);
+  await itemRun(page, 1).click();
+  await expect(page).toHaveURL(new RegExp(`${SCORED_RUN}\\?from=item$`, "u"));
+  const back = page.locator("main").getByRole("link", { name: "Back" });
+  await expect(back).toHaveAttribute("href", ITEM);
+  await page.getByRole("link", { name: "Run details" }).click();
+  await expect(page).toHaveURL(
+    new RegExp(`${SCORED_RUN}/details\\?from=item$`, "u"),
+  );
+  await back.click();
+  await expect(page).toHaveURL(new RegExp(`${SCORED_RUN}\\?from=item$`, "u"));
+  await back.click();
+  await expect(page).toHaveURL(new RegExp(`${ITEM}$`, "u"));
+  // From anywhere else, its back is Activity, and its details' its page.
+  await page.goto(SCORED_RUN);
+  await expect(back).toHaveAttribute("href", "/account/runs");
+  await expect(page.getByRole("link", { name: "Run details" })).toHaveAttribute(
+    "href",
+    `${SCORED_RUN}/details`,
+  );
+});

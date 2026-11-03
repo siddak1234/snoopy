@@ -44,10 +44,22 @@ export const RENDERERS: { [K in Block["type"]]: Renderer<K> } = {
   metric: (block) => <MetricBlock block={block} />,
   badge: (block) => <BadgeBlock block={block} />,
   table: (block, context) => (
-    <Paged block={block} place={{ subscriptionId: context.subscriptionId }} />
+    <Paged
+      block={block}
+      place={{
+        subscriptionId: context.subscriptionId,
+        fromItem: context.fromItem,
+      }}
+    />
   ),
   list: (block, context) => (
-    <Paged block={block} place={{ subscriptionId: context.subscriptionId }} />
+    <Paged
+      block={block}
+      place={{
+        subscriptionId: context.subscriptionId,
+        fromItem: context.fromItem,
+      }}
+    />
   ),
   section: (block, _, inner) => <SectionBlock block={block} inner={inner} />,
   file: (block, context) => <FileBlock block={block} context={context} />,

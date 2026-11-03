@@ -9,8 +9,10 @@ import {
   choicesIn,
   groupsOf,
 } from "../lib/choices.ts";
+import { FROM_ITEM, runDetailsPath, runPagePath } from "../lib/run-progress.ts";
 import {
   elements,
+  loadBlocks,
   loadModules,
   parse,
   visibleWords,
@@ -19,7 +21,8 @@ import {
 /**
  * The owner's TestFlight build 34 feedback on the website (Round 21, stage 1,
  * C1; the same words and behaviour as the app): F1, a select whose choices
- * carry groups as a sheet in two steps.
+ * carry groups as a sheet in two steps; F5, Home's YOUR FLOWS; and the build
+ * 31 items G1 and G4, a run opened from its job going back to it.
  */
 
 const root = resolve(import.meta.dirname, "..");
@@ -311,4 +314,56 @@ test("F5: a flow opens in place to its run's first step; a flow with items reads
   assert.match(rows, /\{open \? \(/u);
   const start = read("app/account/flows/RunStart.tsx");
   assert.match(start, /: itemPage\s*\? "Start"\s*: "Start run"/u);
+});
+
+const RUN = "c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1";
+
+test("G1: a run opened from its job's page says so in its address, and so do its details; opened anywhere else, neither", () => {
+  assert.equal(FROM_ITEM, "item");
+  assert.equal(runPagePath(RUN), `/account/runs/${RUN}`);
+  assert.equal(runPagePath(RUN, true), `/account/runs/${RUN}?from=item`);
+  assert.equal(runDetailsPath(RUN), `/account/runs/${RUN}/details`);
+  assert.equal(
+    runDetailsPath(RUN, true),
+    `/account/runs/${RUN}/details?from=item`,
+  );
+});
+
+test("G1: on an item's page its runs' rows open from it; the same rows anywhere else open plainly", async () => {
+  const blocks = await loadBlocks();
+  loaded.push(blocks.cleanup);
+  const list = [
+    {
+      type: "list",
+      items: [{ title: "Ada Lane", open: { target: "run", runId: RUN } }],
+    },
+  ];
+  const href = (context) =>
+    elements(parse(blocks.render(list, context))).find(
+      (node) => node.attrs["data-testid"] === "block-list-row",
+    )?.attrs.href;
+  assert.equal(href({ fromItem: true }), `/account/runs/${RUN}?from=item`);
+  assert.equal(href({}), `/account/runs/${RUN}`);
+  const item = read(
+    "app/account/flows/[subscriptionId]/items/[itemId]/ItemLive.tsx",
+  );
+  assert.match(item, /fromItem: true,/u);
+});
+
+test("G1: a run's page from its job goes back to that job, by the run's own itemId; its details back to it the same way; otherwise back is Activity", () => {
+  const live = read("app/account/runs/[runId]/RunLive.tsx");
+  assert.match(
+    live,
+    /fromItem && run\.itemId\s*\? itemPath\(run\.subscriptionId, run\.itemId\)\s*: "\/account\/runs"/u,
+  );
+  assert.match(live, /href=\{runDetailsPath\(run\.id, fromItem\)\}/u);
+  assert.match(
+    live,
+    /back=\{<BackLink href=\{runPagePath\(run\.id, fromItem\)\} \/>\}/u,
+  );
+  for (const page of [
+    "app/account/runs/[runId]/page.tsx",
+    "app/account/runs/[runId]/details/page.tsx",
+  ])
+    assert.match(read(page), /fromItem=\{from === FROM_ITEM\}/u, page);
 });

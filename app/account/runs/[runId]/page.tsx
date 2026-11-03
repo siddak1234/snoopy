@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
+import { FROM_ITEM } from "@/lib/run-progress";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 import { RunLive } from "./RunLive";
 import { readRunPage } from "./run-page-data";
@@ -12,7 +13,8 @@ import { readRunPage } from "./run-page-data";
  * owner's item 9: the steps, Duration, Started, Ended, Trigger and Run ID on
  * a page of their own, `details/page.tsx`); the run package's buttons (Build
  * 24, P12; ~~Download JSON~~ until then) and View flow — read by
- * `readRunPage` and kept live by `RunLive`.
+ * `readRunPage` and kept live by `RunLive`. Opened from its job's page
+ * (`?from=item`, the owner's G1), its back goes to that job.
  */
 
 export const dynamic = "force-dynamic";
@@ -24,6 +26,7 @@ export default async function RunDetailPage(
   // literal above type-checked against the actual file tree: renaming the
   // segment breaks the build rather than producing an undefined param.
   const { runId } = await props.params;
+  const { from } = await props.searchParams;
   const session = await getAppSession();
   const workspaceId = await resolveActiveWorkspaceId(session);
   if (!workspaceId) notFound();
@@ -40,6 +43,7 @@ export default async function RunDetailPage(
       approvals={approvals}
       role={role}
       view="run"
+      fromItem={from === FROM_ITEM}
     />
   );
 }

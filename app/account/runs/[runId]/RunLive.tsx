@@ -33,6 +33,7 @@ import type {
   RunPackageFile,
 } from "@/lib/automations";
 import { formatDateTimeMediumUTC as formatWhen } from "@/lib/date";
+import { itemPath } from "@/lib/flow-items";
 import { flowPath } from "@/lib/flow-steps";
 import {
   PlatformApiError,
@@ -61,6 +62,7 @@ import {
   reviewTally,
   runDetailsPath,
   runDuration,
+  runPagePath,
   runLabel,
   stepsDone,
   trackerRows,
@@ -141,9 +143,12 @@ export function RunLive({
   approvals,
   role,
   view,
+  fromItem = false,
 }: {
   /** Which page: the run's own, or its details (build 28, item 9). */
   view: "run" | "details";
+  /** Opened from its job's page (`?from=item`, G1): back goes there. */
+  fromItem?: boolean;
   workspaceId: string;
   initial: RunDetail;
   flow: RunFlow;
@@ -283,7 +288,7 @@ export function RunLive({
       <SectionCard
         title={RUN_DETAILS}
         subheader={name}
-        back={<BackLink href={`/account/runs/${encodeURIComponent(run.id)}`} />}
+        back={<BackLink href={runPagePath(run.id, fromItem)} />}
         primaryAction={<StatusPill status={run.status} />}
       >
         <Group>
@@ -335,7 +340,15 @@ export function RunLive({
     <SectionCard
       title={name}
       subheader={flow?.name ?? run.templateId}
-      back={<BackLink href="/account/runs" />}
+      back={
+        <BackLink
+          href={
+            fromItem && run.itemId
+              ? itemPath(run.subscriptionId, run.itemId)
+              : "/account/runs"
+          }
+        />
+      }
       primaryAction={
         <>
           {headed && run.score !== undefined ? (
@@ -373,7 +386,10 @@ export function RunLive({
             <PackageActions workspaceId={workspaceId} runId={run.id} view />
           </div>
         ) : null}
-        <PageRow href={runDetailsPath(run.id)} testId="run-details-row">
+        <PageRow
+          href={runDetailsPath(run.id, fromItem)}
+          testId="run-details-row"
+        >
           <span className="font-medium text-[var(--text)]">{RUN_DETAILS}</span>
         </PageRow>
         <div
