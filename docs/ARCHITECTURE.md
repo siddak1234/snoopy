@@ -339,8 +339,16 @@ Changes that carry a `group` (platform round 2's B3) are drawn under its
 heading, in both places, the groups in the order first sent and every one
 open, up to 400 changes (`reviewGroups`, `offeredDecisions`); Save review
 still waits for every answer. A review without groups is drawn as before.
+A change that offers other values (`options`, at most 3; backend ADR-0048
+amendment 5) has a third pill to one who may decide, "Other code", which
+opens their short list under the row; one picked is the row's answer, and
+the row says "Changed to {code}" (its value) until Accept or Deny is pressed
+instead. A page that draws no form reads no option (`ReviewRows`, as the
+fixture `review-held-options` reads). A saved review's count does not yet
+count an `other`, as the platform's own line does not.
 Saving sends every answer (`{decisions: [{id,
-decision}]}`) and the job always goes on; a refusal says "The review wasn't
+decision}]}`, or `{id, other}` for a picked value) and the job always goes
+on; a refusal says "The review wasn't
 saved. Try again." On Approvals such a row says "Review {n} changes",
 opening the run, in place of the pair. Once saved, the step that waited
 says "{a} accepted · {d} denied" on the run's details page, even while the

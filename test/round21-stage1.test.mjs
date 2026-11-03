@@ -2,7 +2,20 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { after, before, test } from "node:test";
-import { elements, loadModules, parse } from "./blocks-harness.mjs";
+import { BLOCK_FIXTURES } from "../lib/generated/platform-contracts/block-fixtures.ts";
+import {
+  OPTIONS_LIMIT,
+  OTHER_CODE,
+  changedTo,
+  offeredDecisions,
+  reviewAnswers,
+} from "../lib/run-progress.ts";
+import {
+  elements,
+  loadModules,
+  parse,
+  visibleWords,
+} from "./blocks-harness.mjs";
 
 /**
  * Round 21, stage 1, C2 on the website (the client half of the backend's
@@ -15,7 +28,10 @@ const read = (path) => readFileSync(resolve(root, path), "utf8");
 
 const FIELDS = "app/account/flows/ManifestFields.tsx";
 const SETUP = "app/account/flows/[subscriptionId]/setup/SetupForm.tsx";
+const DECISION = "app/account/approvals/ApprovalDecision.tsx";
 const STUBS = {
+  "@/app/account/flows/actions":
+    "export const decideApproval = async () => ({ ok: true });",
   "../../actions": "export const saveSetup = async () => ({ ok: true });",
   "./actions":
     "export const beginConnectionAuthorization = async () => ({ ok: false }); export const connectProviderWithKey = async () => ({ ok: false }); export const disconnectConnection = async () => ({ ok: false });",
@@ -225,4 +241,147 @@ test("S1-B2: Set up with the manifest's sections draws each vendor choice in its
     }),
   );
   assert.deepEqual(stepTitles(before), ["Connect", "Settings"]);
+});
+
+const optionsFixture = BLOCK_FIXTURES.find(
+  (fixture) => fixture.name === "review-held-options",
+);
+const heldOptions = optionsFixture.blocks.find(
+  (block) => block.type === "questions",
+).form;
+
+test("S1-B3: the words; a change keeps its other values, each value once, at most three; the answers posted may name one in place of Accept or Deny, never both", () => {
+  assert.equal(OTHER_CODE, "Other code");
+  assert.equal(changedTo("N18.31"), "Changed to N18.31");
+  assert.equal(OPTIONS_LIMIT, 3);
+  const [first, second] = offeredDecisions(heldOptions);
+  assert.deepEqual(first.options, [
+    { value: "N18.31", label: "N18.31 · Chronic kidney disease, stage 3a" },
+    { value: "N18.32", label: "N18.32 · Chronic kidney disease, stage 3b" },
+  ]);
+  assert.equal("options" in second, false);
+  const [many] = offeredDecisions({
+    decisions: [
+      {
+        id: "a",
+        label: "A",
+        options: [
+          { value: "1", label: "One" },
+          { value: "1", label: "One again" },
+          { value: "2", label: "Two" },
+          { value: 3, label: "Not shaped" },
+          { value: "4", label: "Four" },
+          { value: "5", label: "Five" },
+        ],
+      },
+    ],
+  });
+  assert.deepEqual(
+    many.options.map((option) => option.value),
+    ["1", "2", "4"],
+  );
+  assert.deepEqual(
+    reviewAnswers(
+      JSON.stringify([
+        { id: "n18-4-change", other: "N18.31" },
+        { id: "i10-keep", decision: "accepted" },
+      ]),
+    ),
+    [
+      { id: "n18-4-change", other: "N18.31" },
+      { id: "i10-keep", decision: "accepted" },
+    ],
+  );
+  for (const bad of [
+    [{ id: "a", decision: "accepted", other: "N18.31" }],
+    [{ id: "a", other: "" }],
+    [{ id: "a", other: 7 }],
+  ])
+    assert.equal(reviewAnswers(JSON.stringify(bad)), null, JSON.stringify(bad));
+});
+
+/** The review form drawn with `othersOf` and `answers` as its first state. */
+async function review({
+  othersOf = null,
+  answers = {},
+  canDecide = true,
+} = {}) {
+  const { ApprovalDecision } = await load(DECISION, (source) =>
+    source
+      .replace(
+        "useState<string | null>(null);\n  const [refused",
+        `useState<string | null>(${JSON.stringify(othersOf)});\n  const [refused`,
+      )
+      .replace(
+        'Record<string, Omit<ReviewAnswer, "id">>\n  >({});',
+        `Record<string, Omit<ReviewAnswer, "id">>\n  >(${JSON.stringify(answers)});`,
+      ),
+  );
+  const markup = draw(ApprovalDecision, {
+    approvalId: "a",
+    canDecide,
+    eligibleRoles: ["owner", "admin"],
+    workspaceId: "w",
+    decisions: offeredDecisions(heldOptions),
+    role: canDecide ? "owner" : "member",
+  });
+  return { markup, nodes: tree(markup) };
+}
+
+test('S1-B3: a change that offers other values has "Other code", which opens their short list; one without has none; a member sees neither', async () => {
+  const closed = await review();
+  const others = closed.nodes.filter(
+    (node) =>
+      node.tag === "button" &&
+      node.attrs["aria-label"]?.startsWith(`${OTHER_CODE}: `),
+  );
+  assert.deepEqual(
+    others.map((node) => node.attrs["aria-label"]),
+    ["Other code: N18.4 → N18.30"],
+  );
+  assert.equal(others[0].attrs["aria-expanded"], "false");
+  assert.ok(
+    !visibleWords(closed.markup).includes(
+      heldOptions.decisions[0].options[0].label,
+    ),
+  );
+
+  const open = await review({ othersOf: "n18-4-change" });
+  const [list] = open.nodes.filter(
+    (node) => node.attrs["data-testid"] === "review-others-n18-4-change",
+  );
+  assert.deepEqual(
+    elements(list)
+      .filter((node) => node.tag === "button")
+      .map((node) => node.children.map((child) => child.text).join("")),
+    [
+      "N18.31 · Chronic kidney disease, stage 3a",
+      "N18.32 · Chronic kidney disease, stage 3b",
+    ],
+  );
+
+  const member = await review({ canDecide: false });
+  assert.ok(!visibleWords(member.markup).includes(OTHER_CODE));
+});
+
+test('S1-B3: a row whose other value was picked says "Changed to {code}", Other code pressed, and the review may be saved', async () => {
+  const { markup, nodes } = await review({
+    answers: {
+      "n18-4-change": { other: "N18.31" },
+      "i10-keep": { decision: "accepted" },
+    },
+  });
+  const [changed] = nodes.filter(
+    (node) => node.attrs["data-testid"] === "review-changed-n18-4-change",
+  );
+  assert.equal(changed.children[0].text, "Changed to N18.31");
+  const other = nodes.find(
+    (node) => node.attrs["aria-label"] === "Other code: N18.4 → N18.30",
+  );
+  assert.equal(other.attrs["aria-pressed"], "true");
+  const save = nodes.find(
+    (node) => node.tag === "button" && node.children[0]?.text === "Save review",
+  );
+  assert.ok(!("disabled" in save.attrs), "every change answered");
+  assert.ok(!visibleWords(markup).includes("Accept or deny each change."));
 });
