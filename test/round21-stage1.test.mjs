@@ -844,3 +844,42 @@ test('S1-14: "Or export every record. A large workspace comes as several files, 
     "Download file",
   ]);
 });
+
+test("S1-15: a connected row with no email names the company its grant belongs to, in Connected's place; an email still comes first, and a row that is not connected says its state", () => {
+  const connection = (extra = {}) => ({
+    id: "c",
+    providerId: "quickbooks",
+    status: "connected",
+    externalAccount: { displayName: "Sandbox Company" },
+    usedByCount: 1,
+    ...extra,
+  });
+  assert.deepEqual(
+    connectionLine(connection({ companyName: "Harbor Supply Co." }), "oauth2"),
+    { text: "Harbor Supply Co.", tone: "muted" },
+  );
+  assert.deepEqual(connectionLine(connection(), "oauth2"), {
+    text: "Connected",
+    tone: "muted",
+  });
+  assert.deepEqual(
+    connectionLine(
+      connection({
+        companyName: "Harbor Supply Co.",
+        externalAccount: { displayName: "books@example.test" },
+      }),
+      "oauth2",
+    ),
+    { text: "books@example.test", tone: "muted" },
+  );
+  assert.deepEqual(
+    connectionLine(
+      connection({
+        companyName: "Harbor Supply Co.",
+        status: "reauthorization-required",
+      }),
+      "oauth2",
+    ),
+    { text: "Needs attention", tone: "warn" },
+  );
+});

@@ -45,6 +45,8 @@ export type RowConnection = {
   externalAccount: { displayName: string };
   usedByCount: number;
   errorCode?: string;
+  /** The company the grant belongs to, read once at connect (backend §12.1 #283). */
+  companyName?: string;
 };
 
 /**
@@ -153,7 +155,9 @@ export function connectionFor<C extends RowConnection>(
 
 /**
  * Line 2 of the row: the account's email when the platform holds one —
- * `externalAccount.displayName` carrying an `@` — else the state in a word;
+ * `externalAccount.displayName` carrying an `@` — else, connected, the
+ * company the grant belongs to (`companyName`, backend §12.1 #283: QuickBooks
+ * names no email), else the state in a word;
  * "Needs attention" in the warning colour; a public service (`isKeyless`),
  * "Connected"; one disconnected at the provider, "Disconnected in
  * {provider}" in the warning colour, its button Reconnect.
@@ -173,6 +177,10 @@ export function connectionLine(
   const name = connection?.externalAccount.displayName ?? "";
   if (state !== "not-connected" && name.includes("@"))
     return { text: name, tone: "muted" };
+  // No email, as QuickBooks sends none: the company the grant belongs to,
+  // when the platform read one at connect (§12.1 #283), in "Connected"'s place.
+  if (state === "connected" && connection?.companyName)
+    return { text: connection.companyName, tone: "muted" };
   if (state === "connected")
     return { text: CONNECTION_CONNECTED, tone: "muted" };
   if (state === "attention")

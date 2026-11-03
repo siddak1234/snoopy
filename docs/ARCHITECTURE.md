@@ -301,8 +301,11 @@ ADR-0043 §2)~~ until Round 21's stage 1. A provider whose
 `authType` is `none` (a public service, platform round 2's B5) has no
 connect step: it is connected for every workspace (`isKeyless`), its row
 says "Connected" with no Connect or Disconnect, Set up draws no Connect
-step for it, and it never holds a flow back. A connection the platform
-retired because the provider would not renew it (backend §12.1 #252:
+step for it, and it never holds a flow back. A connected row whose account
+names no email — QuickBooks sends none — says the company its grant belongs
+to (`ConnectionState.companyName`, read once at connect, backend §12.1 #283)
+in "Connected"'s place (`connectionLine` in `lib/connection-rows.ts`). A
+connection the platform retired because the provider would not renew it (backend §12.1 #252:
 `disconnected`, with the `errorCode` the refresh loop sets when it retires
 one) says "Disconnected in {provider}" in the warning colour, with
 Reconnect, on Connections and a step's vendor rows (`disconnectedAtProvider`
