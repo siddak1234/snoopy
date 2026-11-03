@@ -220,7 +220,8 @@ sections after it, never the error page (Round 21, D2.6); a run
 headed by its title and its score in its verdict's colour with View {file}
 and its file page (a file no longer linked framed by this site's route), its
 sections under "{Run word} details" and its Run details page — every body
-the platform's blocks; a run opened from its job going back to it (G1);
+the platform's blocks; a run opened from its job going back to it (G1),
+and Start on a job opening the new run's page from it (G4);
 Archive, an owner's buttons a member
 does not see and a member's presses refused in words, an unanswered list
 said "Unavailable", and an upload refused with the queue full said in the

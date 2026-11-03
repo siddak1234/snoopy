@@ -367,3 +367,16 @@ test("G1: a run's page from its job goes back to that job, by the run's own item
   ])
     assert.match(read(page), /fromItem=\{from === FROM_ITEM\}/u, page);
 });
+
+test("G4: Start on an item opens the new run's page from the item, so its back returns there; any other start opens it plainly", () => {
+  const start = read("app/account/flows/RunStart.tsx");
+  assert.match(
+    start,
+    /router\.push\(runPagePath\(result\.runId, itemPage\)\);/u,
+  );
+  assert.doesNotMatch(start, /onStarted/u);
+  const item = read(
+    "app/account/flows/[subscriptionId]/items/[itemId]/ItemLive.tsx",
+  );
+  assert.match(item, /itemId=\{form\.itemId \?\? item\.id\}\s*itemPage\s*\/>/u);
+});

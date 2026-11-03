@@ -38,7 +38,8 @@ import { SPACING } from "@/lib/spacing";
  * compact row opening its run's page. The run form is `RunStart`, drawn only
  * where a run can start (`canAddRun`: an owner or admin, the item ready and
  * not archived, the flow live, answering, with a run file); the run names
- * this item and joins the list as "Reading…". Its footer: Archive, for an
+ * this item, and its page opens from here, back returning here, where it is
+ * listed as "Reading…" (the owner's G4). Its footer: Archive, for an
  * owner or admin, behind its confirmation. An answer with no blocks draws the
  * header, the footer and the fallback sentence. ~~Its tiles and ranked rows
  * drawn here~~ until Round 21.
@@ -72,10 +73,9 @@ export function ItemLive({
   canManage: boolean;
   initialKey: string;
 }) {
-  const router = useRouter();
   const [detail, setDetail] = useState(initial);
   const [drawn, setDrawn] = useState(initial);
-  // The server drew the page again (a run started): its answer wins.
+  // The server drew the page again: its answer wins.
   if (drawn !== initial) {
     setDrawn(initial);
     setDetail(initial);
@@ -142,7 +142,6 @@ export function ItemLive({
                       initialKey={initialKey}
                       itemId={form.itemId ?? item.id}
                       itemPage
-                      onStarted={() => router.refresh()}
                     />
                   </div>
                 ) : null,

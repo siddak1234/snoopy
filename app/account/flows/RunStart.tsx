@@ -7,6 +7,7 @@ import { RocketLaunchIcon } from "@phosphor-icons/react/dist/ssr/RocketLaunch";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import type { AutomationRunInputField } from "@/lib/automations";
+import { runPagePath } from "@/lib/run-progress";
 import { setSubscriptionStatus, startRun } from "./actions";
 import { RunInputFields } from "./ManifestFields";
 import { SPACING } from "@/lib/spacing";
@@ -33,11 +34,12 @@ import { SPACING } from "@/lib/spacing";
  *
  * **On an item's page** (backend ADR-0046; plan §5.3) the same form starts a
  * run that names the item (`itemId`): its file, with the accepted types in
- * words beside it, and Start (`itemPage`). A run started there stays on the
- * item's page (`onStarted`), where it joins the ranked list as "Reading…",
- * and the form empties for the next file. Home's YOUR FLOWS starts a run of
- * an item chosen there with Start run, and opens its page (the owner's
- * build 34 F5).
+ * words beside it, and Start (`itemPage`). A run started there opens its
+ * page from the item (`runPagePath`), its steps arriving, and its back
+ * returns to the item (the owner's G4, build 31: "Shoukd i be taken into a
+ * step by step"; ~~it stayed on the item's page, the form emptied for the
+ * next file~~ until then). Home's YOUR FLOWS starts a run of an item chosen
+ * there with Start run, and opens its page (the owner's build 34 F5).
  */
 export function RunStart({
   workspaceId,
@@ -49,7 +51,6 @@ export function RunStart({
   initialKey,
   itemId,
   itemPage = false,
-  onStarted,
 }: {
   /** The workspace this page shows; every action is refused once it is not active. */
   workspaceId: string;
@@ -68,10 +69,8 @@ export function RunStart({
   initialKey: string;
   /** The item every run started here names: an item's page's, or the one Home's YOUR FLOWS chose. */
   itemId?: string;
-  /** On an item's page: its button says Start. */
+  /** On an item's page: its button says Start, and the run opens from the item. */
   itemPage?: boolean;
-  /** Called with a started run's id in place of going to its page. */
-  onStarted?: (runId: string) => void;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -120,14 +119,7 @@ export function RunStart({
         return;
       }
       if (!result.runId) return;
-      if (onStarted) {
-        // Emptied for the next file, under a new key.
-        setFileRound((round) => round + 1);
-        newRunKey();
-        onStarted(result.runId);
-        return;
-      }
-      router.push(`/account/runs/${result.runId}`);
+      router.push(runPagePath(result.runId, itemPage));
     });
   };
 

@@ -392,7 +392,7 @@ test("the upload card: the options, the values typed before and Other; a typed v
   });
 });
 
-test("an item's page: its runs ranked as the platform answers in compact rows the height of a section's, a failure dimmed; no sections; Add entry takes the run's types and stays here, the new run Reading…; axe", async ({
+test("an item's page: its runs ranked as the platform answers in compact rows the height of a section's, a failure dimmed; no sections; Add entry takes the run's types, and Start opens the new run's page, whose back returns here, the new run Reading…; axe (G4)", async ({
   page,
 }) => {
   await page.goto(ITEM);
@@ -433,8 +433,14 @@ test("an item's page: its runs ranked as the platform answers in compact rows th
   await add.getByLabel("Entry file").setInputFiles(entryPdf);
   await expect(add.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
   await add.getByRole("button", { name: "Start" }).click();
-  await expect(itemRun(page, 5)).toBeVisible();
+  // The owner's G4: the new run's page opens, from the item, and its back
+  // returns to it.
+  await expect(page).toHaveURL(/\/account\/runs\/[0-9a-f-]{36}\?from=item$/u);
+  const back = page.locator("main").getByRole("link", { name: "Back" });
+  await expect(back).toHaveAttribute("href", ITEM);
+  await back.click();
   await expect(page).toHaveURL(new RegExp(`${ITEM}$`, "u"));
+  await expect(itemRun(page, 5)).toBeVisible();
   const started = await fixtureRead<{ runStarts: Record<string, unknown>[] }>(
     "items",
   );

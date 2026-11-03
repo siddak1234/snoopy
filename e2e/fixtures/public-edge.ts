@@ -5508,6 +5508,18 @@ const server = createServer(
         state.runReadsRefused += 1;
         return respond(response, 503, problem(503, "Service Unavailable"));
       }
+      // A run of an item (backend ADR-0046) as its item lists it, with its
+      // own itemId: a run started on an item opens here, its back to the
+      // item (the owner's G1 and G4).
+      const ofItem = [...state.itemRuns.values()]
+        .flat()
+        .find((candidate) => candidate.id === runId);
+      if (ofItem)
+        return respond(response, 200, {
+          run: ofItem,
+          steps: [],
+          events: [],
+        } satisfies AutomationOperations["readRun"]["responses"][200]["content"]["application/json"]);
       const run = fixtureRun(runId);
       const failed = run.status === "failed";
       // Invoice Processing's runs: what each reported — no step that did not
