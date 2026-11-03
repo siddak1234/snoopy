@@ -10,6 +10,7 @@ import {
   offeredDecisions,
   reviewAnswers,
 } from "../lib/run-progress.ts";
+import { EMAIL_STATUS, addressStatus } from "../lib/flow-email.ts";
 import {
   elements,
   loadModules,
@@ -29,10 +30,13 @@ const read = (path) => readFileSync(resolve(root, path), "utf8");
 const FIELDS = "app/account/flows/ManifestFields.tsx";
 const SETUP = "app/account/flows/[subscriptionId]/setup/SetupForm.tsx";
 const DECISION = "app/account/approvals/ApprovalDecision.tsx";
+const EMAIL =
+  "app/account/flows/[subscriptionId]/email/EmailRecipientsForm.tsx";
 const STUBS = {
   "@/app/account/flows/actions":
     "export const decideApproval = async () => ({ ok: true });",
-  "../../actions": "export const saveSetup = async () => ({ ok: true });",
+  "../../actions":
+    "export const saveSetup = async () => ({ ok: true }); export const saveEmailRecipients = async () => ({ ok: true });",
   "./actions":
     "export const beginConnectionAuthorization = async () => ({ ok: false }); export const connectProviderWithKey = async () => ({ ok: false }); export const disconnectConnection = async () => ({ ok: false });",
   "./upload-actions":
@@ -71,6 +75,12 @@ async function load(path, mutate) {
 const draw = (component, props) =>
   server.renderToStaticMarkup(react.createElement(component, props));
 const tree = (markup) => elements(parse(markup));
+/** Every text in a drawn node, in order. */
+const textsOf = (node) =>
+  elements(node)
+    .flatMap((one) => one.children)
+    .filter((child) => child.text !== undefined)
+    .map((child) => child.text);
 
 test("S1-B1: a text setup field's example is its box's placeholder; a field without one, or another control, has none", async () => {
   const { SetupFields } = await load(FIELDS);
@@ -384,4 +394,58 @@ test('S1-B3: a row whose other value was picked says "Changed to {code}", Other 
   );
   assert.ok(!("disabled" in save.attrs), "every change answered");
   assert.ok(!visibleWords(markup).includes("Accept or deny each change."));
+});
+
+test('S1-7: each extra address says its consent — "Waiting for confirmation", "Confirmed" or "Unsubscribed" — matched without case; none sent, or one unknown, no line', async () => {
+  assert.deepEqual(EMAIL_STATUS, {
+    pending: "Waiting for confirmation",
+    confirmed: "Confirmed",
+    stopped: "Unsubscribed",
+  });
+  const recipients = {
+    subscriptionId: "s",
+    people: [{ email: "owner@example.test", role: "owner" }],
+    extra: [
+      "new@example.test",
+      "Old@Example.test",
+      "gone@example.test",
+      "odd@example.test",
+      "bare@example.test",
+    ],
+    extraStatuses: [
+      { email: "new@example.test", status: "pending" },
+      { email: "old@example.test", status: "confirmed" },
+      { email: "gone@example.test", status: "stopped" },
+      { email: "odd@example.test", status: "bounced" },
+    ],
+    canEdit: true,
+  };
+  assert.equal(addressStatus(recipients, "Old@Example.test"), "Confirmed");
+  assert.equal(addressStatus({ extra: [] }, "a@example.test"), null);
+
+  const { EmailRecipientsForm } = await load(EMAIL);
+  const nodes = tree(
+    draw(EmailRecipientsForm, {
+      workspaceId: "w",
+      subscriptionId: "s",
+      initial: recipients,
+    }),
+  );
+  const row = (address) =>
+    textsOf(
+      nodes.find(
+        (node) => node.attrs["data-testid"] === `email-extra-${address}`,
+      ),
+    );
+  assert.deepEqual(row("new@example.test"), [
+    "new@example.test",
+    "Waiting for confirmation",
+  ]);
+  assert.deepEqual(row("Old@Example.test"), ["Old@Example.test", "Confirmed"]);
+  assert.deepEqual(row("gone@example.test"), [
+    "gone@example.test",
+    "Unsubscribed",
+  ]);
+  assert.deepEqual(row("odd@example.test"), ["odd@example.test"]);
+  assert.deepEqual(row("bare@example.test"), ["bare@example.test"]);
 });

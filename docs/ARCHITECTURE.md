@@ -114,6 +114,12 @@ page reuses:
   section it names, so Connect is drawn only for an account the flow cannot
   run without, and is then 1. Without them, the four fixed sections, as
   before (`SetupFields` in `app/account/flows/ManifestFields.tsx`).
+- **A flow's extra email addresses** (backend §12.1 #289): on the flow's
+  email page each says its consent under it, "Waiting for confirmation",
+  "Confirmed" or "Unsubscribed" (`FlowEmailRecipients.extraStatuses`,
+  `addressStatus` in `lib/flow-email.ts`); a platform that sends none, no
+  line, as before. The confirmation email, its footer's "Stop these emails"
+  and the pages its links open are the platform's.
 - **Several files at once** (platform round 2's B2 as the batch addendum
   amends it): a run's file field that declares `multiple` (`RunFileField`)
   lets the chooser take several files and the camera add each photo, sends

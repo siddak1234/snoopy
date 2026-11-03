@@ -35,6 +35,39 @@ export const EMAIL_ASK_ADMIN = "Ask an owner or admin to change this.";
 export const EMAIL_INVALID = "Enter an email address.";
 export const EMAIL_DUPLICATE = "Already on the list.";
 export const EMAIL_SAVE_FAILED = "Could not save. Try again.";
+/**
+ * An extra address's consent, under it (backend §12.1 #289): a new address
+ * waits for its one confirmation email; only a confirmed one gets the run
+ * emails; an unsubscribed one stopped them.
+ */
+export const EMAIL_STATUS: Readonly<
+  Record<"pending" | "confirmed" | "stopped", string>
+> = {
+  pending: "Waiting for confirmation",
+  confirmed: "Confirmed",
+  stopped: "Unsubscribed",
+};
+
+/**
+ * The line under an extra address: its status's words, matched without case
+ * as the platform compares addresses; none when the platform sends no status
+ * for it (a platform from before consent), or one this build does not know.
+ */
+export function addressStatus(
+  recipients: {
+    extraStatuses?: readonly { email: string; status: string }[];
+  },
+  address: string,
+): string | null {
+  const wanted = address.toLowerCase();
+  const status = recipients.extraStatuses?.find(
+    (entry) => entry.email.toLowerCase() === wanted,
+  )?.status;
+  return status !== undefined && Object.hasOwn(EMAIL_STATUS, status)
+    ? EMAIL_STATUS[status as keyof typeof EMAIL_STATUS]
+    : null;
+}
+
 /** Step 5's address when its read failed (the session's S22). */
 export const EMAIL_UNAVAILABLE = "Unavailable";
 export function andMore(count: number): string {
