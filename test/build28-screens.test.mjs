@@ -216,8 +216,9 @@ test("Run details: its row on every run's page, after the package's buttons and 
   // The row is drawn for every run, under no condition: after the package's
   // buttons, directly over Cancel run and View flow (finding 2).
   const packaged = run.indexOf("<PackageActions");
-  const row = run.indexOf(
-    '<PageRow href={runDetailsPath(run.id)} testId="run-details-row">',
+  // Its address keeps where the run was opened from (G1).
+  const row = run.search(
+    /<PageRow\s+href=\{runDetailsPath\(run\.id, fromItem\)\}/u,
   );
   assert.ok(
     packaged > 0 && packaged < row,
@@ -225,14 +226,14 @@ test("Run details: its row on every run's page, after the package's buttons and 
   );
   assert.match(
     run.slice(row),
-    /^<PageRow href=\{runDetailsPath\(run\.id\)\} testId="run-details-row">[\s\S]*?<\/PageRow>\s*<div\s+className=\{`\$\{SPACING\.group\.top\} flex flex-wrap items-center \$\{SPACING\.inner\.gap\}`\}\s*>\s*(?:\{\s*\}\s*)?\{going \? \(\s*<CancelRunButton/u,
+    /^<PageRow\s+href=\{runDetailsPath\(run\.id, fromItem\)\}\s+testId="run-details-row"\s*>[\s\S]*?<\/PageRow>\s*<div\s+className=\{`\$\{SPACING\.group\.top\} flex flex-wrap items-center \$\{SPACING\.inner\.gap\}`\}\s*>\s*(?:\{\s*\}\s*)?\{going \? \(\s*<CancelRunButton/u,
   );
   assert.ok(run.indexOf("CancelRunButton") < run.indexOf("View flow"));
   assert.ok(
     !run
       .slice(0, row)
       .match(
-        /\{(?:going|headed|packageAvailable)[^?]*\? \(\s*<PageRow href=\{runDetailsPath/u,
+        /\{(?:going|headed|packageAvailable)[^?]*\? \(\s*<PageRow\s+href=\{runDetailsPath/u,
       ),
   );
   // What it read comes first, under the flow's word for a run, the first open.
