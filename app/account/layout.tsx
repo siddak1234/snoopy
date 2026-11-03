@@ -3,6 +3,8 @@ import { getAppSession } from "@/lib/app-session";
 import { loginHref } from "@/lib/platform-api";
 import { PlatformServerError } from "@/lib/platform-server";
 import { PlatformUnavailable } from "@/components/dashboard/PlatformUnavailable";
+import { OutsideSignIn } from "@/components/account/OutsideSignIn";
+import { outsideSignIns } from "@/lib/domain-only";
 import {
   administers,
   listWorkspaces,
@@ -43,6 +45,10 @@ export default async function AccountLayout({
   } catch (error) {
     if (!(error instanceof PlatformServerError)) throw error;
     if (error.status === 401) redirect(SIGN_IN);
+    // A domain-only organization refusing a sign-in outside its domains, at
+    // session resolve (§12.1 #221): its screen, with each sign-in to remove.
+    const outside = outsideSignIns(error.status, error.details);
+    if (outside) return <OutsideSignIn providers={outside} />;
     return (
       <PlatformUnavailable
         busy={error.status === 429}

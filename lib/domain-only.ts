@@ -12,6 +12,49 @@ export const DOMAIN_ONLY_SUB =
 export const JOIN_OUTSIDE_DOMAIN =
   "This organization admits only people who sign in with addresses at its verified domains.";
 
+/**
+ * A domain-only organization's workspace refuses, at session resolve, a
+ * person who holds a sign-in outside its verified domains (backend §12.1
+ * #221, option b′: 403 `outside_org_domain`, `OutsideOrgDomainDetails`),
+ * until that sign-in is removed; nothing is removed for them. The screen says
+ * `JOIN_OUTSIDE_DOMAIN`, then this, then "Remove {provider} sign-in" for each.
+ */
+export const OUTSIDE_SIGN_IN_NEXT = "Remove your other sign-in to continue.";
+
+/** A sign-in the refusal names (`OutsideOrgDomainDetails.providers`). */
+export type OutsideSignIn = "google" | "microsoft" | "apple";
+
+const SIGN_IN_NAME: Readonly<Record<OutsideSignIn, string>> = {
+  google: "Google",
+  microsoft: "Microsoft",
+  apple: "Apple",
+};
+
+export function removeSignIn(provider: OutsideSignIn): string {
+  return `Remove ${SIGN_IN_NAME[provider]} sign-in`;
+}
+
+/**
+ * The sign-ins to remove, when a refusal is the outside-domain one: a 403
+ * whose `details.reason` is `outside_org_domain`, its `providers` each once,
+ * those this build knows. `null` for any other refusal, or one naming none.
+ */
+export function outsideSignIns(
+  status: number,
+  details: Record<string, unknown> | undefined,
+): OutsideSignIn[] | null {
+  if (status !== 403 || details?.reason !== "outside_org_domain") return null;
+  const named = Array.isArray(details.providers) ? details.providers : [];
+  const known = [
+    ...new Set(
+      named.filter((provider): provider is OutsideSignIn =>
+        Object.hasOwn(SIGN_IN_NAME, String(provider)),
+      ),
+    ),
+  ];
+  return known.length > 0 ? known : null;
+}
+
 /** Approving someone who signs in from outside them while the setting is on. */
 export const APPROVAL_OUTSIDE_DOMAIN =
   "This person signs in with an address outside your verified domains, so they can't join while Verified domains only is on.";

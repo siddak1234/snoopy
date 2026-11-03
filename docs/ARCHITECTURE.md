@@ -306,6 +306,17 @@ static `/quickbooks/disconnected` ("QuickBooks is disconnected", its
 "Reconnect QuickBooks" opening Connections), which the owner sets at
 Intuit; it reads nothing.
 
+A domain-only organization that refuses a person at session resolve because
+they hold a sign-in outside its verified domains (backend §12.1 #221, option
+b′: 403 `outside_org_domain` naming those sign-ins) is the account area's
+own screen (`components/account/OutsideSignIn.tsx`, drawn by the account
+layout in place of the platform's notice): "This organization admits only
+people who sign in with addresses at its verified domains.", "Remove your
+other sign-in to continue." and "Remove {provider} sign-in" for each, which
+unlinks it as Settings' linked accounts do and reads the area again. The
+contract leaves which reads answer it to the platform; the layout's own
+session and workspace reads are where the website looks.
+
 Deleting the account (Settings, `components/account/DeleteAccountButton.tsx`)
 says what the route removes, and "You'll be signed out on all devices.": the
 platform ends every session of the account it deletes (backend §12.1 #248).

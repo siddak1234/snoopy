@@ -55,10 +55,15 @@ const STUBS = {
 
 /** A router where no app router is mounted: what a client page's hooks read here. */
 const NO_ROUTER = (source) =>
-  source.replace(
-    /import \{ useRouter \} from "next\/navigation";/u,
-    "const useRouter = () => ({ push() {}, refresh() {}, replace() {} });",
-  );
+  source
+    .replace(
+      /import \{ useRouter \} from "next\/navigation";/u,
+      "const useRouter = () => ({ push() {}, refresh() {}, replace() {} });",
+    )
+    .replace(
+      /import \{ usePathname, useRouter \} from "next\/navigation";/u,
+      'const usePathname = () => "/account"; const useRouter = () => ({ push() {}, refresh() {}, replace() {} });',
+    );
 
 let react;
 let server;
@@ -705,5 +710,75 @@ test("S1-9: \"Only an owner or admin can change this flow.\" — a member's Add,
       /if \(flowChangeRefused\(error\.status, error\.details\)\)\s*return \{ ok: false, error: FLOW_CHANGE_ADMIN_ONLY, state: "forbidden" \};/gu,
     )?.length,
     3,
+  );
+});
+
+test('S1-11: a domain-only organization refusing a sign-in outside its domains at session resolve is its own screen — "This organization admits only people who sign in with addresses at its verified domains.", "Remove your other sign-in to continue." and "Remove {provider} sign-in" for each; any other refusal is the platform\'s notice, as before', async () => {
+  const {
+    JOIN_OUTSIDE_DOMAIN,
+    OUTSIDE_SIGN_IN_NEXT,
+    outsideSignIns,
+    removeSignIn,
+  } = await import("../lib/domain-only.ts");
+  assert.equal(
+    JOIN_OUTSIDE_DOMAIN,
+    "This organization admits only people who sign in with addresses at its verified domains.",
+  );
+  assert.equal(OUTSIDE_SIGN_IN_NEXT, "Remove your other sign-in to continue.");
+  assert.equal(removeSignIn("microsoft"), "Remove Microsoft sign-in");
+  const refusal = (providers, reason = "outside_org_domain") => ({
+    reason,
+    providers,
+  });
+  assert.deepEqual(
+    outsideSignIns(403, refusal(["google", "apple", "google", "yahoo"])),
+    ["google", "apple"],
+  );
+  assert.equal(outsideSignIns(403, refusal([])), null);
+  assert.equal(outsideSignIns(403, refusal(["google"], "other")), null);
+  assert.equal(outsideSignIns(409, refusal(["google"])), null);
+
+  // The account layout, its session read refused.
+  const PLATFORM =
+    "export class PlatformServerError extends Error { constructor(message, status, code, details, retryAfterSeconds) { super(message); this.status = status; this.code = code; this.details = details; this.retryAfterSeconds = retryAfterSeconds; } }";
+  const layout = async (details) => {
+    const { modules, cleanup } = await loadModules(["app/account/layout.tsx"], {
+      mutate: (_, source) => NO_ROUTER(source),
+      stubs: {
+        "@/lib/platform-server": PLATFORM,
+        "@/lib/app-session": `import { PlatformServerError } from "./stub___lib_platform_server.mjs"; export const getAppSession = async () => { throw new PlatformServerError("Forbidden", 403, undefined, ${JSON.stringify(details)}); };`,
+        "@/lib/tenancy":
+          "export const administers = () => false; export const listWorkspaces = async () => []; export const resolveActiveWorkspaceId = async () => undefined;",
+        // The shell's bars, which this refusal never draws.
+        "@/components/dashboard/AccountTopBar":
+          "export const AccountTopBar = () => null;",
+        "@/components/dashboard/DashboardNav":
+          "export const DashboardSidebar = () => null; export const DashboardHeader = () => null;",
+      },
+    });
+    loaded.push(cleanup);
+    const AccountLayout = modules["app/account/layout.tsx"].default;
+    return tree(
+      server.renderToStaticMarkup(await AccountLayout({ children: null })),
+    );
+  };
+  const outside = await layout(refusal(["google", "apple"]));
+  const [screen] = outside.filter(
+    (node) => node.attrs["data-testid"] === "outside-sign-in",
+  );
+  assert.deepEqual(textsOf(screen), [
+    JOIN_OUTSIDE_DOMAIN,
+    OUTSIDE_SIGN_IN_NEXT,
+    "Remove Google sign-in",
+    "Remove Apple sign-in",
+  ]);
+  const plain = await layout({ reason: "something_else" });
+  assert.equal(
+    plain.filter((node) => node.attrs["data-testid"] === "outside-sign-in")
+      .length,
+    0,
+  );
+  assert.ok(
+    plain.some((node) => node.attrs.id === "platform-unavailable-title"),
   );
 });
