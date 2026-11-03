@@ -376,11 +376,11 @@ test("a version without groups is one row per declared step, numbered", () => {
 test("a run is named by its FULL id — never the request id, never the first eight (spec A8; the owner's D4 and AM2)", () => {
   const id = "793eef82-102d-81be-a2d3-9e8d4e2b2c36";
   assert.equal(runLabel(id), `Run ${id}`);
-  // Every page that names a run names it so, and none shows the request id.
+  // Every page that names a run names it so, and none shows the request id
+  // (Home names none since build 34's F5: YOUR FLOWS in Recent runs' place).
   for (const path of [
     "app/account/runs/[runId]/RunLive.tsx",
     "app/account/runs/page.tsx",
-    "app/account/page.tsx",
     // Approvals' rows (Build 24, P7: they leave as they are decided).
     "app/account/approvals/ApprovalDecision.tsx",
   ]) {
