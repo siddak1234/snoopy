@@ -345,7 +345,11 @@ platform's composer words it (backend `apps/runs/src/pages`), and no page
 holds code for one flow (`test/no-flow-code.test.mjs`).
 
 A run's page and its details page ("Screen standards") are one `RunLive`,
-read alike (`app/account/runs/[runId]/run-page-data.ts`). A batch run's page
+read alike (`app/account/runs/[runId]/run-page-data.ts`). A step titled by
+its connection ("QuickBooks updated") and a setting step's line read the
+connection choices the run started with (`RunDetail.connectionChoices`,
+backend §12.1 #290) over the flow's settings now; a run made before they were
+saved reads the flow's, as before. A batch run's page
 (ADR-0048 amendment 4) is drawn as the platform sends it: the batch's own
 blocks, then its `batch` part — "{unit plural}", "{n} {unit plural} queued"
 and each child run in order, its label, its status and a link to its run. A held job is

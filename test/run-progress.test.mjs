@@ -979,7 +979,12 @@ test("the run page draws the tracker's rows and words alone — never a step's s
     /trackerRows\(\s*steps,\s*flow\?\.pipeline,\s*flow\?\.groups,\s*run,\s*undefined,\s*flow\?\.pipeline,\s*\{\s*flow: flow\?\.tracker,\s*email: detail\.email,\s*decision: decided,\s*review,?\s*\},?\s*\);/u,
   );
   const page = read("app/account/runs/[runId]/run-page-data.ts");
-  assert.match(page, /stepTitle\(group, setup, subscription\.config\)/u);
+  // The run's own choices over the flow's (§12.1 #290; round21-stage1's S1-16).
+  assert.match(
+    page,
+    /const config = \{ \.\.\.subscription\?\.config, \.\.\.detail\.connectionChoices \};/u,
+  );
+  assert.match(page, /stepTitle\(group, setup, config\)/u);
   assert.match(page, /const line = settingLine\(/u);
   assert.match(
     page,

@@ -883,3 +883,82 @@ test("S1-15: a connected row with no email names the company its grant belongs t
     { text: "Needs attention", tone: "warn" },
   );
 });
+
+test("S1-16: a run's page reads the integration the run started with — its step's title and line — not the flow's choice now; a run made before choices were saved reads the flow's, as before", async () => {
+  const entry = {
+    templateId: "invoice-processing",
+    name: "Invoice Processing",
+    requiredConnections: [
+      { providerId: "quickbooks", displayName: "QuickBooks", optional: true },
+    ],
+    pipeline: [{ id: "record", title: "Record", group: "record" }],
+    groups: [
+      { id: "integration", title: "Connect integration" },
+      {
+        id: "record",
+        title: "Details saved",
+        titleByConnection: {
+          field: "vendor",
+          titles: [{ providerId: "quickbooks", title: "QuickBooks updated" }],
+        },
+      },
+    ],
+  };
+  const subscription = {
+    id: "s",
+    setup: [
+      {
+        key: "vendor",
+        control: "connection",
+        group: "integration",
+        defaultValue: "none",
+      },
+    ],
+    // The flow's choice now: None.
+    config: { vendor: "none" },
+  };
+  const page = async (connectionChoices) => {
+    const detail = {
+      run: {
+        id: RUN_ID,
+        subscriptionId: "s",
+        templateId: "invoice-processing",
+        status: "succeeded",
+      },
+      steps: [],
+      ...(connectionChoices ? { connectionChoices } : {}),
+    };
+    const { modules, cleanup } = await loadModules(
+      ["app/account/runs/[runId]/run-page-data.ts"],
+      {
+        stubs: {
+          "@/lib/automations": `export const emptyWhenUnavailable = (read) => read(); export const listApprovals = async () => ({ approvals: [] }); export const listAutomations = async () => ({ automations: [${JSON.stringify(entry)}], categories: [] }); export const readRun = async () => (${JSON.stringify(detail)}); export const readSubscription = async () => (${JSON.stringify(subscription)});`,
+          "@/lib/platform-server":
+            "export class PlatformServerError extends Error {} export class PlatformNotConfiguredError extends Error {}",
+          "@/lib/tenancy":
+            "export const roleInWorkspace = async () => 'owner';",
+        },
+      },
+    );
+    loaded.push(cleanup);
+    return (
+      await modules["app/account/runs/[runId]/run-page-data.ts"].readRunPage(
+        "w",
+        RUN_ID,
+      )
+    ).flow.tracker;
+  };
+  // Started with QuickBooks, though the flow chooses None now.
+  assert.deepEqual(await page({ vendor: "quickbooks" }), {
+    titles: {
+      integration: "Connect integration",
+      record: "QuickBooks updated",
+    },
+    settings: { integration: "QuickBooks" },
+  });
+  // A run from before: the flow's choice now.
+  assert.deepEqual(await page(undefined), {
+    titles: { integration: "Connect integration", record: "Details saved" },
+    settings: { integration: "None" },
+  });
+});

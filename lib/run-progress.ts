@@ -449,10 +449,11 @@ function trackerSub(
 
 /**
  * What a run's page knows of its flow, beside the run (Build 22; the session's
- * S23), as its server read it: each step's title as the flow's connection
- * choice names it NOW (`stepTitle`, "QuickBooks updated"), and each setting
- * step's line — the integration chosen, or "None" (`settingLine`) — a run's
- * own choice not being recorded (backend §12.1 #290). Absent when the flow
+ * S23), as its server read it: each step's title as the run's connection
+ * choice names it (`stepTitle`, "QuickBooks updated"), and each setting
+ * step's line — the integration chosen, or "None" (`settingLine`) — from the
+ * choices the run started with (backend §12.1 #290), else, for a run made
+ * before they were saved, the flow's now. Absent when the flow
  * could not be read: each step its own title, a setting step "Done" (the app's
  * M6).
  */
