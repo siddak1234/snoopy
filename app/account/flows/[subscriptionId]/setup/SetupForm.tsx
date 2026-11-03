@@ -7,6 +7,7 @@ import { FormError } from "@/components/ui/FormError";
 import { NumberedStep } from "@/components/ui/NumberedStep";
 import type {
   AutomationSetupField,
+  AutomationSetupSection,
   SubscriptionStatus,
 } from "@/lib/automations";
 import type { Connection, OfferedProvider } from "@/lib/connections";
@@ -70,6 +71,7 @@ export function SetupForm({
   status,
   available,
   setup,
+  sections,
   config,
   vendorFields,
   required,
@@ -85,6 +87,8 @@ export function SetupForm({
   available: boolean;
   /** The settings of the version the flow runs. */
   setup: AutomationSetupField[];
+  /** Its manifest's sections, when it declares them (`Subscription.setupSections`). */
+  sections?: AutomationSetupSection[];
   config: Record<string, unknown>;
   vendorFields: SetupVendorField[];
   /** The accounts the flow cannot run without. */
@@ -137,7 +141,12 @@ export function SetupForm({
     return returned ? returnedFor! : field.saved;
   };
 
-  const hasConnect = vendorFields.length > 0 || required.length > 0;
+  // The manifest's own sections (ADR-0048 amendment 5) draw each vendor
+  // choice in the section it names; Connect then holds only the accounts
+  // the flow cannot run without.
+  const declared = (sections?.length ?? 0) > 0;
+  const hasConnect =
+    (!declared && vendorFields.length > 0) || required.length > 0;
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -196,6 +205,36 @@ export function SetupForm({
     });
   };
 
+  /** One step's vendor choice: its rows, a tap the choice. */
+  const vendorRows = (field: SetupVendorField) => (
+    <div
+      key={field.key}
+      data-testid={`setup-vendor-${field.key}`}
+      className={`flex flex-col ${SPACING.inner.gap}`}
+    >
+      {/* A flow that chooses a vendor for more than one step names each step's choice. */}
+      {vendorFields.length > 1 ? (
+        <p className="text-xs font-medium text-[var(--muted)]">{field.title}</p>
+      ) : null}
+      <VendorRows
+        label={field.title}
+        options={field.options}
+        chosen={choiceOf(field)}
+        canManage={canManage}
+        // A member changes no flow already on; a new flow's first
+        // choice is theirs (ADR-0043 §2; the app's Set up).
+        readOnly={!canManage && !turnOn}
+        workspaceId={workspaceId}
+        saving={null}
+        returnTo={returnTo}
+        onChoose={(choice) => {
+          setError(null);
+          setPicked((current) => ({ ...current, [field.key]: choice }));
+        }}
+      />
+    </div>
+  );
+
   return (
     <Group className={`flex flex-col ${SPACING.group.gap}`}>
       {callbackStatus === "connected" ? (
@@ -216,36 +255,7 @@ export function SetupForm({
           className={`flex flex-col ${SPACING.group.gap}`}
         >
           <NumberedStep index={1} title={SECTION_NAME.connections} />
-          {vendorFields.map((field) => (
-            <div
-              key={field.key}
-              data-testid={`setup-vendor-${field.key}`}
-              className={`flex flex-col ${SPACING.inner.gap}`}
-            >
-              {/* A flow that chooses a vendor for more than one step names each step's choice. */}
-              {vendorFields.length > 1 ? (
-                <p className="text-xs font-medium text-[var(--muted)]">
-                  {field.title}
-                </p>
-              ) : null}
-              <VendorRows
-                label={field.title}
-                options={field.options}
-                chosen={choiceOf(field)}
-                canManage={canManage}
-                // A member changes no flow already on; a new flow's first
-                // choice is theirs (ADR-0043 §2; the app's Set up).
-                readOnly={!canManage && !turnOn}
-                workspaceId={workspaceId}
-                saving={null}
-                returnTo={returnTo}
-                onChoose={(choice) => {
-                  setError(null);
-                  setPicked((current) => ({ ...current, [field.key]: choice }));
-                }}
-              />
-            </div>
-          ))}
+          {declared ? null : vendorFields.map(vendorRows)}
           {required.length > 0 ? (
             <ConnectionsPanel
               workspaceId={workspaceId}
@@ -268,8 +278,13 @@ export function SetupForm({
         <SetupFields
           setup={setup}
           config={config}
+          sections={sections}
           firstSection={hasConnect ? 2 : 1}
           hideConnections
+          vendors={(key) => {
+            const field = vendorFields.find((one) => one.key === key);
+            return field ? vendorRows(field) : null;
+          }}
           missingChoices={missing}
         />
         <FormError message={error} />

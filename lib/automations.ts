@@ -33,6 +33,9 @@ export type AutomationCatalogEntry =
   components["schemas"]["AutomationCatalogEntry"];
 export type AutomationSetupField =
   components["schemas"]["AutomationSetupField"];
+/** One section of a flow's Set up, as its manifest declares it (`setupSections`, backend ADR-0048 amendment 5). */
+export type AutomationSetupSection =
+  components["schemas"]["AutomationSetupSectionDeclaration"];
 export type AutomationRunInputField =
   components["schemas"]["AutomationRunInputField"];
 export type AutomationCatalog =

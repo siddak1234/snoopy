@@ -46,7 +46,9 @@ import { SetupForm, type SetupVendorField } from "./SetupForm";
  * a vendor not connected is connected first, for an owner or admin, through
  * its sign-in, which comes back here; then each account the flow cannot run
  * without, the one connection row with its Connect. Then its settings by the
- * manifest's sections, the title and the input only — no help line.
+ * manifest's sections, the title and the input only — no help line: its own
+ * `setupSections` when it declares them, each vendor choice in the section it
+ * names (backend ADR-0048 amendment 5), else the four fixed ones.
  *
  * One button: **Turn on** for a draft — everything on the page saved and the
  * flow turned on, in one press — or **Save** for a flow on or paused, which
@@ -160,6 +162,7 @@ export default async function SetupPage(
         status={subscription.status}
         available={entry?.available === true}
         setup={setup}
+        sections={subscription.setupSections}
         config={subscription.config}
         vendorFields={vendorFields}
         required={required}

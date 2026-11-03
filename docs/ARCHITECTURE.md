@@ -107,6 +107,13 @@ page reuses:
   (`app/account/flows/ManifestFields.tsx`); "Optional" stays beside the
   title of a field that may be left empty, where the website has always
   drawn it.
+- **Set up's sections** (backend ADR-0048 amendment 5, the owner's build 34
+  F3): a manifest that declares `setupSections` (`Subscription.setupSections`)
+  has Set up drawn in them, in its order, by its titles, numbered, each its
+  fields by `sectionId` — a step's vendor choice (`VendorRows`) in the
+  section it names, so Connect is drawn only for an account the flow cannot
+  run without, and is then 1. Without them, the four fixed sections, as
+  before (`SetupFields` in `app/account/flows/ManifestFields.tsx`).
 - **Several files at once** (platform round 2's B2 as the batch addendum
   amends it): a run's file field that declares `multiple` (`RunFileField`)
   lets the chooser take several files and the camera add each photo, sends
