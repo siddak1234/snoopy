@@ -94,7 +94,7 @@ export type AutomationItems = components["schemas"]["AutomationItems"];
 export type AutomationItemField = components["schemas"]["AutomationItemField"];
 export type Item = components["schemas"]["Item"];
 export type RunSection = components["schemas"]["RunSection"];
-/** One of the thirteen blocks a run's or an item's page body is made of (backend ADR-0048 and its amendment 1). */
+/** One of the fourteen blocks a run's or an item's page body is made of (backend ADR-0048 and its amendments 1 to 5). */
 export type Block = components["schemas"]["Block"];
 export type BlockOpen = components["schemas"]["BlockOpen"];
 /** Each page's parts in the order the flow's pinned manifest gives (`Subscription.pages`). */

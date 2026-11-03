@@ -37,9 +37,9 @@ before(async () => {
 });
 after(() => blocks?.cleanup());
 
-test("the platform publishes the fixtures this site draws: 29 of them in block set 4", () => {
-  assert.equal(BLOCK_FIXTURES.length, 29, `${BLOCK_FIXTURES.length} fixtures`);
-  assert.ok(BLOCK_FIXTURES.every((fixture) => fixture.blockSetVersion === 4));
+test("the platform publishes the fixtures this site draws: 31 of them in block set 5", () => {
+  assert.equal(BLOCK_FIXTURES.length, 31, `${BLOCK_FIXTURES.length} fixtures`);
+  assert.ok(BLOCK_FIXTURES.every((fixture) => fixture.blockSetVersion === 5));
   for (const name of [
     "long-list",
     "long-table",
@@ -50,6 +50,8 @@ test("the platform publishes the fixtures this site draws: 29 of them in block s
     "review-held-waiting",
     "review-held-decided",
     "review-held-grouped",
+    "review-held-options",
+    "drawn-links",
   ])
     assert.ok(
       BLOCK_FIXTURES.some((fixture) => fixture.name === name),

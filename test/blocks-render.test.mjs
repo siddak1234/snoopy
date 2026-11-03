@@ -12,8 +12,8 @@ import {
 } from "./blocks-harness.mjs";
 
 /**
- * The thirteen block renderers, drawn (backend ADR-0048 decisions 8–10, and
- * its amendment 1's image, chart and group): each type
+ * The fourteen block renderers, drawn (backend ADR-0048 decisions 8–10, its
+ * amendment 1's image, chart and group, and amendment 5's links): each type
  * its words, its tone's theme token, its open or closed state and its press;
  * and everything this build does not know — a type at the top level or in a
  * section, a form, a page part, a target, a tone, a step state — drawn as the
@@ -39,7 +39,7 @@ const tree = (list, context) => elements(parse(draw(list, context)));
 const byTest = (nodes, id) =>
   nodes.filter((node) => node.attrs["data-testid"] === id);
 
-/** The contract's thirteen types, read from the generated union. */
+/** The contract's fourteen types, read from the generated union. */
 function unionTypes() {
   const generated = read("lib/generated/platform-contracts/automations.d.ts");
   const start = generated.indexOf("\n    Block:\n");
@@ -50,9 +50,9 @@ function unionTypes() {
   ].map((match) => match[1]);
 }
 
-test("the registry draws exactly the contract's thirteen types, keyed by the generated union", () => {
+test("the registry draws exactly the contract's fourteen types, keyed by the generated union", () => {
   const types = unionTypes();
-  assert.equal(types.length, 13, types.join(", "));
+  assert.equal(types.length, 14, types.join(", "));
   assert.deepEqual(Object.keys(blocks.RENDERERS).sort(), [...types].sort());
   assert.match(
     read("components/blocks/BlockList.tsx"),
@@ -390,6 +390,98 @@ test("link: its title, then its host muted under it, opening outside — https o
       ["p", undefined, undefined, undefined],
     ],
   );
+});
+
+test("links: full-width pill buttons, one under another, each its brand's mark and its label, opening outside — https only, checked again when drawn; no brand, site or one with no mark here the globe (ADR-0048 amendment 5)", () => {
+  const list = [
+    {
+      type: "links",
+      items: [
+        {
+          label: "LinkedIn",
+          url: "https://www.linkedin.com/in/jane",
+          brand: "linkedin",
+        },
+        { label: "GitHub", url: "https://github.com/jane", brand: "github" },
+        { label: "X", url: "https://x.com/jane", brand: "x" },
+        {
+          label: "Hugging Face",
+          url: "https://huggingface.co/jane",
+          brand: "huggingface",
+        },
+        { label: "Portfolio", url: "https://jane.example", brand: "site" },
+        { label: "Blog", url: "https://blog.jane.example" },
+        { label: "Odd", url: "https://odd.example", brand: "myspace" },
+        { label: "Not this", url: "http://jane.example" },
+      ],
+    },
+  ];
+  const markup = draw(list);
+  assert.deepEqual(visibleWords(markup), [
+    "LinkedIn",
+    "GitHub",
+    "X",
+    "Hugging Face",
+    "Portfolio",
+    "Blog",
+    "Odd",
+    "Not this",
+  ]);
+  const nodes = tree(list);
+  const [box] = byTest(nodes, "block-links");
+  assert.equal(box.tag, "ul");
+  assert.match(box.attrs.class, /flex-col/u);
+  const items = byTest(nodes, "block-links-item");
+  assert.deepEqual(
+    items.map((node) => [
+      node.tag,
+      node.attrs.href,
+      node.attrs.target,
+      node.attrs.rel,
+      node.attrs["data-brand"],
+    ]),
+    [
+      [
+        "a",
+        "https://www.linkedin.com/in/jane",
+        "_blank",
+        "noopener noreferrer",
+        "linkedin",
+      ],
+      [
+        "a",
+        "https://github.com/jane",
+        "_blank",
+        "noopener noreferrer",
+        "github",
+      ],
+      ["a", "https://x.com/jane", "_blank", "noopener noreferrer", "x"],
+      [
+        "a",
+        "https://huggingface.co/jane",
+        "_blank",
+        "noopener noreferrer",
+        "globe",
+      ],
+      ["a", "https://jane.example/", "_blank", "noopener noreferrer", "globe"],
+      [
+        "a",
+        "https://blog.jane.example/",
+        "_blank",
+        "noopener noreferrer",
+        "globe",
+      ],
+      ["a", "https://odd.example/", "_blank", "noopener noreferrer", "globe"],
+      ["p", undefined, undefined, undefined, undefined],
+    ],
+  );
+  for (const pill of items.filter((node) => node.tag === "a")) {
+    assert.match(pill.attrs.class, /\bw-full\b/u);
+    assert.match(pill.attrs.class, /\brounded-full\b/u);
+    // The mark, then the label: an icon read by no screen reader.
+    assert.equal(pill.children[0].tag, "svg");
+    assert.equal(pill.children[0].attrs["aria-hidden"], "true");
+  }
 });
 
 test("timeline: each step its state's look — the running one spinning — and a state this build does not know the unknown look", () => {
@@ -883,7 +975,7 @@ test("every platform fixture body passes the field check: nothing is logged but 
   }
 });
 
-test("the field check reads the generated table: one entry for each of the contract's thirteen types, a table's columns and rows among them", async () => {
+test("the field check reads the generated table: one entry for each of the contract's fourteen types, a table's columns and rows among them", async () => {
   const { modules, cleanup } = await loadModules([
     "lib/generated/platform-contracts/block-required.ts",
   ]);

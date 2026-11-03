@@ -12,6 +12,7 @@ import {
   FileBlock,
   ImageBlock,
   LinkBlock,
+  LinksBlock,
   MetricBlock,
   QuestionsBlock,
   SectionBlock,
@@ -31,10 +32,10 @@ type Renderer<K extends Block["type"]> = (
 ) => ReactNode;
 
 /**
- * The registry: one renderer for each of the contract's thirteen types, keyed
+ * The registry: one renderer for each of the contract's fourteen types, keyed
  * by the generated union, so a type the contract adds fails the build here
- * until it is drawn (backend ADR-0048 decisions 8 and 12, and its amendment
- * 1; `test/blocks-render`). A list or a table is drawn inside `Paged`, which
+ * until it is drawn (backend ADR-0048 decisions 8 and 12, and its amendments
+ * 1 and 5; `test/blocks-render`). A list or a table is drawn inside `Paged`, which
  * adds its search, sort and pages when it has more than 25 rows, or a
  * search when the platform marks the list `searchable`; it is handed the
  * place alone, never the page's forms.
@@ -64,6 +65,7 @@ export const RENDERERS: { [K in Block["type"]]: Renderer<K> } = {
   section: (block, _, inner) => <SectionBlock block={block} inner={inner} />,
   file: (block, context) => <FileBlock block={block} context={context} />,
   link: (block) => <LinkBlock block={block} />,
+  links: (block) => <LinksBlock block={block} />,
   timeline: (block) => <TimelineBlock block={block} />,
   questions: (block, context) => (
     <QuestionsBlock block={block} context={context} />

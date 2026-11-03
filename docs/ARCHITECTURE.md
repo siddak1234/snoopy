@@ -218,7 +218,11 @@ page reuses:
   (`GroupCard`, the owner's F6 and Q6) its title, then one card of its
   sections as drop-downs, divided, the first open and several open at
   once; a list is one card of divided rows, each score in its `valueTone`
-  (green or red, the run's verdict) beside its chip. The
+  (green or red, the run's verdict) beside its chip. Since block set 5
+  (ADR-0048 amendment 5), fourteen: a `links` block is full-width pill
+  buttons, one under another, each its `brand`'s mark from the icon set
+  (LinkedIn, GitHub, X; `site`, none, or one with no mark here, the globe)
+  and its label, opening outside, https only as a `link` is. The
   flow page draws its parts in `Subscription.pages.flow` order (`pageParts`),
   else today's. No page reads documents, sections, details or a flow's
   document, verdict or run words (`test/no-flow-code.test.mjs`), and both
