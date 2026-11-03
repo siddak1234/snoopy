@@ -128,7 +128,7 @@ test("a 409 keeps the account: branched on the status, said inline, nothing sign
 
 test("an answer that may have been lost keeps the account and says the outcome is unknown — never 'deleted'", () => {
   // The contract's 502 ("deleted, but the identity provider could not be
-  // reached") is raised only for a bearer caller — `apps/api/src/app.ts` throws
+  // reached") is raised only for a bearer caller — `snoopy-backend/apps/api/src/app.ts` throws
   // it only when `revoking` is set, and `nativeLogoutSession` returns undefined
   // without a bearer (backend F39) — so every 502 a cookie caller can receive
   // here is the Access hop failing. Every other 5xx and no answer at all is the
