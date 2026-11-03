@@ -4,8 +4,8 @@
  * workspace's owners and admins and the person who starts each run always get
  * it — the session's D1, approved by the owner (21:12Z) — and an owner or
  * admin may add more addresses on the flow's email page. The same rules and
- * words as the app's (snoopy-mobile `lib/view/flow-email.ts`,
- * `lib/content/screen-states.ts`).
+ * words as the app's (`snoopy-mobile/lib/view/flow-email.ts`,
+ * `snoopy-mobile/lib/content/screen-states.ts`).
  *
  * Pure, and loaded by its unit test as it is: no React and no `@/` import.
  */
