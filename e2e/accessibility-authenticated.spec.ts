@@ -32,6 +32,11 @@ const authenticatedRoutes: ReadonlyArray<{
   { path: "/account/billing" },
   { path: "/account/connections" },
   { path: "/account/organization" },
+  // A signed document's copy (Round 21, Stage 2): the one the organization starts with.
+  {
+    path: "/account/organization/documents/d0c0d0c0-d0c0-4d0c-8d0c-d0c0d0c0d0c0",
+    fixture: {},
+  },
   {
     path: "/account/teams/33333333-3333-4333-8333-333333333333",
     fixture: {},

@@ -27,8 +27,8 @@ import { ROW_BAND, SPACING } from "@/lib/spacing";
 /** The two decisions, as the platform names them (the API value stays `rejected`; the word is Deny). */
 export type Decision = "approved" | "rejected";
 
-/** Where a decision is: sent, saved, or refused — told to the page that shows it. */
-export type DecisionState = "sending" | "saved" | "refused";
+/** Where a decision is: sent, saved, refused, or refused because a disconnect expired the approval — told to the page that shows it. */
+export type DecisionState = "sending" | "saved" | "refused" | "expired";
 
 /**
  * Approve or Deny one held job (Build 24, P6; the session's S6: "Deny" and
@@ -46,6 +46,11 @@ export type DecisionState = "sending" | "saved" | "refused";
  * An approval that offers changes (`decisions`; Round 21, the platform
  * round's F2) is a review instead: `ReviewDecisions`, each change accepted or
  * denied, then Save review.
+ *
+ * An Approve a disconnect expired (S1-8b) says Stage 1's two lines in the
+ * pair's place, "Expired · {provider} was disconnected" over "Reconnect
+ * {provider}, then start the run again.", and offers no press: the approval
+ * is over.
  */
 export function ApprovalDecision({
   approvalId,
@@ -109,6 +114,7 @@ function DecisionPair({
   const [pending, startTransition] = useTransition();
   const [pressed, setPressed] = useState<Decision | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [expired, setExpired] = useState<string | null>(null);
 
   const decide = (decision: Decision) => {
     setError(null);
@@ -120,12 +126,27 @@ function DecisionPair({
       data.append("decision", decision);
       data.append("workspaceId", workspaceId);
       const result = await decideApproval(data);
-      if (!result.ok) setError(result.error);
-      onDecision?.(decision, result.ok ? "saved" : "refused");
+      const over = !result.ok && result.state === "approval-expired";
+      if (over) setExpired(result.error);
+      else if (!result.ok) setError(result.error);
+      onDecision?.(
+        decision,
+        result.ok ? "saved" : over ? "expired" : "refused",
+      );
     });
   };
 
   if (!canDecide) return <MayNotDecide eligibleRoles={eligibleRoles} />;
+  if (expired)
+    return (
+      <p
+        role="alert"
+        data-testid="decision-expired"
+        className="text-xs whitespace-pre-line text-[var(--warning-text)]"
+      >
+        {expired}
+      </p>
+    );
 
   return (
     <div className={`flex flex-col ${SPACING.inner.gap}`}>
@@ -438,6 +459,7 @@ export function ApprovalQueue({
   const [shown, setShown] = useState(rows);
   // Each row pressed here, and what it was decided — until it has left.
   const [decided, setDecided] = useState<Record<string, Decision | null>>({});
+  const [over, setOver] = useState<ReadonlySet<string>>(new Set());
   const [left, setLeft] = useState(0);
   if (drawn !== rows) {
     setDrawn(rows);
@@ -450,6 +472,12 @@ export function ApprovalQueue({
 
   const onDecision =
     (id: string) => (decision: Decision, state: DecisionState) => {
+      // Over (S1-8b): the row stays, its words in the pair's place, though
+      // the list drawn again no longer holds it.
+      if (state === "expired") {
+        setOver((current) => new Set(current).add(id));
+        return;
+      }
       if (state === "refused") {
         // Still waiting: the row stays, with the refusal in words.
         setDecided((current) => {
@@ -510,9 +538,11 @@ export function ApprovalQueue({
               <span data-testid={`approval-pill-${approval.id}`}>
                 <StatusPill
                   status={
-                    decision === "rejected"
-                      ? "denied"
-                      : (decision ?? approval.status)
+                    over.has(approval.id)
+                      ? "expired"
+                      : decision === "rejected"
+                        ? "denied"
+                        : (decision ?? approval.status)
                   }
                 />
               </span>

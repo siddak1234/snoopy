@@ -318,17 +318,35 @@ static `/quickbooks/disconnected` ("QuickBooks is disconnected", its
 "Reconnect QuickBooks" opening Connections), which the owner sets at
 Intuit; it reads nothing.
 
-A domain-only organization that refuses a person at session resolve because
-they hold a sign-in outside its verified domains (backend §12.1 #221, option
-b′: 403 `outside_org_domain` naming those sign-ins) has the account area's
-own screen, built (`components/account/OutsideSignIn.tsx`, drawn by the
-account layout in place of the platform's notice): "This organization admits
-only people who sign in with addresses at its verified domains.", "Remove
-your other sign-in to continue." and "Remove {provider} sign-in" for each,
-which unlinks it as Settings' linked accounts do and reads the area again.
-The platform does not send this refusal before Stage 2 (BUILD-PLAN 29.4.6;
-§12.1 #221), so nothing draws the screen until then; the website looks for
-it in the account layout's own session and workspace reads.
+The EHR (backend ADR-0050, D1: `authType` `smart-backend`, SMART Backend
+Services) is connected through Connections' key form, as a pasted-key
+provider is (`opensKeyForm` in `lib/smart-backend.ts`): its fields from
+`credentialFields`, the clinic's FHIR address and its help, and its vendor —
+a picker of radios only when the platform lists two or more `vendors`, the
+one it lists sent unseen otherwise (`app/account/connections/KeyFields.tsx`).
+Nothing secret is pasted: the platform signs with its own key for that
+vendor. An address it will not use is said by its reason ("Use the https
+address your EHR team gave you.", "That address didn't answer as a FHIR
+server.", "Your EHR hasn't turned on Autom8x yet. Ask your EHR team to
+activate it."; `smartBackendRefusal`; the app's too), and its row, connected, names the
+clinic's host (`connectionLine`). A flow step that offers the EHR sends an
+owner or admin to Connections, as any vendor that is not OAuth.
+
+A person who holds a sign-in outside a domain-only organization's verified
+domains (backend §12.1 #221, option b′) sees, in the account area while that
+organization is active, its own screen (`components/account/OutsideSignIn.tsx`):
+"This organization admits only people who sign in with addresses at its
+verified domains.", "Remove your other sign-in to continue." and "Remove
+{provider} sign-in" for each such sign-in, which unlinks it as Settings'
+linked accounts do and reads the area again. The platform refuses (403
+`outside_org_domain`, naming those sign-ins) only a request billed to that
+workspace, one whose path names it; the account layout's session and
+workspace reads name none and still answer, so the navigation stays. A
+page's own read is refused, its render fails, and the account area's error
+screen (`app/account/error.tsx`), with the session kept, makes one read
+that names the active workspace (its members, `outsideOnError` in
+`lib/domain-only.ts`): refused so, it draws this screen in place of "The
+platform could not answer just now". No page that loads makes that read.
 
 Deleting the account (Settings, `components/account/DeleteAccountButton.tsx`)
 says what the route removes, and "You'll be signed out on all devices.": the
@@ -340,6 +358,50 @@ purged that read makes a new, empty account. A second 5xx says the outcome
 is not known, and Try again sends the delete again; any other answer to the
 second attempt is said as the outcome table says (`outcomeFor`). No answer
 at all is not sent again on its own.
+
+## The health data agreement
+
+A flow that carries health data (backend ADR-0049, C3) is refused 403
+`agreement_required` on Add, on Start run and on an item's upload (which
+starts a run) until the workspace's owner has accepted the current health
+data agreement; nothing was made. Only on
+that refusal does the website read anything more (`agreementRefusal` in
+`lib/agreements.ts`): who the person is in the workspace and, for its owner,
+the text. The owner gets one dialog (`app/account/flows/HealthAgreementDialog.tsx`):
+"Health data agreement", "Version {n}", the text to scroll, "I'm authorized
+to sign for {organization}", Full name and Title, and "Accept and add flow"
+or "Accept and start run" (Start run, and an item's upload: its dialog opens
+over the upload card), "Adding…" or "Starting…" while it works, which accepts once, under the dialog's own key, then
+sends the add, the run or the item again under the key the refused one
+carried (`AddAutomation`, `RunStart`, `UploadItemCard`), so a lost answer
+adds or starts nothing twice; a press after that repeat was refused sends
+the repeat alone, never a second acceptance (`acceptThenRepeat`). A refused
+acceptance is said in place: a 403 asks the owner, a 503
+`agreement_not_published` says it isn't available yet, anything else in
+the platform's words. Anyone else sees "Ask your workspace owner to
+accept the health data agreement." and nothing more is sent (a member's
+upload is refused first as a member's: "Only an owner or admin can do
+this."); while no version is published the
+owner sees "The health data agreement isn't available yet.". No other add,
+run or item makes an extra call. The words are `lib/health-agreement.ts`, the
+app's too.
+
+The organization page lists the workspace's signed documents under
+"Documents", read once with the page, newest first: "Business Associate
+Agreement · Version {n}" over "Accepted by {name} on {date}", or "No
+documents yet." (`components/dashboard/OrgDocumentList.tsx`). A row opens
+the signed copy's page (`app/account/organization/documents/[documentId]/page.tsx`),
+the only place the copy is read; a document that is not this workspace's,
+or an id that is not one (the platform's 400), is "not found". The organization page is its owners' and
+admins' (register F55), so on the website the list is theirs, though the
+platform lets any member read it.
+
+The fixture Edge (`e2e/fixtures/health-data.ts`) answers these refusals
+as the published contract says. The platform's own — `agreement_required`
+on an add, a run and an item, `outside_org_domain`, and an Approve's 409
+`approval_expired` — are checked once against the live platform, on a test
+workspace, after backend #266 deploys and before this change is marked
+ready; no local Compose run is made for them.
 
 ## Runs and approvals
 
@@ -421,13 +483,19 @@ without changes is unchanged. The words are ICD-10 Code Check's words.md
 section 3, the app's too.
 
 A held job whose approval a disconnect expired (backend §12.1 #252,
-`Approval.expiredBy` with `connection-disconnected`) is built to say so over
-its run page's body: "Expired · {provider} was disconnected", then
-"Reconnect {provider}, then start the run again." — the provider named as
-the connection row names it (`disconnectedName`; `expiredByDisconnect` in
-`lib/run-progress.ts`). The platform does not send this expiry before Stage
-2 (BUILD-PLAN 29.4.6; §12.1 #252 approval half), so nothing draws it until
-then. A plain expiry, or a reason this build does not know, adds nothing.
+`Approval.expiredBy` with `connection-disconnected`) says so over its run
+page's body: "Expired · {provider} was disconnected", then "Reconnect
+{provider}, then start the run again." — the provider named as the
+connection row names it (`disconnectedName`; `expiredByDisconnect` in
+`lib/run-progress.ts`) — and its step offers no Approve or Deny. The
+platform sets it when the approvals list is read and on an Approve (backend
+§12.1 #252, S1-8b). That Approve is refused 409 `approval_expired` with
+`expiredBy`: the pair's place says the same two lines, with nothing to
+press, the provider named from one read of the providers made on that
+refusal only (`expiredApproval`, `app/account/approvals/expired-approval.ts`);
+Approvals keeps the row, "Expired", and it and the run pages are drawn
+again. A plain expiry, or a reason this build does not know, adds nothing
+and keeps the platform's words.
 
 A job that has documents and has ended or is held has a run package (backend
 ADR-0045; the platform says so, `RunDetail.packageAvailable`): View package, Download PDF and Download Excel replace Download

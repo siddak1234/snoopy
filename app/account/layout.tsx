@@ -45,9 +45,10 @@ export default async function AccountLayout({
   } catch (error) {
     if (!(error instanceof PlatformServerError)) throw error;
     if (error.status === 401) redirect(SIGN_IN);
-    // A domain-only organization refusing a sign-in outside its domains, at
-    // session resolve (§12.1 #221): its screen, with each sign-in to remove.
-    // Stage 2 (BUILD-PLAN 29.4.6; §12.1 #221): the platform does not send this before Stage 2.
+    // A domain-only organization refusing a sign-in outside its domains
+    // (§12.1 #221): its screen, with each sign-in to remove. The platform
+    // refuses only reads billed to that workspace, which these two are not,
+    // so a page's own read usually meets it first: `app/account/error.tsx`.
     const outside = outsideSignIns(error.status, error.details);
     if (outside) return <OutsideSignIn providers={outside} />;
     return (

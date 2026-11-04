@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { DOCUMENTS } from "@/lib/health-agreement";
 
 export const dashboardNavItems = [
   { href: "/account", label: "Home" },
@@ -114,13 +115,15 @@ function getPageTitle(pathname: string): string {
   // details (build 28, item 9), /account/teams/[id], and a flow's own
   // pages — its page, its Set up, its Connect integration (Build 21, spec A6;
   // ~~Connect vendor~~ until Build 22), who gets its email (Build 22) and an
-  // item's page (Round 19), which is "Flow" as its page is.
+  // item's page (Round 19), which is "Flow" as its page is; and a signed
+  // document's page, under the organization's Documents (Round 21, Stage 2).
   if (pathname.startsWith("/account/runs/")) {
     if (pathname.endsWith("/package")) return "Run package";
     if (pathname.endsWith("/details")) return "Run details";
     return "Run";
   }
   if (pathname.startsWith("/account/teams/")) return "Department";
+  if (pathname.startsWith("/account/organization/documents/")) return DOCUMENTS;
   if (pathname.startsWith("/account/flows/")) {
     if (pathname.endsWith("/setup")) return "Set up";
     if (pathname.endsWith("/vendor")) return "Connect integration";

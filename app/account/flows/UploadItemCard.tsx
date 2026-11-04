@@ -23,12 +23,17 @@ import {
   selectChoices,
   uploadLabel,
 } from "@/lib/flow-items";
+import type { AgreementOffer } from "@/lib/health-agreement";
 import { createItem } from "./actions";
+import { HealthAgreementDialog } from "./HealthAgreementDialog";
 import { RunFileField } from "./RunFileField";
 import { SPACING } from "@/lib/spacing";
 
 /** Under a field the platform refused. */
 const CHECK_THIS = "Check this value.";
+
+/** One item as the card sends it. */
+type ItemInput = Parameters<typeof createItem>[0];
 
 /**
  * The upload card (Round 19, plan §5.2; backend ADR-0046): a dialog that
@@ -46,6 +51,13 @@ const CHECK_THIS = "Check this value.";
  * drop-down too — so only a resend of the same values reuses it. A required
  * select left unchosen is said on the card, as the file is. A refusal is said
  * on the card, and a field the platform refused says so under it.
+ *
+ * An item starts a run, so a flow that carries health data refuses it until
+ * the workspace's owner accepts the health data agreement (backend ADR-0049,
+ * C3-b): the owner reads and accepts it in `HealthAgreementDialog`, drawn
+ * beside the card, never in its form, whose "Accept and start run" sends the
+ * same item again under the same key; anyone else sees "Ask your workspace
+ * owner to accept the health data agreement." on the card.
  */
 export function UploadItemCard({
   workspaceId,
@@ -80,6 +92,11 @@ export function UploadItemCard({
   const [fileBusy, setFileBusy] = useState(false);
   // Bumped to empty the file field when the platform will not take its file.
   const [fileRound, setFileRound] = useState(0);
+  // The agreement to accept, and the item it refused, as it was sent.
+  const [offer, setOffer] = useState<{
+    agreement: AgreementOffer;
+    input: ItemInput;
+  } | null>(null);
   const file: AutomationRunInputField = {
     key: declared.file.key,
     title: declared.file.title,
@@ -111,107 +128,130 @@ export function UploadItemCard({
     setError(null);
     setRefused([]);
     startTransition(async () => {
-      const result = await createItem({
-        workspaceId,
-        subscriptionId,
-        fields: itemFieldValues(declared.fields, saved, picked, typed),
-        fieldKeys: declared.fields.map((field) => field.key),
-        file: artifactId,
-        idempotencyKey: itemKey,
-      });
-      if (!result.ok) {
-        setError(result.error);
-        setRefused(result.fields ?? []);
-        if (result.state === "file-unavailable") {
-          setFileRound((round) => round + 1);
-          newItemKey();
-        }
-        return;
-      }
-      onMade(result.item);
+      setError(
+        await send({
+          workspaceId,
+          subscriptionId,
+          fields: itemFieldValues(declared.fields, saved, picked, typed),
+          fieldKeys: declared.fields.map((field) => field.key),
+          file: artifactId,
+          idempotencyKey: itemKey,
+        }),
+      );
     });
+  };
+
+  /** One item as `input` holds it: its refusal in words, or null once it was made or the dialog opened. */
+  const send = async (input: ItemInput): Promise<string | null> => {
+    const result = await createItem(input);
+    if (result.ok) {
+      onMade(result.item);
+      return null;
+    }
+    if (result.agreement) {
+      setOffer({ agreement: result.agreement, input });
+      return null;
+    }
+    setRefused(result.fields ?? []);
+    if (result.state === "file-unavailable") {
+      setFileRound((round) => round + 1);
+      newItemKey();
+    }
+    return result.error;
   };
 
   const fieldError = (field: AutomationItemField) =>
     refused.includes(field.key) ? CHECK_THIS : undefined;
 
   return (
-    <Modal
-      onClose={onClose}
-      bubble
-      ariaLabelledBy={titleId}
-      zIndex={100}
-      dismissible={!pending}
-    >
-      <form
-        data-testid="item-upload"
-        onSubmit={submit}
-        onChange={newItemKey}
-        className={`flex flex-col ${SPACING.group.gap}`}
+    <>
+      <Modal
+        onClose={onClose}
+        bubble
+        ariaLabelledBy={titleId}
+        zIndex={100}
+        dismissible={!pending}
       >
-        <h2 id={titleId} className="text-xl font-semibold text-[var(--text)]">
-          {uploadLabel(declared.words)}
-        </h2>
-        {declared.fields.map((field) =>
-          field.control === "select" ? (
-            <SelectField
-              key={field.key}
-              field={field}
-              saved={saved[field.key]}
-              picked={picked[field.key] ?? ""}
-              typed={typed[field.key] ?? ""}
-              error={fieldError(field)}
+        <form
+          data-testid="item-upload"
+          onSubmit={submit}
+          onChange={newItemKey}
+          className={`flex flex-col ${SPACING.group.gap}`}
+        >
+          <h2 id={titleId} className="text-xl font-semibold text-[var(--text)]">
+            {uploadLabel(declared.words)}
+          </h2>
+          {declared.fields.map((field) =>
+            field.control === "select" ? (
+              <SelectField
+                key={field.key}
+                field={field}
+                saved={saved[field.key]}
+                picked={picked[field.key] ?? ""}
+                typed={typed[field.key] ?? ""}
+                error={fieldError(field)}
+                disabled={pending}
+                onPick={(value) => {
+                  setPicked((current) => ({ ...current, [field.key]: value }));
+                  newItemKey();
+                }}
+                onType={(value) =>
+                  setTyped((current) => ({ ...current, [field.key]: value }))
+                }
+              />
+            ) : (
+              <FormInput
+                key={field.key}
+                id={`item-${field.key}`}
+                label={field.title}
+                value={typed[field.key] ?? ""}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setTyped((current) => ({ ...current, [field.key]: value }));
+                }}
+                maxLength={field.maxLength ?? TEXT_MAX_LENGTH}
+                required={field.required}
+                disabled={pending}
+                error={fieldError(field)}
+                autoComplete="off"
+              />
+            ),
+          )}
+          <RunFileField
+            key={`${declared.file.key}:${fileRound}`}
+            field={file}
+            workspaceId={workspaceId}
+            subscriptionId={subscriptionId}
+            onBusyChange={(_, busy) => setFileBusy(busy)}
+            showTypes
+          />
+          <FormError message={error} />
+          <div className={`flex flex-wrap justify-end ${SPACING.inner.gap}`}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={onClose}
               disabled={pending}
-              onPick={(value) => {
-                setPicked((current) => ({ ...current, [field.key]: value }));
-                newItemKey();
-              }}
-              onType={(value) =>
-                setTyped((current) => ({ ...current, [field.key]: value }))
-              }
-            />
-          ) : (
-            <FormInput
-              key={field.key}
-              id={`item-${field.key}`}
-              label={field.title}
-              value={typed[field.key] ?? ""}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                setTyped((current) => ({ ...current, [field.key]: value }));
-              }}
-              maxLength={field.maxLength ?? TEXT_MAX_LENGTH}
-              required={field.required}
-              disabled={pending}
-              error={fieldError(field)}
-              autoComplete="off"
-            />
-          ),
-        )}
-        <RunFileField
-          key={`${declared.file.key}:${fileRound}`}
-          field={file}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={pending || fileBusy}>
+              {pending || fileBusy ? "Uploading…" : "Upload"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+      {offer ? (
+        <HealthAgreementDialog
+          key={offer.agreement.sha256}
+          offer={offer.agreement}
           workspaceId={workspaceId}
-          subscriptionId={subscriptionId}
-          onBusyChange={(_, busy) => setFileBusy(busy)}
-          showTypes
+          purpose="run"
+          onAccepted={() => send(offer.input)}
+          onClose={() => setOffer(null)}
         />
-        <FormError message={error} />
-        <div className={`flex flex-wrap justify-end ${SPACING.inner.gap}`}>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={onClose}
-            disabled={pending}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" disabled={pending || fileBusy}>
-            {pending || fileBusy ? "Uploading…" : "Upload"}
-          </Button>
-        </div>
-      </form>
-    </Modal>
+      ) : null}
+    </>
   );
 }
 

@@ -4,8 +4,10 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { setupPath } from "@/lib/flow-steps";
+import type { AgreementOffer } from "@/lib/health-agreement";
 import { FLOW_CHANGE_ADMIN_ONLY } from "@/lib/subscription-entitlements";
 import { subscribeToAutomation } from "./actions";
+import { HealthAgreementDialog } from "./HealthAgreementDialog";
 import { SPACING } from "@/lib/spacing";
 
 /**
@@ -32,6 +34,13 @@ import { SPACING } from "@/lib/spacing";
  * **Added, its Set up opens** (Build 21; the owner's AM4: "set up page is
  * initial, after that flow page is the run page"): one simple page with its
  * vendors and its few settings, and Turn on.
+ *
+ * **One add per press, under its key**: a flow that carries health data is
+ * refused until the workspace's owner accepts the health data agreement
+ * (backend ADR-0049, C3). The owner reads and accepts it in
+ * `HealthAgreementDialog`, and its "Accept and add flow" sends the add again
+ * with the same key; anyone else sees "Ask your workspace owner to accept the
+ * health data agreement." and Add does nothing more.
  */
 export function AddAutomation({
   templateId,
@@ -54,19 +63,32 @@ export function AddAutomation({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // The agreement to accept, and the key of the add it refused.
+  const [offer, setOffer] = useState<{
+    agreement: AgreementOffer;
+    key: string;
+  } | null>(null);
+
+  /** One add under `key`: its refusal in words, or null once it went or the dialog opened. */
+  const send = async (key: string): Promise<string | null> => {
+    const data = new FormData();
+    data.append("templateId", templateId);
+    data.append("workspaceId", workspaceId);
+    data.append("idempotencyKey", key);
+    const result = await subscribeToAutomation(data);
+    if (!result.ok) {
+      if (!result.agreement) return result.error;
+      setOffer({ agreement: result.agreement, key });
+      return null;
+    }
+    if (result.subscriptionId) router.push(setupPath(result.subscriptionId));
+    return null;
+  };
 
   const add = () => {
     setError(null);
     startTransition(async () => {
-      const data = new FormData();
-      data.append("templateId", templateId);
-      data.append("workspaceId", workspaceId);
-      const result = await subscribeToAutomation(data);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      if (result.subscriptionId) router.push(setupPath(result.subscriptionId));
+      setError(await send(`subscribe-${crypto.randomUUID()}`));
     });
   };
 
@@ -96,6 +118,16 @@ export function AddAutomation({
         <p role="alert" className="text-xs text-[var(--error-text)]">
           {error}
         </p>
+      ) : null}
+      {offer ? (
+        <HealthAgreementDialog
+          key={offer.agreement.sha256}
+          offer={offer.agreement}
+          workspaceId={workspaceId}
+          purpose="add"
+          onAccepted={() => send(offer.key)}
+          onClose={() => setOffer(null)}
+        />
       ) : null}
     </div>
   );

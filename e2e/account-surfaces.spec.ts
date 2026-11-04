@@ -168,6 +168,42 @@ test("F60 — while the boundary asks for the session it claims nothing: no aler
   ).toBeVisible();
 });
 
+// S1-11 (backend §12.1 #221): the platform refuses only a read billed to
+// the domain-only workspace — here the page's own, then the boundary's one
+// read that names the workspace.
+test("S1-11 — a page refused for a sign-in outside a domain-only organization's domains draws that screen from one read naming the workspace, in place of the platform's notice", async ({
+  page,
+}) => {
+  const billed: string[] = [];
+  await presentSession(page, "page-failing");
+  await page.route("**/api/platform/v1/workspaces/*/members", (route) => {
+    billed.push(route.request().url());
+    return route.fulfill({
+      status: 403,
+      contentType: "application/problem+json",
+      body: JSON.stringify({
+        title: "Forbidden",
+        status: 403,
+        details: { reason: "outside_org_domain", providers: ["google"] },
+      }),
+    });
+  });
+  await page.goto("/account/billing");
+  const screen = page.getByTestId("outside-sign-in");
+  await expect(screen).toContainText(
+    "This organization admits only people who sign in with addresses at its verified domains.",
+  );
+  await expect(
+    screen.getByRole("button", { name: "Remove Google sign-in" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "The platform could not answer just now",
+    }),
+  ).toHaveCount(0);
+  expect(billed).toHaveLength(1);
+});
+
 // The change audit of 97021f9's #17 (register § Round 15).
 test("F60 — when the boundary's own session read fails it claims nothing about the session, and offers Try again", async ({
   page,
@@ -2279,6 +2315,30 @@ test("Activity's search, sort and pages: Enter puts q in the address and the pla
       (query) => !new URLSearchParams(query).has("needsReview"),
     ),
   ).toBe(true);
+});
+
+// S1-8b (backend §12.1 #252): the connection the held run was built on was
+// disconnected after the page was read, so its Approve is refused.
+test("S1-8b — an Approve a disconnect expired says Stage 1's two lines in the pair's place, the row kept and Expired, with nothing more to press", async ({
+  page,
+}) => {
+  await fixtureControl("approval-waiting");
+  await fixtureControl("approval-disconnected");
+  await page.goto("/account/approvals");
+  const row = approvalRows(page).first();
+  await row.getByRole("button", { name: "Approve" }).click();
+  const words = row.getByTestId("decision-expired");
+  await expect(words).toContainText("Expired · QuickBooks was disconnected");
+  await expect(words).toContainText(
+    "Reconnect QuickBooks, then start the run again.",
+  );
+  await expect(row.getByRole("button")).toHaveCount(0);
+  await expect(row.locator('[data-testid^="approval-pill-"]')).toHaveText(
+    /expired/iu,
+  );
+  await expect(page.getByText("its connection was disconnected")).toHaveCount(
+    0,
+  );
 });
 
 test("P7 — under reduced motion a decided row leaves at once, with no fade", async ({

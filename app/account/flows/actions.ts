@@ -20,9 +20,11 @@ import {
   type Item,
   type UpdateSubscriptionRequest,
 } from "@/lib/automations";
+import { agreementRefusal } from "@/lib/agreements";
 import { VENDOR_MEMBER_NOTE } from "@/lib/connection-rows";
 import { EMAIL_SAVE_FAILED } from "@/lib/flow-email";
 import { problemFields } from "@/lib/flow-items";
+import type { AgreementOffer } from "@/lib/health-agreement";
 import { heldCopy } from "@/lib/held-flow";
 import { overPlanRefusal } from "@/lib/plan-limit";
 import { reviewAnswers } from "@/lib/run-progress";
@@ -32,6 +34,7 @@ import {
   subscriptionEntitlementState,
 } from "@/lib/subscription-entitlements";
 import { activeWorkspaceIfShown, WORKSPACE_CHANGED } from "@/lib/tenancy";
+import { expiredApproval } from "../approvals/expired-approval";
 import { uploadRefusalMessage } from "./upload-refusals";
 
 /**
@@ -74,7 +77,14 @@ export type ActionResult =
         | "vendor-not-connected"
         // A change only an owner or admin may make, refused: said in the
         // platform's words (Build 23's B3).
-        | "forbidden";
+        | "forbidden"
+        // A flow that carries health data, before the owner accepted the
+        // agreement (backend ADR-0049): the dialog's text, or the line.
+        | "agreement-required"
+        // An Approve a disconnect expired (S1-8b): `expiredApproval`.
+        | "approval-expired";
+      /** For the workspace's owner: the health data agreement to accept (`agreementRefusal`). */
+      agreement?: AgreementOffer;
     };
 
 /** The workspace the page showed, which the form sends (register F28). */
@@ -146,6 +156,11 @@ export async function subscribeToAutomation(
 ): Promise<ActionResult> {
   const templateId = String(formData.get("templateId") ?? "");
   if (!templateId) return { ok: false, error: "A flow is required" };
+  // The press's key (`AddAutomation`): the add the health data agreement
+  // refused is sent again under it once the owner accepts (backend ADR-0049).
+  const idempotencyKey = String(formData.get("idempotencyKey") ?? "");
+  if (!/^[A-Za-z0-9._~:-]{16,128}$/u.test(idempotencyKey))
+    return { ok: false, error: "Reopen the form and try again." };
   // No team is sent (backend ADR-0036): the platform puts the flow in the team
   // of its category, made when the workspace has none, and puts the person
   // adding it on that team. A team sent would be ignored, so none is.
@@ -160,11 +175,17 @@ export async function subscribeToAutomation(
     const { subscriptions } = await listSubscriptions(workspaceId);
     if (heldCopy(subscriptions, templateId))
       return { ok: false, error: ALREADY_IN_WORKSPACE };
-    const response = await createSubscription(workspaceId, body);
+    const response = await createSubscription(
+      workspaceId,
+      body,
+      idempotencyKey,
+    );
     revalidatePath("/account/flows", "layout");
     revalidatePath("/account/teams");
     return { ok: true, subscriptionId: response.subscription.id };
   } catch (error) {
+    const agreement = await agreementRefusal(error, shownWorkspace(formData));
+    if (agreement) return agreement;
     if (
       error instanceof PlatformServerError &&
       (error.status === 404 || error.status === 502)
@@ -492,6 +513,9 @@ export async function startRun(formData: FormData): Promise<ActionResult> {
     return { ok: true, runId: response.run.id };
   } catch (error) {
     if (!(error instanceof PlatformServerError)) throw error;
+    // A flow that carries health data (backend ADR-0049, C3-b), as on Add.
+    const agreement = await agreementRefusal(error, shownWorkspace(formData));
+    if (agreement) return agreement;
     const reason = error.details?.reason;
     const known =
       typeof reason === "string" && Object.hasOwn(RUN_REFUSALS, reason)
@@ -608,7 +632,10 @@ function decisionBody(formData: FormData): DecideApprovalRequest | null {
  * Decides an approval: `{decision}`, Approve or Deny; or, for an approval
  * that offers changes (Round 21, the platform round's F2), the review's
  * answers, `{decisions: [{id, decision}]}`, posted as JSON under `decisions`
- * by `ReviewDecisions`. A review saved always continues the job.
+ * by `ReviewDecisions`. A review saved always continues the job. An Approve
+ * a disconnect expired (409 `approval_expired` with `expiredBy`, S1-8b) is
+ * said in Stage 1's words (`expiredApproval`), and Approvals and the run
+ * pages are drawn again: the platform saved the expiry.
  */
 export async function decideApproval(
   formData: FormData,
@@ -620,10 +647,21 @@ export async function decideApproval(
   // drawn again too, where step 4 offered the decision (Build 24, P6). The
   // approval names the job's id (backend ADR-0044).
   let runId: string | undefined;
+  const refused: { expired?: ActionResult | null } = {};
   const result = await attempt(formData, async (workspaceId) => {
-    runId = (await decideWorkspaceApproval(workspaceId, approvalId, body))
-      .approval.runId;
+    try {
+      runId = (await decideWorkspaceApproval(workspaceId, approvalId, body))
+        .approval.runId;
+    } catch (error) {
+      refused.expired = await expiredApproval(error);
+      if (!refused.expired) throw error;
+    }
   });
+  if (refused.expired) {
+    revalidatePath("/account/approvals");
+    revalidatePath("/account/runs/[runId]", "page");
+    return refused.expired;
+  }
   if (result.ok) {
     revalidatePath("/account/approvals");
     revalidatePath("/account/runs");
@@ -676,7 +714,10 @@ export type ItemActionResult =
         | "file-unavailable"
         | "forbidden"
         | "plan-limit"
-        | "entitlements-unavailable";
+        | "entitlements-unavailable"
+        | "agreement-required";
+      /** For the workspace's owner: the health data agreement to accept (`agreementRefusal`). */
+      agreement?: AgreementOffer;
     };
 
 /** An item the platform would not make, for a reason this page cannot fix. */
@@ -699,7 +740,9 @@ const ITEM_VALUES_REFUSED =
  * changes (as a run's is, `startRun`): a resubmission after a lost answer
  * reuses it, and the platform answers the same item rather than a second.
  * A refused field is named by its key (`details.problems`), so the card says
- * so under it; a file that can no longer be used empties the file field.
+ * so under it; a file that can no longer be used empties the file field. An
+ * item of a flow that carries health data is refused as a run is, until the
+ * owner accepts the agreement (backend ADR-0049, C3-b): `agreementRefusal`.
  */
 export async function createItem(input: {
   /** The workspace the page showed. */
@@ -733,6 +776,8 @@ export async function createItem(input: {
     return { ok: true, item };
   } catch (error) {
     if (!(error instanceof PlatformServerError)) throw error;
+    const agreement = await agreementRefusal(error, input.workspaceId);
+    if (agreement) return agreement;
     const reason = error.details?.reason;
     if (error.status === 422 && reason === "artifact_unavailable") {
       return {
