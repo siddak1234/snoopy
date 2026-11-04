@@ -360,20 +360,24 @@ at all is not sent again on its own.
 ## The health data agreement
 
 A flow that carries health data (backend ADR-0049, C3) is refused 403
-`agreement_required` on Add and on Start run until the workspace's owner
-has accepted the current health data agreement; nothing was made. Only on
+`agreement_required` on Add, on Start run and on an item's upload (which
+starts a run) until the workspace's owner has accepted the current health
+data agreement; nothing was made. Only on
 that refusal does the website read anything more (`agreementRefusal` in
 `lib/agreements.ts`): who the person is in the workspace and, for its owner,
 the text. The owner gets one dialog (`app/account/flows/HealthAgreementDialog.tsx`):
 "Health data agreement", "Version {n}", the text to scroll, "I'm authorized
 to sign for {organization}", Full name and Title, and "Accept and add flow"
-or "Accept and start run", which accepts once, under the dialog's own key,
-then sends the add or the run again under the key the refused one carried
-(`AddAutomation`, `RunStart`), so a lost answer adds or starts nothing
-twice. Anyone else sees "Ask your workspace owner to accept the health data
-agreement." and nothing more is sent; while no version is published the
-owner sees "The health data agreement isn't available yet.". No other add
-or run makes an extra call. The words are `lib/health-agreement.ts`, the
+or "Accept and start run" (Start run, and an item's upload: its dialog opens
+over the upload card), which accepts once, under the dialog's own key, then
+sends the add, the run or the item again under the key the refused one
+carried (`AddAutomation`, `RunStart`, `UploadItemCard`), so a lost answer
+adds or starts nothing twice. Anyone else sees "Ask your workspace owner to
+accept the health data agreement." and nothing more is sent (a member's
+upload is refused first as a member's: "Only an owner or admin can do
+this."); while no version is published the
+owner sees "The health data agreement isn't available yet.". No other add,
+run or item makes an extra call. The words are `lib/health-agreement.ts`, the
 app's too.
 
 The organization page lists the workspace's signed documents under

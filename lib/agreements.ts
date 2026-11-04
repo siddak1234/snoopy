@@ -92,7 +92,7 @@ export async function readWorkspaceDocument(
   }
 }
 
-/** An add or a run refused for the agreement, as a server action answers it. */
+/** An add, a run or an item refused for the agreement, as a server action answers it. */
 export type AgreementRefusal = {
   ok: false;
   /** The line to show; empty when the dialog opens instead. */
@@ -103,8 +103,9 @@ export type AgreementRefusal = {
 };
 
 /**
- * A refused add or run (`createSubscription`, `createRun`) read as the
- * agreement's, or `null` when the refusal is another's. Only on this refusal
+ * A refused add, run or item (`createSubscription`, `createRun`,
+ * `createItem`) read as the agreement's, or `null` when the refusal is
+ * another's. Only on this refusal
  * does it read anything: the workspace list (who this person is there, and
  * its name) and, for its owner, the text — never on any other add or run.
  * The owner gets the text to accept, or "isn't available yet" while none is

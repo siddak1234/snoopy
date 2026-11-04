@@ -12,15 +12,21 @@ import {
 /**
  * Round 21, Stage 2 on the website, against the loopback fixture Edge, reset
  * before each test (its surfaces: `e2e/fixtures/health-data.ts`): the health
- * data agreement on Add and on Start run (backend ADR-0049, C3) — the dialog
- * for the workspace's owner, the one line for anyone else, the add or run
- * sent again under the refused one's key — and the organization's Documents
+ * data agreement on Add, on Start run and on an item's upload (backend
+ * ADR-0049, C3) — the dialog for the workspace's owner, the one line for
+ * anyone else, the add, run or item sent again under the refused one's key —
+ * and the organization's Documents
  * and one signed copy. Connect your EHR (ADR-0050, D1) is
  * `e2e/ehr-connect.spec.ts`. Every word is the spec's
  * (`lib/health-agreement.ts`).
  */
 
-test.use({ storageState: process.env.PLAYWRIGHT_AUTH_STORAGE_STATE });
+// An item's file goes straight to the fixture's object store, whose
+// certificate is the fixture's own, as e2e/flow-items.spec.ts's do.
+test.use({
+  storageState: process.env.PLAYWRIGHT_AUTH_STORAGE_STATE,
+  ignoreHTTPSErrors: true,
+});
 test.skip(
   process.env.E2E_PUBLIC_EDGE_FIXTURE !== "1",
   "requires the local public Edge fixture",
@@ -32,7 +38,7 @@ test.beforeEach(async () => {
 
 type Health = {
   healthRequests: {
-    path: "subscriptions" | "runs";
+    path: "subscriptions" | "runs" | "items";
     key: string | null;
     accepted: boolean;
   }[];
@@ -173,6 +179,73 @@ test("C3-b: a member's Start run of it is refused in the one line, the form kept
   await expect(form.getByRole("alert")).toHaveText(ASK_OWNER);
   await expect(agreement(page)).toHaveCount(0);
   await expect(form.getByLabel("Vendor")).toHaveValue("Acme Supplies");
+});
+
+/** The made-up flow with items (e2e/flow-items.spec.ts's): its upload card, named and its file ready. */
+async function readyUpload(page: Page) {
+  await fixtureControl("items-flow");
+  await page.goto("/account/flows/b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1");
+  await page.getByRole("button", { name: "Upload batch" }).click();
+  const card = page.getByTestId("item-upload");
+  await card.getByLabel("Name").fill("Health list");
+  await card.getByLabel("Batch file").setInputFiles({
+    name: "entry.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4 fixture entry"),
+  });
+  await expect(card.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
+  return card;
+}
+
+test("C3-b: the owner's upload of an item to a flow that carries health data opens the agreement over the card, and Accept and start run makes the same item under the same key", async ({
+  page,
+}) => {
+  await fixtureControl("health-data");
+  const card = await readyUpload(page);
+  await card.getByRole("button", { name: "Upload", exact: true }).click();
+  await expect(agreement(page)).toBeVisible();
+  await expect(card.getByText(ASK_OWNER)).toHaveCount(0);
+  await accept(page, "Accept and start run");
+  await expect(agreement(page)).toHaveCount(0);
+  await expect(card).toHaveCount(0);
+  const seen = await health();
+  expect(seen.acceptances).toHaveLength(1);
+  expect(
+    seen.healthRequests.map(({ path, accepted }) => [path, accepted]),
+  ).toEqual([
+    ["items", false],
+    ["items", true],
+  ]);
+  const [refused, repeated] = seen.healthRequests;
+  expect(refused.key).toMatch(/^item-/u);
+  expect(repeated.key).toBe(refused.key);
+});
+
+test("C3-b: an admin's upload of it says Ask your workspace owner… on the card — no dialog, nothing more sent", async ({
+  page,
+}) => {
+  await presentSession(page, "admin");
+  await fixtureControl("health-data");
+  const card = await readyUpload(page);
+  await card.getByRole("button", { name: "Upload", exact: true }).click();
+  await expect(card.getByText(ASK_OWNER)).toBeVisible();
+  await expect(agreement(page)).toHaveCount(0);
+  expect((await health()).healthRequests).toHaveLength(1);
+});
+
+test("C3-b: a member's upload of it is refused first as a member's: only an owner or admin can, never the agreement", async ({
+  page,
+}) => {
+  await fixtureControl("health-data");
+  const card = await readyUpload(page);
+  await presentSession(page, "member");
+  await card.getByRole("button", { name: "Upload", exact: true }).click();
+  await expect(
+    card.getByText("Only an owner or admin can do this."),
+  ).toBeVisible();
+  await expect(card.getByText(ASK_OWNER)).toHaveCount(0);
+  await expect(agreement(page)).toHaveCount(0);
+  expect((await health()).healthRequests).toHaveLength(0);
 });
 
 test("C3: the organization's Documents list each signed document — Business Associate Agreement · Version 1, Accepted by its signer on the day — and one opens its signed copy, headed the same, with the way back", async ({

@@ -697,7 +697,10 @@ export type ItemActionResult =
         | "file-unavailable"
         | "forbidden"
         | "plan-limit"
-        | "entitlements-unavailable";
+        | "entitlements-unavailable"
+        | "agreement-required";
+      /** For the workspace's owner: the health data agreement to accept (`agreementRefusal`). */
+      agreement?: AgreementOffer;
     };
 
 /** An item the platform would not make, for a reason this page cannot fix. */
@@ -720,7 +723,9 @@ const ITEM_VALUES_REFUSED =
  * changes (as a run's is, `startRun`): a resubmission after a lost answer
  * reuses it, and the platform answers the same item rather than a second.
  * A refused field is named by its key (`details.problems`), so the card says
- * so under it; a file that can no longer be used empties the file field.
+ * so under it; a file that can no longer be used empties the file field. An
+ * item of a flow that carries health data is refused as a run is, until the
+ * owner accepts the agreement (backend ADR-0049, C3-b): `agreementRefusal`.
  */
 export async function createItem(input: {
   /** The workspace the page showed. */
@@ -754,6 +759,8 @@ export async function createItem(input: {
     return { ok: true, item };
   } catch (error) {
     if (!(error instanceof PlatformServerError)) throw error;
+    const agreement = await agreementRefusal(error, input.workspaceId);
+    if (agreement) return agreement;
     const reason = error.details?.reason;
     if (error.status === 422 && reason === "artifact_unavailable") {
       return {

@@ -6,11 +6,12 @@
  * words as the app's (Round 21, Stage 2's NEW WORDS).
  *
  * A flow that carries health data is refused 403 `agreement_required`
- * (`AgreementRequiredDetails`) on Add and on Start run until the workspace's
- * owner accepts the current version. The owner reads it in one dialog
- * (`app/account/flows/HealthAgreementDialog.tsx`) and accepts, and the add or
- * the run is sent again with its own key; anyone else is told to ask the
- * owner. The signed copies are the workspace's Documents.
+ * (`AgreementRequiredDetails`) on Add, on Start run and on an item's upload
+ * (which starts a run) until the workspace's owner accepts the current
+ * version. The owner reads it in one dialog
+ * (`app/account/flows/HealthAgreementDialog.tsx`) and accepts, and the add,
+ * the run or the item is sent again with its own key; anyone else is told to
+ * ask the owner. The signed copies are the workspace's Documents.
  *
  * Pure, and loaded by its unit test as it is: no React and no `@/` import.
  */

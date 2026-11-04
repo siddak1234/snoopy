@@ -65,10 +65,10 @@ export function healthState() {
     healthData: false,
     agreementAccepted: false,
     agreementUnpublished: false,
-    // Every add and run start sent while the flows carry health data, with
-    // its key — a repeat after Accept must carry the refused one's.
+    // Every add, run start and item sent while the flows carry health data,
+    // with its key — a repeat after Accept must carry the refused one's.
     healthRequests: [] as {
-      path: "subscriptions" | "runs";
+      path: "subscriptions" | "runs" | "items";
       key: string | null;
       accepted: boolean;
     }[],
@@ -181,20 +181,30 @@ export async function healthRoute(input: {
     input;
   const scope = `/v1/workspaces/${input.workspaceId}`;
 
-  // An add or a run start while the flows carry health data: refused 403
-  // `agreement_required` until the owner accepts, nothing made — a member's
-  // add excepted, which the Edge refuses first as a member's. Once accepted,
-  // recorded and answered by the fixture's own routes.
+  // An add, a run start or an item (whose run it starts) while the flows
+  // carry health data: refused 403 `agreement_required` until the owner
+  // accepts, nothing made — a member's add or item excepted, which the Edge
+  // refuses first as a member's. Once accepted, recorded and answered by the
+  // fixture's own routes.
+  const item = new RegExp(`^${scope}/subscriptions/[^/]+/items$`, "u").test(
+    pathname,
+  );
   const start =
     method === "POST" &&
-    (pathname === `${scope}/subscriptions` || pathname === `${scope}/runs`);
+    (pathname === `${scope}/subscriptions` ||
+      pathname === `${scope}/runs` ||
+      item);
   if (
     start &&
     health.healthData &&
-    !(pathname.endsWith("/subscriptions") && input.session === "member")
+    !(!pathname.endsWith("/runs") && input.session === "member")
   ) {
     health.healthRequests.push({
-      path: pathname.endsWith("/runs") ? "runs" : "subscriptions",
+      path: item
+        ? "items"
+        : pathname.endsWith("/runs")
+          ? "runs"
+          : "subscriptions",
       key: header(request, "idempotency-key"),
       accepted: health.agreementAccepted,
     });

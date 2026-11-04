@@ -19,14 +19,15 @@ import { SPACING } from "@/lib/spacing";
 import { acceptHealthAgreement } from "./agreement-actions";
 
 /**
- * The health data agreement, for the workspace's owner, when Add or Start
- * run of a flow that carries health data was refused 403
- * `agreement_required` (backend ADR-0049, C3): one dialog — its title, "Version
- * {n}", the text to scroll, "I'm authorized to sign for {organization}", Full
- * name and Title, and the button that accepts and then sends the add or the
- * run again ("Accept and add flow", "Accept and start run"). The caller sends
- * it again with the key the refused request carried (a refused add or run
- * recorded none), so a lost answer starts nothing twice. Accepted once: a
+ * The health data agreement, for the workspace's owner, when Add, Start run
+ * or an item's upload (which starts a run) of a flow that carries health data
+ * was refused 403 `agreement_required` (backend ADR-0049, C3): one dialog —
+ * its title, "Version {n}", the text to scroll, "I'm authorized to sign for
+ * {organization}", Full name and Title, and the button that accepts and then
+ * sends the add, the run or the item again ("Accept and add flow", "Accept
+ * and start run"). The caller sends it again with the key the refused request
+ * carried (a refused add, run or item recorded none), so a lost answer starts
+ * nothing twice. Accepted once: a
  * press after the repeat was refused sends the repeat alone, never a second
  * acceptance; a newer version opens a new dialog (`key` by its hash). Anyone
  * else gets the caller's one line (`ASK_OWNER`) and no dialog. Words:
