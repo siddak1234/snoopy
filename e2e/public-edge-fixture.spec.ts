@@ -5052,13 +5052,7 @@ test("the deletion itself signs the browser out — the sign-out after it is onl
   await expect(page).toHaveURL(/\/login\?callbackUrl=%2Faccount$/);
 });
 
-// A 502 on DELETE /v1/account — the Edge's call to the service that deletes
-// failed, or the sign-in identity delete failed after the purge (S1-10) — a
-// gateway 504, or a connection lost mid-request: the request may have run and
-// its answer been lost. A 5xx is sent again once, at once; no answer is not.
-// When that fails too, each keeps the account and says the outcome is
-// unknown, rather than relaying a title. The fixture answers none of them;
-// the route is answered here.
+// Why a 5xx is unknown and sent again once: `outcomeFor` in components/account/DeleteAccountButton.tsx.
 const UNKNOWN_OUTCOME = "it is not known whether your account was removed";
 const dependencyFailure = {
   status: 502,

@@ -127,16 +127,7 @@ test("a 409 keeps the account: branched on the status, said inline, nothing sign
 });
 
 test("an answer that may have been lost keeps the account and says the outcome is unknown — never 'deleted'", () => {
-  // The contract's `DEPENDENCY_FAILURE` 502 means one of two things: the Edge
-  // could not complete its call to the service that deletes, or the sign-in
-  // identity delete failed after the purge (S1-10). Its
-  // `SESSION_REVOCATION_FAILED` 502 is for bearer callers only; a cookie
-  // caller never receives it. Every other 5xx and no answer at all is the same
-  // case: the request may have run and its answer been lost — the standalone
-  // server's own rewrite answers 500 when the Edge's answer is lost. A 5xx is
-  // sent again once, at once, and the session is never read after a failed
-  // delete: once the rows are purged, that read makes a new, empty account
-  // (the browser specs count the deletes and the session reads).
+  // Why a 5xx is unknown and sent again once: `outcomeFor` in components/account/DeleteAccountButton.tsx.
   assert.match(
     component,
     /await send\(\)\.catch\(\(first: unknown\) => \{\s*if \(!\(first instanceof PlatformApiError\) \|\| first\.status < 500\) \{\s*throw first;\s*\}\s*anAttemptWasLost\.current = true;\s*return send\(\);\s*\}\);/u,
