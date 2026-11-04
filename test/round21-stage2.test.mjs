@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 import { after, before, test } from "node:test";
 import {
   ACCEPT_AND_ADD,
@@ -36,8 +36,9 @@ import {
  * Round 21, Stage 2 on the website (the client half of backend PR #266,
  * 50a24f7; the same words as the app's, the spec's NEW WORDS): C3, the
  * health data agreement on Add and on Start run, and the organization's
- * Documents; D1, Connect your EHR. Each screen drawn as the browser draws
- * it; the e2e half, the clicks, is `e2e/health-data.spec.ts`.
+ * Documents; D1, Connect your EHR; and S1-8 and S1-11, live now. Each
+ * screen drawn as the browser draws it; the e2e half, the clicks, is
+ * `e2e/health-data.spec.ts`.
  */
 
 const root = resolve(import.meta.dirname, "..");
@@ -581,4 +582,31 @@ test("D1: the EHR's row, connected, names the clinic's host; another key's row w
     text: "Not connected",
     tone: "muted",
   });
+});
+
+/** Every source and record a person reads here: app, components, lib (not its generated copies) and the two documents. */
+function sources() {
+  const walk = (dir) =>
+    readdirSync(join(root, dir), { withFileTypes: true }).flatMap((entry) => {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory())
+        return path === join("lib", "generated") ? [] : walk(path);
+      return /\.(?:tsx?|mjs|md)$/u.test(entry.name) ? [path] : [];
+    });
+  return [
+    ...walk("app"),
+    ...walk("components"),
+    ...walk("lib"),
+    "docs/ARCHITECTURE.md",
+    "README.md",
+  ].map((path) => relative(root, resolve(root, path)));
+}
+
+test("S1-8, S1-11: the outside sign-in screen and the expired approval wait for no stage — nothing says the platform holds them back", () => {
+  for (const path of sources())
+    assert.doesNotMatch(
+      read(path),
+      /before Stage 2|BUILD-PLAN 29\.4\.6/u,
+      `${path} still says the platform does not send it before Stage 2`,
+    );
 });

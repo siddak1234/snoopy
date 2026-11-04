@@ -241,7 +241,6 @@ export function RunLive({
   // The job's approval, expired because its connection was disconnected at
   // the provider (§12.1 #252): its words, in the provider's name
   // (`disconnectedName`: QuickBooks is "QuickBooks").
-  // Stage 2 (BUILD-PLAN 29.4.6; §12.1 #252 approval half): the platform does not send this before Stage 2.
   const expired = expiredByDisconnect(
     newestApproval(run.id, listed),
     (providerId) =>

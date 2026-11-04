@@ -340,9 +340,11 @@ account layout in place of the platform's notice): "This organization admits
 only people who sign in with addresses at its verified domains.", "Remove
 your other sign-in to continue." and "Remove {provider} sign-in" for each,
 which unlinks it as Settings' linked accounts do and reads the area again.
-The platform does not send this refusal before Stage 2 (BUILD-PLAN 29.4.6;
-§12.1 #221), so nothing draws the screen until then; the website looks for
-it in the account layout's own session and workspace reads.
+The website looks for the refusal in the account layout's own session and
+workspace reads. The platform sends it on a request that names the
+workspace (backend §12.1 #221, S1-11), and neither of those names one, so
+a page's own workspace read meets it first (Round 21, Stage 2: a finding
+for the session).
 
 Deleting the account (Settings, `components/account/DeleteAccountButton.tsx`)
 says what the route removes, and "You'll be signed out on all devices.": the
@@ -467,9 +469,10 @@ A held job whose approval a disconnect expired (backend §12.1 #252,
 its run page's body: "Expired · {provider} was disconnected", then
 "Reconnect {provider}, then start the run again." — the provider named as
 the connection row names it (`disconnectedName`; `expiredByDisconnect` in
-`lib/run-progress.ts`). The platform does not send this expiry before Stage
-2 (BUILD-PLAN 29.4.6; §12.1 #252 approval half), so nothing draws it until
-then. A plain expiry, or a reason this build does not know, adds nothing.
+`lib/run-progress.ts`). The platform sets it when the approvals list is
+read and on an Approve (backend §12.1 #252, S1-8b), which it then refuses
+409 `approval_expired`, said in the platform's words. A plain expiry, or a
+reason this build does not know, adds nothing.
 
 A job that has documents and has ended or is held has a run package (backend
 ADR-0045; the platform says so, `RunDetail.packageAvailable`): View package, Download PDF and Download Excel replace Download
