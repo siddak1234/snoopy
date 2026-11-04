@@ -261,12 +261,29 @@ jobs:
         if: ${{ !cancelled() }}
         run: docker build --build-arg BACKEND_API_ORIGIN=https://backend.invalid -t autom8x-web:ci .
 
+      # trivy-action's own setup installs trivy from get.trivy.dev, which stopped
+      # resolving on 2026-11-04 (NXDOMAIN; snoopy-backend §12.1 #328). The same
+      # pinned release comes from GitHub instead, checked against its published
+      # checksum, and every trivy step below skips its own setup.
+      - name: Install trivy 0.70.0 from its GitHub release, checksum-verified
+        if: ${{ !cancelled() && steps.image.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          archive=trivy_0.70.0_Linux-64bit.tar.gz
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/aquasecurity/trivy/releases/download/v0.70.0/$archive"
+          echo "8b4376d5d6befe5c24d503f10ff136d9e0c49f9127a4279fd110b727929a5aa9  $RUNNER_TEMP/$archive" | sha256sum -c -
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$HOME/.local/bin" trivy
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       # Pinned by commit, not tag: a tag is a promise its owner can rewrite, and
       # this is the security gate. The comment names the version the commit is.
       - name: Scan the image — fixable CRITICAL and HIGH block
         if: ${{ !cancelled() && steps.image.outcome == 'success' }}
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: true
           image-ref: autom8x-web:ci
           scanners: vuln
           severity: CRITICAL,HIGH
@@ -279,6 +296,7 @@ jobs:
         continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: true
           image-ref: autom8x-web:ci
           scanners: vuln
           severity: CRITICAL,HIGH
@@ -293,6 +311,7 @@ jobs:
         if: ${{ !cancelled() && steps.image.outcome == 'success' }}
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: true
           image-ref: autom8x-web:ci
           format: cyclonedx
           output: sbom-web.cdx.json
