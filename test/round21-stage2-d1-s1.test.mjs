@@ -248,17 +248,22 @@ test("S1-11: the account area's error screen, its session kept, makes ONE read t
   ])
     assert.equal(await outsideOnError(kept, answering(outcome)), null);
   asked.length = 0;
-  assert.equal(
-    await outsideOnError({ user: {} }, answering({ members: [] })),
+  for (const session of [
+    { user: {} },
     null,
-  );
+    { user: { activeWorkspaceId: 7 } },
+  ])
+    assert.equal(
+      await outsideOnError(session, answering({ members: [] })),
+      null,
+    );
   assert.deepEqual(asked, []);
   // Only once the session is kept, and the screen drawn in place of the
   // platform's notice, its removal read again through the screen's retry.
   const screen = code("app/account/error.tsx");
   assert.match(
     screen,
-    /\.then\(\s*async \(kept\) => \{\s*const refused = await outsideOnError\(kept, \(path\) =>\s*platformApiJson\(path\),?\s*\);/u,
+    /platformApiJson\("\/v1\/session"\)\.then\(\s*async \(kept\) => \{\s*const refused = await outsideOnError\(kept, \(path\) =>\s*platformApiJson\(path\),?\s*\);/u,
   );
   assert.match(
     screen,

@@ -40,9 +40,7 @@ export default function AccountError({ retry }: { retry: () => void }) {
   const [outside, setOutside] = useState<Provider[] | null>(null);
   useEffect(() => {
     let current = true;
-    platformApiJson<{ user?: { activeWorkspaceId?: string } }>(
-      "/v1/session",
-    ).then(
+    platformApiJson("/v1/session").then(
       async (kept) => {
         const refused = await outsideOnError(kept, (path) =>
           platformApiJson(path),

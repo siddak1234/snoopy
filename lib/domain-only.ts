@@ -67,11 +67,12 @@ export function outsideSignIns(
  * active workspace (then nothing is read), `null`.
  */
 export async function outsideOnError(
-  session: { user?: { activeWorkspaceId?: string } },
+  session: unknown,
   read: (path: string) => Promise<unknown>,
 ): Promise<OutsideSignIn[] | null> {
-  const active = session.user?.activeWorkspaceId;
-  if (!active) return null;
+  const active = (session as { user?: { activeWorkspaceId?: unknown } } | null)
+    ?.user?.activeWorkspaceId;
+  if (typeof active !== "string" || !active) return null;
   try {
     await read(`/v1/workspaces/${encodeURIComponent(active)}/members`);
     return null;
