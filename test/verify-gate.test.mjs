@@ -464,6 +464,7 @@ test("the browser fixture run passes every spec that needs the fixture Edge, and
     "e2e/account-surfaces.spec.ts",
     "e2e/dialogs.spec.ts",
     "e2e/flow-items.spec.ts",
+    "e2e/health-data.spec.ts",
     "e2e/accessibility-authenticated.spec.ts",
     "e2e/keyboard-journey.spec.ts",
   ]);

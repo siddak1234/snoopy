@@ -36,6 +36,7 @@ const fixtureOnly =
         /account-surfaces\.spec\.ts/,
         /dialogs\.spec\.ts/,
         /flow-items\.spec\.ts/,
+        /health-data\.spec\.ts/,
         /accessibility-authenticated\.spec\.ts/,
         /keyboard-journey\.spec\.ts/,
       ];

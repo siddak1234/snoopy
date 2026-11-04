@@ -7,9 +7,11 @@ import { RocketLaunchIcon } from "@phosphor-icons/react/dist/ssr/RocketLaunch";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import type { AutomationRunInputField } from "@/lib/automations";
+import type { AgreementOffer } from "@/lib/health-agreement";
 import { runPagePath } from "@/lib/run-progress";
 import { FLOW_CHANGE_ADMIN_ONLY } from "@/lib/subscription-entitlements";
 import { setSubscriptionStatus, startRun } from "./actions";
+import { HealthAgreementDialog } from "./HealthAgreementDialog";
 import { RunInputFields } from "./ManifestFields";
 import { SPACING } from "@/lib/spacing";
 
@@ -45,6 +47,13 @@ import { SPACING } from "@/lib/spacing";
  * Turning a flow on is a change only an owner or admin makes (backend §12.1
  * #180): to a member Turn on is read-only, with "Only an owner or admin can
  * change this flow."; a member still starts runs.
+ *
+ * A run of a flow that carries health data is refused until the workspace's
+ * owner accepts the health data agreement (backend ADR-0049, C3-b): the owner
+ * reads and accepts it in `HealthAgreementDialog`, whose "Accept and start
+ * run" sends the same values under the same key again; anyone else sees "Ask
+ * your workspace owner to accept the health data agreement.". The dialog is
+ * drawn beside the form, never in it, so its fields are not the run's.
  */
 export function RunStart({
   workspaceId,
@@ -103,7 +112,32 @@ export function RunStart({
   }, []);
   // Bumped to empty the file fields when the platform will not take a file.
   const [fileRound, setFileRound] = useState(0);
+  // The agreement to accept, and the run it refused, as it was sent.
+  const [offer, setOffer] = useState<{
+    agreement: AgreementOffer;
+    data: FormData;
+  } | null>(null);
   const canRun = live && available && runInput.length > 0;
+
+  /** One run as `data` holds it: its refusal in words, or null once it went or the dialog opened. */
+  const send = async (data: FormData): Promise<string | null> => {
+    const result = await startRun(data);
+    if (!result.ok) {
+      if (result.agreement) {
+        setOffer({ agreement: result.agreement, data });
+        return null;
+      }
+      // A file already used, or gone: its field is emptied to choose again,
+      // and the changed input is a new run.
+      if (result.state === "file-unavailable") {
+        setFileRound((round) => round + 1);
+        newRunKey();
+      }
+      return result.error;
+    }
+    if (result.runId) router.push(runPagePath(result.runId, itemPage));
+    return null;
+  };
 
   // Submitted from `onSubmit`, not a form `action`: React resets an action
   // form's fields when the action settles, and a refused run must keep what the
@@ -115,19 +149,7 @@ export function RunStart({
     data.set("workspaceId", workspaceId);
     setError(null);
     startTransition(async () => {
-      const result = await startRun(data);
-      if (!result.ok) {
-        setError(result.error);
-        // A file already used, or gone: its field is emptied to choose again,
-        // and the changed input is a new run.
-        if (result.state === "file-unavailable") {
-          setFileRound((round) => round + 1);
-          newRunKey();
-        }
-        return;
-      }
-      if (!result.runId) return;
-      router.push(runPagePath(result.runId, itemPage));
+      setError(await send(data));
     });
   };
 
@@ -150,57 +172,71 @@ export function RunStart({
   if (live && !canRun) return null;
 
   return (
-    <form
-      data-testid="run-form"
-      onSubmit={submit}
-      onChange={newRunKey}
-      className={`flex flex-col ${SPACING.group.gap}`}
-    >
-      <input type="hidden" name="subscriptionId" value={subscriptionId} />
-      <input type="hidden" name="idempotencyKey" value={runKey} />
-      {itemId ? <input type="hidden" name="itemId" value={itemId} /> : null}
-      {runInput.length > 0 ? (
-        <RunInputFields
-          runInput={runInput}
+    <>
+      <form
+        data-testid="run-form"
+        onSubmit={submit}
+        onChange={newRunKey}
+        className={`flex flex-col ${SPACING.group.gap}`}
+      >
+        <input type="hidden" name="subscriptionId" value={subscriptionId} />
+        <input type="hidden" name="idempotencyKey" value={runKey} />
+        {itemId ? <input type="hidden" name="itemId" value={itemId} /> : null}
+        {runInput.length > 0 ? (
+          <RunInputFields
+            runInput={runInput}
+            workspaceId={workspaceId}
+            subscriptionId={subscriptionId}
+            onUploadingChange={onUploadingChange}
+            fileRound={fileRound}
+            showTypes={itemId !== undefined}
+          />
+        ) : null}
+        <FormError message={error} />
+        <div>
+          {live ? (
+            <Button
+              type="submit"
+              disabled={pending || uploading}
+              className={`inline-flex items-center ${SPACING.inner.gap}`}
+            >
+              <PlayIcon size={20} aria-hidden />
+              {pending
+                ? "Starting…"
+                : uploading
+                  ? "Uploading…"
+                  : itemPage
+                    ? "Start"
+                    : "Start run"}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              disabled={pending || !canGoLive || !available || !canChange}
+              onClick={turnOn}
+              className={`inline-flex items-center ${SPACING.inner.gap}`}
+            >
+              <RocketLaunchIcon size={20} aria-hidden />
+              {pending ? "Turning on…" : "Turn on"}
+            </Button>
+          )}
+        </div>
+        {live || canChange ? null : (
+          <p className="text-xs text-[var(--muted)]">
+            {FLOW_CHANGE_ADMIN_ONLY}
+          </p>
+        )}
+      </form>
+      {offer ? (
+        <HealthAgreementDialog
+          key={offer.agreement.sha256}
+          offer={offer.agreement}
           workspaceId={workspaceId}
-          subscriptionId={subscriptionId}
-          onUploadingChange={onUploadingChange}
-          fileRound={fileRound}
-          showTypes={itemId !== undefined}
+          purpose="run"
+          onAccepted={() => send(offer.data)}
+          onClose={() => setOffer(null)}
         />
       ) : null}
-      <FormError message={error} />
-      <div>
-        {live ? (
-          <Button
-            type="submit"
-            disabled={pending || uploading}
-            className={`inline-flex items-center ${SPACING.inner.gap}`}
-          >
-            <PlayIcon size={20} aria-hidden />
-            {pending
-              ? "Starting…"
-              : uploading
-                ? "Uploading…"
-                : itemPage
-                  ? "Start"
-                  : "Start run"}
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            disabled={pending || !canGoLive || !available || !canChange}
-            onClick={turnOn}
-            className={`inline-flex items-center ${SPACING.inner.gap}`}
-          >
-            <RocketLaunchIcon size={20} aria-hidden />
-            {pending ? "Turning on…" : "Turn on"}
-          </Button>
-        )}
-      </div>
-      {live || canChange ? null : (
-        <p className="text-xs text-[var(--muted)]">{FLOW_CHANGE_ADMIN_ONLY}</p>
-      )}
-    </form>
+    </>
   );
 }

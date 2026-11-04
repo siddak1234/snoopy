@@ -341,6 +341,34 @@ is not known, and Try again sends the delete again; any other answer to the
 second attempt is said as the outcome table says (`outcomeFor`). No answer
 at all is not sent again on its own.
 
+## The health data agreement
+
+A flow that carries health data (backend ADR-0049, C3) is refused 403
+`agreement_required` on Add and on Start run until the workspace's owner
+has accepted the current health data agreement; nothing was made. Only on
+that refusal does the website read anything more (`agreementRefusal` in
+`lib/agreements.ts`): who the person is in the workspace and, for its owner,
+the text. The owner gets one dialog (`app/account/flows/HealthAgreementDialog.tsx`):
+"Health data agreement", "Version {n}", the text to scroll, "I'm authorized
+to sign for {organization}", Full name and Title, and "Accept and add flow"
+or "Accept and start run", which accepts once, under the dialog's own key,
+then sends the add or the run again under the key the refused one carried
+(`AddAutomation`, `RunStart`), so a lost answer adds or starts nothing
+twice. Anyone else sees "Ask your workspace owner to accept the health data
+agreement." and nothing more is sent; while no version is published the
+owner sees "The health data agreement isn't available yet.". No other add
+or run makes an extra call. The words are `lib/health-agreement.ts`, the
+app's too.
+
+The organization page lists the workspace's signed documents under
+"Documents", read once with the page, newest first: "Business Associate
+Agreement · Version {n}" over "Accepted by {name} on {date}", or "No
+documents yet." (`components/dashboard/OrgDocumentList.tsx`). A row opens
+the signed copy's page (`app/account/organization/documents/[documentId]/page.tsx`),
+the only place the copy is read. The organization page is its owners' and
+admins' (register F55), so on the website the list is theirs, though the
+platform lets any member read it.
+
 ## Runs and approvals
 
 A job is its first run (backend ADR-0044): the platform lists each job once,

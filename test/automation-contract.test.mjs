@@ -681,7 +681,7 @@ test("a held flow's card says Added ✓, going to it, offers no Add, and Add ref
   assert.ok(subscribe, "subscribeToAutomation not found");
   assert.match(
     subscribe[0],
-    /if \(!workspaceId\) return \{ ok: false, error: WORKSPACE_CHANGED \};[\s\S]*?const \{ subscriptions \} = await listSubscriptions\(workspaceId\);\s*if \(heldCopy\(subscriptions, templateId\)\)\s*return \{ ok: false, error: ALREADY_IN_WORKSPACE \};\s*const response = await createSubscription\(workspaceId, body\);/u,
+    /if \(!workspaceId\) return \{ ok: false, error: WORKSPACE_CHANGED \};[\s\S]*?const \{ subscriptions \} = await listSubscriptions\(workspaceId\);\s*if \(heldCopy\(subscriptions, templateId\)\)\s*return \{ ok: false, error: ALREADY_IN_WORKSPACE \};\s*const response = await createSubscription\(\s*workspaceId,\s*body,\s*idempotencyKey,?\s*\);/u,
   );
   assert.match(
     actions,

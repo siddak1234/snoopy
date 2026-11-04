@@ -191,7 +191,7 @@ billing (Free, Plus and Pro — the platform's, or the one the website draws
 while the platform lists none — and a second plan refused), the quick and the
 complete export (its link followed only when https), account deletion, and the platform's refusals —
 without real accounts or credentials, and each test starts from the fixture's
-first state. Seven specs: `e2e/accessibility.spec.ts`,
+first state. Eight specs: `e2e/accessibility.spec.ts`,
 `e2e/accessibility-authenticated.spec.ts` (every page behind sign-in,
 scanned with axe), `e2e/keyboard-journey.spec.ts` (below),
 `e2e/public-edge-fixture.spec.ts`, `e2e/account-surfaces.spec.ts` (every
@@ -207,7 +207,11 @@ the label said and the value saved) and several files in one upload (all into on
 full queue said; a photo added), a public app connected with no
 Connect step and, as a step's choice, Connected and chosen in place, a batch run's page, and a flow
 whose list row carries no settings still drawn and saved from its one-flow read (backend §12.1 #319), a flow id that is not a UUID, one the platform does not know and a flow it answers archived each "not found", its integration's save refused once it is archived, and a run's details page still drawn when its flow is archived or cannot be read, in `e2e/public-edge-fixture.spec.ts`), `e2e/dialogs.spec.ts`
-(every dialog's Escape, click outside, focus return and hold, one row each)
+(every dialog's Escape, click outside, focus return and hold, one row each),
+`e2e/health-data.spec.ts` (Round 21, Stage 2: the health data agreement on
+Add and on Start run — the owner's dialog, anyone else's one line, nothing
+published yet, the add or the run sent again under the refused one's key —
+and the organization's Documents and a signed copy)
 and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: the Flows
 list by department A–Z; its items grouped A–Z under its group filter, the
 website's drop-down, on its page with no Dashboard, no Steps and no run start
