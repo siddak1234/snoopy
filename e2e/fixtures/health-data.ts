@@ -1,16 +1,19 @@
 /**
  * The fixture Edge's health data surfaces (Round 21, Stage 2), beside
  * `public-edge.ts`, which owns its state and calls `healthRoute` before its
- * own add and run routes: the health data agreement and a workspace's
- * Documents (backend ADR-0049, C3). Each is off until a test's control turns
- * it on, but for the one signed document the organization starts with, so no
- * other test meets them. Made-up text only: this repository is public.
+ * own key, add and run routes: the health data agreement and a workspace's
+ * Documents (backend ADR-0049, C3), and the EHR, a SMART Backend Services
+ * provider (ADR-0050, D1). Each is off until a test's control turns it on,
+ * but for the one signed document the organization starts with, so no other
+ * test meets them. Made-up text and addresses only: this repository is public.
  */
 import { createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { components as PlatformSchemas } from "../../lib/generated/platform-contracts/platform";
+import type { components as ConnectionSchemas } from "../../lib/generated/platform-contracts/connections";
 
 type Platform = PlatformSchemas["schemas"];
+type Connections = ConnectionSchemas["schemas"];
 type Json = Record<string, unknown>;
 
 const now = "2026-08-12T12:00:00.000Z";
@@ -48,6 +51,13 @@ function signedCopy(
   };
 }
 
+export const ehrProviderId = "ehr-fhir";
+const EHR_VENDORS = [
+  { id: "epic-test", label: "Epic (test system)" },
+  { id: "epic", label: "Epic" },
+];
+const ehrConnectionId = "e4e4e4e4-e4e4-4e4e-8e4e-e4e4e4e4e4e4";
+
 export function healthState() {
   return {
     // The workspace's flows carry health data, and whether its owner has
@@ -65,13 +75,19 @@ export function healthState() {
     // Every acceptance the platform took, with its key and body.
     acceptances: [] as { key: string | null; body: Json }[],
     documents: [signedDocument] as Platform["WorkspaceDocument"][],
+    // The EHR: how many vendors this deployment holds a key for (0: not
+    // offered), the host it is connected to, and every connect sent.
+    ehrVendors: 0,
+    ehrHost: null as string | null,
+    ehrConnects: [] as { key: string | null; credentials: Json }[],
   };
 }
 export type HealthState = ReturnType<typeof healthState>;
 
-/** The controls a test turns these on with. */
+/** The controls a test turns these on with. A value it cannot use is false (400). */
 export function healthControls(
   health: HealthState,
+  url: URL,
 ): Record<string, () => boolean | void> {
   return {
     "/__fixture/health-data": () => {
@@ -84,7 +100,59 @@ export function healthControls(
     "/__fixture/documents-none": () => {
       health.documents = [];
     },
+    "/__fixture/ehr-offered": () => {
+      const vendors = Number(url.searchParams.get("vendors") ?? "2");
+      if (vendors !== 1 && vendors !== 2) return false;
+      health.ehrVendors = vendors;
+    },
   };
+}
+
+/** The EHR in the provider list, while offered. */
+export function ehrProviders(
+  health: HealthState,
+): Connections["ConnectionProvider"][] {
+  if (health.ehrVendors === 0) return [];
+  return [
+    {
+      providerId: ehrProviderId,
+      displayName: "EHR",
+      description:
+        "Reads visit notes from your EHR. It never changes your records.",
+      icon: "FirstAid",
+      scopes: ["system/DocumentReference.read"],
+      authType: "smart-backend",
+      credentialFields: [
+        {
+          name: "fhirBaseUrl",
+          label: "FHIR address",
+          secret: false,
+          help: "Your EHR team gives you this address.",
+        },
+      ],
+      vendors: EHR_VENDORS.slice(0, health.ehrVendors),
+    },
+  ];
+}
+
+/** The EHR connection, once connected: named by the clinic's host. */
+export function ehrConnections(
+  health: HealthState,
+  workspaceId: string,
+): Connections["Connection"][] {
+  if (!health.ehrHost) return [];
+  return [
+    {
+      id: ehrConnectionId,
+      providerId: ehrProviderId,
+      workspaceId,
+      externalAccount: { displayName: health.ehrHost },
+      status: "connected",
+      requiredScopes: [],
+      grantedScopes: [],
+      usedByCount: 0,
+    },
+  ];
 }
 
 const header = (request: IncomingMessage, name: string) => {
@@ -225,5 +293,44 @@ export async function healthRoute(input: {
     return true;
   }
 
+  // The EHR's connect: a vendor it lists and the clinic's FHIR address, no
+  // secret; each address the platform refuses by its reason.
+  if (method === "POST" && pathname === `${scope}/connections/key`) {
+    const body = await input.requestJson(request);
+    if (body.providerId !== ehrProviderId) return false;
+    const credentials = (body.credentials ?? {}) as Json;
+    health.ehrConnects.push({
+      key: header(request, "idempotency-key"),
+      credentials,
+    });
+    const vendor = credentials.vendor;
+    const address = String(credentials.fhirBaseUrl ?? "");
+    if (
+      health.ehrVendors === 0 ||
+      !EHR_VENDORS.slice(0, health.ehrVendors).some(({ id }) => id === vendor)
+    ) {
+      respond(response, 400, problem(400, "Bad Request"));
+      return true;
+    }
+    const refusedFor: Record<string, string> = {
+      "https://silent.example.test/fhir": "fhir_not_answering",
+      "https://inactive.example.test/fhir": "ehr_not_activated",
+    };
+    const reason = address.startsWith("https://")
+      ? refusedFor[address]
+      : "fhir_address_refused";
+    if (reason) {
+      respond(response, 400, {
+        ...problem(400, "Bad Request"),
+        details: { reason },
+      });
+      return true;
+    }
+    health.ehrHost = new URL(address).host;
+    respond(response, 201, {
+      connection: ehrConnections(health, input.workspaceId)[0],
+    });
+    return true;
+  }
   return false;
 }

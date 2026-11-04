@@ -18,6 +18,13 @@ import {
   authorizedToSign,
   documentName,
 } from "../lib/health-agreement.ts";
+import { connectionLine } from "../lib/connection-rows.ts";
+import {
+  SMART_BACKEND_REFUSALS,
+  opensKeyForm,
+  smartBackendRefusal,
+  vendorField,
+} from "../lib/smart-backend.ts";
 import {
   elements,
   loadModules,
@@ -29,8 +36,8 @@ import {
  * Round 21, Stage 2 on the website (the client half of backend PR #266,
  * 50a24f7; the same words as the app's, the spec's NEW WORDS): C3, the
  * health data agreement on Add and on Start run, and the organization's
- * Documents. Each screen drawn as the browser draws it; the e2e half, the
- * clicks, is `e2e/health-data.spec.ts`.
+ * Documents; D1, Connect your EHR. Each screen drawn as the browser draws
+ * it; the e2e half, the clicks, is `e2e/health-data.spec.ts`.
  */
 
 const root = resolve(import.meta.dirname, "..");
@@ -45,6 +52,7 @@ const code = (path) =>
 const DIALOG = "app/account/flows/HealthAgreementDialog.tsx";
 const DOCUMENT_LIST = "components/dashboard/OrgDocumentList.tsx";
 const AGREEMENTS = "lib/agreements.ts";
+const KEY_FIELDS = "app/account/connections/KeyFields.tsx";
 
 /**
  * The platform as these modules meet it: `platformServerJson` answers from
@@ -418,4 +426,159 @@ test("C3 Documents: the organization page reads the list once with its other rea
     /await readWorkspaceDocument\(workspace\.id, documentId\)/u,
   );
   assert.match(copy, /if \(!copy \|\| !name\) notFound\(\);/u);
+});
+
+const EHR = {
+  providerId: "ehr-fhir",
+  displayName: "EHR",
+  description:
+    "Reads visit notes from your EHR. It never changes your records.",
+  icon: "FirstAid",
+  scopes: [],
+  authType: "smart-backend",
+  credentialFields: [
+    {
+      name: "fhirBaseUrl",
+      label: "FHIR address",
+      secret: false,
+      help: "Your EHR team gives you this address.",
+    },
+  ],
+  vendors: [
+    { id: "epic-test", label: "Epic (test system)" },
+    { id: "epic", label: "Epic" },
+  ],
+};
+
+test("D1: the EHR's Connect opens the key form, as a pasted key's does; OAuth and a public service's do not", () => {
+  assert.equal(opensKeyForm("api-key"), true);
+  assert.equal(opensKeyForm("smart-backend"), true);
+  for (const authType of ["oauth2", "none", undefined])
+    assert.equal(opensKeyForm(authType), false);
+  const panel = code("app/account/connections/ConnectionsPanel.tsx");
+  assert.match(panel, /if \(opensKeyForm\(provider\.authType\)\) \{/u);
+  assert.match(panel, /<KeyFields provider=\{selectedProvider\} \/>/u);
+});
+
+test("D1: a vendor picker only for two or more vendors; one is sent unseen; none, or another kind, has no vendor", () => {
+  assert.deepEqual(vendorField(EHR), { kind: "picker", vendors: EHR.vendors });
+  assert.deepEqual(vendorField({ ...EHR, vendors: EHR.vendors.slice(0, 1) }), {
+    kind: "fixed",
+    id: "epic-test",
+  });
+  assert.equal(vendorField({ ...EHR, vendors: [] }), null);
+  assert.equal(
+    vendorField({ authType: "api-key", vendors: EHR.vendors }),
+    null,
+  );
+});
+
+test("D1: the key form draws the vendors as one choice named for the provider, then the FHIR address with its help; one vendor, a hidden value and no choice; a pasted key's form, no vendor", async () => {
+  const { KeyFields } = await load(KEY_FIELDS);
+  const two = draw(KeyFields, { provider: EHR });
+  assert.deepEqual(visibleWords(two), [
+    "Epic (test system)",
+    "Epic",
+    "FHIR address",
+    "Your EHR team gives you this address.",
+  ]);
+  const nodes = tree(two);
+  const group = nodes.find((node) => node.attrs.role === "radiogroup");
+  assert.equal(group.attrs["aria-label"], "EHR");
+  const radios = nodes.filter((node) => node.attrs.type === "radio");
+  assert.deepEqual(
+    radios.map((node) => [node.attrs.name, node.attrs.value]),
+    [
+      ["credential:vendor", "epic-test"],
+      ["credential:vendor", "epic"],
+    ],
+  );
+  assert.ok(radios.every((node) => "required" in node.attrs));
+  const address = nodes.find(
+    (node) => node.attrs.name === "credential:fhirBaseUrl",
+  );
+  assert.equal(address.attrs.type, "text");
+
+  const one = tree(
+    draw(KeyFields, { provider: { ...EHR, vendors: EHR.vendors.slice(0, 1) } }),
+  );
+  assert.equal(one.filter((node) => node.attrs.type === "radio").length, 0);
+  const hidden = one.find((node) => node.attrs.name === "credential:vendor");
+  assert.deepEqual(
+    [hidden.attrs.type, hidden.attrs.value],
+    ["hidden", "epic-test"],
+  );
+
+  const key = tree(
+    draw(KeyFields, {
+      provider: {
+        ...EHR,
+        authType: "api-key",
+        vendors: undefined,
+        credentialFields: [
+          {
+            name: "apiKey",
+            label: "API key",
+            secret: true,
+            help: "Fixture value.",
+          },
+        ],
+      },
+    }),
+  );
+  assert.equal(
+    key.filter((node) => node.attrs.name === "credential:vendor").length,
+    0,
+  );
+  assert.equal(
+    key.find((node) => node.attrs.name === "credential:apiKey").attrs.type,
+    "password",
+  );
+});
+
+test("D1: an address the platform will not use is said by its reason, in the spec's words; any other refusal keeps the platform's", () => {
+  assert.deepEqual(SMART_BACKEND_REFUSALS, {
+    fhir_address_refused: "Use the https address your EHR team gave you.",
+    fhir_not_answering: "That address didn't answer as a FHIR server.",
+    ehr_not_activated:
+      "Your EHR hasn't turned on Autom8x yet. Ask your EHR team to activate it.",
+  });
+  for (const [reason, words] of Object.entries(SMART_BACKEND_REFUSALS))
+    assert.equal(smartBackendRefusal(400, { reason }), words);
+  assert.equal(
+    smartBackendRefusal(400, { reason: "credential_invalid" }),
+    null,
+  );
+  assert.equal(
+    smartBackendRefusal(409, { reason: "fhir_not_answering" }),
+    null,
+  );
+  assert.equal(smartBackendRefusal(400, undefined), null);
+  const actions = code("app/account/connections/actions.ts");
+  assert.match(
+    actions,
+    /error: smartBackendRefusal\(error\.status, error\.details\) \?\? error\.message,/u,
+  );
+});
+
+test("D1: the EHR's row, connected, names the clinic's host; another key's row with no email says Connected", () => {
+  const connection = {
+    id: "c1",
+    providerId: "ehr-fhir",
+    status: "connected",
+    externalAccount: { displayName: "fhir.clinic.example.test" },
+    usedByCount: 0,
+  };
+  assert.deepEqual(connectionLine(connection, "smart-backend", "EHR"), {
+    text: "fhir.clinic.example.test",
+    tone: "muted",
+  });
+  assert.deepEqual(connectionLine(connection, "api-key", "Fixture"), {
+    text: "Connected",
+    tone: "muted",
+  });
+  assert.deepEqual(connectionLine(undefined, "smart-backend", "EHR"), {
+    text: "Not connected",
+    tone: "muted",
+  });
 });

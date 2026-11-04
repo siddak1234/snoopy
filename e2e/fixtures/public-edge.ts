@@ -24,7 +24,13 @@ const { itemBody, runBlocks } = (await import(
   new URL("./page-bodies.ts", import.meta.url).href
 )) as typeof import("./page-bodies");
 // Round 21, Stage 2's health data surfaces, by their own path as well.
-const { healthControls, healthRoute, healthState } = (await import(
+const {
+  ehrConnections,
+  ehrProviders,
+  healthControls,
+  healthRoute,
+  healthState,
+} = (await import(
   new URL("./health-data.ts", import.meta.url).href
 )) as typeof import("./health-data");
 
@@ -2997,7 +3003,7 @@ const server = createServer(
       "/__fixture/domain-claim-refused-once": () => {
         state.domainClaimsRefused = 1;
       },
-      ...healthControls(state.health),
+      ...healthControls(state.health, url),
     };
     const control =
       request.method === "POST" ? controls[url.pathname] : undefined;
@@ -4089,6 +4095,7 @@ const server = createServer(
           oauthProvider,
           quickbooksProvider,
           googleProvider,
+          ...ehrProviders(state.health),
         ],
         ...(state.publicProviders ? { publicProviders: [nppesProvider] } : {}),
       } satisfies ConnectionOperations["listConnectionProviders"]["responses"][200]["content"]["application/json"]);
@@ -4103,6 +4110,7 @@ const server = createServer(
           ...(state.fixtureConnectionCreated ? [connection] : []),
           ...(state.quickbooksConnected ? [quickbooksConnection()] : []),
           ...(state.googleConnected ? [googleConnection()] : []),
+          ...ehrConnections(state.health, workspaceId),
         ],
       } satisfies ConnectionOperations["listConnections"]["responses"][200]["content"]["application/json"]);
     }

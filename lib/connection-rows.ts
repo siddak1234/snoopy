@@ -88,10 +88,11 @@ export function disconnectedName(
 export type ConnectionRowState = "connected" | "attention" | "not-connected";
 
 /**
- * A provider's `authType` as the client reads it: the contract's `oauth2` or
- * `api-key`, or `none` — a public service (platform round 2's B5), which the
- * platform lists in `publicProviders`, never in `providers` (the
- * backend's connections contract), and `keylessProviders` gives `none`.
+ * A provider's `authType` as the client reads it: the contract's `oauth2`,
+ * `api-key` or `smart-backend` (the EHR, backend ADR-0050), or `none` — a
+ * public service (platform round 2's B5), which the platform lists in
+ * `publicProviders`, never in `providers` (the backend's connections
+ * contract), and `keylessProviders` gives `none`.
  */
 export type ProviderAuthType =
   components["schemas"]["ConnectionProvider"]["authType"] | "none";
@@ -170,7 +171,9 @@ export function connectionFor<C extends RowConnection>(
  * Line 2 of the row: the account's email when the platform holds one —
  * `externalAccount.displayName` carrying an `@` — else, connected, the
  * company the grant belongs to (`companyName`, backend §12.1 #283: QuickBooks
- * names no email), else the state in a word;
+ * names no email), else the state in a word; the EHR (`authType`
+ * `smart-backend`, backend ADR-0050), connected, the clinic's host, which the
+ * platform keeps as its account's name;
  * "Needs attention" in the warning colour; a public service (`isKeyless`),
  * "Connected"; one disconnected at the provider, "Disconnected in
  * {provider}" (`disconnectedName`) in the warning colour, its button Reconnect.
@@ -192,6 +195,8 @@ export function connectionLine(
   const state = connectionState(connection);
   const name = connection?.externalAccount.displayName ?? "";
   if (state !== "not-connected" && name.includes("@"))
+    return { text: name, tone: "muted" };
+  if (state === "connected" && authType === "smart-backend" && name)
     return { text: name, tone: "muted" };
   // No email, as QuickBooks sends none: the company the grant belongs to,
   // when the platform read one at connect (§12.1 #283), in "Connected"'s place.

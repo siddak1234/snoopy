@@ -141,6 +141,7 @@
 - [lib/several-files.ts](../lib/several-files.ts): Several files in one upload (Round 21, platform round 2's B2 as the batch
 - [lib/signed-link.ts](../lib/signed-link.ts): A signed link the browser goes to (Build 25, the review's R5c 2): the run
 - [lib/site.ts](../lib/site.ts): no header
+- [lib/smart-backend.ts](../lib/smart-backend.ts): Connect your EHR (backend ADR-0050, D1; the owner's item 1 of 2026-11-03:
 - [lib/spacing.ts](../lib/spacing.ts): The spacing table (backend `BLOCK_SPACING`, ADR-0048 amendment 1; the
 - [lib/subscription-entitlements.ts](../lib/subscription-entitlements.ts): no header
 - [lib/team-types.ts](../lib/team-types.ts): The team kinds (the owner, build 7: "project types should just be teams or

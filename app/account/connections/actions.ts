@@ -8,6 +8,7 @@ import {
   type ConnectProviderWithKeyRequest,
 } from "@/lib/connections";
 import { PlatformServerError } from "@/lib/platform-server";
+import { smartBackendRefusal } from "@/lib/smart-backend";
 import { activeWorkspaceIfShown, WORKSPACE_CHANGED } from "@/lib/tenancy";
 
 export type ConnectionActionResult =
@@ -22,11 +23,13 @@ const workspaceChanged: ConnectionActionResult = {
   error: WORKSPACE_CHANGED,
 };
 
+// A refusal in the platform's words — but a FHIR address the EHR's connect
+// will not use (backend ADR-0050), said in the spec's, by its reason.
 function failure(error: unknown): ConnectionActionResult {
   if (error instanceof PlatformServerError) {
     return {
       ok: false,
-      error: error.message,
+      error: smartBackendRefusal(error.status, error.details) ?? error.message,
       ...(error.status === 409 ? { retryWithSameIntent: true } : {}),
     };
   }

@@ -318,6 +318,20 @@ static `/quickbooks/disconnected` ("QuickBooks is disconnected", its
 "Reconnect QuickBooks" opening Connections), which the owner sets at
 Intuit; it reads nothing.
 
+The EHR (backend ADR-0050, D1: `authType` `smart-backend`, SMART Backend
+Services) is connected through Connections' key form, as a pasted-key
+provider is (`opensKeyForm` in `lib/smart-backend.ts`): its fields from
+`credentialFields`, the clinic's FHIR address and its help, and its vendor —
+a picker of radios only when the platform lists two or more `vendors`, the
+one it lists sent unseen otherwise (`app/account/connections/KeyFields.tsx`).
+Nothing secret is pasted: the platform signs with its own key for that
+vendor. An address it will not use is said by its reason ("Use the https
+address your EHR team gave you.", "That address didn't answer as a FHIR
+server.", "Your EHR hasn't turned on Autom8x yet. Ask your EHR team to
+activate it."; `smartBackendRefusal`), and its row, connected, names the
+clinic's host (`connectionLine`). A flow step that offers the EHR sends an
+owner or admin to Connections, as any vendor that is not OAuth.
+
 A domain-only organization that refuses a person at session resolve because
 they hold a sign-in outside its verified domains (backend §12.1 #221, option
 b′: 403 `outside_org_domain` naming those sign-ins) has the account area's
