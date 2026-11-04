@@ -213,13 +213,17 @@ async function readyUpload(page: Page) {
   await page.goto("/account/flows/b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1");
   await page.getByRole("button", { name: "Upload batch" }).click();
   const card = page.getByTestId("item-upload");
-  await card.getByLabel("Name").fill("Health list");
+  // The file first: "Ready" is drawn by the card's own state, so the page is hydrated before
+  // Name is typed. Typed first, Firefox once lost it to hydration (Stage 2 audit, 2026-11-04).
   await card.getByLabel("Batch file").setInputFiles({
     name: "entry.pdf",
     mimeType: "application/pdf",
     buffer: Buffer.from("%PDF-1.4 fixture entry"),
   });
   await expect(card.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
+  const name = card.getByLabel("Name");
+  await name.fill("Health list");
+  await expect(name).toHaveValue("Health list");
   return card;
 }
 
