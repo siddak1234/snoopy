@@ -336,9 +336,10 @@ platform ends every session of the account it deletes (backend §12.1 #248).
 Any 5xx from `DELETE /v1/account` is sent again once, at once: the purge is
 idempotent, and a sign-in identity delete that failed after it runs again.
 The session is never read after a failed delete, because once the rows are
-purged that read makes a new, empty account. A second failure says the
-outcome is not known, and Try again sends the delete again; no answer at all
-is not sent again on its own.
+purged that read makes a new, empty account. A second 5xx says the outcome
+is not known, and Try again sends the delete again; any other answer to the
+second attempt is said as the outcome table says (`outcomeFor`). No answer
+at all is not sent again on its own.
 
 ## Runs and approvals
 
