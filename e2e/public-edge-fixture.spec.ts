@@ -5128,6 +5128,61 @@ for (const [answer, fulfil] of lostAnswers) {
   });
 }
 
+// The session is never read after a failed delete (S1-10): once the rows are
+// purged, that read makes a new, empty account.
+const isSessionRead = (request: Request) =>
+  request.method() === "GET" &&
+  new URL(request.url()).pathname === "/api/platform/v1/session";
+
+test("a 5xx on the delete is sent again at once — a 204 then deletes the account, signs out and leaves (S1-10)", async ({
+  page,
+}) => {
+  const deletes = observe(page, (request) => request.method() === "DELETE");
+  const logouts = observe(page, isLogout);
+  const answers = [502, 204];
+  await page.route(/\/api\/platform\/v1\/account$/, (route) =>
+    answers.shift() === 502
+      ? route.fulfill(dependencyFailure)
+      : route.fulfill({ status: 204 }),
+  );
+  await page.goto("/account/settings");
+  await page.getByRole("button", { name: "Delete Account" }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Yes, delete my account" })
+    .click();
+  await expect(page).toHaveURL(/\/account-deleted$/);
+  expect(deletes).toHaveLength(2);
+  expect(logouts).toHaveLength(1);
+});
+
+test("a 5xx twice says the outcome is not known, with Try again — two deletes and no session read (S1-10)", async ({
+  page,
+}) => {
+  const deletes = observe(page, (request) => request.method() === "DELETE");
+  const logouts = observe(page, isLogout);
+  await page.route(/\/api\/platform\/v1\/account$/, (route) =>
+    route.fulfill(dependencyFailure),
+  );
+  await page.goto("/account/settings");
+  await page.getByRole("button", { name: "Delete Account" }).click();
+  const dialog = page.getByRole("dialog");
+  const sessionReads = observe(page, isSessionRead);
+  await dialog.getByRole("button", { name: "Yes, delete my account" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "The platform could not complete this request, so it is not known whether your account was removed. You can try again.",
+  );
+  await expect(dialog.getByRole("button", { name: "Try again" })).toBeFocused();
+  expect(deletes).toHaveLength(2);
+  // Try again sends the delete again — and a 5xx once more at once.
+  await dialog.getByRole("button", { name: "Try again" }).click();
+  await expect.poll(() => deletes.length).toBe(4);
+  await expect(dialog.getByRole("alert")).toContainText(UNKNOWN_OUTCOME);
+  await expect(page).toHaveURL(/\/account\/settings$/);
+  expect(sessionReads).toHaveLength(0);
+  expect(logouts).toHaveLength(0);
+});
+
 const unauthenticated = {
   status: 401,
   contentType: "application/problem+json",

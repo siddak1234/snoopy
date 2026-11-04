@@ -127,15 +127,26 @@ test("a 409 keeps the account: branched on the status, said inline, nothing sign
 });
 
 test("an answer that may have been lost keeps the account and says the outcome is unknown — never 'deleted'", () => {
-  // The contract's 502 ("deleted, but the identity provider could not be
-  // reached") is raised only for a bearer caller — `snoopy-backend/apps/api/src/app.ts` throws
-  // it only when `revoking` is set, and `nativeLogoutSession` returns undefined
-  // without a bearer (backend F39) — so every 502 a cookie caller can receive
-  // here is the Access hop failing. Every other 5xx and no answer at all is the
-  // same case: the request may have run and its answer been lost — the
-  // standalone server's own rewrite answers 500 when the Edge's answer is lost.
-  // Staying strands nothing: the Edge clears the website's cookies before that
-  // throw could ever be reached.
+  // The contract's `DEPENDENCY_FAILURE` 502 means one of two things: the Edge
+  // could not complete its call to the service that deletes, or the sign-in
+  // identity delete failed after the purge (S1-10). Its
+  // `SESSION_REVOCATION_FAILED` 502 is for bearer callers only; a cookie
+  // caller never receives it. Every other 5xx and no answer at all is the same
+  // case: the request may have run and its answer been lost — the standalone
+  // server's own rewrite answers 500 when the Edge's answer is lost. A 5xx is
+  // sent again once, at once, and the session is never read after a failed
+  // delete: once the rows are purged, that read makes a new, empty account
+  // (the browser specs count the deletes and the session reads).
+  assert.match(
+    component,
+    /await send\(\)\.catch\(\(first: unknown\) => \{\s*if \(!\(first instanceof PlatformApiError\) \|\| first\.status < 500\) \{\s*throw first;\s*\}\s*anAttemptWasLost\.current = true;\s*return send\(\);\s*\}\);/u,
+    "a 5xx is sent again once, at once, with the lost-answer memory set; anything else is not",
+  );
+  assert.doesNotMatch(
+    component,
+    /\/v1\/session/u,
+    "the session is never read after a failed delete",
+  );
   assert.match(
     component,
     /if \(!failure \|\| failure\.status >= 500\) \{\s*return \{ kind: "unknown", message: UNKNOWN_COPY \};/u,
