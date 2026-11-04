@@ -475,14 +475,19 @@ without changes is unchanged. The words are ICD-10 Code Check's words.md
 section 3, the app's too.
 
 A held job whose approval a disconnect expired (backend §12.1 #252,
-`Approval.expiredBy` with `connection-disconnected`) is built to say so over
-its run page's body: "Expired · {provider} was disconnected", then
-"Reconnect {provider}, then start the run again." — the provider named as
-the connection row names it (`disconnectedName`; `expiredByDisconnect` in
-`lib/run-progress.ts`). The platform sets it when the approvals list is
-read and on an Approve (backend §12.1 #252, S1-8b), which it then refuses
-409 `approval_expired`, said in the platform's words. A plain expiry, or a
-reason this build does not know, adds nothing.
+`Approval.expiredBy` with `connection-disconnected`) says so over its run
+page's body: "Expired · {provider} was disconnected", then "Reconnect
+{provider}, then start the run again." — the provider named as the
+connection row names it (`disconnectedName`; `expiredByDisconnect` in
+`lib/run-progress.ts`) — and its step offers no Approve or Deny. The
+platform sets it when the approvals list is read and on an Approve (backend
+§12.1 #252, S1-8b). That Approve is refused 409 `approval_expired` with
+`expiredBy`: the pair's place says the same two lines, with nothing to
+press, the provider named from one read of the providers made on that
+refusal only (`expiredApproval`, `app/account/approvals/expired-approval.ts`);
+Approvals keeps the row, "Expired", and it and the run pages are drawn
+again. A plain expiry, or a reason this build does not know, adds nothing
+and keeps the platform's words.
 
 A job that has documents and has ended or is held has a run package (backend
 ADR-0045; the platform says so, `RunDetail.packageAvailable`): View package, Download PDF and Download Excel replace Download

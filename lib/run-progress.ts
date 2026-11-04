@@ -147,6 +147,26 @@ export function expiredByDisconnect(
   };
 }
 
+/**
+ * An Approve the platform refused because a disconnect expired its approval
+ * (409 `approval_expired` with `expiredBy` `connection-disconnected`, S1-8b;
+ * the platform has already saved the expiry): the provider it names. `null`
+ * for any other refusal — a plain expiry, or a reason this build does not
+ * know, included.
+ */
+export function approveExpiredBy(
+  status: number,
+  details: Record<string, unknown> | undefined,
+): string | null {
+  if (status !== 409 || details?.reason !== "approval_expired") return null;
+  const by = details.expiredBy as
+    { reason?: unknown; providerId?: unknown } | undefined;
+  return by?.reason === "connection-disconnected" &&
+    typeof by.providerId === "string"
+    ? by.providerId
+    : null;
+}
+
 /** Approvals' card for a review: it opens the run. */
 export function reviewChanges(count: number): string {
   return `Review ${count} changes`;

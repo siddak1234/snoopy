@@ -4,6 +4,7 @@ import { join, relative, resolve } from "node:path";
 import { after, test } from "node:test";
 import { connectionLine } from "../lib/connection-rows.ts";
 import { outsideOnError } from "../lib/domain-only.ts";
+import { approveExpiredBy } from "../lib/run-progress.ts";
 import {
   SMART_BACKEND_REFUSALS,
   opensKeyForm,
@@ -16,6 +17,8 @@ import {
   code,
   draw,
   load,
+  platform,
+  platformError,
   read,
   root,
   tree,
@@ -260,5 +263,107 @@ test("S1-11: the account area's error screen, its session kept, makes ONE read t
   assert.match(
     screen,
     /if \(outside\) return <OutsideSignIn providers=\{outside\} onRemoved=\{retry\} \/>;\s*[\s\S]*?return <PlatformUnavailable/u,
+  );
+});
+
+const DECISION = "/v1/workspaces/w1/approvals/a1/decision";
+const PROVIDERS = "/v1/connections/providers";
+const expiredBy = (providerId) => ({
+  reason: "approval_expired",
+  expiredBy: { reason: "connection-disconnected", providerId },
+});
+
+/** `decideApproval`'s Approve of "a1" against the platform's `answers`. */
+async function approve(answers) {
+  const { decideApproval } = await load("app/account/flows/actions.ts");
+  platform(answers);
+  const data = new FormData();
+  data.set("approvalId", "a1");
+  data.set("decision", "approved");
+  data.set("workspaceId", "w1");
+  return decideApproval(data);
+}
+
+test("S1-8b: only a 409 approval_expired whose expiredBy is a disconnect names a provider; a plain expiry, another reason or status, none", () => {
+  assert.equal(approveExpiredBy(409, expiredBy("quickbooks")), "quickbooks");
+  assert.equal(approveExpiredBy(409, { reason: "approval_expired" }), null);
+  assert.equal(
+    approveExpiredBy(409, {
+      reason: "approval_expired",
+      expiredBy: { reason: "later", providerId: "quickbooks" },
+    }),
+    null,
+  );
+  assert.equal(approveExpiredBy(403, expiredBy("quickbooks")), null);
+});
+
+test("S1-8b: an Approve a disconnect expired says Stage 1's two lines, the provider named as its row names it, and draws Approvals and the run pages again; a plain expiry keeps the platform's words and draws nothing", async () => {
+  const words = (provider) =>
+    `Expired · ${provider} was disconnected\nReconnect ${provider}, then start the run again.`;
+  const refused = (providerId) =>
+    platformError(
+      409,
+      expiredBy(providerId),
+      "The approval expired: its connection was disconnected",
+    );
+  assert.deepEqual(
+    await approve({
+      [DECISION]: refused("quickbooks"),
+      [PROVIDERS]: {
+        providers: [
+          { providerId: "quickbooks", displayName: "QuickBooks Online" },
+        ],
+      },
+    }),
+    { ok: false, error: words("QuickBooks"), state: "approval-expired" },
+  );
+  assert.deepEqual(globalThis.__asked, [DECISION, PROVIDERS]);
+  assert.deepEqual(globalThis.__revalidated, [
+    ["/account/approvals"],
+    ["/account/runs/[runId]", "page"],
+  ]);
+  const google = await approve({
+    [DECISION]: refused("google-drive"),
+    [PROVIDERS]: {
+      providers: [{ providerId: "google-drive", displayName: "Google Drive" }],
+    },
+  });
+  assert.equal(google.error, words("Google Drive"));
+  // The names unread: the provider's id, never the platform's sentence.
+  const unread = await approve({
+    [DECISION]: refused("google-drive"),
+    [PROVIDERS]: platformError(503, undefined, "Service Unavailable"),
+  });
+  assert.equal(unread.error, words("google-drive"));
+  const plain = await approve({
+    [DECISION]: platformError(
+      409,
+      { reason: "approval_expired" },
+      "The approval has expired",
+    ),
+  });
+  assert.deepEqual(plain, { ok: false, error: "The approval has expired" });
+  assert.deepEqual(globalThis.__asked, [DECISION]);
+  assert.deepEqual(globalThis.__revalidated, []);
+});
+
+test("S1-8b: the pair says the lines in its place with no press, Approvals keeps that row Expired, and the run page offers no decision once a disconnect expired it", () => {
+  const decision = code("app/account/approvals/ApprovalDecision.tsx");
+  assert.match(
+    decision,
+    /const over = !result\.ok && result\.state === "approval-expired";\s*if \(over\) setExpired\(result\.error\);/u,
+  );
+  assert.match(
+    decision,
+    /if \(expired\)\s*return \(\s*<p\s+role="alert"\s+data-testid="decision-expired"/u,
+  );
+  assert.match(
+    decision,
+    /if \(state === "expired"\) \{\s*setOver\(\(current\) => new Set\(current\)\.add\(id\)\);\s*return;\s*\}/u,
+  );
+  assert.match(decision, /over\.has\(approval\.id\)\s*\? "expired"/u);
+  assert.match(
+    code("app/account/runs/[runId]/RunLive.tsx"),
+    /form\.approvalId && !expired \? \(/u,
   );
 });

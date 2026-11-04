@@ -200,7 +200,8 @@ the image block, a group of drop-downs, a long list's and table's search, sort
 and pages, Activity's search, sort and pages as the platform is asked for
 them, and Share refused; Round 21's review of each change and Approvals'
 "Review {n} changes"; Stage 2's outside sign-in screen, drawn by the
-account area's error screen from one read naming the workspace; Set up's drop-down of several, and build 34's
+account area's error screen from one read naming the workspace, and an
+Approve a disconnect expired, said in its row; Set up's drop-down of several, and build 34's
 sheet for a select whose choices carry groups (Category, Search all, a
 group's own Search, "No matches.", Back, one choice or several, each a chip,
 the label said and the value saved) and several files in one upload (all into one run, one file a list of one; exactly

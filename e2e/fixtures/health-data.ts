@@ -3,7 +3,8 @@
  * `public-edge.ts`, which owns its state and calls `healthRoute` before its
  * own key, add and run routes: the health data agreement and a workspace's
  * Documents (backend ADR-0049, C3), and the EHR, a SMART Backend Services
- * provider (ADR-0050, D1). Each is off until a test's control turns it on,
+ * provider (ADR-0050, D1); and S1-8b's Approve that a disconnect expired.
+ * Each is off until a test's control turns it on,
  * but for the one signed document the organization starts with, so no other
  * test meets them. Made-up text and addresses only: this repository is public.
  */
@@ -82,6 +83,9 @@ export function healthState() {
     ehrVendors: 0,
     ehrHost: null as string | null,
     ehrConnects: [] as { key: string | null; credentials: Json }[],
+    // S1-8b: while set, an Approve is refused 409 approval_expired, its
+    // approval expired by this provider's disconnect.
+    approvalDisconnected: null as string | null,
   };
 }
 export type HealthState = ReturnType<typeof healthState>;
@@ -102,6 +106,9 @@ export function healthControls(
     "/__fixture/agreement-unpublished": () => {
       health.healthData = true;
       health.agreementUnpublished = true;
+    },
+    "/__fixture/approval-disconnected": () => {
+      health.approvalDisconnected = "quickbooks";
     },
     "/__fixture/documents-none": () => {
       health.documents = [];
@@ -226,6 +233,26 @@ export async function healthRoute(input: {
         reason: "agreement_required",
         kind: "health-data",
         ...(health.agreementUnpublished ? {} : { version: 1 }),
+      },
+    });
+    return true;
+  }
+
+  // S1-8b: an Approve — the one press a test makes while this is on — after
+  // the connection its held run was built on was disconnected.
+  if (
+    method === "POST" &&
+    health.approvalDisconnected &&
+    new RegExp(`^${scope}/approvals/[^/]+/decision$`, "u").test(pathname)
+  ) {
+    respond(response, 409, {
+      ...problem(409, "The approval expired: its connection was disconnected"),
+      details: {
+        reason: "approval_expired",
+        expiredBy: {
+          reason: "connection-disconnected",
+          providerId: health.approvalDisconnected,
+        },
       },
     });
     return true;

@@ -123,7 +123,7 @@ test("a held job's page offers the decision: RunLive draws the platform's approv
   );
   assert.match(
     live,
-    /const decisionForm = \(form: QuestionForm\) =>\s*form\.approvalId \? \(\s*<div data-testid="run-decision">\s*<ApprovalDecision\s+approvalId=\{form\.approvalId\}\s+canDecide=\{mayDecide\(role, form\.eligibleRoles\)\}\s+eligibleRoles=\{form\.eligibleRoles \?\? \[\]\}/u,
+    /const decisionForm = \(form: QuestionForm\) =>\s*form\.approvalId && !expired \? \(\s*<div data-testid="run-decision">\s*<ApprovalDecision\s+approvalId=\{form\.approvalId\}\s+canDecide=\{mayDecide\(role, form\.eligibleRoles\)\}\s+eligibleRoles=\{form\.eligibleRoles \?\? \[\]\}/u,
   );
   // The approval form and a review's (Round 21's F2) are the one decision.
   assert.match(

@@ -34,6 +34,7 @@ import {
   subscriptionEntitlementState,
 } from "@/lib/subscription-entitlements";
 import { activeWorkspaceIfShown, WORKSPACE_CHANGED } from "@/lib/tenancy";
+import { expiredApproval } from "../approvals/expired-approval";
 import { uploadRefusalMessage } from "./upload-refusals";
 
 /**
@@ -79,7 +80,9 @@ export type ActionResult =
         | "forbidden"
         // A flow that carries health data, before the owner accepted the
         // agreement (backend ADR-0049): the dialog's text, or the line.
-        | "agreement-required";
+        | "agreement-required"
+        // An Approve a disconnect expired (S1-8b): `expiredApproval`.
+        | "approval-expired";
       /** For the workspace's owner: the health data agreement to accept (`agreementRefusal`). */
       agreement?: AgreementOffer;
     };
@@ -629,7 +632,10 @@ function decisionBody(formData: FormData): DecideApprovalRequest | null {
  * Decides an approval: `{decision}`, Approve or Deny; or, for an approval
  * that offers changes (Round 21, the platform round's F2), the review's
  * answers, `{decisions: [{id, decision}]}`, posted as JSON under `decisions`
- * by `ReviewDecisions`. A review saved always continues the job.
+ * by `ReviewDecisions`. A review saved always continues the job. An Approve
+ * a disconnect expired (409 `approval_expired` with `expiredBy`, S1-8b) is
+ * said in Stage 1's words (`expiredApproval`), and Approvals and the run
+ * pages are drawn again: the platform saved the expiry.
  */
 export async function decideApproval(
   formData: FormData,
@@ -641,10 +647,21 @@ export async function decideApproval(
   // drawn again too, where step 4 offered the decision (Build 24, P6). The
   // approval names the job's id (backend ADR-0044).
   let runId: string | undefined;
+  const refused: { expired?: ActionResult | null } = {};
   const result = await attempt(formData, async (workspaceId) => {
-    runId = (await decideWorkspaceApproval(workspaceId, approvalId, body))
-      .approval.runId;
+    try {
+      runId = (await decideWorkspaceApproval(workspaceId, approvalId, body))
+        .approval.runId;
+    } catch (error) {
+      refused.expired = await expiredApproval(error);
+      if (!refused.expired) throw error;
+    }
   });
+  if (refused.expired) {
+    revalidatePath("/account/approvals");
+    revalidatePath("/account/runs/[runId]", "page");
+    return refused.expired;
+  }
   if (result.ok) {
     revalidatePath("/account/approvals");
     revalidatePath("/account/runs");

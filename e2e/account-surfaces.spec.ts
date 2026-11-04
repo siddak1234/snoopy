@@ -2317,6 +2317,30 @@ test("Activity's search, sort and pages: Enter puts q in the address and the pla
   ).toBe(true);
 });
 
+// S1-8b (backend §12.1 #252): the connection the held run was built on was
+// disconnected after the page was read, so its Approve is refused.
+test("S1-8b — an Approve a disconnect expired says Stage 1's two lines in the pair's place, the row kept and Expired, with nothing more to press", async ({
+  page,
+}) => {
+  await fixtureControl("approval-waiting");
+  await fixtureControl("approval-disconnected");
+  await page.goto("/account/approvals");
+  const row = approvalRows(page).first();
+  await row.getByRole("button", { name: "Approve" }).click();
+  const words = row.getByTestId("decision-expired");
+  await expect(words).toContainText("Expired · QuickBooks was disconnected");
+  await expect(words).toContainText(
+    "Reconnect QuickBooks, then start the run again.",
+  );
+  await expect(row.getByRole("button")).toHaveCount(0);
+  await expect(row.locator('[data-testid^="approval-pill-"]')).toHaveText(
+    /expired/iu,
+  );
+  await expect(page.getByText("its connection was disconnected")).toHaveCount(
+    0,
+  );
+});
+
 test("P7 — under reduced motion a decided row leaves at once, with no fade", async ({
   page,
 }) => {
