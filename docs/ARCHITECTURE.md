@@ -319,14 +319,15 @@ Intuit; it reads nothing.
 
 A domain-only organization that refuses a person at session resolve because
 they hold a sign-in outside its verified domains (backend §12.1 #221, option
-b′: 403 `outside_org_domain` naming those sign-ins) is the account area's
-own screen (`components/account/OutsideSignIn.tsx`, drawn by the account
-layout in place of the platform's notice): "This organization admits only
-people who sign in with addresses at its verified domains.", "Remove your
-other sign-in to continue." and "Remove {provider} sign-in" for each, which
-unlinks it as Settings' linked accounts do and reads the area again. The
-contract leaves which reads answer it to the platform; the layout's own
-session and workspace reads are where the website looks.
+b′: 403 `outside_org_domain` naming those sign-ins) has the account area's
+own screen, built (`components/account/OutsideSignIn.tsx`, drawn by the
+account layout in place of the platform's notice): "This organization admits
+only people who sign in with addresses at its verified domains.", "Remove
+your other sign-in to continue." and "Remove {provider} sign-in" for each,
+which unlinks it as Settings' linked accounts do and reads the area again.
+The platform does not send this refusal before Stage 2 (BUILD-PLAN 29.4.6;
+§12.1 #221), so nothing draws the screen until then; the website looks for
+it in the account layout's own session and workspace reads.
 
 Deleting the account (Settings, `components/account/DeleteAccountButton.tsx`)
 says what the route removes, and "You'll be signed out on all devices.": the
@@ -418,12 +419,13 @@ without changes is unchanged. The words are ICD-10 Code Check's words.md
 section 3, the app's too.
 
 A held job whose approval a disconnect expired (backend §12.1 #252,
-`Approval.expiredBy` with `connection-disconnected`) says so over its run
-page's body: "Expired · {provider} was disconnected", then "Reconnect
-{provider}, then start the run again." — the provider named as the
-connection row names it (`disconnectedName`; `expiredByDisconnect` in
-`lib/run-progress.ts`). A plain expiry, or a reason this build does not
-know, adds nothing.
+`Approval.expiredBy` with `connection-disconnected`) is built to say so over
+its run page's body: "Expired · {provider} was disconnected", then
+"Reconnect {provider}, then start the run again." — the provider named as
+the connection row names it (`disconnectedName`; `expiredByDisconnect` in
+`lib/run-progress.ts`). The platform does not send this expiry before Stage
+2 (BUILD-PLAN 29.4.6; §12.1 #252 approval half), so nothing draws it until
+then. A plain expiry, or a reason this build does not know, adds nothing.
 
 A job that has documents and has ended or is held has a run package (backend
 ADR-0045; the platform says so, `RunDetail.packageAvailable`): View package, Download PDF and Download Excel replace Download
