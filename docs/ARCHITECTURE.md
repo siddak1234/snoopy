@@ -391,7 +391,8 @@ The organization page lists the workspace's signed documents under
 Agreement · Version {n}" over "Accepted by {name} on {date}", or "No
 documents yet." (`components/dashboard/OrgDocumentList.tsx`). A row opens
 the signed copy's page (`app/account/organization/documents/[documentId]/page.tsx`),
-the only place the copy is read. The organization page is its owners' and
+the only place the copy is read; a document that is not this workspace's,
+or an id that is not one (the platform's 400), is "not found". The organization page is its owners' and
 admins' (register F55), so on the website the list is theirs, though the
 platform lets any member read it.
 

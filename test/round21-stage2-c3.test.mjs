@@ -348,3 +348,19 @@ test("C3 Documents: the organization page reads the list once with its other rea
   );
   assert.match(copy, /if \(!copy \|\| !name\) notFound\(\);/u);
 });
+
+test("C3 Documents: a copy that is not this workspace's (404), or an id that is not one (the platform's 400), is not found; any other refusal is the page's error", async () => {
+  const { readWorkspaceDocument } = await agreements();
+  const copy = (id) => `/v1/workspaces/w1/documents/${id}`;
+  for (const [id, status] of [
+    ["d9", 404],
+    ["d0c0-typo", 400],
+  ]) {
+    platform({ [copy(id)]: platformError(status, undefined, "Refused") });
+    assert.equal(await readWorkspaceDocument("w1", id), null, `${status}`);
+  }
+  platform({ [copy("d1")]: platformError(503, undefined, "Unavailable") });
+  await assert.rejects(readWorkspaceDocument("w1", "d1"), { status: 503 });
+  platform({ [copy("d1")]: { document: { id: "d1" } } });
+  assert.deepEqual(await readWorkspaceDocument("w1", "d1"), { id: "d1" });
+});

@@ -74,7 +74,12 @@ export async function listWorkspaceDocuments(
   return documents;
 }
 
-/** One document with its signed copy, read only when its row is opened; `null` when it is not this workspace's. */
+/**
+ * One document with its signed copy, read only when its row is opened;
+ * `null` when it is not this workspace's (404) or its id is not one (the 400
+ * the platform answers for an id that is not a UUID), so the page is "not
+ * found" either way, as a flow's is (`readSubscription`).
+ */
 export async function readWorkspaceDocument(
   workspaceId: string,
   documentId: string,
@@ -86,7 +91,10 @@ export async function readWorkspaceDocument(
       );
     return document;
   } catch (error) {
-    if (error instanceof PlatformServerError && error.status === 404)
+    if (
+      error instanceof PlatformServerError &&
+      (error.status === 404 || error.status === 400)
+    )
       return null;
     throw error;
   }

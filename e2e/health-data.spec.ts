@@ -310,7 +310,7 @@ test("C3: the organization's Documents list each signed document — Business As
   await expect(page).toHaveURL(/\/account\/organization$/u);
 });
 
-test("C3: with none signed, Documents says No documents yet.; a document of another workspace is not found", async ({
+test("C3: with none signed, Documents says No documents yet.; a document of another workspace, or an id that is not one, is not found", async ({
   page,
 }) => {
   await fixtureControl("documents-none");
@@ -322,6 +322,9 @@ test("C3: with none signed, Documents says No documents yet.; a document of anot
     "/account/organization/documents/d0c0d0c0-d0c0-4d0c-8d0c-d0c0d0c0d0c0",
   );
   expect(response?.status()).toBe(404);
+  // The platform answers 400 for an id that is not a UUID: not found too.
+  const typo = await page.goto("/account/organization/documents/d0c0-typo");
+  expect(typo?.status()).toBe(404);
 });
 
 test("C3: the owner's acceptance is the newest of the Documents", async ({

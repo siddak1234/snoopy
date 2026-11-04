@@ -214,8 +214,8 @@ whose list row carries no settings still drawn and saved from its one-flow read 
 Add, on Start run and on an item's upload — the owner's dialog, anyone
 else's one line, nothing published yet, the add, run or item sent again
 under the refused one's key, signed once when that repeat is refused — the
-organization's Documents and a signed copy),
-`e2e/ehr-connect.spec.ts` (Connect your EHR: the FHIR address, a vendor
+organization's Documents and a signed copy, one whose id is not one not
+found), `e2e/ehr-connect.spec.ts` (Connect your EHR: the FHIR address, a vendor
 picker only for two or more vendors, each refusal in words, the row named
 by the clinic's host)
 and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: the Flows

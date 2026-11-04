@@ -333,7 +333,13 @@ export async function healthRoute(input: {
   const one = new RegExp(`^${scope}/documents/([^/]+)$`, "u").exec(pathname);
   if (method === "GET" && one) {
     const document = health.documents.find((entry) => entry.id === one[1]);
-    if (!document) respond(response, 404, problem(404, "Not Found"));
+    // An id that is not a UUID is refused before it is looked up.
+    if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu.test(one[1]))
+      respond(response, 400, {
+        ...problem(400, "Bad Request"),
+        details: { field: "documentId" },
+      });
+    else if (!document) respond(response, 404, problem(404, "Not Found"));
     else
       respond(response, 200, {
         document: signedCopy(document, input.organizationName),
