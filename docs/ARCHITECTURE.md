@@ -332,19 +332,21 @@ activate it."; `smartBackendRefusal`), and its row, connected, names the
 clinic's host (`connectionLine`). A flow step that offers the EHR sends an
 owner or admin to Connections, as any vendor that is not OAuth.
 
-A domain-only organization that refuses a person at session resolve because
-they hold a sign-in outside its verified domains (backend §12.1 #221, option
-b′: 403 `outside_org_domain` naming those sign-ins) has the account area's
-own screen, built (`components/account/OutsideSignIn.tsx`, drawn by the
-account layout in place of the platform's notice): "This organization admits
-only people who sign in with addresses at its verified domains.", "Remove
-your other sign-in to continue." and "Remove {provider} sign-in" for each,
-which unlinks it as Settings' linked accounts do and reads the area again.
-The website looks for the refusal in the account layout's own session and
-workspace reads. The platform sends it on a request that names the
-workspace (backend §12.1 #221, S1-11), and neither of those names one, so
-a page's own workspace read meets it first (Round 21, Stage 2: a finding
-for the session).
+A person who holds a sign-in outside a domain-only organization's verified
+domains (backend §12.1 #221, option b′) sees, in the account area while that
+organization is active, its own screen (`components/account/OutsideSignIn.tsx`):
+"This organization admits only people who sign in with addresses at its
+verified domains.", "Remove your other sign-in to continue." and "Remove
+{provider} sign-in" for each such sign-in, which unlinks it as Settings'
+linked accounts do and reads the area again. The platform refuses (403
+`outside_org_domain`, naming those sign-ins) only a request billed to that
+workspace, one whose path names it; the account layout's session and
+workspace reads name none and still answer, so the navigation stays. A
+page's own read is refused, its render fails, and the account area's error
+screen (`app/account/error.tsx`), with the session kept, makes one read
+that names the active workspace (its members, `outsideOnError` in
+`lib/domain-only.ts`): refused so, it draws this screen in place of "The
+platform could not answer just now". No page that loads makes that read.
 
 Deleting the account (Settings, `components/account/DeleteAccountButton.tsx`)
 says what the route removes, and "You'll be signed out on all devices.": the

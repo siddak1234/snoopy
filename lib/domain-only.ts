@@ -55,6 +55,37 @@ export function outsideSignIns(
   return known.length > 0 ? known : null;
 }
 
+/**
+ * The sign-ins to remove, read where the account area's error screen asks
+ * (`app/account/error.tsx`), and only there. The platform refuses an
+ * outside sign-in only on a request billed to the domain-only workspace
+ * (one whose path names it), never on the session or the workspace list the
+ * account layout reads, so a page's own read meets it first and its server
+ * render throws to that screen. With the session kept, ONE read that names
+ * the active workspace (`read`, through the proxy): its 403
+ * `outside_org_domain` is the sign-ins to remove; anything else, or no
+ * active workspace (then nothing is read), `null`.
+ */
+export async function outsideOnError(
+  session: { user?: { activeWorkspaceId?: string } },
+  read: (path: string) => Promise<unknown>,
+): Promise<OutsideSignIn[] | null> {
+  const active = session.user?.activeWorkspaceId;
+  if (!active) return null;
+  try {
+    await read(`/v1/workspaces/${encodeURIComponent(active)}/members`);
+    return null;
+  } catch (error) {
+    const refusal = error as {
+      status?: unknown;
+      details?: Record<string, unknown>;
+    } | null;
+    return typeof refusal?.status === "number"
+      ? outsideSignIns(refusal.status, refusal.details)
+      : null;
+  }
+}
+
 /** Approving someone who signs in from outside them while the setting is on. */
 export const APPROVAL_OUTSIDE_DOMAIN =
   "This person signs in with an address outside your verified domains, so they can't join while Verified domains only is on.";

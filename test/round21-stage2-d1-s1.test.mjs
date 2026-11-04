@@ -3,6 +3,7 @@ import { readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { after, test } from "node:test";
 import { connectionLine } from "../lib/connection-rows.ts";
+import { outsideOnError } from "../lib/domain-only.ts";
 import {
   SMART_BACKEND_REFUSALS,
   opensKeyForm,
@@ -211,4 +212,53 @@ test("S1-8, S1-11: the outside sign-in screen and the expired approval wait for 
       /before Stage 2|BUILD-PLAN 29\.4\.6/u,
       `${path} still says the platform does not send it before Stage 2`,
     );
+});
+
+test("S1-11: the account area's error screen, its session kept, makes ONE read that names the active workspace — its 403 outside_org_domain is the sign-ins to remove; any other answer, or no active workspace (then nothing is read), none", async () => {
+  const asked = [];
+  const answering = (outcome) => async (path) => {
+    asked.push(path);
+    if (outcome instanceof Error) throw outcome;
+    return outcome;
+  };
+  const refused = (status, details) =>
+    Object.assign(new Error("Forbidden"), { status, details });
+  const kept = { user: { activeWorkspaceId: "w 1" } };
+  assert.deepEqual(
+    await outsideOnError(
+      kept,
+      answering(
+        refused(403, {
+          reason: "outside_org_domain",
+          providers: ["google", "apple"],
+        }),
+      ),
+    ),
+    ["google", "apple"],
+  );
+  assert.deepEqual(asked, ["/v1/workspaces/w%201/members"]);
+  for (const outcome of [
+    { members: [] },
+    refused(403, { requiredRole: "owner" }),
+    refused(503, undefined),
+    new Error("no answer"),
+  ])
+    assert.equal(await outsideOnError(kept, answering(outcome)), null);
+  asked.length = 0;
+  assert.equal(
+    await outsideOnError({ user: {} }, answering({ members: [] })),
+    null,
+  );
+  assert.deepEqual(asked, []);
+  // Only once the session is kept, and the screen drawn in place of the
+  // platform's notice, its removal read again through the screen's retry.
+  const screen = code("app/account/error.tsx");
+  assert.match(
+    screen,
+    /\.then\(\s*async \(kept\) => \{\s*const refused = await outsideOnError\(kept, \(path\) =>\s*platformApiJson\(path\),?\s*\);/u,
+  );
+  assert.match(
+    screen,
+    /if \(outside\) return <OutsideSignIn providers=\{outside\} onRemoved=\{retry\} \/>;\s*[\s\S]*?return <PlatformUnavailable/u,
+  );
 });

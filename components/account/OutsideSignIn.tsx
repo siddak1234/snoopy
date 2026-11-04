@@ -16,13 +16,23 @@ import { PAGE_CARD, SPACING } from "@/lib/spacing";
 
 /**
  * The account area when the active workspace is a domain-only organization
- * that refuses this person at session resolve (backend §12.1 #221, option
- * b′): its words, then "Remove {provider} sign-in" for each sign-in outside
- * its verified domains. A press removes that sign-in (`unlinkLoginIdentity`,
- * as Settings' linked accounts do) and reads the area again; a refusal is
- * said in Settings' words; nothing is removed until a press.
+ * that refuses this person (backend §12.1 #221, option b′; drawn by the
+ * account area's error screen, `app/account/error.tsx`, from the refusal of
+ * a read billed to it): its words, then "Remove {provider} sign-in" for each
+ * sign-in outside its verified domains. A press removes that sign-in
+ * (`unlinkLoginIdentity`, as Settings' linked accounts do) and reads the
+ * area again (`onRemoved`: the error screen's retry; the page's refresh
+ * otherwise); a refusal is said in Settings' words; nothing is removed until
+ * a press.
  */
-export function OutsideSignIn({ providers }: { providers: Provider[] }) {
+export function OutsideSignIn({
+  providers,
+  onRemoved,
+}: {
+  providers: Provider[];
+  /** Reads the area again once a sign-in is removed. */
+  onRemoved?: () => void;
+}) {
   const router = useRouter();
   const [removing, setRemoving] = useState<Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +44,8 @@ export function OutsideSignIn({ providers }: { providers: Provider[] }) {
       await platformApiJson(`/v1/auth/identities/${provider}`, {
         method: "DELETE",
       });
-      router.refresh();
+      if (onRemoved) onRemoved();
+      else router.refresh();
     } catch (caught) {
       if (sessionEnded(caught)) {
         window.location.assign(loginHref("/account"));
