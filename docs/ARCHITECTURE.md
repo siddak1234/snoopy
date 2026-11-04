@@ -396,6 +396,13 @@ or an id that is not one (the platform's 400), is "not found". The organization 
 admins' (register F55), so on the website the list is theirs, though the
 platform lets any member read it.
 
+The fixture Edge (`e2e/fixtures/health-data.ts`) answers these refusals
+as the published contract says. The platform's own — `agreement_required`
+on an add, a run and an item, `outside_org_domain`, and an Approve's 409
+`approval_expired` — are checked once against the live platform, on a test
+workspace, after backend #266 deploys and before this change is marked
+ready; no local Compose run is made for them.
+
 ## Runs and approvals
 
 A job is its first run (backend ADR-0044): the platform lists each job once,
