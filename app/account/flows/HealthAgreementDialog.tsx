@@ -11,6 +11,7 @@ import {
   AGREEMENT_TITLE,
   SIGNER_NAME,
   SIGNER_TITLE,
+  acceptThenRepeat,
   agreementVersion,
   authorizedToSign,
   type AgreementOffer,
@@ -63,16 +64,15 @@ export function HealthAgreementDialog({
     data.set("workspaceId", workspaceId);
     setError(null);
     startTransition(async () => {
-      if (!accepted) {
-        const result = await acceptHealthAgreement(data);
-        if (!result.ok) {
-          setError(result.error);
-          return;
-        }
-        setAccepted(true);
-      }
-      const refused = await onAccepted();
-      if (refused) setError(refused);
+      // Accepted once per opening (`acceptThenRepeat`): a press after the
+      // repeat was refused sends the repeat alone.
+      const pressed = await acceptThenRepeat(
+        accepted,
+        () => acceptHealthAgreement(data),
+        onAccepted,
+      );
+      setAccepted(pressed.accepted);
+      setError(pressed.error);
     });
   };
 

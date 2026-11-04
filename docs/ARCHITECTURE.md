@@ -372,7 +372,11 @@ or "Accept and start run" (Start run, and an item's upload: its dialog opens
 over the upload card), which accepts once, under the dialog's own key, then
 sends the add, the run or the item again under the key the refused one
 carried (`AddAutomation`, `RunStart`, `UploadItemCard`), so a lost answer
-adds or starts nothing twice. Anyone else sees "Ask your workspace owner to
+adds or starts nothing twice; a press after that repeat was refused sends
+the repeat alone, never a second acceptance (`acceptThenRepeat`). A refused
+acceptance is said in place: a 403 asks the owner, a 503
+`agreement_not_published` says it isn't available yet, anything else in
+the platform's words. Anyone else sees "Ask your workspace owner to
 accept the health data agreement." and nothing more is sent (a member's
 upload is refused first as a member's: "Only an owner or admin can do
 this."); while no version is published the

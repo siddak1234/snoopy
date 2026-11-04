@@ -209,9 +209,10 @@ Connect step and, as a step's choice, Connected and chosen in place, a batch run
 whose list row carries no settings still drawn and saved from its one-flow read (backend §12.1 #319), a flow id that is not a UUID, one the platform does not know and a flow it answers archived each "not found", its integration's save refused once it is archived, and a run's details page still drawn when its flow is archived or cannot be read, in `e2e/public-edge-fixture.spec.ts`), `e2e/dialogs.spec.ts`
 (every dialog's Escape, click outside, focus return and hold, one row each),
 `e2e/health-data.spec.ts` (Round 21, Stage 2: the health data agreement on
-Add and on Start run — the owner's dialog, anyone else's one line, nothing
-published yet, the add or the run sent again under the refused one's key —
-the organization's Documents and a signed copy),
+Add, on Start run and on an item's upload — the owner's dialog, anyone
+else's one line, nothing published yet, the add, run or item sent again
+under the refused one's key, signed once when that repeat is refused — the
+organization's Documents and a signed copy),
 `e2e/ehr-connect.spec.ts` (Connect your EHR: the FHIR address, a vendor
 picker only for two or more vendors, each refusal in words, the row named
 by the clinic's host)

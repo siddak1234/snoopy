@@ -82,6 +82,25 @@ export function agreementRequired(
     : { kind };
 }
 
+/**
+ * The dialog's press: accept, unless this opening already did, then send
+ * the add, the run or the item again (`repeat`). Accepted once, a press
+ * after the repeat was refused sends the repeat alone, never a second
+ * acceptance. What it came to: whether it is accepted now, and the refusal
+ * to say — the acceptance's, or the repeat's — or null once it went.
+ */
+export async function acceptThenRepeat(
+  accepted: boolean,
+  accept: () => Promise<{ ok: true } | { ok: false; error: string }>,
+  repeat: () => Promise<string | null>,
+): Promise<{ accepted: boolean; error: string | null }> {
+  if (!accepted) {
+    const acceptance = await accept();
+    if (!acceptance.ok) return { accepted: false, error: acceptance.error };
+  }
+  return { accepted: true, error: await repeat() };
+}
+
 /** What the dialog shows and sends back: the text read, its version and hash, and who signs for. */
 export type AgreementOffer = {
   version: number;

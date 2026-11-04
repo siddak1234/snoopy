@@ -107,6 +107,32 @@ test("C3: the owner's Add of a flow that carries health data opens the agreement
   expect(repeated.key).toBe(refused.key);
 });
 
+test("C3: accepted once — a press after the repeat was refused sends the add again alone, under the same key, and the agreement is signed once", async ({
+  page,
+}) => {
+  await fixtureControl("agreement-repeat-refused-once");
+  await fixtureControl("invoice-not-added");
+  await page.goto("/account/flows");
+  await automationCard(page, "Invoice Processing")
+    .getByRole("button", { name: "Add" })
+    .click();
+  await accept(page, "Accept and add flow");
+  const dialog = agreement(page);
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Could not add this flow. Try again.",
+  );
+  await dialog.getByRole("button", { name: "Accept and add flow" }).click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
+  const seen = await health();
+  expect(seen.acceptances).toHaveLength(1);
+  expect(seen.healthRequests.map(({ accepted }) => accepted)).toEqual([
+    false,
+    true,
+    true,
+  ]);
+  expect(new Set(seen.healthRequests.map(({ key }) => key)).size).toBe(1);
+});
+
 test("C3: an admin's Add of it is refused in the one line — no dialog, nothing more sent", async ({
   page,
 }) => {

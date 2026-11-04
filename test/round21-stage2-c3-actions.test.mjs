@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
-import { ASK_OWNER } from "../lib/health-agreement.ts";
+import {
+  AGREEMENT_NOT_PUBLISHED,
+  ASK_OWNER,
+  acceptThenRepeat,
+} from "../lib/health-agreement.ts";
 import {
   cleanupLoaded,
   code,
@@ -115,4 +119,143 @@ test("C3-b, an item: the upload card opens the owner's dialog beside its form, a
   );
   // Beside the card's dialog, never in its form, whose changes make a new key.
   assert.match(card, /<\/Modal>\s*\{offer \? \(\s*<HealthAgreementDialog/u);
+});
+
+const AGREEMENT_ACTIONS = "app/account/flows/agreement-actions.ts";
+const ACCEPT = "/v1/workspaces/w1/agreements";
+/** The dialog's form, as a press of Accept sends it. */
+const SIGNED = {
+  version: "1",
+  sha256: "a".repeat(64),
+  signerName: " Dana Owner ",
+  signerTitle: "Practice manager",
+  authorized: "true",
+  agreementKey: "agreement-0123456789abcdef",
+  workspaceId: "w1",
+};
+
+/** `acceptHealthAgreement` of `fields` against the platform's `answer` for the acceptance. */
+async function acceptance(answer, fields = SIGNED, { active } = {}) {
+  const { acceptHealthAgreement } = await load(AGREEMENT_ACTIONS);
+  platform({ [ACCEPT]: answer }, { active });
+  const data = new FormData();
+  for (const [name, value] of Object.entries(fields))
+    if (value !== undefined) data.set(name, value);
+  return acceptHealthAgreement(data);
+}
+
+test("C3 Accept: what this person read and signed is sent once, under the dialog's key — the version, the text's hash, the name and title trimmed, authorized — and the organization's Documents are drawn again", async () => {
+  assert.deepEqual(await acceptance({ document: { id: "d1" } }), { ok: true });
+  assert.equal(globalThis.__sent.length, 1);
+  const [sent] = globalThis.__sent;
+  assert.equal(sent.path, ACCEPT);
+  assert.equal(sent.method, "POST");
+  assert.equal(sent.idempotencyKey, SIGNED.agreementKey);
+  assert.deepEqual(JSON.parse(sent.body), {
+    kind: "health-data",
+    version: 1,
+    sha256: SIGNED.sha256,
+    signerName: "Dana Owner",
+    signerTitle: "Practice manager",
+    authorized: true,
+  });
+  assert.deepEqual(globalThis.__revalidated, [
+    ["/account/organization", "layout"],
+  ]);
+});
+
+test("C3 Accept: a form the platform could not take — no version, a hash that is not 64 hex, a name or title empty or over 120, the box unticked, no key — says Reopen the form and try again. and sends nothing", async () => {
+  for (const [field, value] of [
+    ["version", "0"],
+    ["version", "1.5"],
+    ["sha256", "A".repeat(64)],
+    ["sha256", "a".repeat(63)],
+    ["signerName", "   "],
+    ["signerName", "x".repeat(121)],
+    ["signerTitle", ""],
+    ["signerTitle", "x".repeat(121)],
+    ["authorized", undefined],
+    ["authorized", "on"],
+    ["agreementKey", "short"],
+  ]) {
+    const answer = await acceptance(
+      { document: { id: "d1" } },
+      { ...SIGNED, [field]: value },
+    );
+    assert.deepEqual(
+      answer,
+      { ok: false, error: "Reopen the form and try again." },
+      `${field}: ${value}`,
+    );
+    assert.deepEqual(globalThis.__sent, [], `${field}: ${value}`);
+  }
+});
+
+test("C3 Accept: refused, it is said in place — 403 asks the owner, 503 agreement_not_published isn't available yet, anything else in the platform's words; another workspace now active, nothing is sent", async () => {
+  const said = async (error) => (await acceptance(error)).error;
+  assert.equal(
+    await said(platformError(403, { requiredRole: "owner" })),
+    ASK_OWNER,
+  );
+  assert.equal(
+    await said(
+      platformError(
+        503,
+        { reason: "agreement_not_published" },
+        "Service Unavailable",
+      ),
+    ),
+    AGREEMENT_NOT_PUBLISHED,
+  );
+  assert.equal(
+    await said(platformError(503, { reason: "other" }, "Service Unavailable")),
+    "Service Unavailable",
+  );
+  assert.equal(
+    await said(
+      platformError(
+        409,
+        { reason: "agreement_changed" },
+        "The agreement changed",
+      ),
+    ),
+    "The agreement changed",
+  );
+  const moved = await acceptance({ document: {} }, SIGNED, { active: "w2" });
+  assert.deepEqual(moved, { ok: false, error: "WORKSPACE_CHANGED" });
+  assert.deepEqual(globalThis.__sent, []);
+});
+
+test("C3 Accept: once per opening — a press after the repeat was refused sends the repeat alone; a refused acceptance sends no repeat", async () => {
+  const calls = [];
+  const accept = (ok) => async () => {
+    calls.push("accept");
+    return ok ? { ok: true } : { ok: false, error: ASK_OWNER };
+  };
+  const repeat = (error) => async () => {
+    calls.push("repeat");
+    return error;
+  };
+  const busy = "Could not add this flow. Try again.";
+  assert.deepEqual(await acceptThenRepeat(false, accept(true), repeat(busy)), {
+    accepted: true,
+    error: busy,
+  });
+  assert.deepEqual(await acceptThenRepeat(true, accept(true), repeat(null)), {
+    accepted: true,
+    error: null,
+  });
+  assert.deepEqual(calls, ["accept", "repeat", "repeat"]);
+  calls.length = 0;
+  assert.deepEqual(await acceptThenRepeat(false, accept(false), repeat(null)), {
+    accepted: false,
+    error: ASK_OWNER,
+  });
+  assert.deepEqual(calls, ["accept"]);
+  // The dialog keeps what the press came to, and the next press reads it.
+  const dialog = code("app/account/flows/HealthAgreementDialog.tsx");
+  assert.match(
+    dialog,
+    /const pressed = await acceptThenRepeat\(\s*accepted,\s*\(\) => acceptHealthAgreement\(data\),\s*onAccepted,\s*\);\s*setAccepted\(pressed\.accepted\);\s*setError\(pressed\.error\);/u,
+  );
 });

@@ -65,6 +65,8 @@ export function healthState() {
     healthData: false,
     agreementAccepted: false,
     agreementUnpublished: false,
+    // How many repeats after the acceptance are refused (502), once each.
+    repeatsRefused: 0,
     // Every add, run start and item sent while the flows carry health data,
     // with its key — a repeat after Accept must carry the refused one's.
     healthRequests: [] as {
@@ -92,6 +94,10 @@ export function healthControls(
   return {
     "/__fixture/health-data": () => {
       health.healthData = true;
+    },
+    "/__fixture/agreement-repeat-refused-once": () => {
+      health.healthData = true;
+      health.repeatsRefused = 1;
     },
     "/__fixture/agreement-unpublished": () => {
       health.healthData = true;
@@ -208,7 +214,12 @@ export async function healthRoute(input: {
       key: header(request, "idempotency-key"),
       accepted: health.agreementAccepted,
     });
-    if (health.agreementAccepted) return false;
+    if (health.agreementAccepted && health.repeatsRefused === 0) return false;
+    if (health.agreementAccepted) {
+      health.repeatsRefused -= 1;
+      respond(response, 502, problem(502, "Bad Gateway"));
+      return true;
+    }
     respond(response, 403, {
       ...problem(403, "Forbidden"),
       details: {
