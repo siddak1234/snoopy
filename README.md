@@ -191,7 +191,7 @@ billing (Free, Plus and Pro — the platform's, or the one the website draws
 while the platform lists none — and a second plan refused), the quick and the
 complete export (its link followed only when https), account deletion, and the platform's refusals —
 without real accounts or credentials, and each test starts from the fixture's
-first state. Eight specs: `e2e/accessibility.spec.ts`,
+first state. Nine specs: `e2e/accessibility.spec.ts`,
 `e2e/accessibility-authenticated.spec.ts` (every page behind sign-in,
 scanned with axe), `e2e/keyboard-journey.spec.ts` (below),
 `e2e/public-edge-fixture.spec.ts`, `e2e/account-surfaces.spec.ts` (every
@@ -211,9 +211,10 @@ whose list row carries no settings still drawn and saved from its one-flow read 
 `e2e/health-data.spec.ts` (Round 21, Stage 2: the health data agreement on
 Add and on Start run — the owner's dialog, anyone else's one line, nothing
 published yet, the add or the run sent again under the refused one's key —
-the organization's Documents and a signed copy, and Connect your EHR: the
-FHIR address, a vendor picker only for two or more vendors, each refusal in
-words, the row named by the clinic's host)
+the organization's Documents and a signed copy),
+`e2e/ehr-connect.spec.ts` (Connect your EHR: the FHIR address, a vendor
+picker only for two or more vendors, each refusal in words, the row named
+by the clinic's host)
 and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: the Flows
 list by department A–Z; its items grouped A–Z under its group filter, the
 website's drop-down, on its page with no Dashboard, no Steps and no run start

@@ -37,6 +37,7 @@ const fixtureOnly =
         /dialogs\.spec\.ts/,
         /flow-items\.spec\.ts/,
         /health-data\.spec\.ts/,
+        /ehr-connect\.spec\.ts/,
         /accessibility-authenticated\.spec\.ts/,
         /keyboard-journey\.spec\.ts/,
       ];

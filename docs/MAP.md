@@ -154,6 +154,7 @@
 - [e2e/account-surfaces.spec.ts](../e2e/account-surfaces.spec.ts): no header
 - [e2e/connection-callback.spec.ts](../e2e/connection-callback.spec.ts): no header
 - [e2e/dialogs.spec.ts](../e2e/dialogs.spec.ts): no header
+- [e2e/ehr-connect.spec.ts](../e2e/ehr-connect.spec.ts): no header
 - [e2e/flow-items.spec.ts](../e2e/flow-items.spec.ts): no header
 - [e2e/health-data.spec.ts](../e2e/health-data.spec.ts): no header
 - [e2e/keyboard-journey.spec.ts](../e2e/keyboard-journey.spec.ts): The owner's NFR-35 keyboard traversal, by hand — not an automated assertion:

@@ -150,6 +150,7 @@ try {
       "e2e/dialogs.spec.ts",
       "e2e/flow-items.spec.ts",
       "e2e/health-data.spec.ts",
+      "e2e/ehr-connect.spec.ts",
       "e2e/accessibility-authenticated.spec.ts",
       // Collected only with KEYBOARD_JOURNEY=1 (playwright.config.ts).
       "e2e/keyboard-journey.spec.ts",

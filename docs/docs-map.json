@@ -66,7 +66,7 @@
     {
       "key": "fixture-specs",
       "home": "README.md",
-      "pattern": "\\b(?:[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight) specs\\b"
+      "pattern": "\\b(?:[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine) specs\\b"
     }
   ],
   "records": {

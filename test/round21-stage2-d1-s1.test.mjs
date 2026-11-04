@@ -24,7 +24,7 @@ import {
  * Round 21, Stage 2 on the website, D1 and S1 (the client half of backend PR
  * #266, 50a24f7; the same words as the app's): Connect your EHR, and S1-8
  * and S1-11 as the platform sends them now. C3 is
- * `round21-stage2-c3.test.mjs`; the e2e half is `e2e/health-data.spec.ts`.
+ * `round21-stage2-c3.test.mjs`; D1's e2e half is `e2e/ehr-connect.spec.ts`.
  */
 
 const KEY_FIELDS = "app/account/connections/KeyFields.tsx";
