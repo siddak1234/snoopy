@@ -6,37 +6,38 @@ import { PlusIcon } from "@phosphor-icons/react/dist/ssr/Plus";
 import { SparkleIcon } from "@phosphor-icons/react/dist/ssr/Sparkle";
 import { getAppSession } from "@/lib/app-session";
 import {
-  formatWhen,
   listApprovals,
   listAutomations,
-  listRuns,
+  listSubscriptions,
 } from "@/lib/automations";
 import {
   PlatformNotConfiguredError,
   PlatformServerError,
+  newIdempotencyKey,
 } from "@/lib/platform-server";
-import { runLabel } from "@/lib/run-progress";
-import { resolveActiveWorkspaceId } from "@/lib/tenancy";
+import {
+  administers,
+  resolveActiveWorkspaceId,
+  roleInWorkspace,
+} from "@/lib/tenancy";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { Group } from "@/components/dashboard/Group";
-import { PageRow } from "@/components/dashboard/PageRow";
-import { LIST_CARD } from "@/components/dashboard/SectionRows";
-import { StatusPill } from "@/components/dashboard/StatusPill";
 import { Button } from "@/components/ui/Button";
 import { GROUP_BAND, ROW, SPACING } from "@/lib/spacing";
+import { homeFlows, YOUR_FLOWS } from "./home-flows";
 import { TodayTiles } from "./TodayTiles";
-
-/** How many recent runs the dashboard lists, as the app's RECENT RUNS (Build 22, the session's S27). */
-const RECENT_RUNS = 4;
+import { YourFlows } from "./YourFlows";
 
 /**
  * The dashboard's own reads, each a figure of its own (register F54): the
- * recent runs, named from the catalog as Activity names them; the catalog,
- * whose `subscribed` says whether this workspace has set any flow up, ever;
- * and the approvals waiting, for the banner. `null` when no workspace is
- * active, so nothing is claimed about one. Today's counts are the browser's
- * own read (`TodayTiles`): "today" is a local idea.
+ * workspace's flows, for YOUR FLOWS, named and put under their department
+ * from the catalog (`homeFlows`); the catalog, whose `subscribed` says
+ * whether this workspace has set any flow up, ever; and the approvals
+ * waiting, for the banner — with the person's role, which an item's run
+ * start needs (~~the recent runs~~ until build 34's F5). `null` when no
+ * workspace is active, so nothing is claimed about one. Today's counts are
+ * the browser's own read (`TodayTiles`): "today" is a local idea.
  *
  * Each figure stands alone: one the platform refuses or cannot answer says so
  * in its place and the rest still show, rather than one read taking the whole
@@ -48,21 +49,24 @@ const RECENT_RUNS = 4;
  */
 async function readHome(workspaceId: string | undefined) {
   if (!workspaceId) return null;
-  const [runs, catalog, pending] = await Promise.all([
-    figure(() => listRuns(workspaceId)),
+  const [subscriptions, catalog, pending, role] = await Promise.all([
+    figure(() => listSubscriptions(workspaceId)),
     figure(() => listAutomations(workspaceId)),
     figure(() => listApprovals(workspaceId, "pending")),
+    roleInWorkspace(workspaceId),
   ]);
-  const nameFor = new Map(
-    (catalog?.automations ?? []).map((entry) => [entry.templateId, entry.name]),
-  );
   return {
     workspaceId,
-    recent:
-      runs?.runs.slice(0, RECENT_RUNS).map((run) => ({
-        run,
-        name: nameFor.get(run.templateId) ?? run.templateId,
-      })) ?? null,
+    // Either list unanswered: the section says "Unavailable" in its place.
+    flows:
+      subscriptions && catalog
+        ? homeFlows(
+            subscriptions.subscriptions,
+            catalog.automations,
+            administers(role),
+            () => newIdempotencyKey("run"),
+          )
+        : null,
     // With no flow set up, ever — the catalog's flag, so a catalog that could
     // not be read claims nothing — the first run takes the place of the
     // buttons and the runs below (the app's HomeFirstRun).
@@ -108,8 +112,9 @@ function getFirstName(name?: string | null): string | null {
  *    (D6, the session's suggestion the owner approved), in the app's words;
  * 3. **Add a flow** and **Flows**, both to Flows, the website's one page for
  *    adding and for the flows added;
- * 4. **Recent runs** and See all — four rows, each its flow, its status and
- *    "{when} · Run {full id}".
+ * 4. **YOUR FLOWS** (the owner's build 34 F5), only while the workspace has
+ *    a live flow — each a row that opens to its run's first step and Start
+ *    run (`YourFlows`). ~~Recent runs and See all, four rows~~ until then.
  *
  * With no flow set up, ever, the first run takes the place of 3 and 4 — the
  * app's words, and its one way in. ~~Run a flow, Quick actions (Browse flows,
@@ -214,50 +219,22 @@ export default async function AccountDashboardPage() {
             </div>
           </div>
 
-          <Group
-            title="Recent runs"
-            titleId="recent-runs-title"
-            testId="home-recent-runs"
-            action={
-              <Link
-                prefetch={false}
-                href="/account/runs"
-                className="text-sm text-[var(--link)] underline-offset-2 hover:underline"
-              >
-                See all
-              </Link>
-            }
-          >
-            {home.recent === null ? (
-              <p className="text-sm text-[var(--muted)]">
-                Recent activity could not be read just now.
-              </p>
-            ) : home.recent.length > 0 ? (
-              <ul className={LIST_CARD}>
-                {home.recent.map(({ run, name }) => (
-                  <li key={run.id}>
-                    <PageRow
-                      href={`/account/runs/${encodeURIComponent(run.id)}`}
-                      boxed={false}
-                      label={`Run of ${name}, ${run.status}`}
-                      end={<StatusPill status={run.status} />}
-                    >
-                      <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate font-medium text-[var(--text)]">
-                          {name}
-                        </span>
-                        <span className="text-xs break-all text-[var(--muted)]">
-                          {formatWhen(run.createdAt)} · {runLabel(run.id)}
-                        </span>
-                      </span>
-                    </PageRow>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-[var(--muted)]">No activity yet.</p>
-            )}
-          </Group>
+          {home.flows === null || home.flows.length > 0 ? (
+            <Group
+              title={YOUR_FLOWS}
+              titleId="your-flows-title"
+              testId="home-your-flows"
+            >
+              {home.flows === null ? (
+                <p className="text-sm text-[var(--muted)]">Unavailable</p>
+              ) : (
+                <YourFlows
+                  workspaceId={home.workspaceId}
+                  departments={home.flows}
+                />
+              )}
+            </Group>
+          ) : null}
         </>
       ) : null}
     </SectionCard>

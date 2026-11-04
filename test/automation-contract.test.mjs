@@ -480,9 +480,10 @@ test("a manual run is started only from the pinned version's declared input — 
   assert.match(flowPage, /initialKey=\{newIdempotencyKey\("run"\)\}/);
   assert.match(actions, /formData\.get\("idempotencyKey"\)/);
   assert.doesNotMatch(actions, /newIdempotencyKey\("run"\)/);
+  // A started run opens its page — from the item on an item's page (G4).
   assert.match(
     runStart,
-    /router\.push\(`\/account\/runs\/\$\{result\.runId\}`\)/,
+    /router\.push\(runPagePath\(result\.runId, itemPage\)\)/,
   );
 });
 
@@ -512,7 +513,7 @@ test("archiving is its own confirmed action, and the generic status action canno
   assert.match(actionsUi, /pending \? "Archiving…" : "Archive"/u);
 });
 
-test("a card lists every subscription it has, each under its own team (register F21)", () => {
+test("a card lists every subscription it has, each its status and Open, and says no department and no price: its group's header does (register F21; the owner's build 34 F4)", () => {
   // A workspace may hold a duplicate from before one flow per workspace (the
   // owner's build 12, #9) — listed, never hidden. Keyed by template alone, the
   // last-written — the OLDEST, in a newest-first list — hid the rest.
@@ -525,8 +526,12 @@ test("a card lists every subscription it has, each under its own team (register 
     page,
     /const byTemplate = new Map<string, Subscription\[\]>\(\);/u,
   );
-  assert.match(page, /subscriptions\.map\(\(subscription\) => \(/u);
-  assert.match(page, /\{place\(subscription\)\}/u);
+  const card = page.slice(page.indexOf("function AutomationCard("));
+  assert.match(card, /subscriptions\.map\(\(subscription\) => \(/u);
+  assert.match(card, /<StatusPill status=\{subscription\.status\} \/>/u);
+  assert.match(card, /aria-label=\{`Open \$\{automation\.name\}`\}/u);
+  // Build 34's F4: no "Department: …", no "Included" or price on the card.
+  assert.doesNotMatch(card, /place\(|monthlyPriceUsd|Included/u);
 });
 
 test("a flow is added with no team: the platform puts it in the team of its category — no picker, no team sent, no Create a team (backend ADR-0036; the owner, 2026-10-14)", () => {

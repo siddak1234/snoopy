@@ -45,13 +45,45 @@ export type RowConnection = {
   externalAccount: { displayName: string };
   usedByCount: number;
   errorCode?: string;
+  /** The company the grant belongs to, read once at connect (backend §12.1 #283). */
+  companyName?: string;
 };
+
+/**
+ * A connection the platform retired because the provider would not renew it
+ * (backend §12.1 #252): `disconnected`, with the `errorCode` the refresh loop
+ * sets when it retires one. One disconnected here carries no `errorCode`.
+ */
+export function disconnectedAtProvider(
+  connection: RowConnection | undefined,
+): boolean {
+  return connection?.status === "disconnected" && Boolean(connection.errorCode);
+}
+
+/** Line 2 of a connection disconnected at the provider. */
+export function disconnectedIn(provider: string): string {
+  return `Disconnected in ${provider}`;
+}
+
+/**
+ * The provider's name in the disconnect lines — this row's and a held job's
+ * expired approval's (S1-8): QuickBooks is "QuickBooks", where the catalog
+ * lists "QuickBooks Online"; any other provider keeps the name the catalog
+ * lists. The app's `disconnectedName` (`snoopy-mobile/lib/content/screen-states.ts`).
+ */
+export function disconnectedName(
+  providerId: string,
+  listedName: string,
+): string {
+  return providerId === "quickbooks" ? "QuickBooks" : listedName;
+}
 
 /**
  * A connection's state, as the row says it: connected; needing attention —
  * the platform asks for a new sign-in (`reauthorization-required`, backend
- * §12.1 #175) or holds an `errorCode`; or not connected — no connection, one
- * disconnected, or one still authorizing.
+ * §12.1 #175), holds an `errorCode`, or was disconnected at the provider
+ * (`disconnectedAtProvider`); or not connected — no connection, one
+ * disconnected here, or one still authorizing.
  */
 export type ConnectionRowState = "connected" | "attention" | "not-connected";
 
@@ -104,7 +136,11 @@ export function connectionState(
 ): ConnectionRowState {
   if (isKeyless(authType)) return "connected";
   if (!connection) return "not-connected";
-  if (connection.status === "reauthorization-required") return "attention";
+  if (
+    connection.status === "reauthorization-required" ||
+    disconnectedAtProvider(connection)
+  )
+    return "attention";
   if (connection.status === "connected")
     return connection.errorCode ? "attention" : "connected";
   return "not-connected";
@@ -132,22 +168,35 @@ export function connectionFor<C extends RowConnection>(
 
 /**
  * Line 2 of the row: the account's email when the platform holds one —
- * `externalAccount.displayName` carrying an `@` — else the state in a word;
+ * `externalAccount.displayName` carrying an `@` — else, connected, the
+ * company the grant belongs to (`companyName`, backend §12.1 #283: QuickBooks
+ * names no email), else the state in a word;
  * "Needs attention" in the warning colour; a public service (`isKeyless`),
- * "Connected".
+ * "Connected"; one disconnected at the provider, "Disconnected in
+ * {provider}" (`disconnectedName`) in the warning colour, its button Reconnect.
  */
 export function connectionLine(
   connection: RowConnection | undefined,
   authType?: ProviderAuthType | null,
+  provider = "",
 ): {
   text: string;
   tone: "muted" | "warn";
 } {
   if (isKeyless(authType)) return { text: CONNECTION_CONNECTED, tone: "muted" };
+  if (connection && disconnectedAtProvider(connection) && provider)
+    return {
+      text: disconnectedIn(disconnectedName(connection.providerId, provider)),
+      tone: "warn",
+    };
   const state = connectionState(connection);
   const name = connection?.externalAccount.displayName ?? "";
   if (state !== "not-connected" && name.includes("@"))
     return { text: name, tone: "muted" };
+  // No email, as QuickBooks sends none: the company the grant belongs to,
+  // when the platform read one at connect (§12.1 #283), in "Connected"'s place.
+  if (state === "connected" && connection?.companyName)
+    return { text: connection.companyName, tone: "muted" };
   if (state === "connected")
     return { text: CONNECTION_CONNECTED, tone: "muted" };
   if (state === "attention")

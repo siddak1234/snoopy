@@ -74,6 +74,9 @@ page reuses:
 
 - **Flows by department**: the Flows list groups its cards under their
   department, the departments A–Z (`app/account/flows/departments.ts`).
+  The header names the department, so a card says neither it nor a price:
+  its name, its description, each flow added (its status and Open) and Add
+  or Added ✓ (the owner's build 34 F4).
   The departments are the platform's seventeen team kinds, Healthcare the
   newest (platform round 2's B4, `lib/team-types.ts`); the website names a
   department in words and draws no icon for one.
@@ -93,7 +96,30 @@ page reuses:
   label holds what is typed and otherwise says "No matches."; choices with
   a `group` are drawn under its heading, the headings in the order they
   first appear (`choiceGroups`). One of 10 or fewer without groups is drawn
-  as before.
+  as before. A setup `select` whose choices carry groups is a sheet the
+  page's height instead (`components/ui/ChoiceSheet.tsx`; the owner's build
+  34 F1): step 1 its groups under "Category", with a "Search all" box over
+  every choice; step 2 one group's choices with a "Search" box; Back a step
+  back; one choice closes it, several tick and untick; the box says what is
+  chosen as the drop-down's does, and each pick is a chip under it.
+- **A setup text field's example** (backend ADR-0048 amendment 5, the
+  owner's build 34 F2): a `text` field's `example` is its box's placeholder
+  (`app/account/flows/ManifestFields.tsx`); "Optional" stays beside the
+  title of a field that may be left empty, where the website has always
+  drawn it.
+- **Set up's sections** (backend ADR-0048 amendment 5, the owner's build 34
+  F3): a manifest that declares `setupSections` (`Subscription.setupSections`)
+  has Set up drawn in them, in its order, by its titles, numbered, each its
+  fields by `sectionId` — a step's vendor choice (`VendorRows`) in the
+  section it names, so Connect is drawn only for an account the flow cannot
+  run without, and is then 1. Without them, the four fixed sections, as
+  before (`SetupFields` in `app/account/flows/ManifestFields.tsx`).
+- **A flow's extra email addresses** (backend §12.1 #289): on the flow's
+  email page each says its consent under it, "Waiting for confirmation",
+  "Confirmed" or "Unsubscribed" (`FlowEmailRecipients.extraStatuses`,
+  `addressStatus` in `lib/flow-email.ts`); a platform that sends none, no
+  line, as before. The confirmation email, its footer's "Stop these emails"
+  and the pages its links open are the platform's.
 - **Several files at once** (platform round 2's B2 as the batch addendum
   amends it): a run's file field that declares `multiple` (`RunFileField`)
   lets the chooser take several files and the camera add each photo, sends
@@ -113,7 +139,16 @@ page reuses:
 - **A row that opens a page** is `PageRow` (`components/dashboard/PageRow.tsx`):
   a closed section's box and height, the arrow at its end — or, `boxed`
   false, a row of one card of divided rows (`LIST_CARD`): a list block's
-  rows, a flow's items, Activity's runs and Home's recent runs.
+  rows, a flow's items, Activity's runs and Home's flows that start no run
+  there.
+- **Home's YOUR FLOWS** (the owner's build 34 F5; `app/account/YourFlows.tsx`,
+  `home-flows.ts`), in Recent runs' place: the live flows by department
+  A–Z, A–Z in each, from the one subscriptions list Home reads. A flow whose
+  run can start there opens in place to its `runInput` and Start run
+  (`RunStart`), which opens the new run's page; a flow with items reads them
+  only when opened, and its run starts on the ready item chosen in a
+  drop-down, for an owner or admin, as an item's page offers it. Any other
+  flow's row opens its page.
 - **The spacing table** (backend `BLOCK_SPACING`, ADR-0048 amendment 1; the
   owner's Q8), the same names on the app: the numbers are the platform's
   (`lib/generated/platform-contracts/block-rules.ts`), and their classes
@@ -124,7 +159,8 @@ page reuses:
   list card the rows. A title sits `title` above what it heads and `group`
   below what came before it — a form's title ("Add candidate") and a label
   block ("Candidates") alike (F3); a group of related rows is one card with
-  dividers; nothing above the first group. `test/spacing.test.mjs` holds it:
+  dividers; a section's blocks have a divider line between them, none under
+  a label (the owner's build 31 G3); nothing above the first group. `test/spacing.test.mjs` holds it:
   every padding, margin and gap class under components/ and app/account is
   one of the table's, but for older classes counted file by file in
   `test/spacing-baseline.json`, which only goes down and names nothing under
@@ -144,14 +180,17 @@ page reuses:
   `q`, `sort` and `page` in its address (`ActivityControls`) and sends
   them, with the outcome as `status` and the time as `since`, to the
   platform, which searches and counts (`total`) — plain Activity too, its
-  sort and page always sent (`runsQuery`), while Home reads the newest
-  100; it never sends `needsReview`. A search that finds nothing says so,
+  sort and page always sent (`runsQuery`); it never sends `needsReview`. A search that finds nothing says so,
   in `BLOCK_WORDS`' words.
 - **Every run's page** ends with the package's buttons when it has them,
   then the Run details row, then Cancel run while it goes on and View flow;
   Duration, Steps done, the steps, Started, Ended, Trigger and the Run ID are
   on its details page, `/account/runs/[runId]/details`. What a run read comes
-  first, under "{Run word} details", in its result line's place.
+  first, under "{Run word} details", in its result line's place. Its back
+  goes to Activity; opened from its job's page — a ranked row there, or
+  Start on it, which opens the new run's page (the owner's G4) —
+  (`?from=item`, `runPagePath`) to that job, by the run's own `itemId`, and
+  its details page back to it on the way (the owner's G1).
 - **A page body is the platform's blocks** (backend ADR-0048): the run, item
   and file pages draw their fixed header and footer, then the blocks the
   one-run and one-item reads send with `shape=blocks` (`BLOCKS_SHAPE`), each
@@ -198,7 +237,11 @@ page reuses:
   (`GroupCard`, the owner's F6 and Q6) its title, then one card of its
   sections as drop-downs, divided, the first open and several open at
   once; a list is one card of divided rows, each score in its `valueTone`
-  (green or red, the run's verdict) beside its chip. The
+  (green or red, the run's verdict) beside its chip. Since block set 5
+  (ADR-0048 amendment 5), fourteen: a `links` block is full-width pill
+  buttons, one under another, each its `brand`'s mark from the icon set
+  (LinkedIn, GitHub, X; `site`, none, or one with no mark here, the globe)
+  and its label, opening outside, https only as a `link` is. The
   flow page draws its parts in `Subscription.pages.flow` order (`pageParts`),
   else today's. No page reads documents, sections, details or a flow's
   document, verdict or run words (`test/no-flow-code.test.mjs`), and both
@@ -223,7 +266,13 @@ page reuses:
   `?export={id}`): its ask and its signed link read on the server, the
   bytes an attachment of no type, never cached, `nosniff`, for this site's
   pages alone (`Sec-Fetch-Site`, `lib/file-view.ts`'s `askedHere`); the
-  workspace summary shares its own JSON.
+  workspace summary shares its own JSON. A complete export of a large
+  workspace comes in parts (backend §12.1 #181, `WorkspaceExportJob.files`):
+  "Download file {n} of {N}" for each, in order, each link asked for at the
+  press, and no Share, which reads the one-file export alone
+  (`exportFiles` in `lib/export-contract.ts`); its line says "Or export
+  every record. A large workspace comes as several files, each kept for a
+  day."
 - **A run's score** is in its verdict's colour (the owner's F1 and Q5):
   the positive green and the negative red, with the flow's word for it as a
   chip ("Advance", "Decline"; `RunScore`, `lib/run-verdict.ts`, the one
@@ -241,14 +290,56 @@ separate, confirmed owner-or-admin intent that names the exact connection it
 replaces (backend ADR-0019 §4, ADR-0026). A grant that already holds what the
 provider asks for is reused without consent, and the page says so. Connections
 and a flow step's vendor rows start a connect the same way
-(`app/account/connections/start-connect.ts`). A member sees a flow's
-integration and does not change it, with one exception: on a newly added
-flow's Set up, the member makes its first choice, a connected vendor or None
-(backend ADR-0043 §2), as the app's Set up allows. A provider whose
+(`app/account/connections/start-connect.ts`). Only an owner or admin
+changes a flow (backend §12.1 #180): a member sees Add on Flows, a flow's
+Set up (its integration and settings, no Turn on or Save), and its Turn on,
+Pause and Archive flow read-only, under "Only an owner or admin can change
+this flow." (`FLOW_CHANGE_ADMIN_ONLY` in `lib/subscription-entitlements.ts`),
+and a change the platform refuses as a member's (403
+`flow_change_requires_admin`) says the same; a member still starts runs.
+~~On a newly added flow's Set up, the member makes its first choice (backend
+ADR-0043 §2)~~ until Round 21's stage 1. A provider whose
 `authType` is `none` (a public service, platform round 2's B5) has no
 connect step: it is connected for every workspace (`isKeyless`), its row
 says "Connected" with no Connect or Disconnect, Set up draws no Connect
-step for it, and it never holds a flow back.
+step for it, and it never holds a flow back. A connected row whose account
+names no email — QuickBooks sends none — says the company its grant belongs
+to (`ConnectionState.companyName`, read once at connect, backend §12.1 #283)
+in "Connected"'s place (`connectionLine` in `lib/connection-rows.ts`). A
+connection the platform retired because the provider would not renew it (backend §12.1 #252:
+`disconnected`, with the `errorCode` the refresh loop sets when it retires
+one) says "Disconnected in {provider}" in the warning colour, with
+Reconnect, on Connections and a step's vendor rows (`disconnectedAtProvider`
+in `lib/connection-rows.ts`). It names QuickBooks "QuickBooks", where the
+catalog lists "QuickBooks Online", and any other provider as the catalog
+lists it (`disconnectedName`); one disconnected here carries no `errorCode`
+and stays "Not connected" with Connect. QuickBooks' Disconnect URL is the
+static `/quickbooks/disconnected` ("QuickBooks is disconnected", its
+"Reconnect QuickBooks" opening Connections), which the owner sets at
+Intuit; it reads nothing.
+
+A domain-only organization that refuses a person at session resolve because
+they hold a sign-in outside its verified domains (backend §12.1 #221, option
+b′: 403 `outside_org_domain` naming those sign-ins) has the account area's
+own screen, built (`components/account/OutsideSignIn.tsx`, drawn by the
+account layout in place of the platform's notice): "This organization admits
+only people who sign in with addresses at its verified domains.", "Remove
+your other sign-in to continue." and "Remove {provider} sign-in" for each,
+which unlinks it as Settings' linked accounts do and reads the area again.
+The platform does not send this refusal before Stage 2 (BUILD-PLAN 29.4.6;
+§12.1 #221), so nothing draws the screen until then; the website looks for
+it in the account layout's own session and workspace reads.
+
+Deleting the account (Settings, `components/account/DeleteAccountButton.tsx`)
+says what the route removes, and "You'll be signed out on all devices.": the
+platform ends every session of the account it deletes (backend §12.1 #248).
+Any 5xx from `DELETE /v1/account` is sent again once, at once: the purge is
+idempotent, and a sign-in identity delete that failed after it runs again.
+The session is never read after a failed delete, because once the rows are
+purged that read makes a new, empty account. A second 5xx says the outcome
+is not known, and Try again sends the delete again; any other answer to the
+second attempt is said as the outcome table says (`outcomeFor`). No answer
+at all is not sent again on its own.
 
 ## Runs and approvals
 
@@ -265,7 +356,11 @@ platform's composer words it (backend `apps/runs/src/pages`), and no page
 holds code for one flow (`test/no-flow-code.test.mjs`).
 
 A run's page and its details page ("Screen standards") are one `RunLive`,
-read alike (`app/account/runs/[runId]/run-page-data.ts`). A batch run's page
+read alike (`app/account/runs/[runId]/run-page-data.ts`). A step titled by
+its connection ("QuickBooks updated") and a setting step's line read the
+connection choices the run started with (`RunDetail.connectionChoices`,
+backend §12.1 #290) over the flow's settings now; a run made before they were
+saved reads the flow's, as before. A batch run's page
 (ADR-0048 amendment 4) is drawn as the platform sends it: the batch's own
 blocks, then its `batch` part — "{unit plural}", "{n} {unit plural} queued"
 and each child run in order, its label, its status and a link to its run. A held job is
@@ -303,8 +398,16 @@ Changes that carry a `group` (platform round 2's B3) are drawn under its
 heading, in both places, the groups in the order first sent and every one
 open, up to 400 changes (`reviewGroups`, `offeredDecisions`); Save review
 still waits for every answer. A review without groups is drawn as before.
+A change that offers other values (`options`, at most 3; backend ADR-0048
+amendment 5) has a third pill to one who may decide, "Other code", which
+opens their short list under the row; one picked is the row's answer, and
+the row says "Changed to {code}" (its value) until Accept or Deny is pressed
+instead. A page that draws no form reads no option (`ReviewRows`, as the
+fixture `review-held-options` reads). A saved review's count does not yet
+count an `other`, as the platform's own line does not.
 Saving sends every answer (`{decisions: [{id,
-decision}]}`) and the job always goes on; a refusal says "The review wasn't
+decision}]}`, or `{id, other}` for a picked value) and the job always goes
+on; a refusal says "The review wasn't
 saved. Try again." On Approvals such a row says "Review {n} changes",
 opening the run, in place of the pair. Once saved, the step that waited
 says "{a} accepted · {d} denied" on the run's details page, even while the
@@ -316,6 +419,15 @@ run's page, so no Approvals row ever holds a saved review; the default
 until the owner says otherwise is the count on the run alone. A held run
 without changes is unchanged. The words are ICD-10 Code Check's words.md
 section 3, the app's too.
+
+A held job whose approval a disconnect expired (backend §12.1 #252,
+`Approval.expiredBy` with `connection-disconnected`) is built to say so over
+its run page's body: "Expired · {provider} was disconnected", then
+"Reconnect {provider}, then start the run again." — the provider named as
+the connection row names it (`disconnectedName`; `expiredByDisconnect` in
+`lib/run-progress.ts`). The platform does not send this expiry before Stage
+2 (BUILD-PLAN 29.4.6; §12.1 #252 approval half), so nothing draws it until
+then. A plain expiry, or a reason this build does not know, adds nothing.
 
 A job that has documents and has ended or is held has a run package (backend
 ADR-0045; the platform says so, `RunDetail.packageAvailable`): View package, Download PDF and Download Excel replace Download

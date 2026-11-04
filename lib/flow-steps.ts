@@ -208,9 +208,10 @@ export function flowStepPlan(
 
 /**
  * A setting step's line on a run's page (Build 22; the session's S23): the
- * integration each of its connection fields holds now — its name, or "None" —
- * a run's own choice not being recorded (backend §12.1 #290). `null` for a
- * setting step with no connection field, which then says "Done".
+ * integration each of its connection fields holds in `config` — its name, or
+ * "None" — the run's own choice where it was saved (backend §12.1 #290), else
+ * the flow's now. `null` for a setting step with no connection field, which
+ * then says "Done".
  */
 export function settingLine(
   groupId: string,

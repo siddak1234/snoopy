@@ -2,9 +2,11 @@ import { FormInput } from "@/components/ui/FormInput";
 import { NumberedStep } from "@/components/ui/NumberedStep";
 import { RunFileField } from "./RunFileField";
 import { SelectField } from "./SelectField";
+import { Fragment, type ReactNode } from "react";
 import type {
   AutomationRunInputField,
   AutomationSetupField,
+  AutomationSetupSection,
 } from "@/lib/automations";
 import { SPACING } from "@/lib/spacing";
 import { choicesOf } from "@/lib/choices";
@@ -43,33 +45,17 @@ export const SECTION_NAME: Record<AutomationSetupField["section"], string> = {
   notifications: "Email",
 };
 
+type SetupGroup = { name: string; fields: AutomationSetupField[] };
+
 /**
- * Setup fields, grouped under their manifest section without reordering, and
- * numbered from `firstSection` — Set up's Connect is 1 when it draws one. A
- * vendor choice (`connection`) is not drawn here: Set up draws its vendors
- * (`VendorRows`); its value is carried as it is, since a save replaces every
- * setting — a move keeps the vendor a flow chose.
+ * The four fixed sections: each run of fields under its manifest section,
+ * without reordering, the vendor choices left out.
  */
-export function SetupFields({
-  setup,
-  config,
-  firstSection = 1,
-  hideConnections = false,
-  missingChoices,
-}: {
-  setup: AutomationSetupField[];
-  config: Record<string, unknown>;
-  firstSection?: number;
-  /** Set up carries each vendor choice itself, as the page's choice. */
-  hideConnections?: boolean;
-  /** Every required drop-down the save found empty (`missingChoices`): "Choose at least one." under each. */
-  missingChoices?: ReadonlySet<string>;
-}) {
+function fixedGroups(setup: readonly AutomationSetupField[]): SetupGroup[] {
   const groups: Array<{
     section: AutomationSetupField["section"];
     fields: AutomationSetupField[];
   }> = [];
-
   // `setup` is published in manifest order. The contract declares a field's
   // section, but it does not declare an independent section order, so grouping
   // may never move a field ahead of an earlier one.
@@ -82,6 +68,69 @@ export function SetupFields({
     }
     groups.push({ section: field.section, fields: [field] });
   }
+  return groups.map(({ section, fields }) => ({
+    name: SECTION_NAME[section],
+    fields,
+  }));
+}
+
+/**
+ * The manifest's own sections (backend ADR-0048 amendment 5; the owner's
+ * build 34 F3), in its order and by its titles: each its fields by
+ * `sectionId`, in manifest order — a vendor choice among them where
+ * `vendors` draws it. A section with nothing to draw is left out.
+ */
+function declaredGroups(
+  setup: readonly AutomationSetupField[],
+  sections: readonly AutomationSetupSection[],
+  vendors: boolean,
+): SetupGroup[] {
+  return sections
+    .map((section) => ({
+      name: section.title,
+      fields: setup.filter(
+        (field) =>
+          field.sectionId === section.id &&
+          (vendors || field.control !== "connection"),
+      ),
+    }))
+    .filter((group) => group.fields.length > 0);
+}
+
+/**
+ * Setup fields, grouped under their sections and numbered from
+ * `firstSection` — Set up's Connect is 1 when it draws one. The sections are
+ * the manifest's `setupSections` when it declares them, else the four fixed
+ * ones. A vendor choice (`connection`) is drawn by `vendors` — Set up's
+ * `VendorRows` — in its declared section; with the fixed sections, or no
+ * `vendors`, it is not drawn here, and its value is carried as it is, since a
+ * save replaces every setting — a move keeps the vendor a flow chose.
+ */
+export function SetupFields({
+  setup,
+  config,
+  sections,
+  firstSection = 1,
+  hideConnections = false,
+  vendors,
+  missingChoices,
+}: {
+  setup: AutomationSetupField[];
+  config: Record<string, unknown>;
+  /** The manifest's sections, when it declares them (`Subscription.setupSections`). */
+  sections?: readonly AutomationSetupSection[];
+  firstSection?: number;
+  /** Set up carries each vendor choice itself, as the page's choice. */
+  hideConnections?: boolean;
+  /** A vendor choice's rows, by its key, drawn in its declared section. */
+  vendors?: (key: string) => ReactNode;
+  /** Every required drop-down the save found empty (`missingChoices`): "Choose at least one." under each. */
+  missingChoices?: ReadonlySet<string>;
+}) {
+  const groups =
+    sections && sections.length > 0
+      ? declaredGroups(setup, sections, vendors !== undefined)
+      : fixedGroups(setup);
 
   return (
     <>
@@ -106,17 +155,18 @@ export function SetupFields({
                 </span>
               );
             })}
-      {groups.map(({ section, fields }, groupIndex) => {
-        const name = SECTION_NAME[section];
-        return (
-          <div
-            key={`${section}-${groupIndex}`}
-            role="group"
-            aria-label={name}
-            className={`flex flex-col ${SPACING.group.gap}`}
-          >
-            <NumberedStep index={groupIndex + firstSection} title={name} />
-            {fields.map((field) => (
+      {groups.map(({ name, fields }, groupIndex) => (
+        <div
+          key={`${name}-${groupIndex}`}
+          role="group"
+          aria-label={name}
+          className={`flex flex-col ${SPACING.group.gap}`}
+        >
+          <NumberedStep index={groupIndex + firstSection} title={name} />
+          {fields.map((field) =>
+            field.control === "connection" && vendors ? (
+              <Fragment key={field.key}>{vendors(field.key)}</Fragment>
+            ) : (
               <ManifestFieldInput
                 key={field.key}
                 field={field}
@@ -124,10 +174,10 @@ export function SetupFields({
                 prefix="config"
                 missing={missingChoices?.has(field.key) ?? false}
               />
-            ))}
-          </div>
-        );
-      })}
+            ),
+          )}
+        </div>
+      ))}
     </>
   );
 }
@@ -188,6 +238,17 @@ function OptionalMark({ field }: { field: ManifestField }) {
       <span className="text-xs font-normal text-[var(--muted)]">Optional</span>
     </>
   );
+}
+
+/**
+ * A `text` setup field's `example` (backend ADR-0048 amendment 5, the owner's
+ * build 34 F2): the box's placeholder. Any other control, or none, has no
+ * placeholder; "Optional" stays beside the title.
+ */
+function exampleOf(field: ManifestField): string | undefined {
+  return field.control === "text" && "example" in field && field.example
+    ? field.example
+    : undefined;
 }
 
 function ManifestFieldInput({
@@ -275,6 +336,7 @@ function ManifestFieldInput({
           </>
         }
         required={required}
+        placeholder={exampleOf(field)}
         defaultValue={
           initialValue === undefined || initialValue === null
             ? undefined

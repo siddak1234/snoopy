@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { setupPath } from "@/lib/flow-steps";
+import { FLOW_CHANGE_ADMIN_ONLY } from "@/lib/subscription-entitlements";
 import { subscribeToAutomation } from "./actions";
 import { SPACING } from "@/lib/spacing";
 
@@ -12,7 +13,10 @@ import { SPACING } from "@/lib/spacing";
  * owner, 2026-10-14: "theres no choose a team. there will be pre existing
  * teams depending on which flows are added"): the platform puts the flow in
  * the team of its category, making that team when the workspace has none, and
- * puts the person adding it on the team. Any member may add a flow.
+ * puts the person adding it on the team. Only an owner or admin adds one
+ * (backend §12.1 #180): a member sees Add read-only, with "Only an owner or
+ * admin can change this flow." under it. ~~Any member may add a flow~~ until
+ * Round 21's stage 1.
  *
  * A workspace holds each flow once (the owner, build 12's #9): the card draws
  * this only while the flow is held nowhere, and the action refuses a second
@@ -35,6 +39,7 @@ export function AddAutomation({
   available,
   workspaceId,
   unarchive = false,
+  canManage = true,
 }: {
   templateId: string;
   name: string;
@@ -43,6 +48,8 @@ export function AddAutomation({
   workspaceId: string;
   /** Drawn on an archived flow's row: "Unarchive", named for its flow. */
   unarchive?: boolean;
+  /** An owner or admin: a member's Add is read-only. */
+  canManage?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -69,7 +76,7 @@ export function AddAutomation({
         <Button
           variant="primary"
           size="sm"
-          disabled={pending || !available}
+          disabled={pending || !available || !canManage}
           onClick={add}
           aria-label={unarchive ? `Unarchive ${name}` : undefined}
         >
@@ -82,6 +89,9 @@ export function AddAutomation({
               : "Add"}
         </Button>
       </div>
+      {canManage ? null : (
+        <p className="text-xs text-[var(--muted)]">{FLOW_CHANGE_ADMIN_ONLY}</p>
+      )}
       {error ? (
         <p role="alert" className="text-xs text-[var(--error-text)]">
           {error}

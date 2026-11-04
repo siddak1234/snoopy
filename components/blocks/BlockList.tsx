@@ -12,6 +12,7 @@ import {
   FileBlock,
   ImageBlock,
   LinkBlock,
+  LinksBlock,
   MetricBlock,
   QuestionsBlock,
   SectionBlock,
@@ -31,10 +32,10 @@ type Renderer<K extends Block["type"]> = (
 ) => ReactNode;
 
 /**
- * The registry: one renderer for each of the contract's thirteen types, keyed
+ * The registry: one renderer for each of the contract's fourteen types, keyed
  * by the generated union, so a type the contract adds fails the build here
- * until it is drawn (backend ADR-0048 decisions 8 and 12, and its amendment
- * 1; `test/blocks-render`). A list or a table is drawn inside `Paged`, which
+ * until it is drawn (backend ADR-0048 decisions 8 and 12, and its amendments
+ * 1 and 5; `test/blocks-render`). A list or a table is drawn inside `Paged`, which
  * adds its search, sort and pages when it has more than 25 rows, or a
  * search when the platform marks the list `searchable`; it is handed the
  * place alone, never the page's forms.
@@ -44,14 +45,27 @@ export const RENDERERS: { [K in Block["type"]]: Renderer<K> } = {
   metric: (block) => <MetricBlock block={block} />,
   badge: (block) => <BadgeBlock block={block} />,
   table: (block, context) => (
-    <Paged block={block} place={{ subscriptionId: context.subscriptionId }} />
+    <Paged
+      block={block}
+      place={{
+        subscriptionId: context.subscriptionId,
+        fromItem: context.fromItem,
+      }}
+    />
   ),
   list: (block, context) => (
-    <Paged block={block} place={{ subscriptionId: context.subscriptionId }} />
+    <Paged
+      block={block}
+      place={{
+        subscriptionId: context.subscriptionId,
+        fromItem: context.fromItem,
+      }}
+    />
   ),
   section: (block, _, inner) => <SectionBlock block={block} inner={inner} />,
   file: (block, context) => <FileBlock block={block} context={context} />,
   link: (block) => <LinkBlock block={block} />,
+  links: (block) => <LinksBlock block={block} />,
   timeline: (block) => <TimelineBlock block={block} />,
   questions: (block, context) => (
     <QuestionsBlock block={block} context={context} />
@@ -68,13 +82,23 @@ const isLabel = (block: unknown): boolean =>
   (block as { type?: unknown }).type === "text" &&
   (block as { style?: unknown }).style === "label";
 
+/** A section's entry under the one before it: a divider line, `inner` above and below it. */
+const DIVIDED = `${SPACING.inner.top} ${SPACING.inner.pt} border-t border-[var(--ring)]`;
+
 /**
  * The gap above a block (the spacing table's rules, F3): none above the
- * first; `title` under a label, which heads it; else `group`.
+ * first; `title` under a label, which heads it; else `group` on a page, and
+ * inside a section (`nested`) a divider line — LinkedIn's and GitHub's links
+ * apart (the owner's build 31 G3).
  */
-function gapAbove(blocks: readonly unknown[], index: number): string {
+function gapAbove(
+  blocks: readonly unknown[],
+  index: number,
+  nested: boolean,
+): string {
   if (index === 0) return "";
-  return isLabel(blocks[index - 1]) ? SPACING.title.top : SPACING.group.top;
+  if (isLabel(blocks[index - 1])) return SPACING.title.top;
+  return nested ? DIVIDED : SPACING.group.top;
 }
 
 /** A block's `type`, or `unknown` when it has none: what a fallback is logged with. */
@@ -116,19 +140,25 @@ function Blocks({
   blocks,
   context,
   testId,
+  nested = false,
 }: {
   blocks: readonly unknown[];
   context: BlockContext;
   testId?: string;
+  /** A section's blocks, drawn through `inner`: a divider between its entries. */
+  nested?: boolean;
 }) {
   const inner: DrawBlocks = (within) => (
-    <Blocks blocks={within} context={context} />
+    <Blocks blocks={within} context={context} nested />
   );
   return (
     <div data-testid={testId} className="flex flex-col">
       {blocks.map((block, index) => (
         // A block that draws nothing (a form the page does not offer) takes no gap.
-        <div key={index} className={`${gapAbove(blocks, index)} empty:hidden`}>
+        <div
+          key={index}
+          className={`${gapAbove(blocks, index, nested)} empty:hidden`}
+        >
           <BlockBoundary type={typeOf(block)} block={block}>
             {drawBlock(block, context, inner)}
           </BlockBoundary>

@@ -523,13 +523,13 @@ test("a held run's review: each change a row with Accept and Deny (Deny the dang
   );
   assert.match(
     review,
-    /variant=\{answer === "accepted" \? "secondary" : "danger"\}[\s\S]*?\{DENY\}/u,
+    /variant=\{decision === "accepted" \? "secondary" : "danger"\}[\s\S]*?\{DENY\}/u,
   );
-  assert.match(review, /aria-pressed=\{answer === "accepted"\}/u);
+  assert.match(review, /aria-pressed=\{decision === "accepted"\}/u);
   assert.match(review, /disabled=\{!answered \|\| pending\}/u);
   assert.match(
     review,
-    /data\.append\(\s*"decisions",\s*JSON\.stringify\(\s*decisions\.map\(\(change\) => \(\{\s*id: change\.id,\s*decision: answers\[change\.id\],/u,
+    /data\.append\(\s*"decisions",\s*JSON\.stringify\(\s*decisions\.map\(\(change\) => \(\{\s*id: change\.id,\s*\.\.\.answers\[change\.id\],/u,
   );
   assert.match(review, /role === "member" \? \(/u);
   assert.match(review, /if \(!result\.ok\) setRefused\(true\);/u);

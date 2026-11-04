@@ -1,5 +1,6 @@
 import type { BlockOpen } from "@/lib/automations";
 import { itemFilePath, runFilePath } from "@/lib/run-files";
+import { runPagePath } from "@/lib/run-progress";
 
 /**
  * How the blocks look and where they go (backend ADR-0048 decisions 8–10):
@@ -62,8 +63,11 @@ export function httpsLink(url: unknown): { href: string; host: string } | null {
   }
 }
 
-/** Where the blocks are drawn: what an item's file opens is under its flow. */
-export type BlockPlace = { subscriptionId?: string };
+/**
+ * Where the blocks are drawn: what an item's file opens is under its flow;
+ * on an item's page (`fromItem`) a run opens so its back is that item (G1).
+ */
+export type BlockPlace = { subscriptionId?: string; fromItem?: boolean };
 
 const id = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
@@ -81,7 +85,7 @@ export function openHref(
   const { runId, fileId, itemId } = open as Record<string, unknown>;
   switch (open.target) {
     case "run":
-      return id(runId) ? `/account/runs/${encodeURIComponent(runId)}` : null;
+      return id(runId) ? runPagePath(runId, place.fromItem === true) : null;
     case "run-file":
       return id(runId) && id(fileId) ? runFilePath(runId, fileId) : null;
     case "item-file":

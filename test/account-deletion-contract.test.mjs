@@ -40,6 +40,8 @@ test("the confirmation says what the route removes, and promises no more", () =>
     "your account stays and you can try again",
     "anything already removed stays removed",
     "This cannot be undone",
+    // Every session ends with the account (backend §12.1 #248, S1-10).
+    "You&apos;ll be signed out on all devices.",
   ]) {
     assert.ok(
       prose.includes(sentence),
@@ -125,15 +127,17 @@ test("a 409 keeps the account: branched on the status, said inline, nothing sign
 });
 
 test("an answer that may have been lost keeps the account and says the outcome is unknown — never 'deleted'", () => {
-  // The contract's 502 ("deleted, but the identity provider could not be
-  // reached") is raised only for a bearer caller — `apps/api/src/app.ts` throws
-  // it only when `revoking` is set, and `nativeLogoutSession` returns undefined
-  // without a bearer (backend F39) — so every 502 a cookie caller can receive
-  // here is the Access hop failing. Every other 5xx and no answer at all is the
-  // same case: the request may have run and its answer been lost — the
-  // standalone server's own rewrite answers 500 when the Edge's answer is lost.
-  // Staying strands nothing: the Edge clears the website's cookies before that
-  // throw could ever be reached.
+  // Why a 5xx is unknown and sent again once: `outcomeFor` in components/account/DeleteAccountButton.tsx.
+  assert.match(
+    component,
+    /await send\(\)\.catch\(\(first: unknown\) => \{\s*if \(!\(first instanceof PlatformApiError\) \|\| first\.status < 500\) \{\s*throw first;\s*\}\s*anAttemptWasLost\.current = true;\s*return send\(\);\s*\}\);/u,
+    "a 5xx is sent again once, at once, with the lost-answer memory set; anything else is not",
+  );
+  assert.doesNotMatch(
+    component,
+    /\/v1\/session/u,
+    "the session is never read after a failed delete",
+  );
   assert.match(
     component,
     /if \(!failure \|\| failure\.status >= 500\) \{\s*return \{ kind: "unknown", message: UNKNOWN_COPY \};/u,

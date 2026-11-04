@@ -48,13 +48,17 @@ type Outcome = null | Settled;
 //   ended BECAUSE that attempt finished, and the copy hedges.
 // - 409: a partial deletion; the account is kept.
 // - Any 5xx, or no answer at all: the server did not complete the request, so
-//   whether the deletion ran is not known. That covers the Edge's own 502 —
-//   the contract's "deleted, but not revoked" 502 is raised only for a bearer
-//   caller (`snoopy-backend/apps/api/src/app.ts`: the throw needs `revoking`, undefined
-//   without a bearer), so for this website it is the Access hop failing — and
+//   whether the deletion ran is not known. The contract's `DEPENDENCY_FAILURE`
+//   502 means one of two things (`DELETE /v1/account` in
+//   `lib/generated/snoopy-backend/docs/openapi.yaml`): the Edge could not
+//   complete its call to the service that deletes, or the sign-in identity
+//   delete failed after the purge (backend §12.1 #248, S1-10) — the rows gone,
+//   the identity left. Its `SESSION_REVOCATION_FAILED` 502 is for bearer
+//   callers only; a cookie caller never receives it. Any other 5xx is
 //   whatever stands between this page and the Edge: the standalone server's
 //   rewrite answers 500 when the Edge's answer is lost, a gateway 502 or 504.
-//   The account is never read as gone.
+//   A 5xx was already sent again once (`handleConfirmDelete`) before this row
+//   is read. The account is never read as gone.
 // - 429: the platform is busy; the deletion did not run, and the wait it
 //   stated is said.
 // - Any other 4xx: a refusal, so the deletion did not run. Said in words
@@ -112,9 +116,22 @@ export default function DeleteAccountButton() {
   async function handleConfirmDelete() {
     setLoading(true);
     setOutcome(null);
-    try {
-      await platformApiJson<void>("/v1/account", {
+    const send = () =>
+      platformApiJson<void>("/v1/account", {
         method: "DELETE",
+      });
+    try {
+      // Any 5xx is sent again once, at once (the stage 1 spec's addendum 4):
+      // the purge is idempotent, and the identity delete runs again. The
+      // session is never read after a failed delete — once the rows are
+      // purged, that read makes a new, empty account. No answer at all is not
+      // sent again on its own; Try again sends it.
+      await send().catch((first: unknown) => {
+        if (!(first instanceof PlatformApiError) || first.status < 500) {
+          throw first;
+        }
+        anAttemptWasLost.current = true;
+        return send();
       });
     } catch (caught) {
       // Nothing in here leaves the page or signs out: the account is still
@@ -176,6 +193,11 @@ export default function DeleteAccountButton() {
             Workspaces are removed one at a time. If one cannot be removed, your
             account stays and you can try again; anything already removed stays
             removed. This cannot be undone.
+          </p>
+          {/* The platform signs this account out everywhere once it is
+              deleted (backend §12.1 #248, S1-10). */}
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            You&apos;ll be signed out on all devices.
           </p>
           <FormError message={outcome?.message ?? null} className="mt-2" />
           <div className="mt-4 flex flex-wrap gap-2">

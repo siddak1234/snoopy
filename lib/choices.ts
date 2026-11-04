@@ -82,3 +82,42 @@ export function choiceGroups<T extends Choice>(
   }
   return groups;
 }
+
+/**
+ * A setup `select` whose choices carry groups is drawn as a sheet in two
+ * steps, not the drop-down (the owner's build 34 F1: "rather than one drop
+ * down is it possible to do two? One for category and then the sub
+ * specialty … add a typing feature"): its first step lists the groups under
+ * "Category", with a "Search all" box over every choice; its second, one
+ * group's choices with a "Search" box over them. The same words as the app.
+ */
+export const CATEGORY = "Category";
+
+/** The sheet's first step's search box: every choice, whatever its group. */
+export const SEARCH_ALL = "Search all";
+
+/** Whether a select's choices carry groups (a manifest gives one on every option or none). */
+export function carriesGroups(choices: readonly Choice[]): boolean {
+  return choices.some((choice) => choice.group !== undefined);
+}
+
+/** The groups, each once, in the order they first appear (the manifest's). */
+export function groupsOf(choices: readonly Choice[]): string[] {
+  return choiceGroups(choices).flatMap(({ group }) =>
+    group === null ? [] : [group],
+  );
+}
+
+/** One group's choices whose label holds what was typed, in order. */
+export function choicesIn<T extends Choice>(
+  choices: readonly T[],
+  group: string,
+  query = "",
+): T[] {
+  return (
+    choiceGroups(
+      choices.filter((choice) => choice.group === group),
+      query,
+    )[0]?.choices ?? []
+  );
+}

@@ -36,7 +36,7 @@ const UNLINK_REFUSALS: Record<string, string> = {
   refused: "This sign-in account cannot be unlinked.",
 };
 
-function unlinkRefusal(error: unknown): string {
+export function unlinkRefusal(error: unknown): string {
   if (error instanceof PlatformApiError) {
     // A platform from before the SEVENTEENTH promotion has no unlink route: the
     // Edge's unknown-route 404 names the method and path it was asked for. Any

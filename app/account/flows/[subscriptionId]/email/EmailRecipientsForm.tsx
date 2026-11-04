@@ -31,6 +31,7 @@ import {
   EMAIL_SAVE_FAILED,
   EMAIL_STARTER,
   addProblem,
+  addressStatus,
   removeAddress,
 } from "@/lib/flow-email";
 import { saveEmailRecipients } from "../../actions";
@@ -48,7 +49,9 @@ import { SPACING } from "@/lib/spacing";
  * "Could not save. Try again." under the section, the list unchanged. One
  * write at a time; typing clears the line; the field clears after a saved add
  * (the app's M8). A member sees the lists and "Ask an owner or admin to
- * change this." — no remove, no field (the session's S12).
+ * change this." — no remove, no field (the session's S12). Under each extra
+ * address, its consent (`addressStatus`, backend §12.1 #289): "Waiting for
+ * confirmation", "Confirmed" or "Unsubscribed".
  *
  * **A write's end hands focus back** (the Build 22 review): the field and the
  * buttons are disabled while one waits, and a remove takes its row's button
@@ -201,7 +204,11 @@ export function EmailRecipientsForm({
                 testId={`email-extra-${address}`}
                 mark={<GlyphMark icon={EnvelopeSimpleIcon} />}
                 name={address}
-                line={removing === address ? EMAIL_REMOVING : null}
+                line={
+                  removing === address
+                    ? EMAIL_REMOVING
+                    : addressStatus(recipients, address)
+                }
                 right={
                   canEdit ? (
                     <button

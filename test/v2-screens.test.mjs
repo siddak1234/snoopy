@@ -84,9 +84,10 @@ test("Activity: q, sort, page, status and since reach the platform, the flow as 
     /listRuns\(workspaceId, query\)/u,
   );
   // None of them still sends the sort and the page, so the platform pages
-  // plain Activity and counts it (`total`); Home alone reads the newest 100.
+  // plain Activity and counts it (`total`); Home reads no runs since build
+  // 34's F5 (YOUR FLOWS).
   assert.equal(runsQuery(activityQuery({})), "?sort=newest&page=1");
-  assert.match(read("app/account/page.tsx"), /listRuns\(workspaceId\)\)/u);
+  assert.doesNotMatch(read("app/account/page.tsx"), /listRuns\(/u);
   // What the address may not say is no filter at all.
   assert.deepEqual(
     activityQuery({ q: "x".repeat(90), sort: "random", page: "0" }),
@@ -320,7 +321,7 @@ test("F4: Download, then Share, on all five places; with canShare false, no Shar
     ],
     [
       "app/account/settings/CompleteExportSection.tsx",
-      /\{ label: "Download file", run: download, disabled: pending \},/u,
+      /label: downloadFileLabel\(index \+ 1, files\.length\),\s*run: download\(index\),\s*disabled: pending,/u,
     ],
     [
       "app/account/settings/WorkspaceExportSection.tsx",

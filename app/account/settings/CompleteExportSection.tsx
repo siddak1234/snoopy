@@ -5,6 +5,11 @@ import { FileActions } from "@/components/dashboard/FileActions";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import type { WorkspaceExportJob } from "@/lib/exports";
+import {
+  COMPLETE_EXPORT_INTRO,
+  downloadFileLabel,
+  exportFiles,
+} from "@/lib/export-contract";
 import { siteFileNamed } from "@/lib/platform-api";
 import { DOWNLOAD_FAILED, shareHref } from "@/lib/run-documents";
 import { typeOfName } from "@/lib/run-files";
@@ -31,7 +36,10 @@ const FAILURES: Record<string, string> = {
 };
 
 /**
- * Everything, as one file (backend §12.1 #39) — no section cut at 250 rows.
+ * Everything (backend §12.1 #39) — no section cut at 250 rows — as one file,
+ * or a large workspace as several (§12.1 #181): "Download file {n} of {N}"
+ * for each, in order, and Share only for an export of one file, the one the
+ * site's share route reads.
  *
  * The platform assembles it while the page waits, then answers a link that is
  * signed for minutes. So the link is asked for again at the moment of the
@@ -107,7 +115,8 @@ export function CompleteExportSection({
     });
   };
 
-  const download = async (): Promise<string | null> => {
+  // The file at `index`, by a link asked for at the press.
+  const download = (index: number) => async (): Promise<string | null> => {
     if (!job) return null;
     const result = await readCompleteExport(workspaceId, job.id).catch(() => ({
       ok: false as const,
@@ -115,19 +124,16 @@ export function CompleteExportSection({
     }));
     if (!result.ok) return result.error;
     setJob(result.job);
-    return result.job.file && !followSignedLink(result.job.file.downloadUrl)
-      ? DOWNLOAD_FAILED
-      : null;
+    const file = exportFiles(result.job)[index];
+    return file && !followSignedLink(file.downloadUrl) ? DOWNLOAD_FAILED : null;
   };
 
   const running = job?.status === "running";
+  const files = job?.status === "ready" ? exportFiles(job) : [];
 
   return (
     <div className={SPACING.group.top}>
-      <p className="text-sm text-[var(--muted)]">
-        Or export everything as one file, however large the workspace. It takes
-        a moment to prepare and is kept for a day.
-      </p>
+      <p className="text-sm text-[var(--muted)]">{COMPLETE_EXPORT_INTRO}</p>
       <div
         className={`${SPACING.inner.top} flex flex-wrap ${SPACING.inner.gap}`}
       >
@@ -139,17 +145,23 @@ export function CompleteExportSection({
         >
           {running ? "Preparing everything…" : "Export everything"}
         </Button>
-        {job?.status === "ready" && job.file ? (
+        {job && files.length > 0 ? (
           <FileActions
             testId="complete-export-actions"
-            downloads={[
-              { label: "Download file", run: download, disabled: pending },
-            ]}
-            share={{
-              filename: job.file.filename,
-              contentType: typeOfName(job.file.filename),
-              read: () => siteFileNamed(shareHref({ exportId: job.id })),
-            }}
+            downloads={files.map((_, index) => ({
+              label: downloadFileLabel(index + 1, files.length),
+              run: download(index),
+              disabled: pending,
+            }))}
+            share={
+              files.length === 1
+                ? {
+                    filename: files[0]!.filename,
+                    contentType: typeOfName(files[0]!.filename),
+                    read: () => siteFileNamed(shareHref({ exportId: job.id })),
+                  }
+                : null
+            }
           />
         ) : null}
       </div>

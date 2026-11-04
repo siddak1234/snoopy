@@ -134,13 +134,15 @@ a flow and the archived ones, adding a flow (it goes to the department of its
 category, which the platform makes when there is none, and its Set up opens;
 a catalog with nothing to add), the dashboard (Today's three tiles, counted
 from the browser's midnight and each opening Activity from it; the approvals
-banner while something waits; Add a flow and Flows; Recent runs; and a
-workspace with no flow yet), a flow's page (its live Dashboard, its five
+banner while something waits; Add a flow and Flows; YOUR FLOWS, a flow
+opened to its run's fields and Start run, a flow with items read only when
+opened and its item chosen first; and a workspace with no flow yet), a flow's page (its live Dashboard, its five
 Steps — titles only, Step 1 holding the run's fields and Start run, step 2 its
 integration, step 4 titled by the flow's choice, step 5 who gets the email —
 and Edit setup; no Connections and no move to another version), its Set up
-(Turn on, or Save; a member makes a newly added flow's first choice there, a
-connected vendor or None, and on a flow already on sees it read-only), its
+(Turn on, or Save; a member sees it read-only under "Only an owner or admin
+can change this flow.", as Add, Pause and Archive flow are, and a save refused
+as a member's says it), its
 Connect integration page (a tap saves and goes back; a vendor connected from
 it comes back chosen, one connected meanwhile is reused, and a refused
 connect is said under its row; a member sees the integration and no row is a
@@ -197,13 +199,14 @@ surface a change audit probed and no test asserted — Round 21 v2's among them:
 the image block, a group of drop-downs, a long list's and table's search, sort
 and pages, Activity's search, sort and pages as the platform is asked for
 them, and Share refused; Round 21's review of each change and Approvals'
-"Review {n} changes"; Set up's drop-down of several, and platform round
-2's bigger drop-down (Search, "No matches.", its headings, the label said
-and the value saved) and several files in one upload (all into one run, one file a list of one; exactly
+"Review {n} changes"; Set up's drop-down of several, and build 34's
+sheet for a select whose choices carry groups (Category, Search all, a
+group's own Search, "No matches.", Back, one choice or several, each a chip,
+the label said and the value saved) and several files in one upload (all into one run, one file a list of one; exactly
 `maxFiles` taken, past it refused, a photo past it keeping the files held; a
 full queue said; a photo added), a public app connected with no
 Connect step and, as a step's choice, Connected and chosen in place, a batch run's page, and a flow
-whose list row carries no settings still drawn and saved from its one-flow read (backend §12.1 #319), and a flow id that is not a UUID "not found", in `e2e/public-edge-fixture.spec.ts`), `e2e/dialogs.spec.ts`
+whose list row carries no settings still drawn and saved from its one-flow read (backend §12.1 #319), a flow id that is not a UUID, one the platform does not know and a flow it answers archived each "not found", its integration's save refused once it is archived, and a run's details page still drawn when its flow is archived or cannot be read, in `e2e/public-edge-fixture.spec.ts`), `e2e/dialogs.spec.ts`
 (every dialog's Escape, click outside, focus return and hold, one row each)
 and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: the Flows
 list by department A–Z; its items grouped A–Z under its group filter, the
@@ -218,7 +221,9 @@ sections after it, never the error page (Round 21, D2.6); a run
 headed by its title and its score in its verdict's colour with View {file}
 and its file page (a file no longer linked framed by this site's route), its
 sections under "{Run word} details" and its Run details page — every body
-the platform's blocks; Archive, an owner's buttons a member
+the platform's blocks; a run opened from its job going back to it (G1),
+and Start on a job opening the new run's page from it (G4);
+Archive, an owner's buttons a member
 does not see and a member's presses refused in words, an unanswered list
 said "Unavailable", and an upload refused with the queue full said in the
 owner's words, its file kept), sharing `e2e/helpers.ts`. The spacing table
