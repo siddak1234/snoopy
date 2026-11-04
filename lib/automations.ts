@@ -33,6 +33,9 @@ export type AutomationCatalogEntry =
   components["schemas"]["AutomationCatalogEntry"];
 export type AutomationSetupField =
   components["schemas"]["AutomationSetupField"];
+/** One section of a flow's Set up, as its manifest declares it (`setupSections`, backend ADR-0048 amendment 5). */
+export type AutomationSetupSection =
+  components["schemas"]["AutomationSetupSectionDeclaration"];
 export type AutomationRunInputField =
   components["schemas"]["AutomationRunInputField"];
 export type AutomationCatalog =
@@ -94,7 +97,7 @@ export type AutomationItems = components["schemas"]["AutomationItems"];
 export type AutomationItemField = components["schemas"]["AutomationItemField"];
 export type Item = components["schemas"]["Item"];
 export type RunSection = components["schemas"]["RunSection"];
-/** One of the thirteen blocks a run's or an item's page body is made of (backend ADR-0048 and its amendment 1). */
+/** One of the fourteen blocks a run's or an item's page body is made of (backend ADR-0048 and its amendments 1 to 5). */
 export type Block = components["schemas"]["Block"];
 export type BlockOpen = components["schemas"]["BlockOpen"];
 /** Each page's parts in the order the flow's pinned manifest gives (`Subscription.pages`). */
@@ -177,8 +180,8 @@ export async function listArchivedSubscriptions(
 }
 
 /**
- * The workspace's jobs, newest first: with no query (Home), today's newest
- * 100; with Activity's query (`runsQuery`, which always sends a sort and a
+ * The workspace's jobs, newest first: with no query, today's newest 100
+ * (Home's until build 34's F5); with Activity's query (`runsQuery`, which always sends a sort and a
  * page), one page of 25 and `total` (backend ADR-0048 amendment 1).
  */
 export function listRuns(

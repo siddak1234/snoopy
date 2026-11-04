@@ -108,6 +108,46 @@ export const REVIEW_MEMBER_NOTE = "Only an owner or admin can review this.";
 /** The platform refused the review, or did not answer. */
 export const REVIEW_NOT_SAVED = "The review wasn't saved. Try again.";
 
+/**
+ * A change's other values (backend ADR-0048 amendment 5): "Other code" opens
+ * its short list, and a row whose value was picked says "Changed to {code}".
+ */
+export const OTHER_CODE = "Other code";
+export function changedTo(code: string): string {
+  return `Changed to ${code}`;
+}
+
+/** The most other values one change offers (`HELD_DECISION_LIMITS.options`). */
+export const OPTIONS_LIMIT = 3;
+
+/**
+ * A held job's approval a disconnect expired before its time (backend §12.1
+ * #252, `Approval.expiredBy`): the connection its held run was built on was
+ * disconnected at the provider. Its two lines, in the name `providerName`
+ * gives (the run page's passes `disconnectedName`'s, in
+ * `lib/connection-rows.ts`); `null` for any other approval, and for a reason
+ * this build does not know, which reads as a plain expiry.
+ * Stage 2 (BUILD-PLAN 29.4.6; §12.1 #252 approval half): the platform does not send this before Stage 2.
+ */
+export function expiredByDisconnect(
+  approval:
+    | { status: string; expiredBy?: { reason: string; providerId: string } }
+    | undefined
+    | null,
+  providerName: (providerId: string) => string,
+): { title: string; next: string } | null {
+  if (
+    approval?.status !== "expired" ||
+    approval.expiredBy?.reason !== "connection-disconnected"
+  )
+    return null;
+  const provider = providerName(approval.expiredBy.providerId);
+  return {
+    title: `Expired · ${provider} was disconnected`,
+    next: `Reconnect ${provider}, then start the run again.`,
+  };
+}
+
 /** Approvals' card for a review: it opens the run. */
 export function reviewChanges(count: number): string {
   return `Review ${count} changes`;
@@ -126,7 +166,7 @@ export function changeLine(change: { label: string; detail?: string }): string {
 /** The most changes a held run offers, and a review draws (backend ADR-0048 amendment 3; 40 until then). */
 export const REVIEW_LIMIT = 400;
 
-/** The changes an approval or a review form offers, or none (a plain approval: Approve / Deny), at most `REVIEW_LIMIT`, each with its `group` when it has one. Rows not shaped as the contract says are left out. */
+/** The changes an approval or a review form offers, or none (a plain approval: Approve / Deny), at most `REVIEW_LIMIT`, each with its `group` when it has one and its other values (`options`, at most `OPTIONS_LIMIT`) when it offers any. Rows not shaped as the contract says are left out. */
 export function offeredDecisions(
   holder: { decisions?: unknown } | undefined | null,
 ): OfferedChange[] {
@@ -135,18 +175,39 @@ export function offeredDecisions(
   return list
     .flatMap((row: unknown): OfferedChange[] => {
       if (typeof row !== "object" || row === null) return [];
-      const { id, label, detail, group } = row as Record<string, unknown>;
+      const { id, label, detail, group, options } = row as Record<
+        string,
+        unknown
+      >;
       if (typeof id !== "string" || typeof label !== "string") return [];
+      const others = otherValues(options);
       return [
         {
           id,
           label,
           ...(typeof detail === "string" && detail !== "" ? { detail } : {}),
           ...(typeof group === "string" && group !== "" ? { group } : {}),
+          ...(others.length > 0 ? { options: others } : {}),
         },
       ];
     })
     .slice(0, REVIEW_LIMIT);
+}
+
+/** A change's other values as the contract shapes them, each value once, at most `OPTIONS_LIMIT`. */
+function otherValues(options: unknown): { value: string; label: string }[] {
+  if (!Array.isArray(options)) return [];
+  const seen = new Set<string>();
+  return options
+    .flatMap((option: unknown) => {
+      if (typeof option !== "object" || option === null) return [];
+      const { value, label } = option as Record<string, unknown>;
+      if (typeof value !== "string" || typeof label !== "string") return [];
+      if (value === "" || seen.has(value)) return [];
+      seen.add(value);
+      return [{ value, label }];
+    })
+    .slice(0, OPTIONS_LIMIT);
 }
 
 /**
@@ -200,9 +261,11 @@ export function reviewTally(
 
 /**
  * The answers a review form posted (`decisions`, JSON), as the decision
- * route takes them: each id once, `accepted` or `denied`. `null` when the
- * list is not that, so nothing is sent. The form answers every change it
- * offers; the platform checks that every offered id is answered once.
+ * route takes them: each id once, `accepted` or `denied` — or `other`, one of
+ * the change's other values (backend ADR-0048 amendment 5), never both.
+ * `null` when the list is not that, so nothing is sent. The form answers
+ * every change it offers; the platform checks that every offered id is
+ * answered once, and that an `other` is one the change offered.
  */
 export function reviewAnswers(posted: unknown): ReviewAnswer[] | null {
   if (typeof posted !== "string") return null;
@@ -213,15 +276,23 @@ export function reviewAnswers(posted: unknown): ReviewAnswer[] | null {
     return null;
   }
   if (!Array.isArray(list) || list.length === 0) return null;
-  const answers = new Map<string, ReviewAnswer["decision"]>();
+  const answers = new Map<string, ReviewAnswer>();
   for (const row of list as unknown[]) {
     if (typeof row !== "object" || row === null) return null;
-    const { id, decision } = row as { id?: unknown; decision?: unknown };
+    const { id, decision, other } = row as {
+      id?: unknown;
+      decision?: unknown;
+      other?: unknown;
+    };
     if (typeof id !== "string" || answers.has(id)) return null;
-    if (decision !== "accepted" && decision !== "denied") return null;
-    answers.set(id, decision);
+    if (decision === "accepted" || decision === "denied") {
+      if (other !== undefined) return null;
+      answers.set(id, { id, decision });
+    } else if (decision === undefined && typeof other === "string" && other) {
+      answers.set(id, { id, other });
+    } else return null;
   }
-  return [...answers].map(([id, decision]) => ({ id, decision }));
+  return [...answers.values()];
 }
 
 /**
@@ -380,10 +451,11 @@ function trackerSub(
 
 /**
  * What a run's page knows of its flow, beside the run (Build 22; the session's
- * S23), as its server read it: each step's title as the flow's connection
- * choice names it NOW (`stepTitle`, "QuickBooks updated"), and each setting
- * step's line — the integration chosen, or "None" (`settingLine`) — a run's
- * own choice not being recorded (backend §12.1 #290). Absent when the flow
+ * S23), as its server read it: each step's title as the run's connection
+ * choice names it (`stepTitle`, "QuickBooks updated"), and each setting
+ * step's line — the integration chosen, or "None" (`settingLine`) — from the
+ * choices the run started with (backend §12.1 #290), else, for a run made
+ * before they were saved, the flow's now. Absent when the flow
  * could not be read: each step its own title, a setting step "Done" (the app's
  * M6).
  */
@@ -624,9 +696,27 @@ export function runLabel(id: string): string {
  */
 export const RUN_DETAILS = "Run details";
 
-/** A run's details page, under its own. */
-export function runDetailsPath(runId: string): string {
-  return `/account/runs/${encodeURIComponent(runId)}/details`;
+/**
+ * A run's page and its details page opened from its job's — an item's page
+ * (the owner's G1, build 31: "Why is it that when i go back from the
+ * candidate page it goes back to the activity"): `?from=item`, so their
+ * back goes to that job, found by the run's own `itemId`, never by an id the
+ * address names, as the app's back does. Opened anywhere else, a run's back
+ * is Activity.
+ */
+export const FROM_ITEM = "item";
+
+const fromItemQuery = (fromItem: boolean) =>
+  fromItem ? `?from=${FROM_ITEM}` : "";
+
+/** A run's page; from its job's, so its back goes there. */
+export function runPagePath(runId: string, fromItem = false): string {
+  return `/account/runs/${encodeURIComponent(runId)}${fromItemQuery(fromItem)}`;
+}
+
+/** A run's details page, under its own; from its job's, as its page was. */
+export function runDetailsPath(runId: string, fromItem = false): string {
+  return `/account/runs/${encodeURIComponent(runId)}/details${fromItemQuery(fromItem)}`;
 }
 
 /** What became of a held run's approval, as the run's page says it (the app's `heldDecision`). */

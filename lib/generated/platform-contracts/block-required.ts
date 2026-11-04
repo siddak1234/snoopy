@@ -1,4 +1,4 @@
-// From snoopy-backend docs/openapi/automations.yaml, sha256 5f2084a95c4a6a389d7ab0c156a15d858b6cca892b71365709f7ad9aa6ea9737.
+// From snoopy-backend docs/openapi/automations.yaml, sha256 fcac7a9a8b6ef84032cefae0405d9f64eb7ba5faaab9d4efac82077503827481.
 // Regenerate with `npm run generate:platform-contracts`; never edit by hand.
 /** A JSON value's basic type, as `typeof` names it, with "array" and "null" told apart. */
 export type BlockKind =
@@ -126,6 +126,16 @@ export const BLOCK_REQUIRED: {
           title: { kinds: ["string"] },
           blocks: { kinds: ["array"], items: { kinds: ["object"] } },
         },
+      },
+    },
+  },
+  links: {
+    type: { kinds: ["string"], value: "links" },
+    items: {
+      kinds: ["array"],
+      items: {
+        kinds: ["object"],
+        fields: { label: { kinds: ["string"] }, url: { kinds: ["string"] } },
       },
     },
   },

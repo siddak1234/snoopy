@@ -319,6 +319,7 @@ export default async function FlowPage(
         available={available}
         canGoLive={subscription.unmetConnections.length === 0}
         initialKey={newIdempotencyKey("run")}
+        canChange={canManage}
       />
       {owed.map((line) => (
         <p key={line.key} className="text-xs text-[var(--warning-text)]">
@@ -476,6 +477,7 @@ export default async function FlowPage(
               : null
           }
           webhook={subscription.triggerKind === "webhook" && canManage}
+          canManage={canManage}
         />
       </Group>
     </SectionCard>

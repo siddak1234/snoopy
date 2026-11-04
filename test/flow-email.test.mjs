@@ -158,7 +158,10 @@ test("the email page: Always then Also send to; for an owner or admin a remove p
   assert.match(form, /save\(\[\.\.\.extra, draft\.trim\(\)\]/u);
   // Remove: the list without it, at once, "Removing…" meanwhile.
   assert.match(form, /extra\.filter\(\(listed\) => listed !== address\)/u);
-  assert.match(form, /line=\{removing === address \? EMAIL_REMOVING : null\}/u);
+  assert.match(
+    form,
+    /line=\{\s*removing === address\s*\?\s*EMAIL_REMOVING\s*:\s*addressStatus\(recipients, address\)\s*\}/u,
+  );
   // One write at a time.
   assert.match(form, /const writing = adding \|\| removing !== null;/u);
   const actions = read("app/account/flows/actions.ts");

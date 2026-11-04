@@ -40,9 +40,11 @@ import type { RunFlow } from "./RunLive";
  * (`RunLive`) until the form comes.
  *
  * And its flow, as it is now (Build 22, the session's S23): a setting step's
- * line — the integration the flow has chosen — and a title by connection
- * ("QuickBooks updated") follow the flow's settings, since a run does not
- * record its own choice (backend §12.1 #290). Read by its id, in any status,
+ * line — the integration chosen — and a title by connection ("QuickBooks
+ * updated") follow the connection choices the run started with
+ * (`RunDetail.connectionChoices`, backend §12.1 #290), over the flow's
+ * settings; a run made before they were saved follows the flow's settings, as
+ * before. Read by its id, in any status,
  * archived too (backend §12.1 #319; it was the live list, then the archived
  * one, the app's M6); a flow that cannot be read costs those two their words,
  * never the page.
@@ -107,6 +109,9 @@ export async function readRunPage(
     (candidate) => candidate.templateId === detail.run.templateId,
   );
   const setup = subscription?.setup ?? entry?.setup ?? [];
+  // The run's own integration (§12.1 #290): its saved choices over the flow's
+  // settings now, which a run made before they were saved still reads.
+  const config = { ...subscription?.config, ...detail.connectionChoices };
   const providerName = (providerId: string) =>
     entry?.requiredConnections.find(
       (connection) => connection.providerId === providerId,
@@ -121,6 +126,12 @@ export async function readRunPage(
   const flow: RunFlow = entry
     ? {
         name: entry.name,
+        providerNames: Object.fromEntries(
+          entry.requiredConnections.map((connection) => [
+            connection.providerId,
+            connection.displayName,
+          ]),
+        ),
         ...(fileFields ? { fileFields } : {}),
         ...(verdictNames ? { verdictNames } : {}),
         pipeline: entry.pipeline.map((step) => ({
@@ -145,7 +156,7 @@ export async function readRunPage(
                 titles: Object.fromEntries(
                   entry.groups.map((group) => [
                     group.id,
-                    stepTitle(group, setup, subscription.config),
+                    stepTitle(group, setup, config),
                   ]),
                 ),
                 settings: Object.fromEntries(
@@ -153,7 +164,7 @@ export async function readRunPage(
                     const line = settingLine(
                       group.id,
                       setup,
-                      subscription.config,
+                      config,
                       providerName,
                     );
                     return line === null ? [] : [[group.id, line]];

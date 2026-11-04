@@ -7,6 +7,8 @@ import { RocketLaunchIcon } from "@phosphor-icons/react/dist/ssr/RocketLaunch";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import type { AutomationRunInputField } from "@/lib/automations";
+import { runPagePath } from "@/lib/run-progress";
+import { FLOW_CHANGE_ADMIN_ONLY } from "@/lib/subscription-entitlements";
 import { setSubscriptionStatus, startRun } from "./actions";
 import { RunInputFields } from "./ManifestFields";
 import { SPACING } from "@/lib/spacing";
@@ -33,9 +35,16 @@ import { SPACING } from "@/lib/spacing";
  *
  * **On an item's page** (backend ADR-0046; plan §5.3) the same form starts a
  * run that names the item (`itemId`): its file, with the accepted types in
- * words beside it, and Start. A run started there stays on the item's page
- * (`onStarted`), where it joins the ranked list as "Reading…", and the form
- * empties for the next file.
+ * words beside it, and Start (`itemPage`). A run started there opens its
+ * page from the item (`runPagePath`), its steps arriving, and its back
+ * returns to the item (the owner's G4, build 31: "Shoukd i be taken into a
+ * step by step"; ~~it stayed on the item's page, the form emptied for the
+ * next file~~ until then). Home's YOUR FLOWS starts a run of an item chosen
+ * there with Start run, and opens its page (the owner's build 34 F5).
+ *
+ * Turning a flow on is a change only an owner or admin makes (backend §12.1
+ * #180): to a member Turn on is read-only, with "Only an owner or admin can
+ * change this flow."; a member still starts runs.
  */
 export function RunStart({
   workspaceId,
@@ -46,7 +55,8 @@ export function RunStart({
   canGoLive,
   initialKey,
   itemId,
-  onStarted,
+  itemPage = false,
+  canChange = true,
 }: {
   /** The workspace this page shows; every action is refused once it is not active. */
   workspaceId: string;
@@ -63,10 +73,12 @@ export function RunStart({
    * the browser draw the same one; each change of a value makes a new one.
    */
   initialKey: string;
-  /** The item every run started here names, on an item's page. */
+  /** The item every run started here names: an item's page's, or the one Home's YOUR FLOWS chose. */
   itemId?: string;
-  /** Called with a started run's id in place of going to its page. */
-  onStarted?: (runId: string) => void;
+  /** On an item's page: its button says Start, and the run opens from the item. */
+  itemPage?: boolean;
+  /** An owner or admin: a member's Turn on is read-only. */
+  canChange?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -115,14 +127,7 @@ export function RunStart({
         return;
       }
       if (!result.runId) return;
-      if (onStarted) {
-        // Emptied for the next file, under a new key.
-        setFileRound((round) => round + 1);
-        newRunKey();
-        onStarted(result.runId);
-        return;
-      }
-      router.push(`/account/runs/${result.runId}`);
+      router.push(runPagePath(result.runId, itemPage));
     });
   };
 
@@ -177,14 +182,14 @@ export function RunStart({
               ? "Starting…"
               : uploading
                 ? "Uploading…"
-                : itemId
+                : itemPage
                   ? "Start"
                   : "Start run"}
           </Button>
         ) : (
           <Button
             type="button"
-            disabled={pending || !canGoLive || !available}
+            disabled={pending || !canGoLive || !available || !canChange}
             onClick={turnOn}
             className={`inline-flex items-center ${SPACING.inner.gap}`}
           >
@@ -193,6 +198,9 @@ export function RunStart({
           </Button>
         )}
       </div>
+      {live || canChange ? null : (
+        <p className="text-xs text-[var(--muted)]">{FLOW_CHANGE_ADMIN_ONLY}</p>
+      )}
     </form>
   );
 }

@@ -9,8 +9,8 @@ import { SECTION_BAR, SECTION_ROW } from "./SectionRows";
  * section's box and bar (`SectionRows`), so it is exactly a closed section's
  * height, with what it names on the left, `end` (a score) before the arrow,
  * and the whole row the link. An item's ranked runs and every run page's
- * Run details; a flow's items, Activity's runs and Home's recent runs. The
- * app's row with an arrow, on the website.
+ * Run details; a flow's items, Activity's runs and Home's flows that start
+ * no run there. The app's row with an arrow, on the website.
  */
 export function PageRow({
   href,

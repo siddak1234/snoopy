@@ -18,3 +18,20 @@ export function subscriptionEntitlementState(
   }
   return null;
 }
+
+/**
+ * Only an owner or admin changes a flow (backend §12.1 #180): a member's add,
+ * set up, pause or resume, or archive is refused at the Edge with 403
+ * `flow_change_requires_admin`. A member sees each of those controls
+ * read-only, with this line; a refusal says it too.
+ */
+export const FLOW_CHANGE_ADMIN_ONLY =
+  "Only an owner or admin can change this flow.";
+
+/** Whether a refusal is a member's change of a flow (`flow_change_requires_admin`). */
+export function flowChangeRefused(
+  status: number,
+  details: Record<string, unknown> | undefined,
+): boolean {
+  return status === 403 && details?.reason === "flow_change_requires_admin";
+}

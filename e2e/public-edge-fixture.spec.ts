@@ -1821,16 +1821,15 @@ test("a danger button keeps AA contrast at rest, hovered and pressed: Archive fl
   await page.mouse.up();
 });
 
-test("a flow is held once per workspace: its row says its team, and its card says Added ✓, going to it, with no Add (the owner's build 12, #9; spec §3.A)", async ({
+test("a flow is held once per workspace: its row says its status and Open, no department, and its card says Added ✓, going to it, with no Add (the owner's build 12, #9; spec §3.A; build 34's F4)", async ({
   page,
 }) => {
   await page.goto("/account/flows");
-  // In the general team, as a draft: its row says where, and the card offers
-  // no Add but says it is added, going to its row.
+  // In the general team, as a draft: its group's header says the department,
+  // so the card does not (F4); the card offers no Add but says it is added,
+  // going to its row.
   const draft = automationCard(page, "Team draft automation");
-  await expect(
-    draft.locator("p", { hasText: "Department: general" }),
-  ).toBeVisible();
+  await expect(draft).not.toContainText("Department");
   await expect(draft.getByRole("combobox")).toHaveCount(0);
   await expect(draft.getByRole("button", { name: "Add" })).toHaveCount(0);
   const held = draft.getByRole("link", { name: "Added ✓" });
@@ -1842,8 +1841,8 @@ test("a flow is held once per workspace: its row says its team, and its card say
   await held.click();
   await expect(page).toHaveURL(/#flow-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb$/u);
   const row = page.locator("#flow-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
-  await expect(row).toContainText("Department: general");
-  // Its team, its status and Open — its page, where it is turned on.
+  await expect(row).toContainText(/draft/iu);
+  // Its status and Open — its page, where it is turned on.
   await expect(
     row.getByRole("link", { name: "Open Team draft automation" }),
   ).toHaveAttribute(
@@ -1862,15 +1861,14 @@ test("Add sends no team: the flow goes to the team of its category, which the pl
     }),
   ).toBeVisible();
   const card = automationCard(page, "Project automation");
-  // Under its category's header (build 28's item 1), its price, and no
-  // version (spec §3.A, S9).
+  // Under its category's header (build 28's item 1), with no price and no
+  // version (spec §3.A, S9; build 34's F4).
   await expect(
     page
       .getByTestId("flows-department")
       .filter({ has: page.getByRole("heading", { name: "Operations" }) }),
   ).toContainText("Project automation");
-  await expect(card).toContainText("Included");
-  await expect(card).not.toContainText("Version");
+  await expect(card).not.toContainText(/Included|Version/u);
   await expect(card.getByRole("combobox")).toHaveCount(0);
   await expect(card.getByRole("link", { name: "Added ✓" })).toHaveCount(0);
   await card.getByRole("button", { name: "Add" }).click();
@@ -1886,8 +1884,9 @@ test("Add sends no team: the flow goes to the team of its category, which the pl
   await expect(main.getByRole("button", { name: "Turn on" })).toBeVisible();
   await page.goto("/account/flows");
   await expect(
-    card.locator("p", { hasText: "Department: Operations" }),
+    card.getByRole("link", { name: "Open Project automation" }),
   ).toBeVisible();
+  await expect(card).not.toContainText("Department");
   await expect(card.getByRole("link", { name: "Added ✓" })).toBeVisible();
   await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
   await expect(card.getByRole("alert")).toHaveCount(0);
@@ -1928,22 +1927,22 @@ test("Add on a page drawn before another tab added that flow is refused in words
   // Nothing was sent: read again, the flow is in its team once.
   await page.reload();
   await expect(
-    card.locator("p", { hasText: "Department: Operations" }),
+    card.getByRole("link", { name: "Open Project automation" }),
   ).toHaveCount(1);
   await expect(card.getByRole("link", { name: "Added ✓" })).toBeVisible();
   await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
 });
 
-test("a flow held twice from before one flow per workspace keeps both copies listed, each under its place, and its card says Added ✓ once (the owner's build 12, #9; register F87)", async ({
+test("a flow held twice from before one flow per workspace keeps both copies listed, each its status and Open, and its card says Added ✓ once (the owner's build 12, #9; register F87; build 34's F4)", async ({
   page,
 }) => {
   await fixtureControl("flow-held-twice");
   await page.goto("/account/flows");
   const card = automationCard(page, "Project automation");
   await expect(
-    card.locator("p", { hasText: "Department: general" }),
-  ).toBeVisible();
-  await expect(card.locator("p", { hasText: "Whole workspace" })).toBeVisible();
+    card.getByRole("link", { name: "Open Project automation" }),
+  ).toHaveCount(2);
+  await expect(card).not.toContainText(/Department|Whole workspace/u);
   await expect(card.getByRole("link", { name: "Added ✓" })).toHaveCount(1);
   await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
 });
@@ -1985,7 +1984,7 @@ test("Unarchive adds an archived flow afresh by its card's own Add, to the team 
   );
   await expect(row.getByRole("button")).toHaveCount(0);
   await expect(
-    card.locator("p", { hasText: "Department: Operations" }),
+    card.getByRole("link", { name: "Open Archivable automation" }),
   ).toBeVisible();
   await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
   await added.click();
@@ -2011,11 +2010,10 @@ test("an Add the platform refuses — a team it could not find or make, or its t
   expect(await createdTeams()).toEqual([]);
 });
 
-test("with no team yet, anyone in the workspace adds a flow and its team is made — no Create a team, no Ask to join (backend ADR-0036; the owner, 2026-10-14)", async ({
+test("with no team yet, an owner adds a flow and its team is made — no Create a team, no Ask to join (backend ADR-0036; the owner, 2026-10-14; only an owner or admin adds one since backend §12.1 #180)", async ({
   page,
 }) => {
   await fixtureControl("org-without-projects");
-  await presentSession(page, "member");
   await page.goto("/account/flows");
   const main = page.locator("main");
   for (const gone of [
@@ -2047,7 +2045,7 @@ async function invoiceSettings() {
   ).invoiceConfig;
 }
 
-test("Invoice Processing: its card says its category, Included and its team; Add opens Set up — one page: 1 · Connect, its vendors and None; 2 · Settings, the Approval limit, no line under it — and Turn on turns it on and opens its page (the owner's AM4; spec A6)", async ({
+test("Invoice Processing: its card, under its department, says neither it nor a price (build 34's F4); Add opens Set up — one page: 1 · Connect, its vendors and None; 2 · Settings, the Approval limit, no line under it — and Turn on turns it on and opens its page (the owner's AM4; spec A6)", async ({
   page,
 }) => {
   await fixtureControl("invoice-not-added");
@@ -2058,8 +2056,7 @@ test("Invoice Processing: its card says its category, Included and its team; Add
       .getByTestId("flows-department")
       .filter({ has: page.getByRole("heading", { name: "Accounting" }) }),
   ).toContainText("Invoice Processing");
-  await expect(card).toContainText("Included");
-  await expect(card).not.toContainText(/Version|v3/u);
+  await expect(card).not.toContainText(/Included|Department|Version|v3/u);
   await card.getByRole("button", { name: "Add" }).click();
   await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
   const main = page.locator("main");
@@ -2218,80 +2215,56 @@ test("a member on the Connect integration page sees the integration and never ch
   );
 });
 
-test("a member who adds a flow makes its first integration choice on its Set up — a connected vendor, or None — and on a flow already on its rows are read-only (backend ADR-0043 §2; the app's Set up; Build 25, the review's R5c 3)", async ({
+test("a member changes no flow (backend §12.1 #180): on Flows, Add is read-only under the line; a flow's Set up draws its integration and settings read-only, with no Turn on or Save; its page offers Pause and Archive flow read-only", async ({
   page,
 }) => {
+  const line = "Only an owner or admin can change this flow.";
   await fixtureControl("quickbooks-connected");
   await fixtureControl("invoice-not-added");
   await presentSession(page, "member");
   await page.goto("/account/flows");
-  await automationCard(page, "Invoice Processing")
-    .getByRole("button", { name: "Add" })
-    .click();
-  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
-  const main = page.locator("main");
-  const quickbooks = main.getByRole("radio", { name: "QuickBooks Online" });
-  const none = main.getByRole("radio", { name: "None" });
-  await expect(quickbooks).toBeEnabled();
-  await expect(none).toBeEnabled();
-  await expect(main.getByTestId("vendor-member-note")).toHaveCount(0);
-  await quickbooks.click();
-  await expect(quickbooks).toHaveAttribute("aria-checked", "true");
-  await expect(none).toHaveAttribute("aria-checked", "false");
-  await main.getByRole("button", { name: "Turn on" }).click();
-  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
-  expect(await invoiceSettings()).toEqual({
-    vendor: "quickbooks",
-    holdAboveAmount: 500,
-  });
-  // On now: the member's Set up shows the integration and changes nothing.
-  await page.goto(`${FLOWS.invoice}/setup`);
-  await expect(quickbooks).toHaveAttribute("aria-checked", "true");
-  await expect(quickbooks).toBeDisabled();
-  await expect(none).toBeDisabled();
-  await expect(main.getByTestId("vendor-member-note")).toHaveText(
-    "Only an owner or admin can change the integration.",
-  );
+  const card = automationCard(page, "Invoice Processing");
+  await expect(card.getByRole("button", { name: "Add" })).toBeDisabled();
+  await expect(card).toContainText(line);
+  await expectNoAxeViolations(page);
 });
 
-test("a member on a newly added flow's Set up is offered no vendor that is not connected — its row says who connects it, and a tap goes nowhere — and None is theirs to choose and turn on with (Build 25's audit; the review's R5c 3)", async ({
+test("a member's Set up and flow page are read-only under the line, and a change refused as a member's says it (backend §12.1 #180)", async ({
   page,
 }) => {
-  const left = observe(
-    page,
-    (request) =>
-      request.isNavigationRequest() &&
-      /\/connections(?:\?|$)|^https:\/\/oauth\.invalid\//u.test(request.url()),
-  );
-  await fixtureControl("invoice-not-added");
+  const line = "Only an owner or admin can change this flow.";
+  await fixtureControl("quickbooks-connected");
   await presentSession(page, "member");
-  await page.goto("/account/flows");
-  await automationCard(page, "Invoice Processing")
-    .getByRole("button", { name: "Add" })
-    .click();
-  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
+  await page.goto(`${FLOWS.invoice}/setup`);
   const main = page.locator("main");
-  const quickbooks = main.getByRole("radio", { name: "QuickBooks Online" });
-  const none = main.getByRole("radio", { name: "None" });
-  await expect(quickbooks).toBeDisabled();
-  await expect(quickbooks).toHaveAccessibleDescription(
-    "Ask an owner or admin to connect it.",
-  );
-  await expect(none).toBeEnabled();
-  await expect(main.getByTestId("vendor-member-note")).toHaveCount(0);
-  // A tap on it, forced past its disabled state, chooses nothing and stays.
-  await quickbooks.click({ force: true });
-  await expect(quickbooks).toHaveAttribute("aria-checked", "false");
-  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
-  await none.click();
-  await expect(none).toHaveAttribute("aria-checked", "true");
-  await main.getByRole("button", { name: "Turn on" }).click();
-  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
-  expect(await invoiceSettings()).toEqual({
-    vendor: "none",
-    holdAboveAmount: 500,
-  });
-  expect(left).toEqual([]);
+  await expect(
+    main.getByRole("radio", { name: "QuickBooks Online" }),
+  ).toBeDisabled();
+  await expect(main.getByRole("radio", { name: "None" })).toBeDisabled();
+  await expect(
+    main.getByRole("spinbutton", { name: "Approval limit" }),
+  ).toBeDisabled();
+  await expect(
+    main.getByRole("button", { name: /^(Save|Turn on)$/u }),
+  ).toHaveCount(0);
+  await expect(main.getByTestId("flow-change-admin-only")).toHaveText(line);
+  await expectNoAxeViolations(page);
+
+  await page.goto(FLOWS.invoice);
+  await expect(main.getByRole("button", { name: "Pause" })).toBeDisabled();
+  await expect(
+    main.getByRole("button", { name: "Archive flow" }),
+  ).toBeDisabled();
+  await expect(main.getByTestId("flow-change-admin-only")).toHaveText(line);
+
+  // Drawn for an owner, then refused as a member's: the platform's 403.
+  const before = await invoiceSettings();
+  await presentSession(page, "owner");
+  await page.goto(`${FLOWS.invoice}/setup`);
+  await presentSession(page, "member");
+  await main.getByRole("button", { name: "Save" }).click();
+  await expect(main.getByRole("alert").filter({ hasText: line })).toBeVisible();
+  expect(await invoiceSettings()).toEqual(before);
 });
 
 test("a vendor connected since its Connect integration page was read is reused at the tap — chosen, saved and back to the flow — with no consent asked (Build 25's audit; the review's R5c 5)", async ({
@@ -3288,9 +3261,7 @@ test("a figure the platform cannot answer reads Unavailable — once, in Today's
     await unavailable.evaluate((line) => line.scrollWidth - line.clientWidth),
   ).toBe(0);
   await expect(page.getByTestId("home-quick-actions")).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Run of Manual input automation, running" }),
-  ).toBeVisible();
+  await expect(page.getByTestId("home-your-flows")).toBeVisible();
   await expect(
     page.getByRole("heading", {
       name: /The platform (is busy|could not answer)/,
@@ -3322,7 +3293,7 @@ test("Cancel on a run whose workspace was switched away in another tab says so, 
   await expect(page.locator("main").getByText(/^running$/i)).toBeVisible();
 });
 
-test("the dashboard reads top to bottom — Today's three tiles, Add a flow and Flows, Recent runs and See all — with no Run a flow, Quick actions, Workspace overview, Get started, View teams or Connect integration (Build 22, W1; the owner's build 21 item 1; D4, D5)", async ({
+test("the dashboard reads top to bottom — Today's three tiles, Add a flow and Flows, YOUR FLOWS — with no Recent runs, Run a flow, Quick actions, Workspace overview, Get started, View teams or Connect integration (Build 22, W1; the owner's build 21 item 1; D4, D5; build 34's F5)", async ({
   page,
 }) => {
   const runStats = observe(page, (request) =>
@@ -3335,14 +3306,14 @@ test("the dashboard reads top to bottom — Today's three tiles, Add a flow and 
   );
   await expect(main.getByRole("heading", { level: 2 })).toHaveText([
     "Today",
-    "Recent runs",
+    "Your flows",
   ]);
   const at = async (locator: ReturnType<Page["locator"]>) =>
     (await locator.boundingBox())?.y ?? Number.NaN;
   const order = [
     await at(main.getByTestId("home-stats")),
     await at(main.getByTestId("home-quick-actions")),
-    await at(main.getByTestId("home-recent-runs")),
+    await at(main.getByTestId("home-your-flows")),
   ];
   expect([...order].sort((a, b) => a - b)).toEqual(order);
   for (const gone of [
@@ -3392,19 +3363,20 @@ test("the dashboard reads top to bottom — Today's three tiles, Add a flow and 
     "href",
     `/account/runs?status=failed&${sinceQuery}`,
   );
-  // Recent runs: each its flow, its status and the run by its full id (A8).
-  const recent = main.getByTestId("home-recent-runs");
-  await expect(
-    recent.getByRole("link", {
-      name: "Run of Manual input automation, running",
-    }),
-  ).toBeVisible();
-  await expect(recent).toContainText("Run fixture-run-running");
-  await expect(main).not.toContainText("fixture-manual-input");
-  await expect(recent.getByRole("link", { name: "See all" })).toHaveAttribute(
-    "href",
-    "/account/runs",
-  );
+  // YOUR FLOWS (build 34's F5): the live flows by department A–Z, A–Z in
+  // each; no recent runs.
+  const flows = main.getByTestId("home-your-flows");
+  await expect(flows.getByRole("heading", { level: 3 })).toHaveText([
+    "Accounting",
+    "Operations",
+  ]);
+  await expect(flows.getByRole("listitem")).toHaveText([
+    "Invoice Processing",
+    "Archivable automation",
+    "Manual input automation",
+    "Webhook automation",
+  ]);
+  await expect(main).not.toContainText(/Recent runs|See all|fixture-run-/u);
   await expectNoAxeViolations(page);
 });
 
@@ -3428,7 +3400,7 @@ test("the dashboard's approvals banner, right after Today, while something waits
   await expectNoAxeViolations(page);
 });
 
-test("the dashboard of a workspace with no flow yet: Today, then the first run's words and its one Add a flow — no buttons, no Recent runs (W1; the app's HomeFirstRun)", async ({
+test("the dashboard of a workspace with no flow yet: Today, then the first run's words and its one Add a flow — no buttons, no YOUR FLOWS (W1; the app's HomeFirstRun)", async ({
   page,
 }) => {
   await page.goto("/account");
@@ -3449,7 +3421,7 @@ test("the dashboard of a workspace with no flow yet: Today, then the first run's
   );
   await expect(main.getByTestId("home-stats")).toBeVisible();
   await expect(main.getByTestId("home-quick-actions")).toHaveCount(0);
-  await expect(main.getByTestId("home-recent-runs")).toHaveCount(0);
+  await expect(main.getByTestId("home-your-flows")).toHaveCount(0);
   await expectNoAxeViolations(page);
 });
 
@@ -4337,7 +4309,7 @@ test('the dashboard lists no teams — Teams stay on their own page (the owner\'
 }) => {
   await page.goto("/account");
   const main = page.locator("main");
-  await expect(main.getByTestId("home-recent-runs")).toBeVisible();
+  await expect(main.getByTestId("home-your-flows")).toBeVisible();
   await expect(
     main.getByRole("heading", { name: "Departments", exact: true }),
   ).toHaveCount(0);
@@ -5080,33 +5052,26 @@ test("the deletion itself signs the browser out — the sign-out after it is onl
   await expect(page).toHaveURL(/\/login\?callbackUrl=%2Faccount$/);
 });
 
-// For a cookie caller every 502 on DELETE /v1/account means the Access hop
-// failed — the contract's "deleted, but not revoked" 502 is bearer-only
-// (backend F39) — and a gateway 504 or a connection lost mid-request is the
-// same case: the request may have run and its answer been lost. All of them
-// keep the account and say the outcome is unknown, rather than relaying a
-// title. The fixture answers none of them; the route is answered here.
+// Why a 5xx is unknown and sent again once: `outcomeFor` in components/account/DeleteAccountButton.tsx.
 const UNKNOWN_OUTCOME = "it is not known whether your account was removed";
+const dependencyFailure = {
+  status: 502,
+  contentType: "application/problem+json",
+  body: JSON.stringify({
+    type: "urn:autom8x:problem:dependency-failure",
+    title: "Dependency Failure",
+    status: 502,
+    detail: "Access service is unreachable",
+    code: "DEPENDENCY_FAILURE",
+  }),
+};
 const lostAnswers: ReadonlyArray<
   readonly [
     string,
     { status: number; contentType: string; body: string } | "connectionreset",
   ]
 > = [
-  [
-    "the Edge's own 502 problem body",
-    {
-      status: 502,
-      contentType: "application/problem+json",
-      body: JSON.stringify({
-        type: "urn:autom8x:problem:dependency-failure",
-        title: "Dependency Failure",
-        status: 502,
-        detail: "Access service is unreachable",
-        code: "DEPENDENCY_FAILURE",
-      }),
-    },
-  ],
+  ["the Edge's own 502 problem body", dependencyFailure],
   [
     "a bodiless gateway 502",
     {
@@ -5129,6 +5094,7 @@ for (const [answer, fulfil] of lostAnswers) {
   test(`${answer} keeps the account — the outcome is said to be unknown`, async ({
     page,
   }) => {
+    const deletes = observe(page, (request) => request.method() === "DELETE");
     const logouts = observe(page, isLogout);
     await page.route(/\/api\/platform\/v1\/account$/, (route) =>
       fulfil === "connectionreset"
@@ -5149,11 +5115,67 @@ for (const [answer, fulfil] of lostAnswers) {
       dialog.getByRole("button", { name: "Try again" }),
     ).toBeVisible();
     await expect(page).toHaveURL(/\/account\/settings$/);
+    expect(deletes).toHaveLength(fulfil === "connectionreset" ? 1 : 2);
     expect(logouts).toHaveLength(0);
     await page.goto("/account");
     await expect(page).toHaveURL(/\/account$/);
   });
 }
+
+// The session is never read after a failed delete (S1-10): once the rows are
+// purged, that read makes a new, empty account.
+const isSessionRead = (request: Request) =>
+  request.method() === "GET" &&
+  new URL(request.url()).pathname === "/api/platform/v1/session";
+
+test("a 5xx on the delete is sent again at once — a 204 then deletes the account, signs out and leaves (S1-10)", async ({
+  page,
+}) => {
+  const deletes = observe(page, (request) => request.method() === "DELETE");
+  const logouts = observe(page, isLogout);
+  const answers = [502, 204];
+  await page.route(/\/api\/platform\/v1\/account$/, (route) =>
+    answers.shift() === 502
+      ? route.fulfill(dependencyFailure)
+      : route.fulfill({ status: 204 }),
+  );
+  await page.goto("/account/settings");
+  await page.getByRole("button", { name: "Delete Account" }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Yes, delete my account" })
+    .click();
+  await expect(page).toHaveURL(/\/account-deleted$/);
+  expect(deletes).toHaveLength(2);
+  expect(logouts).toHaveLength(1);
+});
+
+test("a 5xx twice says the outcome is not known, with Try again — two deletes and no session read (S1-10)", async ({
+  page,
+}) => {
+  const deletes = observe(page, (request) => request.method() === "DELETE");
+  const logouts = observe(page, isLogout);
+  await page.route(/\/api\/platform\/v1\/account$/, (route) =>
+    route.fulfill(dependencyFailure),
+  );
+  await page.goto("/account/settings");
+  await page.getByRole("button", { name: "Delete Account" }).click();
+  const dialog = page.getByRole("dialog");
+  const sessionReads = observe(page, isSessionRead);
+  await dialog.getByRole("button", { name: "Yes, delete my account" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "The platform could not complete this request, so it is not known whether your account was removed. You can try again.",
+  );
+  await expect(dialog.getByRole("button", { name: "Try again" })).toBeFocused();
+  expect(deletes).toHaveLength(2);
+  // Try again sends the delete again — and a 5xx once more at once.
+  await dialog.getByRole("button", { name: "Try again" }).click();
+  await expect.poll(() => deletes.length).toBe(4);
+  await expect(dialog.getByRole("alert")).toContainText(UNKNOWN_OUTCOME);
+  await expect(page).toHaveURL(/\/account\/settings$/);
+  expect(sessionReads).toHaveLength(0);
+  expect(logouts).toHaveLength(0);
+});
 
 const unauthenticated = {
   status: 401,
@@ -5210,7 +5232,7 @@ test("an expired session is said inline, with the way back in — not a retry, n
   expect(deletes).toHaveLength(1);
 });
 
-test("a 401 right after a lost answer hedges — the account may already be gone", async ({
+test("a 401 right after a lost answer hedges, even after Cancel — the account may already be gone", async ({
   page,
 }) => {
   // The earlier attempt may have finished server-side and taken the session
@@ -5230,21 +5252,32 @@ test("a 401 right after a lost answer hedges — the account may already be gone
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "Yes, delete my account" }).click();
   await expect(dialog.getByRole("alert")).toContainText(UNKNOWN_OUTCOME);
+  // Focus is back on the control that answers it (NFR-35), not on <body>.
+  await expect(dialog.getByRole("button", { name: "Try again" })).toBeFocused();
+  // The person closes the dialog and comes back to it later on the same page:
+  // closing it does not make a lost answer less lost.
   answer = "expired";
-  await dialog.getByRole("button", { name: "Try again" }).click();
-  await expect(dialog.getByRole("alert")).toContainText(
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("button", { name: "Delete Account" }).click();
+  const reopened = page.getByRole("dialog");
+  await reopened
+    .getByRole("button", { name: "Yes, delete my account" })
+    .click();
+  await expect(reopened.getByRole("alert")).toContainText(
     "may already have been removed by the earlier attempt",
   );
   await expect(
-    dialog.getByRole("link", { name: "Sign in again" }),
-  ).toBeVisible();
+    reopened.getByRole("link", { name: "Sign in again" }),
+  ).toBeFocused();
   await expect(page).toHaveURL(/\/account\/settings$/);
 });
 
 test("a 409 after a lost answer clears the hedge — the account is still here, so a later 401 is only a session that ended (register F47)", async ({
   page,
 }) => {
+  // The first press meets two lost answers: the 5xx is sent again at once.
   const answers: ("lost" | "partial" | "expired")[] = [
+    "lost",
     "lost",
     "partial",
     "expired",
@@ -5306,12 +5339,13 @@ test("a session that ended while the settings page was open is said, with the wa
   );
 });
 
-test("an answer lost behind the website's own proxy reads as unknown — and after Cancel, the retry's 401 still hedges", async ({
+test("an answer lost behind the website's own proxy is sent again at once — and the second attempt's 401 hedges", async ({
   page,
 }) => {
   // No page.route: the fixture's departing session runs its deletion and then
   // drops the connection, and the website's own /api/platform rewrite meets
-  // that loss. Its session went with the account, so the next attempt is 401.
+  // that loss with a 500. Its session went with the account, so the delete
+  // sent again at once is 401 — and the account may already be gone.
   await page.context().addCookies([
     {
       name: "e2e-public-edge-session",
@@ -5320,28 +5354,21 @@ test("an answer lost behind the website's own proxy reads as unknown — and aft
       path: "/",
     },
   ]);
+  const deletes = observe(page, (request) => request.method() === "DELETE");
   const logouts = observe(page, isLogout);
   await page.goto("/account/settings");
   await page.getByRole("button", { name: "Delete Account" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "Yes, delete my account" }).click();
-  await expect(dialog.getByRole("alert")).toContainText(UNKNOWN_OUTCOME);
-  // Focus is back on the control that answers it (NFR-35), not on <body>.
-  await expect(dialog.getByRole("button", { name: "Try again" })).toBeFocused();
-  // The person closes the dialog and comes back to it later on the same page.
-  await dialog.getByRole("button", { name: "Cancel" }).click();
-  await page.getByRole("button", { name: "Delete Account" }).click();
-  const reopened = page.getByRole("dialog");
-  await reopened
-    .getByRole("button", { name: "Yes, delete my account" })
-    .click();
-  await expect(reopened.getByRole("alert")).toContainText(
+  await expect(dialog.getByRole("alert")).toContainText(
     "may already have been removed by the earlier attempt",
   );
+  // Focus is on the control that answers it (NFR-35), not on <body>.
   await expect(
-    reopened.getByRole("link", { name: "Sign in again" }),
+    dialog.getByRole("link", { name: "Sign in again" }),
   ).toBeFocused();
   await expect(page).toHaveURL(/\/account\/settings$/);
+  expect(deletes).toHaveLength(2);
   expect(logouts).toHaveLength(0);
 });
 
@@ -5584,43 +5611,65 @@ test("Round 21 (F1) — Set up's drop-down of several: never the browser's selec
   });
 });
 
-test("Round 21, platform round 2 (B1) — a drop-down of more than 10 choices opens on Search, keeps the labels that hold what is typed, says No matches. for none, draws its headings in the manifest's order, says the label chosen and saves its value", async ({
+test("build 34's F1 — a select whose choices carry groups is a sheet the page's height: Category lists its groups, Search all finds a choice in any of them, a group's choices are searched alone, Back goes a step back, one choice closes it, the box says its label and a chip, and its value is saved", async ({
   page,
 }) => {
   await fixtureControl("invoice-specialties");
   await page.goto(`${FLOWS.invoice}/setup`);
   const main = page.locator("main");
-  const trigger = main.getByRole("combobox", { name: "Taxonomy" });
+  const trigger = main.getByTestId("select-taxonomy");
+  await expect(trigger).toHaveText("Choose");
+  await expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
   await trigger.click();
-  const search = main.getByRole("searchbox", { name: "Search" });
-  await expect(search).toBeFocused();
-  await expect(search).toHaveAttribute("placeholder", "Search");
-  const menu = main.getByRole("listbox", { name: "Taxonomy" });
-  await expect(menu.getByRole("option")).toHaveCount(12);
-  await expect(menu.getByRole("group")).toHaveCount(2);
-  await expect(menu.getByRole("group").first()).toHaveAccessibleName(
+  const sheet = page.getByRole("dialog", { name: /Taxonomy/u });
+  await expect(sheet.getByRole("heading", { level: 2 })).toHaveText("Taxonomy");
+  await expect(sheet.getByRole("heading", { level: 3 })).toHaveText("Category");
+  // Step 1: the groups, in the manifest's order, and no choice yet.
+  await expect(sheet.getByRole("listitem")).toHaveText([
     "Internal medicine",
-  );
-  await expect(menu.getByRole("group").last()).toHaveAccessibleName(
+    "Psychiatry & neurology",
+  ]);
+  await expect(sheet.getByRole("option")).toHaveCount(0);
+  const searchAll = sheet.getByRole("searchbox", { name: "Search all" });
+  await expect(searchAll).toHaveAttribute("placeholder", "Search all");
+  await expectNoAxeViolations(page);
+  // Search all: every group's choices, under their headings.
+  await searchAll.fill("PSYCH");
+  await expect(sheet.getByRole("option")).toHaveText([
+    "Psychiatry",
+    "Forensic psychiatry",
+  ]);
+  await expect(sheet.getByRole("group")).toHaveAccessibleName(
     "Psychiatry & neurology",
   );
-  await expectNoAxeViolations(page);
-  await search.fill("zzz");
-  await expect(main.getByText("No matches.")).toBeVisible();
-  await expect(menu.getByRole("option")).toHaveCount(0);
-  await search.fill("PSYCH");
-  await expect(menu.getByRole("option")).toHaveCount(2);
-  await expect(menu.getByRole("group")).toHaveCount(1);
-  // Enter in the search box never sends the form; the down arrow goes to a row.
-  await search.press("Enter");
-  await expect(menu).toBeVisible();
-  await search.press("ArrowDown");
-  await expect(
-    menu.getByRole("option", { name: "Psychiatry", exact: true }),
-  ).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(menu).toHaveCount(0);
+  await searchAll.fill("zzz");
+  await expect(sheet.getByText("No matches.")).toBeVisible();
+  await searchAll.fill("");
+  // Step 2: one group's choices, searched alone; Back goes to step 1.
+  await sheet.getByRole("button", { name: "Psychiatry & neurology" }).click();
+  await expect(sheet.getByRole("heading", { level: 2 })).toHaveText(
+    "Psychiatry & neurology",
+  );
+  await expect(sheet.getByRole("option")).toHaveCount(6);
+  const search = sheet.getByRole("searchbox", { name: "Search" });
+  await search.fill("sport");
+  await expect(sheet.getByRole("option")).toHaveText(["Sports medicine"]);
+  await search.fill("");
+  await sheet.getByRole("button", { name: "Back" }).click();
+  await expect(sheet.getByRole("heading", { level: 3 })).toHaveText("Category");
+  // Back from step 1 closes it, focus back on the box.
+  await sheet.getByRole("button", { name: "Back" }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  // One choice closes it: the box says its label, a chip under it.
+  await trigger.click();
+  await sheet.getByRole("button", { name: "Psychiatry & neurology" }).click();
+  await sheet.getByRole("option", { name: "Psychiatry", exact: true }).click();
+  await expect(sheet).toHaveCount(0);
   await expect(trigger).toHaveText("Psychiatry");
+  await expect(main.getByTestId("select-taxonomy-chips")).toHaveText(
+    "Psychiatry",
+  );
   // Set up's other required choices, then saved: the value, never the label.
   await main.getByRole("combobox", { name: "Specialties" }).click();
   await main
@@ -5640,6 +5689,57 @@ test("Round 21, platform round 2 (B1) — a drop-down of more than 10 choices op
     specialties: ["Nephrology"],
     placeOfCare: "Office",
     taxonomy: "2084P0800X",
+  });
+});
+
+test("build 34's F1 — a sheet of several stays open: a choice found by Search all and one in a group each tick, a second press unticks, each pick is a chip, and the list is saved in the order chosen", async ({
+  page,
+}) => {
+  await fixtureControl("taxonomy-several");
+  await page.goto(`${FLOWS.invoice}/setup`);
+  const main = page.locator("main");
+  const trigger = main.getByTestId("select-taxonomy");
+  await trigger.click();
+  const sheet = page.getByRole("dialog", { name: /Taxonomy/u });
+  await sheet.getByRole("searchbox", { name: "Search all" }).fill("nephro");
+  await sheet.getByRole("option", { name: "Nephrology" }).click();
+  await expect(sheet).toBeVisible();
+  await expect(
+    sheet.getByRole("listbox", { name: "Taxonomy" }),
+  ).toHaveAttribute("aria-multiselectable", "true");
+  await sheet.getByRole("searchbox", { name: "Search all" }).fill("");
+  await sheet.getByRole("button", { name: "Psychiatry & neurology" }).click();
+  await sheet.getByRole("option", { name: "Neurology", exact: true }).click();
+  await sheet.getByRole("option", { name: "Obesity medicine" }).click();
+  await expect(trigger).toHaveText("3 chosen");
+  await sheet.getByRole("option", { name: "Obesity medicine" }).click();
+  await expect(
+    sheet.getByRole("option", { name: "Obesity medicine" }),
+  ).toHaveAttribute("aria-selected", "false");
+  await expect(trigger).toHaveText("Nephrology, Neurology");
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  await expect(main.getByTestId("select-taxonomy-chips")).toHaveText(
+    "NephrologyNeurology",
+  );
+  await main.getByRole("combobox", { name: "Specialties" }).click();
+  await main
+    .getByRole("listbox", { name: "Specialties" })
+    .getByRole("option", { name: "Nephrology" })
+    .click();
+  await page.keyboard.press("Escape");
+  await main.getByRole("combobox", { name: "Place of care" }).click();
+  await main
+    .getByRole("listbox", { name: "Place of care" })
+    .getByRole("option", { name: "Office" })
+    .click();
+  await main.getByRole("button", { name: "Save", exact: true }).click();
+  await expect.poll(invoiceSettings).toEqual({
+    vendor: "none",
+    holdAboveAmount: 500,
+    specialties: ["Nephrology"],
+    placeOfCare: "Office",
+    taxonomy: ["207RN0300X", "2084N0400X"],
   });
 });
 
@@ -6002,4 +6102,148 @@ test('backend §12.1 #319 step 2 — an address whose flow id is not a UUID, whi
       ).subscriptionReads.slice(before),
     ).toContain("not-a-uuid");
   }
+});
+
+// Backend §12.1 #319 step 2's debt: the six surfaces the hardening change
+// audit drove by hand and left UNCOVERED, each now a spec (its
+// `required_tests`, carried to the next website change).
+const flowReads = async () =>
+  (await fixtureRead<{ subscriptionReads: string[] }>("counts"))
+    .subscriptionReads;
+
+test("backend §12.1 #319 step 2 — a well-formed flow id the platform answers 404 (unknown, or another workspace's) is the flow's \"not found\" on its page, Set up and Connect integration, read by its id", async ({
+  page,
+}) => {
+  const unknown = "12345678-1234-4123-8123-123456789abc";
+  for (const path of [
+    `/account/flows/${unknown}`,
+    `/account/flows/${unknown}/setup`,
+    `/account/flows/${unknown}/vendor?field=vendor`,
+  ]) {
+    const before = (await flowReads()).length;
+    const response = await page.goto(path);
+    expect([path, response?.status()]).toEqual([path, 404]);
+    expect((await flowReads()).slice(before)).toContain(unknown);
+  }
+});
+
+test('backend §12.1 #319 step 2 — a flow archived from its page, which the platform still answers by its id as archived, is "not found" on its page and Set up, with no flow controls', async ({
+  page,
+}) => {
+  const archivableId = FLOWS.archivable.split("/").at(-1);
+  await page.goto(FLOWS.archivable);
+  await page.getByRole("button", { name: "Archive flow" }).click();
+  await page
+    .getByRole("dialog", { name: "Archive Archivable automation?" })
+    .getByRole("button", { name: "Archive", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/account\/flows$/u);
+  for (const path of [FLOWS.archivable, `${FLOWS.archivable}/setup`]) {
+    const before = (await flowReads()).length;
+    const response = await page.goto(path);
+    expect([path, response?.status()]).toEqual([path, 404]);
+    expect((await flowReads()).slice(before)).toContain(archivableId);
+    await expect(
+      page.locator("main").getByRole("button", { name: "Archive flow" }),
+    ).toHaveCount(0);
+  }
+});
+
+test('backend §12.1 #319 step 2 — a flow the platform answers by its id as archived, though its list still holds it, is "not found" on its page, Set up and Connect integration', async ({
+  page,
+}) => {
+  const paths = [
+    FLOWS.invoice,
+    `${FLOWS.invoice}/setup`,
+    `${FLOWS.invoice}/vendor?field=vendor`,
+  ];
+  // The control: live, each answers.
+  for (const path of paths)
+    expect([path, (await page.goto(path))?.status()]).toEqual([path, 200]);
+  await fixtureControl("invoice-archived");
+  for (const path of paths)
+    expect([path, (await page.goto(path))?.status()]).toEqual([path, 404]);
+});
+
+test("backend §12.1 #319 step 2 — Connect integration's save for a flow archived after its page was drawn is refused in words, saves nothing and stays on the page", async ({
+  page,
+}) => {
+  // QuickBooks connected, so the tap saves at once rather than going to sign in.
+  await fixtureControl("quickbooks-connected");
+  const vendor = `${FLOWS.invoice}/vendor?field=vendor`;
+  await page.goto(vendor);
+  const main = page.locator("main");
+  const quickbooks = main.getByRole("radio", { name: "QuickBooks Online" });
+  await expect(quickbooks).toBeEnabled();
+  const saves = async () =>
+    (await fixtureRead<{ invoiceSaves: unknown[] }>("counts")).invoiceSaves
+      .length;
+  const before = await saves();
+  await fixtureControl("invoice-archived");
+  await quickbooks.click();
+  await expect(main.getByRole("alert")).toHaveText(
+    "Could not save. Try again.",
+  );
+  await expect(page).toHaveURL(/\/vendor\?field=vendor$/u);
+  expect(await saves()).toBe(before);
+  expect(
+    (await fixtureRead<{ invoiceConfig: Record<string, unknown> }>("counts"))
+      .invoiceConfig,
+  ).toMatchObject({ vendor: "none" });
+});
+
+test.describe("backend §12.1 #319 step 2 — a run's details page and its flow's one read", () => {
+  test.beforeEach(async ({ page }) => {
+    // QuickBooks chosen for Invoice Processing, then a run of it on step 3.
+    await fixtureControl("quickbooks-connected");
+    await page.goto(`${FLOWS.invoice}/vendor?field=vendor`);
+    await page
+      .locator("main")
+      .getByRole("radio", { name: "QuickBooks Online" })
+      .click();
+    await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
+    await fixtureControl("invoice-run-started");
+    await fixtureControl("invoice-run-advance");
+  });
+
+  test("a run of a flow now archived keeps its flow's words: step 2 QuickBooks Online, step 4 QuickBooks updated", async ({
+    page,
+  }) => {
+    await fixtureControl("invoice-archived");
+    const before = (await flowReads()).length;
+    const response = await page.goto(
+      "/account/runs/fixture-run-invoice-started/details",
+    );
+    expect(response?.status()).toBe(200);
+    const rows = page.locator("main").getByTestId("run-steps").locator("li");
+    await expect(rows.nth(1).locator("p:not(.font-medium)")).toHaveText(
+      "QuickBooks Online",
+    );
+    await expect(rows.nth(3).locator("p.font-medium")).toHaveText(
+      "4 · QuickBooks updated",
+    );
+    expect((await flowReads()).slice(before)).toContain(
+      FLOWS.invoice.split("/").at(-1),
+    );
+  });
+
+  test("a run whose flow cannot be read (503) still draws its details page, every step, losing only the flow's two words", async ({
+    page,
+  }) => {
+    await fixtureControl("subscription-read-failing");
+    const response = await page.goto(
+      "/account/runs/fixture-run-invoice-started/details",
+    );
+    expect(response?.status()).toBe(200);
+    const rows = page.locator("main").getByTestId("run-steps").locator("li");
+    await expect(rows).toHaveCount(5);
+    await expect(rows.locator("p.font-medium")).toHaveCount(5);
+    await expect(rows.locator("p:not(.font-medium)")).toHaveCount(5);
+    await expect(rows.nth(1).locator("p:not(.font-medium)")).not.toHaveText(
+      "QuickBooks Online",
+    );
+    await expect(rows.nth(3).locator("p.font-medium")).not.toHaveText(
+      "4 · QuickBooks updated",
+    );
+  });
 });

@@ -348,6 +348,9 @@ function initialState() {
     // Round 21 (the platform round's F1): Invoice Processing's Set up with
     // a required drop-down of several, its Specialties.
     invoiceSpecialties: false,
+    // The owner's build 34 F1: the Taxonomy, whose choices carry groups, of
+    // several, as ICD-10 Code Check's Specialties are.
+    taxonomySeveral: false,
     quickbooksConnected: false,
     // Build 23 (B3): a change of the flow's integration refused as a
     // member's is — 403 `integration_requires_admin`, the Edge's "Forbidden".
@@ -406,6 +409,12 @@ function initialState() {
     // declares no word for its documents.
     documentWordsDeclared: true,
     subscriptionsFailing: false,
+    // Backend §12.1 #319 step 2's debt (the hardening audit's required
+    // tests): the one-flow read (`GET …/subscriptions/{id}`) answering
+    // Invoice Processing as archived while the list still holds it live — a
+    // flow archived after its page was drawn — or refused (503).
+    invoiceArchivedOnRead: false,
+    subscriptionReadFailing: false,
     // Backend §12.1 #319 step 2: the list's rows without `setup`, as the
     // platform's list will answer once step 3 lands; the one-flow read
     // (`GET …/subscriptions/{id}`) still carries it, and every page that draws
@@ -1097,7 +1106,14 @@ function invoiceSetup(): Automations["AutomationSetupField"][] {
       )
     : invoiceAutomation.setup;
   return state.invoiceSpecialties
-    ? [...setup, specialtiesField, placeOfCareField, taxonomyField]
+    ? [
+        ...setup,
+        specialtiesField,
+        placeOfCareField,
+        state.taxonomySeveral
+          ? { ...taxonomyField, multiple: true }
+          : taxonomyField,
+      ]
     : setup;
 }
 
@@ -2610,6 +2626,10 @@ const server = createServer(
       "/__fixture/invoice-specialties": () => {
         state.invoiceSpecialties = true;
       },
+      "/__fixture/taxonomy-several": () => {
+        state.invoiceSpecialties = true;
+        state.taxonomySeveral = true;
+      },
       "/__fixture/invoice-approval-pending": () => {
         state.approvals = [
           ...state.approvals.filter((entry) => entry.id !== invoiceApprovalId),
@@ -2658,6 +2678,12 @@ const server = createServer(
       },
       "/__fixture/subscriptions-failing": () => {
         state.subscriptionsFailing = true;
+      },
+      "/__fixture/invoice-archived": () => {
+        state.invoiceArchivedOnRead = true;
+      },
+      "/__fixture/subscription-read-failing": () => {
+        state.subscriptionReadFailing = true;
       },
       "/__fixture/list-without-setup": () => {
         state.listWithoutSetup = true;
@@ -4324,15 +4350,33 @@ const server = createServer(
           400,
           problem(400, "subscriptionId must be a UUID"),
         );
-      const subscription = [
-        ...liveSubscriptions(),
-        ...archivedSubscriptions(),
-      ].find(({ id }) => id === oneFlow[1]);
-      if (!subscription)
-        return respond(response, 404, problem(404, "Not Found"));
+      if (state.subscriptionReadFailing)
+        return respond(response, 503, problem(503, "Service Unavailable"));
+      const held = [...liveSubscriptions(), ...archivedSubscriptions()].find(
+        ({ id }) => id === oneFlow[1],
+      );
+      if (!held) return respond(response, 404, problem(404, "Not Found"));
+      const subscription =
+        state.invoiceArchivedOnRead && held.id === invoiceSubscriptionId
+          ? { ...held, status: "archived" as const }
+          : held;
       return respond(response, 200, {
         subscription,
       } satisfies AutomationOperations["getSubscription"]["responses"][200]["content"]["application/json"]);
+    }
+    // Backend §12.1 #180: only an owner or admin changes a flow — adds it,
+    // sets it up, pauses or resumes it, archives it — refused to a member at
+    // the Edge, before anything is read, as 403 `flow_change_requires_admin`.
+    if (
+      fixtureSession === "member" &&
+      ((method === "POST" && isWorkspacePath(pathname, "/subscriptions")) ||
+        (method === "PATCH" &&
+          /^\/v1\/workspaces\/[^/]+\/subscriptions\/[^/]+$/u.test(pathname)))
+    ) {
+      return respond(response, 403, {
+        ...problem(403, "Forbidden"),
+        details: { reason: "flow_change_requires_admin" },
+      } satisfies Platform["ApiProblem"]);
     }
     // Build 22 (P4; backend ADR-0041): no client chooses a version — a flow's
     // update naming one is refused, as the Edge refuses it, naming the field
@@ -4450,13 +4494,18 @@ const server = createServer(
           state.invoiceSpecialties &&
           (typeof config?.placeOfCare !== "string" ||
             !(placeOfCareField.options ?? []).includes(config.placeOfCare));
-        // An object option's value, never its label (platform round 2's B1).
+        // An object option's value, never its label (platform round 2's B1);
+        // of several, a list of them (build 34's F1).
+        const isTaxonomy = (value: unknown) =>
+          (taxonomyField.options ?? []).some(
+            (option) => typeof option === "object" && option.value === value,
+          );
         const badTaxonomy =
           config?.taxonomy !== undefined &&
-          !(taxonomyField.options ?? []).some(
-            (option) =>
-              typeof option === "object" && option.value === config.taxonomy,
-          );
+          (state.taxonomySeveral
+            ? !Array.isArray(config.taxonomy) ||
+              !config.taxonomy.every(isTaxonomy)
+            : !isTaxonomy(config.taxonomy));
         if (
           !config ||
           badChoices ||
@@ -5473,6 +5522,18 @@ const server = createServer(
         state.runReadsRefused += 1;
         return respond(response, 503, problem(503, "Service Unavailable"));
       }
+      // A run of an item (backend ADR-0046) as its item lists it, with its
+      // own itemId: a run started on an item opens here, its back to the
+      // item (the owner's G1 and G4).
+      const ofItem = [...state.itemRuns.values()]
+        .flat()
+        .find((candidate) => candidate.id === runId);
+      if (ofItem)
+        return respond(response, 200, {
+          run: ofItem,
+          steps: [],
+          events: [],
+        } satisfies AutomationOperations["readRun"]["responses"][200]["content"]["application/json"]);
       const run = fixtureRun(runId);
       const failed = run.status === "failed";
       // Invoice Processing's runs: what each reported — no step that did not

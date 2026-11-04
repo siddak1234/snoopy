@@ -15,7 +15,7 @@ import {
 } from "./helpers";
 
 /**
- * Every dialog `components/ui/Modal.tsx` serves — thirteen, one row each — held
+ * Every dialog `components/ui/Modal.tsx` serves — fourteen, one row each — held
  * to the same behaviours (filed at Round 15's close; the register's § "The
  * backlog before Round 17"):
  *
@@ -281,6 +281,13 @@ const dialogs: Dialog[] = [
         expect(dialog.getByRole("alert")).toHaveText(busy),
       staysOpen: true,
     },
+  },
+  {
+    // Build 34's F1: a select whose choices carry groups opens as a sheet.
+    name: "Taxonomy Optional",
+    state: "invoice-specialties",
+    path: `${FLOWS.invoice}/setup`,
+    opener: (page) => page.locator("main").getByTestId("select-taxonomy"),
   },
   {
     name: "Add members",

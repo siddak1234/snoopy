@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { ChoiceSheet } from "@/components/ui/ChoiceSheet";
 import { Dropdown } from "@/components/ui/Dropdown";
-import { CHOOSE_AT_LEAST_ONE, type Choice } from "@/lib/choices";
+import { CHOOSE_AT_LEAST_ONE, carriesGroups, type Choice } from "@/lib/choices";
 import { SPACING } from "@/lib/spacing";
 
 /**
@@ -17,6 +18,10 @@ import { SPACING } from "@/lib/spacing";
  * Its choices are the manifest's `options` read by `choicesOf` (platform
  * round 2's B1): strings, or `{value, label, group}` — the form posts the
  * `value`, the drop-down says the `label` under its `group`'s heading.
+ *
+ * Choices that carry groups are the sheet instead (`ChoiceSheet`; the
+ * owner's build 34 F1): Category, then one group's choices, each searched,
+ * and "Search all" over every choice; each pick a chip under the box.
  */
 export function SelectField({
   fieldKey,
@@ -74,7 +79,30 @@ export function SelectField({
         {title}
         {optional}
       </label>
-      {multiple ? (
+      {carriesGroups(options) ? (
+        multiple ? (
+          <ChoiceSheet
+            id={id}
+            labelledBy={labelId}
+            title={title}
+            options={options}
+            multiple
+            value={chosen}
+            onChange={setChosen}
+            testId={`select-${fieldKey}`}
+          />
+        ) : (
+          <ChoiceSheet
+            id={id}
+            labelledBy={labelId}
+            title={title}
+            options={options}
+            value={chosen[0] ?? ""}
+            onChange={(value) => setChosen([value])}
+            testId={`select-${fieldKey}`}
+          />
+        )
+      ) : multiple ? (
         <Dropdown
           id={id}
           labelledBy={labelId}

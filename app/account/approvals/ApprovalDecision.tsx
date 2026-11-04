@@ -11,10 +11,12 @@ import {
   ACCEPT,
   ANSWER_EACH,
   DENY,
+  OTHER_CODE,
   REVIEW_MEMBER_NOTE,
   REVIEW_NOT_SAVED,
   SAVE_REVIEW,
   changeLine,
+  changedTo,
   offeredDecisions,
   reviewChanges,
   reviewGroups,
@@ -175,7 +177,11 @@ function MayNotDecide({ eligibleRoles }: { eligibleRoles: readonly string[] }) {
  * review this."; anyone else not named, who may. Changes that carry a
  * `group` are drawn under its heading, every group open, in the order sent
  * (`reviewGroups`; platform round 2's B3), up to 400 — and "Save review"
- * still waits for every one.
+ * still waits for every one. A change that offers other values (`options`,
+ * backend ADR-0048 amendment 5) has a third pill, "Other code", which opens
+ * their short list under the row; one picked is that row's answer (`other`,
+ * its value), and the row says "Changed to {code}" until Accept or Deny is
+ * pressed instead.
  */
 function ReviewDecisions({
   approvalId,
@@ -196,8 +202,10 @@ function ReviewDecisions({
 }) {
   const [pending, startTransition] = useTransition();
   const [answers, setAnswers] = useState<
-    Record<string, ReviewAnswer["decision"]>
+    Record<string, Omit<ReviewAnswer, "id">>
   >({});
+  // The change whose other values are open under its row, if any.
+  const [othersOf, setOthersOf] = useState<string | null>(null);
   const [refused, setRefused] = useState(false);
   const answered = decisions.every((change) => answers[change.id]);
 
@@ -213,7 +221,7 @@ function ReviewDecisions({
         JSON.stringify(
           decisions.map((change) => ({
             id: change.id,
-            decision: answers[change.id],
+            ...answers[change.id],
           })),
         ),
       );
@@ -224,20 +232,34 @@ function ReviewDecisions({
     });
   };
 
-  // One change's row: its line, and to one who may decide, Accept and Deny.
+  // One change's row: its line, and to one who may decide, Accept and Deny —
+  // and Other code, with its short list, when it offers other values.
   const changeRow = (change: HeldDecision) => {
     const answer = answers[change.id];
-    const pick = (next: ReviewAnswer["decision"]) =>
+    const decision = answer?.decision;
+    const other = answer?.other;
+    const options = change.options ?? [];
+    const pick = (next: Omit<ReviewAnswer, "id">) => {
       setAnswers((current) => ({ ...current, [change.id]: next }));
+      setOthersOf(null);
+    };
     return (
       <li
         key={change.id}
         data-testid={`review-change-${change.id}`}
         className={`flex flex-wrap items-center justify-between ${SPACING.inner.gap}`}
       >
-        <p className="min-w-0 text-sm text-[var(--text)]">
-          {changeLine(change)}
-        </p>
+        <div className="min-w-0">
+          <p className="text-sm text-[var(--text)]">{changeLine(change)}</p>
+          {other === undefined ? null : (
+            <p
+              data-testid={`review-changed-${change.id}`}
+              className="text-xs text-[var(--muted)]"
+            >
+              {changedTo(other)}
+            </p>
+          )}
+        </div>
         {canDecide ? (
           <div
             role="group"
@@ -245,26 +267,62 @@ function ReviewDecisions({
             className={`flex items-center ${SPACING.inner.gap}`}
           >
             <Button
-              variant={answer === "denied" ? "secondary" : "primary"}
+              variant={decision === "denied" ? "secondary" : "primary"}
               size="sm"
-              aria-pressed={answer === "accepted"}
+              aria-pressed={decision === "accepted"}
               aria-label={`${ACCEPT}: ${change.label}`}
               disabled={pending}
-              onClick={() => pick("accepted")}
+              onClick={() => pick({ decision: "accepted" })}
             >
               {ACCEPT}
             </Button>
             <Button
-              variant={answer === "accepted" ? "secondary" : "danger"}
+              variant={decision === "accepted" ? "secondary" : "danger"}
               size="sm"
-              aria-pressed={answer === "denied"}
+              aria-pressed={decision === "denied"}
               aria-label={`${DENY}: ${change.label}`}
               disabled={pending}
-              onClick={() => pick("denied")}
+              onClick={() => pick({ decision: "denied" })}
             >
               {DENY}
             </Button>
+            {options.length > 0 ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-pressed={other !== undefined}
+                aria-expanded={othersOf === change.id}
+                aria-label={`${OTHER_CODE}: ${change.label}`}
+                disabled={pending}
+                onClick={() =>
+                  setOthersOf((open) => (open === change.id ? null : change.id))
+                }
+              >
+                {OTHER_CODE}
+              </Button>
+            ) : null}
           </div>
+        ) : null}
+        {canDecide && othersOf === change.id ? (
+          <ul
+            data-testid={`review-others-${change.id}`}
+            aria-label={`${OTHER_CODE}: ${change.label}`}
+            className={`flex w-full flex-col ${SPACING.inner.gap}`}
+          >
+            {options.map((option) => (
+              <li key={option.value}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  aria-pressed={other === option.value}
+                  disabled={pending}
+                  onClick={() => pick({ other: option.value })}
+                >
+                  {option.label}
+                </Button>
+              </li>
+            ))}
+          </ul>
         ) : null}
       </li>
     );

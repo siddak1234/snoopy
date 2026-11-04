@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import Modal from "@/components/ui/Modal";
 import type { SubscriptionStatus } from "@/lib/automations";
+import { FLOW_CHANGE_ADMIN_ONLY } from "@/lib/subscription-entitlements";
 import {
   archiveSubscription,
   setSubscriptionStatus,
@@ -40,6 +41,10 @@ export const EDIT_SETUP = "Edit setup";
  * dont want a move to vx number in the flows. The user always gets the latest
  * version"): the platform moves every flow to the newest (backend ADR-0041).
  *
+ * Only an owner or admin changes a flow (backend §12.1 #180): to a member,
+ * Pause and Archive flow are read-only, under "Only an owner or admin can
+ * change this flow."; Edit setup still opens Set up, read-only too.
+ *
  * A client component only because it holds pending state and the last refusal;
  * the work happens in server actions. A refusal is shown rather than
  * swallowed.
@@ -50,6 +55,7 @@ export function AutomationActions({
   subscription,
   setupHref,
   webhook,
+  canManage = true,
 }: {
   /** The workspace this page shows; every action is refused once it is not active. */
   workspaceId: string;
@@ -59,6 +65,8 @@ export function AutomationActions({
   setupHref: string | null;
   /** A webhook-started version, for an owner or admin. */
   webhook: boolean;
+  /** An owner or admin: a member's controls are read-only. */
+  canManage?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -96,12 +104,20 @@ export function AutomationActions({
 
   return (
     <div className={`flex flex-col ${SPACING.group.gap}`}>
+      {canManage ? null : (
+        <p
+          data-testid="flow-change-admin-only"
+          className="text-xs text-[var(--muted)]"
+        >
+          {FLOW_CHANGE_ADMIN_ONLY}
+        </p>
+      )}
       {subscription.status === "live" ? (
         <div>
           <Button
             variant="secondary"
             size="sm"
-            disabled={pending}
+            disabled={pending || !canManage}
             onClick={() =>
               run(
                 setSubscriptionStatus,
@@ -156,7 +172,7 @@ export function AutomationActions({
         <Button
           variant="danger"
           size="sm"
-          disabled={pending}
+          disabled={pending || !canManage}
           onClick={() => {
             setError(null);
             setArchiving(true);

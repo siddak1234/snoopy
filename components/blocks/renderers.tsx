@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
 import { CaretDownIcon } from "@phosphor-icons/react/dist/ssr/CaretDown";
 import { CaretRightIcon } from "@phosphor-icons/react/dist/ssr/CaretRight";
+import { GithubLogoIcon } from "@phosphor-icons/react/dist/ssr/GithubLogo";
+import { GlobeIcon } from "@phosphor-icons/react/dist/ssr/Globe";
+import { LinkedinLogoIcon } from "@phosphor-icons/react/dist/ssr/LinkedinLogo";
+import { XLogoIcon } from "@phosphor-icons/react/dist/ssr/XLogo";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { PageRow } from "@/components/dashboard/PageRow";
 import { SectionTitle } from "@/components/dashboard/SectionTitle";
@@ -497,6 +501,67 @@ export function LinkBlock({ block }: { block: BlockOf<"link"> }) {
         className="shrink-0 text-[var(--muted)]"
       />
     </a>
+  );
+}
+
+/**
+ * A links button's mark, by its `brand` (backend ADR-0048 amendment 5): the
+ * icon set's LinkedIn, GitHub and X logos, bundled with the site; `site`, no
+ * brand, or one with no logo here, the globe.
+ */
+const BRAND_ICONS = {
+  linkedin: LinkedinLogoIcon,
+  github: GithubLogoIcon,
+  x: XLogoIcon,
+} as const;
+
+const brandOf = (brand: unknown): keyof typeof BRAND_ICONS | "globe" =>
+  typeof brand === "string" && Object.hasOwn(BRAND_ICONS, brand)
+    ? (brand as keyof typeof BRAND_ICONS)
+    : "globe";
+
+/**
+ * links (backend ADR-0048 amendment 5): full-width pill buttons, one under
+ * another, each its brand's mark and its label, opening outside as a link
+ * does — https only, checked again here; any other address is its label
+ * alone, with no press.
+ */
+export function LinksBlock({ block }: { block: BlockOf<"links"> }) {
+  return (
+    <ul
+      data-testid="block-links"
+      className={`flex flex-col ${SPACING.inner.gap}`}
+    >
+      {block.items.map((item, index) => {
+        const link = httpsLink(item.url);
+        const brand = brandOf(item.brand);
+        const Mark = brand === "globe" ? GlobeIcon : BRAND_ICONS[brand];
+        return (
+          <li key={`${item.label}-${index}`}>
+            {link ? (
+              <a
+                data-testid="block-links-item"
+                data-brand={brand}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex w-full items-center justify-center ${SPACING.inner.gap} rounded-full border border-[var(--ring)] ${ROW} text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-hover)]`}
+              >
+                <Mark size={20} aria-hidden className="shrink-0" />
+                <span className="min-w-0 truncate">{item.label}</span>
+              </a>
+            ) : (
+              <p
+                data-testid="block-links-item"
+                className="text-sm text-[var(--text)]"
+              >
+                {item.label}
+              </p>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

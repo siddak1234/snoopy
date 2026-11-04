@@ -278,7 +278,11 @@ export function ConnectionsPanel({
             // button: nothing to connect or disconnect (platform round 2's B5).
             const keyless = isKeyless(provider.authType);
             const state = connectionState(connection, provider.authType);
-            const line = connectionLine(connection, provider.authType);
+            const line = connectionLine(
+              connection,
+              provider.authType,
+              provider.displayName,
+            );
             const action = connectionAction(state);
             const failed = rowError?.providerId === provider.providerId;
             return (

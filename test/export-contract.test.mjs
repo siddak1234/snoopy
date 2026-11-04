@@ -120,10 +120,10 @@ test("the complete export is started once, followed, and its link asked for agai
   );
   assert.match(contract, /components\["schemas"\]\["WorkspaceExportJob"\]/u);
   // A link is signed for minutes, so the one used is read at the click — never
-  // one kept from when the file became ready.
+  // one kept from when the file became ready; each part's alike (§12.1 #181).
   assert.match(
     complete,
-    /const download = async \(\): Promise<string \| null> => \{[\s\S]*?const result = await readCompleteExport\(workspaceId, job\.id\)[\s\S]*?return result\.job\.file && !followSignedLink\(result\.job\.file\.downloadUrl\)\s*\? DOWNLOAD_FAILED\s*: null;/u,
+    /const download = \(index: number\) => async \(\): Promise<string \| null> => \{[\s\S]*?const result = await readCompleteExport\(workspaceId, job\.id\)[\s\S]*?const file = exportFiles\(result\.job\)\[index\];\s*return file && !followSignedLink\(file\.downloadUrl\)\s*\? DOWNLOAD_FAILED\s*: null;/u,
   );
   // An https link only (Build 25, the review's R5c 2): never assigned directly.
   assert.doesNotMatch(complete, /window\.location\.assign/u);

@@ -320,7 +320,7 @@ test("the flow page reads top to bottom: its name and status, Dashboard, Steps �
   assert.doesNotMatch(code(actions), /newer|MoveVersion|is available/u);
 });
 
-test("the dashboard reads top to bottom: Today, the approvals banner while something waits, Add a flow and Flows, Recent runs and See all — the first run in their place; no Run a flow, Quick actions, Workspace overview, Get started, View teams or Connect integration (W1; the owner's build 21 item 1; D4, D6)", () => {
+test("the dashboard reads top to bottom: Today, the approvals banner while something waits, Add a flow and Flows, YOUR FLOWS — the first run in their place; no Recent runs, Run a flow, Quick actions, Workspace overview, Get started, View teams or Connect integration (W1; the owner's build 21 item 1; D4, D6; build 34's F5)", () => {
   const home = read("app/account/page.tsx");
   const at = (pattern) => home.search(pattern);
   const order = [
@@ -329,7 +329,7 @@ test("the dashboard reads top to bottom: Today, the approvals banner while somet
     at(/item needs" : "items need"\}\s*your review/u),
     at(/Exceptions your agents held for judgment/u),
     at(/data-testid="home-quick-actions"/u),
-    at(/title="Recent runs"/u),
+    at(/title=\{YOUR_FLOWS\}/u),
   ];
   assert.ok(
     order.every((index) => index > 0),
@@ -339,14 +339,15 @@ test("the dashboard reads top to bottom: Today, the approvals banner while somet
     [...order].sort((a, b) => a - b),
     order,
   );
-  // Both buttons to Flows, and four recent runs with See all.
+  // Both buttons to Flows; YOUR FLOWS from the one subscriptions list, no
+  // runs read (build 34's F5).
   assert.equal(
     home.match(/href="\/account\/flows"/gu)?.length,
     3,
     "Add a flow and Flows, and the first run's Add a flow",
   );
-  assert.match(home, /const RECENT_RUNS = 4;/u);
-  assert.match(home, /href="\/account\/runs"[\s\S]*?See all/u);
+  assert.match(home, /figure\(\(\) => listSubscriptions\(workspaceId\)\)/u);
+  assert.doesNotMatch(code(home), /listRuns|RECENT_RUNS|Recent runs|See all/u);
   // The banner only while something waits; the first run in the buttons' and
   // runs' place.
   assert.match(home, /\{home && home\.pending > 0 \? \(/u);

@@ -32,7 +32,9 @@ import type {
   RunOrigin,
   RunPackageFile,
 } from "@/lib/automations";
+import { disconnectedName } from "@/lib/connection-rows";
 import { formatDateTimeMediumUTC as formatWhen } from "@/lib/date";
+import { itemPath } from "@/lib/flow-items";
 import { flowPath } from "@/lib/flow-steps";
 import {
   PlatformApiError,
@@ -52,6 +54,7 @@ import {
   BLOCKS_SHAPE,
   RUN_DETAILS,
   RUN_REREAD_MS,
+  expiredByDisconnect,
   heldDecision,
   mayDecide,
   newestApproval,
@@ -61,6 +64,7 @@ import {
   reviewTally,
   runDetailsPath,
   runDuration,
+  runPagePath,
   runLabel,
   stepsDone,
   trackerRows,
@@ -90,6 +94,8 @@ const ORIGIN_LABEL: Record<RunOrigin, string> = {
  */
 export type RunFlow = {
   name: string;
+  /** Each connection's name by its `providerId`, as the catalog lists it: what an approval a disconnect expired names. */
+  providerNames?: Readonly<Record<string, string>>;
   /** The file fields of the version the flow runs, in order: what names a run's files ("Resume"). */
   fileFields?: { control: string; title: string }[];
   /** What the flow calls its verdicts ("Advance", "Decline"): the score's chip (`verdictChip`). */
@@ -141,9 +147,12 @@ export function RunLive({
   approvals,
   role,
   view,
+  fromItem = false,
 }: {
   /** Which page: the run's own, or its details (build 28, item 9). */
   view: "run" | "details";
+  /** Opened from its job's page (`?from=item`, G1): back goes there. */
+  fromItem?: boolean;
   workspaceId: string;
   initial: RunDetail;
   flow: RunFlow;
@@ -229,6 +238,18 @@ export function RunLive({
   }, [owed, approvalReads, workspaceId, run.id, view]);
 
   const name = headed && run.title ? run.title : runLabel(run.id);
+  // The job's approval, expired because its connection was disconnected at
+  // the provider (§12.1 #252): its words, in the provider's name
+  // (`disconnectedName`: QuickBooks is "QuickBooks").
+  // Stage 2 (BUILD-PLAN 29.4.6; §12.1 #252 approval half): the platform does not send this before Stage 2.
+  const expired = expiredByDisconnect(
+    newestApproval(run.id, listed),
+    (providerId) =>
+      disconnectedName(
+        providerId,
+        flow?.providerNames?.[providerId] ?? providerId,
+      ),
+  );
 
   // The decision where the job waits (Build 24, P6; build 28's review,
   // finding 1: not one tap more): one press, or a review's Save review
@@ -283,7 +304,7 @@ export function RunLive({
       <SectionCard
         title={RUN_DETAILS}
         subheader={name}
-        back={<BackLink href={`/account/runs/${encodeURIComponent(run.id)}`} />}
+        back={<BackLink href={runPagePath(run.id, fromItem)} />}
         primaryAction={<StatusPill status={run.status} />}
       >
         <Group>
@@ -335,7 +356,15 @@ export function RunLive({
     <SectionCard
       title={name}
       subheader={flow?.name ?? run.templateId}
-      back={<BackLink href="/account/runs" />}
+      back={
+        <BackLink
+          href={
+            fromItem && run.itemId
+              ? itemPath(run.subscriptionId, run.itemId)
+              : "/account/runs"
+          }
+        />
+      }
       primaryAction={
         <>
           {headed && run.score !== undefined ? (
@@ -349,8 +378,21 @@ export function RunLive({
       }
     >
       {/* The body, as the platform sent it: the run's files, its result
-          line and what is to decide, then what it read (ADR-0048). */}
+          line and what is to decide, then what it read (ADR-0048). Over it,
+          an approval a disconnect expired says so (§12.1 #252). */}
       <Group>
+        {expired ? (
+          <div
+            data-testid="run-expired"
+            role="status"
+            className={`${SPACING.group.bottom} flex flex-col ${SPACING.inner.gap}`}
+          >
+            <p className="text-sm font-medium text-[var(--warning-text)]">
+              {expired.title}
+            </p>
+            <p className="text-sm text-[var(--muted)]">{expired.next}</p>
+          </div>
+        ) : null}
         <BlockList
           blocks={detail.blocks}
           testId="run-blocks"
@@ -373,7 +415,10 @@ export function RunLive({
             <PackageActions workspaceId={workspaceId} runId={run.id} view />
           </div>
         ) : null}
-        <PageRow href={runDetailsPath(run.id)} testId="run-details-row">
+        <PageRow
+          href={runDetailsPath(run.id, fromItem)}
+          testId="run-details-row"
+        >
           <span className="font-medium text-[var(--text)]">{RUN_DETAILS}</span>
         </PageRow>
         <div
