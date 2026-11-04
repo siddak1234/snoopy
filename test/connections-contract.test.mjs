@@ -86,9 +86,9 @@ test("connection mutations consume generated operation response types", () => {
 });
 
 test("the connection UI renders only contract-declared auth modes and credential fields", () => {
-  assert.match(spec, /enum:\s*\[oauth2, api-key\]/);
+  assert.match(spec, /enum:\s*\[oauth2, api-key, smart-backend\]/);
   assert.match(spec, /credentialFields:/);
-  assert.match(generated, /authType:\s*"oauth2" \| "api-key"/);
+  assert.match(generated, /authType:\s*"oauth2" \| "api-key" \| "smart-backend"/);
   assert.match(generated, /credentialFields\?:/);
 });
 
