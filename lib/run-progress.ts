@@ -127,7 +127,6 @@ export const OPTIONS_LIMIT = 3;
  * gives (the run page's passes `disconnectedName`'s, in
  * `lib/connection-rows.ts`); `null` for any other approval, and for a reason
  * this build does not know, which reads as a plain expiry.
- * Stage 2 (BUILD-PLAN 29.4.6; §12.1 #252 approval half): the platform does not send this before Stage 2.
  */
 export function expiredByDisconnect(
   approval:
@@ -146,6 +145,26 @@ export function expiredByDisconnect(
     title: `Expired · ${provider} was disconnected`,
     next: `Reconnect ${provider}, then start the run again.`,
   };
+}
+
+/**
+ * An Approve the platform refused because a disconnect expired its approval
+ * (409 `approval_expired` with `expiredBy` `connection-disconnected`, S1-8b;
+ * the platform has already saved the expiry): the provider it names. `null`
+ * for any other refusal — a plain expiry, or a reason this build does not
+ * know, included.
+ */
+export function approveExpiredBy(
+  status: number,
+  details: Record<string, unknown> | undefined,
+): string | null {
+  if (status !== 409 || details?.reason !== "approval_expired") return null;
+  const by = details.expiredBy as
+    { reason?: unknown; providerId?: unknown } | undefined;
+  return by?.reason === "connection-disconnected" &&
+    typeof by.providerId === "string"
+    ? by.providerId
+    : null;
 }
 
 /** Approvals' card for a review: it opens the run. */

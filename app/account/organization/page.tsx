@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
+import { listWorkspaceDocuments } from "@/lib/agreements";
+import { DOCUMENTS } from "@/lib/health-agreement";
 import {
   administers,
   listOrganizationDomains,
@@ -14,6 +16,7 @@ import { OrgMemberList } from "@/components/dashboard/OrgMemberList";
 import { OrgJoinRequestList } from "@/components/dashboard/OrgJoinRequestList";
 import { OrgJoinLink } from "@/components/dashboard/OrgJoinLink";
 import { OrgDomainOnly } from "@/components/dashboard/OrgDomainOnly";
+import { OrgDocumentList } from "@/components/dashboard/OrgDocumentList";
 import { joinLinkLine } from "@/lib/join-link";
 import { Group } from "@/components/dashboard/Group";
 import { SectionTitle } from "@/components/dashboard/SectionTitle";
@@ -41,10 +44,13 @@ export default async function OrganizationPage() {
   );
   if (!workspace) redirect("/account");
 
-  const [rawMembers, domains, joinRequests] = await Promise.all([
+  // The Documents list is one read with the page (backend ADR-0049); a
+  // document's copy is read only on its own page.
+  const [rawMembers, domains, joinRequests, documents] = await Promise.all([
     listWorkspaceMembers(workspace.id),
     listOrganizationDomains(workspace.id),
     listJoinRequests(workspace.id),
+    listWorkspaceDocuments(workspace.id),
   ]);
   const members: OrgMember[] = rawMembers.map((member) => ({
     userId: member.userId,
@@ -99,6 +105,11 @@ export default async function OrganizationPage() {
       </Group>
 
       {/* Each list keeps its own title gap: the band and its title only. */}
+      <section className={GROUP_BAND}>
+        <SectionTitle>{DOCUMENTS}</SectionTitle>
+        <OrgDocumentList documents={documents} />
+      </section>
+
       <section className={GROUP_BAND}>
         <SectionTitle>Members</SectionTitle>
         <OrgMemberList

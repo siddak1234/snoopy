@@ -241,7 +241,6 @@ export function RunLive({
   // The job's approval, expired because its connection was disconnected at
   // the provider (§12.1 #252): its words, in the provider's name
   // (`disconnectedName`: QuickBooks is "QuickBooks").
-  // Stage 2 (BUILD-PLAN 29.4.6; §12.1 #252 approval half): the platform does not send this before Stage 2.
   const expired = expiredByDisconnect(
     newestApproval(run.id, listed),
     (providerId) =>
@@ -254,9 +253,9 @@ export function RunLive({
   // The decision where the job waits (Build 24, P6; build 28's review,
   // finding 1: not one tap more): one press, or a review's Save review
   // (`review`, Round 21's F2), then the page is drawn again — running on, or
-  // Denied.
+  // Denied. None once a disconnect expired the approval: its words say so.
   const decisionForm = (form: QuestionForm) =>
-    form.approvalId ? (
+    form.approvalId && !expired ? (
       <div data-testid="run-decision">
         <ApprovalDecision
           approvalId={form.approvalId}

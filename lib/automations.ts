@@ -234,17 +234,19 @@ export function readRunStats(
  * server actions decide what to send and what a refusal means, and nothing else.
  */
 
+/**
+ * The key is the caller's, one per press of Add: an add refused for the
+ * health data agreement is sent again under it once the owner accepts
+ * (backend ADR-0049; a refused add recorded none).
+ */
 export function createSubscription(
   workspaceId: string,
   body: CreateSubscriptionRequest,
+  idempotencyKey: string,
 ): Promise<CreateSubscriptionResponse> {
   return platformServerJson<CreateSubscriptionResponse>(
     `${scope(workspaceId)}/subscriptions`,
-    {
-      method: "POST",
-      body: JSON.stringify(body),
-      idempotencyKey: newIdempotencyKey("subscribe"),
-    },
+    { method: "POST", body: JSON.stringify(body), idempotencyKey },
   );
 }
 

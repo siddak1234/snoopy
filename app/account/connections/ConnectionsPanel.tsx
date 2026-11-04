@@ -10,7 +10,6 @@ import {
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
-import { FormInput } from "@/components/ui/FormInput";
 import Modal from "@/components/ui/Modal";
 import {
   ConnectionMark,
@@ -28,7 +27,9 @@ import {
   isKeyless,
 } from "@/lib/connection-rows";
 import type { Connection, OfferedProvider } from "@/lib/connections";
+import { opensKeyForm } from "@/lib/smart-backend";
 import { connectProviderWithKey, disconnectConnection } from "./actions";
+import { KeyFields } from "./KeyFields";
 import {
   PENDING_CONNECT,
   takeConnectReturn,
@@ -65,7 +66,8 @@ const noSubscription = () => () => {};
  * told who can change them (register F8); the server refuses them either way.
  *
  * Connect and Reconnect go through the provider at once — Reconnect keeps the
- * account (backend ADR-0019 §4) — and a key provider's opens its key form. A
+ * account (backend ADR-0019 §4) — and a key provider's, or the EHR's (backend
+ * ADR-0050), opens its key form (`KeyFields`). A
  * connect started on a flow's page (`returnTo`) comes back to it. **Disconnect
  * asks first**, saying what it stops: "{n} live flows use it. They stop until
  * you connect it again."
@@ -173,7 +175,7 @@ export function ConnectionsPanel({
       setDisconnecting(provider);
       return;
     }
-    if (provider.authType === "api-key") {
+    if (opensKeyForm(provider.authType)) {
       // This is intentionally browser-memory only: it identifies one explicit
       // connect intent, but neither it nor any credential is persisted.
       setConnectionIntentKey(`connection-${crypto.randomUUID()}`);
@@ -424,18 +426,7 @@ export function ConnectionsPanel({
               name="idempotencyKey"
               value={connectionIntentKey ?? ""}
             />
-            {selectedProvider.credentialFields?.map((field) => (
-              <FormInput
-                key={field.name}
-                id={`credential-${field.name}`}
-                name={`credential:${field.name}`}
-                type={field.secret ? "password" : "text"}
-                label={field.label}
-                hint={field.help}
-                required
-                autoComplete="off"
-              />
-            ))}
+            <KeyFields provider={selectedProvider} />
             <FormError message={error} />
             {retryWithSameIntent ? (
               <p className="text-xs text-[var(--muted)]">

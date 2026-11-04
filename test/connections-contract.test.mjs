@@ -86,9 +86,12 @@ test("connection mutations consume generated operation response types", () => {
 });
 
 test("the connection UI renders only contract-declared auth modes and credential fields", () => {
-  assert.match(spec, /enum:\s*\[oauth2, api-key\]/);
+  assert.match(spec, /enum:\s*\[oauth2, api-key, smart-backend\]/);
   assert.match(spec, /credentialFields:/);
-  assert.match(generated, /authType:\s*"oauth2" \| "api-key"/);
+  assert.match(
+    generated,
+    /authType:\s*"oauth2" \| "api-key" \| "smart-backend"/,
+  );
   assert.match(generated, /credentialFields\?:/);
 });
 
@@ -118,11 +121,18 @@ test("pasted-key retries preserve one client intent and send its key as a header
 });
 
 test("provider help is rendered from declared credential fields without scope claims", () => {
-  assert.match(panel, /hint=\{field\.help\}/);
-  assert.doesNotMatch(
-    panel,
-    /Mail-Send-only|live-verified|scopes are verified/iu,
+  // The key form's fields are KeyFields' (Round 21, Stage 2's D1), drawn by the panel.
+  const fields = readFileSync(
+    resolve(import.meta.dirname, "../app/account/connections/KeyFields.tsx"),
+    "utf8",
   );
+  assert.match(panel, /<KeyFields provider=\{selectedProvider\} \/>/);
+  assert.match(fields, /hint=\{field\.help\}/);
+  for (const source of [panel, fields])
+    assert.doesNotMatch(
+      source,
+      /Mail-Send-only|live-verified|scopes are verified/iu,
+    );
 });
 
 test("every connection status has a dashboard tone", () => {

@@ -78,6 +78,7 @@
 - `/account/flows/[subscriptionId]/setup`: [app/account/flows/[subscriptionId]/setup/page.tsx](../app/account/flows/[subscriptionId]/setup/page.tsx)
 - `/account/flows/[subscriptionId]/vendor`: [app/account/flows/[subscriptionId]/vendor/page.tsx](../app/account/flows/[subscriptionId]/vendor/page.tsx)
 - `/account/flows`: [app/account/flows/page.tsx](../app/account/flows/page.tsx)
+- `/account/organization/documents/[documentId]`: [app/account/organization/documents/[documentId]/page.tsx](../app/account/organization/documents/[documentId]/page.tsx)
 - `/account/organization`: [app/account/organization/page.tsx](../app/account/organization/page.tsx)
 - `/account`: [app/account/page.tsx](../app/account/page.tsx)
 - `/account/runs/[runId]/details`: [app/account/runs/[runId]/details/page.tsx](../app/account/runs/[runId]/details/page.tsx)
@@ -100,6 +101,7 @@
 
 ### lib
 
+- [lib/agreements.ts](../lib/agreements.ts): The health data agreement and a workspace's Documents, as the website reads
 - [lib/app-session.ts](../lib/app-session.ts): no header
 - [lib/auth-callback-errors.ts](../lib/auth-callback-errors.ts): A sign-in or a link that came back refused, by the callback's reason (the
 - [lib/automations.ts](../lib/automations.ts): no header
@@ -121,6 +123,7 @@
 - [lib/flow-email.ts](../lib/flow-email.ts): Who a flow's run emails go to, as the website draws it (Build 22, P1 and P5;
 - [lib/flow-items.ts](../lib/flow-items.ts): A flow's ITEMS as the website draws them (Round 19, plan §5; backend
 - [lib/flow-steps.ts](../lib/flow-steps.ts): A flow page's STEPS and its vendor choices (Build 21, spec A6; Build 22,
+- [lib/health-agreement.ts](../lib/health-agreement.ts): The health data agreement (a Business Associate Agreement; backend
 - [lib/held-flow.ts](../lib/held-flow.ts): A workspace holds each flow once (the owner, build 12's #9): Personal is one
 - [lib/join-link.ts](../lib/join-link.ts): The line under Copy join link (the owner's build 9, decision 5): what the
 - [lib/nav.ts](../lib/nav.ts): Single source of truth for marketing navigation.
@@ -138,6 +141,7 @@
 - [lib/several-files.ts](../lib/several-files.ts): Several files in one upload (Round 21, platform round 2's B2 as the batch
 - [lib/signed-link.ts](../lib/signed-link.ts): A signed link the browser goes to (Build 25, the review's R5c 2): the run
 - [lib/site.ts](../lib/site.ts): no header
+- [lib/smart-backend.ts](../lib/smart-backend.ts): Connect your EHR (backend ADR-0050, D1; the owner's item 1 of 2026-11-03:
 - [lib/spacing.ts](../lib/spacing.ts): The spacing table (backend `BLOCK_SPACING`, ADR-0048 amendment 1; the
 - [lib/subscription-entitlements.ts](../lib/subscription-entitlements.ts): no header
 - [lib/team-types.ts](../lib/team-types.ts): The team kinds (the owner, build 7: "project types should just be teams or
@@ -150,7 +154,9 @@
 - [e2e/account-surfaces.spec.ts](../e2e/account-surfaces.spec.ts): no header
 - [e2e/connection-callback.spec.ts](../e2e/connection-callback.spec.ts): no header
 - [e2e/dialogs.spec.ts](../e2e/dialogs.spec.ts): no header
+- [e2e/ehr-connect.spec.ts](../e2e/ehr-connect.spec.ts): no header
 - [e2e/flow-items.spec.ts](../e2e/flow-items.spec.ts): no header
+- [e2e/health-data.spec.ts](../e2e/health-data.spec.ts): no header
 - [e2e/keyboard-journey.spec.ts](../e2e/keyboard-journey.spec.ts): The owner's NFR-35 keyboard traversal, by hand — not an automated assertion:
 - [e2e/marketing.visual.spec.ts](../e2e/marketing.visual.spec.ts): Marketing is intentionally static and design-owned. These snapshots protect
 - [e2e/public-edge-fixture.spec.ts](../e2e/public-edge-fixture.spec.ts): no header

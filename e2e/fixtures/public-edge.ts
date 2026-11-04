@@ -23,6 +23,16 @@ import type {
 const { itemBody, runBlocks } = (await import(
   new URL("./page-bodies.ts", import.meta.url).href
 )) as typeof import("./page-bodies");
+// Round 21, Stage 2's health data surfaces, by their own path as well.
+const {
+  ehrConnections,
+  ehrProviders,
+  healthControls,
+  healthRoute,
+  healthState,
+} = (await import(
+  new URL("./health-data.ts", import.meta.url).href
+)) as typeof import("./health-data");
 
 const port = Number(process.env.FIXTURE_EDGE_PORT ?? "3443");
 const certificate = process.env.FIXTURE_EDGE_CERT;
@@ -450,6 +460,8 @@ function initialState() {
     pictureFailing: 0,
     entryFileLinkGone: false,
     packageFailing: false,
+    // Round 21, Stage 2 (e2e/fixtures/health-data.ts).
+    health: healthState(),
   };
 }
 let state = initialState();
@@ -2991,6 +3003,7 @@ const server = createServer(
       "/__fixture/domain-claim-refused-once": () => {
         state.domainClaimsRefused = 1;
       },
+      ...healthControls(state.health, url),
     };
     const control =
       request.method === "POST" ? controls[url.pathname] : undefined;
@@ -3064,6 +3077,8 @@ const server = createServer(
         runsQueries: state.runsQueries,
         // Backend §12.1 #319: every flow read by its id.
         subscriptionReads: state.subscriptionReads,
+        // Round 21, Stage 2: each add, run, acceptance and connect it saw.
+        health: state.health,
       });
     }
     if (
@@ -4080,6 +4095,7 @@ const server = createServer(
           oauthProvider,
           quickbooksProvider,
           googleProvider,
+          ...ehrProviders(state.health),
         ],
         ...(state.publicProviders ? { publicProviders: [nppesProvider] } : {}),
       } satisfies ConnectionOperations["listConnectionProviders"]["responses"][200]["content"]["application/json"]);
@@ -4094,6 +4110,7 @@ const server = createServer(
           ...(state.fixtureConnectionCreated ? [connection] : []),
           ...(state.quickbooksConnected ? [quickbooksConnection()] : []),
           ...(state.googleConnected ? [googleConnection()] : []),
+          ...ehrConnections(state.health, workspaceId),
         ],
       } satisfies ConnectionOperations["listConnections"]["responses"][200]["content"]["application/json"]);
     }
@@ -4225,6 +4242,24 @@ const server = createServer(
         answer satisfies ConnectionOperations["beginConnectionAuthorization"]["responses"][200]["content"]["application/json"],
       );
     }
+    // Round 21, Stage 2 (e2e/fixtures/health-data.ts): ahead of the routes
+    // it refuses first.
+    if (
+      await healthRoute({
+        health: state.health,
+        method,
+        pathname,
+        workspaceId,
+        organizationName: workspace.name,
+        session: fixtureSession,
+        request,
+        response,
+        respond,
+        problem,
+        requestJson,
+      })
+    )
+      return;
     if (method === "POST" && isWorkspacePath(pathname, "/connections/key")) {
       const rawIdempotencyKey = request.headers["idempotency-key"];
       const idempotencyKey = Array.isArray(rawIdempotencyKey)
