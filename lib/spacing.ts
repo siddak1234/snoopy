@@ -36,6 +36,7 @@ export const SPACING = {
     x: "gap-x-2",
     y: "gap-y-2",
     py: "py-2",
+    pt: "pt-2",
     pb: "pb-2",
   },
   /** A row's top and bottom padding: 12. */

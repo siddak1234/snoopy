@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { after, before, test } from "node:test";
 import { BLOCK_FIXTURES } from "../lib/generated/platform-contracts/block-fixtures.ts";
+import { SPACING } from "../lib/spacing.ts";
 import {
   elements,
   loadBlocks,
@@ -324,6 +325,47 @@ test("section: its own box, closed unless open, its title, subtitle and chip on 
     "Experience",
     "Inside two",
   ]);
+});
+
+test("section: its entries apart with a divider line, `inner` above and below it — none above the first, none under a label, none between a page's blocks (the owner's build 31 G3)", () => {
+  const nodes = tree([
+    {
+      type: "section",
+      title: "Contact",
+      open: true,
+      blocks: [
+        {
+          type: "link",
+          title: "LinkedIn",
+          url: "https://www.linkedin.com/in/someone",
+        },
+        { type: "link", title: "GitHub", url: "https://github.com/someone" },
+        { type: "text", text: "Other", style: "label" },
+        { type: "text", text: "A site" },
+      ],
+    },
+    { type: "text", text: "After" },
+  ]);
+  const tagged = (node) => node.children.filter((child) => child.tag);
+  const classes = (node) => (node.attrs.class ?? "").split(/\s+/u);
+  const lined = (node) =>
+    classes(node).includes("border-t") &&
+    classes(node).includes("border-[var(--ring)]");
+  // Each entry's own wrapper: the page's under `blocks`, the section's under its box.
+  const page = tagged(byTest(nodes, "blocks")[0]);
+  const [section] = byTest(nodes, "block-section");
+  const box = section.children.find((node) => node.tag === "div");
+  const entries = tagged(tagged(box)[0]);
+  assert.equal(entries.length, 4);
+  assert.deepEqual(entries.map(lined), [false, true, true, false]);
+  for (const entry of entries.slice(1, 3)) {
+    assert.ok(classes(entry).includes(SPACING.inner.top), entry.attrs.class);
+    assert.ok(classes(entry).includes(SPACING.inner.pt), entry.attrs.class);
+    assert.ok(!classes(entry).includes(SPACING.group.top), entry.attrs.class);
+  }
+  assert.ok(classes(entries[3]).includes(SPACING.title.top));
+  assert.deepEqual(page.map(lined), [false, false]);
+  assert.ok(classes(page[1]).includes(SPACING.group.top), page[1].attrs.class);
 });
 
 test("file: its row, its title alone, to the run's file page or the item's — an item's only where the page names its flow", () => {
@@ -1036,7 +1078,10 @@ test("a block whose renderer throws in the browser: its boundary draws the fallb
     /<BlockBoundary type=\{typeOf\(block\)\} block=\{block\}>\s*\{drawBlock\(block, context, inner\)\}\s*<\/BlockBoundary>/u,
   );
   // Nested blocks are drawn by the same `Blocks`, so each is wrapped too.
-  assert.match(source, /<Blocks blocks=\{within\} context=\{context\} \/>/u);
+  assert.match(
+    source,
+    /<Blocks blocks=\{within\} context=\{context\} nested \/>/u,
+  );
   assert.match(read(ENTRY), /^"use client";/u);
 });
 

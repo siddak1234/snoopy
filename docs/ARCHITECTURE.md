@@ -159,7 +159,8 @@ page reuses:
   list card the rows. A title sits `title` above what it heads and `group`
   below what came before it — a form's title ("Add candidate") and a label
   block ("Candidates") alike (F3); a group of related rows is one card with
-  dividers; nothing above the first group. `test/spacing.test.mjs` holds it:
+  dividers; a section's blocks have a divider line between them, none under
+  a label (the owner's build 31 G3); nothing above the first group. `test/spacing.test.mjs` holds it:
   every padding, margin and gap class under components/ and app/account is
   one of the table's, but for older classes counted file by file in
   `test/spacing-baseline.json`, which only goes down and names nothing under
