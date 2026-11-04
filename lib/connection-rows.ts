@@ -66,6 +66,19 @@ export function disconnectedIn(provider: string): string {
 }
 
 /**
+ * The provider's name in the disconnect lines — this row's and a held job's
+ * expired approval's (S1-8): QuickBooks is "QuickBooks", where the catalog
+ * lists "QuickBooks Online"; any other provider keeps the name the catalog
+ * lists. The app's `disconnectedName` (`snoopy-mobile/lib/content/screen-states.ts`).
+ */
+export function disconnectedName(
+  providerId: string,
+  listedName: string,
+): string {
+  return providerId === "quickbooks" ? "QuickBooks" : listedName;
+}
+
+/**
  * A connection's state, as the row says it: connected; needing attention —
  * the platform asks for a new sign-in (`reauthorization-required`, backend
  * §12.1 #175), holds an `errorCode`, or was disconnected at the provider
@@ -160,7 +173,7 @@ export function connectionFor<C extends RowConnection>(
  * names no email), else the state in a word;
  * "Needs attention" in the warning colour; a public service (`isKeyless`),
  * "Connected"; one disconnected at the provider, "Disconnected in
- * {provider}" in the warning colour, its button Reconnect.
+ * {provider}" (`disconnectedName`) in the warning colour, its button Reconnect.
  */
 export function connectionLine(
   connection: RowConnection | undefined,
@@ -171,8 +184,11 @@ export function connectionLine(
   tone: "muted" | "warn";
 } {
   if (isKeyless(authType)) return { text: CONNECTION_CONNECTED, tone: "muted" };
-  if (disconnectedAtProvider(connection) && provider)
-    return { text: disconnectedIn(provider), tone: "warn" };
+  if (connection && disconnectedAtProvider(connection) && provider)
+    return {
+      text: disconnectedIn(disconnectedName(connection.providerId, provider)),
+      tone: "warn",
+    };
   const state = connectionState(connection);
   const name = connection?.externalAccount.displayName ?? "";
   if (state !== "not-connected" && name.includes("@"))

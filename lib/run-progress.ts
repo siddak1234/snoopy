@@ -123,9 +123,10 @@ export const OPTIONS_LIMIT = 3;
 /**
  * A held job's approval a disconnect expired before its time (backend §12.1
  * #252, `Approval.expiredBy`): the connection its held run was built on was
- * disconnected at the provider. Its two lines, in the provider's name; `null`
- * for any other approval, and for a reason this build does not know, which
- * reads as a plain expiry.
+ * disconnected at the provider. Its two lines, in the name `providerName`
+ * gives (the run page's passes `disconnectedName`'s, in
+ * `lib/connection-rows.ts`); `null` for any other approval, and for a reason
+ * this build does not know, which reads as a plain expiry.
  */
 export function expiredByDisconnect(
   approval:

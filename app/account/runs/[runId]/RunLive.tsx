@@ -32,6 +32,7 @@ import type {
   RunOrigin,
   RunPackageFile,
 } from "@/lib/automations";
+import { disconnectedName } from "@/lib/connection-rows";
 import { formatDateTimeMediumUTC as formatWhen } from "@/lib/date";
 import { itemPath } from "@/lib/flow-items";
 import { flowPath } from "@/lib/flow-steps";
@@ -238,10 +239,15 @@ export function RunLive({
 
   const name = headed && run.title ? run.title : runLabel(run.id);
   // The job's approval, expired because its connection was disconnected at
-  // the provider (§12.1 #252): its words, in the catalog's name for it.
+  // the provider (§12.1 #252): its words, in the provider's name
+  // (`disconnectedName`: QuickBooks is "QuickBooks").
   const expired = expiredByDisconnect(
     newestApproval(run.id, listed),
-    (providerId) => flow?.providerNames?.[providerId] ?? providerId,
+    (providerId) =>
+      disconnectedName(
+        providerId,
+        flow?.providerNames?.[providerId] ?? providerId,
+      ),
   );
 
   // The decision where the job waits (Build 24, P6; build 28's review,

@@ -309,7 +309,9 @@ connection the platform retired because the provider would not renew it (backend
 `disconnected`, with the `errorCode` the refresh loop sets when it retires
 one) says "Disconnected in {provider}" in the warning colour, with
 Reconnect, on Connections and a step's vendor rows (`disconnectedAtProvider`
-in `lib/connection-rows.ts`); one disconnected here carries no `errorCode`
+in `lib/connection-rows.ts`). It names QuickBooks "QuickBooks", where the
+catalog lists "QuickBooks Online", and any other provider as the catalog
+lists it (`disconnectedName`); one disconnected here carries no `errorCode`
 and stays "Not connected" with Connect. QuickBooks' Disconnect URL is the
 static `/quickbooks/disconnected` ("QuickBooks is disconnected", its
 "Reconnect QuickBooks" opening Connections), which the owner sets at
@@ -418,8 +420,8 @@ section 3, the app's too.
 A held job whose approval a disconnect expired (backend §12.1 #252,
 `Approval.expiredBy` with `connection-disconnected`) says so over its run
 page's body: "Expired · {provider} was disconnected", then "Reconnect
-{provider}, then start the run again." — the provider named as the catalog
-lists the flow's connections (`expiredByDisconnect` in
+{provider}, then start the run again." — the provider named as the
+connection row names it (`disconnectedName`; `expiredByDisconnect` in
 `lib/run-progress.ts`). A plain expiry, or a reason this build does not
 know, adds nothing.
 

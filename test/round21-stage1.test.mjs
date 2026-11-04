@@ -16,6 +16,7 @@ import {
   connectionLine,
   connectionState,
   disconnectedAtProvider,
+  disconnectedName,
 } from "../lib/connection-rows.ts";
 import { EMAIL_STATUS, addressStatus } from "../lib/flow-email.ts";
 import {
@@ -467,7 +468,11 @@ test('S1-7: each extra address says its consent — "Waiting for confirmation", 
 
 const RUN_ID = "0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a";
 
-/** A held run's page, its job's newest approval expired with `approval`'s fields. */
+/**
+ * A held run's page, its job's newest approval expired with `approval`'s
+ * fields; the catalog lists QuickBooks as the platform does, "QuickBooks
+ * Online", and Google as "Google".
+ */
 async function heldRunPage(approval) {
   const { RunLive } = await load(RUN);
   return tree(
@@ -490,7 +495,7 @@ async function heldRunPage(approval) {
       },
       flow: {
         name: "Invoice Processing",
-        providerNames: { quickbooks: "QuickBooks" },
+        providerNames: { quickbooks: "QuickBooks Online", google: "Google" },
         pipeline: [],
       },
       approvals: [
@@ -509,7 +514,9 @@ async function heldRunPage(approval) {
 }
 
 test('S1-8: an approval a disconnect expired says "Expired · QuickBooks was disconnected" and "Reconnect QuickBooks, then start the run again." over the run\'s body; a plain expiry, or a reason this build does not know, says nothing more', async () => {
-  const names = (id) => ({ quickbooks: "QuickBooks" })[id] ?? id;
+  // The name as the run page gives it: the catalog's, through disconnectedName.
+  const names = (id) =>
+    disconnectedName(id, { quickbooks: "QuickBooks Online" }[id] ?? id);
   const expired = {
     status: "expired",
     expiredBy: { reason: "connection-disconnected", providerId: "quickbooks" },
@@ -540,6 +547,17 @@ test('S1-8: an approval a disconnect expired says "Expired · QuickBooks was dis
     "Expired · QuickBooks was disconnected",
     "Reconnect QuickBooks, then start the run again.",
   ]);
+  // Any other provider keeps the name the catalog lists.
+  const google = await heldRunPage({
+    expiredBy: { reason: "connection-disconnected", providerId: "google" },
+  });
+  const [googleNotice] = google.filter(
+    (node) => node.attrs["data-testid"] === "run-expired",
+  );
+  assert.deepEqual(textsOf(googleNotice), [
+    "Expired · Google was disconnected",
+    "Reconnect Google, then start the run again.",
+  ]);
   const plain = await heldRunPage({});
   assert.equal(
     plain.filter((node) => node.attrs["data-testid"] === "run-expired").length,
@@ -560,10 +578,21 @@ test('S1-8: a connection disconnected at the provider (disconnected, with the er
   assert.equal(disconnectedAtProvider(retired), true);
   assert.equal(connectionState(retired), "attention");
   assert.equal(connectionAction(connectionState(retired)), "Reconnect");
-  assert.deepEqual(connectionLine(retired, "oauth2", "QuickBooks"), {
+  // The catalog lists "QuickBooks Online"; the line says "QuickBooks", the
+  // spec's word. Any other provider keeps the name the catalog lists.
+  assert.equal(
+    disconnectedName("quickbooks", "QuickBooks Online"),
+    "QuickBooks",
+  );
+  assert.equal(disconnectedName("google", "Google"), "Google");
+  assert.deepEqual(connectionLine(retired, "oauth2", "QuickBooks Online"), {
     text: "Disconnected in QuickBooks",
     tone: "warn",
   });
+  assert.deepEqual(
+    connectionLine({ ...retired, providerId: "google" }, "oauth2", "Google"),
+    { text: "Disconnected in Google", tone: "warn" },
+  );
   const ours = connection("disconnected");
   assert.equal(disconnectedAtProvider(ours), false);
   assert.equal(connectionState(ours), "not-connected");
