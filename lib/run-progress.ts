@@ -127,6 +127,7 @@ export const OPTIONS_LIMIT = 3;
  * gives (the run page's passes `disconnectedName`'s, in
  * `lib/connection-rows.ts`); `null` for any other approval, and for a reason
  * this build does not know, which reads as a plain expiry.
+ * Stage 2 (BUILD-PLAN 29.4.6; §12.1 #252 approval half): the platform does not send this before Stage 2.
  */
 export function expiredByDisconnect(
   approval:

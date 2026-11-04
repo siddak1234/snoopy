@@ -47,6 +47,7 @@ export default async function AccountLayout({
     if (error.status === 401) redirect(SIGN_IN);
     // A domain-only organization refusing a sign-in outside its domains, at
     // session resolve (§12.1 #221): its screen, with each sign-in to remove.
+    // Stage 2 (BUILD-PLAN 29.4.6; §12.1 #221): the platform does not send this before Stage 2.
     const outside = outsideSignIns(error.status, error.details);
     if (outside) return <OutsideSignIn providers={outside} />;
     return (

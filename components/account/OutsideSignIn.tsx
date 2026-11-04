@@ -21,6 +21,7 @@ import { PAGE_CARD, SPACING } from "@/lib/spacing";
  * its verified domains. A press removes that sign-in (`unlinkLoginIdentity`,
  * as Settings' linked accounts do) and reads the area again; a refusal is
  * said in Settings' words; nothing is removed until a press.
+ * Stage 2 (BUILD-PLAN 29.4.6; §12.1 #221): the platform does not send this before Stage 2.
  */
 export function OutsideSignIn({ providers }: { providers: Provider[] }) {
   const router = useRouter();

@@ -38,6 +38,7 @@ export function removeSignIn(provider: OutsideSignIn): string {
  * The sign-ins to remove, when a refusal is the outside-domain one: a 403
  * whose `details.reason` is `outside_org_domain`, its `providers` each once,
  * those this build knows. `null` for any other refusal, or one naming none.
+ * Stage 2 (BUILD-PLAN 29.4.6; §12.1 #221): the platform does not send this before Stage 2.
  */
 export function outsideSignIns(
   status: number,
