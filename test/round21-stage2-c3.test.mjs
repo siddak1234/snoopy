@@ -3,6 +3,7 @@ import { after, test } from "node:test";
 import {
   ACCEPT_AND_ADD,
   ACCEPT_AND_START,
+  ADDING,
   AGREEMENT_NOT_PUBLISHED,
   AGREEMENT_TITLE,
   ASK_OWNER,
@@ -10,6 +11,7 @@ import {
   NO_DOCUMENTS,
   SIGNER_NAME,
   SIGNER_TITLE,
+  STARTING,
   acceptedBy,
   agreementRequired,
   agreementVersion,
@@ -53,6 +55,11 @@ test("C3 words: the spec's, byte for byte, as the app says them", () => {
   assert.equal(SIGNER_TITLE, "Title");
   assert.equal(ACCEPT_AND_ADD, "Accept and add flow");
   assert.equal(ACCEPT_AND_START, "Accept and start run");
+  // While it accepts and sends again: Add's and Start run's own words, which
+  // the app adopts (finding 6), drawn from here alone.
+  assert.equal(ADDING, "Adding…");
+  assert.equal(STARTING, "Starting…");
+  assert.doesNotMatch(code(DIALOG), /"(?:Adding|Starting|Working)…"/u);
   assert.equal(
     ASK_OWNER,
     "Ask your workspace owner to accept the health data agreement.",

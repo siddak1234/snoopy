@@ -328,7 +328,7 @@ Nothing secret is pasted: the platform signs with its own key for that
 vendor. An address it will not use is said by its reason ("Use the https
 address your EHR team gave you.", "That address didn't answer as a FHIR
 server.", "Your EHR hasn't turned on Autom8x yet. Ask your EHR team to
-activate it."; `smartBackendRefusal`), and its row, connected, names the
+activate it."; `smartBackendRefusal`; the app's too), and its row, connected, names the
 clinic's host (`connectionLine`). A flow step that offers the EHR sends an
 owner or admin to Connections, as any vendor that is not OAuth.
 
@@ -371,7 +371,7 @@ the text. The owner gets one dialog (`app/account/flows/HealthAgreementDialog.ts
 "Health data agreement", "Version {n}", the text to scroll, "I'm authorized
 to sign for {organization}", Full name and Title, and "Accept and add flow"
 or "Accept and start run" (Start run, and an item's upload: its dialog opens
-over the upload card), which accepts once, under the dialog's own key, then
+over the upload card), "Adding…" or "Starting…" while it works, which accepts once, under the dialog's own key, then
 sends the add, the run or the item again under the key the refused one
 carried (`AddAutomation`, `RunStart`, `UploadItemCard`), so a lost answer
 adds or starts nothing twice; a press after that repeat was refused sends

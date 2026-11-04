@@ -143,7 +143,7 @@ test("D1: the key form draws the vendors as one choice named for the provider, t
   );
 });
 
-test("D1: an address the platform will not use is said by its reason, in the spec's words; any other refusal keeps the platform's", () => {
+test("D1: an address the platform will not use is said by its reason, in the spec's words — all three, which the app adds too (finding 6); any other refusal keeps the platform's", () => {
   assert.deepEqual(SMART_BACKEND_REFUSALS, {
     fhir_address_refused: "Use the https address your EHR team gave you.",
     fhir_not_answering: "That address didn't answer as a FHIR server.",

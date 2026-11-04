@@ -8,9 +8,11 @@ import Modal from "@/components/ui/Modal";
 import {
   ACCEPT_AND_ADD,
   ACCEPT_AND_START,
+  ADDING,
   AGREEMENT_TITLE,
   SIGNER_NAME,
   SIGNER_TITLE,
+  STARTING,
   acceptThenRepeat,
   agreementVersion,
   authorizedToSign,
@@ -156,10 +158,10 @@ export function HealthAgreementDialog({
           <Button type="submit" disabled={pending}>
             {purpose === "add"
               ? pending
-                ? "Adding…"
+                ? ADDING
                 : ACCEPT_AND_ADD
               : pending
-                ? "Starting…"
+                ? STARTING
                 : ACCEPT_AND_START}
           </Button>
         </div>

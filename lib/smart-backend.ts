@@ -37,7 +37,12 @@ export function vendorField(provider: {
   return vendors.length === 1 ? { kind: "fixed", id: vendors[0].id } : null;
 }
 
-/** The connect refusals the platform names for a FHIR address (`connectProviderWithKey`'s 400), in words. */
+/**
+ * The connect refusals the platform names for a FHIR address
+ * (`connectProviderWithKey`'s 400), in the spec's words — all three, as
+ * drawn here; the app adds them too (the session's decision of Round 21,
+ * Stage 2's review, finding 6).
+ */
 export const SMART_BACKEND_REFUSALS: Record<string, string> = {
   fhir_address_refused: "Use the https address your EHR team gave you.",
   fhir_not_answering: "That address didn't answer as a FHIR server.",

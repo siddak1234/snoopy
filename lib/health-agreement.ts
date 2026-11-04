@@ -21,6 +21,13 @@ export const SIGNER_NAME = "Full name";
 export const SIGNER_TITLE = "Title";
 export const ACCEPT_AND_ADD = "Accept and add flow";
 export const ACCEPT_AND_START = "Accept and start run";
+/**
+ * The button while it accepts and sends the add, or the run, again: the
+ * words Add and Start run already say while they wait, the app's too (the
+ * session's decision of Round 21, Stage 2's review, finding 6).
+ */
+export const ADDING = "Adding…";
+export const STARTING = "Starting…";
 /** Anyone but the workspace's owner, refused: the one line, and nothing more. */
 export const ASK_OWNER =
   "Ask your workspace owner to accept the health data agreement.";
