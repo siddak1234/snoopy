@@ -265,7 +265,7 @@ secret provisioning belongs to the deployment configuration round, not here.
 | `npm run build` | Production build |
 | `npm run build:no-backend` | The build a Vercel preview makes: no `BACKEND_API_ORIGIN` |
 | `npm run probe:no-backend` | Serve that build as a preview does, and check what a visitor gets |
-| `npm run test:contracts` | Public-contract and boundary behavior tests, and the common kit's own (`scripts/kit/kit.test.mjs`) |
+| `npm run test:contracts` | Public-contract and boundary behavior tests, and the common kit's own (`scripts/kit/kit.test.mjs`, its scratch repositories kept off an inherited `GIT_DIR`: snoopy-backend §12.1 #342) |
 | `npm run check:docs` | Each changed area's doc changed with it, and each fact in one place (`docs/docs-map.json`) |
 | `npm run map` | Rebuild `docs/MAP.md` from the tree; `-- --check` fails when it is stale |
 | `npm run generate:platform-contracts` | Regenerate the typed client from `../snoopy-backend`'s published contracts, its block fixtures, its block rules (`block-rules.ts`: the words, the spacing table and the search and sort cases) and each block type's required fields (`block-required.ts`) |

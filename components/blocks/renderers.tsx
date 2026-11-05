@@ -5,6 +5,7 @@ import { GithubLogoIcon } from "@phosphor-icons/react/dist/ssr/GithubLogo";
 import { GlobeIcon } from "@phosphor-icons/react/dist/ssr/Globe";
 import { LinkedinLogoIcon } from "@phosphor-icons/react/dist/ssr/LinkedinLogo";
 import { XLogoIcon } from "@phosphor-icons/react/dist/ssr/XLogo";
+import { HuggingFaceLogo } from "@/components/ui/HuggingFaceLogo";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { PageRow } from "@/components/dashboard/PageRow";
 import { SectionTitle } from "@/components/dashboard/SectionTitle";
@@ -506,13 +507,16 @@ export function LinkBlock({ block }: { block: BlockOf<"link"> }) {
 
 /**
  * A links button's mark, by its `brand` (backend ADR-0048 amendment 5): the
- * icon set's LinkedIn, GitHub and X logos, bundled with the site; `site`, no
- * brand, or one with no logo here, the globe.
+ * icon set's LinkedIn, GitHub and X logos, bundled with the site, and Hugging
+ * Face's own logo (`HuggingFaceLogo`, the owner's F3 of 2026-11-04), each in
+ * the button's text colour; `site`, no brand, or one with no mark here, the
+ * globe.
  */
 const BRAND_ICONS = {
   linkedin: LinkedinLogoIcon,
   github: GithubLogoIcon,
   x: XLogoIcon,
+  huggingface: HuggingFaceLogo,
 } as const;
 
 const brandOf = (brand: unknown): keyof typeof BRAND_ICONS | "globe" =>

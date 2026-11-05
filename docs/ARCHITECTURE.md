@@ -239,10 +239,14 @@ page reuses:
   once; a list is one card of divided rows, each score in its `valueTone`
   (green or red, the run's verdict) beside its chip. Since block set 5
   (ADR-0048 amendment 5), fourteen: a `links` block is full-width pill
-  buttons, one under another, each its `brand`'s mark from the icon set
-  (LinkedIn, GitHub, X; `site`, none, or one with no mark here, the globe)
-  and its label, opening outside, https only as a `link` is. The
-  flow page draws its parts in `Subscription.pages.flow` order (`pageParts`),
+  buttons, one under another, each its `brand`'s mark and its label,
+  opening outside, https only as a `link` is. The marks are the icon set's
+  LinkedIn, GitHub and X, and Hugging Face's own monochrome logo
+  (`components/ui/HuggingFaceLogo.tsx`, its official file kept as
+  `public/vendors/hf-logo-monochrome.svg`, the owner's F3 of 2026-11-04),
+  each in the text colour; `site`, none, or one with no mark here, the
+  globe. The flow page draws its parts in `Subscription.pages.flow` order
+  (`pageParts`),
   else today's. No page reads documents, sections, details or a flow's
   document, verdict or run words (`test/no-flow-code.test.mjs`), and both
   clients draw every block fixture to its words (`test/blocks-parity.test.mjs`).
@@ -272,7 +276,11 @@ page reuses:
   press, and no Share, which reads the one-file export alone
   (`exportFiles` in `lib/export-contract.ts`); its line says "Or export
   every record. A large workspace comes as several files, each kept for a
-  day."
+  day." Its ready, partial, removed and too-large lines say "the export",
+  one file or several: "Ready. The export holds the whole workspace.",
+  "…and the export says which.", "That export has been removed. Export
+  again for a new one." and "The workspace is larger than one export may
+  be." (the owner's F2, 2026-11-04), as the app's.
 - **A run's score** is in its verdict's colour (the owner's F1 and Q5):
   the positive green and the negative red, with the flow's word for it as a
   chip ("Advance", "Decline"; `RunScore`, `lib/run-verdict.ts`, the one

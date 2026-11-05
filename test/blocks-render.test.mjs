@@ -503,7 +503,7 @@ test("links: full-width pill buttons, one under another, each its brand's mark a
         "https://huggingface.co/jane",
         "_blank",
         "noopener noreferrer",
-        "globe",
+        "huggingface",
       ],
       ["a", "https://jane.example/", "_blank", "noopener noreferrer", "globe"],
       [
@@ -524,6 +524,41 @@ test("links: full-width pill buttons, one under another, each its brand's mark a
     assert.equal(pill.children[0].tag, "svg");
     assert.equal(pill.children[0].attrs["aria-hidden"], "true");
   }
+  // Hugging Face's own logo (the owner's F3, 2026-11-04: "logo, i said
+  // logo."): its official monochrome file's five paths, in order, each in the
+  // text colour as the other marks.
+  const [huggingFace] = items.filter(
+    (node) => node.attrs["data-brand"] === "huggingface",
+  );
+  const mark = huggingFace.children[0];
+  assert.equal(mark.tag, "svg");
+  assert.equal(mark.attrs.viewBox, "0 0 1500 1500");
+  assert.equal(mark.attrs["aria-hidden"], "true");
+  const filePaths = [
+    ...read("public/vendors/hf-logo-monochrome.svg").matchAll(
+      /<path\b([^>]*?)\/?>/gu,
+    ),
+  ].map(([, attrs]) =>
+    Object.fromEntries(
+      [...attrs.matchAll(/([a-z-]+)="([^"]*)"/gu)].map(([, name, value]) => [
+        name,
+        value,
+      ]),
+    ),
+  );
+  assert.equal(filePaths.length, 5);
+  assert.deepEqual(
+    mark.children
+      .filter((child) => child.tag === "path")
+      .map((path) => path.attrs),
+    filePaths.map((path) => ({
+      ...(path["fill-rule"]
+        ? { "fill-rule": path["fill-rule"], "clip-rule": path["clip-rule"] }
+        : {}),
+      d: path.d,
+      fill: "currentColor",
+    })),
+  );
 });
 
 test("timeline: each step its state's look — the running one spinning — and a state this build does not know the unknown look", () => {

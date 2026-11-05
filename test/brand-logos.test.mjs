@@ -33,6 +33,10 @@ test("every bundled vendor file is held to its sha256 — the symbol the app bun
     // snoopy-mobile assets/vendors/quickbooks-symbol.png's sha256.
     "public/vendors/quickbooks-symbol.png":
       "616e1f163e195b6267d2ff92735a40db13f83ca04c42af97060b702694ecaf9b",
+    // Hugging Face's brand assets' hf-logo-monochrome.svg at dataset revision
+    // 233827f4, its LFS oid (the owner's F3, 2026-11-04).
+    "public/vendors/hf-logo-monochrome.svg":
+      "87ac947dc4f0a9146fcd42aad52b657909bef9860eb284c651a6690e935e0595",
   });
   for (const [path, expected] of Object.entries(BRAND_FILE_SHA256)) {
     assert.equal(sha256(read(path)), expected, path);
