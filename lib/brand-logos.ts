@@ -13,13 +13,13 @@
  * - `QuickBooksLogo` — the round QuickBooks symbol, cropped square from
  *   Intuit's preferred logo file the site already bundled, its pixels
  *   unchanged (`QUICKBOOKS_SYMBOL` records the source and the crop; the test
- *   holds both files' sha256). The app's file, byte for byte (snoopy-mobile
- *   `assets/vendors/quickbooks-symbol.png`). ~~The full logo on the row,
+ *   holds both files' sha256). The app's file, byte for byte
+ *   (`snoopy-mobile/assets/vendors/quickbooks-symbol.png`). ~~The full logo on the row,
  *   Intuit's "Connect to QuickBooks" button image and "Disconnect from
  *   QuickBooks"~~ until Build 21: Intuit's rules bind apps listed on the
  *   QuickBooks App Store, and Autom8x is not.
  * - `GoogleLogo` — the design's own Google glyph (`components/ui/ProviderGlyph.tsx`),
- *   in the row's text colour (backend `providers/google.json`, the session's S29).
+ *   in the row's text colour (`snoopy-backend/providers/google.json`, the session's S29).
  * - Any other name: the icon set, as before.
  *
  * No React and no `@/` import here: the unit test loads this file as it is.
@@ -65,6 +65,12 @@ export const BRAND_FILE_SHA256 = {
   // QUICKBOOKS_SYMBOL's crop of the first, as the app bundles it.
   "public/vendors/quickbooks-symbol.png":
     "616e1f163e195b6267d2ff92735a40db13f83ca04c42af97060b702694ecaf9b",
+  // https://huggingface.co/datasets/huggingface/brand-assets/resolve/233827f481bf0f0f413795f1f3cd1b131f77e55a/hf-logo-monochrome.svg
+  // — Hugging Face's official monochrome logo, drawn inline by
+  // `components/ui/HuggingFaceLogo.tsx`; the app's `assets/vendors/` file, byte
+  // for byte.
+  "public/vendors/hf-logo-monochrome.svg":
+    "87ac947dc4f0a9146fcd42aad52b657909bef9860eb284c651a6690e935e0595",
 } as const;
 
 /**

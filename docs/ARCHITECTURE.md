@@ -239,8 +239,11 @@ page reuses:
   once; a list is one card of divided rows, each score in its `valueTone`
   (green or red, the run's verdict) beside its chip. Since block set 5
   (ADR-0048 amendment 5), fourteen: a `links` block is full-width pill
-  buttons, one under another, each its `brand`'s mark from the icon set
-  (LinkedIn, GitHub, X; `site`, none, or one with no mark here, the globe)
+  buttons, one under another, each its `brand`'s mark: the icon set's
+  LinkedIn, GitHub and X, and Hugging Face's own monochrome logo
+  (`components/ui/HuggingFaceLogo.tsx`, its official file kept as
+  `public/vendors/hf-logo-monochrome.svg`, the owner's F3 of 2026-11-04),
+  each in the text colour; `site`, none, or one with no mark here, the globe
   and its label, opening outside, https only as a `link` is. The
   flow page draws its parts in `Subscription.pages.flow` order (`pageParts`),
   else today's. No page reads documents, sections, details or a flow's
