@@ -272,7 +272,11 @@ page reuses:
   press, and no Share, which reads the one-file export alone
   (`exportFiles` in `lib/export-contract.ts`); its line says "Or export
   every record. A large workspace comes as several files, each kept for a
-  day."
+  day." Its ready, partial, removed and too-large lines say "the export",
+  one file or several: "Ready. The export holds the whole workspace.",
+  "…and the export says which.", "That export has been removed. Export
+  again for a new one." and "The workspace is larger than one export may
+  be." (the owner's F2, 2026-11-04), as the app's.
 - **A run's score** is in its verdict's colour (the owner's F1 and Q5):
   the positive green and the negative red, with the flow's word for it as a
   chip ("Advance", "Decline"; `RunScore`, `lib/run-verdict.ts`, the one

@@ -875,6 +875,65 @@ test('S1-14: "Or export every record. A large workspace comes as several files, 
   ]);
 });
 
+test('S1-14 in the owner\'s words (F2, 2026-11-04: "approve plus yes to files"): one file or several, the lines say "the export"', async () => {
+  const part = (n) => ({
+    artifactId: `0000000${n}-0000-4000-8000-000000000000`,
+    filename: `workspace-export-${n}.json`,
+    sizeBytes: 10,
+    downloadUrl: `https://store.example.test/${n}`,
+    expiresAt: "2026-11-04T10:00:00Z",
+  });
+  const section = async (job) => {
+    const { CompleteExportSection } = await load(
+      "app/account/settings/CompleteExportSection.tsx",
+      (source) =>
+        source.replace(
+          "useState<WorkspaceExportJob | null>(null)",
+          `useState<WorkspaceExportJob | null>(${JSON.stringify(job)})`,
+        ),
+    );
+    return tree(draw(CompleteExportSection, { workspaceId: "w" }));
+  };
+  /** The section's `role="status"` paragraph, as one text. */
+  const statusLine = async (job) => {
+    const lines = (await section(job)).filter(
+      (node) => node.tag === "p" && node.attrs.role === "status",
+    );
+    assert.equal(lines.length, 1);
+    return textsOf(lines[0]).join("");
+  };
+  const createdAt = "2026-11-03T10:00:00Z";
+  const cases = [
+    [
+      {
+        id: "e",
+        status: "ready",
+        createdAt,
+        complete: true,
+        files: [part(1), part(2)],
+      },
+      "Ready. The export holds the whole workspace.",
+    ],
+    [
+      { id: "e", status: "ready", createdAt, complete: false, file: part(1) },
+      "Ready, but partial: a part of the workspace could not be read, and the export says which.",
+    ],
+    [
+      { id: "e", status: "failed", createdAt, failureReason: "too_large" },
+      "The workspace is larger than one export may be.",
+    ],
+    [
+      { id: "e", status: "expired", createdAt },
+      "That export has been removed. Export again for a new one.",
+    ],
+  ];
+  for (const [job, words] of cases) {
+    const line = await statusLine(job);
+    assert.equal(line, words);
+    assert.doesNotMatch(line, /\bfile\b/u);
+  }
+});
+
 test("S1-15: a connected row with no email names the company its grant belongs to, in Connected's place; an email still comes first, and a row that is not connected says its state", () => {
   const connection = (extra = {}) => ({
     id: "c",

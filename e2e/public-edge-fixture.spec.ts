@@ -3748,7 +3748,7 @@ test.describe("the complete export (backend §12.1 #39)", () => {
     ).toBeDisabled();
     // Read as running once, then ready: the page asks again on its own.
     await expect(
-      page.getByText("Ready. The file holds the whole workspace."),
+      page.getByText("Ready. The export holds the whole workspace."),
     ).toBeVisible({ timeout: 15_000 });
     await expectNoAxeViolations(page);
     const download = page.waitForEvent("download");
@@ -3770,7 +3770,7 @@ test.describe("the complete export (backend §12.1 #39)", () => {
     await page.goto("/account/settings");
     await page.getByRole("button", { name: "Export everything" }).click();
     await expect(
-      page.getByText("Ready. The file holds the whole workspace."),
+      page.getByText("Ready. The export holds the whole workspace."),
     ).toBeVisible({ timeout: 15_000 });
     const share = page
       .getByTestId("complete-export-actions")
@@ -3802,7 +3802,7 @@ test.describe("the complete export (backend §12.1 #39)", () => {
       const title = await page.title();
       await page.getByRole("button", { name: "Export everything" }).click();
       await expect(
-        page.getByText("Ready. The file holds the whole workspace."),
+        page.getByText("Ready. The export holds the whole workspace."),
       ).toBeVisible({ timeout: 15_000 });
       await page.getByRole("button", { name: "Download file" }).click();
       await expect(
@@ -3821,7 +3821,7 @@ test.describe("the complete export (backend §12.1 #39)", () => {
     const start = page.getByRole("button", { name: "Export everything" });
     for (const [reason, words] of [
       ["interrupted", "The export was interrupted. Start it again."],
-      ["too_large", "The workspace is larger than one export file may be."],
+      ["too_large", "The workspace is larger than one export may be."],
       ["not_configured", "Exports are not available here."],
       // A reason the page does not name, and none at all.
       ["store_refused", "The export could not be made."],
@@ -3851,11 +3851,11 @@ test.describe("the complete export (backend §12.1 #39)", () => {
     await page.getByRole("button", { name: "Export everything" }).click();
     await expect(
       page.getByText(
-        "Ready, but partial: a part of the workspace could not be read, and the file says which.",
+        "Ready, but partial: a part of the workspace could not be read, and the export says which.",
       ),
     ).toBeVisible({ timeout: 15_000 });
     await expect(
-      page.getByText("Ready. The file holds the whole workspace."),
+      page.getByText("Ready. The export holds the whole workspace."),
     ).toHaveCount(0);
     const download = page.waitForEvent("download");
     await page.getByRole("button", { name: "Download file" }).click();
@@ -3890,7 +3890,7 @@ test.describe("the complete export (backend §12.1 #39)", () => {
     await page.goto("/account/settings");
     await page.getByRole("button", { name: "Export everything" }).click();
     await expect(
-      page.getByText("Ready. The file holds the whole workspace."),
+      page.getByText("Ready. The export holds the whole workspace."),
     ).toBeVisible({ timeout: 15_000 });
     await fixtureControl("export-read-failing");
     await page.getByRole("button", { name: "Download file" }).click();
@@ -3914,7 +3914,7 @@ test.describe("the complete export (backend §12.1 #39)", () => {
     await page.goto("/account/settings");
     await page.getByRole("button", { name: "Export everything" }).click();
     await expect(
-      page.getByText("Ready. The file holds the whole workspace."),
+      page.getByText("Ready. The export holds the whole workspace."),
     ).toBeVisible({ timeout: 15_000 });
     const other = await context.newPage();
     try {
@@ -3947,12 +3947,12 @@ test("a complete export's file that has been removed is said so, and nothing is 
   await page.goto("/account/settings");
   await page.getByRole("button", { name: "Export everything" }).click();
   await expect(
-    page.getByText("Ready. The file holds the whole workspace."),
+    page.getByText("Ready. The export holds the whole workspace."),
   ).toBeVisible({ timeout: 15_000 });
   await fixtureControl("export-expired");
   await page.getByRole("button", { name: "Download file" }).click();
   await expect(
-    page.getByText("That file has been removed. Export again for a new one."),
+    page.getByText("That export has been removed. Export again for a new one."),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Download file" })).toHaveCount(
     0,
@@ -3973,7 +3973,7 @@ test.describe("following a complete export when a read of it fails (backend §12
     await fixtureControl("export-read-failing-once");
     await page.getByRole("button", { name: "Export everything" }).click();
     await expect(
-      page.getByText("Ready. The file holds the whole workspace."),
+      page.getByText("Ready. The export holds the whole workspace."),
     ).toBeVisible({ timeout: 20_000 });
     await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
   });
@@ -3993,7 +3993,7 @@ test.describe("following a complete export when a read of it fails (backend §12
       await route.abort();
     });
     await expect(
-      page.getByText("Ready. The file holds the whole workspace."),
+      page.getByText("Ready. The export holds the whole workspace."),
     ).toBeVisible({ timeout: 20_000 });
     expect(failed).toBe(true);
   });
@@ -4014,7 +4014,7 @@ test.describe("following a complete export when a read of it fails (backend §12
     await fixtureControl("export-read-failing-once");
     await again.click();
     await expect(
-      page.getByText("Ready. The file holds the whole workspace."),
+      page.getByText("Ready. The export holds the whole workspace."),
     ).toBeVisible({ timeout: 20_000 });
   });
 

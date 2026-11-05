@@ -31,7 +31,7 @@ const FAILED_READS_ALLOWED = 3;
 /** A reason code the platform names, in words. */
 const FAILURES: Record<string, string> = {
   interrupted: "The export was interrupted. Start it again.",
-  too_large: "The workspace is larger than one export file may be.",
+  too_large: "The workspace is larger than one export may be.",
   not_configured: "Exports are not available here.",
 };
 
@@ -172,13 +172,13 @@ export function CompleteExportSection({
       >
         {job?.status === "ready"
           ? job.complete
-            ? "Ready. The file holds the whole workspace."
-            : "Ready, but partial: a part of the workspace could not be read, and the file says which."
+            ? "Ready. The export holds the whole workspace."
+            : "Ready, but partial: a part of the workspace could not be read, and the export says which."
           : job?.status === "failed"
             ? (FAILURES[job.failureReason ?? ""] ??
               "The export could not be made.")
             : job?.status === "expired"
-              ? "That file has been removed. Export again for a new one."
+              ? "That export has been removed. Export again for a new one."
               : null}
       </p>
       <FormError message={error} className={SPACING.inner.top} />
