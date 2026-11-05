@@ -401,8 +401,9 @@ documents yet." (`components/dashboard/OrgDocumentList.tsx`). A row opens
 the signed copy's page (`app/account/organization/documents/[documentId]/page.tsx`),
 the only place the copy is read; a document that is not this workspace's,
 or an id that is not one (the platform's 400), is "not found". The organization page is its owners' and
-admins' (register F55), so on the website the list is theirs, though the
-platform lets any member read it.
+admins' (register F55), and so are both reads: the platform refuses a
+member 403 for the list and for a copy (backend ADR-0049 amendment 1,
+snoopy-backend #269).
 
 The fixture Edge (`e2e/fixtures/health-data.ts`) answers these refusals
 as the published contract says. The platform's own — `agreement_required`
