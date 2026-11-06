@@ -57,6 +57,7 @@ import { pageParts } from "@/components/blocks/look";
 import { AutomationActions } from "../AutomationActions";
 import { FlowDashboard } from "../FlowDashboard";
 import { FlowItems } from "../FlowItems";
+import { FROM_FLOW } from "@/lib/run-progress";
 import { RunStart } from "../RunStart";
 import { placeOf } from "../place";
 import { owedLines, vendorPath } from "../vendor-path";
@@ -320,6 +321,8 @@ export default async function FlowPage(
         canGoLive={subscription.unmetConnections.length === 0}
         initialKey={newIdempotencyKey("run")}
         canChange={canManage}
+        // Its run's page opens from here: back returns to this page.
+        from={FROM_FLOW}
       />
       {owed.map((line) => (
         <p key={line.key} className="text-xs text-[var(--warning-text)]">

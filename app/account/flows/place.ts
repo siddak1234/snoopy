@@ -7,8 +7,9 @@ import type { Project } from "@/lib/tenancy";
  * kind (the owner, build 9), and a flow's team is the one of its category
  * (backend ADR-0036), so a team this person cannot list is still named by the
  * category. A flow added to the whole workspace before teams says so. Said on
- * a flow's page, its Set up and an archived flow's row (~~Home's Run a flow~~
- * until Build 22; ~~the Flows card~~ until build 34's F4).
+ * a flow's page and its Set up — pages, not cards (~~Home's Run a flow~~
+ * until Build 22; ~~the Flows card~~ until build 34's F4; ~~an archived
+ * flow's row~~ until builds 37 and 39: it is the flow card, `FlowCard`).
  */
 export function placeOf(
   projects: readonly Project[],

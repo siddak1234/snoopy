@@ -709,33 +709,72 @@ export function runLabel(id: string): string {
 /**
  * The row at the foot of every run's page, and the page it opens (the owner's
  * build 28 item 9: "a standard where run details is a component with an
- * arrow"): the steps, Duration, Steps done, Started, Ended, Trigger and the
- * Run ID — Invoice Processing's runs too. ~~All of them on the run's page~~
- * until build 28.
+ * arrow"): a run's metadata — Duration, Steps done, Started, Ended, Trigger
+ * and the Run ID — Invoice Processing's runs too. Its steps are on the run's
+ * own page, its steps face (`runFace`; the owner's builds 37 and 39, item 10:
+ * "When a run starts i want to see the steps 1-x. I just dont want to see
+ * the meta data in the bottom. That should be through the run details button
+ * for a separate page"). ~~All of them on the run's page~~ until build 28;
+ * ~~its steps here~~ until builds 37 and 39.
  */
 export const RUN_DETAILS = "Run details";
 
 /**
- * A run's page and its details page opened from its job's — an item's page
- * (the owner's G1, build 31: "Why is it that when i go back from the
- * candidate page it goes back to the activity"): `?from=item`, so their
- * back goes to that job, found by the run's own `itemId`, never by an id the
- * address names, as the app's back does. Opened anywhere else, a run's back
- * is Activity.
+ * Which face a run's page shows (the owner's builds 37 and 39, item 10, and
+ * his words of 2026-11-06: "run starts shows the steps for that run, run
+ * details in the bottom … once done you are taken to the candidates page
+ * with the extracted items and score"): its **steps** while it is pending,
+ * running or held, and when it failed or was cancelled — the failed step and
+ * its line stay in front; its **result** once it succeeded. The page turns
+ * from one to the other in place as its status moves, so its back is still
+ * where it was opened from. The app's `runFace`.
  */
-export const FROM_ITEM = "item";
+export type RunFace = "steps" | "result";
 
-const fromItemQuery = (fromItem: boolean) =>
-  fromItem ? `?from=${FROM_ITEM}` : "";
-
-/** A run's page; from its job's, so its back goes there. */
-export function runPagePath(runId: string, fromItem = false): string {
-  return `/account/runs/${encodeURIComponent(runId)}${fromItemQuery(fromItem)}`;
+export function runFace(status: RunStatus): RunFace {
+  return status === "succeeded" ? "result" : "steps";
 }
 
-/** A run's details page, under its own; from its job's, as its page was. */
-export function runDetailsPath(runId: string, fromItem = false): string {
-  return `/account/runs/${encodeURIComponent(runId)}/details${fromItemQuery(fromItem)}`;
+/**
+ * Where a run's page was opened from, in its address (`?from=`), so its back
+ * goes there: its job's page (`item`; the owner's G1, build 31: "Why is it
+ * that when i go back from the candidate page it goes back to the
+ * activity"), found by the run's own `itemId`, never by an id the address
+ * names, as the app's back does; or its flow's page (`flow`; the owner's
+ * words of 2026-11-06), for a run started on Home or a flow's page of a flow
+ * without items. A run started on Home on a job opens from that job, as one
+ * started on the job's page does: back is all candidates, back again all
+ * jobs. Opened anywhere else — Activity, Approvals, an email — a run's back
+ * is Activity. The run's details, its file pages and its package page keep
+ * it, so their back returns to the run as it was opened.
+ */
+export const FROM_ITEM = "item";
+export const FROM_FLOW = "flow";
+export type RunFrom = typeof FROM_ITEM | typeof FROM_FLOW;
+
+/** The `from` an address names, when it is one of the two; else none. */
+export function runFrom(value: unknown): RunFrom | undefined {
+  return value === FROM_ITEM || value === FROM_FLOW ? value : undefined;
+}
+
+/** The query that carries it: "?from=item", "?from=flow", or nothing. */
+export function fromQuery(from: RunFrom | undefined): string {
+  return from ? `?from=${from}` : "";
+}
+
+/** A run's page, opened from `from`, so its back goes there. */
+export function runPagePath(runId: string, from?: RunFrom): string {
+  return `/account/runs/${encodeURIComponent(runId)}${fromQuery(from)}`;
+}
+
+/** A run's details page, under its own; from where its page was. */
+export function runDetailsPath(runId: string, from?: RunFrom): string {
+  return `/account/runs/${encodeURIComponent(runId)}/details${fromQuery(from)}`;
+}
+
+/** A run's package page, under its own; from where its page was. */
+export function runPackagePath(runId: string, from?: RunFrom): string {
+  return `/account/runs/${encodeURIComponent(runId)}/package${fromQuery(from)}`;
 }
 
 /** What became of a held run's approval, as the run's page says it (the app's `heldDecision`). */

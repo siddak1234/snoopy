@@ -112,6 +112,7 @@
 - [lib/choices.ts](../lib/choices.ts): A drop-down's words for what it holds (Round 21, the platform round's F1;
 - [lib/connection-rows.ts](../lib/connection-rows.ts): The one connection row (Build 21, spec A4; the owner's build 20 items 6 and
 - [lib/connections.ts](../lib/connections.ts): no header
+- [lib/contact-value.ts](../lib/contact-value.ts): A list row's text that is a way to reach someone (the owner's builds 37
 - [lib/cookie-header.ts](../lib/cookie-header.ts): The request's cookies as a `Cookie` header — `name=value` pairs and nothing
 - [lib/date.ts](../lib/date.ts): no header
 - [lib/domain-only.ts](../lib/domain-only.ts): An organization's domain-only setting — the owner's build 13 decision 8B: its
@@ -121,6 +122,7 @@
 - [lib/exports.ts](../lib/exports.ts): no header
 - [lib/file-view.ts](../lib/file-view.ts): no header
 - [lib/flow-email.ts](../lib/flow-email.ts): Who a flow's run emails go to, as the website draws it (Build 22, P1 and P5;
+- [lib/flow-icons.ts](../lib/flow-icons.ts): A flow's icon by the catalog's name (`AutomationCatalogEntry.icon`: "An
 - [lib/flow-items.ts](../lib/flow-items.ts): A flow's ITEMS as the website draws them (Round 19, plan §5; backend
 - [lib/flow-steps.ts](../lib/flow-steps.ts): A flow page's STEPS and its vendor choices (Build 21, spec A6; Build 22,
 - [lib/health-agreement.ts](../lib/health-agreement.ts): The health data agreement (a Business Associate Agreement; backend
@@ -189,7 +191,7 @@
 
 ### Tests
 
-- `test/`: account, automation, billing, block, blocks, boundaries, brand, browser, build21, build22, build24, build28, build34, change, connection, connections, deployed, doc, export, fixture, flow, global, kit, new, no, picture, platform, pre, repo, round19, round21, run, session, signed, spacing, structure, tenancy, upload, v2, vendor, verify
+- `test/`: account, automation, billing, block, blocks, boundaries, brand, browser, build21, build22, build24, build28, build34, builds37, change, connection, connections, deployed, doc, export, fixture, flow, global, kit, new, no, picture, platform, pre, repo, round19, round21, run, session, signed, spacing, structure, tenancy, upload, v2, vendor, verify
 
 ## Skills, agents and hooks
 

@@ -274,9 +274,10 @@ test("the package page shows the PDF itself: a frame the page's height of the si
   // Its PDF read once, for the frame and Share alike.
   assert.match(page, /<PackageFile runId=\{job\}>\{card\}<\/PackageFile>/u);
   assert.match(page, /<EmptyRow text=\{PACKAGE_UNAVAILABLE\} \/>/u);
+  // Back to its run as it was opened (`?from=`, kept: builds 37 and 39).
   assert.match(
     page,
-    /back=\{<BackLink href=\{`\/account\/runs\/\$\{encodeURIComponent\(job\)\}`\} \/>\}/u,
+    /back=\{<BackLink href=\{runPagePath\(job, runFrom\(from\)\)\} \/>\}/u,
   );
   const live = code(read(LIVE));
   assert.match(

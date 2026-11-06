@@ -14,16 +14,15 @@ import { flowsOverPlan, overPlanSentence } from "@/lib/plan-limit";
 import SectionCard from "@/components/dashboard/SectionCard";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
 import { Group } from "@/components/dashboard/Group";
+import { FlowCard } from "@/components/dashboard/FlowCard";
 import { StatusPill } from "@/components/dashboard/StatusPill";
-import { CARD, SPACING } from "@/lib/spacing";
+import { SPACING } from "@/lib/spacing";
 import { Button } from "@/components/ui/Button";
 import { flowPath } from "@/lib/flow-steps";
 import { AddAutomation } from "./AddAutomation";
 import { byDepartment } from "./departments";
-import { placeOf } from "./place";
 import {
   administers,
-  listWorkspaceProjects,
   resolveActiveWorkspaceId,
   roleInWorkspace,
 } from "@/lib/tenancy";
@@ -62,13 +61,16 @@ import {
  * **By department** (plan §3; the owner's build 28 item 1): the cards are
  * grouped under their department, the catalog's `category`, the departments
  * A–Z (`byDepartment`) — the header says it, so the card no longer does. A
- * card is its name, its description, each flow added and Add or Added ✓
- * (the owner's build 34 F4: "we do not need words like HR included and
- * Department: healthcare inside the flow component"; ~~its price,
- * "Included"~~ until then).
+ * card is the one flow card (`FlowCard`; the owner's builds 37 and 39, items
+ * 1 and 4) — its icon, name and description — then each flow added and Add
+ * or Added ✓ (the owner's build 34 F4: "we do not need words like HR
+ * included and Department: healthcare inside the flow component"; ~~its
+ * price, "Included"~~ until then).
  *
  * Archived flows are read by name (`status=archived`, backend §12.1 #203) and
- * listed last, each with the day it was archived (BUILD-PLAN 24.11.11) and
+ * listed last, each the flow card as a row — its icon, name and description,
+ * ~~its department~~ until builds 37 and 39 — with the day it was archived
+ * (BUILD-PLAN 24.11.11) and
  * Unarchive (the owner, build 12's #4): the card's own Add, which adds the
  * flow afresh — the platform's archive is one-way. A flow held again says
  * where it is instead, as its card does.
@@ -91,7 +93,7 @@ export default async function FlowsPage() {
     );
   }
 
-  const [catalog, subscriptions, archived, projects, role] = await Promise.all([
+  const [catalog, subscriptions, archived, role] = await Promise.all([
     emptyWhenUnavailable(() => listAutomations(workspaceId), {
       automations: [],
       categories: [],
@@ -100,7 +102,6 @@ export default async function FlowsPage() {
       subscriptions: [],
     }),
     emptyWhenUnavailable(() => listArchivedSubscriptions(workspaceId), []),
-    emptyWhenUnavailable(() => listWorkspaceProjects(workspaceId), []),
     roleInWorkspace(workspaceId),
   ]);
   // Only an owner or admin adds a flow (backend §12.1 #180).
@@ -124,9 +125,6 @@ export default async function FlowsPage() {
   const catalogEntry = new Map(
     catalog.automations.map((entry) => [entry.templateId, entry]),
   );
-  // An archived flow keeps the team it was in, deleted or not. A team is its
-  // kind (the owner, build 9).
-  const place = placeOf(projects, catalogEntry);
 
   return (
     <SectionCard title="Flows" subheader={SUBTITLE}>
@@ -183,51 +181,52 @@ export default async function FlowsPage() {
               const name =
                 subscription.name ?? entry?.name ?? subscription.templateId;
               // Held again, in any team or the whole workspace (#9), the row
-              // says where, as the card does, and goes to it: there is nothing
-              // to unarchive (D3's live twin).
+              // says "Added ✓", as the card does, and goes to it: there is
+              // nothing to unarchive (D3's live twin).
               const twin = heldCopy(
                 subscriptions.subscriptions,
                 subscription.templateId,
               );
               return (
-                <li
-                  key={subscription.id}
-                  className={`flex flex-wrap items-center justify-between ${SPACING.inner.gap} ${SPACING.rowY.y}`}
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-[var(--text)]">
-                      {name}
-                    </p>
-                    <p className="text-xs text-[var(--muted)]">
-                      {place(subscription)}
-                    </p>
-                  </div>
-                  <div
-                    className={`flex flex-col items-end ${SPACING.inner.gap}`}
-                  >
-                    <span className="text-xs text-[var(--muted)]">
-                      Archived {formatDay(subscription.updatedAt)}
-                    </span>
-                    {/* A flow the catalog no longer lists has no card: nothing
-                        to add afresh, and no row to go to. */}
-                    {!entry ? null : twin ? (
-                      <a
-                        href={`#flow-${twin.id}`}
-                        className="inline-flex min-h-6 items-center text-xs text-[var(--muted)] underline underline-offset-2"
-                      >
-                        Added ✓
-                      </a>
-                    ) : (
-                      <AddAutomation
-                        workspaceId={workspaceId}
-                        templateId={subscription.templateId}
-                        name={name}
-                        available={entry.available}
-                        canManage={canManage}
-                        unarchive
-                      />
-                    )}
-                  </div>
+                <li key={subscription.id} className={SPACING.rowY.y}>
+                  {/* The one flow card, a row of the list (the owner's
+                      builds 37 and 39, items 1 and 4): its icon, name and
+                      description, and the day it was archived in its pill's
+                      place. ~~"Department: {kind}" under its name~~ until
+                      then. */}
+                  <FlowCard
+                    boxed={false}
+                    testId="archived-flow"
+                    icon={entry?.icon}
+                    name={name}
+                    description={entry?.description}
+                    aside={
+                      <>
+                        <span className="text-xs text-[var(--muted)]">
+                          Archived {formatDay(subscription.updatedAt)}
+                        </span>
+                        {/* A flow the catalog no longer lists has no card:
+                            nothing to add afresh, and no row to go to. */}
+                        {!entry ? null : twin ? (
+                          <a
+                            href={`#flow-${twin.id}`}
+                            className="inline-flex min-h-6 items-center text-xs text-[var(--muted)] underline underline-offset-2"
+                          >
+                            Added ✓
+                          </a>
+                        ) : (
+                          <AddAutomation
+                            workspaceId={workspaceId}
+                            templateId={subscription.templateId}
+                            name={name}
+                            available={entry.available}
+                            canManage={canManage}
+                            unarchive
+                          />
+                        )}
+                      </>
+                    }
+                  />
                 </li>
               );
             })}
@@ -256,21 +255,14 @@ function AutomationCard({
   const held = heldCopy(subscriptions, automation.templateId);
 
   return (
-    <div className={`bubble flex flex-col ${SPACING.inner.gap} ${CARD}`}>
-      <div className={`flex items-start justify-between ${SPACING.inner.gap}`}>
-        <div className="min-w-0">
-          {/* Its department is its group's header (build 28's item 1). */}
-          <h3
-            id={`automation-${automation.templateId}-name`}
-            className="truncate text-base font-medium text-[var(--text)]"
-          >
-            {automation.name}
-          </h3>
-        </div>
-      </div>
-
-      <p className="text-sm text-[var(--muted)]">{automation.description}</p>
-
+    // The one flow card (the owner's builds 37 and 39, items 1 and 4): its
+    // icon, name and description; its department is its group's header.
+    <FlowCard
+      icon={automation.icon}
+      name={automation.name}
+      description={automation.description}
+      nameId={`automation-${automation.templateId}-name`}
+    >
       {/* `available` is evidence from a reachability probe. Saying so beats an
           Add button that fails at the first run. */}
       {!automation.available ? (
@@ -320,6 +312,6 @@ function AutomationCard({
           />
         )}
       </div>
-    </div>
+    </FlowCard>
   );
 }

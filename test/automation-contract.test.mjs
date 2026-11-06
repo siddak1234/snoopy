@@ -480,10 +480,12 @@ test("a manual run is started only from the pinned version's declared input — 
   assert.match(flowPage, /initialKey=\{newIdempotencyKey\("run"\)\}/);
   assert.match(actions, /formData\.get\("idempotencyKey"\)/);
   assert.doesNotMatch(actions, /newIdempotencyKey\("run"\)/);
-  // A started run opens its page — from the item on an item's page (G4).
+  // A started run opens its page — from the item on an item's page (G4),
+  // else from where the form says (Home's job, a flow's page: builds 37
+  // and 39).
   assert.match(
     runStart,
-    /router\.push\(runPagePath\(result\.runId, itemPage\)\)/,
+    /router\.push\(runPagePath\(result\.runId, itemPage \? FROM_ITEM : from\)\)/,
   );
 });
 
@@ -527,6 +529,12 @@ test("a card lists every subscription it has, each its status and Open, and says
     /const byTemplate = new Map<string, Subscription\[\]>\(\);/u,
   );
   const card = page.slice(page.indexOf("function AutomationCard("));
+  // The one flow card (the owner's builds 37 and 39, items 1 and 4): its
+  // icon, name and description, then each flow added.
+  assert.match(
+    card,
+    /<FlowCard\s+icon=\{automation\.icon\}\s+name=\{automation\.name\}\s+description=\{automation\.description\}/u,
+  );
   assert.match(card, /subscriptions\.map\(\(subscription\) => \(/u);
   assert.match(card, /<StatusPill status=\{subscription\.status\} \/>/u);
   assert.match(card, /aria-label=\{`Open \$\{automation\.name\}`\}/u);
@@ -735,8 +743,15 @@ test("an archived flow's row offers Unarchive — its card's own Add, named for 
     assert.match(drawn[1], prop);
   }
   assert.doesNotMatch(drawn[1], /scopes|hasTeam|canAdminister|canAskToJoin/u);
-  // Where the archived copy was, by its team's kind, or the whole workspace.
-  assert.match(row, /\{place\(subscription\)\}/u);
+  // The one flow card, as a row: its icon, name and description, the day
+  // it was archived in its pill's place — never where it was ("Department:
+  // {kind}", the owner's builds 37 and 39, items 1 and 4).
+  assert.match(
+    row,
+    /<FlowCard\s+boxed=\{false\}\s+testId="archived-flow"\s+icon=\{entry\?\.icon\}\s+name=\{name\}\s+description=\{entry\?\.description\}/u,
+  );
+  assert.match(row, /Archived \{formatDay\(subscription\.updatedAt\)\}/u);
+  assert.doesNotMatch(page, /place\(|placeOf|listWorkspaceProjects/u);
 });
 
 test("a notifications toggle says what it switches, in words (register F22)", () => {
@@ -772,7 +787,7 @@ test("a run that can still stop offers Cancel, and nothing else does (cancelRun)
   );
   assert.match(
     live,
-    /\{going \? \(\s*<CancelRunButton runId=\{run\.id\} workspaceId=\{run\.workspaceId\} \/>/u,
+    /\{going \? \(\s*<div[^>]*>\s*<CancelRunButton runId=\{run\.id\} workspaceId=\{run\.workspaceId\} \/>/u,
   );
   // The run the page showed, in the workspace it showed: after a switch in
   // another tab the same id would 404 elsewhere and read as "already stopped".

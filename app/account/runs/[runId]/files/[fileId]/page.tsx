@@ -4,7 +4,7 @@ import { BackLink } from "@/components/dashboard/BackLink";
 import { FileView } from "@/components/dashboard/FileView";
 import { getAppSession } from "@/lib/app-session";
 import { fileViewHref, runFilePath, runFileRows } from "@/lib/run-files";
-import { runLabel } from "@/lib/run-progress";
+import { runFrom, runLabel, runPagePath } from "@/lib/run-progress";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 import { readRunPage } from "../../run-page-data";
 import { Group } from "@/components/dashboard/Group";
@@ -15,7 +15,9 @@ import { Group } from "@/components/dashboard/Group";
  * other documents"): headed by the flow's word for it as its row names it
  * (`runFileRows`: "Resume", or "File" for a flow that names none), under the
  * run's; the file itself,
- * Download and Share (`FileView`). Opened from the run's "View {file}" row.
+ * Download and Share (`FileView`). Opened from the run's "View {file}" row;
+ * its back returns to the run as it was opened (`?from=`, kept: the owner's
+ * builds 37 and 39; ~~dropped, so the run's back was Activity~~ until then).
  * A file the job does not list, or another workspace's run, is the same "not
  * found".
  */
@@ -26,6 +28,7 @@ export default async function RunFilePage(
   props: PageProps<"/account/runs/[runId]/files/[fileId]">,
 ) {
   const { runId, fileId } = await props.params;
+  const { from } = await props.searchParams;
   const session = await getAppSession();
   const workspaceId = await resolveActiveWorkspaceId(session);
   if (!workspaceId) notFound();
@@ -43,7 +46,7 @@ export default async function RunFilePage(
     <SectionCard
       title={row.title}
       subheader={run.title ?? runLabel(run.id)}
-      back={<BackLink href={`/account/runs/${encodeURIComponent(run.id)}`} />}
+      back={<BackLink href={runPagePath(run.id, runFrom(from))} />}
     >
       <Group>
         <FileView

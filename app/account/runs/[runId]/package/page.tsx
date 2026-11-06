@@ -6,7 +6,7 @@ import { getAppSession } from "@/lib/app-session";
 import { readRun } from "@/lib/automations";
 import { PlatformServerError } from "@/lib/platform-server";
 import { PACKAGE_UNAVAILABLE } from "@/lib/run-documents";
-import { runLabel } from "@/lib/run-progress";
+import { runFrom, runLabel, runPagePath } from "@/lib/run-progress";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 import { PackageActions, PackageFile, PackageFrame } from "../RunLive";
 import { Group } from "@/components/dashboard/Group";
@@ -19,7 +19,8 @@ import { Group } from "@/components/dashboard/Group";
  * (`file/route.ts`; `PackageFile`), and Download PDF and Download Excel, then
  * Share, those same bytes. A job the platform cannot package yet
  * (no documents, or still going: `packageAvailable`) says so, with the way
- * back to its run.
+ * back to its run — as it was opened (`?from=`, kept: the owner's builds 37
+ * and 39).
  * ~~The package's content drawn as sections of this page~~ (the session's
  * S16), overridden by the owner: the page shows the PDF.
  */
@@ -30,6 +31,7 @@ export default async function RunPackagePage(
   props: PageProps<"/account/runs/[runId]/package">,
 ) {
   const { runId } = await props.params;
+  const { from } = await props.searchParams;
   const workspaceId = await resolveActiveWorkspaceId(await getAppSession());
   if (!workspaceId) notFound();
 
@@ -50,7 +52,7 @@ export default async function RunPackagePage(
     <SectionCard
       title="Run package"
       subheader={runLabel(job)}
-      back={<BackLink href={`/account/runs/${encodeURIComponent(job)}`} />}
+      back={<BackLink href={runPagePath(job, runFrom(from))} />}
       primaryAction={
         ready ? (
           <PackageActions workspaceId={workspaceId} runId={job} view={false} />

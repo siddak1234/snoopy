@@ -113,8 +113,11 @@ function getFirstName(name?: string | null): string | null {
  * 3. **Add a flow** and **Flows**, both to Flows, the website's one page for
  *    adding and for the flows added;
  * 4. **YOUR FLOWS** (the owner's build 34 F5), only while the workspace has
- *    a live flow — each a row that opens to its run's first step and Start
- *    run (`YourFlows`). ~~Recent runs and See all, four rows~~ until then.
+ *    a live flow — its department drop-down and search, then each flow a
+ *    card of its own, always open, with its run's first step and Start run
+ *    (`YourFlows`; the owner's builds 37 and 39, item 8). ~~Recent runs and
+ *    See all, four rows~~ until build 34; ~~a row per flow that opened in
+ *    place~~ until builds 37 and 39.
  *
  * With no flow set up, ever, the first run takes the place of 3 and 4 — the
  * app's words, and its one way in. ~~Run a flow, Quick actions (Browse flows,
@@ -219,21 +222,21 @@ export default async function AccountDashboardPage() {
             </div>
           </div>
 
-          {home.flows === null || home.flows.length > 0 ? (
+          {/* YOUR FLOWS draws its own title, with its department
+              drop-down beside it (the owner's builds 37 and 39, item 8). */}
+          {home.flows === null ? (
             <Group
               title={YOUR_FLOWS}
               titleId="your-flows-title"
               testId="home-your-flows"
             >
-              {home.flows === null ? (
-                <p className="text-sm text-[var(--muted)]">Unavailable</p>
-              ) : (
-                <YourFlows
-                  workspaceId={home.workspaceId}
-                  departments={home.flows}
-                />
-              )}
+              <p className="text-sm text-[var(--muted)]">Unavailable</p>
             </Group>
+          ) : home.flows.length > 0 ? (
+            <YourFlows
+              workspaceId={home.workspaceId}
+              departments={home.flows}
+            />
           ) : null}
         </>
       ) : null}

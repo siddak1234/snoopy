@@ -1,6 +1,11 @@
 import type { BlockOpen } from "@/lib/automations";
 import { itemFilePath, runFilePath } from "@/lib/run-files";
-import { runPagePath } from "@/lib/run-progress";
+import {
+  FROM_ITEM,
+  fromQuery,
+  runPagePath,
+  type RunFrom,
+} from "@/lib/run-progress";
 
 /**
  * How the blocks look and where they go (backend ADR-0048 decisions 8–10):
@@ -65,9 +70,16 @@ export function httpsLink(url: unknown): { href: string; host: string } | null {
 
 /**
  * Where the blocks are drawn: what an item's file opens is under its flow;
- * on an item's page (`fromItem`) a run opens so its back is that item (G1).
+ * on an item's page (`fromItem`) a run opens so its back is that item (G1);
+ * on a run's page opened from somewhere (`runFrom`, `?from=`) its files open
+ * keeping it, so their back returns to the run as it was opened (the
+ * owner's builds 37 and 39; ~~the file's back dropped it~~ until then).
  */
-export type BlockPlace = { subscriptionId?: string; fromItem?: boolean };
+export type BlockPlace = {
+  subscriptionId?: string;
+  fromItem?: boolean;
+  runFrom?: RunFrom;
+};
 
 const id = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
@@ -85,9 +97,13 @@ export function openHref(
   const { runId, fileId, itemId } = open as Record<string, unknown>;
   switch (open.target) {
     case "run":
-      return id(runId) ? runPagePath(runId, place.fromItem === true) : null;
+      return id(runId)
+        ? runPagePath(runId, place.fromItem === true ? FROM_ITEM : undefined)
+        : null;
     case "run-file":
-      return id(runId) && id(fileId) ? runFilePath(runId, fileId) : null;
+      return id(runId) && id(fileId)
+        ? `${runFilePath(runId, fileId)}${fromQuery(place.runFrom)}`
+        : null;
     case "item-file":
       return id(itemId) && id(place.subscriptionId)
         ? itemFilePath(place.subscriptionId, itemId)

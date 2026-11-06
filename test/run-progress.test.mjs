@@ -968,7 +968,7 @@ test("a platform step this build does not know: its title, no line, no state —
   assert.equal(stepsDone(rows), "4 / 4");
 });
 
-test("the run page draws the tracker's rows and words alone — never a step's summary, never its id — and reads the run again while it goes on", () => {
+test("the run page draws the tracker's rows and words alone — never a step's summary, never its id — on its steps face, and reads the run again while it goes on (builds 37 and 39, item 10)", () => {
   const live = read("app/account/runs/[runId]/RunLive.tsx");
   assert.match(live, /const tracker = trackerRows\(/u);
   // The catalog's steps for any run — no version gate (S25) — with the flow
@@ -1002,17 +1002,21 @@ test("the run page draws the tracker's rows and words alone — never a step's s
     /if \(!going\) return;[\s\S]*?setTimeout\([\s\S]*?RUN_REREAD_MS\)/u,
   );
   assert.match(live, /\[going, reads, workspaceId, run\.id\]/u);
-  // The steps on the run's details page, before its facts (build 28, item
-  // 9); the platform's body on the run's page.
+  // The facts on the run's details page (build 28, item 9); the steps on
+  // the run's steps face, over the platform's body (the owner's builds 37
+  // and 39, item 10: ~~the steps on the details page~~ until then).
   const details = live.indexOf('if (view === "details") {');
-  const steps = live.search(/<Group title="Steps" titleId="run-steps-title">/u);
   const facts = live.indexOf("data-testid={`run-fact-${fact.label}`}");
-  const runPage = live.indexOf("return (", live.indexOf("\n  }\n", details));
-  assert.ok(
-    details > 0 && details < steps && steps < facts,
-    "steps, then facts",
+  const runPage = live.indexOf("const face = runFace(run.status);");
+  const steps = live.search(
+    /<Group\s+title="Steps"\s+titleId="run-steps-title"/u,
   );
-  assert.ok(facts < runPage, "both on the details page");
+  assert.ok(
+    details > 0 && details < facts && facts < runPage,
+    "the facts on the details page",
+  );
+  assert.ok(runPage < steps, "the steps on the run's page");
+  assert.ok(steps < live.indexOf("{body}", steps), "the steps, then the body");
   assert.ok(live.indexOf("<BlockList", runPage) > runPage);
   assert.ok(
     live.indexOf('label: "Run ID", value: run.id') > 0,

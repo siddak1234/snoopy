@@ -1,20 +1,21 @@
 import { notFound } from "next/navigation";
 import { getAppSession } from "@/lib/app-session";
-import { FROM_ITEM } from "@/lib/run-progress";
+import { runFrom } from "@/lib/run-progress";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 import { RunLive } from "./RunLive";
 import { readRunPage } from "./run-page-data";
 
 /**
- * One run (Build 21, spec A7): named by its FULL id (A8; the owner's D4 and
- * AM2), or by its title and score (Round 19); its body as the platform sends
- * it (backend ADR-0048: a run of an item's "View {file}" row, how it went and
- * what is to decide, then what it read); the Run details row (build 28, the
- * owner's item 9: the steps, Duration, Started, Ended, Trigger and Run ID on
- * a page of their own, `details/page.tsx`); the run package's buttons (Build
- * 24, P12; ~~Download JSON~~ until then) and View flow — read by
- * `readRunPage` and kept live by `RunLive`. Opened from its job's page
- * (`?from=item`, the owner's G1), its back goes to that job.
+ * One run (Build 21, spec A7), read by `readRunPage` and kept live by
+ * `RunLive`: its steps while it goes, waits, failed or was cancelled — its
+ * flow's name, its job's title, its steps live, its body as the platform
+ * sends it, Cancel run and the Run details row — and its result once it
+ * succeeded — its title and score (Round 19) or its flow's name, its body,
+ * the run package's buttons (Build 24, P12), View flow and the Run details
+ * row (the owner's builds 37 and 39, item 10; build 28's item 9: its
+ * metadata on a page of its own, `details/page.tsx`). Opened from its job's
+ * page or its flow's (`?from=item`, `?from=flow`; the owner's G1 and his
+ * words of 2026-11-06), its back goes there.
  */
 
 export const dynamic = "force-dynamic";
@@ -31,9 +32,10 @@ export default async function RunDetailPage(
   const workspaceId = await resolveActiveWorkspaceId(session);
   if (!workspaceId) notFound();
 
-  const { detail, flow, approvals, role } = await readRunPage(
+  const { detail, flow, approvals, role, itemTitle } = await readRunPage(
     workspaceId,
     runId,
+    { withItem: true },
   );
   return (
     <RunLive
@@ -43,7 +45,8 @@ export default async function RunDetailPage(
       approvals={approvals}
       role={role}
       view="run"
-      fromItem={from === FROM_ITEM}
+      itemTitle={itemTitle}
+      from={runFrom(from)}
     />
   );
 }
