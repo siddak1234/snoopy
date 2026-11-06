@@ -57,6 +57,7 @@ import {
   RUN_DETAILS,
   RUN_REREAD_MS,
   batchRows,
+  batchStepsFor,
   expiredByDisconnect,
   heldDecision,
   mayDecide,
@@ -283,32 +284,32 @@ export function RunLive({
   // steps); a run that reported a step they no longer declare is drawn by
   // the steps it reported. Step 2 says the flow's integration, step 4's
   // title follows it, step 5 is the run's email. A batch run is drawn by
-  // its flow's batch steps, by name (`batchRows`; the owner's item 10 of
+  // its flow's batch steps, by name (`batchStepsFor`, `batchRows`; the owner's item 10 of
   // builds 37 and 39). The steps face draws them; Run details counts them
   // (Steps done).
   const decided = heldDecision(run, listed);
   // A saved review's count on the step that waited (Round 21's F2).
   const review = reviewTally(newestApproval(run.id, listed));
-  const tracker =
-    run.batch === true && flow?.batch
-      ? batchRows(steps, flow.batch, flow.groups, run, undefined, {
-          flow: flow.tracker,
+  const batchSteps = batchStepsFor(run, flow);
+  const tracker = batchSteps
+    ? batchRows(steps, batchSteps, flow?.groups, run, undefined, {
+        flow: flow?.tracker,
+        email: detail.email,
+      })
+    : trackerRows(
+        steps,
+        flow?.pipeline,
+        flow?.groups,
+        run,
+        undefined,
+        flow?.pipeline,
+        {
+          flow: flow?.tracker,
           email: detail.email,
-        })
-      : trackerRows(
-          steps,
-          flow?.pipeline,
-          flow?.groups,
-          run,
-          undefined,
-          flow?.pipeline,
-          {
-            flow: flow?.tracker,
-            email: detail.email,
-            decision: decided,
-            review,
-          },
-        );
+          decision: decided,
+          review,
+        },
+      );
 
   // The decision where the job waits (Build 24, P6; build 28's review,
   // finding 1: not one tap more): one press, or a review's Save review

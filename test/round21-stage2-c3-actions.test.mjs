@@ -319,11 +319,15 @@ test("wave 2, Set up: a turn-on refused 403 agreement_required answers agreement
   });
 });
 
-test("wave 2, Set up: the form turns the refusal into a re-read of the section (router.refresh), never a dialog", () => {
+test("wave 2, Set up: the form turns the refusal into a re-read of the section (router.refresh), the box unticked and a new key, never a dialog; Accepted holds only for the text it accepted", () => {
   const form = code("app/account/flows/[subscriptionId]/setup/SetupForm.tsx");
   assert.match(
     form,
-    /if \(result\.state === "agreement-required"\) \{\s*router\.refresh\(\);\s*return null;\s*\}/u,
+    /if \(result\.state === "agreement-required"\) \{\s*setSigned\(\(current\) => \(\{ \.\.\.current, authorized: false \}\)\);\s*setAgreementKey\(`agreement-\$\{crypto\.randomUUID\(\)\}`\);\s*router\.refresh\(\);\s*return null;\s*\}/u,
+  );
+  assert.match(
+    form,
+    /acceptedHere !== null &&\s*contract\.offer\?\.sha256 === acceptedHere/u,
   );
   // A 409 on the acceptance: read again, the box unticked, a new key.
   assert.match(
@@ -342,5 +346,66 @@ test("wave 2, Accept: a text changed since it was read (409 agreement_changed) a
       ),
     ),
     { ok: false, error: "The agreement changed", state: "agreement-changed" },
+  );
+});
+
+/** A flow page's `setSubscriptionStatus` (`RunStart`'s Turn on, or Pause) against the platform's `answer`. */
+async function status(answer, { to = "live", role = "owner", mutate } = {}) {
+  const { setSubscriptionStatus } = await load(ACTIONS, mutate);
+  platform({ [FLOW]: answer, ...TEXT }, { role });
+  const data = new FormData();
+  data.set("subscriptionId", "s1");
+  data.set("workspaceId", "w1");
+  data.set("status", to);
+  return setSubscriptionStatus(data);
+}
+
+test("wave 2, a flow page's Turn on: refused 403 agreement_required, the owner is given the agreement — one workspace read, one text read — and nothing is drawn again", async () => {
+  assert.deepEqual(await status(platformError(403, REQUIRED)), {
+    ok: false,
+    error: "",
+    state: "agreement-required",
+    agreement: OFFER,
+  });
+  assert.deepEqual(globalThis.__asked, [
+    FLOW,
+    "/v1/workspaces",
+    "/v1/agreements/health-data",
+  ]);
+  assert.equal(JSON.parse(globalThis.__sent[0].body).status, "live");
+  assert.deepEqual(globalThis.__revalidated, []);
+});
+
+test("wave 2, a flow page's Turn on: an admin is told to ask the owner, the text never read; a Pause is never read as the agreement's", async () => {
+  assert.deepEqual(
+    await status(platformError(403, REQUIRED), { role: "admin" }),
+    {
+      ok: false,
+      error: ASK_OWNER,
+      state: "agreement-required",
+    },
+  );
+  assert.ok(!globalThis.__asked.includes("/v1/agreements/health-data"));
+  const paused = await status(platformError(403, REQUIRED), { to: "paused" });
+  assert.equal(paused.ok, false);
+  assert.equal(paused.agreement, undefined);
+  assert.notEqual(paused.state, "agreement-required");
+  assert.deepEqual(globalThis.__asked, [FLOW]);
+});
+
+test("wave 2, a flow page's Turn on: RunStart opens the owner's dialog for it, its button Accept and turn on, and sends the turn-on again once accepted", () => {
+  const start = code("app/account/flows/RunStart.tsx");
+  assert.match(
+    start,
+    /if \(result\.agreement\) \{\s*setOffer\(\{\s*agreement: result\.agreement,\s*purpose: "turn-on",\s*repeat: sendTurnOn,\s*\}\);/u,
+  );
+  assert.match(
+    start,
+    /purpose=\{offer\.purpose\}\s*onAccepted=\{offer\.repeat\}/u,
+  );
+  const dialog = code("app/account/flows/HealthAgreementDialog.tsx");
+  assert.match(
+    dialog,
+    /purpose === "turn-on"\s*\?\s*pending\s*\?\s*TURNING_ON\s*:\s*ACCEPT_AND_TURN_ON/u,
   );
 });

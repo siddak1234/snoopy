@@ -86,7 +86,10 @@ const UNAVAILABLE = "This flow is not responding, so it cannot run yet.";
  * on, and a retry after a later refusal never accepts twice
  * (`acceptThenRepeat`). A text that changed since it was read (409) is read
  * again, the box unticked; a turn-on the platform refuses 403
- * `agreement_required` reads the section again — never the agreement dialog.
+ * `agreement_required` reads the section again, the box unticked and a new
+ * key — never the agreement dialog. "Accepted" by this page's press holds
+ * only while the text offered is the one it accepted (its sha256): a newer
+ * version read since is signed afresh.
  * Save, on a flow on or paused, is never held by it.
  *
  * Only an owner or admin changes a flow (backend §12.1 #180): to a member the
@@ -145,7 +148,8 @@ export function SetupForm({
     name: "",
     title: "",
   });
-  const [acceptedHere, setAcceptedHere] = useState(false);
+  // The hash of the text this page's press accepted.
+  const [acceptedHere, setAcceptedHere] = useState<string | null>(null);
   const [agreementKey, setAgreementKey] = useState(
     () => `agreement-${crypto.randomUUID()}`,
   );
@@ -191,9 +195,10 @@ export function SetupForm({
   const declared = (sections?.length ?? 0) > 0;
   const hasConnect =
     (!declared && vendorFields.length > 0) || required.length > 0;
-  // Accepted by this page's press: said so until the page is read again.
+  // Accepted by this page's press: said so while the text offered is the
+  // one accepted — a newer one read since (a turn-on refused 403) is signed.
   const shownContract: ContractView | null =
-    contract && acceptedHere && contract.offer
+    contract && acceptedHere !== null && contract.offer?.sha256 === acceptedHere
       ? {
           ...contract,
           state: "accepted",
@@ -285,8 +290,11 @@ export function SetupForm({
         router.push(flowPath(subscriptionId));
         return null;
       }
-      // Its section, read again, says what is owed.
+      // Its section, read again, says what is owed: a text to sign again
+      // is signed afresh — the box unticked, a new key.
       if (result.state === "agreement-required") {
+        setSigned((current) => ({ ...current, authorized: false }));
+        setAgreementKey(`agreement-${crypto.randomUUID()}`);
         router.refresh();
         return null;
       }
@@ -294,7 +302,7 @@ export function SetupForm({
     };
     startTransition(async () => {
       const pressed = await acceptThenRepeat(!signing, accept, save);
-      if (signing && pressed.accepted) setAcceptedHere(true);
+      if (signing && pressed.accepted && offer) setAcceptedHere(offer.sha256);
       setError(pressed.error);
     });
   };

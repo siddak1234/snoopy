@@ -15,7 +15,8 @@ import {
  * data agreement in Set up's "Contract and accept" (builds 37 and 39, wave 2;
  * backend ADR-0049 amendment 2) — an Add that opens Set up, every state of
  * the section, the owner's one press that accepts then turns on — and on
- * Start run and an item's upload (C3) — the dialog for the workspace's owner,
+ * Start run, an item's upload (C3) and a draft's Turn on on its own page — the
+ * dialog for the workspace's owner,
  * the one line for anyone else, the run or item sent again under the refused
  * one's key — the organization's Documents and one signed copy, and a batch
  * run's steps by name (wave 2, item 10). Connect your EHR (ADR-0050, D1) is
@@ -40,7 +41,7 @@ test.beforeEach(async () => {
 
 type Health = {
   healthRequests: {
-    path: "subscriptions" | "runs" | "items";
+    path: "runs" | "items" | "turn-on";
     key: string | null;
     accepted: boolean;
   }[];
@@ -170,6 +171,74 @@ test("wave 2: accepted once — a press after the turn-on was refused sends the 
     true,
     true,
   ]);
+});
+
+test("wave 2: accepted here, then the turn-on refused 403 for a newer version — the section reads it again: the newer text to sign, the box unticked, never Accepted; ticked again, one press accepts it under a new key and turns on", async ({
+  page,
+}) => {
+  await fixtureControl("agreement-newer-after-accept");
+  const section = await addToSetup(page);
+  await sign(section);
+  await turnOn(page).click();
+  await expect(
+    section.getByRole("region", { name: "Health data agreement" }),
+  ).toContainText("3. Version 2 adds this line.");
+  await expect(section).not.toContainText("Accepted ·");
+  const box = section.getByRole("checkbox", {
+    name: "I'm authorized to sign for Fixture Organization",
+  });
+  await expect(box).not.toBeChecked();
+  await expect(section.getByLabel("Full name")).toHaveValue("Dana Owner");
+  await expect(turnOn(page)).toBeDisabled();
+  await box.check();
+  await turnOn(page).click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
+  const seen = await health();
+  expect(seen.acceptances.map(({ body }) => body.version)).toEqual([1, 2]);
+  expect(seen.acceptances[1].key).not.toBe(seen.acceptances[0].key);
+  expect(
+    seen.healthRequests.map(({ path, accepted }) => [path, accepted]),
+  ).toEqual([
+    ["turn-on", false],
+    ["turn-on", true],
+  ]);
+});
+
+test("wave 2: a draft added and not set up, turned on from its own page — refused for the agreement, the owner's dialog opens, and Accept and turn on accepts once and turns it on", async ({
+  page,
+}) => {
+  await fixtureControl("health-data");
+  await addToSetup(page);
+  await page.goto(FLOWS.invoice);
+  await turnOn(page).click();
+  await expect(agreement(page)).toBeVisible();
+  await accept(page, "Accept and turn on");
+  await expect(agreement(page)).toHaveCount(0);
+  await expect(turnOn(page)).toHaveCount(0);
+  await expect(
+    runForm(page).getByRole("button", { name: "Start run" }),
+  ).toBeVisible();
+  const seen = await health();
+  expect(seen.acceptances).toHaveLength(1);
+  expect(
+    seen.healthRequests.map(({ path, accepted }) => [path, accepted]),
+  ).toEqual([
+    ["turn-on", false],
+    ["turn-on", true],
+  ]);
+});
+
+test("wave 2: an admin's Turn on of that draft from its own page says Ask your workspace owner… — no dialog, nothing more sent", async ({
+  page,
+}) => {
+  await presentSession(page, "admin");
+  await fixtureControl("health-data");
+  await addToSetup(page);
+  await page.goto(FLOWS.invoice);
+  await turnOn(page).click();
+  await expect(runForm(page).getByRole("alert")).toHaveText(ASK_OWNER);
+  await expect(agreement(page)).toHaveCount(0);
+  expect((await health()).healthRequests).toHaveLength(1);
 });
 
 test("wave 2: a text changed since it was read (409) is read again — the box unticked, the name and title kept, nothing turned on; ticked again, one press accepts and turns on", async ({

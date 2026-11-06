@@ -10,7 +10,7 @@ import {
   fillForDisplay,
   signerLine,
 } from "../lib/health-agreement.ts";
-import { batchRows } from "../lib/run-progress.ts";
+import { batchRows, batchStepsFor, trackerRows } from "../lib/run-progress.ts";
 import { visibleWords } from "./blocks-harness.mjs";
 import {
   cleanupLoaded,
@@ -21,16 +21,18 @@ import {
 } from "./round21-stage2-harness.mjs";
 
 /**
- * Builds 37 and 39, wave 2 on the website (the owner's items 9 and 10; plan
- * decisions 1, 2, 5 and 8): Set up's "Contract and accept" state and words,
- * the text filled for display, and a batch run's steps by name. The same
- * rows as the app's `snoopy-mobile/__tests__/fb39-wave2.test.ts`. The clicks are
+ * Builds 37 and 39, wave 2 on the website (the owner's items 9 and 10;
+ * backend ADR-0049 amendment 2, ADR-0048 amendment 6): Set up's "Contract
+ * and accept" state and words, the text filled for display, and a batch
+ * run's steps by name. `contractStep`, `fillForDisplay`, `batchRows` and
+ * `batchStepsFor` hold the SAME rows as the app's
+ * `snoopy-mobile/__tests__/fb39-wave2.test.ts`, copied as they are. The clicks are
  * `e2e/health-data.spec.ts`; the actions, `round21-stage2-c3-actions.test.mjs`.
  */
 
 after(cleanupLoaded);
 
-test("wave 2 words: the plan's, byte for byte, as the app says them", () => {
+test("wave 2 words: byte for byte, as the app says them", () => {
   assert.equal(CONTRACT_STEP, "Contract and accept");
   assert.equal(AGREEMENT_FINALIZING, "The agreement is being finalized.");
   assert.equal(AGREEMENT_UNAVAILABLE, "Unavailable");
@@ -44,70 +46,203 @@ test("wave 2 words: the plan's, byte for byte, as the app says them", () => {
   );
 });
 
+// The app's rows, copied as they are.
 const CURRENT = { version: 1, sha256: "a".repeat(64) };
 const ACCEPTANCE = {
-  id: "d1",
+  id: "00000000-0000-4000-8000-0000000000d1",
   kind: "health-data",
   version: 1,
-  signerName: "Dana Owner",
+  signerName: "Dana Reyes",
   signerTitle: "Practice manager",
-  acceptedAt: "2026-11-06T15:00:00.000Z",
+  acceptedAt: "2026-11-04T12:00:00Z",
 };
-const TEXT = { version: 1, text: "# BAA", sha256: "a".repeat(64) };
-const open = { current: CURRENT, acceptance: null };
+const TEXT = { version: 1, text: "The agreement.", sha256: "a".repeat(64) };
+const read = (current, acceptance) => ({
+  kind: "health-data",
+  current,
+  acceptance,
+});
 
-test("contractStep: every state, in its precedence — hidden, unavailable, finalizing, accepted, sign, ask-owner", () => {
-  const row = (input) => ({
-    role: "owner",
-    healthData: true,
-    read: open,
-    text: TEXT,
-    readFailed: false,
-    ...input,
-  });
-  for (const [input, state] of [
-    // Not a health flow: nothing, whatever was read.
-    [{ healthData: false }, "hidden"],
-    [{ healthData: false, readFailed: true }, "hidden"],
-    // A read that failed wins over everything else.
-    [{ readFailed: true }, "unavailable"],
+test("contractStep: every state, in its precedence (the app's rows)", () => {
+  for (const [name, input, state] of [
     [
-      { readFailed: true, read: { current: null, acceptance: null } },
-      "unavailable",
-    ],
-    [{ readFailed: true, role: "member", read: null }, "unavailable"],
-    // Nothing published: for the owner, an admin, and a 503 text read.
-    [{ read: { current: null, acceptance: null }, text: null }, "finalizing"],
-    [
-      { role: "admin", read: { current: null, acceptance: null }, text: null },
-      "finalizing",
-    ],
-    [{ text: "unpublished" }, "finalizing"],
-    // Finalizing wins over an acceptance (never sent with `current` null).
-    [{ read: { current: null, acceptance: ACCEPTANCE } }, "finalizing"],
-    // Accepted, the owner or an admin.
-    [
-      { read: { current: CURRENT, acceptance: ACCEPTANCE }, text: null },
-      "accepted",
+      "not a health flow (owner)",
+      {
+        role: "owner",
+        healthData: undefined,
+        read: undefined,
+        text: undefined,
+        readFailed: false,
+      },
+      "hidden",
     ],
     [
+      "not a health flow, even with a failed read",
+      {
+        role: "owner",
+        healthData: false,
+        read: undefined,
+        text: undefined,
+        readFailed: true,
+      },
+      "hidden",
+    ],
+    [
+      "a member (never read)",
+      {
+        role: "member",
+        healthData: true,
+        read: undefined,
+        text: undefined,
+        readFailed: false,
+      },
+      "ask-owner",
+    ],
+    [
+      "an admin, not accepted",
       {
         role: "admin",
-        read: { current: CURRENT, acceptance: ACCEPTANCE },
-        text: null,
+        healthData: true,
+        read: read(CURRENT, null),
+        text: undefined,
+        readFailed: false,
+      },
+      "ask-owner",
+    ],
+    [
+      "an admin, accepted",
+      {
+        role: "admin",
+        healthData: true,
+        read: read(CURRENT, ACCEPTANCE),
+        text: undefined,
+        readFailed: false,
       },
       "accepted",
     ],
-    // The owner signs the text read; without it, unavailable.
-    [{}, "sign"],
-    [{ text: null }, "unavailable"],
-    [{ read: null, text: null }, "unavailable"],
-    // Anyone else asks the owner: an admin, a member (never read), no role.
-    [{ role: "admin", text: null }, "ask-owner"],
-    [{ role: "member", read: null, text: null }, "ask-owner"],
-    [{ role: undefined, read: null, text: null }, "ask-owner"],
+    [
+      "an admin, nothing published",
+      {
+        role: "admin",
+        healthData: true,
+        read: read(null, null),
+        text: undefined,
+        readFailed: false,
+      },
+      "finalizing",
+    ],
+    [
+      "an admin, the read failed",
+      {
+        role: "admin",
+        healthData: true,
+        read: undefined,
+        text: undefined,
+        readFailed: true,
+      },
+      "unavailable",
+    ],
+    [
+      "the owner, nothing published",
+      {
+        role: "owner",
+        healthData: true,
+        read: read(null, null),
+        text: undefined,
+        readFailed: false,
+      },
+      "finalizing",
+    ],
+    [
+      "the owner, the text 503",
+      {
+        role: "owner",
+        healthData: true,
+        read: read(CURRENT, null),
+        text: "unpublished",
+        readFailed: false,
+      },
+      "finalizing",
+    ],
+    [
+      "the owner, accepted",
+      {
+        role: "owner",
+        healthData: true,
+        read: read(CURRENT, ACCEPTANCE),
+        text: undefined,
+        readFailed: false,
+      },
+      "accepted",
+    ],
+    [
+      "the owner, not accepted, the text read",
+      {
+        role: "owner",
+        healthData: true,
+        read: read(CURRENT, null),
+        text: TEXT,
+        readFailed: false,
+      },
+      "sign",
+    ],
+    [
+      "the owner, the read failed",
+      {
+        role: "owner",
+        healthData: true,
+        read: undefined,
+        text: undefined,
+        readFailed: true,
+      },
+      "unavailable",
+    ],
+    [
+      "the owner, the text failed (not 503)",
+      {
+        role: "owner",
+        healthData: true,
+        read: read(CURRENT, null),
+        text: undefined,
+        readFailed: true,
+      },
+      "unavailable",
+    ],
+    [
+      "precedence: a failed read over an acceptance",
+      {
+        role: "owner",
+        healthData: true,
+        read: read(CURRENT, ACCEPTANCE),
+        text: undefined,
+        readFailed: true,
+      },
+      "unavailable",
+    ],
+    [
+      "precedence: finalizing over an acceptance",
+      {
+        role: "owner",
+        healthData: true,
+        read: read(null, ACCEPTANCE),
+        text: undefined,
+        readFailed: false,
+      },
+      "finalizing",
+    ],
+    [
+      "precedence: accepted over sign",
+      {
+        role: "owner",
+        healthData: true,
+        read: read(CURRENT, ACCEPTANCE),
+        text: TEXT,
+        readFailed: false,
+      },
+      "accepted",
+    ],
   ])
-    assert.equal(contractStep(row(input)), state, JSON.stringify(input));
+    assert.equal(contractStep(input), state, name);
 });
 
 test("contractAllowsTurnOn: a flow without it and an accepted one, yes; the owner's sign only with the box ticked and both fields filled; never finalizing, unavailable or ask-owner", () => {
@@ -130,16 +265,36 @@ test("contractAllowsTurnOn: a flow without it and an accepted one, yes; the owne
     );
 });
 
-test("fillForDisplay: every {Covered Entity} the workspace's name and every {Effective date} today's UTC date; a text with neither unchanged", () => {
+test("fillForDisplay: the two placeholders, for display only (the app's rows)", () => {
+  for (const [name, text, filled] of [
+    [
+      "both",
+      "Between {Covered Entity} and Autom8x, from {Effective date}.",
+      "Between Acme Clinic and Autom8x, from 2026-11-06.",
+    ],
+    [
+      "repeated",
+      "{Covered Entity} agrees. {Covered Entity} signs on {Effective date}; {Effective date}.",
+      "Acme Clinic agrees. Acme Clinic signs on 2026-11-06; 2026-11-06.",
+    ],
+    ["none", "No placeholders here.", "No placeholders here."],
+  ])
+    assert.equal(
+      fillForDisplay(text, "Acme Clinic", "2026-11-06"),
+      filled,
+      name,
+    );
+});
+
+test("fillForDisplay: today is the UTC day, as the platform's signed copy writes it", () => {
   assert.equal(
     fillForDisplay(
-      "Between {Covered Entity} and Autom8x, effective {Effective date}. {Covered Entity} agrees; from {Effective date}.",
+      "{Effective date}",
       "Acme Clinic",
-      "2026-11-06T23:59:00.000Z",
+      new Date("2026-11-06T23:30:00-05:00").toISOString(),
     ),
-    "Between Acme Clinic and Autom8x, effective 2026-11-06. Acme Clinic agrees; from 2026-11-06.",
+    "2026-11-07",
   );
-  assert.equal(fillForDisplay("# BAA", "Acme Clinic", "2026-11-06"), "# BAA");
 });
 
 const STEP_FILE = "app/account/flows/[subscriptionId]/setup/ContractStep.tsx";
@@ -250,9 +405,19 @@ test("Set up numbers it after the flow's own sections, Connect counted, and hold
   assert.doesNotMatch(form, /HealthAgreementDialog/u);
 });
 
-// ICD-10 Code Check v4 (snoopy-automations manifests/icd10-code-check.v4.json):
-// its groups, and its batch run's steps as the catalog publishes them, each
-// in the first group (ADR-0048 amendment 6) — which the rows ignore.
+// ICD-10 Code Check v4, as the catalog publishes it (backend ADR-0048
+// amendment 6): the app's rows, copied as they are.
+const BATCH = [
+  { id: "chunk", title: "Pages counted", description: "d", group: "upload" },
+  {
+    id: "categorize",
+    title: "Pages sorted",
+    description: "d",
+    group: "upload",
+  },
+  { id: "organize", title: "Visits found", description: "d", group: "upload" },
+  { id: "queue", title: "Visits queued", description: "d", group: "upload" },
+];
 const GROUPS = [
   { id: "upload", title: "Add visit notes" },
   { id: "read", title: "AI reading" },
@@ -260,64 +425,71 @@ const GROUPS = [
   { id: "approve", title: "Your review" },
   { id: "email", title: "Run completed", platform: "email" },
 ];
-const BATCH = {
-  pipeline: [
-    { id: "chunk", title: "Pages counted", description: "", group: "upload" },
-    {
-      id: "categorize",
-      title: "Pages sorted",
-      description: "",
-      group: "upload",
-    },
-    { id: "organize", title: "Visits found", description: "", group: "upload" },
-    { id: "queue", title: "Visits queued", description: "", group: "upload" },
-  ],
-};
-const T = (minute) =>
-  `2026-11-06T14:${String(minute).padStart(2, "0")}:00.000Z`;
+const VISIT = [
+  { id: "receive-visit", title: "Visit received", group: "upload" },
+  { id: "read-visit", title: "Visit read", group: "read" },
+  { id: "check-codes", title: "Codes checked", group: "check" },
+  { id: "save-visit", title: "Saved", group: "approve" },
+];
+const ENTRY = { pipeline: VISIT, groups: GROUPS, batch: { pipeline: BATCH } };
+const clock = (iso) => iso.slice(11, 16);
 const ok = (stepId, minute) => ({
   stepId,
   outcome: "ok",
-  summary: "never shown",
-  occurredAt: T(minute),
+  summary: "s",
+  occurredAt: `2026-11-06T10:0${minute}:00Z`,
 });
-const rows = (steps, run, email) =>
-  batchRows(steps, BATCH, GROUPS, run, undefined, email ? { email } : {}).map(
-    ({ title, state, sub }) => [title, state, sub],
-  );
+const view = (rows) => rows.map(({ title, state, sub }) => [title, state, sub]);
 
-test("batchRows, ICD-10 v4: running after chunk — 1 Done, 2 Working…, 3 and 4 Waiting; never the flow's groups", () => {
-  assert.deepEqual(rows([ok("chunk", 32)], { status: "running" }), [
-    ["1 · Pages counted", "done", "Done · 2:32 PM"],
-    ["2 · Pages sorted", "working", "Working…"],
-    ["3 · Visits found", "waiting", "Waiting"],
-    ["4 · Visits queued", "waiting", "Waiting"],
-  ]);
-});
-
-const ALL = [
-  ok("chunk", 32),
-  ok("categorize", 33),
-  ok("organize", 34),
-  ok("queue", 35),
-];
-
-test("batchRows: succeeded with its email sent — four Done, then 5 · Run completed, Email sent · {time}", () => {
+test("batchRows: running after chunk — 1 done, 2 working, 3–4 waiting", () => {
   assert.deepEqual(
-    rows(ALL, { status: "succeeded" }, { status: "sent", sentAt: T(40) }),
+    view(
+      batchRows([ok("chunk", 1)], BATCH, GROUPS, { status: "running" }, clock),
+    ),
     [
-      ["1 · Pages counted", "done", "Done · 2:32 PM"],
-      ["2 · Pages sorted", "done", "Done · 2:33 PM"],
-      ["3 · Visits found", "done", "Done · 2:34 PM"],
-      ["4 · Visits queued", "done", "Done · 2:35 PM"],
-      ["5 · Run completed", "done", "Email sent · 2:40 PM"],
+      ["1 · Pages counted", "done", "Done · 10:01"],
+      ["2 · Pages sorted", "working", "Working…"],
+      ["3 · Visits found", "waiting", "Waiting"],
+      ["4 · Visits queued", "waiting", "Waiting"],
     ],
   );
 });
 
-test("batchRows: succeeded with no email — the four steps alone", () => {
+test('batchRows: succeeded, the email sent — four done, then "5 · Run completed"', () => {
+  const steps = [
+    ok("chunk", 1),
+    ok("categorize", 2),
+    ok("organize", 3),
+    ok("queue", 4),
+  ];
+  const email = { status: "sent", sentAt: "2026-11-06T10:05:00Z" };
   assert.deepEqual(
-    rows(ALL, { status: "succeeded" }).map(([title]) => title),
+    view(
+      batchRows(steps, BATCH, GROUPS, { status: "succeeded" }, clock, {
+        email,
+      }),
+    ),
+    [
+      ["1 · Pages counted", "done", "Done · 10:01"],
+      ["2 · Pages sorted", "done", "Done · 10:02"],
+      ["3 · Visits found", "done", "Done · 10:03"],
+      ["4 · Visits queued", "done", "Done · 10:04"],
+      ["5 · Run completed", "done", "Email sent · 10:05"],
+    ],
+  );
+});
+
+test("batchRows: succeeded, no email from the platform — the four rows only", () => {
+  const steps = [
+    ok("chunk", 1),
+    ok("categorize", 2),
+    ok("organize", 3),
+    ok("queue", 4),
+  ];
+  assert.deepEqual(
+    batchRows(steps, BATCH, GROUPS, { status: "succeeded" }, clock).map(
+      (row) => row.title,
+    ),
     [
       "1 · Pages counted",
       "2 · Pages sorted",
@@ -327,58 +499,82 @@ test("batchRows: succeeded with no email — the four steps alone", () => {
   );
 });
 
-test("batchRows: failed at organize — 1 and 2 Done, 3 the run's reason, 4 Stopped, its email Failed", () => {
+test("batchRows: failed at organize — its reason there, the rest stopped", () => {
+  const steps = [
+    ok("chunk", 1),
+    ok("categorize", 2),
+    { ...ok("organize", 3), outcome: "failed" },
+  ];
   assert.deepEqual(
-    rows(
-      [
-        ok("chunk", 32),
-        ok("categorize", 33),
-        { ...ok("organize", 34), outcome: "failed" },
-      ],
-      { status: "failed", failureReason: "No visits were found." },
-      { status: "not_sent", sentAt: null },
+    view(
+      batchRows(
+        steps,
+        BATCH,
+        GROUPS,
+        { status: "failed", failureReason: "No visits found." },
+        clock,
+      ),
     ),
     [
-      ["1 · Pages counted", "done", "Done · 2:32 PM"],
-      ["2 · Pages sorted", "done", "Done · 2:33 PM"],
-      ["3 · Visits found", "failed", "No visits were found."],
+      ["1 · Pages counted", "done", "Done · 10:01"],
+      ["2 · Pages sorted", "done", "Done · 10:02"],
+      ["3 · Visits found", "failed", "No visits found."],
       ["4 · Visits queued", "stopped", "Stopped"],
-      ["5 · Run completed", "failed", "Failed"],
     ],
   );
 });
 
-test("batchRows: a step the flow no longer declares — the steps it reported, titled from batch.pipeline, Step {n} for the rest, Working… while it goes", () => {
+test("batchRows: a step the batch does not declare — the steps reported, titled from it, and no email row", () => {
+  const steps = [ok("chunk", 1), ok("split-pages", 2)];
+  const email = { status: "sent", sentAt: "2026-11-06T10:05:00Z" };
   assert.deepEqual(
-    rows(
-      [ok("chunk", 32), ok("split", 33)],
-      { status: "running" },
-      {
-        status: "waiting",
-        sentAt: null,
-      },
+    view(
+      batchRows(steps, BATCH, GROUPS, { status: "succeeded" }, clock, {
+        email,
+      }),
     ),
     [
-      ["1 · Pages counted", "done", "Done · 2:32 PM"],
-      ["2 · Step 2", "done", "Done · 2:33 PM"],
-      ["3 · Step 3", "working", "Working…"],
+      ["1 · Pages counted", "done", "Done · 10:01"],
+      ["2 · Step 2", "done", "Done · 10:02"],
     ],
   );
 });
 
-test("a batch's child and a flow without batch keep the group rows: the run page chooses batchRows only for run.batch with the flow's batch", () => {
-  const live = code("app/account/runs/[runId]/RunLive.tsx");
-  assert.match(
-    live,
-    /run\.batch === true && flow\?\.batch\s*\?\s*batchRows\(steps, flow\.batch, flow\.groups, run, undefined, \{/u,
+test("batchStepsFor: which runs are drawn by their batch steps", () => {
+  for (const [name, run, entry, steps] of [
+    ["a batch parent of a flow with batch", { batch: true }, ENTRY, BATCH],
+    [
+      "a batch child (a visit), or any run without `batch`",
+      {},
+      ENTRY,
+      undefined,
+    ],
+    [
+      "a batch parent of a flow without batch",
+      { batch: true },
+      { ...ENTRY, batch: undefined },
+      undefined,
+    ],
+  ])
+    assert.equal(batchStepsFor(run, entry), steps, name);
+});
+
+test("batchStepsFor: a child and a flow without batch keep today's group rows", () => {
+  const rows = trackerRows(
+    [ok("receive-visit", 1)],
+    VISIT,
+    GROUPS,
+    { status: "running" },
+    clock,
   );
-  assert.match(
-    live,
-    /:\s*trackerRows\(\s*steps,\s*flow\?\.pipeline,\s*flow\?\.groups,/u,
-  );
-  const data = code("app/account/runs/[runId]/run-page-data.ts");
-  assert.match(
-    data,
-    /\.\.\.\(entry\.batch\s*\?\s*\{\s*batch: \{\s*pipeline: entry\.batch\.pipeline\.map\(\(step\) => \(\{\s*id: step\.id,\s*title: step\.title,\s*\}\)\),/u,
+  assert.deepEqual(
+    rows.map((row) => row.title),
+    [
+      "1 · Add visit notes",
+      "2 · AI reading",
+      "3 · Code check",
+      "4 · Your review",
+      "5 · Run completed",
+    ],
   );
 });

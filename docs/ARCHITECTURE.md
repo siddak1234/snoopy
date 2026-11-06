@@ -210,8 +210,9 @@ page reuses:
   step from the start, live (`trackerRows`, `TrackerItem`) — a batch run's
   by its flow's batch steps in order, "1 · Pages counted" to "4 · Visits
   queued" for ICD-10 Code Check v4, then "Run completed" only when the run
-  has an email (`batchRows`; backend ADR-0048 amendment 6; never the
-  flow's groups, which a batch's child keeps); its body as the
+  has an email (`batchRows`, chosen by `batchStepsFor` for a batch parent
+  of a flow with `batch`; backend ADR-0048 amendment 6; never the flow's
+  groups, which a batch's child and a flow without `batch` keep); its body as the
   platform sent it (the files rows, the result line, a held job's form, a
   batch's children — blocks carry no part marker, so the body is drawn
   whole); Cancel run while it goes on; the Run details row last. Its
@@ -442,11 +443,18 @@ box unticked, the name and title kept, a new key. A turn-on the platform
 refuses 403 `agreement_required` (`saveSetup`'s `agreement-required`) reads
 the section again — never the dialog. Save, on a flow on or paused, is
 never held by it: the platform asks nothing of a save that moves no status.
-A gap, recorded (plan 7): Resume on a paused flow's page (`RunStart`'s Turn
-on) routes no agreement refusal and says the platform's words; only a new
-agreement version could refuse it, and none is published.
+"Accepted" by the page's own press holds only while the text offered is the
+one it accepted (its sha256); a turn-on refused 403 after it (a newer
+version published) reads the section again, the box unticked and a new
+key, and the newer text is signed.
 
-**On Start run and an item's upload** only that refusal makes the website
+**On Turn on outside Set up** — a flow's own page (`RunStart`), for a draft
+added and not set up or a paused flow — the same refusal is read as Start
+run's (`setSubscriptionStatus` with `agreementRefusal`): the owner gets the
+dialog below, its button "Accept and turn on" ("Turning on…"), which
+accepts once and sends the turn-on again; anyone else the one line.
+
+**On Start run, an item's upload and that Turn on** only that refusal makes the website
 read anything more (`agreementRefusal` in `lib/agreements.ts`): who the
 person is in the workspace and, for its owner, the text. The owner gets one
 dialog (`app/account/flows/HealthAgreementDialog.tsx`): "Health data
@@ -480,7 +488,7 @@ snoopy-backend #269).
 
 The fixture Edge (`e2e/fixtures/health-data.ts`) answers these refusals
 as the published contract says. The platform's own — `agreement_required`
-on an add, a run and an item, `outside_org_domain`, and an Approve's 409
+on a turn-on, a run and an item, `outside_org_domain`, and an Approve's 409
 `approval_expired` — are checked once against the live platform, on a test
 workspace, after backend #266 deploys and before this change is marked
 ready; no local Compose run is made for them.

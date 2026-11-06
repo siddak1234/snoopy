@@ -14,10 +14,11 @@
  * "Contract and accept" section (`contractStep`; the owner's item 9 of builds
  * 37 and 39: "Where is the BAA contract to view prefilled and checkmark to
  * accept below it … 4. Contract and accept"), and its Turn on accepts, then
- * turns the flow on, in one press. Start run and an item's upload still open
- * the one dialog (`app/account/flows/HealthAgreementDialog.tsx`), and the run
- * or the item is sent again with its own key; anyone else is told to ask the
- * owner. The signed copies are the workspace's Documents. ~~Add refused until
+ * turns the flow on, in one press. Start run, an item's upload and Turn on
+ * on a flow's own page (a draft added and not set up, or a paused flow) still
+ * open the one dialog (`app/account/flows/HealthAgreementDialog.tsx`), and the
+ * run, the item or the turn-on is sent again — a run and an item with their
+ * own key; anyone else is told to ask the owner. The signed copies are the workspace's Documents. ~~Add refused until
  * the owner accepted, in the dialog~~ until wave 2.
  *
  * Pure, and loaded by its unit test as it is: no React and no `@/` import.
@@ -33,6 +34,9 @@ export const ACCEPT_AND_START = "Accept and start run";
  * Round 21, Stage 2's review, finding 6).
  */
 export const STARTING = "Starting…";
+/** The dialog's button on a flow page's Turn on, and its words while it works (Turn on's own). */
+export const ACCEPT_AND_TURN_ON = "Accept and turn on";
+export const TURNING_ON = "Turning on…";
 /** Anyone but the workspace's owner, refused: the one line, and nothing more. */
 export const ASK_OWNER =
   "Ask your workspace owner to accept the health data agreement.";
@@ -123,7 +127,7 @@ export type AgreementOffer = {
   organization: string;
 };
 
-/** Set up's numbered section for a flow that carries health data (plan 5). */
+/** Set up's numbered section for a flow that carries health data (builds 37 and 39, wave 2). */
 export const CONTRACT_STEP = "Contract and accept";
 /** No version published yet (`current` null): Turn on waits for it. */
 export const AGREEMENT_FINALIZING = "The agreement is being finalized.";
@@ -141,7 +145,7 @@ export function signerLine(name: string, title: string): string {
 }
 
 /**
- * What Set up's "Contract and accept" section is (plan 1), in this order of
+ * What Set up's "Contract and accept" section is (ADR-0049 amendment 2), in this order of
  * precedence after `hidden` (a flow that carries no health data):
  * `unavailable` — a read failed; `finalizing` — no version is published
  * (`current` null, or, for the owner, the text read answered 503);
@@ -177,7 +181,7 @@ export function contractStep(input: {
 }
 
 /**
- * Whether Turn on may be pressed for this section (plan 3): a flow without
+ * Whether Turn on may be pressed for this section (builds 37 and 39, wave 2): a flow without
  * it, or accepted; for the owner signing, only once the box is ticked and
  * both fields are filled.
  */
@@ -193,7 +197,7 @@ export function contractAllowsTurnOn(
 }
 
 /**
- * The text as the owner reads it before signing (plan 2), for display only:
+ * The text as the owner reads it before signing (builds 37 and 39, wave 2), for display only:
  * every `{Covered Entity}` the workspace's name, every `{Effective date}`
  * today's UTC date, `YYYY-MM-DD` — what the platform writes into the signed
  * copy at acceptance. The hash sent is the unfilled text's, as read.

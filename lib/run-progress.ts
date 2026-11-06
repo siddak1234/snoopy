@@ -631,12 +631,11 @@ export function trackerRows(
  * `emailRow`). A batch run that reported a step its flow no longer declares
  * is drawn by the steps it reported (`reportedRows`), titled from
  * `batch.pipeline`. A batch's child (a visit) and a flow without `batch` keep
- * `trackerRows`; the caller chooses (`run.batch === true` and the flow's
- * `batch`).
+ * `trackerRows`; `batchStepsFor` chooses.
  */
 export function batchRows(
   steps: readonly ProgressStep[],
-  batch: { pipeline: readonly { id: string; title: string }[] },
+  batch: readonly { id: string; title: string }[],
   groups: readonly ProgressGroup[] | undefined,
   run: RunState,
   clock: (iso: string) => string = timeOfDay,
@@ -645,7 +644,7 @@ export function batchRows(
     email?: RunEmailState;
   } = {},
 ): TrackerRow[] {
-  const pipeline = batch.pipeline.map(({ id, title }) => ({ id, title }));
+  const pipeline = batch.map(({ id, title }) => ({ id, title }));
   const rows = trackerRows(steps, pipeline, undefined, run, clock, pipeline);
   const known = new Set(pipeline.map((step) => step.id));
   const covered =
@@ -662,6 +661,20 @@ export function batchRows(
       clock,
     ),
   ];
+}
+
+/**
+ * The steps a run is drawn by, by name (`batchRows`): its flow's
+ * `batch.pipeline`, only for a batch parent (`run.batch === true`) of a flow
+ * that declares one; `undefined` — the flow's group rows (`trackerRows`) —
+ * for a batch's child (a visit), any other run, and a flow without `batch`.
+ * The app's `batchStepsFor` too.
+ */
+export function batchStepsFor<Step extends { id: string; title: string }>(
+  run: { batch?: boolean },
+  flow: { batch?: { pipeline: readonly Step[] } } | null | undefined,
+): readonly Step[] | undefined {
+  return run.batch === true ? flow?.batch?.pipeline : undefined;
 }
 
 /** The fallback: the steps a run of another version reported, in order, by state. */

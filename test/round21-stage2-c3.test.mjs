@@ -224,8 +224,11 @@ test("C3: Start run reads the refusal through agreementRefusal; Add no longer do
   );
   assert.doesNotMatch(add, /HealthAgreementDialog|setOffer|agreement/u);
   const run = code("app/account/flows/RunStart.tsx");
-  assert.match(run, /setOffer\(\{ agreement: result\.agreement, data \}\);/u);
-  assert.match(run, /onAccepted=\{\(\) => send\(offer\.data\)\}/u);
+  assert.match(
+    run,
+    /setOffer\(\{\s*agreement: result\.agreement,\s*purpose: "run",\s*repeat: \(\) => send\(data\),\s*\}\);/u,
+  );
+  assert.match(run, /onAccepted=\{offer\.repeat\}/u);
   // Beside the form, never in it: its fields are not the run's.
   assert.match(run, /<\/form>\s*\{offer \? \(\s*<HealthAgreementDialog/u);
 });

@@ -23,9 +23,13 @@ const now = "2026-08-12T12:00:00.000Z";
 /** The agreement's text, `{Covered Entity}` and `{Effective date}` left to fill, and its hash. */
 const AGREEMENT_TEXT =
   "# Business Associate Agreement\n\nThis agreement is between {Covered Entity} and Autom8x, effective {Effective date}.\n\n1. Autom8x uses health data only to run the flows the Covered Entity adds.\n2. Autom8x tells the Covered Entity of any breach it finds.\n";
-const AGREEMENT_SHA256 = createHash("sha256")
-  .update(AGREEMENT_TEXT)
-  .digest("hex");
+/** Each version's text: version 2 (published after an acceptance, `agreement-newer-after-accept`) adds a line. */
+const agreementText = (version: number) =>
+  version === 1
+    ? AGREEMENT_TEXT
+    : `${AGREEMENT_TEXT}3. Version ${version} adds this line.\n`;
+const agreementSha256 = (version: number) =>
+  createHash("sha256").update(agreementText(version)).digest("hex");
 
 /** The document the organization starts with: accepted by its owner. */
 export const signedDocumentId = "d0c0d0c0-d0c0-4d0c-8d0c-d0c0d0c0d0c0";
@@ -49,7 +53,7 @@ function signedCopy(
   ).replace("{Effective date}", "August 12, 2026");
   return {
     ...document,
-    text: `${filled}\n## Signature\n\n${organization}\n${document.signerName}, ${document.signerTitle}\nAuthorized to sign for ${organization}.\nAccepted ${document.acceptedAt}, version ${document.version}, SHA-256 ${AGREEMENT_SHA256}.\n`,
+    text: `${filled}\n## Signature\n\n${organization}\n${document.signerName}, ${document.signerTitle}\nAuthorized to sign for ${organization}.\nAccepted ${document.acceptedAt}, version ${document.version}, SHA-256 ${agreementSha256(document.version)}.\n`,
   };
 }
 
@@ -73,6 +77,10 @@ export function healthState() {
     // (503), and how many acceptances answer 409 `agreement_changed`.
     agreementReadFailing: false,
     agreementChanges: 0,
+    // The version published now, and whether the next acceptance publishes
+    // a newer one (version 2) the workspace has not accepted.
+    agreementVersion: 1,
+    newerOnAccept: false,
     // Every run start, item and turn-on (`public-edge.ts`'s Invoice
     // Processing PATCH to live) sent while the flows carry health data, with
     // its key — a repeat after Accept must carry the refused one's.
@@ -120,6 +128,10 @@ export function healthControls(
     "/__fixture/agreement-read-failing": () => {
       health.healthData = true;
       health.agreementReadFailing = true;
+    },
+    "/__fixture/agreement-newer-after-accept": () => {
+      health.healthData = true;
+      health.newerOnAccept = true;
     },
     "/__fixture/agreement-changed-once": () => {
       health.healthData = true;
@@ -196,7 +208,9 @@ export function agreementRefusal(
     details: {
       reason: "agreement_required",
       kind: "health-data",
-      ...(health.agreementUnpublished ? {} : { version: 1 }),
+      ...(health.agreementUnpublished
+        ? {}
+        : { version: health.agreementVersion }),
     },
   };
 }
@@ -272,11 +286,15 @@ export async function healthRoute(input: {
       kind: "health-data",
       current: health.agreementUnpublished
         ? null
-        : { version: 1, sha256: AGREEMENT_SHA256 },
+        : {
+            version: health.agreementVersion,
+            sha256: agreementSha256(health.agreementVersion),
+          },
       acceptance:
         health.agreementAccepted && !health.agreementUnpublished
-          ? (health.documents.find((document) => document.version === 1) ??
-            null)
+          ? (health.documents.find(
+              (document) => document.version === health.agreementVersion,
+            ) ?? null)
           : null,
     } satisfies Platform["WorkspaceHealthDataAgreement"]);
     return true;
@@ -311,9 +329,9 @@ export async function healthRoute(input: {
       return true;
     }
     respond(response, 200, {
-      version: 1,
-      text: AGREEMENT_TEXT,
-      sha256: AGREEMENT_SHA256,
+      version: health.agreementVersion,
+      text: agreementText(health.agreementVersion),
+      sha256: agreementSha256(health.agreementVersion),
     } satisfies Platform["HealthDataAgreement"]);
     return true;
   }
@@ -346,7 +364,11 @@ export async function healthRoute(input: {
     // A text changed since it was read: once per `agreement-changed-once`.
     const changed = health.agreementChanges > 0;
     if (changed) health.agreementChanges -= 1;
-    if (changed || body.version !== 1 || body.sha256 !== AGREEMENT_SHA256) {
+    if (
+      changed ||
+      body.version !== health.agreementVersion ||
+      body.sha256 !== agreementSha256(health.agreementVersion)
+    ) {
       respond(response, 409, {
         ...problem(409, "Conflict"),
         details: { reason: "agreement_changed" },
@@ -356,7 +378,7 @@ export async function healthRoute(input: {
     const document = {
       id: `d0c0d0c0-d0c0-4d0c-8d0c-${String(health.documents.length).padStart(12, "0")}`,
       kind: "health-data",
-      version: 1,
+      version: health.agreementVersion,
       signerName: body.signerName as string,
       signerTitle: body.signerTitle as string,
       acceptedAt: now,
@@ -367,6 +389,13 @@ export async function healthRoute(input: {
     });
     health.agreementAccepted = true;
     health.documents = [document, ...health.documents];
+    // A newer version published just after: the workspace's acceptance is
+    // of the one before, and a turn-on is refused until it signs again.
+    if (health.newerOnAccept) {
+      health.newerOnAccept = false;
+      health.agreementVersion = 2;
+      health.agreementAccepted = false;
+    }
     respond(response, 201, { document });
     return true;
   }

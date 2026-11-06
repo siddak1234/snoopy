@@ -93,10 +93,14 @@ function shownWorkspace(formData: FormData): string {
   return String(formData.get("workspaceId") ?? "");
 }
 
-/** Turns a refusal into something renderable, and lets the unexpected surface. */
+/**
+ * Turns a refusal into something renderable, and lets the unexpected surface;
+ * `own` reads a refusal the action says its own way first (`null`: not one).
+ */
 async function attempt(
   formData: FormData,
   run: (workspaceId: string) => Promise<unknown>,
+  own?: (error: PlatformServerError) => Promise<ActionResult | null>,
 ): Promise<ActionResult> {
   try {
     const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
@@ -105,6 +109,8 @@ async function attempt(
     return { ok: true };
   } catch (error) {
     if (error instanceof PlatformServerError) {
+      const refused = await own?.(error);
+      if (refused) return refused;
       // A member's change of a flow (§12.1 #180): said in the clients' words.
       if (flowChangeRefused(error.status, error.details))
         return { ok: false, error: FLOW_CHANGE_ADMIN_ONLY, state: "forbidden" };
@@ -516,7 +522,7 @@ export async function startRun(formData: FormData): Promise<ActionResult> {
     return { ok: true, runId: response.run.id };
   } catch (error) {
     if (!(error instanceof PlatformServerError)) throw error;
-    // A flow that carries health data (backend ADR-0049, C3-b), as on Add.
+    // A flow that carries health data (backend ADR-0049, C3-b).
     const agreement = await agreementRefusal(error, shownWorkspace(formData));
     if (agreement) return agreement;
     const reason = error.details?.reason;
@@ -602,6 +608,13 @@ export async function archiveSubscription(
   return result;
 }
 
+/**
+ * Pause, or Turn on outside Set up (`RunStart` on a flow's own page). A
+ * turn-on of a flow that carries health data, before the owner accepted, is
+ * refused 403 `agreement_required` (backend ADR-0049 amendment 2): read as
+ * Start run's is (`agreementRefusal`) — the owner the text, for the dialog;
+ * anyone else the line.
+ */
 export async function setSubscriptionStatus(
   formData: FormData,
 ): Promise<ActionResult> {
@@ -612,8 +625,13 @@ export async function setSubscriptionStatus(
   }
 
   const body: UpdateSubscriptionRequest = { status };
-  const result = await attempt(formData, (workspaceId) =>
-    updateSubscription(workspaceId, subscriptionId, body, "status"),
+  const result = await attempt(
+    formData,
+    (workspaceId) =>
+      updateSubscription(workspaceId, subscriptionId, body, "status"),
+    status === "live"
+      ? (error) => agreementRefusal(error, shownWorkspace(formData))
+      : undefined,
   );
   if (result.ok) revalidatePath("/account/flows", "layout");
   return result;
