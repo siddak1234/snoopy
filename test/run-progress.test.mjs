@@ -970,7 +970,13 @@ test("a platform step this build does not know: its title, no line, no state —
 
 test("the run page draws the tracker's rows and words alone — never a step's summary, never its id — on its steps face, and reads the run again while it goes on (builds 37 and 39, item 10)", () => {
   const live = read("app/account/runs/[runId]/RunLive.tsx");
-  assert.match(live, /const tracker = trackerRows\(/u);
+  // A batch parent by its flow's batch steps (`batchStepsFor`, `batchRows`,
+  // builds 37 and 39, wave 2: test/fb39-wave2.test.mjs); every other run by
+  // the tracker.
+  assert.match(
+    live,
+    /const batchSteps = batchStepsFor\(run, flow\);\s*const tracker =\s*batchSteps\s*\?\s*batchRows\(steps, batchSteps,[\s\S]*?\)\s*:\s*trackerRows\(/u,
+  );
   // The catalog's steps for any run — no version gate (S25) — with the flow
   // as read now and the run's email (S23, S24).
   assert.doesNotMatch(live, /templateVersion|declaredFor/u);

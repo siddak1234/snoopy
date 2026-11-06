@@ -26,6 +26,8 @@ export type HealthDataAgreement = Schema["HealthDataAgreement"];
 export type AgreementAcceptanceRequest = Schema["AgreementAcceptanceRequest"];
 export type WorkspaceDocument = Schema["WorkspaceDocument"];
 export type WorkspaceDocumentCopy = Schema["WorkspaceDocumentCopy"];
+export type WorkspaceHealthDataAgreement =
+  Schema["WorkspaceHealthDataAgreement"];
 type AcceptAgreementResponse =
   operations["acceptAgreement"]["responses"][201]["content"]["application/json"];
 type ReadWorkspaceDocumentResponse =
@@ -61,6 +63,20 @@ export function acceptAgreement(
   return platformServerJson<AcceptAgreementResponse>(
     `${scope(workspaceId)}/agreements`,
     { method: "POST", body: JSON.stringify(body), idempotencyKey },
+  );
+}
+
+/**
+ * What Set up's "Contract and accept" section shows (ADR-0049 amendment 2):
+ * the current version and its sha256 (`current`, null while none is
+ * published) and the workspace's acceptance of exactly it (`acceptance`).
+ * Owner or admin only (a member is 403, so Set up never asks for one).
+ */
+export function readWorkspaceHealthDataAgreement(
+  workspaceId: string,
+): Promise<WorkspaceHealthDataAgreement> {
+  return platformServerJson<WorkspaceHealthDataAgreement>(
+    `${scope(workspaceId)}/agreements/health-data`,
   );
 }
 
@@ -100,7 +116,7 @@ export async function readWorkspaceDocument(
   }
 }
 
-/** An add, a run or an item refused for the agreement, as a server action answers it. */
+/** A run, an item or a turn-on refused for the agreement, as a server action answers it. */
 export type AgreementRefusal = {
   ok: false;
   /** The line to show; empty when the dialog opens instead. */
@@ -111,11 +127,12 @@ export type AgreementRefusal = {
 };
 
 /**
- * A refused add, run or item (`createSubscription`, `createRun`,
- * `createItem`) read as the agreement's, or `null` when the refusal is
- * another's. Only on this refusal
+ * A refused run, item or turn-on outside Set up (`createRun`, `createItem`,
+ * `setSubscriptionStatus`) read as the agreement's, or `null` when the
+ * refusal is another's (an add is never refused for it since ADR-0049
+ * amendment 2; Set up's turn-on is read by `saveSetup`). Only on this refusal
  * does it read anything: the workspace list (who this person is there, and
- * its name) and, for its owner, the text — never on any other add or run.
+ * its name) and, for its owner, the text — never on any other run.
  * The owner gets the text to accept, or "isn't available yet" while none is
  * published; anyone else the line asking the owner.
  */

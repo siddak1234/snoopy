@@ -55,8 +55,11 @@ import { SPACING } from "@/lib/spacing";
  * owner accepts the health data agreement (backend ADR-0049, C3-b): the owner
  * reads and accepts it in `HealthAgreementDialog`, whose "Accept and start
  * run" sends the same values under the same key again; anyone else sees "Ask
- * your workspace owner to accept the health data agreement.". The dialog is
- * drawn beside the form, never in it, so its fields are not the run's.
+ * your workspace owner to accept the health data agreement.". Turn on here (a
+ * draft added and not set up, or a paused flow) is refused the same way
+ * (ADR-0049 amendment 2), and opens the same dialog, whose "Accept and turn
+ * on" turns the flow on again. The dialog is drawn beside the form, never in
+ * it, so its fields are not the run's.
  */
 export function RunStart({
   workspaceId,
@@ -118,10 +121,12 @@ export function RunStart({
   }, []);
   // Bumped to empty the file fields when the platform will not take a file.
   const [fileRound, setFileRound] = useState(0);
-  // The agreement to accept, and the run it refused, as it was sent.
+  // The agreement to accept, and what it refused: the run, as it was sent,
+  // or the turn-on, sent again once accepted.
   const [offer, setOffer] = useState<{
     agreement: AgreementOffer;
-    data: FormData;
+    purpose: "run" | "turn-on";
+    repeat: () => Promise<string | null>;
   } | null>(null);
   const canRun = live && available && runInput.length > 0;
 
@@ -130,7 +135,11 @@ export function RunStart({
     const result = await startRun(data);
     if (!result.ok) {
       if (result.agreement) {
-        setOffer({ agreement: result.agreement, data });
+        setOffer({
+          agreement: result.agreement,
+          purpose: "run",
+          repeat: () => send(data),
+        });
         return null;
       }
       // A file already used, or gone: its field is emptied to choose again,
@@ -160,19 +169,33 @@ export function RunStart({
     });
   };
 
+  /** Turns the flow on: its refusal in words, or null once it went or the dialog opened. */
+  const sendTurnOn = async (): Promise<string | null> => {
+    const data = new FormData();
+    data.set("workspaceId", workspaceId);
+    data.set("subscriptionId", subscriptionId);
+    data.set("status", "live");
+    const result = await setSubscriptionStatus(data);
+    if (!result.ok) {
+      if (result.agreement) {
+        setOffer({
+          agreement: result.agreement,
+          purpose: "turn-on",
+          repeat: sendTurnOn,
+        });
+        return null;
+      }
+      return result.error;
+    }
+    setOffer(null);
+    router.refresh();
+    return null;
+  };
+
   const turnOn = () => {
     setError(null);
     startTransition(async () => {
-      const data = new FormData();
-      data.set("workspaceId", workspaceId);
-      data.set("subscriptionId", subscriptionId);
-      data.set("status", "live");
-      const result = await setSubscriptionStatus(data);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      router.refresh();
+      setError(await sendTurnOn());
     });
   };
 
@@ -239,8 +262,8 @@ export function RunStart({
           key={offer.agreement.sha256}
           offer={offer.agreement}
           workspaceId={workspaceId}
-          purpose="run"
-          onAccepted={() => send(offer.data)}
+          purpose={offer.purpose}
+          onAccepted={offer.repeat}
           onClose={() => setOffer(null)}
         />
       ) : null}

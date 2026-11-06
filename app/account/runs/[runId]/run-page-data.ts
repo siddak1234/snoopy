@@ -30,7 +30,8 @@ import type { RunFlow } from "./RunLive";
  * its manifest declares — and not `events`, which is the platform's own record
  * of state transitions. The run names no flow (`Run.templateId`'s own words: a
  * screen joins the catalog), so its name, steps' titles and groups come from
- * there; its file page's word is its version's file fields (`runFileRows`).
+ * there — a batch run's from its flow's `batch.pipeline` (ADR-0048 amendment
+ * 6); its file page's word is its version's file fields (`runFileRows`).
  * A held run's approvals are read too, for step 4 on its steps face, and
  * a run's that waited and went on, for its saved review's count (Round 21's
  * F2; `readsJobApprovals`). The
@@ -169,6 +170,17 @@ export async function readRunPage(
           title: step.title,
           ...(step.group ? { group: step.group } : {}),
         })),
+        // A batch run's own steps (ADR-0048 amendment 6), by name.
+        ...(entry.batch
+          ? {
+              batch: {
+                pipeline: entry.batch.pipeline.map((step) => ({
+                  id: step.id,
+                  title: step.title,
+                })),
+              },
+            }
+          : {}),
         ...(entry.groups
           ? {
               groups: entry.groups.map((group) => ({

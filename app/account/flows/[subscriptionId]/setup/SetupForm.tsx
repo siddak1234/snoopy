@@ -24,13 +24,24 @@ import {
 } from "@/lib/flow-steps";
 import { ConnectionsPanel } from "@/app/account/connections/ConnectionsPanel";
 import { PENDING_CONNECT } from "@/app/account/connections/pending-connect";
+import { acceptThenRepeat, contractAllowsTurnOn } from "@/lib/health-agreement";
 import { saveSetup } from "../../actions";
-import { SECTION_NAME, SetupFields } from "../../ManifestFields";
+import { acceptHealthAgreement } from "../../agreement-actions";
+import {
+  SECTION_NAME,
+  SetupFields,
+  setupSectionCount,
+} from "../../ManifestFields";
 import { missingChoices, setupProblem } from "../../setup-check";
 import { VendorRows, type VendorOption } from "../../VendorRows";
 import { Group } from "@/components/dashboard/Group";
 import { SPACING } from "@/lib/spacing";
 import { FLOW_CHANGE_ADMIN_ONLY } from "@/lib/subscription-entitlements";
+import {
+  ContractStep,
+  type ContractSigned,
+  type ContractView,
+} from "./ContractStep";
 
 /** One step's vendor choice on Set up. */
 export type SetupVendorField = {
@@ -66,6 +77,21 @@ const UNAVAILABLE = "This flow is not responding, so it cannot run yet.";
  * Back from a vendor's sign-in that connected the vendor the connect left for,
  * that vendor is its step's choice, until another is picked.
  *
+ * A flow that carries health data draws "Contract and accept" after its own
+ * sections, numbered next (`ContractStep`; the owner's item 9 of builds 37
+ * and 39; backend ADR-0049 amendment 2). Its Turn on is disabled until the
+ * section allows it (`contractAllowsTurnOn`: accepted, or the owner's box
+ * ticked and both fields filled); for the owner one press accepts (the text's
+ * version and sha256, one key per text read), then saves and turns the flow
+ * on, and a retry after a later refusal never accepts twice
+ * (`acceptThenRepeat`). A text that changed since it was read (409) is read
+ * again, the box unticked; a turn-on the platform refuses 403
+ * `agreement_required` reads the section again, the box unticked and a new
+ * key — never the agreement dialog. "Accepted" by this page's press holds
+ * only while the text offered is the one it accepted (its sha256): a newer
+ * version read since is signed afresh.
+ * Save, on a flow on or paused, is never held by it.
+ *
  * Only an owner or admin changes a flow (backend §12.1 #180): to a member the
  * page is read-only — the vendor rows and the settings drawn as they are, no
  * Turn on or Save — under "Only an owner or admin can change this flow.".
@@ -86,6 +112,7 @@ export function SetupForm({
   canManage,
   returnTo,
   callbackStatus,
+  contract = null,
 }: {
   /** The workspace this page shows; every action is refused once it is not active. */
   workspaceId: string;
@@ -105,6 +132,8 @@ export function SetupForm({
   /** This page, for a connect's way back. */
   returnTo: string;
   callbackStatus: "connected" | "error" | null;
+  /** The health data agreement's section, for a flow that carries health data; else null. */
+  contract?: ContractView | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -112,6 +141,18 @@ export function SetupForm({
   // Every required drop-down the save found empty, said under each.
   const [missing, setMissing] = useState<ReadonlySet<string>>(new Set());
   const [picked, setPicked] = useState<Record<string, string>>({});
+  // The owner's signature, accepted by this page's press, and the key of
+  // the text read (a new one after the text changed).
+  const [signed, setSigned] = useState<ContractSigned>({
+    authorized: false,
+    name: "",
+    title: "",
+  });
+  // The hash of the text this page's press accepted.
+  const [acceptedHere, setAcceptedHere] = useState<string | null>(null);
+  const [agreementKey, setAgreementKey] = useState(
+    () => `agreement-${crypto.randomUUID()}`,
+  );
   // Read in the browser only: which vendor this tab's last connect left for.
   const returnedFor = useSyncExternalStore(
     noSubscription,
@@ -154,6 +195,26 @@ export function SetupForm({
   const declared = (sections?.length ?? 0) > 0;
   const hasConnect =
     (!declared && vendorFields.length > 0) || required.length > 0;
+  // Accepted by this page's press: said so while the text offered is the
+  // one accepted — a newer one read since (a turn-on refused 403) is signed.
+  const shownContract: ContractView | null =
+    contract && acceptedHere !== null && contract.offer?.sha256 === acceptedHere
+      ? {
+          ...contract,
+          state: "accepted",
+          acceptance: {
+            version: contract.offer.version,
+            signerName: signed.name.trim(),
+            signerTitle: signed.title.trim(),
+            acceptedAt: contract.today,
+          },
+        }
+      : contract;
+  // Only Turn on is held by the agreement (the platform asks nothing of Save).
+  const contractHolds =
+    turnOn &&
+    shownContract !== null &&
+    !contractAllowsTurnOn(shownContract.state, signed);
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -202,13 +263,47 @@ export function SetupForm({
       data.set(`config:${field.key}`, choiceOf(field));
     }
     data.set("turnOn", turnOn ? "true" : "false");
-    startTransition(async () => {
-      const result = await saveSetup(data);
-      if (!result.ok) {
-        setError(result.error);
-        return;
+    // The owner signing: accept first, once, then turn on.
+    const offer = shownContract?.state === "sign" ? shownContract.offer : null;
+    const signing = turnOn && offer !== null;
+    const accept = async () => {
+      const form = new FormData();
+      form.set("workspaceId", workspaceId);
+      form.set("version", String(offer!.version));
+      form.set("sha256", offer!.sha256);
+      form.set("signerName", signed.name);
+      form.set("signerTitle", signed.title);
+      form.set("authorized", "true");
+      form.set("agreementKey", agreementKey);
+      const answer = await acceptHealthAgreement(form);
+      if (!answer.ok && answer.state === "agreement-changed") {
+        // Read again: the box unticked, the name and title kept, a new key.
+        setSigned((current) => ({ ...current, authorized: false }));
+        setAgreementKey(`agreement-${crypto.randomUUID()}`);
+        router.refresh();
       }
-      router.push(flowPath(subscriptionId));
+      return answer;
+    };
+    const save = async (): Promise<string | null> => {
+      const result = await saveSetup(data);
+      if (result.ok) {
+        router.push(flowPath(subscriptionId));
+        return null;
+      }
+      // Its section, read again, says what is owed: a text to sign again
+      // is signed afresh — the box unticked, a new key.
+      if (result.state === "agreement-required") {
+        setSigned((current) => ({ ...current, authorized: false }));
+        setAgreementKey(`agreement-${crypto.randomUUID()}`);
+        router.refresh();
+        return null;
+      }
+      return result.error;
+    };
+    startTransition(async () => {
+      const pressed = await acceptThenRepeat(!signing, accept, save);
+      if (signing && pressed.accepted && offer) setAcceptedHere(offer.sha256);
+      setError(pressed.error);
     });
   };
 
@@ -298,10 +393,25 @@ export function SetupForm({
             missingChoices={missing}
           />
         </fieldset>
+        {shownContract ? (
+          <ContractStep
+            index={
+              (hasConnect ? 1 : 0) +
+              setupSectionCount(setup, sections, true) +
+              1
+            }
+            view={shownContract}
+            signed={signed}
+            onSigned={(next) => {
+              setError(null);
+              setSigned(next);
+            }}
+          />
+        ) : null}
         <FormError message={error} />
         {canManage ? (
           <div>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending || contractHolds}>
               {turnOn
                 ? pending
                   ? "Turning on…"
