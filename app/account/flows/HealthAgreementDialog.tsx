@@ -6,13 +6,13 @@ import { FormError } from "@/components/ui/FormError";
 import { FormInput } from "@/components/ui/FormInput";
 import Modal from "@/components/ui/Modal";
 import {
-  ACCEPT_AND_ADD,
   ACCEPT_AND_START,
-  ADDING,
+  ACCEPT_AND_TURN_ON,
   AGREEMENT_TITLE,
   SIGNER_NAME,
   SIGNER_TITLE,
   STARTING,
+  TURNING_ON,
   acceptThenRepeat,
   agreementVersion,
   authorizedToSign,
@@ -22,15 +22,19 @@ import { SPACING } from "@/lib/spacing";
 import { acceptHealthAgreement } from "./agreement-actions";
 
 /**
- * The health data agreement, for the workspace's owner, when Add, Start run
- * or an item's upload (which starts a run) of a flow that carries health data
- * was refused 403 `agreement_required` (backend ADR-0049, C3): one dialog —
- * its title, "Version {n}", the text to scroll, "I'm authorized to sign for
- * {organization}", Full name and Title, and the button that accepts and then
- * sends the add, the run or the item again ("Accept and add flow", "Accept
- * and start run"). The caller sends it again with the key the refused request
- * carried (a refused add, run or item recorded none), so a lost answer starts
- * nothing twice. Accepted once: a
+ * The health data agreement, for the workspace's owner, when Start run, an
+ * item's upload (which starts a run) or Turn on on a flow's own page, of a
+ * flow that carries health data, was refused 403 `agreement_required`
+ * (backend ADR-0049, C3; amendment 2): one dialog — its title, "Version {n}",
+ * the text to scroll, "I'm authorized to sign for {organization}", Full name
+ * and Title, and "Accept and start run" ("Accept and turn on" for a turn-on,
+ * `purpose`), which accepts and then sends the run, the item or the turn-on
+ * again. The caller sends a run or an item again with the key the refused
+ * request carried (a refused run or item recorded none), so a lost answer
+ * starts nothing twice. Set up's turn-on asks in its
+ * own "Contract and accept" section instead (`ContractStep.tsx`), and an Add
+ * is no longer refused (ADR-0049 amendment 2; ~~"Accept and add flow"~~
+ * until builds 37 and 39, wave 2). Accepted once: a
  * press after the repeat was refused sends the repeat alone, never a second
  * acceptance; a newer version opens a new dialog (`key` by its hash). Anyone
  * else gets the caller's one line (`ASK_OWNER`) and no dialog. Words:
@@ -39,18 +43,18 @@ import { acceptHealthAgreement } from "./agreement-actions";
 export function HealthAgreementDialog({
   offer,
   workspaceId,
-  purpose,
   onAccepted,
   onClose,
+  purpose = "run",
 }: {
   offer: AgreementOffer;
   /** The workspace the page shows; the acceptance is refused once it is not active. */
   workspaceId: string;
-  /** What the button does once accepted: add the flow, or start the run. */
-  purpose: "add" | "run";
-  /** Sends the add or the run again: its refusal in words, or null once it went. */
+  /** Sends the run, the item or the turn-on again: its refusal in words, or null once it went. */
   onAccepted: () => Promise<string | null>;
   onClose: () => void;
+  /** What the button does once accepted: start the run (or the item's), or turn the flow on. */
+  purpose?: "run" | "turn-on";
 }) {
   const id = useId();
   const [pending, startTransition] = useTransition();
@@ -156,10 +160,10 @@ export function HealthAgreementDialog({
             Cancel
           </Button>
           <Button type="submit" disabled={pending}>
-            {purpose === "add"
+            {purpose === "turn-on"
               ? pending
-                ? ADDING
-                : ACCEPT_AND_ADD
+                ? TURNING_ON
+                : ACCEPT_AND_TURN_ON
               : pending
                 ? STARTING
                 : ACCEPT_AND_START}

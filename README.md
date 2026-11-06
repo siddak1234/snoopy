@@ -218,12 +218,17 @@ full queue said; a photo added), a public app connected with no
 Connect step and, as a step's choice, Connected and chosen in place, a batch run's page, and a flow
 whose list row carries no settings still drawn and saved from its one-flow read (backend §12.1 #319), a flow id that is not a UUID, one the platform does not know and a flow it answers archived each "not found", its integration's save refused once it is archived, and a run's steps face still drawn when its flow is archived or cannot be read, in `e2e/public-edge-fixture.spec.ts`), `e2e/dialogs.spec.ts`
 (every dialog's Escape, click outside, focus return and hold, one row each),
-`e2e/health-data.spec.ts` (Round 21, Stage 2: the health data agreement on
-Add, on Start run and on an item's upload — the owner's dialog, anyone
-else's one line, nothing published yet, the add, run or item sent again
-under the refused one's key, signed once when that repeat is refused — the
-organization's Documents and a signed copy, one whose id is not one not
-found), `e2e/ehr-connect.spec.ts` (Connect your EHR: the FHIR address, a vendor
+`e2e/health-data.spec.ts` (Round 21, Stage 2 and builds 37 and 39, wave 2:
+an Add of a health flow opening Set up with no dialog, its "Contract and
+accept" in every state — not published, accepted, the owner's one press
+that accepts then turns on, signed once when the turn-on is refused, a
+newer text signed afresh after the turn-on is refused 403, a changed text
+read again, an admin, a member, a read that failed — the health data
+agreement on Start run, on an item's upload and on a draft's Turn on from
+its flow page — the owner's
+dialog, anyone else's one line, the run or item sent again under the
+refused one's key — the organization's Documents and a signed copy, one
+whose id is not one not found, and a batch run's steps by name), `e2e/ehr-connect.spec.ts` (Connect your EHR: the FHIR address, a vendor
 picker only for two or more vendors, each refusal in words, the row named
 by the clinic's host)
 and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: the Flows

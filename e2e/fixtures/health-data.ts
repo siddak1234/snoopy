@@ -1,8 +1,9 @@
 /**
  * The fixture Edge's health data surfaces (Round 21, Stage 2), beside
  * `public-edge.ts`, which owns its state and calls `healthRoute` before its
- * own key, add and run routes: the health data agreement and a workspace's
- * Documents (backend ADR-0049, C3), and the EHR, a SMART Backend Services
+ * own key and run routes: the health data agreement, a workspace's
+ * acceptance of it (ADR-0049 amendment 2) and its Documents (backend
+ * ADR-0049, C3), and the EHR, a SMART Backend Services
  * provider (ADR-0050, D1); and S1-8b's Approve that a disconnect expired.
  * Each is off until a test's control turns it on,
  * but for the one signed document the organization starts with, so no other
@@ -22,9 +23,13 @@ const now = "2026-08-12T12:00:00.000Z";
 /** The agreement's text, `{Covered Entity}` and `{Effective date}` left to fill, and its hash. */
 const AGREEMENT_TEXT =
   "# Business Associate Agreement\n\nThis agreement is between {Covered Entity} and Autom8x, effective {Effective date}.\n\n1. Autom8x uses health data only to run the flows the Covered Entity adds.\n2. Autom8x tells the Covered Entity of any breach it finds.\n";
-const AGREEMENT_SHA256 = createHash("sha256")
-  .update(AGREEMENT_TEXT)
-  .digest("hex");
+/** Each version's text: version 2 (published after an acceptance, `agreement-newer-after-accept`) adds a line. */
+const agreementText = (version: number) =>
+  version === 1
+    ? AGREEMENT_TEXT
+    : `${AGREEMENT_TEXT}3. Version ${version} adds this line.\n`;
+const agreementSha256 = (version: number) =>
+  createHash("sha256").update(agreementText(version)).digest("hex");
 
 /** The document the organization starts with: accepted by its owner. */
 export const signedDocumentId = "d0c0d0c0-d0c0-4d0c-8d0c-d0c0d0c0d0c0";
@@ -48,7 +53,7 @@ function signedCopy(
   ).replace("{Effective date}", "August 12, 2026");
   return {
     ...document,
-    text: `${filled}\n## Signature\n\n${organization}\n${document.signerName}, ${document.signerTitle}\nAuthorized to sign for ${organization}.\nAccepted ${document.acceptedAt}, version ${document.version}, SHA-256 ${AGREEMENT_SHA256}.\n`,
+    text: `${filled}\n## Signature\n\n${organization}\n${document.signerName}, ${document.signerTitle}\nAuthorized to sign for ${organization}.\nAccepted ${document.acceptedAt}, version ${document.version}, SHA-256 ${agreementSha256(document.version)}.\n`,
   };
 }
 
@@ -68,10 +73,19 @@ export function healthState() {
     agreementUnpublished: false,
     // How many repeats after the acceptance are refused (502), once each.
     repeatsRefused: 0,
-    // Every add, run start and item sent while the flows carry health data,
-    // with its key — a repeat after Accept must carry the refused one's.
+    // Builds 37 and 39, wave 2: the workspace's agreement read failing
+    // (503), and how many acceptances answer 409 `agreement_changed`.
+    agreementReadFailing: false,
+    agreementChanges: 0,
+    // The version published now, and whether the next acceptance publishes
+    // a newer one (version 2) the workspace has not accepted.
+    agreementVersion: 1,
+    newerOnAccept: false,
+    // Every run start, item and turn-on (`public-edge.ts`'s Invoice
+    // Processing PATCH to live) sent while the flows carry health data, with
+    // its key — a repeat after Accept must carry the refused one's.
     healthRequests: [] as {
-      path: "subscriptions" | "runs" | "items";
+      path: "runs" | "items" | "turn-on";
       key: string | null;
       accepted: boolean;
     }[],
@@ -106,6 +120,22 @@ export function healthControls(
     "/__fixture/agreement-unpublished": () => {
       health.healthData = true;
       health.agreementUnpublished = true;
+    },
+    "/__fixture/agreement-accepted": () => {
+      health.healthData = true;
+      health.agreementAccepted = true;
+    },
+    "/__fixture/agreement-read-failing": () => {
+      health.healthData = true;
+      health.agreementReadFailing = true;
+    },
+    "/__fixture/agreement-newer-after-accept": () => {
+      health.healthData = true;
+      health.newerOnAccept = true;
+    },
+    "/__fixture/agreement-changed-once": () => {
+      health.healthData = true;
+      health.agreementChanges = 1;
     },
     "/__fixture/approval-disconnected": () => {
       health.approvalDisconnected = "quickbooks";
@@ -168,6 +198,23 @@ export function ehrConnections(
   ];
 }
 
+/** The 403 a run start, an item or a turn-on answers before the owner accepted. */
+export function agreementRefusal(
+  health: HealthState,
+  problem: (status: number, title: string, details?: Json) => Json,
+): Json {
+  return {
+    ...problem(403, "Forbidden"),
+    details: {
+      reason: "agreement_required",
+      kind: "health-data",
+      ...(health.agreementUnpublished
+        ? {}
+        : { version: health.agreementVersion }),
+    },
+  };
+}
+
 const header = (request: IncomingMessage, name: string) => {
   const value = request.headers[name];
   return (Array.isArray(value) ? value[0] : value) ?? null;
@@ -194,30 +241,19 @@ export async function healthRoute(input: {
     input;
   const scope = `/v1/workspaces/${input.workspaceId}`;
 
-  // An add, a run start or an item (whose run it starts) while the flows
-  // carry health data: refused 403 `agreement_required` until the owner
-  // accepts, nothing made — a member's add or item excepted, which the Edge
-  // refuses first as a member's. Once accepted, recorded and answered by the
-  // fixture's own routes.
+  // A run start or an item (whose run it starts) while the flows carry
+  // health data: refused 403 `agreement_required` until the owner accepts,
+  // nothing made — a member's item excepted, which the Edge refuses first as
+  // a member's. Once accepted, recorded and answered by the fixture's own
+  // routes. An add is not refused (ADR-0049 amendment 2): its turn-on is,
+  // in `public-edge.ts` (`agreementRefusal`).
   const item = new RegExp(`^${scope}/subscriptions/[^/]+/items$`, "u").test(
     pathname,
   );
-  const start =
-    method === "POST" &&
-    (pathname === `${scope}/subscriptions` ||
-      pathname === `${scope}/runs` ||
-      item);
-  if (
-    start &&
-    health.healthData &&
-    !(!pathname.endsWith("/runs") && input.session === "member")
-  ) {
+  const start = method === "POST" && (pathname === `${scope}/runs` || item);
+  if (start && health.healthData && !(item && input.session === "member")) {
     health.healthRequests.push({
-      path: item
-        ? "items"
-        : pathname.endsWith("/runs")
-          ? "runs"
-          : "subscriptions",
+      path: item ? "items" : "runs",
       key: header(request, "idempotency-key"),
       accepted: health.agreementAccepted,
     });
@@ -227,14 +263,40 @@ export async function healthRoute(input: {
       respond(response, 502, problem(502, "Bad Gateway"));
       return true;
     }
-    respond(response, 403, {
-      ...problem(403, "Forbidden"),
-      details: {
-        reason: "agreement_required",
-        kind: "health-data",
-        ...(health.agreementUnpublished ? {} : { version: 1 }),
-      },
-    });
+    respond(response, 403, agreementRefusal(health, problem));
+    return true;
+  }
+
+  // What Set up's "Contract and accept" reads (ADR-0049 amendment 2): owner
+  // or admin, a member 403; the current version, null while unpublished, and
+  // the workspace's acceptance of it.
+  if (method === "GET" && pathname === `${scope}/agreements/health-data`) {
+    if (input.session === "member") {
+      respond(response, 403, {
+        ...problem(403, "Forbidden"),
+        details: { requiredRole: "admin" },
+      });
+      return true;
+    }
+    if (health.agreementReadFailing) {
+      respond(response, 503, problem(503, "Service Unavailable"));
+      return true;
+    }
+    respond(response, 200, {
+      kind: "health-data",
+      current: health.agreementUnpublished
+        ? null
+        : {
+            version: health.agreementVersion,
+            sha256: agreementSha256(health.agreementVersion),
+          },
+      acceptance:
+        health.agreementAccepted && !health.agreementUnpublished
+          ? (health.documents.find(
+              (document) => document.version === health.agreementVersion,
+            ) ?? null)
+          : null,
+    } satisfies Platform["WorkspaceHealthDataAgreement"]);
     return true;
   }
 
@@ -267,9 +329,9 @@ export async function healthRoute(input: {
       return true;
     }
     respond(response, 200, {
-      version: 1,
-      text: AGREEMENT_TEXT,
-      sha256: AGREEMENT_SHA256,
+      version: health.agreementVersion,
+      text: agreementText(health.agreementVersion),
+      sha256: agreementSha256(health.agreementVersion),
     } satisfies Platform["HealthDataAgreement"]);
     return true;
   }
@@ -299,7 +361,14 @@ export async function healthRoute(input: {
       respond(response, 400, problem(400, "Bad Request"));
       return true;
     }
-    if (body.version !== 1 || body.sha256 !== AGREEMENT_SHA256) {
+    // A text changed since it was read: once per `agreement-changed-once`.
+    const changed = health.agreementChanges > 0;
+    if (changed) health.agreementChanges -= 1;
+    if (
+      changed ||
+      body.version !== health.agreementVersion ||
+      body.sha256 !== agreementSha256(health.agreementVersion)
+    ) {
       respond(response, 409, {
         ...problem(409, "Conflict"),
         details: { reason: "agreement_changed" },
@@ -309,7 +378,7 @@ export async function healthRoute(input: {
     const document = {
       id: `d0c0d0c0-d0c0-4d0c-8d0c-${String(health.documents.length).padStart(12, "0")}`,
       kind: "health-data",
-      version: 1,
+      version: health.agreementVersion,
       signerName: body.signerName as string,
       signerTitle: body.signerTitle as string,
       acceptedAt: now,
@@ -320,6 +389,13 @@ export async function healthRoute(input: {
     });
     health.agreementAccepted = true;
     health.documents = [document, ...health.documents];
+    // A newer version published just after: the workspace's acceptance is
+    // of the one before, and a turn-on is refused until it signs again.
+    if (health.newerOnAccept) {
+      health.newerOnAccept = false;
+      health.agreementVersion = 2;
+      health.agreementAccepted = false;
+    }
     respond(response, 201, { document });
     return true;
   }

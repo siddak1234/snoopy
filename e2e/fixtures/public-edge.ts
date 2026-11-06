@@ -25,6 +25,7 @@ const { itemBody, runBlocks } = (await import(
 )) as typeof import("./page-bodies");
 // Round 21, Stage 2's health data surfaces, by their own path as well.
 const {
+  agreementRefusal,
   ehrConnections,
   ehrProviders,
   healthControls,
@@ -351,6 +352,10 @@ function initialState() {
     // Backend ADR-0037: Invoice Processing's flow — its status, its settings
     // (the vendor it chose among them), and whether QuickBooks is connected.
     invoiceStatus: "live" as "live" | "paused" | "draft",
+    // Builds 37 and 39, wave 2 (backend ADR-0048 amendment 6): Invoice
+    // Processing's catalog entry declares a batch run's steps, as ICD-10
+    // Code Check v4's does.
+    invoiceBatch: false,
     invoiceConfig: { vendor: "none", holdAboveAmount: 500 } as Json,
     invoiceSaves: [] as Json[],
     // Backend §12.1 #319: every flow read by its id, in order.
@@ -1220,6 +1225,10 @@ function fixtureCatalog(): Automations["AutomationCatalogResponse"] {
           ? invoiceAutomation
           : wordlessInvoice()),
         subscribed: state.invoiceAdded,
+        // Builds 37 and 39, wave 2 (ADR-0049 amendment 2; ADR-0048
+        // amendment 6): it carries health data, and a batch run's steps.
+        ...(state.health.healthData ? { healthData: true } : {}),
+        ...(state.invoiceBatch ? { batch: invoiceBatch } : {}),
         ...(state.publicProviders
           ? {
               requiredConnections: [
@@ -1670,6 +1679,17 @@ const invoiceRunId = "fixture-run-invoice";
 const invoiceHeldRunId = "fixture-run-invoice-held";
 const invoiceV2RunId = "793eef82-102d-81be-a2d3-9e8d4e2b2c36";
 const invoiceStartedRunId = "fixture-run-invoice-started";
+// Builds 37 and 39, wave 2: a batch run of Invoice Processing, going, its
+// first batch step reported.
+const batchStepsRunId = "fixture-run-batch-steps";
+const invoiceBatch = {
+  pipeline: [
+    { id: "chunk", title: "Pages counted", description: "Counts the pages." },
+    { id: "categorize", title: "Pages sorted", description: "Sorts them." },
+    { id: "organize", title: "Visits found", description: "Finds visits." },
+    { id: "queue", title: "Visits queued", description: "Queues each." },
+  ].map((step) => ({ ...step, group: "upload" })),
+};
 const invoiceRunIds = [invoiceRunId, invoiceHeldRunId, invoiceV2RunId];
 
 /** One of three receipts as v3 writes it (spec §1.1, AM7). */
@@ -1977,6 +1997,22 @@ function invoiceApprovalNow(): Automations["Approval"] {
 // reason, the succeeded one its summary. Listed by Activity and read by its
 // page, so both handlers describe the same run.
 function fixtureRun(runId: string): Automations["Run"] {
+  if (runId === batchStepsRunId)
+    return {
+      id: runId,
+      workspaceId,
+      subscriptionId: invoiceSubscriptionId,
+      templateId: invoiceAutomation.templateId,
+      templateVersion: 4,
+      status: "running",
+      origin: "manual",
+      rootRunId: runId,
+      requestId: "fixture-request",
+      batch: true,
+      startedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
   if (runId === invoiceStartedRunId) {
     const stage = state.invoiceRunStage;
     return {
@@ -2738,6 +2774,9 @@ const server = createServer(
       },
       "/__fixture/invoice-paused": () => {
         state.invoiceStatus = "paused";
+      },
+      "/__fixture/invoice-batch": () => {
+        state.invoiceBatch = true;
       },
       "/__fixture/invoice-v1": () => {
         state.invoiceV1 = true;
@@ -4590,6 +4629,32 @@ const server = createServer(
           },
         } satisfies Platform["ApiProblem"]);
       }
+      // A flow that carries health data, turned on from draft or paused
+      // before the owner accepted: refused, nothing written (backend
+      // ADR-0049 amendment 2). Recorded with whether it was accepted, ahead
+      // of the checks below (the PATCH is the one the test reads).
+      if (
+        state.health.healthData &&
+        body.status === "live" &&
+        state.invoiceStatus !== "live"
+      ) {
+        state.health.healthRequests.push({
+          path: "turn-on",
+          key: (request.headers["idempotency-key"] as string) ?? null,
+          accepted: state.health.agreementAccepted,
+        });
+        if (!state.health.agreementAccepted)
+          return respond(
+            response,
+            403,
+            agreementRefusal(state.health, problem),
+          );
+        // Accepted, a turn-on refused once (`agreement-repeat-refused-once`).
+        if (state.health.repeatsRefused > 0) {
+          state.health.repeatsRefused -= 1;
+          return respond(response, 502, problem(502, "Bad Gateway"));
+        }
+      }
       const vendor = (config ?? state.invoiceConfig).vendor;
       const status = body.status ?? state.invoiceStatus;
       if (
@@ -5586,6 +5651,23 @@ const server = createServer(
         } satisfies AutomationOperations["readRun"]["responses"][200]["content"]["application/json"]);
       const run = fixtureRun(runId);
       const failed = run.status === "failed";
+      // A batch run, its first step reported (builds 37 and 39, wave 2).
+      if (runId === batchStepsRunId)
+        return respond(response, 200, {
+          run,
+          steps: [
+            {
+              id: "fixture-batch-step-1",
+              runId,
+              workspaceId,
+              stepId: "chunk",
+              outcome: "ok",
+              summary: "12 pages.",
+              occurredAt: now,
+            },
+          ],
+          events: [],
+        } satisfies AutomationOperations["readRun"]["responses"][200]["content"]["application/json"]);
       // Invoice Processing's runs: what each reported — no step that did not
       // run is reported — and the documents it read (backend ADR-0039).
       if (runId === invoiceStartedRunId || invoiceRunIds.includes(runId)) {

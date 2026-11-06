@@ -97,6 +97,29 @@ function declaredGroups(
     .filter((group) => group.fields.length > 0);
 }
 
+/** The sections `SetupFields` draws, in order: the manifest's own, else the four fixed ones. */
+function setupGroups(
+  setup: readonly AutomationSetupField[],
+  sections: readonly AutomationSetupSection[] | undefined,
+  vendors: boolean,
+): SetupGroup[] {
+  return sections && sections.length > 0
+    ? declaredGroups(setup, sections, vendors)
+    : fixedGroups(setup);
+}
+
+/**
+ * How many numbered sections `SetupFields` draws, so a section after them —
+ * Set up's "Contract and accept" — is numbered next.
+ */
+export function setupSectionCount(
+  setup: readonly AutomationSetupField[],
+  sections: readonly AutomationSetupSection[] | undefined,
+  vendors: boolean,
+): number {
+  return setupGroups(setup, sections, vendors).length;
+}
+
 /**
  * Setup fields, grouped under their sections and numbered from
  * `firstSection` — Set up's Connect is 1 when it draws one. The sections are
@@ -127,10 +150,7 @@ export function SetupFields({
   /** Every required drop-down the save found empty (`missingChoices`): "Choose at least one." under each. */
   missingChoices?: ReadonlySet<string>;
 }) {
-  const groups =
-    sections && sections.length > 0
-      ? declaredGroups(setup, sections, vendors !== undefined)
-      : fixedGroups(setup);
+  const groups = setupGroups(setup, sections, vendors !== undefined);
 
   return (
     <>

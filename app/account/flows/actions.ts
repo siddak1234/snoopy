@@ -24,7 +24,7 @@ import { agreementRefusal } from "@/lib/agreements";
 import { VENDOR_MEMBER_NOTE } from "@/lib/connection-rows";
 import { EMAIL_SAVE_FAILED } from "@/lib/flow-email";
 import { problemFields } from "@/lib/flow-items";
-import type { AgreementOffer } from "@/lib/health-agreement";
+import { agreementRequired, type AgreementOffer } from "@/lib/health-agreement";
 import { heldCopy } from "@/lib/held-flow";
 import { overPlanRefusal } from "@/lib/plan-limit";
 import { reviewAnswers } from "@/lib/run-progress";
@@ -79,7 +79,8 @@ export type ActionResult =
         // platform's words (Build 23's B3).
         | "forbidden"
         // A flow that carries health data, before the owner accepted the
-        // agreement (backend ADR-0049): the dialog's text, or the line.
+        // agreement (backend ADR-0049): the dialog's text, or the line; on
+        // Set up's turn-on, neither (its section is read again).
         | "agreement-required"
         // An Approve a disconnect expired (S1-8b): `expiredApproval`.
         | "approval-expired";
@@ -92,10 +93,14 @@ function shownWorkspace(formData: FormData): string {
   return String(formData.get("workspaceId") ?? "");
 }
 
-/** Turns a refusal into something renderable, and lets the unexpected surface. */
+/**
+ * Turns a refusal into something renderable, and lets the unexpected surface;
+ * `own` reads a refusal the action says its own way first (`null`: not one).
+ */
 async function attempt(
   formData: FormData,
   run: (workspaceId: string) => Promise<unknown>,
+  own?: (error: PlatformServerError) => Promise<ActionResult | null>,
 ): Promise<ActionResult> {
   try {
     const workspaceId = await activeWorkspaceIfShown(shownWorkspace(formData));
@@ -104,6 +109,8 @@ async function attempt(
     return { ok: true };
   } catch (error) {
     if (error instanceof PlatformServerError) {
+      const refused = await own?.(error);
+      if (refused) return refused;
       // A member's change of a flow (§12.1 #180): said in the clients' words.
       if (flowChangeRefused(error.status, error.details))
         return { ok: false, error: FLOW_CHANGE_ADMIN_ONLY, state: "forbidden" };
@@ -156,8 +163,7 @@ export async function subscribeToAutomation(
 ): Promise<ActionResult> {
   const templateId = String(formData.get("templateId") ?? "");
   if (!templateId) return { ok: false, error: "A flow is required" };
-  // The press's key (`AddAutomation`): the add the health data agreement
-  // refused is sent again under it once the owner accepts (backend ADR-0049).
+  // The press's key (`AddAutomation`): one add per press.
   const idempotencyKey = String(formData.get("idempotencyKey") ?? "");
   if (!/^[A-Za-z0-9._~:-]{16,128}$/u.test(idempotencyKey))
     return { ok: false, error: "Reopen the form and try again." };
@@ -184,8 +190,6 @@ export async function subscribeToAutomation(
     revalidatePath("/account/teams");
     return { ok: true, subscriptionId: response.subscription.id };
   } catch (error) {
-    const agreement = await agreementRefusal(error, shownWorkspace(formData));
-    if (agreement) return agreement;
     if (
       error instanceof PlatformServerError &&
       (error.status === 404 || error.status === 502)
@@ -258,9 +262,12 @@ function declaredValues(
  * for a draft, with the flow turned on in the same change (`turnOn`), and for
  * a flow on or paused, its status kept. A vendor chosen and not connected is
  * said by the page, which knows its name (`vendor-not-connected`); a turn-on
- * refused by the plan in the platform's words for it; anything else in the
- * button's own words. A workspace switched away in another tab is said as it
- * is everywhere.
+ * refused by the plan in the platform's words for it; a turn-on of a flow that
+ * carries health data refused 403 `agreement_required` (backend ADR-0049
+ * amendment 2) as `agreement-required` with no line and no agreement offered
+ * — Set up reads its "Contract and accept" section again, which says what is
+ * owed; anything else in the button's own words. A workspace switched away in
+ * another tab is said as it is everywhere.
  */
 export async function saveSetup(formData: FormData): Promise<ActionResult> {
   const subscriptionId = String(formData.get("subscriptionId") ?? "");
@@ -290,6 +297,8 @@ export async function saveSetup(formData: FormData): Promise<ActionResult> {
     // Only an owner or admin changes a flow (§12.1 #180).
     if (flowChangeRefused(error.status, error.details))
       return { ok: false, error: FLOW_CHANGE_ADMIN_ONLY, state: "forbidden" };
+    if (turnOn && agreementRequired(error.status, error.details))
+      return { ok: false, error: "", state: "agreement-required" };
     if (turnOn) {
       const entitlement = subscriptionEntitlementState(
         error.status,
@@ -513,7 +522,7 @@ export async function startRun(formData: FormData): Promise<ActionResult> {
     return { ok: true, runId: response.run.id };
   } catch (error) {
     if (!(error instanceof PlatformServerError)) throw error;
-    // A flow that carries health data (backend ADR-0049, C3-b), as on Add.
+    // A flow that carries health data (backend ADR-0049, C3-b).
     const agreement = await agreementRefusal(error, shownWorkspace(formData));
     if (agreement) return agreement;
     const reason = error.details?.reason;
@@ -599,6 +608,13 @@ export async function archiveSubscription(
   return result;
 }
 
+/**
+ * Pause, or Turn on outside Set up (`RunStart` on a flow's own page). A
+ * turn-on of a flow that carries health data, before the owner accepted, is
+ * refused 403 `agreement_required` (backend ADR-0049 amendment 2): read as
+ * Start run's is (`agreementRefusal`) — the owner the text, for the dialog;
+ * anyone else the line.
+ */
 export async function setSubscriptionStatus(
   formData: FormData,
 ): Promise<ActionResult> {
@@ -609,8 +625,13 @@ export async function setSubscriptionStatus(
   }
 
   const body: UpdateSubscriptionRequest = { status };
-  const result = await attempt(formData, (workspaceId) =>
-    updateSubscription(workspaceId, subscriptionId, body, "status"),
+  const result = await attempt(
+    formData,
+    (workspaceId) =>
+      updateSubscription(workspaceId, subscriptionId, body, "status"),
+    status === "live"
+      ? (error) => agreementRefusal(error, shownWorkspace(formData))
+      : undefined,
   );
   if (result.ok) revalidatePath("/account/flows", "layout");
   return result;
