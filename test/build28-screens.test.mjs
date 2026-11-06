@@ -181,29 +181,76 @@ test("an item's page draws no sections, and its runs as rows the height of a sec
   );
 });
 
-test("Run details: its row on every run's page, after the package's buttons and over Cancel run and View flow; its page the tiles, the steps and the facts; the result line only for a run that read no sections, a held job's decision under it (items 8 and 9; the review's findings 1 and 2)", () => {
+test("Run details: its row last on every run's page, both faces; its page the run's metadata alone — Duration, Steps done, Started, Ended, Trigger, Run ID; the steps on the run's steps face, live; the result face the body, the package's buttons, View flow, then Run details (items 8 and 9; the review's findings 1 and 2; the owner's builds 37 and 39, item 10)", () => {
   assert.equal(RUN_DETAILS, "Run details");
   assert.equal(runDetailsPath("r 1/2"), "/account/runs/r%201%2F2/details");
   const live = code(read(RUN_LIVE));
   const split = live.indexOf('if (view === "details") {');
-  const runPage = live.indexOf("return (", live.indexOf("\n  }\n", split));
+  const runPage = live.indexOf("const face = runFace(run.status);");
   assert.ok(split > 0 && runPage > split);
   const details = live.slice(split, runPage);
   const run = live.slice(runPage, live.indexOf("type PackageFormat"));
+  // Its details: the metadata alone (item 10: "I just dont want to see the
+  // meta data in the bottom").
   for (const drawn of [
     'label="Duration"',
     'label="Steps done"',
-    'data-testid="run-steps"',
     "data-testid={`run-fact-${fact.label}`}",
   ]) {
     assert.ok(details.includes(drawn), `the details page draws ${drawn}`);
     assert.ok(!run.includes(drawn), `the run's page does not draw ${drawn}`);
   }
+  assert.ok(
+    !details.includes('data-testid="run-steps"'),
+    "no steps on the details page",
+  );
+  assert.ok(!details.includes("<TrackerItem"));
   // The run's page draws the platform's body; its details page none of it.
   assert.ok(!details.includes("<BlockList"));
   assert.ok(!details.includes("<ApprovalDecision"));
+  const stepsFace = run.slice(
+    run.indexOf('if (face === "steps")'),
+    run.indexOf('testId="run-face-result"'),
+  );
+  const resultFace = run.slice(run.indexOf('testId="run-face-result"'));
+  // The steps face: STEPS, the body, then Cancel run while it goes, and the
+  // Run details row last.
+  assert.ok(stepsFace.includes('data-testid="run-steps"'));
+  assert.ok(stepsFace.indexOf("<TrackerItem") < stepsFace.indexOf("{body}"));
+  assert.ok(
+    stepsFace.indexOf("{body}") < stepsFace.indexOf("<CancelRunButton"),
+  );
+  assert.ok(
+    stepsFace.indexOf("<CancelRunButton") < stepsFace.indexOf("{detailsRow}"),
+  );
+  assert.ok(!stepsFace.includes("<PackageActions"));
+  assert.ok(!stepsFace.includes("View flow"));
+  // The result face: the body, the package's buttons, View flow, then the
+  // Run details row last.
+  assert.ok(!resultFace.includes('data-testid="run-steps"'));
+  assert.ok(resultFace.indexOf("{body}") < 0, "the body is above the footer");
+  assert.ok(
+    run.lastIndexOf("{body}") < run.indexOf('testId="run-face-result"'),
+  );
+  assert.ok(resultFace.indexOf("<PackageActions") > 0);
+  assert.ok(
+    resultFace.indexOf("<PackageActions") < resultFace.indexOf("View flow"),
+  );
+  assert.ok(
+    resultFace.indexOf("View flow") < resultFace.indexOf("{detailsRow}"),
+  );
+  assert.match(
+    resultFace,
+    /\{detailsRow\}\s*<\/Group>\s*<\/>\s*<\/SectionCard>/u,
+  );
+  // The row is drawn for every run, under no condition, keeping where the
+  // run was opened from (G1).
+  assert.match(
+    run,
+    /const detailsRow = \(\s*<PageRow href=\{runDetailsPath\(run\.id, from\)\} testId="run-details-row">/u,
+  );
+  // The body itself: the platform's blocks, as sent.
   assert.ok(run.indexOf("<BlockList") > 0);
-  assert.ok(run.indexOf("<BlockList") < run.indexOf("<PackageActions"));
   // How it went stays for a run that read no sections; sections take its
   // place (item 8), and a held job's decision is under the result line.
   const held = fixture("v7-held-waiting").blocks.map((block) => block.type);
@@ -212,29 +259,6 @@ test("Run details: its row on every run's page, after the package's buttons and 
   assert.ok(
     !candidate.blocks.some((block) => block.type === "text" && block.tone),
     "a run that read sections has no result line",
-  );
-  // The row is drawn for every run, under no condition: after the package's
-  // buttons, directly over Cancel run and View flow (finding 2).
-  const packaged = run.indexOf("<PackageActions");
-  // Its address keeps where the run was opened from (G1).
-  const row = run.search(
-    /<PageRow\s+href=\{runDetailsPath\(run\.id, fromItem\)\}/u,
-  );
-  assert.ok(
-    packaged > 0 && packaged < row,
-    "the package's buttons, then Run details",
-  );
-  assert.match(
-    run.slice(row),
-    /^<PageRow\s+href=\{runDetailsPath\(run\.id, fromItem\)\}\s+testId="run-details-row"\s*>[\s\S]*?<\/PageRow>\s*<div\s+className=\{`\$\{SPACING\.group\.top\} flex flex-wrap items-center \$\{SPACING\.inner\.gap\}`\}\s*>\s*(?:\{\s*\}\s*)?\{going \? \(\s*<CancelRunButton/u,
-  );
-  assert.ok(run.indexOf("CancelRunButton") < run.indexOf("View flow"));
-  assert.ok(
-    !run
-      .slice(0, row)
-      .match(
-        /\{(?:going|headed|packageAvailable)[^?]*\? \(\s*<PageRow\s+href=\{runDetailsPath/u,
-      ),
   );
   // What it read comes first, under the flow's word for a run, the first open.
   assert.deepEqual(visibleWords(blocks.render(candidate.blocks)).slice(0, 3), [
@@ -253,7 +277,11 @@ test("Run details: its row on every run's page, after the package's buttons and 
     "app/account/runs/[runId]/details/page.tsx",
   ]) {
     const page = code(read(path));
-    assert.match(page, /readRunPage\(\s*workspaceId,\s*runId,\s*\)/u, path);
+    assert.match(
+      page,
+      /readRunPage\(\s*workspaceId,\s*runId,\s*(?:\{ withItem: true \},\s*)?\)/u,
+      path,
+    );
     assert.match(page, /resolveActiveWorkspaceId/u, path);
   }
   assert.match(

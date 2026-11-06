@@ -103,6 +103,12 @@ test("the Flows list: grouped by department, the departments A–Z, each keeping
   await expect(departments.nth(0).locator("h3")).toHaveText([
     "Invoice Processing",
   ]);
+  // The one flow card: its icon, name and description (builds 37 and 39,
+  // items 1 and 4).
+  await expect(departments.nth(0).getByTestId("flow-card-icon")).toHaveCount(1);
+  await expect(
+    departments.nth(0).getByTestId("flow-card-description"),
+  ).toBeVisible();
   // A department of two words names its section (the review's finding 4).
   await expect(
     page.getByRole("region", { name: "Customer Support" }).locator("h3"),
@@ -548,7 +554,7 @@ test("an item's page as drawn: each title sits the spacing table's title gap abo
   expect(measured).toEqual(measured.map(() => spacingPx(SPACING.group.top)));
 });
 
-test('a run with a title and a score is headed by them; its sections first, under "{Run word} details", rows, the first open; a link only when http or https, opening outside; then Run details, its page the result line, the steps and the facts; axe', async ({
+test('a run with a title and a score is headed by them once it succeeded (its result face); its sections first, under "{Run word} details", rows, the first open; a link only when http or https, opening outside; then View flow, then Run details last, its page the metadata alone; axe (builds 37 and 39, item 10)', async ({
   page,
 }) => {
   await page.goto(SCORED_RUN);
@@ -584,14 +590,15 @@ test('a run with a title and a score is headed by them; its sections first, unde
   await expect(link).toHaveAttribute("target", "_blank");
   await expect(page.getByText("Not a link")).toBeVisible();
   await expect(runSection(page, 1).getByRole("link")).toHaveCount(1);
-  // The sections, then Run details, then View flow (build 28, item 9).
+  // The sections, then View flow, then Run details last (build 28, item 9;
+  // builds 37 and 39, item 10).
   const order = await page.evaluate(() => {
     const at = (selector: string) => document.querySelector(selector);
     const section = at('[data-testid="block-section"]');
-    const row = at('[data-testid="run-details-row"]');
     const flow = [...document.querySelectorAll("main a")].find(
       (link) => link.textContent?.trim() === "View flow",
     );
+    const row = at('[data-testid="run-details-row"]');
     const follows = (
       a: Element | null | undefined,
       b: Element | null | undefined,
@@ -601,14 +608,16 @@ test('a run with a title and a score is headed by them; its sections first, unde
             a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING,
           )
         : false;
-    return follows(section, row) && follows(row, flow);
+    return follows(section, flow) && follows(flow, row);
   });
   expect(order).toBe(true);
+  // Succeeded: its result face, its steps not drawn.
+  await expect(page.getByTestId("run-face-result")).toBeVisible();
   await expect(page.getByTestId("run-steps")).toHaveCount(0);
   await runSection(page, 2).locator("summary").click();
   await expect(page.getByText("Ran the example team.")).toBeVisible();
   await expectNoAxeViolations(page);
-  // Its details page: how it went, the tiles, the steps and the facts.
+  // Its details page: the run's metadata alone — the tiles and the facts.
   await page.getByRole("link", { name: "Run details" }).click();
   await expect(page).toHaveURL(new RegExp(`${SCORED_RUN}/details$`, "u"));
   await expect(
@@ -617,8 +626,11 @@ test('a run with a title and a score is headed by them; its sections first, unde
   await expect(page.locator("main")).toContainText("Ada Lane");
   // Its result line is gone, not moved: its sections said it.
   await expect(page.getByTestId("block-text")).toHaveCount(0);
-  await expect(page.getByTestId("run-steps")).toBeVisible();
+  await expect(page.getByTestId("run-steps")).toHaveCount(0);
+  await expect(page.getByTestId("run-tile-Duration")).toBeVisible();
   await expect(page.getByTestId("run-tile-Steps done")).toBeVisible();
+  for (const fact of ["Started", "Ended", "Trigger", "Run ID"])
+    await expect(page.getByTestId(`run-fact-${fact}`)).toBeVisible();
   await expect(page.getByTestId("run-fact-Run ID")).toHaveText(
     SCORED_RUN.split("/").at(-1) ?? "",
   );
@@ -994,7 +1006,7 @@ test("Upload refused because the flow's queue is full says so in the owner's wor
   await expect(card.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
 });
 
-test("build 34's F5 — Home's YOUR FLOWS: a flow with items reads them only when opened; its ready batches in the drop-down under their area; one chosen, its file and Start run start a run of that batch and open the run's page", async ({
+test("builds 37 and 39, items 5 and 8 — Home's YOUR FLOWS: a flow with items is a card of its own that reads them as Home opens; its newest ready batch is chosen already, still changeable under its area; Start run starts a run of that batch and opens the run's page from it — back is the batch, then the flow", async ({
   page,
 }) => {
   const itemReads = observe(page, (request) =>
@@ -1009,16 +1021,15 @@ test("build 34's F5 — Home's YOUR FLOWS: a flow with items reads them only whe
     "Customer Support",
     "Operations",
   ]);
-  const flow = flows.getByRole("button", { name: "Item automation" });
-  await expect(flow).toBeVisible();
-  await page.waitForLoadState("networkidle");
-  expect(itemReads).toEqual([]);
-  await flow.click();
+  // Always open: no row to press, and its items read once, as Home opens.
+  await expect(
+    flows.getByRole("heading", { level: 4, name: "Item automation" }),
+  ).toBeVisible();
   const pick = flows.getByRole("combobox", { name: "Batch" });
-  await expect(pick).toHaveText("Choose");
+  // The newest ready batch, chosen already (item 5), never "Choose".
+  await expect(pick).toHaveText("Autumn intake");
   expect(itemReads).toHaveLength(1);
-  // No form until a batch is chosen: a run of this flow needs one.
-  await expect(flows.getByTestId("run-form")).toHaveCount(0);
+  await expect(flows.getByTestId("run-form").first()).toBeVisible();
   await pick.click();
   const menu = flows.getByRole("listbox", { name: "Batch" });
   await expect(menu.getByRole("group")).toHaveText([
@@ -1027,21 +1038,30 @@ test("build 34's F5 — Home's YOUR FLOWS: a flow with items reads them only whe
   ]);
   await menu.getByRole("option", { name: "Spring intake" }).click();
   await expect(pick).toHaveText("Spring intake");
-  const form = flows.getByTestId("run-form");
+  const card = flows.getByTestId(
+    "home-flow-b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1",
+  );
+  const form = card.getByTestId("run-form");
   await form.getByLabel("Entry file").setInputFiles(entryPdf);
   await expect(form.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
   await expectNoAxeViolations(page);
   await form.getByRole("button", { name: "Start run" }).click();
-  await expect(page).toHaveURL(/\/account\/runs\/[0-9a-f-]{36}$/u);
+  await expect(page).toHaveURL(/\/account\/runs\/[0-9a-f-]{36}\?from=item$/u);
   const started = await fixtureRead<{ runStarts: Record<string, unknown>[] }>(
     "items",
   );
   expect(started.runStarts).toHaveLength(1);
   expect(started.runStarts[0]).toMatchObject({ itemId: READY_ITEM });
-  expect(itemReads).toHaveLength(1);
+  // Back: the batch (all its runs), then back again the flow (all batches).
+  const back = page.locator("main").getByRole("link", { name: "Back" });
+  await expect(back).toHaveAttribute("href", ITEM);
+  await back.click();
+  await expect(page).toHaveURL(new RegExp(`${ITEM}$`, "u"));
+  await page.locator("main").getByRole("link", { name: "Back" }).click();
+  await expect(page).toHaveURL(new RegExp(`${FLOW}$`, "u"));
 });
 
-test("build 34's F5 — a member's YOUR FLOWS: a flow with items is not started there, its row opens the flow's page", async ({
+test("builds 37 and 39, item 8 — a member's YOUR FLOWS: a flow with items is not started there, its card's Open goes to the flow's page", async ({
   page,
 }) => {
   await presentSession(page, "member");
@@ -1049,7 +1069,7 @@ test("build 34's F5 — a member's YOUR FLOWS: a flow with items is not started 
   await expect(
     page
       .getByTestId("home-your-flows")
-      .getByRole("link", { name: "Item automation" }),
+      .getByRole("link", { name: "Open Item automation" }),
   ).toHaveAttribute("href", FLOW);
 });
 

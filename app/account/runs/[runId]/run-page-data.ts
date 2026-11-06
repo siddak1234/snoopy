@@ -3,6 +3,7 @@ import {
   emptyWhenUnavailable,
   listApprovals,
   listAutomations,
+  readItem,
   readRun,
   readSubscription,
   type Approval,
@@ -48,13 +49,37 @@ import type { RunFlow } from "./RunLive";
  * archived too (backend §12.1 #319; it was the live list, then the archived
  * one, the app's M6); a flow that cannot be read costs those two their words,
  * never the page.
+ *
+ * And, for the run's own page (`withItem`), its job's title when it belongs
+ * to one (`run.itemId`): the line under its steps face's flow name (the
+ * owner's builds 37 and 39, item 10), one `readItem` that settles alone — a
+ * job that cannot be read costs the line, never the page.
  */
 export type RunPageData = {
   detail: RunDetail;
   flow: RunFlow;
   approvals: Approval[];
   role: WorkspaceRole | undefined;
+  /** Its job's title, read only `withItem`; undefined when none or unread. */
+  itemTitle: string | undefined;
 };
+
+/** The run's job's title, or `undefined` when it cannot be read. */
+async function readItemTitle(
+  workspaceId: string,
+  itemId: string,
+): Promise<string | undefined> {
+  try {
+    return (await readItem(workspaceId, itemId)).item.title;
+  } catch (error) {
+    if (
+      error instanceof PlatformServerError ||
+      error instanceof PlatformNotConfiguredError
+    )
+      return undefined;
+    throw error;
+  }
+}
 
 /** The run's flow as the platform holds it now, or `undefined` when it cannot be read or is gone. */
 async function readFlow(
@@ -76,6 +101,7 @@ async function readFlow(
 export async function readRunPage(
   workspaceId: string,
   runId: string,
+  { withItem = false }: { withItem?: boolean } = {},
 ): Promise<RunPageData> {
   let detail;
   try {
@@ -89,19 +115,23 @@ export async function readRunPage(
   }
 
   const waited = readsJobApprovals(detail);
-  const [catalog, approvals, subscription, role] = await Promise.all([
-    emptyWhenUnavailable(() => listAutomations(workspaceId), {
-      automations: [],
-      categories: [],
-    }),
-    waited
-      ? emptyWhenUnavailable(() => listApprovals(workspaceId), {
-          approvals: [],
-        })
-      : { approvals: [] },
-    readFlow(workspaceId, detail.run.subscriptionId),
-    roleInWorkspace(workspaceId),
-  ]);
+  const itemId = withItem ? detail.run.itemId : undefined;
+  const [catalog, approvals, subscription, role, itemTitle] = await Promise.all(
+    [
+      emptyWhenUnavailable(() => listAutomations(workspaceId), {
+        automations: [],
+        categories: [],
+      }),
+      waited
+        ? emptyWhenUnavailable(() => listApprovals(workspaceId), {
+            approvals: [],
+          })
+        : { approvals: [] },
+      readFlow(workspaceId, detail.run.subscriptionId),
+      roleInWorkspace(workspaceId),
+      itemId ? readItemTitle(workspaceId, itemId) : undefined,
+    ],
+  );
   const jobApprovals = approvals.approvals.filter(
     (approval) => approval.runId === detail.run.id,
   );
@@ -176,5 +206,5 @@ export async function readRunPage(
       }
     : null;
 
-  return { detail, flow, approvals: jobApprovals, role };
+  return { detail, flow, approvals: jobApprovals, role, itemTitle };
 }

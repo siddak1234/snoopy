@@ -80,6 +80,19 @@ page reuses:
   The departments are the platform's seventeen team kinds, Healthcare the
   newest (platform round 2's B4, `lib/team-types.ts`); the website names a
   department in words and draws no icon for one.
+- **One flow card** (the owner's builds 37 and 39, items 1 and 4: "Make a
+  standard for flow cards … Icon, short deacription and live. Not meta data
+  under."; `components/dashboard/FlowCard.tsx`): the flow's icon — the
+  catalog's `icon` name through one map, `lib/flow-icons.ts`, the app's
+  `iconFor` names over the same Phosphor set, `Sparkles` read as `Sparkle`,
+  an unknown name the neutral `CircleDashed` — its name, its short
+  description, and one thing at its end: Live, the day it was archived, or
+  Add. Never a line of metadata under it: no department, no "Whole
+  workspace", no run counts. Drawn on the Flows cards (each flow added, Open
+  and its pill, under it), the archived rows and Home's cards; a flow's page
+  and its Set up keep "Department: {kind}" under their title (`place.ts`).
+  ~~The website draws no flow icon~~ until then: a flow's icon is the
+  catalog's, a department still has none.
 - **A choice is a drop-down**: a flow's `select` field, a setup `select`
   (`app/account/flows/SelectField.tsx`) and a list's filter are the website's
   drop-down (`components/ui/Dropdown.tsx`) — a pill for a filter, a field's
@@ -141,14 +154,22 @@ page reuses:
   false, a row of one card of divided rows (`LIST_CARD`): a list block's
   rows, a flow's items, Activity's runs and Home's flows that start no run
   there.
-- **Home's YOUR FLOWS** (the owner's build 34 F5; `app/account/YourFlows.tsx`,
-  `home-flows.ts`), in Recent runs' place: the live flows by department
-  A–Z, A–Z in each, from the one subscriptions list Home reads. A flow whose
-  run can start there opens in place to its `runInput` and Start run
-  (`RunStart`), which opens the new run's page; a flow with items reads them
-  only when opened, and its run starts on the ready item chosen in a
-  drop-down, for an owner or admin, as an item's page offers it. Any other
-  flow's row opens its page.
+- **Home's YOUR FLOWS** (the owner's build 34 F5, and builds 37 and 39,
+  items 2, 3, 5 and 8; `app/account/YourFlows.tsx`, `home-flows.ts`), in
+  Recent runs' place: the title and, at its right, a department drop-down
+  ("All departments", then the departments drawn, A–Z); under it "Search
+  flows", by name whatever its case (nothing found, `BLOCK_WORDS.noMatch`);
+  then the live flows by department A–Z, A–Z in each, from the one
+  subscriptions list Home reads, each a card of its own, always open: the
+  flow card (Live), then a flow without items its `runInput` and Start run
+  (`RunStart`); a flow with items, for an owner or admin, its items read as
+  Home opens — each flow's alone, "Unavailable" in its place — the job
+  drop-down on its newest ready job (`newestReady`, the list is newest
+  first), then the run form; none ready, "No jobs yet." and "Upload job",
+  the flow page's upload card, the job read again every 2 s on Home until it
+  is ready. Any other flow's card says Open, to its page. ~~A row per flow
+  that opened in place; items read when opened; "Choose" a job~~ until
+  builds 37 and 39.
 - **The spacing table** (backend `BLOCK_SPACING`, ADR-0048 amendment 1; the
   owner's Q8), the same names on the app: the numbers are the platform's
   (`lib/generated/platform-contracts/block-rules.ts`), and their classes
@@ -182,15 +203,29 @@ page reuses:
   platform, which searches and counts (`total`) — plain Activity too, its
   sort and page always sent (`runsQuery`); it never sends `needsReview`. A search that finds nothing says so,
   in `BLOCK_WORDS`' words.
-- **Every run's page** ends with the package's buttons when it has them,
-  then the Run details row, then Cancel run while it goes on and View flow;
-  Duration, Steps done, the steps, Started, Ended, Trigger and the Run ID are
-  on its details page, `/account/runs/[runId]/details`. What a run read comes
-  first, under "{Run word} details", in its result line's place. Its back
-  goes to Activity; opened from its job's page — a ranked row there, or
-  Start on it, which opens the new run's page (the owner's G4) —
-  (`?from=item`, `runPagePath`) to that job, by the run's own `itemId`, and
-  its details page back to it on the way (the owner's G1).
+- **Every run's page** has two faces by its status (`runFace`; the owner's
+  builds 37 and 39, item 10, and his words of 2026-11-06), every flow alike.
+  Its **steps face** while it is pending, running or held, and once it
+  failed or was cancelled: its flow's name, its job's title under it (one
+  `readItem`, left out when it cannot be read), its status; STEPS, every
+  step from the start, live (`trackerRows`, `TrackerItem`); its body as the
+  platform sent it (the files rows, the result line, a held job's form, a
+  batch's children — blocks carry no part marker, so the body is drawn
+  whole); Cancel run while it goes on; the Run details row last. Its
+  **result face** once it succeeded: its title and score (a candidate) or
+  its flow's name, its body — what it read first, under "{Run word}
+  details", in its result line's place — the package's buttons, View flow,
+  and the Run details row last. A run that succeeds while its steps are in
+  front turns in place. Its details page, `/account/runs/[runId]/details`,
+  is its metadata alone: Duration, Steps done, Started, Ended, Trigger and
+  the Run ID. Its back goes to Activity; opened from its job's page — a
+  ranked row there, Start on it (the owner's G4), or Start on Home on that
+  job — (`?from=item`, `runPagePath`) to that job, by the run's own
+  `itemId`; started on Home or a flow's page for a flow without items
+  (`?from=flow`) to the flow's page. Its details, file and package pages
+  keep `from`, so their back returns to it as it was opened (the owner's
+  G1). ~~"Run {id}" as its title; its steps on its details page~~ until
+  builds 37 and 39.
 - **A page body is the platform's blocks** (backend ADR-0048): the run, item
   and file pages draw their fixed header and footer, then the blocks the
   one-run and one-item reads send with `shape=blocks` (`BLOCKS_SHAPE`), each
@@ -439,7 +474,7 @@ decided on its page: under the result line, "Waiting for approval.", the
 platform's approval form (`questions{approval}`), drawn as the one Approve
 and Deny pair (`app/account/approvals/ApprovalDecision.tsx`, Deny the danger
 variant) to a role the form names (`mayDecide`), and says who can otherwise;
-step 4 on its details page keeps the step's state alone (build 28's review,
+step 4 on its steps face keeps the step's state alone (build 28's review,
 finding 1). A decision draws the page again (the action revalidates it by
 the job id the platform answers with). A run can turn held while its page is
 open, or the page can read it before its approval is asked. Then the browser
@@ -571,7 +606,12 @@ alone and asked only by its pages (`Sec-Fetch-Site`) — then Download, the
 signed link followed only when https, and Share where the browser hands
 files to the share sheet, the bytes read from that same route
 (`siteFileBlob`); a block's link is drawn only when it is `https:` and
-opens outside the site (`components/blocks/look.ts`). A file field that names its
+opens outside the site (`components/blocks/look.ts`). A list row's text that
+is, whole and trimmed, one email address or one phone number
+(`lib/contact-value.ts`; the owner's builds 37 and 39, item 11) is a
+`mailto:` or `tel:` link with Copy beside it, which puts the value on the
+clipboard and says "Copied" (`components/blocks/ContactLink.tsx`); any other
+text stays words, whichever flow sent it. A file field that names its
 `acceptedContentTypes` offers those, sends a Word file as it is, offers Take
 photo only where a JPEG is taken, and refuses another type in words that name
 what it takes (`app/account/flows/run-file-image.ts`); without them, a PDF,

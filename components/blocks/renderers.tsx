@@ -17,9 +17,11 @@ import {
 import { Tile } from "@/components/dashboard/Tile";
 import { TrackerItem } from "@/components/dashboard/TrackerItem";
 import type { Block } from "@/lib/automations";
+import { contactValue } from "@/lib/contact-value";
 import { fileViewHref } from "@/lib/run-files";
 import { offeredDecisions, reviewGroups } from "@/lib/run-progress";
 import { CARD, ROW, SPACING } from "@/lib/spacing";
+import { ContactLink } from "./ContactLink";
 import { notDrawn } from "./drawable";
 import { Fallback } from "./Fallback";
 import {
@@ -288,11 +290,14 @@ function OpenRow({ item, href }: { item: ListItem; href: string }) {
 
 /**
  * An entry (`SectionRows`' entries): its title, strong; its chip and score;
- * its subtitle, muted; its text; and its address, a link only when https,
- * opening outside the site — else its words alone.
+ * its subtitle, muted; its text — when the whole of it is one email or one
+ * phone number (`contactValue`; the owner's builds 37 and 39, item 11), a
+ * `mailto:` or `tel:` link with Copy (`ContactLink`); and its address, a
+ * link only when https, opening outside the site — else its words alone.
  */
 function Entry({ item }: { item: ListItem }) {
   const link = httpsLink(item.url);
+  const contact = contactValue(item.text);
   return (
     <div data-testid="block-list-entry" className={`min-w-0 ${ROW}`}>
       <div className={`flex items-start ${SPACING.inner.gap}`}>
@@ -314,7 +319,9 @@ function Entry({ item }: { item: ListItem }) {
           {item.subtitle}
         </p>
       ) : null}
-      {item.text ? (
+      {contact ? (
+        <ContactLink contact={contact} />
+      ) : item.text ? (
         <p
           className={`${SPACING.inner.top} text-sm break-words whitespace-pre-line text-[var(--text)]`}
         >
@@ -703,8 +710,10 @@ export function ImageBlock({
   context: BlockContext;
 }) {
   const page = openHref(block.open, context);
+  // The file's own route is the page's path, never its `?from=`.
+  const path = openHref(block.open, { ...context, runFrom: undefined });
   const kind = pictureKind(block.file);
-  if (!page || !kind)
+  if (!page || !path || !kind)
     return (
       <FileBlock
         block={{
@@ -720,7 +729,7 @@ export function ImageBlock({
     <Picture
       alt={block.alt}
       page={page}
-      view={fileViewHref(page)}
+      view={fileViewHref(path)}
       pdf={kind === "pdf"}
     />
   );

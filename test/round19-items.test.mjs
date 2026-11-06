@@ -129,31 +129,35 @@ test("a section's link is drawn only when https, opening outside with noopener n
   );
 });
 
-test("a run with a title and a score is headed by them, the full id kept among its facts; its sections come first, in its result line's place, the steps on its details page (plan §5.4; build 28, items 8 and 9)", () => {
+test("a run with a title and a score is headed by them once it succeeded, else by its flow's name — never \"Run {id}\", the full id kept among its facts; its sections come first, in its result line's place; its steps on its steps face (plan §5.4; build 28, items 8 and 9; the owner's builds 37 and 39, item 10)", () => {
   const live = code(read(RUN_LIVE));
   assert.match(
     live,
     /const headed = run\.title !== undefined && run\.score !== undefined;/u,
   );
+  assert.match(live, /const flowName = flow\?\.name \?\? run\.templateId;/u);
   assert.match(
     live,
-    /const name = headed && run\.title \? run\.title : runLabel\(run\.id\);/u,
+    /const name = headed && run\.title \? run\.title : flowName;/u,
   );
   assert.match(live, /<SectionCard\s+title=\{name\}/u);
+  assert.match(
+    live,
+    /<SectionCard\s+title=\{flowName\}\s+subheader=\{itemTitle\}/u,
+  );
   assert.match(live, /<RunScore\b/u);
   assert.match(
     code(read("components/dashboard/RunScore.tsx")),
     /data-testid="run-score"/u,
   );
   assert.match(live, /\{ label: "Run ID", value: run\.id \}/u);
-  // The details page's tiles and steps, then the run's page: its body.
+  // The details page's tiles, then the run's page: its steps, its body.
   const details = live.indexOf('if (view === "details") {');
   assert.ok(
     details > 0 &&
       details < live.indexOf('label="Duration"') &&
-      live.indexOf('label="Duration"') <
-        live.indexOf('titleId="run-steps-title"') &&
-      live.indexOf('titleId="run-steps-title"') < live.indexOf("<BlockList"),
+      live.indexOf('label="Duration"') < live.indexOf("<BlockList") &&
+      live.indexOf("<BlockList") < live.indexOf('titleId="run-steps-title"'),
   );
   // First on the run's page, under "{Run word} details", in the result
   // line's place (build 28's items 7 and 8).

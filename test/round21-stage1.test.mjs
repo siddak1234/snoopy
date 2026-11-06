@@ -1021,7 +1021,7 @@ test("S1-16: a run's page reads the integration the run started with — its ste
       ["app/account/runs/[runId]/run-page-data.ts"],
       {
         stubs: {
-          "@/lib/automations": `export const emptyWhenUnavailable = (read) => read(); export const listApprovals = async () => ({ approvals: [] }); export const listAutomations = async () => ({ automations: [${JSON.stringify(entry)}], categories: [] }); export const readRun = async () => (${JSON.stringify(detail)}); export const readSubscription = async () => (${JSON.stringify(subscription)});`,
+          "@/lib/automations": `export const emptyWhenUnavailable = (read) => read(); export const listApprovals = async () => ({ approvals: [] }); export const listAutomations = async () => ({ automations: [${JSON.stringify(entry)}], categories: [] }); export const readRun = async () => (${JSON.stringify(detail)}); export const readSubscription = async () => (${JSON.stringify(subscription)}); export const readItem = async () => { throw new Error("not read for a run of no item"); };`,
           "@/lib/platform-server":
             "export class PlatformServerError extends Error {} export class PlatformNotConfiguredError extends Error {}",
           "@/lib/tenancy":
