@@ -60,12 +60,7 @@ const [target] = process.argv.slice(2).filter((arg) => !arg.startsWith("--"));
 const root = resolve(target ?? resolve(import.meta.dirname, ".."));
 // The other repositories, each looked for beside this one — the platform's
 // where SNOOPY_BACKEND_ROOT says, as it is for every reader here.
-const SIBLINGS = [
-  "snoopy-backend",
-  "snoopy-mobile",
-  "snoopy-n8n",
-  "snoopy-automations",
-];
+const SIBLINGS = ["snoopy-backend", "snoopy-mobile", "snoopy-automations"];
 const siblingRoot = (name) =>
   resolve(
     root,
