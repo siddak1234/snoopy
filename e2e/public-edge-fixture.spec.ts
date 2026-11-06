@@ -6223,7 +6223,7 @@ test("backend §12.1 #319 step 2 — Connect integration's save for a flow archi
   ).toMatchObject({ vendor: "none" });
 });
 
-test.describe("backend §12.1 #319 step 2 — a run's details page and its flow's one read", () => {
+test.describe("backend §12.1 #319 step 2 — a run's steps face and its flow's one read", () => {
   test.beforeEach(async ({ page }) => {
     // QuickBooks chosen for Invoice Processing, then a run of it on step 3.
     await fixtureControl("quickbooks-connected");

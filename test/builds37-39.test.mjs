@@ -431,6 +431,40 @@ test("item 11: a row's text that is one email or one phone, whole, is a way to r
     assert.equal(contactValue(words), null, String(words));
 });
 
+test("item 11: the phone and email table both clients share (snoopy-mobile's contact-value test holds the same rows): a number as people write one is a phone; a date, a time, an address or a short number is words", () => {
+  const table = {
+    phone: [
+      "(214) 983-2568",
+      "214-983-2568",
+      "214.983.2568",
+      "2149832568",
+      "1-800-555-1234",
+      "+44 20 7946 0958",
+      "+1 214 983 2568",
+    ],
+    notPhone: [
+      "555-1234",
+      "2019-2023",
+      "123-45-6789",
+      "10.5.2025 14.30",
+      "2025.11.06 12.00",
+      "12.34.56.78",
+      "192.168.10.100",
+      "555 12 34",
+      "12 34 56 78",
+      "Call 214-983-2568",
+    ],
+    email: ["akulaggarwal05@gmail.com"],
+    notEmail: ["a@b", "mail me at x@y.com"],
+  };
+  for (const text of table.phone)
+    assert.equal(contactValue(text)?.kind, "phone", text);
+  for (const text of table.email)
+    assert.equal(contactValue(text)?.kind, "email", text);
+  for (const text of [...table.notPhone, ...table.notEmail])
+    assert.equal(contactValue(text), null, text);
+});
+
 test("item 11: a list row's email is a mailto: link and its phone a tel: link, each with Copy; Copy writes the value itself", async () => {
   const blocks = await loadBlocks();
   loaded.push(blocks.cleanup);

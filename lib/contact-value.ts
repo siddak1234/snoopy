@@ -6,9 +6,18 @@
  * pressed the same way, and no flow's code is named (`test/no-flow-code`).
  * A sentence that holds an address is words, never a link. The website
  * draws an email as a `mailto:` link and a phone as a `tel:` link, each with
- * Copy (`ContactValue`). The app (snoopy-mobile) contact-value must hold
- * this same rule — this EMAIL, and a phone of 10 to 15 digits (8 with "+")
- * — so "555-1234" and "2019-2023" are words in both clients.
+ * Copy (`ContactValue`).
+ *
+ * The rule — the app's `snoopy-mobile/lib/view/contact-value.ts` holds the
+ * same one, with the same test table: the text trimmed, at most 254
+ * characters. An EMAIL is a local part, "@" and a domain with a dot
+ * (`mailto:` + the text). A PHONE is only "+", digits, spaces, ".", "-",
+ * "(" and ")", with 10 to 15 digits, or 8 to 15 when it starts with "+";
+ * and when it does not start with "+", its runs of digits after the first
+ * have 3 or more digits each and its last run 4 or more ("214-983-2568",
+ * never a date, a time or an address like "10.5.2025 14.30" or
+ * "192.168.10.100") — `tel:` + "+" when it starts with one + its digits.
+ * Anything else is words.
  *
  * Pure, and loaded by its unit test as it is: no React and no `@/` import.
  */
@@ -25,17 +34,18 @@ export type ContactValue = {
 export const COPY = "Copy";
 export const COPIED = "Copied";
 
-/** One address: a local part and a domain with a dot, no space, no second "@". */
 const EMAIL =
   /^[A-Za-z0-9._%+'-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/u;
-/** A number as people write it: a leading "+", digits, spaces, dots, dashes and brackets. */
 const PHONE = /^\+?[\d\s().-]+$/u;
-/**
- * The fewest and most digits a phone number has: 10 (a national number with
- * its area code), or 8 written with its "+" country code; at most 15
- * (E.164). Fewer is a date or a span of years ("2019 - 2023"), never a phone.
- */
 const PHONE_DIGITS = { min: 10, minInternational: 8, max: 15 } as const;
+/** A number without "+": its digit runs after the first 3+ each, its last 4+. */
+function groupedAsPhone(value: string): boolean {
+  const runs = value.match(/\d+/gu) ?? [];
+  return (
+    runs.slice(1).every((run) => run.length >= 3) &&
+    (runs.at(-1)?.length ?? 0) >= 4
+  );
+}
 
 /** The text as a way to reach someone, or null when it is anything else. */
 export function contactValue(text: unknown): ContactValue | null {
@@ -50,6 +60,7 @@ export function contactValue(text: unknown): ContactValue | null {
       ? PHONE_DIGITS.minInternational
       : PHONE_DIGITS.min;
     if (digits.length < min || digits.length > PHONE_DIGITS.max) return null;
+    if (!value.startsWith("+") && !groupedAsPhone(value)) return null;
     return {
       kind: "phone",
       value,

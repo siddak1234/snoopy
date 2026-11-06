@@ -1052,6 +1052,15 @@ test("builds 37 and 39, items 5 and 8 — Home's YOUR FLOWS: a flow with items i
   );
   expect(started.runStarts).toHaveLength(1);
   expect(started.runStarts[0]).toMatchObject({ itemId: READY_ITEM });
+  // Its steps face (item 10): the flow's name, the batch it runs under it.
+  await expect(page.getByTestId("run-face-steps")).toBeVisible();
+  const heading = page
+    .locator("main")
+    .getByRole("heading", { level: 1, name: "Item automation" });
+  await expect(heading).toBeVisible();
+  await expect(heading.locator("xpath=following-sibling::p")).toHaveText(
+    "Spring intake",
+  );
   // Back: the batch (all its runs), then back again the flow (all batches).
   const back = page.locator("main").getByRole("link", { name: "Back" });
   await expect(back).toHaveAttribute("href", ITEM);
@@ -1059,6 +1068,26 @@ test("builds 37 and 39, items 5 and 8 — Home's YOUR FLOWS: a flow with items i
   await expect(page).toHaveURL(new RegExp(`${ITEM}$`, "u"));
   await page.locator("main").getByRole("link", { name: "Back" }).click();
   await expect(page).toHaveURL(new RegExp(`${FLOW}$`, "u"));
+});
+
+test("builds 37 and 39, item 10 — a run of a batch whose own read is unanswered (503) still draws its steps face, headed by its flow's name, without the batch's line", async ({
+  page,
+}) => {
+  const run = "/account/runs/c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3?from=item";
+  const heading = page
+    .locator("main")
+    .getByRole("heading", { level: 1, name: "Item automation" });
+  await page.goto(run);
+  await expect(heading.locator("xpath=following-sibling::p")).toHaveText(
+    "Spring intake",
+  );
+  await fixtureControl("item-read-failing");
+  const response = await page.goto(run);
+  expect(response?.status()).toBe(200);
+  await expect(page.getByTestId("run-face-steps")).toBeVisible();
+  await expect(heading).toBeVisible();
+  await expect(heading.locator("xpath=following-sibling::p")).toHaveCount(0);
+  await expect(page.locator("main")).not.toContainText("Spring intake");
 });
 
 test("builds 37 and 39, item 8 — Home's YOUR FLOWS with no batch yet: No batches yet. and Upload batch; the batch uploaded there reads Reading…, is read again every 2 s on Home, and once ready is chosen already for its run", async ({

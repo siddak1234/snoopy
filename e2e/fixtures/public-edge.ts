@@ -440,6 +440,9 @@ function initialState() {
     // website sent to make an item or start a run of one.
     itemsFlow: false,
     itemsFailing: false,
+    // Builds 37 and 39, item 10: one item's own read unanswered (503), so a
+    // run of it draws its steps face without its job's title.
+    itemReadFailing: false,
     // Round 21 (design D2.6): an item's reading led by a table the platform
     // sent without its rows, as a client older or newer than it might meet.
     itemReadingBroken: false,
@@ -2921,6 +2924,10 @@ const server = createServer(
       "/__fixture/items-failing": () => {
         state.itemsFailing = true;
       },
+      // An item's own read, unanswered (503).
+      "/__fixture/item-read-failing": () => {
+        state.itemReadFailing = true;
+      },
       // Builds 37 and 39, item 8: the flow with items has none yet, so
       // Home's card offers its Upload. Only once the flow with items is on.
       "/__fixture/items-none": () => {
@@ -4902,6 +4909,8 @@ const server = createServer(
         const item = itemOf(itemPathMatch[1] ?? "");
         if (!item) return respond(response, 404, problem(404, "Not Found"));
         if (method === "GET" && !itemPathMatch[2]) {
+          if (state.itemReadFailing)
+            return respond(response, 503, problem(503, "Service Unavailable"));
           return respond(response, 200, {
             item,
             runs: state.itemRuns.get(item.id) ?? [],

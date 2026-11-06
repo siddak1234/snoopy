@@ -515,7 +515,7 @@ decision}]}`, or `{id, other}` for a picked value) and the job always goes
 on; a refusal says "The review wasn't
 saved. Try again." On Approvals such a row says "Review {n} changes",
 opening the run, in place of the pair. Once saved, the step that waited
-says "{a} accepted · {d} denied" on the run's details page, even while the
+says "{a} accepted · {d} denied" on the run's steps face, even while the
 job goes on (`reviewTally`, `trackerRows`): a run's page reads the job's
 approvals whenever a step reported `held`, not only while it is held
 (`readsJobApprovals`). A gap, named: words.md also puts the count in

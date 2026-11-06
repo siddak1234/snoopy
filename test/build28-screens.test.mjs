@@ -271,17 +271,21 @@ test("Run details: its row last on every run's page, both faces; its page the ru
     sections.map((section) => section.open === true),
     [true, ...sections.slice(1).map(() => false)],
   );
-  // Both pages read the run as the other does.
-  for (const path of [
-    "app/account/runs/[runId]/page.tsx",
-    "app/account/runs/[runId]/details/page.tsx",
+  // Both pages read the run as the other does; the run's own page its job's
+  // title too, the line under its steps face's flow name (`withItem`; the
+  // owner's builds 37 and 39, item 10).
+  for (const [path, reads] of [
+    [
+      "app/account/runs/[runId]/page.tsx",
+      /readRunPage\(\s*workspaceId,\s*runId,\s*\{ withItem: true \},\s*\)/u,
+    ],
+    [
+      "app/account/runs/[runId]/details/page.tsx",
+      /readRunPage\(\s*workspaceId,\s*runId,\s*\)/u,
+    ],
   ]) {
     const page = code(read(path));
-    assert.match(
-      page,
-      /readRunPage\(\s*workspaceId,\s*runId,\s*(?:\{ withItem: true \},\s*)?\)/u,
-      path,
-    );
+    assert.match(page, reads, path);
     assert.match(page, /resolveActiveWorkspaceId/u, path);
   }
   assert.match(

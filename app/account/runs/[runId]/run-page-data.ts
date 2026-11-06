@@ -31,7 +31,7 @@ import type { RunFlow } from "./RunLive";
  * of state transitions. The run names no flow (`Run.templateId`'s own words: a
  * screen joins the catalog), so its name, steps' titles and groups come from
  * there; its file page's word is its version's file fields (`runFileRows`).
- * A held run's approvals are read too, for step 4 on its details page, and
+ * A held run's approvals are read too, for step 4 on its steps face, and
  * a run's that waited and went on, for its saved review's count (Round 21's
  * F2; `readsJobApprovals`). The
  * role goes with every run, held or not: the approval form in a run's blocks

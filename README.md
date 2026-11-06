@@ -216,7 +216,7 @@ the label said and the value saved) and several files in one upload (all into on
 `maxFiles` taken, past it refused, a photo past it keeping the files held; a
 full queue said; a photo added), a public app connected with no
 Connect step and, as a step's choice, Connected and chosen in place, a batch run's page, and a flow
-whose list row carries no settings still drawn and saved from its one-flow read (backend §12.1 #319), a flow id that is not a UUID, one the platform does not know and a flow it answers archived each "not found", its integration's save refused once it is archived, and a run's details page still drawn when its flow is archived or cannot be read, in `e2e/public-edge-fixture.spec.ts`), `e2e/dialogs.spec.ts`
+whose list row carries no settings still drawn and saved from its one-flow read (backend §12.1 #319), a flow id that is not a UUID, one the platform does not know and a flow it answers archived each "not found", its integration's save refused once it is archived, and a run's steps face still drawn when its flow is archived or cannot be read, in `e2e/public-edge-fixture.spec.ts`), `e2e/dialogs.spec.ts`
 (every dialog's Escape, click outside, focus return and hold, one row each),
 `e2e/health-data.spec.ts` (Round 21, Stage 2: the health data agreement on
 Add, on Start run and on an item's upload — the owner's dialog, anyone
@@ -240,7 +240,9 @@ headed by its title and its score in its verdict's colour with View {file}
 and its file page (a file no longer linked framed by this site's route), its
 sections under "{Run word} details" and its Run details page, the metadata
 alone — every body the platform's blocks; a run opened from its job going
-back to it (G1), and Start on a job opening the new run's page from it (G4);
+back to it (G1), and Start on a job opening the new run's page from it (G4),
+its steps face headed by its flow's name with the job's title under it, the
+line left out when the job's own read is unanswered (builds 37 and 39, item 10);
 Archive, an owner's buttons a member
 does not see and a member's presses refused in words, an unanswered list
 said "Unavailable", and an upload refused with the queue full said in the
