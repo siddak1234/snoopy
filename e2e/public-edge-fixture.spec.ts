@@ -3389,13 +3389,14 @@ test("the dashboard reads top to bottom — Today's three tiles, Add a flow and 
     `/account/runs?status=failed&${sinceQuery}`,
   );
   // YOUR FLOWS (build 34's F5): the live flows by department A–Z, A–Z in
-  // each; no recent runs.
+  // each; no recent runs. Each is a flow card, read by its name (builds 37
+  // and 39, item 8: the card holds its run's start too).
   const flows = main.getByTestId("home-your-flows");
   await expect(flows.getByRole("heading", { level: 3 })).toHaveText([
     "Accounting",
     "Operations",
   ]);
-  await expect(flows.getByRole("listitem")).toHaveText([
+  await expect(flows.getByTestId("flow-card-name")).toHaveText([
     "Invoice Processing",
     "Archivable automation",
     "Manual input automation",
