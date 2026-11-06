@@ -1224,6 +1224,26 @@ test("the cancelled run reads as cancelled on its page, and Activity reached by 
   ).toBeVisible();
 });
 
+test("builds 37 and 39, item 10 — a running run opened from Activity shows its steps face: the steps, Cancel run, Run details last; never its result face", async ({
+  page,
+}) => {
+  await page.goto("/account/runs");
+  await page
+    .getByRole("link", { name: "Run of Manual input automation, running" })
+    .click();
+  await expect(page).toHaveURL(/\/account\/runs\/fixture-run-running$/u);
+  await expect(page.getByTestId("run-face-steps")).toBeVisible();
+  await expect(
+    page.getByTestId("run-steps").locator("li").first(),
+  ).toBeVisible();
+  await expect(page.getByTestId("run-face-result")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Cancel run" })).toBeVisible();
+  await expect(page.getByTestId("run-details-row")).toHaveAttribute(
+    "href",
+    "/account/runs/fixture-run-running/details",
+  );
+});
+
 test("17 — Approvals: nothing waiting, a decision by an eligible role, and none offered to a member", async ({
   page,
 }) => {

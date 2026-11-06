@@ -6,7 +6,9 @@
  * pressed the same way, and no flow's code is named (`test/no-flow-code`).
  * A sentence that holds an address is words, never a link. The website
  * draws an email as a `mailto:` link and a phone as a `tel:` link, each with
- * Copy (`ContactValue`); the app's `contact-value` reads the same.
+ * Copy (`ContactValue`). The app (snoopy-mobile) contact-value must hold
+ * this same rule — this EMAIL, and a phone of 10 to 15 digits (8 with "+")
+ * — so "555-1234" and "2019-2023" are words in both clients.
  *
  * Pure, and loaded by its unit test as it is: no React and no `@/` import.
  */

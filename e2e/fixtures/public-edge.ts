@@ -2921,6 +2921,12 @@ const server = createServer(
       "/__fixture/items-failing": () => {
         state.itemsFailing = true;
       },
+      // Builds 37 and 39, item 8: the flow with items has none yet, so
+      // Home's card offers its Upload. Only once the flow with items is on.
+      "/__fixture/items-none": () => {
+        if (!state.itemsFlow) return false;
+        state.items = [];
+      },
       "/__fixture/items-read": () => {
         for (const item of state.items)
           if (item.status === "reading") item.status = "ready";

@@ -1061,6 +1061,40 @@ test("builds 37 and 39, items 5 and 8 — Home's YOUR FLOWS: a flow with items i
   await expect(page).toHaveURL(new RegExp(`${FLOW}$`, "u"));
 });
 
+test("builds 37 and 39, item 8 — Home's YOUR FLOWS with no batch yet: No batches yet. and Upload batch; the batch uploaded there reads Reading…, is read again every 2 s on Home, and once ready is chosen already for its run", async ({
+  page,
+}) => {
+  await fixtureControl("items-none");
+  await page.goto("/account");
+  const card = page.getByTestId(
+    "home-flow-b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1",
+  );
+  await expect(card.getByText("No batches yet.")).toBeVisible();
+  await expect(card.getByRole("combobox", { name: "Batch" })).toHaveCount(0);
+  await card.getByRole("button", { name: "Upload batch" }).click();
+  // The flow page's upload card, a dialog over Home.
+  const upload = page.getByTestId("item-upload");
+  await expect(upload.getByRole("combobox", { name: "Area" })).toHaveText(
+    "North",
+  );
+  await upload.getByLabel("Batch file").setInputFiles(wordFile);
+  await expect(upload.getByText(/^Ready: delta\.docx/u)).toBeVisible();
+  await upload.getByLabel("Name").fill("Delta list");
+  await expect(upload.getByLabel("Name")).toHaveValue("Delta list");
+  await upload.getByRole("button", { name: "Upload", exact: true }).click();
+  await expect(upload).toHaveCount(0);
+  await expect(
+    card.getByTestId("home-reading-b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1"),
+  ).toHaveText(/Delta list.*Reading…/u);
+  // The run that reads it ends: Home's next read finds it ready, chosen.
+  await fixtureControl("items-read");
+  await expect(card.getByRole("combobox", { name: "Batch" })).toHaveText(
+    "Delta list",
+  );
+  await expect(card.getByTestId("run-form")).toBeVisible();
+  await expect(page).toHaveURL(/\/account$/u);
+});
+
 test("builds 37 and 39, item 8 — a member's YOUR FLOWS: a flow with items is not started there, its card's Open goes to the flow's page", async ({
   page,
 }) => {

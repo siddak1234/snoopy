@@ -152,8 +152,7 @@ page reuses:
 - **A row that opens a page** is `PageRow` (`components/dashboard/PageRow.tsx`):
   a closed section's box and height, the arrow at its end — or, `boxed`
   false, a row of one card of divided rows (`LIST_CARD`): a list block's
-  rows, a flow's items, Activity's runs and Home's flows that start no run
-  there.
+  rows, a flow's items and Activity's runs.
 - **Home's YOUR FLOWS** (the owner's build 34 F5, and builds 37 and 39,
   items 2, 3, 5 and 8; `app/account/YourFlows.tsx`, `home-flows.ts`), in
   Recent runs' place: the title and, at its right, a department drop-down
