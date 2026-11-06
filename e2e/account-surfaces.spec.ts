@@ -67,17 +67,27 @@ async function switchInAnotherTab(page: Page, to: RegExp) {
   }
 }
 
-test("1 — Home's YOUR FLOWS: a flow opens in place to its run's fields, and Start run starts the run and opens its page; a flow that cannot start here opens its own page (build 34's F5; ~~the recent-run link~~)", async ({
+test("1 — Home's YOUR FLOWS (builds 37 and 39, item 8): the department drop-down and Search flows over a card per flow, always open — its icon, name, description and Live, its run's fields inside it — Start run starts the run and opens its page from the flow; a flow that cannot start here is Open, to its own page", async ({
   page,
 }) => {
   await page.goto("/account");
   const flows = page.getByTestId("home-your-flows");
-  const manual = flows.getByRole("button", { name: "Manual input automation" });
-  await expect(manual).toHaveAttribute("aria-expanded", "false");
-  await expect(flows.getByTestId("run-form")).toHaveCount(0);
-  await manual.click();
-  await expect(manual).toHaveAttribute("aria-expanded", "true");
-  const form = flows.getByTestId("run-form");
+  await expect(flows.getByRole("combobox", { name: "Department" })).toHaveText(
+    "All departments",
+  );
+  await expect(
+    flows.getByRole("searchbox", { name: "Search flows" }),
+  ).toBeVisible();
+  // No row opens or closes: every card is open (no caret, no aria-expanded).
+  await expect(flows.locator("button[aria-expanded]:not([role])")).toHaveCount(
+    0,
+  );
+  const card = flows
+    .locator('[data-testid^="home-flow-"]')
+    .filter({ hasText: "Manual input automation" });
+  await expect(card.getByTestId("flow-card-icon")).toHaveCount(1);
+  await expect(card.getByText(/^live$/iu)).toBeVisible();
+  const form = card.getByTestId("run-form");
   await expect(form.getByLabel("Vendor")).toBeVisible();
   await expect(form.getByLabel("Invoice file")).toHaveAttribute("type", "file");
   await expectNoAxeViolations(page);
@@ -85,12 +95,28 @@ test("1 — Home's YOUR FLOWS: a flow opens in place to its run's fields, and St
   await form.getByLabel("Amount").fill("120.50");
   await form.getByLabel("Invoice reference").fill("INV-1001");
   await form.getByRole("button", { name: "Start run" }).click();
-  await expect(page).toHaveURL(/\/account\/runs\/fixture-run-started$/u);
-  // A live flow with no run input: its row is its page.
+  await expect(page).toHaveURL(
+    /\/account\/runs\/fixture-run-started\?from=flow$/u,
+  );
+  // Its back: the flow's page (the owner's words of 2026-11-06).
+  await expect(
+    page.locator("main").getByRole("link", { name: "Back" }),
+  ).toHaveAttribute("href", FLOWS.manual);
+  // A live flow with no run input: its card's Open is its page.
   await page.goto("/account");
   await expect(
-    flows.getByRole("link", { name: "Webhook automation" }),
+    flows.getByRole("link", { name: "Open Webhook automation" }),
   ).toHaveAttribute("href", FLOWS.webhook);
+  // The search keeps the cards whose name holds what is typed, whatever its
+  // case; nothing found says so.
+  const search = flows.getByRole("searchbox", { name: "Search flows" });
+  await search.fill("WEBHOOK");
+  await expect(
+    flows.getByRole("link", { name: "Open Webhook automation" }),
+  ).toBeVisible();
+  await expect(flows.getByTestId("run-form")).toHaveCount(0);
+  await search.fill("zzz");
+  await expect(flows).toContainText('Nothing matches "zzz".');
 });
 
 test("2 — YOUR FLOWS says Unavailable when the flows cannot be read, and the rest of the dashboard still shows (build 34's F5)", async ({
@@ -1198,6 +1224,26 @@ test("the cancelled run reads as cancelled on its page, and Activity reached by 
   ).toBeVisible();
 });
 
+test("builds 37 and 39, item 10 — a running run opened from Activity shows its steps face: the steps, Cancel run, Run details last; never its result face", async ({
+  page,
+}) => {
+  await page.goto("/account/runs");
+  await page
+    .getByRole("link", { name: "Run of Manual input automation, running" })
+    .click();
+  await expect(page).toHaveURL(/\/account\/runs\/fixture-run-running$/u);
+  await expect(page.getByTestId("run-face-steps")).toBeVisible();
+  await expect(
+    page.getByTestId("run-steps").locator("li").first(),
+  ).toBeVisible();
+  await expect(page.getByTestId("run-face-result")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Cancel run" })).toBeVisible();
+  await expect(page.getByTestId("run-details-row")).toHaveAttribute(
+    "href",
+    "/account/runs/fixture-run-running/details",
+  );
+});
+
 test("17 — Approvals: nothing waiting, a decision by an eligible role, and none offered to a member", async ({
   page,
 }) => {
@@ -1248,9 +1294,9 @@ test("17 — Deny is recorded as rejected, and the last row leaving goes to Acti
 
 // The held Invoice Processing job: Approve and Deny under its page's result
 // line (Build 24, P6; build 28's review, finding 1), and its step 4 — where
-// it waits — on its details page, its state alone (build 28, item 9).
+// it waits — on the same page's steps face, its state alone, no button of
+// its own (builds 37 and 39, item 10; ~~on its details page~~ until then).
 const heldJob = "/account/runs/fixture-run-invoice-held";
-const heldJobDetails = `${heldJob}/details`;
 const heldStep = (page: Page) =>
   page.locator("main").getByTestId("run-step-group:record");
 const heldDecision = (page: Page) =>
@@ -1280,20 +1326,19 @@ const heldJobReads = async () =>
   (await fixtureRead<{ heldJobBlockReads: number }>("counts"))
     .heldJobBlockReads;
 
-test("P6 — a held job's page offers Approve and Deny under its result line, Deny red; Approving… while it saves, then the page is drawn again: the job runs on under its id; its details page shows step 4's state alone", async ({
+test("P6 — a held job's page, its steps face: step 4 its state alone, then Approve and Deny under its result line, Deny red; Approving… while it saves, then the page is drawn again: the job runs on under its id, step 4 working (builds 37 and 39, item 10)", async ({
   page,
 }) => {
   await fixtureControl("invoice-approval-pending");
-  // Its details page: step 4 waits, and offers nothing.
-  await page.goto(heldJobDetails);
+  // Its steps face: step 4 waits, and offers nothing of its own.
+  await page.goto(heldJob);
   const step = heldStep(page);
   await expect(step).toHaveAttribute("data-state", "held");
   await expect(step).toContainText(
     "Waiting for approval: Document 2: the total can't be read.",
   );
-  await expect(page.locator("main").getByRole("button")).toHaveCount(0);
-  // Its page: the pair under the result line, the one pair there is.
-  await page.goto(heldJob);
+  await expect(step.getByRole("button")).toHaveCount(0);
+  // The pair under the result line, the one pair there is.
   const main = page.locator("main");
   await expect(resultLine(page)).toHaveText("Waiting for approval.");
   const decision = heldDecision(page);
@@ -1329,7 +1374,7 @@ test("P6 — a held job's page offers Approve and Deny under its result line, De
   await expect(decision).toHaveCount(0);
   await expect(page).toHaveURL(new RegExp(`${heldJob}$`, "u"));
   expect(await approvalStatuses()).toEqual(["approved"]);
-  await page.goto(heldJobDetails);
+  // Approved from its steps face, the job goes on there: step 4 working.
   await expect(step).toHaveAttribute("data-state", "working");
 });
 
@@ -1343,7 +1388,6 @@ test("P6 — Deny on a held job's page: the result Denied, its waiting document 
   await expect(heldDecision(page)).toHaveCount(0);
   await expect(documentChip(page, 2)).toHaveText("Not approved");
   expect(await approvalStatuses()).toEqual(["rejected"]);
-  await page.goto(heldJobDetails);
   await expect(heldStep(page)).toHaveAttribute("data-state", "held");
   await expect(heldStep(page).locator("p").nth(1)).toHaveText("Denied");
   await expect(heldStep(page).getByRole("button")).toHaveCount(0);
@@ -1405,9 +1449,8 @@ test("Round 21 (F2) — a held run's review: each change a row with Accept and D
   ]);
   // Saved, the job goes on under its id, even with a change denied.
   await expect(page.locator("main").getByText(/^running$/iu)).toBeVisible();
-  // Its details page: the step that waited says the review's count while
-  // the job goes on.
-  await page.goto(heldJobDetails);
+  // Its steps face: the step that waited says the review's count while the
+  // job goes on.
   await expect(heldStep(page)).toContainText("1 accepted · 1 denied");
   await expect(heldStep(page).getByRole("button")).toHaveCount(0);
 });
@@ -1568,7 +1611,7 @@ test("a job's re-reads refused several in a row cost only those reads: the run p
   page,
 }) => {
   await fixtureControl("held-job-running");
-  await page.goto(heldJobDetails);
+  await page.goto(heldJob);
   const main = page.locator("main");
   await expect(main.getByText(/^running$/iu)).toBeVisible();
   await page.evaluate(() => Object.assign(window, { sameDocument: true }));

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
 import type { AutomationRunInputField } from "@/lib/automations";
 import type { AgreementOffer } from "@/lib/health-agreement";
-import { runPagePath } from "@/lib/run-progress";
+import { FROM_ITEM, runPagePath, type RunFrom } from "@/lib/run-progress";
 import { FLOW_CHANGE_ADMIN_ONLY } from "@/lib/subscription-entitlements";
 import { setSubscriptionStatus, startRun } from "./actions";
 import { HealthAgreementDialog } from "./HealthAgreementDialog";
@@ -41,8 +41,11 @@ import { SPACING } from "@/lib/spacing";
  * page from the item (`runPagePath`), its steps arriving, and its back
  * returns to the item (the owner's G4, build 31: "Shoukd i be taken into a
  * step by step"; ~~it stayed on the item's page, the form emptied for the
- * next file~~ until then). Home's YOUR FLOWS starts a run of an item chosen
- * there with Start run, and opens its page (the owner's build 34 F5).
+ * next file~~ until then). Home's YOUR FLOWS starts a run of the job on
+ * its card with Start run (the owner's build 34 F5), and opens its page from
+ * that job too (`from`: back is all candidates, back again all jobs); Home
+ * and a flow's page start a flow without items opening its page from the
+ * flow (`from`: back is the flow's page; the owner's words of 2026-11-06).
  *
  * Turning a flow on is a change only an owner or admin makes (backend §12.1
  * #180): to a member Turn on is read-only, with "Only an owner or admin can
@@ -65,6 +68,7 @@ export function RunStart({
   initialKey,
   itemId,
   itemPage = false,
+  from,
   canChange = true,
 }: {
   /** The workspace this page shows; every action is refused once it is not active. */
@@ -86,6 +90,8 @@ export function RunStart({
   itemId?: string;
   /** On an item's page: its button says Start, and the run opens from the item. */
   itemPage?: boolean;
+  /** Where the run's page opens from, off an item's page: its job's or its flow's. */
+  from?: RunFrom;
   /** An owner or admin: a member's Turn on is read-only. */
   canChange?: boolean;
 }) {
@@ -135,7 +141,8 @@ export function RunStart({
       }
       return result.error;
     }
-    if (result.runId) router.push(runPagePath(result.runId, itemPage));
+    if (result.runId)
+      router.push(runPagePath(result.runId, itemPage ? FROM_ITEM : from));
     return null;
   };
 

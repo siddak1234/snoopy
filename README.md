@@ -132,11 +132,16 @@ runs in Chromium and Firefox; CI runs it once per engine, WebKit's leg
 included (register F104). Its tests drive the published operations the website calls — flows and runs, archiving
 a flow and the archived ones, adding a flow (it goes to the department of its
 category, which the platform makes when there is none, and its Set up opens;
-a catalog with nothing to add), the dashboard (Today's three tiles, counted
+a catalog with nothing to add; the one flow card, its icon and
+description, on the Flows cards and the archived rows, with no department
+line), the dashboard (Today's three tiles, counted
 from the browser's midnight and each opening Activity from it; the approvals
-banner while something waits; Add a flow and Flows; YOUR FLOWS, a flow
-opened to its run's fields and Start run, a flow with items read only when
-opened and its item chosen first; and a workspace with no flow yet), a flow's page (its live Dashboard, its five
+banner while something waits; Add a flow and Flows; YOUR FLOWS, its
+department drop-down and Search flows over a card per flow, always open —
+the one flow card, its run's fields and Start run inside it, its run opening
+from the flow; a flow with items read as Home opens, on its newest ready
+item, its run opening from that item, back to it and then its flow; a
+member's Open — and a workspace with no flow yet), a flow's page (its live Dashboard, its five
 Steps — titles only, Step 1 holding the run's fields and Start run, step 2 its
 integration, step 4 titled by the flow's choice, step 5 who gets the email —
 and Edit setup; no Connections and no move to another version), its Set up
@@ -149,10 +154,13 @@ connect is said under its row; a member sees the integration and no row is a
 choice; a flow still on an older version
 with no vendor to choose is sent to Connections instead), who gets its email
 (an owner or admin adds and removes addresses, each saved at once, at most
-ten; a member reads them), a run's details page, opened from the Run details
-row on every run's page (every step from the start — its
-integration and its email among them, the running one spinning — read again
-while it goes on, a held job's step 4 its state alone), a run's page (a held
+ten; a member reads them), a run's steps face while it goes on, waits,
+failed or was cancelled (every step from the start — its integration and its
+email among them, the running one spinning — read again while it goes on,
+turning to its result in place when it succeeds, a held job's step 4 its
+state alone, Cancel run, then the Run details row last), its details page
+(its metadata alone: Duration, Steps done, Started, Ended, Trigger, Run ID),
+a run's page (a held
 job's Approve and Deny under its result line, or a review's Accept and
 Deny for each change then Save review, appearing with no reload when
 the job reaches it while its page is open, as docs/ARCHITECTURE.md's "Screen
@@ -164,8 +172,8 @@ each toned by its verdict, since block set 2) and, for `blocks-{name}` runs,
 serves as the platform's
 block fixtures hold them; each document it read a closed section of its own
 that opens in place, headed as "Screen standards" says; the
-package's buttons when the platform offers the package, then Run details,
-then View flow — and View package, Download PDF and Download Excel, each
+package's buttons when the platform offers the package, then View flow,
+then Run details last — and View package, Download PDF and Download Excel, each
 download to the platform's signed link, an https one only), the run
 package's page (the PDF itself, read once from the site's inline route that
 answers it `application/pdf` inline and shown in a frame, Share handing on
@@ -208,7 +216,7 @@ the label said and the value saved) and several files in one upload (all into on
 `maxFiles` taken, past it refused, a photo past it keeping the files held; a
 full queue said; a photo added), a public app connected with no
 Connect step and, as a step's choice, Connected and chosen in place, a batch run's page, and a flow
-whose list row carries no settings still drawn and saved from its one-flow read (backend §12.1 #319), a flow id that is not a UUID, one the platform does not know and a flow it answers archived each "not found", its integration's save refused once it is archived, and a run's details page still drawn when its flow is archived or cannot be read, in `e2e/public-edge-fixture.spec.ts`), `e2e/dialogs.spec.ts`
+whose list row carries no settings still drawn and saved from its one-flow read (backend §12.1 #319), a flow id that is not a UUID, one the platform does not know and a flow it answers archived each "not found", its integration's save refused once it is archived, and a run's steps face still drawn when its flow is archived or cannot be read, in `e2e/public-edge-fixture.spec.ts`), `e2e/dialogs.spec.ts`
 (every dialog's Escape, click outside, focus return and hold, one row each),
 `e2e/health-data.spec.ts` (Round 21, Stage 2: the health data agreement on
 Add, on Start run and on an item's upload — the owner's dialog, anyone
@@ -230,9 +238,11 @@ reading's table sent without its rows drawn as the fallback with the
 sections after it, never the error page (Round 21, D2.6); a run
 headed by its title and its score in its verdict's colour with View {file}
 and its file page (a file no longer linked framed by this site's route), its
-sections under "{Run word} details" and its Run details page — every body
-the platform's blocks; a run opened from its job going back to it (G1),
-and Start on a job opening the new run's page from it (G4);
+sections under "{Run word} details" and its Run details page, the metadata
+alone — every body the platform's blocks; a run opened from its job going
+back to it (G1), and Start on a job opening the new run's page from it (G4),
+its steps face headed by its flow's name with the job's title under it, the
+line left out when the job's own read is unanswered (builds 37 and 39, item 10);
 Archive, an owner's buttons a member
 does not see and a member's presses refused in words, an unanswered list
 said "Unavailable", and an upload refused with the queue full said in the

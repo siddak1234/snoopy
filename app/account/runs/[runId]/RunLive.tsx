@@ -52,6 +52,8 @@ import {
 } from "@/lib/run-documents";
 import {
   BLOCKS_SHAPE,
+  FROM_FLOW,
+  FROM_ITEM,
   RUN_DETAILS,
   RUN_REREAD_MS,
   expiredByDisconnect,
@@ -64,12 +66,15 @@ import {
   reviewTally,
   runDetailsPath,
   runDuration,
+  runFace,
+  runPackagePath,
   runPagePath,
   runLabel,
   stepsDone,
   trackerRows,
   type DeclaredStep,
   type ProgressGroup,
+  type RunFrom,
   type TrackerFlow,
 } from "@/lib/run-progress";
 import { verdictChip, type VerdictNames } from "@/lib/run-verdict";
@@ -111,21 +116,34 @@ export type RunFlow = {
  * two pages (build 28, the owner's item 9: Run details "a standard … a
  * component with an arrow"; `view`):
  *
- * - **the run's page** (`run`): its header — its full id, or its title and
- *   score, and its status; then its body, the platform's blocks as it sent
- *   them (backend ADR-0048; `BlockList`), in its flow's `pages.run` order —
- *   a run of an item's "View {file}" row, its result line, a held job's
- *   approval form (drawn by `ApprovalDecision`, to a role it names, else who
- *   can), then what it read; then its footer — View package, Download PDF
- *   and Download Excel when the platform offers the package
- *   (`packageAvailable`), the Run details row (`PageRow`), Cancel run while
- *   it goes on, and View flow. An answer with no blocks draws the header,
- *   the footer and the fallback sentence. ~~Its documents, sections and
+ * - **the run's page** (`run`), with two faces by its status (`runFace`; the
+ *   owner's builds 37 and 39, item 10: "When a run starts i want to see the
+ *   steps 1-x", and his words of 2026-11-06: "run starts shows the steps for
+ *   that run, run details in the bottom … all automations should be the
+ *   same format"), every flow alike:
+ *   - its **steps face**, while it is pending, running or held, and once it
+ *     failed or was cancelled: headed by its flow's name, under it its job's
+ *     title when it belongs to one (`itemTitle`), and its status; then
+ *     STEPS, every step from the start, each where the run is
+ *     (`trackerRows`, `TrackerItem`), live; then its body as the platform
+ *     sent it (backend ADR-0048; `BlockList`) — the files rows, the result
+ *     line, a held job's approval form (drawn by `ApprovalDecision`, to a
+ *     role it names, else who can), a batch's children; then Cancel run
+ *     while it goes on, and the Run details row last;
+ *   - its **result face**, once it succeeded: headed by its title and score
+ *     when it has both (a candidate), else its flow's name; its body; then
+ *     View package, Download PDF and Download Excel when the platform offers
+ *     the package (`packageAvailable`), View flow, and the Run details row
+ *     last.
+ *   A run that succeeds while its steps are in front turns to its result in
+ *   place, so its back is still where it was opened from (`from`): its job,
+ *   its flow, else Activity. An answer with no blocks draws the rest and the
+ *   fallback sentence. ~~"Run {id}" as its title, its steps on its details
+ *   page alone~~ until builds 37 and 39; ~~its documents, sections and
  *   details drawn here, by kind~~ until Round 21;
- * - **its details page** (`details`): Duration and Steps done; every step
- *   from the start, each where the run is — a held step its state, "Waiting
- *   for approval" (~~Approve and Deny under it~~ until build 28's review);
- *   then Started, Ended, Trigger and the full Run ID.
+ * - **its details page** (`details`): its metadata alone — Duration and
+ *   Steps done, then Started, Ended, Trigger and the full Run ID. ~~Every
+ *   step from the start~~ until builds 37 and 39: they are the steps face.
  *
  * Both are read again every 2 s while the run is pending or running
  * (`RUN_REREAD_MS`), through `/api/platform`, one read at a time; the page
@@ -137,8 +155,9 @@ export type RunFlow = {
  * comes or the run leaves held (`rereadForApprovalForm`); its details page
  * reads the job and its approvals together, until the approval is listed
  * (`rereadForApproval`; Build 25, the review's R5c 1). So Approve and Deny
- * appear with no reload. A read that fails costs only itself: the page
- * stays as it was, as the app's does.
+ * appear with no reload.
+ * A read that fails costs only itself: the page stays as it was, as the
+ * app's does.
  */
 export function RunLive({
   workspaceId,
@@ -147,12 +166,15 @@ export function RunLive({
   approvals,
   role,
   view,
-  fromItem = false,
+  from,
+  itemTitle,
 }: {
   /** Which page: the run's own, or its details (build 28, item 9). */
   view: "run" | "details";
-  /** Opened from its job's page (`?from=item`, G1): back goes there. */
-  fromItem?: boolean;
+  /** Where it was opened from (`?from=`): its job's page or its flow's; back goes there. */
+  from?: RunFrom;
+  /** Its job's title, when the run belongs to one and the job could be read. */
+  itemTitle?: string;
   workspaceId: string;
   initial: RunDetail;
   flow: RunFlow;
@@ -237,7 +259,9 @@ export function RunLive({
     };
   }, [owed, approvalReads, workspaceId, run.id, view]);
 
-  const name = headed && run.title ? run.title : runLabel(run.id);
+  // Its flow's name: what heads its steps, and a result with no title.
+  const flowName = flow?.name ?? run.templateId;
+  const name = headed && run.title ? run.title : flowName;
   // The job's approval, expired because its connection was disconnected at
   // the provider (§12.1 #252): its words, in the provider's name
   // (`disconnectedName`: QuickBooks is "QuickBooks").
@@ -248,6 +272,26 @@ export function RunLive({
         providerId,
         flow?.providerNames?.[providerId] ?? providerId,
       ),
+  );
+
+  // Every step from the start (spec A7; S14): by the catalog's groups, the
+  // newest version's, for any run whose every reported step they still
+  // declare (Build 22, the session's S25: a v3 run is drawn by v4's five
+  // steps); a run that reported a step they no longer declare is drawn by
+  // the steps it reported. Step 2 says the flow's integration, step 4's
+  // title follows it, step 5 is the run's email. The steps face draws them;
+  // Run details counts them (Steps done).
+  const decided = heldDecision(run, listed);
+  // A saved review's count on the step that waited (Round 21's F2).
+  const review = reviewTally(newestApproval(run.id, listed));
+  const tracker = trackerRows(
+    steps,
+    flow?.pipeline,
+    flow?.groups,
+    run,
+    undefined,
+    flow?.pipeline,
+    { flow: flow?.tracker, email: detail.email, decision: decided, review },
   );
 
   // The decision where the job waits (Build 24, P6; build 28's review,
@@ -272,24 +316,8 @@ export function RunLive({
     ) : null;
 
   if (view === "details") {
-    // Every step from the start (spec A7; S14): by the catalog's groups, the
-    // newest version's, for any run whose every reported step they still
-    // declare (Build 22, the session's S25: a v3 run is drawn by v4's five
-    // steps); a run that reported a step they no longer declare is drawn by
-    // the steps it reported. Step 2 says the flow's integration, step 4's
-    // title follows it, step 5 is the run's email.
-    const decided = heldDecision(run, listed);
-    // A saved review's count on the step that waited (Round 21's F2).
-    const review = reviewTally(newestApproval(run.id, listed));
-    const tracker = trackerRows(
-      steps,
-      flow?.pipeline,
-      flow?.groups,
-      run,
-      undefined,
-      flow?.pipeline,
-      { flow: flow?.tracker, email: detail.email, decision: decided, review },
-    );
+    // Its metadata alone (the owner's builds 37 and 39, item 10): its steps
+    // are its page's steps face.
     const facts = [
       {
         label: "Started",
@@ -303,7 +331,7 @@ export function RunLive({
       <SectionCard
         title={RUN_DETAILS}
         subheader={name}
-        back={<BackLink href={runPagePath(run.id, fromItem)} />}
+        back={<BackLink href={runPagePath(run.id, from)} />}
         primaryAction={<StatusPill status={run.status} />}
       >
         <Group>
@@ -319,17 +347,6 @@ export function RunLive({
               testId="run-tile-Steps done"
             />
           </dl>
-        </Group>
-
-        <Group title="Steps" titleId="run-steps-title">
-          <ol
-            data-testid="run-steps"
-            className={`flex flex-col ${SPACING.group.gap}`}
-          >
-            {tracker.map((row) => (
-              <TrackerItem key={row.key} row={row} />
-            ))}
-          </ol>
         </Group>
 
         <Group>
@@ -351,19 +368,95 @@ export function RunLive({
     );
   }
 
+  const face = runFace(run.status);
+  // Back to where it was opened (`from`): its job, by the run's own itemId;
+  // its flow; else Activity.
+  const back =
+    from === FROM_ITEM && run.itemId
+      ? itemPath(run.subscriptionId, run.itemId)
+      : from === FROM_FLOW
+        ? flowPath(run.subscriptionId)
+        : "/account/runs";
+  // Every run's, whatever its flow (build 28, item 9), always last: its
+  // metadata on a page of its own.
+  const detailsRow = (
+    <PageRow href={runDetailsPath(run.id, from)} testId="run-details-row">
+      <span className="font-medium text-[var(--text)]">{RUN_DETAILS}</span>
+    </PageRow>
+  );
+  // The body, as the platform sent it: the run's files, its result line and
+  // what is to decide, then what it read (ADR-0048). Over it, an approval a
+  // disconnect expired says so (§12.1 #252).
+  const body = (
+    <Group>
+      {expired ? (
+        <div
+          data-testid="run-expired"
+          role="status"
+          className={`${SPACING.group.bottom} flex flex-col ${SPACING.inner.gap}`}
+        >
+          <p className="text-sm font-medium text-[var(--warning-text)]">
+            {expired.title}
+          </p>
+          <p className="text-sm text-[var(--muted)]">{expired.next}</p>
+        </div>
+      ) : null}
+      <BlockList
+        blocks={detail.blocks}
+        testId="run-blocks"
+        context={{
+          subscriptionId: run.subscriptionId,
+          runFrom: from,
+          forms: { approval: decisionForm, review: decisionForm },
+        }}
+      />
+    </Group>
+  );
+
+  if (face === "steps")
+    return (
+      <SectionCard
+        title={flowName}
+        subheader={itemTitle}
+        back={<BackLink href={back} />}
+        primaryAction={<StatusPill status={run.status} />}
+      >
+        <>
+          <Group
+            title="Steps"
+            titleId="run-steps-title"
+            testId="run-face-steps"
+          >
+            <ol
+              data-testid="run-steps"
+              className={`flex flex-col ${SPACING.group.gap}`}
+            >
+              {tracker.map((row) => (
+                <TrackerItem key={row.key} row={row} />
+              ))}
+            </ol>
+          </Group>
+          {body}
+          <Group>
+            {/* Only the two states the platform cancels; any other answers 404. */}
+            {going ? (
+              <div
+                className={`${SPACING.group.bottom} flex flex-wrap items-center ${SPACING.inner.gap}`}
+              >
+                <CancelRunButton runId={run.id} workspaceId={run.workspaceId} />
+              </div>
+            ) : null}
+            {detailsRow}
+          </Group>
+        </>
+      </SectionCard>
+    );
+
   return (
     <SectionCard
       title={name}
-      subheader={flow?.name ?? run.templateId}
-      back={
-        <BackLink
-          href={
-            fromItem && run.itemId
-              ? itemPath(run.subscriptionId, run.itemId)
-              : "/account/runs"
-          }
-        />
-      }
+      subheader={headed ? flowName : itemTitle}
+      back={<BackLink href={back} />}
       primaryAction={
         <>
           {headed && run.score !== undefined ? (
@@ -376,69 +469,41 @@ export function RunLive({
         </>
       }
     >
-      {/* The body, as the platform sent it: the run's files, its result
-          line and what is to decide, then what it read (ADR-0048). Over it,
-          an approval a disconnect expired says so (§12.1 #252). */}
-      <Group>
-        {expired ? (
-          <div
-            data-testid="run-expired"
-            role="status"
-            className={`${SPACING.group.bottom} flex flex-col ${SPACING.inner.gap}`}
-          >
-            <p className="text-sm font-medium text-[var(--warning-text)]">
-              {expired.title}
-            </p>
-            <p className="text-sm text-[var(--muted)]">{expired.next}</p>
-          </div>
-        ) : null}
-        <BlockList
-          blocks={detail.blocks}
-          testId="run-blocks"
-          context={{
-            subscriptionId: run.subscriptionId,
-            forms: { approval: decisionForm, review: decisionForm },
-          }}
-        />
-      </Group>
-
-      <Group>
-        {/* Every run's, whatever its flow (build 28, item 9): the steps and
-            the facts on a page of their own. */}
-        {/* The package's three first, then Run details, directly over
-            Cancel run and View flow (build 28's review, finding 2). */}
-        {detail.packageAvailable === true ? (
+      <>
+        {body}
+        <Group testId="run-face-result">
+          {/* The package's three first, then View flow, then Run details,
+              last (the owner's builds 37 and 39; build 28's review,
+              finding 2). */}
+          {detail.packageAvailable === true ? (
+            <div
+              className={`${SPACING.group.bottom} flex flex-wrap items-center ${SPACING.inner.gap}`}
+            >
+              <PackageActions
+                workspaceId={workspaceId}
+                runId={run.id}
+                view
+                from={from}
+              />
+            </div>
+          ) : null}
           <div
             className={`${SPACING.group.bottom} flex flex-wrap items-center ${SPACING.inner.gap}`}
           >
-            <PackageActions workspaceId={workspaceId} runId={run.id} view />
+            <Button
+              href={flowPath(run.subscriptionId)}
+              variant="secondary"
+              size="sm"
+              prefetch={false}
+              className={`inline-flex items-center ${SPACING.inner.gap}`}
+            >
+              <FlowArrowIcon size={20} aria-hidden />
+              View flow
+            </Button>
           </div>
-        ) : null}
-        <PageRow
-          href={runDetailsPath(run.id, fromItem)}
-          testId="run-details-row"
-        >
-          <span className="font-medium text-[var(--text)]">{RUN_DETAILS}</span>
-        </PageRow>
-        <div
-          className={`${SPACING.group.top} flex flex-wrap items-center ${SPACING.inner.gap}`}
-        >
-          {/* Only the two states the platform cancels; any other answers 404. */}
-          {going ? (
-            <CancelRunButton runId={run.id} workspaceId={run.workspaceId} />
-          ) : null}
-          <Button
-            href={flowPath(run.subscriptionId)}
-            variant="secondary"
-            size="sm"
-            prefetch={false}
-            className={`inline-flex items-center ${SPACING.inner.gap}`}
-          >
-            <FlowArrowIcon size={20} aria-hidden />
-            View flow
-          </Button>
-        </div>
-      </Group>
+          {detailsRow}
+        </Group>
+      </>
     </SectionCard>
   );
 }
@@ -501,11 +566,14 @@ export function PackageActions({
   workspaceId,
   runId,
   view,
+  from,
 }: {
   workspaceId: string;
   runId: string;
   /** Whether to offer View package too: the run page's row. */
   view: boolean;
+  /** Where the run's page was opened from: the package page's back keeps it. */
+  from?: RunFrom;
 }) {
   const page = useContext(PackageFileContext);
   // The package page's bytes, unless its read failed.
@@ -525,7 +593,7 @@ export function PackageActions({
       before={
         view ? (
           <Button
-            href={`/account/runs/${encodeURIComponent(runId)}/package`}
+            href={runPackagePath(runId, from)}
             variant="secondary"
             size="sm"
             prefetch={false}

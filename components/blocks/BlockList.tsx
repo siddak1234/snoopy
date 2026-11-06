@@ -50,6 +50,7 @@ export const RENDERERS: { [K in Block["type"]]: Renderer<K> } = {
       place={{
         subscriptionId: context.subscriptionId,
         fromItem: context.fromItem,
+        runFrom: context.runFrom,
       }}
     />
   ),
@@ -59,6 +60,7 @@ export const RENDERERS: { [K in Block["type"]]: Renderer<K> } = {
       place={{
         subscriptionId: context.subscriptionId,
         fromItem: context.fromItem,
+        runFrom: context.runFrom,
       }}
     />
   ),

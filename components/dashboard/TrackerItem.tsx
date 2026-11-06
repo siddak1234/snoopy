@@ -45,7 +45,7 @@ export const STATE_LOOK: Record<
  * (Build 23's A7, `lib/run-progress.ts`) — never a step's own summary
  * and never a step id (B6). A state this build does not know draws the
  * "unknown" look, with no line of its own. Under it, what the row offers,
- * when a page gives it. A run's details page and the timeline block
+ * when a page gives it. A run's steps face and the timeline block
  * (`components/blocks`) draw it; it uses no hooks.
  */
 export function TrackerItem({
