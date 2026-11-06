@@ -115,7 +115,7 @@ test("C3-b, an item: the upload card opens the owner's dialog beside its form, a
   );
   assert.match(
     card,
-    /purpose="run"\s+onAccepted=\{\(\) => send\(offer\.input\)\}/u,
+    /workspaceId=\{workspaceId\}\s+onAccepted=\{\(\) => send\(offer\.input\)\}/u,
   );
   // Beside the card's dialog, never in its form, whose changes make a new key.
   assert.match(card, /<\/Modal>\s*\{offer \? \(\s*<HealthAgreementDialog/u);
@@ -257,5 +257,90 @@ test("C3 Accept: once per opening — a press after the repeat was refused sends
   assert.match(
     dialog,
     /const pressed = await acceptThenRepeat\(\s*accepted,\s*\(\) => acceptHealthAgreement\(data\),\s*onAccepted,\s*\);\s*setAccepted\(pressed\.accepted\);\s*setError\(pressed\.error\);/u,
+  );
+});
+
+const SUBSCRIPTIONS = "/v1/workspaces/w1/subscriptions";
+const FLOW = "/v1/workspaces/w1/subscriptions/s1";
+
+/** `subscribeToAutomation` (Add) against the platform's `answer` for the add. */
+async function add(answer, { mutate } = {}) {
+  const { subscribeToAutomation } = await load(ACTIONS, mutate);
+  platform({ ...TEXT });
+  // One path, two asks: the list (none held), then the add.
+  let asked = 0;
+  Object.defineProperty(globalThis.__platform, SUBSCRIPTIONS, {
+    get: () => (asked++ === 0 ? { subscriptions: [] } : answer),
+  });
+  const data = new FormData();
+  data.set("templateId", "icd10-code-check");
+  data.set("workspaceId", "w1");
+  data.set("idempotencyKey", "subscribe-0123456789abcdef");
+  return subscribeToAutomation(data);
+}
+
+test("wave 2, Add: a flow that carries health data is added as a draft, and a refusal for the agreement (an older platform's) offers no agreement — nothing more is read", async () => {
+  assert.deepEqual(await add({ subscription: { id: "s1" } }), {
+    ok: true,
+    subscriptionId: "s1",
+  });
+  const refused = await add(platformError(403, REQUIRED));
+  assert.equal(refused.ok, false);
+  assert.equal(refused.agreement, undefined);
+  assert.notEqual(refused.state, "agreement-required");
+  assert.ok(!globalThis.__asked.includes("/v1/agreements/health-data"));
+  assert.ok(!globalThis.__asked.includes("/v1/workspaces"));
+});
+
+/** Set up's `saveSetup` against the platform's `answer` for the flow's change. */
+async function save(answer, { turnOn = true, mutate } = {}) {
+  const { saveSetup } = await load(ACTIONS, mutate);
+  platform({ [FLOW]: answer, ...TEXT });
+  const data = new FormData();
+  data.set("subscriptionId", "s1");
+  data.set("workspaceId", "w1");
+  data.set("turnOn", turnOn ? "true" : "false");
+  return saveSetup(data);
+}
+
+test("wave 2, Set up: a turn-on refused 403 agreement_required answers agreement-required with no line and no agreement — the form reads its section again; nothing else is read, nothing drawn again", async () => {
+  assert.deepEqual(await save(platformError(403, REQUIRED)), {
+    ok: false,
+    error: "",
+    state: "agreement-required",
+  });
+  assert.deepEqual(globalThis.__asked, [FLOW]);
+  assert.equal(JSON.parse(globalThis.__sent[0].body).status, "live");
+  assert.deepEqual(globalThis.__revalidated, []);
+  // Turned on, the flow's pages are drawn again.
+  assert.deepEqual(await save({ subscription: { id: "s1" } }), {
+    ok: true,
+    subscriptionId: "s1",
+  });
+});
+
+test("wave 2, Set up: the form turns the refusal into a re-read of the section (router.refresh), never a dialog", () => {
+  const form = code("app/account/flows/[subscriptionId]/setup/SetupForm.tsx");
+  assert.match(
+    form,
+    /if \(result\.state === "agreement-required"\) \{\s*router\.refresh\(\);\s*return null;\s*\}/u,
+  );
+  // A 409 on the acceptance: read again, the box unticked, a new key.
+  assert.match(
+    form,
+    /if \(!answer\.ok && answer\.state === "agreement-changed"\) \{\s*setSigned\(\(current\) => \(\{ \.\.\.current, authorized: false \}\)\);\s*setAgreementKey\(`agreement-\$\{crypto\.randomUUID\(\)\}`\);\s*router\.refresh\(\);/u,
+  );
+});
+
+test("wave 2, Accept: a text changed since it was read (409 agreement_changed) answers agreement-changed in the platform's words", async () => {
+  assert.deepEqual(
+    await acceptance(
+      platformError(
+        409,
+        { reason: "agreement_changed" },
+        "The agreement changed",
+      ),
+    ),
+    { ok: false, error: "The agreement changed", state: "agreement-changed" },
   );
 });

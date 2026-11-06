@@ -207,7 +207,11 @@ page reuses:
   Its **steps face** while it is pending, running or held, and once it
   failed or was cancelled: its flow's name, its job's title under it (one
   `readItem`, left out when it cannot be read), its status; STEPS, every
-  step from the start, live (`trackerRows`, `TrackerItem`); its body as the
+  step from the start, live (`trackerRows`, `TrackerItem`) — a batch run's
+  by its flow's batch steps in order, "1 · Pages counted" to "4 · Visits
+  queued" for ICD-10 Code Check v4, then "Run completed" only when the run
+  has an email (`batchRows`; backend ADR-0048 amendment 6; never the
+  flow's groups, which a batch's child keeps); its body as the
   platform sent it (the files rows, the result line, a held job's form, a
   batch's children — blocks carry no part marker, so the body is drawn
   whole); Cancel run while it goes on; the Run details row last. Its
@@ -403,30 +407,65 @@ at all is not sent again on its own.
 
 ## The health data agreement
 
-A flow that carries health data (backend ADR-0049, C3) is refused 403
-`agreement_required` on Add, on Start run and on an item's upload (which
-starts a run) until the workspace's owner has accepted the current health
-data agreement; nothing was made. Only on
-that refusal does the website read anything more (`agreementRefusal` in
-`lib/agreements.ts`): who the person is in the workspace and, for its owner,
-the text. The owner gets one dialog (`app/account/flows/HealthAgreementDialog.tsx`):
-"Health data agreement", "Version {n}", the text to scroll, "I'm authorized
-to sign for {organization}", Full name and Title, and "Accept and add flow"
-or "Accept and start run" (Start run, and an item's upload: its dialog opens
-over the upload card), "Adding…" or "Starting…" while it works, which accepts once, under the dialog's own key, then
-sends the add, the run or the item again under the key the refused one
-carried (`AddAutomation`, `RunStart`, `UploadItemCard`), so a lost answer
-adds or starts nothing twice; a press after that repeat was refused sends
-the repeat alone, never a second acceptance (`acceptThenRepeat`). A refused
-acceptance is said in place: a 403 asks the owner, a 503
-`agreement_not_published` says it isn't available yet, anything else in
-the platform's words. Anyone else sees "Ask your workspace owner to
+A flow that carries health data (backend ADR-0049, C3; the catalog says so,
+`AutomationCatalogEntry.healthData`) is added as a draft like any other, so
+its Add opens Set up with no dialog (builds 37 and 39, wave 2; ADR-0049
+amendment 2). Turning it on, starting a run and an item's upload (which
+starts a run) are refused 403 `agreement_required` until the workspace's
+owner has accepted the current health data agreement; nothing was made.
+
+**In Set up** (the owner's item 9 of builds 37 and 39: "Where is the BAA
+contract to view prefilled and checkmark to accept below it … 4. Contract
+and accept"): after the flow's own sections, numbered next, "Contract and
+accept" (`app/account/flows/[subscriptionId]/setup/ContractStep.tsx`,
+`NumberedStep` as the others). The page
+reads, for an owner or admin only, the workspace's agreement
+(`readWorkspaceHealthDataAgreement`: the current version and sha256, null
+while none is published, and the workspace's acceptance of exactly it) and,
+for the owner while it is not accepted, the text; a member is not read and
+is asked to ask the owner. By its state (`contractStep` in
+`lib/health-agreement.ts`): "The agreement is being finalized." (none
+published); "Accepted · Version {n} · {date}" over "{name}, {title}"; for
+the owner the text in the dialog's scroll box, its `{Covered Entity}` the
+workspace's name and its `{Effective date}` today's UTC date, for display
+only (`fillForDisplay`; the platform fills the signed copy at acceptance),
+then "I'm authorized to sign for {organization}", Full name and Title (120);
+"Ask your workspace owner to accept the health data agreement." for anyone
+else; "Unavailable" when a read failed — the rest of Set up drawn either
+way. Turn on is disabled until it allows (`contractAllowsTurnOn`: accepted,
+or the owner's box ticked and both fields filled). The owner's one press
+accepts (`acceptHealthAgreement`, the text's version and sha256, one key per
+text read), then saves and turns the flow on; a press after the turn-on was
+refused sends the turn-on alone, never a second acceptance
+(`acceptThenRepeat`). A 409 `agreement_changed` reads the section again, the
+box unticked, the name and title kept, a new key. A turn-on the platform
+refuses 403 `agreement_required` (`saveSetup`'s `agreement-required`) reads
+the section again — never the dialog. Save, on a flow on or paused, is
+never held by it: the platform asks nothing of a save that moves no status.
+A gap, recorded (plan 7): Resume on a paused flow's page (`RunStart`'s Turn
+on) routes no agreement refusal and says the platform's words; only a new
+agreement version could refuse it, and none is published.
+
+**On Start run and an item's upload** only that refusal makes the website
+read anything more (`agreementRefusal` in `lib/agreements.ts`): who the
+person is in the workspace and, for its owner, the text. The owner gets one
+dialog (`app/account/flows/HealthAgreementDialog.tsx`): "Health data
+agreement", "Version {n}", the text to scroll, "I'm authorized to sign for
+{organization}", Full name and Title, and "Accept and start run" (an item's
+upload: its dialog opens over the upload card), "Starting…" while it works,
+which accepts once, under the dialog's own key, then sends the run or the
+item again under the key the refused one carried (`RunStart`,
+`UploadItemCard`), so a lost answer starts nothing twice; a press after that
+repeat was refused sends the repeat alone, never a second acceptance
+(`acceptThenRepeat`). A refused acceptance is said in place: a 403 asks the
+owner, a 503 `agreement_not_published` says it isn't available yet, anything
+else in the platform's words. Anyone else sees "Ask your workspace owner to
 accept the health data agreement." and nothing more is sent (a member's
 upload is refused first as a member's: "Only an owner or admin can do
-this."); while no version is published the
-owner sees "The health data agreement isn't available yet.". No other add,
-run or item makes an extra call. The words are `lib/health-agreement.ts`, the
-app's too.
+this."); while no version is published the owner sees "The health data
+agreement isn't available yet.". No other run or item makes an extra call.
+~~Add refused until accepted, "Accept and add flow"~~ until wave 2. The words
+are `lib/health-agreement.ts`, the app's too.
 
 The organization page lists the workspace's signed documents under
 "Documents", read once with the page, newest first: "Business Associate

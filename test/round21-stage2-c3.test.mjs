@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
+import * as words from "../lib/health-agreement.ts";
 import {
-  ACCEPT_AND_ADD,
   ACCEPT_AND_START,
-  ADDING,
   AGREEMENT_NOT_PUBLISHED,
   AGREEMENT_TITLE,
   ASK_OWNER,
@@ -32,7 +31,8 @@ import {
 /**
  * Round 21, Stage 2 on the website, C3 (the client half of backend PR #266,
  * 50a24f7; the same words as the app's, the spec's NEW WORDS): the health
- * data agreement on Add, on Start run and on an item's upload, and the
+ * data agreement on Start run and on an item's upload (on Add until
+ * builds 37 and 39, wave 2: `fb39-wave2.test.mjs`), and the
  * organization's Documents. Each screen drawn as the browser draws it; the
  * e2e half, the clicks, is `e2e/health-data.spec.ts`. D1 and S1 are
  * `round21-stage2-d1-s1.test.mjs`.
@@ -53,12 +53,14 @@ test("C3 words: the spec's, byte for byte, as the app says them", () => {
   );
   assert.equal(SIGNER_NAME, "Full name");
   assert.equal(SIGNER_TITLE, "Title");
-  assert.equal(ACCEPT_AND_ADD, "Accept and add flow");
   assert.equal(ACCEPT_AND_START, "Accept and start run");
-  // While it accepts and sends again: Add's and Start run's own words, which
-  // the app adopts (finding 6), drawn from here alone.
-  assert.equal(ADDING, "Adding…");
+  // While it accepts and sends again: Start run's own words, which the app
+  // adopts (finding 6), drawn from here alone.
   assert.equal(STARTING, "Starting…");
+  // An Add is no longer refused (backend ADR-0049 amendment 2): its words
+  // went with the dialog's add (builds 37 and 39, wave 2).
+  assert.equal("ACCEPT_AND_ADD" in words, false);
+  assert.equal("ADDING" in words, false);
   assert.doesNotMatch(code(DIALOG), /"(?:Adding|Starting|Working)…"/u);
   assert.equal(
     ASK_OWNER,
@@ -197,7 +199,7 @@ test("C3: any other refusal is not the agreement's, and nothing more is read", a
   }
 });
 
-test("C3: Add and Start run read the refusal through agreementRefusal, and Add sends its press's key — the one the agreement's repeat sends again", () => {
+test("C3: Start run reads the refusal through agreementRefusal; Add no longer does, sends its press's key and opens Set up (wave 2)", () => {
   const actions = code("app/account/flows/actions.ts");
   const subscribe =
     /export async function subscribeToAutomation[\s\S]*?\n\}/u.exec(actions)[0];
@@ -205,19 +207,22 @@ test("C3: Add and Start run read the refusal through agreementRefusal, and Add s
     subscribe,
     /const idempotencyKey = String\(formData\.get\("idempotencyKey"\) \?\? ""\);/u,
   );
-  assert.match(
-    subscribe,
-    /\} catch \(error\) \{\s*const agreement = await agreementRefusal\(error, shownWorkspace\(formData\)\);\s*if \(agreement\) return agreement;/u,
-  );
+  assert.doesNotMatch(subscribe, /agreementRefusal/u);
   const start = /export async function startRun[\s\S]*?\n\}/u.exec(actions)[0];
   assert.match(
     start,
     /const agreement = await agreementRefusal\(error, shownWorkspace\(formData\)\);\s*if \(agreement\) return agreement;/u,
   );
   const add = code("app/account/flows/AddAutomation.tsx");
-  assert.match(add, /data\.append\("idempotencyKey", key\);/u);
-  assert.match(add, /setOffer\(\{ agreement: result\.agreement, key \}\);/u);
-  assert.match(add, /onAccepted=\{\(\) => send\(offer\.key\)\}/u);
+  assert.match(
+    add,
+    /data\.append\("idempotencyKey", `subscribe-\$\{crypto\.randomUUID\(\)\}`\);/u,
+  );
+  assert.match(
+    add,
+    /if \(result\.subscriptionId\) router\.push\(setupPath\(result\.subscriptionId\)\);/u,
+  );
+  assert.doesNotMatch(add, /HealthAgreementDialog|setOffer|agreement/u);
   const run = code("app/account/flows/RunStart.tsx");
   assert.match(run, /setOffer\(\{ agreement: result\.agreement, data \}\);/u);
   assert.match(run, /onAccepted=\{\(\) => send\(offer\.data\)\}/u);
@@ -232,19 +237,18 @@ const OFFER = {
   organization: "Acme Clinic",
 };
 
-async function dialog(purpose, mutate) {
+async function dialog(mutate) {
   const { HealthAgreementDialog } = await load(DIALOG, mutate);
   return draw(HealthAgreementDialog, {
     offer: OFFER,
     workspaceId: "w1",
-    purpose,
     onAccepted: async () => null,
     onClose: () => {},
   });
 }
 
-test("C3: the dialog is the title, Version {n}, the text to scroll, the checkbox, Full name and Title, then Cancel and Accept and add flow", async () => {
-  const markup = await dialog("add");
+test("C3: the dialog is the title, Version {n}, the text to scroll, the checkbox, Full name and Title, then Cancel and Accept and start run", async () => {
+  const markup = await dialog();
   assert.deepEqual(visibleWords(markup), [
     "Health data agreement",
     "Version 3",
@@ -253,7 +257,7 @@ test("C3: the dialog is the title, Version {n}, the text to scroll, the checkbox
     "Full name",
     "Title",
     "Cancel",
-    "Accept and add flow",
+    "Accept and start run",
   ]);
   const nodes = tree(markup);
   const named = (name) => nodes.find((node) => node.attrs.name === name);
@@ -274,12 +278,6 @@ test("C3: the dialog is the title, Version {n}, the text to scroll, the checkbox
   );
   assert.equal(text.attrs.tabindex, "0");
   assert.match(text.attrs.class, /\boverflow-y-auto\b/u);
-});
-
-test("C3: on Start run, its button is Accept and start run", async () => {
-  const words = visibleWords(await dialog("run"));
-  assert.equal(words.at(-1), "Accept and start run");
-  assert.ok(!words.includes("Accept and add flow"));
 });
 
 const documents = [

@@ -24,7 +24,7 @@ import { agreementRefusal } from "@/lib/agreements";
 import { VENDOR_MEMBER_NOTE } from "@/lib/connection-rows";
 import { EMAIL_SAVE_FAILED } from "@/lib/flow-email";
 import { problemFields } from "@/lib/flow-items";
-import type { AgreementOffer } from "@/lib/health-agreement";
+import { agreementRequired, type AgreementOffer } from "@/lib/health-agreement";
 import { heldCopy } from "@/lib/held-flow";
 import { overPlanRefusal } from "@/lib/plan-limit";
 import { reviewAnswers } from "@/lib/run-progress";
@@ -79,7 +79,8 @@ export type ActionResult =
         // platform's words (Build 23's B3).
         | "forbidden"
         // A flow that carries health data, before the owner accepted the
-        // agreement (backend ADR-0049): the dialog's text, or the line.
+        // agreement (backend ADR-0049): the dialog's text, or the line; on
+        // Set up's turn-on, neither (its section is read again).
         | "agreement-required"
         // An Approve a disconnect expired (S1-8b): `expiredApproval`.
         | "approval-expired";
@@ -156,8 +157,7 @@ export async function subscribeToAutomation(
 ): Promise<ActionResult> {
   const templateId = String(formData.get("templateId") ?? "");
   if (!templateId) return { ok: false, error: "A flow is required" };
-  // The press's key (`AddAutomation`): the add the health data agreement
-  // refused is sent again under it once the owner accepts (backend ADR-0049).
+  // The press's key (`AddAutomation`): one add per press.
   const idempotencyKey = String(formData.get("idempotencyKey") ?? "");
   if (!/^[A-Za-z0-9._~:-]{16,128}$/u.test(idempotencyKey))
     return { ok: false, error: "Reopen the form and try again." };
@@ -184,8 +184,6 @@ export async function subscribeToAutomation(
     revalidatePath("/account/teams");
     return { ok: true, subscriptionId: response.subscription.id };
   } catch (error) {
-    const agreement = await agreementRefusal(error, shownWorkspace(formData));
-    if (agreement) return agreement;
     if (
       error instanceof PlatformServerError &&
       (error.status === 404 || error.status === 502)
@@ -258,9 +256,12 @@ function declaredValues(
  * for a draft, with the flow turned on in the same change (`turnOn`), and for
  * a flow on or paused, its status kept. A vendor chosen and not connected is
  * said by the page, which knows its name (`vendor-not-connected`); a turn-on
- * refused by the plan in the platform's words for it; anything else in the
- * button's own words. A workspace switched away in another tab is said as it
- * is everywhere.
+ * refused by the plan in the platform's words for it; a turn-on of a flow that
+ * carries health data refused 403 `agreement_required` (backend ADR-0049
+ * amendment 2) as `agreement-required` with no line and no agreement offered
+ * — Set up reads its "Contract and accept" section again, which says what is
+ * owed; anything else in the button's own words. A workspace switched away in
+ * another tab is said as it is everywhere.
  */
 export async function saveSetup(formData: FormData): Promise<ActionResult> {
   const subscriptionId = String(formData.get("subscriptionId") ?? "");
@@ -290,6 +291,8 @@ export async function saveSetup(formData: FormData): Promise<ActionResult> {
     // Only an owner or admin changes a flow (§12.1 #180).
     if (flowChangeRefused(error.status, error.details))
       return { ok: false, error: FLOW_CHANGE_ADMIN_ONLY, state: "forbidden" };
+    if (turnOn && agreementRequired(error.status, error.details))
+      return { ok: false, error: "", state: "agreement-required" };
     if (turnOn) {
       const entitlement = subscriptionEntitlementState(
         error.status,

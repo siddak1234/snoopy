@@ -239,7 +239,6 @@ export function RunStart({
           key={offer.agreement.sha256}
           offer={offer.agreement}
           workspaceId={workspaceId}
-          purpose="run"
           onAccepted={() => send(offer.data)}
           onClose={() => setOffer(null)}
         />

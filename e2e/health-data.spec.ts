@@ -12,11 +12,13 @@ import {
 /**
  * Round 21, Stage 2 on the website, against the loopback fixture Edge, reset
  * before each test (its surfaces: `e2e/fixtures/health-data.ts`): the health
- * data agreement on Add, on Start run and on an item's upload (backend
- * ADR-0049, C3) — the dialog for the workspace's owner, the one line for
- * anyone else, the add, run or item sent again under the refused one's key —
- * and the organization's Documents
- * and one signed copy. Connect your EHR (ADR-0050, D1) is
+ * data agreement in Set up's "Contract and accept" (builds 37 and 39, wave 2;
+ * backend ADR-0049 amendment 2) — an Add that opens Set up, every state of
+ * the section, the owner's one press that accepts then turns on — and on
+ * Start run and an item's upload (C3) — the dialog for the workspace's owner,
+ * the one line for anyone else, the run or item sent again under the refused
+ * one's key — the organization's Documents and one signed copy, and a batch
+ * run's steps by name (wave 2, item 10). Connect your EHR (ADR-0050, D1) is
  * `e2e/ehr-connect.spec.ts`. Every word is the spec's
  * (`lib/health-agreement.ts`).
  */
@@ -67,28 +69,74 @@ async function accept(page: Page, button: string) {
   await dialog.getByRole("button", { name: button }).click();
 }
 
-test("C3: the owner's Add of a flow that carries health data opens the agreement — its title, Version 1, the text to scroll, the checkbox, Full name and Title — and Accept and add flow signs once and adds it under the refused add's key, then Set up opens", async ({
-  page,
-}) => {
-  await fixtureControl("health-data");
+/** Adds Invoice Processing, the flow that carries health data here, and lands on its Set up. */
+async function addToSetup(page: Page) {
   await fixtureControl("invoice-not-added");
   await page.goto("/account/flows");
   await automationCard(page, "Invoice Processing")
     .getByRole("button", { name: "Add" })
     .click();
-  const dialog = agreement(page);
-  await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText("Version 1");
-  const text = dialog.getByRole("region", { name: "Health data agreement" });
-  await expect(text).toContainText("Business Associate Agreement");
-  await expect(text).toContainText("{Covered Entity}");
-  // Nothing was added, and the page says nothing else of it.
-  await expect(page.getByText(ASK_OWNER)).toHaveCount(0);
-  await expectNoAxeViolations(page);
-  await accept(page, "Accept and add flow");
   await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
+  await expect(agreement(page)).toHaveCount(0);
+  return page.getByTestId("setup-contract");
+}
+
+const turnOn = (page: Page) =>
+  page.locator("main").getByRole("button", { name: "Turn on" });
+
+/** Ticks the box and fills the two fields of Set up's section. */
+async function sign(section: ReturnType<Page["getByTestId"]>) {
+  await section
+    .getByRole("checkbox", {
+      name: "I'm authorized to sign for Fixture Organization",
+    })
+    .check();
+  await section.getByLabel("Full name").fill("Dana Owner");
+  await section.getByLabel("Title", { exact: true }).fill("Practice manager");
+}
+
+test("wave 2: the owner's Add of a flow that carries health data opens Set up — no dialog, nothing refused — and its 03 Contract and accept shows the text, its organization and today filled, the box, Full name and Title; Turn on waits for all three", async ({
+  page,
+}) => {
+  await fixtureControl("health-data");
+  const section = await addToSetup(page);
+  await expect(section.getByText("03", { exact: true })).toBeVisible();
+  await expect(
+    section.getByRole("heading", { name: "Contract and accept", level: 3 }),
+  ).toBeVisible();
+  const text = section.getByRole("region", { name: "Health data agreement" });
+  await expect(text).toContainText(
+    /This agreement is between Fixture Organization and Autom8x, effective \d{4}-\d{2}-\d{2}\./u,
+  );
+  await expect(text).not.toContainText("{Covered Entity}");
+  await expectNoAxeViolations(page);
+  // Each of the three alone, or two of them, leaves Turn on disabled.
+  await expect(turnOn(page)).toBeDisabled();
+  const box = section.getByRole("checkbox", {
+    name: "I'm authorized to sign for Fixture Organization",
+  });
+  await box.check();
+  await expect(turnOn(page)).toBeDisabled();
+  await section.getByLabel("Full name").fill("Dana Owner");
+  await expect(turnOn(page)).toBeDisabled();
+  await section.getByLabel("Title", { exact: true }).fill("Practice manager");
+  await expect(turnOn(page)).toBeEnabled();
+  await box.uncheck();
+  await expect(turnOn(page)).toBeDisabled();
+  expect((await health()).healthRequests).toEqual([]);
+});
+
+test("wave 2: the owner's one press of Turn on accepts first — the version, the text's hash, the name, the title, authorized, under its key — then turns the flow on, and its page opens", async ({
+  page,
+}) => {
+  await fixtureControl("health-data");
+  const section = await addToSetup(page);
+  await sign(section);
+  await turnOn(page).click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
   const seen = await health();
   expect(seen.acceptances).toHaveLength(1);
+  expect(seen.acceptances[0].key).toMatch(/^agreement-/u);
   expect(seen.acceptances[0].body).toMatchObject({
     kind: "health-data",
     version: 1,
@@ -96,69 +144,115 @@ test("C3: the owner's Add of a flow that carries health data opens the agreement
     signerTitle: "Practice manager",
     authorized: true,
   });
+  // The acceptance was taken before the turn-on reached the platform.
   expect(
     seen.healthRequests.map(({ path, accepted }) => [path, accepted]),
-  ).toEqual([
-    ["subscriptions", false],
-    ["subscriptions", true],
-  ]);
-  const [refused, repeated] = seen.healthRequests;
-  expect(refused.key).toMatch(/^subscribe-/u);
-  expect(repeated.key).toBe(refused.key);
+  ).toEqual([["turn-on", true]]);
 });
 
-test("C3: accepted once — a press after the repeat was refused sends the add again alone, under the same key, and the agreement is signed once", async ({
+test("wave 2: accepted once — a press after the turn-on was refused sends the turn-on alone, and the agreement is signed once", async ({
   page,
 }) => {
   await fixtureControl("agreement-repeat-refused-once");
-  await fixtureControl("invoice-not-added");
-  await page.goto("/account/flows");
-  await automationCard(page, "Invoice Processing")
-    .getByRole("button", { name: "Add" })
-    .click();
-  await accept(page, "Accept and add flow");
-  const dialog = agreement(page);
-  await expect(dialog.getByRole("alert")).toHaveText(
-    "Could not add this flow. Try again.",
+  const section = await addToSetup(page);
+  await sign(section);
+  await turnOn(page).click();
+  await expect(page.locator("main").getByRole("alert")).toHaveText(
+    "Could not turn it on. Try again.",
   );
-  await dialog.getByRole("button", { name: "Accept and add flow" }).click();
-  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
+  await expect(section).toContainText("Accepted · Version 1 ·");
+  await expect(section).toContainText("Dana Owner, Practice manager");
+  await turnOn(page).click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
   const seen = await health();
   expect(seen.acceptances).toHaveLength(1);
   expect(seen.healthRequests.map(({ accepted }) => accepted)).toEqual([
-    false,
     true,
     true,
   ]);
-  expect(new Set(seen.healthRequests.map(({ key }) => key)).size).toBe(1);
 });
 
-test("C3: an admin's Add of it is refused in the one line — no dialog, nothing more sent", async ({
+test("wave 2: a text changed since it was read (409) is read again — the box unticked, the name and title kept, nothing turned on; ticked again, one press accepts and turns on", async ({
+  page,
+}) => {
+  await fixtureControl("agreement-changed-once");
+  const section = await addToSetup(page);
+  await sign(section);
+  await turnOn(page).click();
+  const box = section.getByRole("checkbox", {
+    name: "I'm authorized to sign for Fixture Organization",
+  });
+  await expect(box).not.toBeChecked();
+  await expect(section.getByLabel("Full name")).toHaveValue("Dana Owner");
+  await expect(turnOn(page)).toBeDisabled();
+  expect((await health()).healthRequests).toEqual([]);
+  await box.check();
+  await turnOn(page).click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
+  expect((await health()).acceptances).toHaveLength(1);
+});
+
+test("wave 2: before a version is published, Set up says The agreement is being finalized. and Turn on stays disabled", async ({
+  page,
+}) => {
+  await fixtureControl("agreement-unpublished");
+  const section = await addToSetup(page);
+  await expect(section).toContainText("The agreement is being finalized.");
+  await expect(
+    section.getByRole("region", { name: "Health data agreement" }),
+  ).toHaveCount(0);
+  await expect(turnOn(page)).toBeDisabled();
+});
+
+test("wave 2: once accepted, Set up says Accepted · Version 1 · its day and its signer, and Turn on turns it on with nothing more signed", async ({
+  page,
+}) => {
+  await fixtureControl("agreement-accepted");
+  const section = await addToSetup(page);
+  await expect(section).toContainText("Accepted · Version 1 · Aug 12, 2026");
+  await expect(section).toContainText("Fixture Owner, Owner");
+  await expect(section.getByRole("checkbox")).toHaveCount(0);
+  await turnOn(page).click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
+  const seen = await health();
+  expect(seen.acceptances).toHaveLength(0);
+  expect(seen.healthRequests.map(({ path }) => path)).toEqual(["turn-on"]);
+});
+
+test("wave 2: an admin's Set up asks the owner in the section, and Turn on stays disabled", async ({
   page,
 }) => {
   await presentSession(page, "admin");
   await fixtureControl("health-data");
-  await fixtureControl("invoice-not-added");
-  await page.goto("/account/flows");
-  const card = automationCard(page, "Invoice Processing");
-  await card.getByRole("button", { name: "Add" }).click();
-  await expect(card.getByRole("alert")).toHaveText(ASK_OWNER);
-  await expect(agreement(page)).toHaveCount(0);
-  expect((await health()).healthRequests).toHaveLength(1);
+  const section = await addToSetup(page);
+  await expect(section).toContainText(ASK_OWNER);
+  await expect(section.getByRole("checkbox")).toHaveCount(0);
+  await expect(turnOn(page)).toBeDisabled();
 });
 
-test("C3: before a version is published, the owner's Add says so and opens nothing", async ({
+test("wave 2: a member's Set up of it asks the owner, never read, with no Turn on", async ({
   page,
 }) => {
-  await fixtureControl("agreement-unpublished");
-  await fixtureControl("invoice-not-added");
-  await page.goto("/account/flows");
-  const card = automationCard(page, "Invoice Processing");
-  await card.getByRole("button", { name: "Add" }).click();
-  await expect(card.getByRole("alert")).toHaveText(
-    "The health data agreement isn't available yet.",
-  );
-  await expect(agreement(page)).toHaveCount(0);
+  await fixtureControl("health-data");
+  await addToSetup(page);
+  await presentSession(page, "member");
+  await page.reload();
+  const section = page.getByTestId("setup-contract");
+  await expect(section).toContainText(ASK_OWNER);
+  await expect(turnOn(page)).toHaveCount(0);
+  await expect(
+    page.getByText("Only an owner or admin can change this flow."),
+  ).toBeVisible();
+});
+
+test("wave 2: a read that fails says Unavailable in the section, the rest of Set up drawn, and Turn on stays disabled", async ({
+  page,
+}) => {
+  await fixtureControl("agreement-read-failing");
+  const section = await addToSetup(page);
+  await expect(section).toContainText("Unavailable");
+  await expect(page.locator("main").getByLabel("Approval limit")).toBeVisible();
+  await expect(turnOn(page)).toBeDisabled();
 });
 
 /** Fills the manual flow's run form, as the other run tests do. */
@@ -331,19 +425,36 @@ test("C3: with none signed, Documents says No documents yet.; a document of anot
   expect(typo?.status()).toBe(404);
 });
 
-test("C3: the owner's acceptance is the newest of the Documents", async ({
+test("C3: the owner's acceptance in Set up is the newest of the Documents", async ({
   page,
 }) => {
   await fixtureControl("health-data");
-  await fixtureControl("invoice-not-added");
-  await page.goto("/account/flows");
-  await automationCard(page, "Invoice Processing")
-    .getByRole("button", { name: "Add" })
-    .click();
-  await accept(page, "Accept and add flow");
-  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}/setup$`, "u"));
+  const section = await addToSetup(page);
+  await sign(section);
+  await turnOn(page).click();
+  await expect(page).toHaveURL(new RegExp(`${FLOWS.invoice}$`, "u"));
   await page.goto("/account/organization");
   const rows = page.getByTestId("org-documents").getByRole("link");
   await expect(rows).toHaveCount(2);
   await expect(rows.first()).toContainText("Accepted by Dana Owner");
+});
+
+test("wave 2: a batch run's steps, by its flow's batch steps in order — 1 · Pages counted Done, 2 · Pages sorted Working…, 3 and 4 Waiting — never its groups", async ({
+  page,
+}) => {
+  await fixtureControl("invoice-batch");
+  await page.goto("/account/runs/fixture-run-batch-steps");
+  const steps = page.locator("main").getByTestId("run-steps").locator("li");
+  await expect(steps).toHaveCount(4);
+  for (const [index, title, state, words] of [
+    [0, "1 · Pages counted", "done", "Done"],
+    [1, "2 · Pages sorted", "working", "Working…"],
+    [2, "3 · Visits found", "waiting", "Waiting"],
+    [3, "4 · Visits queued", "waiting", "Waiting"],
+  ] as const) {
+    await expect(steps.nth(index)).toContainText(title);
+    await expect(steps.nth(index)).toContainText(words);
+    await expect(steps.nth(index)).toHaveAttribute("data-state", state);
+  }
+  await expect(page.locator("main")).not.toContainText("Upload invoice");
 });

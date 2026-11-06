@@ -621,6 +621,49 @@ export function trackerRows(
   );
 }
 
+/**
+ * A batch run's rows (the owner's item 10 of builds 37 and 39: "When a run
+ * starts i want to see the steps 1-x"; backend ADR-0048 amendment 6): its
+ * flow's `batch.pipeline` steps in order, each "{n} · {title}" with the same
+ * states and lines as every other step row (`trackerRows` without groups —
+ * the `group` the catalog gives each batch step is ignored), then, only when
+ * the run has an `email`, the flow's email row ("{n+1} · Run completed",
+ * `emailRow`). A batch run that reported a step its flow no longer declares
+ * is drawn by the steps it reported (`reportedRows`), titled from
+ * `batch.pipeline`. A batch's child (a visit) and a flow without `batch` keep
+ * `trackerRows`; the caller chooses (`run.batch === true` and the flow's
+ * `batch`).
+ */
+export function batchRows(
+  steps: readonly ProgressStep[],
+  batch: { pipeline: readonly { id: string; title: string }[] },
+  groups: readonly ProgressGroup[] | undefined,
+  run: RunState,
+  clock: (iso: string) => string = timeOfDay,
+  context: {
+    flow?: TrackerFlow;
+    email?: RunEmailState;
+  } = {},
+): TrackerRow[] {
+  const pipeline = batch.pipeline.map(({ id, title }) => ({ id, title }));
+  const rows = trackerRows(steps, pipeline, undefined, run, clock, pipeline);
+  const known = new Set(pipeline.map((step) => step.id));
+  const covered =
+    pipeline.length > 0 && steps.every((step) => known.has(step.stepId));
+  const email = groups?.find((group) => group.platform === "email");
+  if (!covered || !email || context.email === undefined) return rows;
+  return [
+    ...rows,
+    emailRow(
+      `group:${email.id}`,
+      `${rows.length + 1} · ${context.flow?.titles[email.id] ?? email.title}`,
+      run,
+      context.email,
+      clock,
+    ),
+  ];
+}
+
 /** The fallback: the steps a run of another version reported, in order, by state. */
 function reportedRows(
   steps: readonly ProgressStep[],

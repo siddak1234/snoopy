@@ -246,7 +246,6 @@ export function UploadItemCard({
           key={offer.agreement.sha256}
           offer={offer.agreement}
           workspaceId={workspaceId}
-          purpose="run"
           onAccepted={() => send(offer.input)}
           onClose={() => setOffer(null)}
         />

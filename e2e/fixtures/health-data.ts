@@ -1,8 +1,9 @@
 /**
  * The fixture Edge's health data surfaces (Round 21, Stage 2), beside
  * `public-edge.ts`, which owns its state and calls `healthRoute` before its
- * own key, add and run routes: the health data agreement and a workspace's
- * Documents (backend ADR-0049, C3), and the EHR, a SMART Backend Services
+ * own key and run routes: the health data agreement, a workspace's
+ * acceptance of it (ADR-0049 amendment 2) and its Documents (backend
+ * ADR-0049, C3), and the EHR, a SMART Backend Services
  * provider (ADR-0050, D1); and S1-8b's Approve that a disconnect expired.
  * Each is off until a test's control turns it on,
  * but for the one signed document the organization starts with, so no other
@@ -68,10 +69,15 @@ export function healthState() {
     agreementUnpublished: false,
     // How many repeats after the acceptance are refused (502), once each.
     repeatsRefused: 0,
-    // Every add, run start and item sent while the flows carry health data,
-    // with its key — a repeat after Accept must carry the refused one's.
+    // Builds 37 and 39, wave 2: the workspace's agreement read failing
+    // (503), and how many acceptances answer 409 `agreement_changed`.
+    agreementReadFailing: false,
+    agreementChanges: 0,
+    // Every run start, item and turn-on (`public-edge.ts`'s Invoice
+    // Processing PATCH to live) sent while the flows carry health data, with
+    // its key — a repeat after Accept must carry the refused one's.
     healthRequests: [] as {
-      path: "subscriptions" | "runs" | "items";
+      path: "runs" | "items" | "turn-on";
       key: string | null;
       accepted: boolean;
     }[],
@@ -106,6 +112,18 @@ export function healthControls(
     "/__fixture/agreement-unpublished": () => {
       health.healthData = true;
       health.agreementUnpublished = true;
+    },
+    "/__fixture/agreement-accepted": () => {
+      health.healthData = true;
+      health.agreementAccepted = true;
+    },
+    "/__fixture/agreement-read-failing": () => {
+      health.healthData = true;
+      health.agreementReadFailing = true;
+    },
+    "/__fixture/agreement-changed-once": () => {
+      health.healthData = true;
+      health.agreementChanges = 1;
     },
     "/__fixture/approval-disconnected": () => {
       health.approvalDisconnected = "quickbooks";
@@ -168,6 +186,21 @@ export function ehrConnections(
   ];
 }
 
+/** The 403 a run start, an item or a turn-on answers before the owner accepted. */
+export function agreementRefusal(
+  health: HealthState,
+  problem: (status: number, title: string, details?: Json) => Json,
+): Json {
+  return {
+    ...problem(403, "Forbidden"),
+    details: {
+      reason: "agreement_required",
+      kind: "health-data",
+      ...(health.agreementUnpublished ? {} : { version: 1 }),
+    },
+  };
+}
+
 const header = (request: IncomingMessage, name: string) => {
   const value = request.headers[name];
   return (Array.isArray(value) ? value[0] : value) ?? null;
@@ -194,30 +227,19 @@ export async function healthRoute(input: {
     input;
   const scope = `/v1/workspaces/${input.workspaceId}`;
 
-  // An add, a run start or an item (whose run it starts) while the flows
-  // carry health data: refused 403 `agreement_required` until the owner
-  // accepts, nothing made — a member's add or item excepted, which the Edge
-  // refuses first as a member's. Once accepted, recorded and answered by the
-  // fixture's own routes.
+  // A run start or an item (whose run it starts) while the flows carry
+  // health data: refused 403 `agreement_required` until the owner accepts,
+  // nothing made — a member's item excepted, which the Edge refuses first as
+  // a member's. Once accepted, recorded and answered by the fixture's own
+  // routes. An add is not refused (ADR-0049 amendment 2): its turn-on is,
+  // in `public-edge.ts` (`agreementRefusal`).
   const item = new RegExp(`^${scope}/subscriptions/[^/]+/items$`, "u").test(
     pathname,
   );
-  const start =
-    method === "POST" &&
-    (pathname === `${scope}/subscriptions` ||
-      pathname === `${scope}/runs` ||
-      item);
-  if (
-    start &&
-    health.healthData &&
-    !(!pathname.endsWith("/runs") && input.session === "member")
-  ) {
+  const start = method === "POST" && (pathname === `${scope}/runs` || item);
+  if (start && health.healthData && !(item && input.session === "member")) {
     health.healthRequests.push({
-      path: item
-        ? "items"
-        : pathname.endsWith("/runs")
-          ? "runs"
-          : "subscriptions",
+      path: item ? "items" : "runs",
       key: header(request, "idempotency-key"),
       accepted: health.agreementAccepted,
     });
@@ -227,14 +249,36 @@ export async function healthRoute(input: {
       respond(response, 502, problem(502, "Bad Gateway"));
       return true;
     }
-    respond(response, 403, {
-      ...problem(403, "Forbidden"),
-      details: {
-        reason: "agreement_required",
-        kind: "health-data",
-        ...(health.agreementUnpublished ? {} : { version: 1 }),
-      },
-    });
+    respond(response, 403, agreementRefusal(health, problem));
+    return true;
+  }
+
+  // What Set up's "Contract and accept" reads (ADR-0049 amendment 2): owner
+  // or admin, a member 403; the current version, null while unpublished, and
+  // the workspace's acceptance of it.
+  if (method === "GET" && pathname === `${scope}/agreements/health-data`) {
+    if (input.session === "member") {
+      respond(response, 403, {
+        ...problem(403, "Forbidden"),
+        details: { requiredRole: "admin" },
+      });
+      return true;
+    }
+    if (health.agreementReadFailing) {
+      respond(response, 503, problem(503, "Service Unavailable"));
+      return true;
+    }
+    respond(response, 200, {
+      kind: "health-data",
+      current: health.agreementUnpublished
+        ? null
+        : { version: 1, sha256: AGREEMENT_SHA256 },
+      acceptance:
+        health.agreementAccepted && !health.agreementUnpublished
+          ? (health.documents.find((document) => document.version === 1) ??
+            null)
+          : null,
+    } satisfies Platform["WorkspaceHealthDataAgreement"]);
     return true;
   }
 
@@ -299,7 +343,10 @@ export async function healthRoute(input: {
       respond(response, 400, problem(400, "Bad Request"));
       return true;
     }
-    if (body.version !== 1 || body.sha256 !== AGREEMENT_SHA256) {
+    // A text changed since it was read: once per `agreement-changed-once`.
+    const changed = health.agreementChanges > 0;
+    if (changed) health.agreementChanges -= 1;
+    if (changed || body.version !== 1 || body.sha256 !== AGREEMENT_SHA256) {
       respond(response, 409, {
         ...problem(409, "Conflict"),
         details: { reason: "agreement_changed" },
