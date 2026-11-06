@@ -473,7 +473,10 @@ upload is refused first as a member's: "Only an owner or admin can do
 this."); while no version is published the owner sees "The health data
 agreement isn't available yet.". No other run or item makes an extra call.
 ~~Add refused until accepted, "Accept and add flow"~~ until wave 2. The words
-are `lib/health-agreement.ts`, the app's too.
+are `lib/health-agreement.ts`. Both clients hold them: the app's are
+`snoopy-mobile/lib/content/health-agreement.ts`, and the app's own wave 2 pull
+request gives it "Accept and turn on", "Turning on…" and the turn-on step on
+its flow page.
 
 The organization page lists the workspace's signed documents under
 "Documents", read once with the page, newest first: "Business Associate
@@ -487,11 +490,13 @@ member 403 for the list and for a copy (backend ADR-0049 amendment 1,
 snoopy-backend #269).
 
 The fixture Edge (`e2e/fixtures/health-data.ts`) answers these refusals
-as the published contract says. The platform's own — `agreement_required`
-on a turn-on, a run and an item, `outside_org_domain`, and an Approve's 409
-`approval_expired` — are checked once against the live platform, on a test
-workspace, after backend #266 deploys and before this change is marked
-ready; no local Compose run is made for them.
+as the published contract says. The platform's own are checked once against
+the live platform, on a test workspace, each after its own deploy and before
+this change is marked ready; no local Compose run is made for them: backend
+#266's `agreement_required` on a run and an item, `outside_org_domain`, and an
+Approve's 409 `approval_expired`; backend #272's (ADR-0049 amendment 2,
+deployed 2026-11-06) `agreement_required` on a turn-on and the workspace's
+agreement read, `GET /v1/workspaces/{id}/agreements/health-data`.
 
 ## Runs and approvals
 

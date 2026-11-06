@@ -2,9 +2,9 @@
  * The health data agreement (a Business Associate Agreement; backend
  * ADR-0049, C3 — the owner's item 3 of 2026-11-03: "Can we automate baa
  * generation during addition of a healthcare flow and it stays in the user
- * or orgs docs"): its words, and how a refused turn-on or run is read. The
- * same words as the app's (Round 21, Stage 2's NEW WORDS; builds 37 and 39,
- * wave 2).
+ * or orgs docs"): its words, and how a refused turn-on or run is read. Both
+ * clients hold these words: docs/ARCHITECTURE.md, "The health data agreement"
+ * (Round 21, Stage 2's NEW WORDS; builds 37 and 39, wave 2).
  *
  * A flow that carries health data (`AutomationCatalogEntry.healthData`) is
  * added as a draft; turning it on, starting a run and an item's upload (which
