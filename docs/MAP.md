@@ -204,7 +204,7 @@
 - agent `reviewer`: Single-pass review of a branch before it lands. Checks correctness, docs kept true (D) and leftovers (A); writes a PASS, FAIL or UNKNOWN verdict with 10 findin… ([.claude/agents/reviewer.md](../.claude/agents/reviewer.md))
 - hook `PreToolUse` (`Bash`): `node "$CLAUDE_PROJECT_DIR/scripts/hooks/require-change-audi…`
 - hook `PreToolUse` (`Bash`): `node "$CLAUDE_PROJECT_DIR/scripts/hooks/require-change-audi…`
-- hook `PreToolUse` (`Bash|Write|Edit|NotebookEdit`): `guard.mjs`
+- hook `PreToolUse` (`Bash|Write|Edit|NotebookEdit|Artifact`): `guard.mjs`
 - hook `SessionStart`: `session-start.mjs`
 - hook `Stop`: `stop-check.mjs`
 - hook `SubagentStop`: `stop-check.mjs`
