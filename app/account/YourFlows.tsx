@@ -8,7 +8,6 @@ import { FlowCard } from "@/components/dashboard/FlowCard";
 import { Group } from "@/components/dashboard/Group";
 import { SearchBox } from "@/components/blocks/ListTools";
 import { SectionTitle } from "@/components/dashboard/SectionTitle";
-import { StatusPill } from "@/components/dashboard/StatusPill";
 import { Button } from "@/components/ui/Button";
 import { Dropdown } from "@/components/ui/Dropdown";
 import type { ListItemsResponse } from "@/lib/automations";
@@ -45,8 +44,10 @@ const SEARCH_FLOWS = fill(BLOCK_WORDS.searchItems, { items: "flows" });
  * department A–Z); under it the search box, "Search flows", by name
  * whatever its case (`shownFlows`; nothing found, the platform's
  * `noMatch`); then each department's name and its flows, a card each,
- * always open: the flow card (`FlowCard`: icon, name, description, Live),
- * then what starts its run here —
+ * always open: the flow card, compact (`FlowCard` `compact`: its icon and
+ * name in one row, no description and no Live — the owner's build 41, item
+ * 14: "Just the logo, title, then the buttons and items. We do not need the
+ * description and live"), then directly what starts its run here —
  *
  * - a flow without items: its run's fields and Start run (`RunStart`), its
  *   run's page opening from its flow (back: the flow's page);
@@ -145,12 +146,11 @@ function HomeFlowCard({
     <FlowCard
       icon={flow.icon}
       name={flow.name}
-      description={flow.description}
-      aside={<StatusPill status="live" />}
+      compact
       heading="h4"
       testId={`home-flow-${flow.id}`}
     >
-      <div className={`border-t border-[var(--ring)] ${SPACING.group.pt}`}>
+      <div>
         {!flow.startable ? (
           <Button
             href={flowPath(flow.id)}

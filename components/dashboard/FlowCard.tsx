@@ -18,6 +18,13 @@ import { CARD, SPACING } from "@/lib/spacing";
  * rows (`boxed={false}`, a row of the list) and on Home's YOUR FLOWS (a card
  * per flow, its run form under it). A flow's own page and its Set up keep
  * "Department: {kind}" under their title: they are pages, not cards.
+ *
+ * `compact` (Home's YOUR FLOWS only; the owner's build 41, item 14: "The
+ * component cards do not need to be this big for the quick access cards.
+ * Just the logo, title, then the buttons and items"): the card pads by the
+ * table's row steps (`SPACING.rowY` top and bottom, `SPACING.rowX` at the
+ * sides) instead of `CARD`, and its icon and name sit centred in one row;
+ * Home passes it no description and no `aside`.
  */
 export function FlowCard({
   icon,
@@ -27,6 +34,7 @@ export function FlowCard({
   aside,
   children,
   boxed = true,
+  compact = false,
   heading: Heading = "h3",
   testId = "flow-card",
 }: {
@@ -43,12 +51,16 @@ export function FlowCard({
   children?: ReactNode;
   /** A card of its own (`bubble`); else a row inside a list's card. */
   boxed?: boolean;
+  /** Home's smaller card: the row steps' padding, its head centred. */
+  compact?: boolean;
   /** Its name's heading: one level under the title it sits under. */
   heading?: "h3" | "h4";
   testId?: string;
 }) {
   const head = (
-    <div className={`flex items-start ${SPACING.inner.gap}`}>
+    <div
+      className={`flex ${compact ? "items-center" : "items-start"} ${SPACING.inner.gap}`}
+    >
       <span
         data-testid="flow-card-icon"
         className="flex h-6 w-6 shrink-0 items-center justify-center text-[var(--icon-text)]"
@@ -87,7 +99,7 @@ export function FlowCard({
       data-testid={testId}
       className={
         boxed
-          ? `bubble flex flex-col ${SPACING.inner.gap} ${CARD}`
+          ? `bubble flex flex-col ${SPACING.inner.gap} ${compact ? `${SPACING.rowY.y} ${SPACING.rowX.x}` : CARD}`
           : `flex flex-col ${SPACING.inner.gap}`
       }
     >

@@ -160,7 +160,11 @@ page reuses:
   flows", by name whatever its case (nothing found, `BLOCK_WORDS.noMatch`);
   then the live flows by department A–Z, A–Z in each, from the one
   subscriptions list Home reads, each a card of its own, always open: the
-  flow card (Live), then a flow without items its `runInput` and Start run
+  flow card, compact (`FlowCard` `compact`: the table's row steps,
+  `SPACING.rowY` and `SPACING.rowX`, for its padding, its icon and name in
+  one centred row, no description and no Live — the owner's build 41, item
+  14: "Just the logo, title, then the buttons and items. We do not need the
+  description and live"), then directly a flow without items its `runInput` and Start run
   (`RunStart`); a flow with items, for an owner or admin, its items read as
   Home opens — each flow's alone, "Unavailable" in its place — the job
   drop-down on its newest ready job (`newestReady`, the list is newest
@@ -168,7 +172,15 @@ page reuses:
   the flow page's upload card, the job read again every 2 s on Home until it
   is ready. Any other flow's card says Open, to its page. ~~A row per flow
   that opened in place; items read when opened; "Choose" a job~~ until
-  builds 37 and 39.
+  builds 37 and 39; ~~the full card, its description and Live, a divider
+  over the run form~~ until build 41. The Flows list, its archived rows and
+  Add a flow keep the full card. The owner's build 41, item 15 ("Why am i
+  seeing departments not actively part of active flows for this org") needs
+  no change here: the website has no department scope menu (a deliberate
+  mobile difference, `snoopy-mobile/DESIGN-CONTRACT.md:166`), and Home's
+  drop-down lists only the departments of the live flows it draws
+  (`app/account/home-flows.ts:72` keeps live flows, `:130-140` its
+  choices).
 - **The spacing table** (backend `BLOCK_SPACING`, ADR-0048 amendment 1; the
   owner's Q8), the same names on the app: the numbers are the platform's
   (`lib/generated/platform-contracts/block-rules.ts`), and their classes
