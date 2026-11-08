@@ -56,7 +56,7 @@ test("the settings name the kit's three hooks and keep both change-audit entries
     ],
   );
   const guard = hooks.PreToolUse.find(
-    (entry) => entry.matcher === "Bash|Write|Edit|NotebookEdit",
+    (entry) => entry.matcher === "Bash|Write|Edit|NotebookEdit|Artifact",
   );
   assert.deepEqual(guard.hooks, [
     { type: "command", command: kit("guard.mjs"), timeout: 5 },

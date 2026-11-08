@@ -21,7 +21,7 @@
         ]
       },
       {
-        "matcher": "Bash|Write|Edit|NotebookEdit",
+        "matcher": "Bash|Write|Edit|NotebookEdit|Artifact",
         "hooks": [
           {
             "type": "command",

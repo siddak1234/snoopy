@@ -19,7 +19,8 @@ import { pathToFileURL } from "node:url";
  * observed rather than read from its source. It never reads a real sibling
  * repository here: another repository's files are that repository's facts, and
  * the audit reports them as not checked. A planted sibling is how the opt-in
- * sibling read is tested.
+ * sibling read is tested. snoopy-n8n left the workspace on 2026-11-06: a path
+ * under its name is this repository's, and missing.
  */
 
 const root = resolve(import.meta.dirname, "..");
@@ -332,6 +333,30 @@ test("another repository's file is not checked, even with its checkout beside th
       elsewhere.output,
       /found 0, struck 0, not checked 7, missing 0$/mu,
     );
+  });
+});
+
+test("snoopy-n8n left the workspace (2026-11-06): a path under its name is no other repository's, so it is missing, even with its checkout beside this one and the opt-in", () => {
+  planted((folder) => {
+    const repository = join(folder, "web");
+    plant(repository, {
+      "docs/guide.md": [
+        "Its file: `snoopy-n8n/README.md`.",
+        "Its [README](../../snoopy-n8n/README.md).",
+        "",
+      ].join("\n"),
+    });
+    // There on disk: were it still a sibling, the opt-in read would find it.
+    plant(join(folder, "snoopy-n8n"), { "README.md": "# n8n\n" });
+
+    for (const environment of [{}, { AUDIT_DOC_SIBLINGS: "1" }]) {
+      const { status, output } = audit(repository, ["--all"], environment);
+      assert.equal(status, 1, output);
+      assert.deepEqual(lines(output, "missing"), [
+        "missing\tdocs/guide.md:1\tsnoopy-n8n/README.md",
+        "missing\tdocs/guide.md:2\t../../snoopy-n8n/README.md",
+      ]);
+    }
   });
 });
 
