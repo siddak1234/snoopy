@@ -90,7 +90,8 @@ const unknownOnServer = () => false;
  * item 16: "Maybe we dont need the clip icon and document/resume in there"):
  * the title's `<label>` is `sr-only` — the chooser keeps its name, and Take
  * photo and Upload keep theirs, " for {title}" — the button row has no
- * margin above it and ends with `trailing` (the card's Start), and the
+ * margin above it and puts `trailing` (the card's Start) right after
+ * Upload, before a job flow's accepted types, and the
  * uploading or ready line and the error take their margin only once they
  * say something, so nothing stands empty under the row before a pick.
  * ~~The visible title over the buttons, and the line's margin always~~ until
@@ -426,12 +427,12 @@ export function RunFileField({
           <UploadSimpleIcon size={20} aria-hidden />
           Upload<span className="sr-only"> for {field.title}</span>
         </Button>
+        {trailing}
         {showTypes ? (
           <span id={typesId} className="text-xs text-[var(--muted)]">
             {typesInWords(accepted)}
           </span>
         ) : null}
-        {trailing}
       </div>
       <p aria-live="polite" className={`${lineTop}text-xs text-[var(--muted)]`}>
         {status}

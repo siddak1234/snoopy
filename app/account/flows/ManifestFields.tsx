@@ -205,8 +205,8 @@ export function SetupFields({
 /**
  * A manual run's input fields. An `artifact` field is a file the run reads: it
  * is uploaded when chosen (backend FR-14) and carried as the file's id.
- * `compact` and `trailing` go to each file field as they are (`RunFileField`;
- * Home's card passes them only for a run input of one file field).
+ * `compact` and `trailing` go to each file field as they are (`RunStart`
+ * `compact`).
  */
 export function RunInputFields({
   runInput,

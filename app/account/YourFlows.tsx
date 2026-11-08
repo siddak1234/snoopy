@@ -50,9 +50,7 @@ const SEARCH_FLOWS = fill(BLOCK_WORDS.searchItems, { items: "flows" });
  * description and live"), then directly what starts its run here, in two
  * rows (the owner's build 42, item 16: "It looks like big squares for a
  * quick access"): the icon and name, then the run's start, compact
- * (`RunStart` `compact`: a run input of one file field is Take photo, Upload
- * and Start on one row that wraps, its title for screen readers only, its
- * uploading or ready line under the row once a file is picked) —
+ * (`RunStart` `compact`) —
  *
  * - a flow without items: its run's start, its run's page opening from its
  *   flow (back: the flow's page);
@@ -68,8 +66,7 @@ const SEARCH_FLOWS = fill(BLOCK_WORDS.searchItems, { items: "flows" });
  * - any other flow (a member's flow with items, one not answering): Open,
  *   to the flow's page.
  *
- * ~~The job drop-down a row of its own under its title, the file's title
- * over its buttons, Start run on a row of its own~~ until build 42.
+ * ~~The job drop-down a row of its own under its title~~ until build 42.
  *
  * ~~One card of divided rows, each opening in place with a caret; a flow's
  * items read when it was opened; "Choose" a job first~~ until builds 37 and
@@ -361,7 +358,7 @@ function ItemRunStart({
       flow={flow}
       aside={
         // The department drop-down's pattern: a pill named by a word for screen readers.
-        <div className="flex max-w-[12rem]">
+        <div className="flex">
           <span id={`${pickId}-label`} className="sr-only">
             {declared.words.singular}
           </span>

@@ -141,6 +141,21 @@ test("build 42, item 16 (b): Take photo, Upload and Start share one row; Upload 
   assert.ok(!classes(row).includes("mt-2"), "no margin above the row");
   // The sr-only " for Resume" stays on each.
   assert.match(markup, /Upload<span class="sr-only"> for Resume<\/span>/u);
+  // A job flow's card (itemId): Upload, then Start, then the accepted types.
+  const job = draw(computer, props({ compact: true, itemId: "i" }));
+  const jobRow = nodes(job).find((node) =>
+    (node.children ?? []).some((child) => child.attrs?.type === "submit"),
+  );
+  assert.deepEqual(
+    (jobRow?.children ?? [])
+      .filter((child) => child.tag)
+      .map((child) =>
+        child.tag === "button"
+          ? (child.attrs.type ?? "button")
+          : `${child.tag}#${child.attrs.id ? "types" : ""}`,
+      ),
+    ["button", "submit", "span#types"],
+  );
   // Two fields: Start in a row of its own, as today.
   const two = draw(computer, props({ compact: true, runInput: TWO_FIELDS }));
   assert.deepEqual(rowOf(two), ["Start"]);
