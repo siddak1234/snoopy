@@ -47,6 +47,17 @@ import { SPACING } from "@/lib/spacing";
  * and a flow's page start a flow without items opening its page from the
  * flow (`from`: back is the flow's page; the owner's words of 2026-11-06).
  *
+ * **Compact** (`compact`, Home's YOUR FLOWS card only; the owner's build 42,
+ * item 16: "reduce the real estate it takes on the screen"): the form's
+ * gap is the card's inner one and the button says "Start", named "Start run"
+ * while it waits (busy, its "Starting…" or "Uploading…" as everywhere). A run
+ * input of exactly one file field puts Start at the end of that field's
+ * button row — Take photo, Upload and Start on one row that wraps — with the
+ * field's title for screen readers only (`RunFileField` `compact`); any
+ * other run input keeps its fields and their titles, then Start. ~~Start
+ * run under the field, full width of its own row~~ until build 42, on Home;
+ * a flow's page and an item's page draw it as before.
+ *
  * Turning a flow on is a change only an owner or admin makes (backend §12.1
  * #180): to a member Turn on is read-only, with "Only an owner or admin can
  * change this flow."; a member still starts runs.
@@ -73,6 +84,7 @@ export function RunStart({
   itemPage = false,
   from,
   canChange = true,
+  compact = false,
 }: {
   /** The workspace this page shows; every action is refused once it is not active. */
   workspaceId: string;
@@ -97,6 +109,8 @@ export function RunStart({
   from?: RunFrom;
   /** An owner or admin: a member's Turn on is read-only. */
   canChange?: boolean;
+  /** Home's card: its smaller face, Start in the file's row (see above). */
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -201,13 +215,39 @@ export function RunStart({
 
   if (live && !canRun) return null;
 
+  const start = live ? (
+    <Button
+      type="submit"
+      disabled={pending || uploading}
+      aria-label={compact && !pending && !uploading ? "Start run" : undefined}
+      className={`inline-flex items-center ${SPACING.inner.gap}`}
+    >
+      <PlayIcon size={20} aria-hidden />
+      {pending
+        ? "Starting…"
+        : uploading
+          ? "Uploading…"
+          : compact
+            ? "Start"
+            : itemPage
+              ? "Start"
+              : "Start run"}
+    </Button>
+  ) : null;
+  // Home's card, one file field: Start ends that field's button row.
+  const inRow =
+    compact &&
+    start !== null &&
+    runInput.length === 1 &&
+    runInput[0]!.control === "artifact";
+
   return (
     <>
       <form
         data-testid="run-form"
         onSubmit={submit}
         onChange={newRunKey}
-        className={`flex flex-col ${SPACING.group.gap}`}
+        className={`flex flex-col ${compact ? SPACING.inner.gap : SPACING.group.gap}`}
       >
         <input type="hidden" name="subscriptionId" value={subscriptionId} />
         <input type="hidden" name="idempotencyKey" value={runKey} />
@@ -220,37 +260,26 @@ export function RunStart({
             onUploadingChange={onUploadingChange}
             fileRound={fileRound}
             showTypes={itemId !== undefined}
+            compact={inRow}
+            trailing={inRow ? start : undefined}
           />
         ) : null}
         <FormError message={error} />
-        <div>
-          {live ? (
-            <Button
-              type="submit"
-              disabled={pending || uploading}
-              className={`inline-flex items-center ${SPACING.inner.gap}`}
-            >
-              <PlayIcon size={20} aria-hidden />
-              {pending
-                ? "Starting…"
-                : uploading
-                  ? "Uploading…"
-                  : itemPage
-                    ? "Start"
-                    : "Start run"}
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              disabled={pending || !canGoLive || !available || !canChange}
-              onClick={turnOn}
-              className={`inline-flex items-center ${SPACING.inner.gap}`}
-            >
-              <RocketLaunchIcon size={20} aria-hidden />
-              {pending ? "Turning on…" : "Turn on"}
-            </Button>
-          )}
-        </div>
+        {inRow ? null : (
+          <div>
+            {start ?? (
+              <Button
+                type="button"
+                disabled={pending || !canGoLive || !available || !canChange}
+                onClick={turnOn}
+                className={`inline-flex items-center ${SPACING.inner.gap}`}
+              >
+                <RocketLaunchIcon size={20} aria-hidden />
+                {pending ? "Turning on…" : "Turn on"}
+              </Button>
+            )}
+          </div>
+        )}
         {live || canChange ? null : (
           <p className="text-xs text-[var(--muted)]">
             {FLOW_CHANGE_ADMIN_ONLY}

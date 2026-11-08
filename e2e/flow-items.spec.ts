@@ -1041,11 +1041,37 @@ test("builds 37 and 39, items 5 and 8 — Home's YOUR FLOWS: a flow with items i
   const card = flows.getByTestId(
     "home-flow-b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1",
   );
+  // Build 42, item 16: two rows — the batch pill in the name's row; Upload
+  // and Start in one row, no visible field title, no line before a pick.
+  await expect(
+    card.getByTestId("flow-card-head").getByRole("combobox", { name: "Batch" }),
+  ).toBeVisible();
   const form = card.getByTestId("run-form");
+  await expect(
+    form.locator("label.sr-only", { hasText: "Entry file" }),
+  ).toHaveCount(1);
+  const start = form.getByRole("button", { name: "Start run" });
+  await expect(start).toHaveText("Start");
+  await expect(form.getByText(/^Ready:/u)).toHaveCount(0);
+  // The store's answer held, so the upload is seen: Start waits for it.
+  let release = () => {};
+  const held = new Promise<void>((done) => {
+    release = done;
+  });
+  await page.route("**/__fixture/objects/**", async (route) => {
+    if (route.request().method() === "PUT") await held;
+    await route.fallback();
+  });
   await form.getByLabel("Entry file").setInputFiles(entryPdf);
-  await expect(form.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
+  const busy = form.getByRole("button", { name: "Uploading…" });
+  await expect(busy).toBeDisabled();
+  release();
+  await expect(
+    form.getByText(/^Ready: entry\.pdf \(\d+ (?:bytes|KB|MB)\)$/u),
+  ).toBeVisible();
+  await expect(start).toBeEnabled();
   await expectNoAxeViolations(page);
-  await form.getByRole("button", { name: "Start run" }).click();
+  await start.click();
   await expect(page).toHaveURL(/\/account\/runs\/[0-9a-f-]{36}\?from=item$/u);
   const started = await fixtureRead<{ runStarts: Record<string, unknown>[] }>(
     "items",
@@ -1068,6 +1094,71 @@ test("builds 37 and 39, items 5 and 8 — Home's YOUR FLOWS: a flow with items i
   await expect(page).toHaveURL(new RegExp(`${ITEM}$`, "u"));
   await page.locator("main").getByRole("link", { name: "Back" }).click();
   await expect(page).toHaveURL(new RegExp(`${FLOW}$`, "u"));
+});
+
+test("build 42, item 16 — a batch title of 60 characters on a phone-width Home card: the pill shrinks to at most half the name's row and is cut short inside the card; the flow's icon and name stay in view beside it", async ({
+  page,
+}) => {
+  const long = "Senior Clinical Research Coordinator Cardiology and Oncology";
+  expect(long).toHaveLength(60);
+  // Home's read of the flow's batches, its newest ready one renamed.
+  await page.route(
+    /\/subscriptions\/b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1\/items(?:\?|$)/u,
+    async (route) => {
+      const response = await route.fetch();
+      const body = (await response.json()) as {
+        items: { title: string }[];
+      };
+      for (const item of body.items)
+        if (item.title === "Autumn intake") item.title = long;
+      await route.fulfill({ response, json: body });
+    },
+  );
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/account");
+  const card = page.getByTestId(
+    "home-flow-b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1",
+  );
+  const head = card.getByTestId("flow-card-head");
+  const pill = head.getByRole("combobox", { name: "Batch" });
+  await expect(pill).toHaveText(long);
+  const name = head.getByRole("heading", { level: 4, name: "Item automation" });
+  const icon = head.getByTestId("flow-card-icon");
+  await expect(name).toBeVisible();
+  await expect(icon).toBeVisible();
+  const box = async (part: typeof card) => {
+    const drawn = await part.boundingBox();
+    if (!drawn) throw new Error("not drawn");
+    return drawn;
+  };
+  const [cardBox, headBox, pillBox, nameBox, iconBox] = await Promise.all(
+    [card, head, pill, name, icon].map(box),
+  );
+  // Inside the card, at most half the row, its words cut short.
+  expect(pillBox.x).toBeGreaterThanOrEqual(cardBox.x);
+  expect(pillBox.x + pillBox.width).toBeLessThanOrEqual(
+    cardBox.x + cardBox.width + 0.5,
+  );
+  expect(pillBox.width).toBeLessThanOrEqual(headBox.width / 2 + 0.5);
+  expect(
+    await pill
+      .locator("span")
+      .first()
+      .evaluate((words) => words.scrollWidth > words.clientWidth),
+  ).toBe(true);
+  // The icon, then the name, before the pill, inside the card: the name
+  // keeps the rest of the row, truncated.
+  expect(iconBox.x).toBeGreaterThanOrEqual(cardBox.x);
+  expect(nameBox.x).toBeGreaterThanOrEqual(iconBox.x + iconBox.width);
+  expect(nameBox.width).toBeGreaterThan(0);
+  expect(nameBox.x + nameBox.width).toBeLessThanOrEqual(pillBox.x + 0.5);
+  expect(nameBox.width + iconBox.width).toBeGreaterThanOrEqual(
+    headBox.width / 2 - spacingPx(SPACING.inner.gap) * 2 - 0.5,
+  );
+  // Nothing wider than the phone.
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(375);
 });
 
 test("builds 37 and 39, item 10 — a run of a batch whose own read is unanswered (503) still draws its steps face, headed by its flow's name, without the batch's line", async ({
@@ -1100,6 +1191,12 @@ test("builds 37 and 39, item 8 — Home's YOUR FLOWS with no batch yet: No batch
   );
   await expect(card.getByText("No batches yet.")).toBeVisible();
   await expect(card.getByRole("combobox", { name: "Batch" })).toHaveCount(0);
+  // Build 42, item 16: the line and Upload batch in one row.
+  await expect(
+    card
+      .getByTestId("home-empty-b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1")
+      .getByRole("button", { name: "Upload batch" }),
+  ).toBeVisible();
   await card.getByRole("button", { name: "Upload batch" }).click();
   // The flow page's upload card, a dialog over Home.
   const upload = page.getByTestId("item-upload");

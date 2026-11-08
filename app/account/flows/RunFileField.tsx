@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ReactNode,
 } from "react";
 import { CameraIcon } from "@phosphor-icons/react/dist/ssr/Camera";
 import { UploadSimpleIcon } from "@phosphor-icons/react/dist/ssr/UploadSimple";
@@ -85,6 +86,17 @@ const unknownOnServer = () => false;
  * photo past it keeps the files held; a file refused, or one that fails,
  * empties the field as one alone does.
  *
+ * **Compact** (`compact`, Home's YOUR FLOWS card only; the owner's build 42,
+ * item 16: "Maybe we dont need the clip icon and document/resume in there"):
+ * the title's `<label>` is `sr-only` — the chooser keeps its name, and Take
+ * photo and Upload keep theirs, " for {title}" — the button row has no
+ * margin above it and puts `trailing` (the card's Start) right after
+ * Upload, before a job flow's accepted types, and the
+ * uploading or ready line and the error take their margin only once they
+ * say something, so nothing stands empty under the row before a pick.
+ * ~~The visible title over the buttons, and the line's margin always~~ until
+ * build 42, on Home's card; everywhere else the field is drawn as before.
+ *
  * An upload belongs to the field that started it: its busy state is reported
  * under the field's key, it stops when the field goes (the form closed), and an
  * answer that arrives for one no longer in flight changes nothing.
@@ -95,6 +107,8 @@ export function RunFileField({
   subscriptionId,
   onBusyChange,
   showTypes = false,
+  compact = false,
+  trailing,
 }: {
   field: AutomationRunInputField;
   /** The workspace the page showed; the upload is refused once it is not active. */
@@ -103,6 +117,10 @@ export function RunFileField({
   onBusyChange: (key: string, busy: boolean) => void;
   /** Say the accepted types beside the button (an item's file, and its runs'). */
   showTypes?: boolean;
+  /** Home's card: the title for screen readers only, no empty gaps. */
+  compact?: boolean;
+  /** At the end of the button row (Home's card: its Start). */
+  trailing?: ReactNode;
 }) {
   const inputId = useId();
   const typesId = useId();
@@ -305,6 +323,17 @@ export function RunFileField({
     }
   };
 
+  const status =
+    state.kind === "uploading"
+      ? `Uploading ${state.name}…`
+      : files.length === 1
+        ? `Ready: ${files[0]!.name} (${formatSize(files[0]!.sizeBytes)})`
+        : files.length > 1
+          ? filesSelected(files.length)
+          : null;
+  // Off Home's card a line's margin is always there, as before.
+  const lineTop = compact && !status ? "" : `${SPACING.inner.top} `;
+
   return (
     <div>
       <input
@@ -325,7 +354,9 @@ export function RunFileField({
           optional. */}
       <label
         htmlFor={inputId}
-        className="block text-sm font-medium text-[var(--text)]"
+        className={
+          compact ? "sr-only" : "block text-sm font-medium text-[var(--text)]"
+        }
       >
         {field.title}
       </label>
@@ -349,7 +380,7 @@ export function RunFileField({
         }
       />
       <div
-        className={`${SPACING.inner.top} flex flex-wrap items-center ${SPACING.inner.gap}`}
+        className={`${compact ? "" : `${SPACING.inner.top} `}flex flex-wrap items-center ${SPACING.inner.gap}`}
       >
         {offersCamera ? (
           <>
@@ -396,23 +427,15 @@ export function RunFileField({
           <UploadSimpleIcon size={20} aria-hidden />
           Upload<span className="sr-only"> for {field.title}</span>
         </Button>
+        {trailing}
         {showTypes ? (
           <span id={typesId} className="text-xs text-[var(--muted)]">
             {typesInWords(accepted)}
           </span>
         ) : null}
       </div>
-      <p
-        aria-live="polite"
-        className={`${SPACING.inner.top} text-xs text-[var(--muted)]`}
-      >
-        {state.kind === "uploading"
-          ? `Uploading ${state.name}…`
-          : files.length === 1
-            ? `Ready: ${files[0]!.name} (${formatSize(files[0]!.sizeBytes)})`
-            : files.length > 1
-              ? filesSelected(files.length)
-              : null}
+      <p aria-live="polite" className={`${lineTop}text-xs text-[var(--muted)]`}>
+        {status}
       </p>
       <FormError message={error} className={`${SPACING.inner.top} text-xs`} />
     </div>

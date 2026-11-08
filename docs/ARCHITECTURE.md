@@ -90,8 +90,9 @@ page reuses:
   Add. Never a line of metadata under it: no department, no "Whole
   workspace", no run counts. Drawn on the Flows cards (each flow added, Open
   and its pill, under it) and the archived rows; Home's cards are its
-  compact face, icon and name with no description and no Live (see "Home's
-  YOUR FLOWS" below, the owner's build 41, item 14); a flow's page
+  compact face, icon and name with no description and no Live, a flow with
+  jobs its job pill at their right (see "Home's YOUR FLOWS" below, the
+  owner's build 41, item 14, and build 42, item 16); a flow's page
   and its Set up keep "Department: {kind}" under their title (`place.ts`).
   ~~The website draws no flow icon~~ until then: a flow's icon is the
   catalog's, a department still has none.
@@ -166,16 +167,32 @@ page reuses:
   `SPACING.rowY` and `SPACING.rowX`, for its padding, its icon and name in
   one centred row, no description and no Live — the owner's build 41, item
   14: "Just the logo, title, then the buttons and items. We do not need the
-  description and live"), then directly a flow without items its `runInput` and Start run
-  (`RunStart`); a flow with items, for an owner or admin, its items read as
-  Home opens — each flow's alone, "Unavailable" in its place — the job
-  drop-down on its newest ready job (`newestReady`, the list is newest
-  first), then the run form; none ready, "No jobs yet." and "Upload job",
-  the flow page's upload card, the job read again every 2 s on Home until it
-  is ready. Any other flow's card says Open, to its page. ~~A row per flow
-  that opened in place; items read when opened; "Choose" a job~~ until
-  builds 37 and 39; ~~the full card, its description and Live, a divider
-  over the run form~~ until build 41. The Flows list, its archived rows and
+  description and live"), in two rows (the owner's build 42, item 16: "It
+  looks like big squares for a quick access"): row 1 the icon and name (the
+  head, `flow-card-head`); row 2 the run's start, compact (`RunStart`
+  `compact`, Home only: the form's gap `SPACING.inner.gap`, its button
+  "Start", named "Start run" while idle). A run input of exactly one file
+  field is Take photo (a phone or tablet), Upload and Start on one row that
+  wraps, the field's title for screen readers only (`RunFileField`
+  `compact`: its `<label>` `sr-only`, Start its `trailing`), its uploading
+  or ready line under the row only once a file is picked; any other run
+  input keeps its fields and their titles, then Start. A flow without items:
+  that start. A flow with items, for an owner or admin: its items read as
+  Home opens — each flow's alone, "Loading…" or "Unavailable" in the card —
+  the job drop-down, a pill at the right of row 1 (`aside`, named by the
+  flow's word for one for screen readers; at most half the row, as the
+  app's, so a long title is cut short inside the card and the name keeps
+  its icon and a truncated name), on its newest ready job
+  (`newestReady`, the list is newest first), then the start; none ready,
+  "No jobs yet." and "Upload job" in one row (`home-empty-…`), the flow
+  page's upload card, the job read again every 2 s on Home until it is
+  ready. Any other flow's card says Open, to its page. A flow's page and an
+  item's page draw the start form as before. ~~A row per flow that opened
+  in place; items read when opened; "Choose" a job~~ until builds 37 and
+  39; ~~the full card, its description and Live, a divider over the run
+  form~~ until build 41; ~~the job drop-down a row of its own under its
+  title, the file's title over its buttons, Start run on a row of its
+  own~~ until build 42. The Flows list, its archived rows and
   Add a flow keep the full card. The owner's build 41, item 15 ("Why am i
   seeing departments not actively part of active flows for this org") needs
   no change here: the website has no department scope menu (a deliberate

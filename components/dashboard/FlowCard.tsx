@@ -23,8 +23,14 @@ import { CARD, SPACING } from "@/lib/spacing";
  * component cards do not need to be this big for the quick access cards.
  * Just the logo, title, then the buttons and items"): the card pads by the
  * table's row steps (`SPACING.rowY` top and bottom, `SPACING.rowX` at the
- * sides) instead of `CARD`, and its icon and name sit centred in one row;
- * Home passes it no description and no `aside`.
+ * sides) instead of `CARD`, and its icon and name sit centred in one row
+ * (`flow-card-head`); Home passes it no description, and as its `aside` a
+ * flow with jobs' job drop-down, in that row (the owner's build 42, item 16;
+ * ~~no `aside`, the drop-down a row of its own~~ until build 42). Its
+ * `aside` shrinks there, at most half the row (the app's `styles.aside`,
+ * `maxWidth: '50%'`), so a long job title is cut short inside the card and
+ * the name keeps its icon and a truncated name; elsewhere it keeps its whole
+ * width.
  */
 export function FlowCard({
   icon,
@@ -59,6 +65,7 @@ export function FlowCard({
 }) {
   const head = (
     <div
+      data-testid="flow-card-head"
       className={`flex ${compact ? "items-center" : "items-start"} ${SPACING.inner.gap}`}
     >
       <span
@@ -87,7 +94,8 @@ export function FlowCard({
       </div>
       {aside ? (
         <div
-          className={`flex shrink-0 flex-col items-end ${SPACING.inner.gap}`}
+          data-testid="flow-card-aside"
+          className={`flex ${compact ? "max-w-[50%] min-w-0" : "shrink-0"} flex-col items-end ${SPACING.inner.gap}`}
         >
           {aside}
         </div>
