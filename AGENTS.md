@@ -114,8 +114,12 @@ records by size. Then:
 - Hooks (`.claude/settings.json`): `guard.mjs` refuses `--no-verify`, a forced
   recursive `rm` outside the repo or scratch, and installs or builds in a
   synced folder (any npm script that runs one, e.g. `npm run release:ios`,
-  too); `session-start.mjs` prints the repo's state; `stop-check.mjs`
-  warns of processes left behind. The cases: `.claude/hooks/cases.json`.
+  too), and asks the owner first before a Write or Edit outside the scratch
+  root and a project's memory, a Bash write into Downloads, Desktop,
+  Documents or iCloud Drive, or an Artifact publish or delete (the
+  backend's [router rule 11](../snoopy-backend/CLAUDE.md));
+  `session-start.mjs` prints the repo's state; `stop-check.mjs` warns of
+  processes left behind. The cases: `.claude/hooks/cases.json`.
 
 ## Docs always updated
 
