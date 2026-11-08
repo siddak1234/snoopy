@@ -324,7 +324,7 @@ test("F5 (builds 37 and 39, item 8): every flow is a card of its own, always ope
   assert.match(panel, /if \(live\) setList\("failed"\);/u);
   assert.match(
     panel,
-    /if \(list === "failed"\)\s*return <p className="text-sm text-\[var\(--muted\)\]">Unavailable<\/p>;/u,
+    /if \(list === "failed"\)\s*return \(\s*<HomeCard flow=\{flow\}>\s*<p className="text-sm text-\[var\(--muted\)\]">Unavailable<\/p>\s*<\/HomeCard>/u,
   );
   const start = read("app/account/flows/RunStart.tsx");
   assert.match(start, /: itemPage\s*\? "Start"\s*: "Start run"/u);
