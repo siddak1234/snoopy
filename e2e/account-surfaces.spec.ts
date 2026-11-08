@@ -67,7 +67,7 @@ async function switchInAnotherTab(page: Page, to: RegExp) {
   }
 }
 
-test("1 — Home's YOUR FLOWS (builds 37 and 39, item 8): the department drop-down and Search flows over a card per flow, always open — its icon, name, description and Live, its run's fields inside it — Start run starts the run and opens its page from the flow; a flow that cannot start here is Open, to its own page", async ({
+test("1 — Home's YOUR FLOWS (builds 37 and 39, item 8): the department drop-down and Search flows over a card per flow, always open — its icon and name, then its run's fields (build 41, item 14: no description, no Live) — Start run starts the run and opens its page from the flow; a flow that cannot start here is Open, to its own page", async ({
   page,
 }) => {
   await page.goto("/account");
@@ -86,7 +86,13 @@ test("1 — Home's YOUR FLOWS (builds 37 and 39, item 8): the department drop-do
     .locator('[data-testid^="home-flow-"]')
     .filter({ hasText: "Manual input automation" });
   await expect(card.getByTestId("flow-card-icon")).toHaveCount(1);
-  await expect(card.getByText(/^live$/iu)).toBeVisible();
+  await expect(card.getByTestId("flow-card-name")).toHaveText(
+    "Manual input automation",
+  );
+  // The owner's build 41, item 14: "We do not need the description and
+  // live. Just the trigger buttons."
+  await expect(card.getByTestId("flow-card-description")).toHaveCount(0);
+  await expect(card.getByText(/^live$/iu)).toHaveCount(0);
   const form = card.getByTestId("run-form");
   await expect(form.getByLabel("Vendor")).toBeVisible();
   await expect(form.getByLabel("Invoice file")).toHaveAttribute("type", "file");

@@ -16,7 +16,8 @@ import { byDepartment, type Department } from "./flows/departments";
  * sections by department A–Z (`byDepartment`, the catalog's `category`, as
  * Flows groups them), A–Z in each. Each carries what its card and its run
  * form need, read from the one subscriptions list and the catalog Home reads
- * — its icon and description, its pinned `runInput` and, for a flow with
+ * — its icon (Home's compact card draws no description since the owner's
+ * build 41, item 14), its pinned `runInput` and, for a flow with
  * items, its `items` declaration. The owner's builds 37 and 39, item 8:
  * "Your flows — on the right hand side department select drop down / Search
  * bar / Department name in sorted order / Quick access cards" — a drop-down
@@ -36,9 +37,8 @@ export type HomeFlow = {
   id: string;
   name: string;
   category: string;
-  /** The catalog's icon name and short description: its card's (`FlowCard`). */
+  /** The catalog's icon name: its card's (`FlowCard`). */
   icon: string;
-  description: string;
   runInput: AutomationRunInputField[];
   /** A flow with items starts a run on one of them (backend ADR-0046). */
   items: AutomationItems | null;
@@ -78,7 +78,6 @@ export function homeFlows(
         name: subscription.name ?? entry.name,
         category: entry.category,
         icon: entry.icon,
-        description: entry.description,
         runInput,
         items,
         startable:
