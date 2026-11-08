@@ -357,8 +357,9 @@ function ItemRunStart({
     <HomeCard
       flow={flow}
       aside={
-        // The department drop-down's pattern: a pill named by a word for screen readers.
-        <div className="flex">
+        // The department drop-down's pattern: a pill named by a word for screen
+        // readers. A block no wider than the aside, so a long title truncates.
+        <div className="max-w-full">
           <span id={`${pickId}-label`} className="sr-only">
             {declared.words.singular}
           </span>

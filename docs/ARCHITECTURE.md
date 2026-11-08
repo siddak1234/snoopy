@@ -180,7 +180,9 @@ page reuses:
   that start. A flow with items, for an owner or admin: its items read as
   Home opens — each flow's alone, "Loading…" or "Unavailable" in the card —
   the job drop-down, a pill at the right of row 1 (`aside`, named by the
-  flow's word for one for screen readers), on its newest ready job
+  flow's word for one for screen readers; at most half the row, as the
+  app's, so a long title is cut short inside the card and the name keeps
+  its icon and a truncated name), on its newest ready job
   (`newestReady`, the list is newest first), then the start; none ready,
   "No jobs yet." and "Upload job" in one row (`home-empty-…`), the flow
   page's upload card, the job read again every 2 s on Home until it is

@@ -139,7 +139,8 @@ from the browser's midnight and each opening Activity from it; the approvals
 banner while something waits; Add a flow and Flows; YOUR FLOWS, its
 department drop-down and Search flows over a card per flow, always open —
 the compact flow card in two rows (icon and name, a flow with items its job
-pill beside them; then one file's Take photo, Upload and Start on one row, no
+pill beside them, at most half the row, a long title cut short and measured at
+375 px; then one file's Take photo, Upload and Start on one row, no
 field title — build 42, item 16), its run opening
 from the flow; a flow with items read as Home opens, on its newest ready
 item, its run opening from that item, back to it and then its flow; a

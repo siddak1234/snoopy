@@ -1096,6 +1096,71 @@ test("builds 37 and 39, items 5 and 8 — Home's YOUR FLOWS: a flow with items i
   await expect(page).toHaveURL(new RegExp(`${FLOW}$`, "u"));
 });
 
+test("build 42, item 16 — a batch title of 60 characters on a phone-width Home card: the pill shrinks to at most half the name's row and is cut short inside the card; the flow's icon and name stay in view beside it", async ({
+  page,
+}) => {
+  const long = "Senior Clinical Research Coordinator Cardiology and Oncology";
+  expect(long).toHaveLength(60);
+  // Home's read of the flow's batches, its newest ready one renamed.
+  await page.route(
+    /\/subscriptions\/b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1\/items(?:\?|$)/u,
+    async (route) => {
+      const response = await route.fetch();
+      const body = (await response.json()) as {
+        items: { title: string }[];
+      };
+      for (const item of body.items)
+        if (item.title === "Autumn intake") item.title = long;
+      await route.fulfill({ response, json: body });
+    },
+  );
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/account");
+  const card = page.getByTestId(
+    "home-flow-b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1",
+  );
+  const head = card.getByTestId("flow-card-head");
+  const pill = head.getByRole("combobox", { name: "Batch" });
+  await expect(pill).toHaveText(long);
+  const name = head.getByRole("heading", { level: 4, name: "Item automation" });
+  const icon = head.getByTestId("flow-card-icon");
+  await expect(name).toBeVisible();
+  await expect(icon).toBeVisible();
+  const box = async (part: typeof card) => {
+    const drawn = await part.boundingBox();
+    if (!drawn) throw new Error("not drawn");
+    return drawn;
+  };
+  const [cardBox, headBox, pillBox, nameBox, iconBox] = await Promise.all(
+    [card, head, pill, name, icon].map(box),
+  );
+  // Inside the card, at most half the row, its words cut short.
+  expect(pillBox.x).toBeGreaterThanOrEqual(cardBox.x);
+  expect(pillBox.x + pillBox.width).toBeLessThanOrEqual(
+    cardBox.x + cardBox.width + 0.5,
+  );
+  expect(pillBox.width).toBeLessThanOrEqual(headBox.width / 2 + 0.5);
+  expect(
+    await pill
+      .locator("span")
+      .first()
+      .evaluate((words) => words.scrollWidth > words.clientWidth),
+  ).toBe(true);
+  // The icon, then the name, before the pill, inside the card: the name
+  // keeps the rest of the row, truncated.
+  expect(iconBox.x).toBeGreaterThanOrEqual(cardBox.x);
+  expect(nameBox.x).toBeGreaterThanOrEqual(iconBox.x + iconBox.width);
+  expect(nameBox.width).toBeGreaterThan(0);
+  expect(nameBox.x + nameBox.width).toBeLessThanOrEqual(pillBox.x + 0.5);
+  expect(nameBox.width + iconBox.width).toBeGreaterThanOrEqual(
+    headBox.width / 2 - spacingPx(SPACING.inner.gap) * 2 - 0.5,
+  );
+  // Nothing wider than the phone.
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(375);
+});
+
 test("builds 37 and 39, item 10 — a run of a batch whose own read is unanswered (503) still draws its steps face, headed by its flow's name, without the batch's line", async ({
   page,
 }) => {

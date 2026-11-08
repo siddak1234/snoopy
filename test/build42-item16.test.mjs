@@ -318,3 +318,49 @@ test("build 42, item 16 (f): no ready job — No jobs yet. and Upload job in one
   const loadingCard = byTestId(loading, "home-flow-res")[0];
   assert.ok(visibleWords(markupOf(loadingCard)).includes("Loading…"));
 });
+
+test("build 42, item 16 (g): a long job title truncates — Home's aside shrinks, at most half the row, its pill a block no wider than it; elsewhere the aside keeps its whole width", async () => {
+  const title = "Senior Clinical Research Coordinator Cardiology and Oncology";
+  assert.equal(title.length, 60);
+  const markup = await jobCard({ choices: {}, items: [job("j", title)] });
+  const card = byTestId(markup, "home-flow-res")[0];
+  const aside = elements(card).find(
+    (node) => node.attrs["data-testid"] === "flow-card-aside",
+  );
+  for (const name of ["min-w-0", "max-w-[50%]"])
+    assert.ok(classes(aside).includes(name), name);
+  assert.ok(!classes(aside).includes("shrink-0"), "it may shrink");
+  // The pill's wrapper: a block capped at the aside, not a row of its own size.
+  const wrapper = aside.children.find((node) => node.tag === "div");
+  assert.ok(classes(wrapper).includes("max-w-full"));
+  assert.ok(!classes(wrapper).includes("flex"), "a block, so the pill fits it");
+  // The pill truncates its words; the name truncates beside it.
+  const pill = elements(aside).find(
+    (node) => node.attrs["data-testid"] === "home-job-res",
+  );
+  assert.match(pill.attrs.class, /\bmax-w-full\b/u);
+  assert.ok(
+    elements(pill).some(
+      (node) => classes(node).includes("truncate") && textOf(node) === title,
+    ),
+  );
+  const name = elements(card).find(
+    (node) => node.attrs["data-testid"] === "flow-card-name",
+  );
+  assert.ok(classes(name).includes("truncate"));
+  // The Flows page's card (not compact): its aside keeps its whole width.
+  const { modules, cleanup } = await loadModules([
+    "components/dashboard/FlowCard.tsx",
+  ]);
+  loaded.push(cleanup);
+  const full = byTestId(
+    draw(modules["components/dashboard/FlowCard.tsx"].FlowCard, {
+      icon: "Receipt",
+      name: "Invoices",
+      aside: react.createElement("span", null, "Live"),
+    }),
+    "flow-card-aside",
+  )[0];
+  assert.ok(classes(full).includes("shrink-0"));
+  assert.ok(!classes(full).includes("max-w-[50%]"));
+});
