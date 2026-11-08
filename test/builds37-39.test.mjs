@@ -138,7 +138,13 @@ test("items 1 and 4: every place a flow is a card draws the one flow card — Fl
   assert.equal(flows.match(/<FlowCard\b/gu)?.length, 2);
   assert.doesNotMatch(flows, /Department:|place\(|placeOf/u);
   assert.match(read(YOUR_FLOWS), /<FlowCard\b/u);
-  assert.match(read(YOUR_FLOWS), /aside=\{<StatusPill status="live" \/>\}/u);
+  // The owner's build 41, item 14: Home's card is compact — no description,
+  // no Live.
+  assert.match(code(read(YOUR_FLOWS)), /<FlowCard\b[^>]*\bcompact\b/u);
+  assert.doesNotMatch(
+    code(read(YOUR_FLOWS)),
+    /\baside=|\bdescription=|StatusPill/u,
+  );
   for (const page of [
     "app/account/flows/[subscriptionId]/page.tsx",
     "app/account/flows/[subscriptionId]/setup/page.tsx",
@@ -151,7 +157,6 @@ const flow = (id, name, category, extra = {}) => ({
   name,
   category,
   icon: "Receipt",
-  description: `${name}, in a line.`,
   runInput: [{ key: "file", title: "File", control: "artifact" }],
   items: null,
   startable: true,
@@ -223,7 +228,8 @@ test("item 8: the department drop-down is All departments then the departments d
     ["HR", ["Resume Screening"]],
   ]);
   assert.deepEqual(names(shownFlows(departments, "Accounting", "resume")), []);
-  // Each flow carries its card's icon and description, from the catalog.
+  // Each flow carries its card's icon, from the catalog; no description (the
+  // owner's build 41, item 14: Home's card draws none).
   const [section] = homeFlows(
     [{ id: "s", templateId: "t", status: "live", runInput: [] }],
     [
@@ -240,7 +246,7 @@ test("item 8: the department drop-down is All departments then the departments d
     () => "run-1",
   );
   assert.equal(section.entries[0].icon, "Receipt");
-  assert.equal(section.entries[0].description, "Reads invoices.");
+  assert.equal("description" in section.entries[0], false);
 });
 
 test("item 5: a flow with items starts on the newest ready job not archived — the platform lists newest first — and on none when none is ready", async () => {
@@ -515,4 +521,48 @@ test("item 11: a list row's email is a mailto: link and its phone a tel: link, e
     },
   };
   assert.equal(await copyValue(contactValue("a@b.co"), refused), false);
+});
+
+test("build 41, item 14: the flow card's compact face pads by the row steps (py-3 px-4), its head centred; without it the card's own p-4", async () => {
+  const { FlowCard } = await load(FLOW_CARD);
+  const classes = (props) =>
+    byTestId(
+      draw(FlowCard, { icon: "Receipt", name: "Invoices", ...props }),
+      "flow-card",
+    )[0].attrs.class.split(/\s+/u);
+  const compact = classes({ compact: true });
+  for (const name of ["bubble", "py-3", "px-4"])
+    assert.ok(compact.includes(name), name);
+  assert.ok(!compact.includes("p-4"));
+  const full = classes({});
+  assert.ok(full.includes("p-4"));
+  for (const name of ["py-3", "px-4"]) assert.ok(!full.includes(name), name);
+  const head = (props) =>
+    elements(
+      parse(draw(FlowCard, { icon: "Receipt", name: "Invoices", ...props })),
+    )
+      .find((node) => node.attrs["data-testid"] === "flow-card")
+      .children.find((node) => node.tag === "div").attrs.class;
+  assert.match(head({ compact: true }), /\bitems-center\b/u);
+  assert.match(head({}), /\bitems-start\b/u);
+});
+
+test("build 41, item 14: Home's card is the flow's icon and name, then its start controls — no description, no Live, the compact card", async () => {
+  const { YourFlows } = await yourFlows();
+  const markup = draw(YourFlows, { workspaceId: "w", departments: sections });
+  const cards = elements(parse(markup)).filter((node) =>
+    /^home-flow-/u.test(node.attrs["data-testid"] ?? ""),
+  );
+  assert.ok(cards.length > 0);
+  for (const card of cards) {
+    assert.ok(
+      card.attrs.class.split(/\s+/u).includes("py-3"),
+      card.attrs["data-testid"],
+    );
+    assert.ok(!card.attrs.class.split(/\s+/u).includes("p-4"));
+  }
+  assert.equal(byTestId(markup, "flow-card-description").length, 0);
+  assert.equal(byTestId(markup, "flow-card-icon").length, cards.length);
+  assert.ok(!visibleWords(markup).some((word) => /^live$/iu.test(word)));
+  assert.doesNotMatch(markup, /border-t border-\[var\(--ring\)\] pt-4/u);
 });
