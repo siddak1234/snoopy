@@ -96,6 +96,14 @@ test("1 — Home's YOUR FLOWS (builds 37 and 39, item 8): the department drop-do
   const form = card.getByTestId("run-form");
   await expect(form.getByLabel("Vendor")).toBeVisible();
   await expect(form.getByLabel("Invoice file")).toHaveAttribute("type", "file");
+  // Build 42, item 16: a run input of several fields keeps each title in
+  // sight; Start says "Start", named "Start run".
+  await expect(
+    form.locator("label:not(.sr-only)", { hasText: "Invoice file" }),
+  ).toBeVisible();
+  await expect(form.getByRole("button", { name: "Start run" })).toHaveText(
+    "Start",
+  );
   await expectNoAxeViolations(page);
   await form.getByLabel("Vendor").fill("Acme Supplies");
   await form.getByLabel("Amount").fill("120.50");

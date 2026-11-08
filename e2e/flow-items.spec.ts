@@ -1041,11 +1041,37 @@ test("builds 37 and 39, items 5 and 8 — Home's YOUR FLOWS: a flow with items i
   const card = flows.getByTestId(
     "home-flow-b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1",
   );
+  // Build 42, item 16: two rows — the batch pill in the name's row; Upload
+  // and Start in one row, no visible field title, no line before a pick.
+  await expect(
+    card.getByTestId("flow-card-head").getByRole("combobox", { name: "Batch" }),
+  ).toBeVisible();
   const form = card.getByTestId("run-form");
+  await expect(
+    form.locator("label.sr-only", { hasText: "Entry file" }),
+  ).toHaveCount(1);
+  const start = form.getByRole("button", { name: "Start run" });
+  await expect(start).toHaveText("Start");
+  await expect(form.getByText(/^Ready:/u)).toHaveCount(0);
+  // The store's answer held, so the upload is seen: Start waits for it.
+  let release = () => {};
+  const held = new Promise<void>((done) => {
+    release = done;
+  });
+  await page.route("**/__fixture/objects/**", async (route) => {
+    if (route.request().method() === "PUT") await held;
+    await route.fallback();
+  });
   await form.getByLabel("Entry file").setInputFiles(entryPdf);
-  await expect(form.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
+  const busy = form.getByRole("button", { name: "Uploading…" });
+  await expect(busy).toBeDisabled();
+  release();
+  await expect(
+    form.getByText(/^Ready: entry\.pdf \(\d+ (?:bytes|KB|MB)\)$/u),
+  ).toBeVisible();
+  await expect(start).toBeEnabled();
   await expectNoAxeViolations(page);
-  await form.getByRole("button", { name: "Start run" }).click();
+  await start.click();
   await expect(page).toHaveURL(/\/account\/runs\/[0-9a-f-]{36}\?from=item$/u);
   const started = await fixtureRead<{ runStarts: Record<string, unknown>[] }>(
     "items",
@@ -1100,6 +1126,12 @@ test("builds 37 and 39, item 8 — Home's YOUR FLOWS with no batch yet: No batch
   );
   await expect(card.getByText("No batches yet.")).toBeVisible();
   await expect(card.getByRole("combobox", { name: "Batch" })).toHaveCount(0);
+  // Build 42, item 16: the line and Upload batch in one row.
+  await expect(
+    card
+      .getByTestId("home-empty-b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1")
+      .getByRole("button", { name: "Upload batch" }),
+  ).toBeVisible();
   await card.getByRole("button", { name: "Upload batch" }).click();
   // The flow page's upload card, a dialog over Home.
   const upload = page.getByTestId("item-upload");

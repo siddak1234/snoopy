@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { UploadSimpleIcon } from "@phosphor-icons/react/dist/ssr/UploadSimple";
 import { fill } from "@/lib/block-sort";
 import { EmptyRow } from "@/components/dashboard/EmptyRow";
@@ -47,20 +47,29 @@ const SEARCH_FLOWS = fill(BLOCK_WORDS.searchItems, { items: "flows" });
  * always open: the flow card, compact (`FlowCard` `compact`: its icon and
  * name in one row, no description and no Live — the owner's build 41, item
  * 14: "Just the logo, title, then the buttons and items. We do not need the
- * description and live"), then directly what starts its run here —
+ * description and live"), then directly what starts its run here, in two
+ * rows (the owner's build 42, item 16: "It looks like big squares for a
+ * quick access"): the icon and name, then the run's start, compact
+ * (`RunStart` `compact`: a run input of one file field is Take photo, Upload
+ * and Start on one row that wraps, its title for screen readers only, its
+ * uploading or ready line under the row once a file is picked) —
  *
- * - a flow without items: its run's fields and Start run (`RunStart`), its
- *   run's page opening from its flow (back: the flow's page);
+ * - a flow without items: its run's start, its run's page opening from its
+ *   flow (back: the flow's page);
  * - a flow with items, for an owner or admin: its items, read as Home opens,
- *   each flow's alone ("Unavailable" in its place); the job drop-down,
- *   chosen already on the newest ready job (`newestReady`; the owner's item
- *   5), still changeable, and the run form, its run's page opening from that
- *   job (back: the job, then the flow). None ready: "No jobs yet." and
- *   "Upload job" (the owner's item 2: "it should show a configure in the
- *   home screen. Basically upload a job"), the flow page's own upload card;
- *   the job is then read again every 2 s, on Home, until it is ready;
+ *   each flow's alone ("Unavailable" in its place); the job drop-down, a
+ *   pill at the right of the name's row, chosen already on the newest ready
+ *   job (`newestReady`; the owner's item 5), still changeable, and the run's
+ *   start, its run's page opening from that job (back: the job, then the
+ *   flow). None ready: "No jobs yet." and "Upload job" in one row (the
+ *   owner's item 2: "it should show a configure in the home screen.
+ *   Basically upload a job"), the flow page's own upload card; the job is
+ *   then read again every 2 s, on Home, until it is ready;
  * - any other flow (a member's flow with items, one not answering): Open,
  *   to the flow's page.
+ *
+ * ~~The job drop-down a row of its own under its title, the file's title
+ * over its buttons, Start run on a row of its own~~ until build 42.
  *
  * ~~One card of divided rows, each opening in place with a caret; a flow's
  * items read when it was opened; "Choose" a job first~~ until builds 37 and
@@ -134,6 +143,30 @@ export function YourFlows({
   );
 }
 
+/** Home's flow card, compact: its icon and name (and `aside`), then `children`. */
+function HomeCard({
+  flow,
+  aside,
+  children,
+}: {
+  flow: HomeFlow;
+  aside?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <FlowCard
+      icon={flow.icon}
+      name={flow.name}
+      compact
+      heading="h4"
+      aside={aside}
+      testId={`home-flow-${flow.id}`}
+    >
+      {children}
+    </FlowCard>
+  );
+}
+
 /** One flow's card: the flow card, then its run's start, or Open. */
 function HomeFlowCard({
   workspaceId,
@@ -142,14 +175,13 @@ function HomeFlowCard({
   workspaceId: string;
   flow: HomeFlow;
 }) {
+  // A flow with items draws its card itself: its job drop-down is in its head.
+  if (flow.startable && flow.items)
+    return (
+      <ItemRunStart workspaceId={workspaceId} flow={flow} items={flow.items} />
+    );
   return (
-    <FlowCard
-      icon={flow.icon}
-      name={flow.name}
-      compact
-      heading="h4"
-      testId={`home-flow-${flow.id}`}
-    >
+    <HomeCard flow={flow}>
       <div>
         {!flow.startable ? (
           <Button
@@ -161,12 +193,6 @@ function HomeFlowCard({
           >
             Open
           </Button>
-        ) : flow.items ? (
-          <ItemRunStart
-            workspaceId={workspaceId}
-            flow={flow}
-            items={flow.items}
-          />
         ) : (
           <RunStart
             workspaceId={workspaceId}
@@ -177,22 +203,25 @@ function HomeFlowCard({
             canGoLive
             initialKey={flow.initialKey}
             from={FROM_FLOW}
+            compact
           />
         )}
       </div>
-    </FlowCard>
+    </HomeCard>
   );
 }
 
 /**
- * A flow with items, on its card: its items, read once as Home opens and
- * again every 2 s while one is being read (as the flow page's list is); the
- * ready ones in a drop-down under their group (`jobChoices`), the newest
- * chosen already (`newestReady`); the run form for the job chosen, under a
- * key of its own. A read that fails says "Unavailable"; none ready says the
- * flow's own "No jobs yet." — with each job uploaded here and still being
- * read, its line ("Reading…") — and its "Upload job", the flow page's upload
- * card (`UploadItemCard`).
+ * A flow with items, its card drawn here: its items, read once as Home opens
+ * and again every 2 s while one is being read (as the flow page's list is);
+ * the ready ones in a drop-down pill under their group (`jobChoices`), at
+ * the right of the card's name row (`aside`, named by the flow's word for
+ * one, for screen readers), the newest chosen already (`newestReady`); the
+ * run's start for the job chosen, compact, under a key of its own. A read
+ * that fails says "Unavailable", inside the card; none ready says the flow's
+ * own "No jobs yet." — with each job uploaded here and still being read, its
+ * line ("Reading…") — and its "Upload job" beside it, the flow page's upload
+ * card (`UploadItemCard`) under them.
  */
 function ItemRunStart({
   workspaceId,
@@ -252,9 +281,17 @@ function ItemRunStart({
   }, [reading, reads, path]);
 
   if (list === undefined)
-    return <p className="text-sm text-[var(--muted)]">Loading…</p>;
+    return (
+      <HomeCard flow={flow}>
+        <p className="text-sm text-[var(--muted)]">Loading…</p>
+      </HomeCard>
+    );
   if (list === "failed")
-    return <p className="text-sm text-[var(--muted)]">Unavailable</p>;
+    return (
+      <HomeCard flow={flow}>
+        <p className="text-sm text-[var(--muted)]">Unavailable</p>
+      </HomeCard>
+    );
   const choices = jobChoices(list.items, declared.groupField);
   // The job chosen, else the newest ready one: the owner's item 5.
   const chosen = choices.some((choice) => choice.value === itemId)
@@ -265,24 +302,27 @@ function ItemRunStart({
       (item) => item.status === "reading" && !item.archivedAt,
     );
     return (
-      <div className={`flex flex-col ${SPACING.inner.gap}`}>
-        {read.length > 0 ? (
-          <ul data-testid={`home-reading-${flow.id}`}>
-            {read.map((item) => (
-              <li key={item.id} className="text-sm text-[var(--text)]">
-                {item.title}{" "}
-                <span className="text-[var(--muted)]">
-                  · {itemStatusLine(item)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-[var(--muted)]">
-            {noneYet(declared.words)}
-          </p>
-        )}
-        <div>
+      <HomeCard flow={flow}>
+        <div
+          data-testid={`home-empty-${flow.id}`}
+          className={`flex flex-wrap items-center ${SPACING.inner.gap}`}
+        >
+          {read.length > 0 ? (
+            <ul data-testid={`home-reading-${flow.id}`}>
+              {read.map((item) => (
+                <li key={item.id} className="text-sm text-[var(--text)]">
+                  {item.title}{" "}
+                  <span className="text-[var(--muted)]">
+                    · {itemStatusLine(item)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-[var(--muted)]">
+              {noneYet(declared.words)}
+            </p>
+          )}
           <Button
             variant="secondary"
             size="sm"
@@ -313,31 +353,33 @@ function ItemRunStart({
             }}
           />
         ) : null}
-      </div>
+      </HomeCard>
     );
   }
   return (
-    <div className={`flex flex-col ${SPACING.group.gap}`}>
-      <div>
-        <label
-          id={`${pickId}-label`}
-          htmlFor={pickId}
-          className="block text-sm font-medium text-[var(--text)]"
-        >
-          {declared.words.singular}
-        </label>
-        <Dropdown
-          id={pickId}
-          labelledBy={`${pickId}-label`}
-          options={choices}
-          value={chosen}
-          onChange={(value) => {
-            setItemId(value);
-            setRunKey(`run-${crypto.randomUUID()}`);
-          }}
-          testId={`home-job-${flow.id}`}
-        />
-      </div>
+    <HomeCard
+      flow={flow}
+      aside={
+        // The department drop-down's pattern: a pill named by a word for screen readers.
+        <div className="flex max-w-[12rem]">
+          <span id={`${pickId}-label`} className="sr-only">
+            {declared.words.singular}
+          </span>
+          <Dropdown
+            id={pickId}
+            look="pill"
+            labelledBy={`${pickId}-label`}
+            options={choices}
+            value={chosen}
+            onChange={(value) => {
+              setItemId(value);
+              setRunKey(`run-${crypto.randomUUID()}`);
+            }}
+            testId={`home-job-${flow.id}`}
+          />
+        </div>
+      }
+    >
       <RunStart
         key={chosen}
         workspaceId={workspaceId}
@@ -349,7 +391,8 @@ function ItemRunStart({
         initialKey={runKey}
         itemId={chosen}
         from={FROM_ITEM}
+        compact
       />
-    </div>
+    </HomeCard>
   );
 }

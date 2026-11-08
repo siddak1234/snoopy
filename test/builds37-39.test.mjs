@@ -139,12 +139,13 @@ test("items 1 and 4: every place a flow is a card draws the one flow card — Fl
   assert.doesNotMatch(flows, /Department:|place\(|placeOf/u);
   assert.match(read(YOUR_FLOWS), /<FlowCard\b/u);
   // The owner's build 41, item 14: Home's card is compact — no description,
-  // no Live.
+  // no Live; its one `aside` is a flow with jobs' job drop-down (build 42,
+  // item 16), passed through Home's own card.
   assert.match(code(read(YOUR_FLOWS)), /<FlowCard\b[^>]*\bcompact\b/u);
-  assert.doesNotMatch(
-    code(read(YOUR_FLOWS)),
-    /\baside=|\bdescription=|StatusPill/u,
-  );
+  assert.doesNotMatch(code(read(YOUR_FLOWS)), /\bdescription=|StatusPill/u);
+  // HomeCard's pass-through and ItemRunStart's job pill
+  // (test/build42-item16.test.mjs draws it).
+  assert.equal(code(read(YOUR_FLOWS)).match(/\baside=/gu)?.length, 2);
   for (const page of [
     "app/account/flows/[subscriptionId]/page.tsx",
     "app/account/flows/[subscriptionId]/setup/page.tsx",
