@@ -1,9 +1,9 @@
 #!/bin/sh
 # Native pre-push gate: every push of this repository — from any tool or
-# terminal — runs the fast gates `npm run verify` begins with (register F93;
-# README "Verification" counts them), so a push that would turn CI red is
-# refused here, in about half a minute, instead of costing a run; and then
-# requires a PASS marker from /audit-change for the exact tree being pushed.
+# terminal — runs the gates its change needs (scripts/change-class.mjs: docs,
+# code or full; README "Verification"; register F93), so a push that would turn
+# CI red is refused here instead of costing a run; and then requires a PASS
+# marker from /audit-change for the exact tree being pushed.
 # Installed via `npm run hooks:install` (bash scripts/install-git-hooks.sh:
 # git config core.hooksPath scripts/githooks). Deliberate bypass: --no-verify.
 #
@@ -21,6 +21,7 @@ marker_dir="$git_dir/autom8x-audit"
 zero="0000000000000000000000000000000000000000"
 now_epoch="$(date +%s)"
 gated=""
+pushed=""
 
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ "$local_sha" = "$zero" ] && continue # deletion push
@@ -33,18 +34,15 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   fi
 
   gated="$gated $tree:$local_ref"
+  pushed="$pushed --head $local_sha"
 done
 
 [ -n "$gated" ] || exit 0
 
-# The fast gates, in verify's order (README "Verification"), on the working
-# tree, stopped at the first red — what is wrong in the tree, before what is
-# missing from the process. CI is the authority: the slow gates — the builds,
-# the browser suites — are its, and this hook never runs them. It writes no
-# facts file and no marker: only a whole green `npm run verify` emits facts,
-# and only scripts/audit/record-pass.mjs writes a marker. Verify's map gate
-# (`npm run map -- --check`) is not run twice: test:contracts asserts the map
-# is current (test/kit-repo.test.mjs).
+# The gates the change needs, on the working tree: scripts/change-class.mjs
+# (its classes and rails: README "Change-aware pre-push gate"). This hook
+# writes no facts file and no marker: only a whole green `npm run verify`
+# emits facts, and only scripts/audit/record-pass.mjs writes a marker.
 cd "$(git rev-parse --show-toplevel)" || exit 1
 # A push from a linked worktree (or with --git-dir) exports GIT_DIR and its
 # siblings to this hook. The gates' tests run git in throwaway repositories,
@@ -54,30 +52,20 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   echo "pre-push: the working tree has uncommitted changes; the gates run on it, not on the pushed commit." >&2
 fi
-# verify:platform-contracts reads the sibling checkout when there is one and
-# the committed copy of its contract files otherwise
-# (scripts/backend-contract.mjs), so every gate runs: none is ever skipped.
-output="$(mktemp)" || exit 1
-trap 'rm -f "$output"' EXIT
-started="$(date +%s)"
-for gate in format:check check:docs lint typecheck audit:boundaries test:contracts verify:platform-contracts; do
-  begun="$(date +%s)"
-  if npm run --silent "$gate" >"$output" 2>&1 </dev/null; then
-    # A skipped or todo contract test is a check that did not run: red here,
-    # as in CI's gates job (README "Verification", no silent skips).
-    if [ "$gate" = "test:contracts" ] && grep -qE '^# (skipped|todo) [1-9]' "$output"; then
-      grep -E '^# (skipped|todo) ' "$output" >&2
-      echo "pre-push: test:contracts skipped a test or left one todo — refused before CI. Fix it, or bypass deliberately with git push --no-verify." >&2
-      exit 1
-    fi
-    echo "pre-push: $gate ok ($(( $(date +%s) - begun ))s)" >&2
-  else
-    tail -n 30 "$output" >&2
-    echo "pre-push: $gate is red — refused before CI. Fix it, or bypass deliberately with git push --no-verify." >&2
+node scripts/change-class.mjs --run --worktree $pushed </dev/null >&2
+status=$?
+if [ "$status" -eq 10 ]; then
+  echo "pre-push: a gate is red — refused before CI. Fix it, or bypass deliberately with git push --no-verify." >&2
+  exit 1
+elif [ "$status" -ne 0 ]; then
+  # The classifier itself failed: never fail open, run the full class.
+  echo "pre-push: the change classifier failed (exit $status); running the full class: npm run verify, then npm audit --omit=dev --audit-level=high." >&2
+  if ! npm run verify </dev/null >&2 || ! npm audit --omit=dev --audit-level=high </dev/null >&2; then
+    echo "pre-push: the full class is red — refused before CI. Fix it, or bypass deliberately with git push --no-verify." >&2
     exit 1
   fi
-done
-echo "pre-push: the fast gates are green ($(( $(date +%s) - started ))s); CI runs the rest." >&2
+fi
+echo "pre-push: the change-aware gates are green; CI runs the whole suite." >&2
 
 # The change-audit marker, for each tree pushed (AGENTS.md rule 8).
 for entry in $gated; do

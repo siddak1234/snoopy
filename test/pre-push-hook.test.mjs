@@ -1,10 +1,12 @@
 // The native pre-push gate, tested hermetically against throwaway repos —
 // driven exactly as git drives it: remote name + url as args, ref lines on
-// stdin. The fast gates are the fixture's stubs: each notes that it ran,
-// and exits as the test says.
+// stdin. The repository carries the real classifier (scripts/change-class.mjs)
+// and its checks (scripts/audit/preflight.mjs); `npm` is a stub first on PATH
+// that notes each command it is asked for and exits as the test says.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -16,94 +18,133 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 
-const hook = resolve(import.meta.dirname, "../scripts/githooks/pre-push");
+const here = resolve(import.meta.dirname, "..");
+const hook = join(here, "scripts/githooks/pre-push");
 const SNOOPY_URL = "https://github.com/siddak1234/snoopy.git";
 const ZERO = "0000000000000000000000000000000000000000";
-// verify's gates before its first build, in its order (README
-// "Verification"), less the map's staleness check, which test:contracts runs
-// (test/kit-repo.test.mjs) — read from the change audit's list rather than
-// restated here.
-const AUDIT_GATES = [
-  ...readFileSync(
-    resolve(import.meta.dirname, "../scripts/audit/run-gates.mjs"),
-    "utf8",
-  ).matchAll(/name: "([^"]+)"/gu),
-].map((match) => match[1]);
-const FAST_GATES = AUDIT_GATES.slice(
-  0,
-  AUDIT_GATES.indexOf("build:no-backend"),
-).filter((gate) => gate !== "map");
-const CONTRACTS = [
-  "docs/openapi.yaml",
-  "docs/openapi/automations.yaml",
-  "docs/openapi/connections.yaml",
+const DOCS = [
+  "format:check",
+  "check:docs",
+  "map",
+  "doc-references",
+  "test:contracts",
 ];
+const CODE = [
+  "format:check",
+  "check:docs",
+  "map",
+  "lint",
+  "typecheck",
+  "audit:boundaries",
+  "test:contracts",
+  "verify:platform-contracts",
+];
+const FULL = ["verify", "audit"];
+// A changed screen's run: the fast gates, the build, its specs, then the check
+// that no browser test was skipped.
+const SCREEN = [...CODE, "build", "test:browser", "no-skipped-browser-tests"];
 
 function git(cwd, ...args) {
-  const run = spawnSync("git", args, { cwd, encoding: "utf8" });
+  const run = spawnSync(
+    "git",
+    ["-c", "user.email=t@t", "-c", "user.name=t", ...args],
+    { cwd, encoding: "utf8" },
+  );
   assert.equal(run.status, 0, `git ${args.join(" ")}: ${run.stderr}`);
   return run.stdout.trim();
 }
 
-// A repository whose fast gates are stubs — each writes `ran-<gate>` and exits
-// red or green as asked, after printing what `print` gives it (printf's
-// escapes) — with the sibling checkout the last reads planted beside it, or
-// not.
-function makeRepo({
-  red = [],
-  sibling = true,
-  recordGitDir = false,
-  print = {},
-} = {}) {
-  const base = mkdtempSync(join(tmpdir(), "pre-push-"));
-  const repo = join(base, "snoopy");
-  mkdirSync(repo);
-  git(repo, "init", "-q");
-  const scripts = Object.fromEntries(
-    FAST_GATES.map((gate) => [
-      gate,
-      `${recordGitDir ? `printf %s "\${GIT_DIR-unset}" > seen-git-dir-${gate.replace(":", "-")} && ` : ""}${gate in print ? `printf '${print[gate]}\\n' && ` : ""}touch ran-${gate.replace(":", "-")} && exit ${red.includes(gate) ? 1 : 0}`,
-    ]),
-  );
-  writeFileSync(
-    join(repo, "package.json"),
-    JSON.stringify({ name: "fixture", private: true, scripts }),
-  );
-  git(repo, "add", "package.json");
-  git(
-    repo,
-    "-c",
-    "user.email=t@t",
-    "-c",
-    "user.name=t",
-    "commit",
-    "-q",
-    "-m",
-    "one",
-  );
-  if (sibling) {
-    for (const contract of CONTRACTS) {
-      const path = join(base, "snoopy-backend", contract);
-      mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(path, "openapi: 3.1.0\n");
-    }
-  }
-  return { base, repo };
+function write(path, content) {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, content);
 }
 
-const ran = (repo) =>
-  FAST_GATES.filter((gate) =>
-    existsSync(join(repo, `ran-${gate.replace(":", "-")}`)),
+// A repository at origin/main with the classifier, then one pushed commit
+// that changes `change` (README.md, a doc, by default).
+function makeRepo({ change = "README.md", origin = true, classifier } = {}) {
+  const base = mkdtempSync(join(tmpdir(), "pre-push-"));
+  const repo = join(base, "snoopy");
+  const bin = join(base, "bin");
+  const log = join(base, "npm.log");
+  // The stub npm: `npm run <name> ...` and `npm audit ...` note their name
+  // (and the GIT_DIR and arguments they saw), go red when FAKE_RED names them,
+  // test:contracts prints FAKE_TAP's TAP summary, and build writes a routes
+  // manifest with the /api/platform rewrite (none under FAKE_NO_REWRITE).
+  write(
+    join(bin, "npm"),
+    `#!/bin/sh
+name="$1"; [ "$1" = "run" ] && name="$2"
+echo "$name" >> "${log}"
+printf %s "\${GIT_DIR-unset}" > "${base}/git-dir-$(echo "$name" | tr : -)"
+printf '%s\\n' "$*" > "${base}/args-$(echo "$name" | tr : -)"
+case " $FAKE_RED " in *" $name "*) exit 1 ;; esac
+[ "$name" = "test:contracts" ] && printf '%b\\n' "\${FAKE_TAP:-# skipped 0\\n# todo 0}"
+if [ "$name" = "build" ]; then
+  mkdir -p .next
+  if [ -n "$FAKE_NO_REWRITE" ]; then
+    echo '{"rewrites":[]}' > .next/routes-manifest.json
+  else
+    echo '{"rewrites":[{"source":"/api/platform/:path*"}]}' > .next/routes-manifest.json
+  fi
+fi
+exit 0
+`,
   );
+  chmodSync(join(bin, "npm"), 0o755);
+  mkdirSync(repo);
+  git(repo, "init", "-q");
+  // On origin/main: the build's output ignored, a tracked package.json, and a
+  // stub of the browser no-skip check that notes its run (red under FAKE_RED).
+  write(join(repo, ".gitignore"), ".next/\n");
+  write(join(repo, "package.json"), "{}\n");
+  write(
+    join(repo, "scripts/no-skipped-browser-tests.mjs"),
+    `import { appendFileSync } from "node:fs";\nappendFileSync(${JSON.stringify(log)}, "no-skipped-browser-tests\\n");\nprocess.exit(\` \${process.env.FAKE_RED ?? ""} \`.includes(" no-skipped-browser-tests ") ? 1 : 0);\n`,
+  );
+  write(
+    join(repo, "scripts/change-class.mjs"),
+    classifier ?? readFileSync(join(here, "scripts/change-class.mjs"), "utf8"),
+  );
+  write(
+    join(repo, "scripts/audit/preflight.mjs"),
+    readFileSync(join(here, "scripts/audit/preflight.mjs"), "utf8"),
+  );
+  write(
+    join(repo, "scripts/audit-doc-references.mjs"),
+    `import { appendFileSync } from "node:fs";\nappendFileSync(${JSON.stringify(log)}, "doc-references\\n");\n`,
+  );
+  write(join(repo, "README.md"), "# one\n");
+  git(repo, "add", ".");
+  git(repo, "commit", "-q", "-m", "one");
+  if (origin) git(repo, "update-ref", "refs/remotes/origin/main", "HEAD");
+  write(join(repo, change), "two\n");
+  git(repo, "add", ".");
+  git(repo, "commit", "-q", "-m", "two");
+  const sha = git(repo, "rev-parse", "HEAD");
+  return {
+    base,
+    repo,
+    bin,
+    tree: git(repo, "rev-parse", "HEAD^{tree}"),
+    refLine: `refs/heads/main ${sha} refs/heads/main ${ZERO}\n`,
+    ran: () =>
+      existsSync(log)
+        ? readFileSync(log, "utf8").split("\n").filter(Boolean)
+        : [],
+    reset: () => rmSync(log, { force: true }),
+  };
+}
 
-function runHook(repo, url, lines, extraEnv = {}) {
-  // The hook resolves the sibling as the generator does, from the environment
-  // or beside the repository; the test's own environment must not reach it.
+function runHook(fixture, url, lines, extraEnv = {}) {
   const env = { ...process.env };
   delete env.SNOOPY_BACKEND_ROOT;
+  delete env.FAKE_RED;
+  delete env.FAKE_TAP;
+  delete env.FAKE_NO_REWRITE;
   Object.assign(env, extraEnv);
+  env.PATH = `${fixture.bin}:${env.PATH}`;
   const run = spawnSync("sh", [hook, "origin", url], {
-    cwd: repo,
+    cwd: fixture.repo,
     encoding: "utf8",
     input: lines,
     env,
@@ -123,129 +164,229 @@ function mark(repo, tree, expiresAt) {
 
 const inAnHour = () => new Date(Date.now() + 3600_000).toISOString();
 
-test("native pre-push gate", (t) => {
-  const { base, repo } = makeRepo();
-  t.after(() => rmSync(base, { recursive: true, force: true }));
+test("native pre-push gate: the classifier's gates, then the change-audit marker", (t) => {
+  const fixture = makeRepo();
+  const { repo, tree, refLine } = fixture;
+  t.after(() => rmSync(fixture.base, { recursive: true, force: true }));
   const sha = git(repo, "rev-parse", "HEAD");
-  const tree = git(repo, "rev-parse", "HEAD^{tree}");
-  const refLine = `refs/heads/main ${sha} refs/heads/main ${ZERO}\n`;
 
   assert.equal(
-    runHook(repo, "https://github.com/other/elsewhere.git", refLine).exit,
+    runHook(fixture, "https://github.com/other/elsewhere.git", refLine).exit,
     0,
     "another remote is not gated",
   );
   assert.equal(
     runHook(
-      repo,
+      fixture,
       SNOOPY_URL,
       `refs/heads/gone ${ZERO} refs/heads/gone ${sha}\n`,
     ).exit,
     0,
     "a deletion push is allowed",
   );
+  assert.deepEqual(fixture.ran(), [], "neither ran a gate");
 
-  const blocked = runHook(repo, SNOOPY_URL, refLine);
+  const blocked = runHook(fixture, SNOOPY_URL, refLine);
   assert.equal(blocked.exit, 1, "an unaudited tree is blocked");
-  assert.match(blocked.stderr, /the fast gates are green/);
-  assert.match(blocked.stderr, /no change-audit PASS marker/);
-  assert.deepEqual(ran(repo), FAST_GATES, "the gates ran first, in order");
-  for (const gate of ran(repo))
-    rmSync(join(repo, `ran-${gate.replace(":", "-")}`));
+  assert.match(blocked.stderr, /change-class: docs \(Markdown only\)/u);
+  assert.match(blocked.stderr, /the change-aware gates are green/u);
+  assert.match(blocked.stderr, /no change-audit PASS marker/u);
+  assert.deepEqual(fixture.ran(), DOCS, "the docs class ran first, in order");
+  fixture.reset();
 
   const marker = mark(repo, tree, inAnHour());
-  const passed = runHook(repo, SNOOPY_URL, refLine);
-  assert.equal(passed.exit, 0, "a marked tree passes");
-  assert.deepEqual(ran(repo), FAST_GATES, "every fast gate ran, in order");
-  assert.match(passed.stderr, /the fast gates are green/);
-  assert.ok(
-    !existsSync(join(repo, ".autom8x")),
-    "the hook writes no facts file",
-  );
+  const passed = runHook(fixture, SNOOPY_URL, refLine);
+  assert.equal(passed.exit, 0, passed.stderr);
+  assert.deepEqual(fixture.ran(), DOCS);
+  assert.ok(!existsSync(join(repo, ".autom8x")), "no facts file is written");
 
   mark(repo, tree, "2000-01-01T00:00:00.000Z");
-  const expired = runHook(repo, SNOOPY_URL, refLine);
+  const expired = runHook(fixture, SNOOPY_URL, refLine);
   assert.equal(expired.exit, 1, "an expired marker blocks");
-  assert.match(expired.stderr, /expired/);
+  assert.match(expired.stderr, /expired/u);
 
   rmSync(marker);
-  for (const gate of ran(repo))
-    rmSync(join(repo, `ran-${gate.replace(":", "-")}`));
+  fixture.reset();
   git(repo, "update-ref", "refs/remotes/origin/main", "HEAD");
   assert.equal(
-    runHook(repo, SNOOPY_URL, refLine).exit,
+    runHook(fixture, SNOOPY_URL, refLine).exit,
     0,
     "a tree identical to origin/main needs no marker",
   );
-  assert.deepEqual(ran(repo), [], "and runs no gate: nothing new ships");
+  assert.deepEqual(fixture.ran(), [], "and runs no gate: nothing new ships");
 });
 
-test("the fast gates are verify's seven before its builds (all but the map's check), run in its order and stopped at the first red, which is named with the bypass (register F93)", (t) => {
-  assert.deepEqual(FAST_GATES, [
-    "format:check",
-    "check:docs",
-    "lint",
-    "typecheck",
-    "audit:boundaries",
-    "test:contracts",
-    "verify:platform-contracts",
-  ]);
+test("the hook calls the classifier on the pushed commits and the working tree, and keeps the marker check", () => {
+  const source = readFileSync(hook, "utf8");
+  const code = source
+    .split("\n")
+    .filter((line) => !/^\s*#/u.test(line))
+    .join("\n");
   assert.match(
-    readFileSync(hook, "utf8"),
-    new RegExp(`^for gate in ${FAST_GATES.join(" ")}; do$`, "mu"),
-    "the hook's list is verify's",
+    code,
+    /^node scripts\/change-class\.mjs --run --worktree \$pushed/mu,
   );
-  // The count lives in one place, README "Verification"; the hook and
-  // AGENTS.md link to it.
-  assert.match(
-    readFileSync(resolve(import.meta.dirname, "../README.md"), "utf8"),
-    /the seven fast gates/u,
-    "README counts the hook's gates",
-  );
-  // Nothing slow, and nothing written: CI runs the builds and the browser
-  // suites; only a whole green verify emits facts, only record-pass a marker.
-  // Read from the code, not its comments, which say exactly this.
-  assert.doesNotMatch(
-    readFileSync(hook, "utf8")
-      .split("\n")
-      .filter((line) => !/^\s*#/u.test(line))
-      .join("\n"),
-    /npm run build|test:browser|verify\.mjs|record-pass|repo-facts/u,
-  );
+  assert.match(code, /pushed="\$pushed --head \$local_sha"/u);
+  assert.doesNotMatch(code, /^for gate in /mu, "no fixed gate list");
+  assert.match(code, /no change-audit PASS marker/u);
+  assert.match(code, /marker="\$marker_dir\/\$tree\.json"/u);
+  // Nothing written: only a whole green verify emits facts, only record-pass
+  // a marker.
+  assert.doesNotMatch(code, /record-pass|repo-facts/u);
+});
 
-  // No marker: the gate is named whether or not the process was followed.
-  const { base, repo } = makeRepo({ red: ["typecheck"] });
-  t.after(() => rmSync(base, { recursive: true, force: true }));
-  const sha = git(repo, "rev-parse", "HEAD");
-  const refused = runHook(
-    repo,
-    SNOOPY_URL,
-    `refs/heads/main ${sha} refs/heads/main ${ZERO}\n`,
-  );
+test("a code change runs verify's fast gates, stopped at the first red, which is named with the bypass", (t) => {
+  const fixture = makeRepo({ change: "test/new.test.mjs" });
+  t.after(() => rmSync(fixture.base, { recursive: true, force: true }));
+  mark(fixture.repo, fixture.tree, inAnHour());
+  const green = runHook(fixture, SNOOPY_URL, fixture.refLine);
+  assert.equal(green.exit, 0, green.stderr);
+  assert.match(green.stderr, /change-class: code \(code; no screen changed\)/u);
+  assert.deepEqual(fixture.ran(), CODE);
+  fixture.reset();
+
+  const refused = runHook(fixture, SNOOPY_URL, fixture.refLine, {
+    FAKE_RED: "typecheck",
+  });
   assert.equal(refused.exit, 1, "a red gate refuses the push");
-  assert.match(refused.stderr, /pre-push: typecheck is red/);
-  assert.match(refused.stderr, /git push --no-verify/);
+  assert.match(refused.stderr, /change-class: typecheck is red/u);
+  assert.match(refused.stderr, /git push --no-verify/u);
   assert.deepEqual(
-    ran(repo),
-    FAST_GATES.slice(0, FAST_GATES.indexOf("typecheck") + 1),
+    fixture.ran(),
+    CODE.slice(0, CODE.indexOf("typecheck") + 1),
     "the gates after the red one did not run",
   );
-  assert.ok(!existsSync(join(repo, ".autom8x")));
 });
 
-test("with no sibling checkout every fast gate still runs, verify:platform-contracts too: it reads the committed copy (Round 21 hardening, W1)", (t) => {
-  const { base, repo } = makeRepo({ sibling: false });
-  t.after(() => rmSync(base, { recursive: true, force: true }));
-  const sha = git(repo, "rev-parse", "HEAD");
-  mark(repo, git(repo, "rev-parse", "HEAD^{tree}"), inAnHour());
-  const passed = runHook(
-    repo,
-    SNOOPY_URL,
-    `refs/heads/main ${sha} refs/heads/main ${ZERO}\n`,
+// The run binds 3001 and 3443 as the gates' preflight does: test:contracts runs
+// before any server in verify, the change audit and the code class.
+test("a changed screen holds the gates' lock, then builds, asserts the /api/platform rewrite, runs its mapped specs and checks none was skipped", (t) => {
+  const fixture = makeRepo({ change: "app/(marketing)/solutions/page.tsx" });
+  const { repo, refLine } = fixture;
+  t.after(() => rmSync(fixture.base, { recursive: true, force: true }));
+  mark(repo, fixture.tree, inAnHour());
+
+  // A held lock (a live pid: this test's) refuses with exit 10 before a gate.
+  const gitDir = git(repo, "rev-parse", "--absolute-git-dir");
+  const lock = join(gitDir, "autom8x-audit", "lock");
+  writeFileSync(lock, String(process.pid));
+  const direct = spawnSync(
+    process.execPath,
+    ["scripts/change-class.mjs", "--run"],
+    {
+      cwd: repo,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${fixture.bin}:${process.env.PATH}` },
+    },
   );
-  assert.equal(passed.exit, 0);
-  assert.doesNotMatch(passed.stderr, /skipped/u);
-  assert.deepEqual(ran(repo), FAST_GATES);
+  assert.equal(direct.status, 10, direct.stderr);
+  assert.match(direct.stderr, /another verify is running \(pid \d+\)/u);
+  const held = runHook(fixture, SNOOPY_URL, refLine);
+  assert.equal(held.exit, 1, "the hook refuses it");
+  assert.match(held.stderr, /pre-push: a gate is red/u);
+  assert.deepEqual(fixture.ran(), [], "no gate ran under a held lock");
+  rmSync(lock);
+
+  const green = runHook(fixture, SNOOPY_URL, refLine);
+  assert.equal(green.exit, 0, green.stderr);
+  assert.match(
+    green.stderr,
+    /change-class: code \(code; the specs its screens map to: accessibility\.spec\.ts, marketing\.visual\.spec\.ts\)/u,
+  );
+  assert.deepEqual(fixture.ran(), SCREEN, "the no-skip check after the specs");
+  assert.equal(
+    readFileSync(join(fixture.base, "args-test-browser"), "utf8").trim(),
+    "run test:browser -- e2e/accessibility.spec.ts e2e/marketing.visual.spec.ts",
+  );
+  fixture.reset();
+
+  const noRewrite = runHook(fixture, SNOOPY_URL, refLine, {
+    FAKE_NO_REWRITE: "1",
+  });
+  assert.equal(noRewrite.exit, 1, "a build with no rewrite is red");
+  assert.match(noRewrite.stderr, /no \/api\/platform rewrite/u);
+  assert.match(noRewrite.stderr, /change-class: build is red/u);
+  assert.deepEqual(fixture.ran(), [...CODE, "build"], "no spec ran after it");
+  fixture.reset();
+
+  const skipped = runHook(fixture, SNOOPY_URL, refLine, {
+    FAKE_RED: "no-skipped-browser-tests",
+  });
+  assert.equal(skipped.exit, 1, "a skipped browser test is red");
+  assert.match(skipped.stderr, /a browser test did not run/u);
+  assert.match(skipped.stderr, /change-class: test:browser is red/u);
+  assert.deepEqual(fixture.ran(), SCREEN);
+});
+
+test("with --worktree, an uncommitted package.json edit, staged or not, or an untracked file after a docs commit runs the full class", (t) => {
+  const fixture = makeRepo();
+  const { repo, refLine } = fixture;
+  t.after(() => rmSync(fixture.base, { recursive: true, force: true }));
+  mark(repo, fixture.tree, inAnHour());
+  const edit = () => write(join(repo, "package.json"), '{ "name": "two" }\n');
+  const dependency = /change-class: full \(package\.json: a dependency file\)/u;
+  for (const [what, change, reason, gates] of [
+    ["a clean tree", () => {}, /change-class: docs \(Markdown only\)/u, DOCS],
+    ["an unstaged edit", edit, dependency, FULL],
+    [
+      "a staged edit",
+      () => {
+        edit();
+        git(repo, "add", "package.json");
+      },
+      dependency,
+      FULL,
+    ],
+    [
+      "an untracked file",
+      () => write(join(repo, "foo.txt"), "two\n"),
+      /change-class: full \(foo\.txt: a path this classifier does not know\)/u,
+      FULL,
+    ],
+  ]) {
+    git(repo, "reset", "-q", "--hard");
+    rmSync(join(repo, "foo.txt"), { force: true });
+    change();
+    const run = runHook(fixture, SNOOPY_URL, refLine);
+    assert.equal(run.exit, 0, `${what}: ${run.stderr}`);
+    assert.match(run.stderr, reason, what);
+    assert.deepEqual(fixture.ran(), gates, what);
+    fixture.reset();
+  }
+});
+
+test("a dependency change, or no origin/main to compare with, runs the full class: npm run verify, then the runtime npm audit", (t) => {
+  for (const options of [{ change: "package.json" }, { origin: false }]) {
+    const fixture = makeRepo(options);
+    t.after(() => rmSync(fixture.base, { recursive: true, force: true }));
+    mark(fixture.repo, fixture.tree, inAnHour());
+    const run = runHook(fixture, SNOOPY_URL, fixture.refLine);
+    assert.equal(run.exit, 0, run.stderr);
+    assert.match(run.stderr, /change-class: full/u);
+    assert.deepEqual(fixture.ran(), FULL, JSON.stringify(options));
+    fixture.reset();
+    const red = runHook(fixture, SNOOPY_URL, fixture.refLine, {
+      FAKE_RED: "audit",
+    });
+    assert.equal(red.exit, 1, "a red audit refuses the push");
+  }
+});
+
+test("a classifier that fails runs the full class from the hook: never fail open", (t) => {
+  const fixture = makeRepo({ classifier: "process.exit(3);\n" });
+  t.after(() => rmSync(fixture.base, { recursive: true, force: true }));
+  mark(fixture.repo, fixture.tree, inAnHour());
+  const run = runHook(fixture, SNOOPY_URL, fixture.refLine);
+  assert.equal(run.exit, 0, run.stderr);
+  assert.match(run.stderr, /the change classifier failed \(exit 3\)/u);
+  assert.deepEqual(fixture.ran(), FULL);
+  fixture.reset();
+  const red = runHook(fixture, SNOOPY_URL, fixture.refLine, {
+    FAKE_RED: "verify",
+  });
+  assert.equal(red.exit, 1);
+  assert.match(red.stderr, /the full class is red/u);
+  assert.deepEqual(fixture.ran(), ["verify"], "the audit did not run after it");
 });
 
 test("a skipped or todo contract test refuses the push, as CI's gates job does, and a run with none skipped passes (Round 21 hardening, W-5)", (t) => {
@@ -254,54 +395,35 @@ test("a skipped or todo contract test refuses the push, as CI's gates job does, 
     ["# skipped 0\\n# todo 2", true],
     ["# skipped 0\\n# todo 0", false],
   ]) {
-    const { base, repo } = makeRepo({
-      print: { "test:contracts": `# tests 3\\n# pass 3\\n${summary}` },
+    const fixture = makeRepo();
+    t.after(() => rmSync(fixture.base, { recursive: true, force: true }));
+    mark(fixture.repo, fixture.tree, inAnHour());
+    const run = runHook(fixture, SNOOPY_URL, fixture.refLine, {
+      FAKE_TAP: `# tests 3\\n# pass 3\\n${summary}`,
     });
-    t.after(() => rmSync(base, { recursive: true, force: true }));
-    const sha = git(repo, "rev-parse", "HEAD");
-    mark(repo, git(repo, "rev-parse", "HEAD^{tree}"), inAnHour());
-    const run = runHook(
-      repo,
-      SNOOPY_URL,
-      `refs/heads/main ${sha} refs/heads/main ${ZERO}\n`,
-    );
     if (refused) {
       assert.equal(run.exit, 1, summary);
-      assert.match(
-        run.stderr,
-        /pre-push: test:contracts skipped a test or left one todo/u,
-      );
+      assert.match(run.stderr, /a contract test did not run/u);
       assert.match(run.stderr, /git push --no-verify/u);
-      assert.deepEqual(
-        ran(repo),
-        FAST_GATES.slice(0, FAST_GATES.indexOf("test:contracts") + 1),
-        "the gates after it did not run",
-      );
     } else {
       assert.equal(run.exit, 0, summary);
-      assert.deepEqual(ran(repo), FAST_GATES);
     }
+    assert.deepEqual(fixture.ran(), DOCS);
   }
 });
 
 test("a push from a linked worktree runs the gates without git's repository variables, so the gates' own git calls cannot touch this repository", (t) => {
-  // git exports GIT_DIR (and, with --work-tree, GIT_WORK_TREE) to the hook for
-  // a push from a linked worktree or with --git-dir; the gates' tests run git
-  // in throwaway repositories, which those variables would redirect here.
-  const { base, repo } = makeRepo({ recordGitDir: true });
-  t.after(() => rmSync(base, { recursive: true, force: true }));
-  const sha = git(repo, "rev-parse", "HEAD");
-  mark(repo, git(repo, "rev-parse", "HEAD^{tree}"), inAnHour());
-  const gitDir = git(repo, "rev-parse", "--absolute-git-dir");
-  const pushed = runHook(
-    repo,
-    SNOOPY_URL,
-    `refs/heads/main ${sha} refs/heads/main ${ZERO}\n`,
-    { GIT_DIR: gitDir, GIT_WORK_TREE: repo },
-  );
+  const fixture = makeRepo();
+  t.after(() => rmSync(fixture.base, { recursive: true, force: true }));
+  mark(fixture.repo, fixture.tree, inAnHour());
+  const gitDir = git(fixture.repo, "rev-parse", "--absolute-git-dir");
+  const pushed = runHook(fixture, SNOOPY_URL, fixture.refLine, {
+    GIT_DIR: gitDir,
+    GIT_WORK_TREE: fixture.repo,
+  });
   assert.equal(pushed.exit, 0, pushed.stderr);
-  for (const gate of FAST_GATES) {
-    const seen = join(repo, `seen-git-dir-${gate.replace(":", "-")}`);
+  for (const gate of DOCS.filter((name) => name !== "doc-references")) {
+    const seen = join(fixture.base, `git-dir-${gate.replace(":", "-")}`);
     assert.equal(readFileSync(seen, "utf8"), "unset", `${gate} saw GIT_DIR`);
   }
 });
