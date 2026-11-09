@@ -97,8 +97,9 @@ them and stops at the first red. Three classes:
 
 A class that fails to run its classifier runs the full class from the hook:
 it never fails open. CI is unchanged: every pull request runs the whole suite
-(no paths filter) in all three engines, `all-green` is required, and main and
-nightly run it in full. `node scripts/change-class.mjs --files <path>...` or
+(no paths filter) in all three engines and `all-green` is required; nightly
+runs it in full, and main runs a smoke or the whole suite (see "Useful scripts"
+below). `node scripts/change-class.mjs --files <path>...` or
 `--range A..B` prints a class without running it.
 
 **The backend's contract, copied.** The generator, its check and the

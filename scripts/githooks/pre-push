@@ -39,17 +39,10 @@ done
 
 [ -n "$gated" ] || exit 0
 
-# The change-aware gates (scripts/change-class.mjs; README "Verification"), on
-# the working tree: the classifier reads what the pushed commits change from
-# origin/main, plus what is staged, unstaged or untracked, prints its class,
-# the commands and what it skips, and runs them, stopped at the first red. A
-# docs change runs the docs checks; a code change verify's fast gates and the
-# browser specs its screens map to; a dependency, contract, kit, CI or tooling
-# change, an unknown path or a deleted file, the whole of `npm run verify` and
-# the runtime dependency audit. CI is the authority: every pull request runs
-# the whole suite in all three engines. This hook writes no facts file and no
-# marker: only a whole green `npm run verify` emits facts, and only
-# scripts/audit/record-pass.mjs writes a marker.
+# The gates the change needs, on the working tree: scripts/change-class.mjs
+# (its classes and rails: README "Change-aware pre-push gate"). This hook
+# writes no facts file and no marker: only a whole green `npm run verify`
+# emits facts, and only scripts/audit/record-pass.mjs writes a marker.
 cd "$(git rev-parse --show-toplevel)" || exit 1
 # A push from a linked worktree (or with --git-dir) exports GIT_DIR and its
 # siblings to this hook. The gates' tests run git in throwaway repositories,

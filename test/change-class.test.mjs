@@ -345,6 +345,52 @@ test("the screen -> spec map names specs that exist, and every spec runs in some
   assert.equal(specsFor("components/x.tsx"), "every");
 });
 
+// A screen key's route: "app/(marketing)/contact/" -> "/contact",
+// "app/account/page.tsx" -> "/account". Keys that name one file of a screen
+// (TodayTiles.tsx) have no route of their own.
+const routeOf = (key) => {
+  if (!key.endsWith("/") && !key.endsWith("/page.tsx")) return undefined;
+  const path = key
+    .replace(/^app\//u, "")
+    .replace(/(page\.tsx|\/)$/u, "")
+    .split("/")
+    .filter((segment) => segment && !/^\(.*\)$/u.test(segment))
+    .join("/");
+  return `/${path}`;
+};
+
+test("each public spec is mapped from every screen it opens", () => {
+  // The public specs open routes by literal (accessibility.spec.ts's and
+  // marketing.visual.spec.ts's route lists, connection-callback.spec.ts's
+  // goto). The screen that serves each route must name the spec, or a change
+  // to that screen would skip it. Fixture specs run as one suite.
+  const keys = Object.keys(SCREEN_SPECS).filter((key) => routeOf(key));
+  let checked = 0;
+  for (const spec of SPECS.filter((spec) => !FIXTURE_ONLY.includes(spec))) {
+    const routes = [
+      ...read(`e2e/${spec}`).matchAll(/["'`](\/[\w\-/]*)[?"'`]/gu),
+    ].map((m) => m[1]);
+    assert.ok(routes.length > 0, `${spec} opens a route`);
+    for (const route of new Set(routes)) {
+      const key = keys
+        .filter((key) => {
+          const base = routeOf(key);
+          return (
+            route === base || (base !== "/" && route.startsWith(`${base}/`))
+          );
+        })
+        .sort((a, b) => routeOf(b).length - routeOf(a).length)[0];
+      assert.ok(key, `${spec}: ${route} is served by a mapped screen`);
+      assert.ok(
+        SCREEN_SPECS[key].includes(spec),
+        `${key} (${route}) names ${spec}`,
+      );
+      checked += 1;
+    }
+  }
+  assert.ok(checked >= 13, `${checked} routes checked`);
+});
+
 test("unchanged: CI runs the whole suite on every pull request in three engines, scans both dependency trees, and main and nightly call it", () => {
   const ci = read(".github/workflows/ci.yml");
   assert.match(ci, /^on:\n {2}pull_request:\n {2}workflow_call:\n/mu);

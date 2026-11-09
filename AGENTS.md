@@ -74,9 +74,8 @@ records by size. Then:
 6. **Prisma is gone.** Rule 5's audit refuses it, a direct database import, or a
    Supabase SDK coming back.
 7. **The change's gates green before every push**: `node scripts/change-class.mjs
-   --run` (docs, code or full, whose class is `npm run verify` plus `npm audit`;
-   README "Change-aware pre-push gate"); CI runs the whole suite on every pull
-   request. Locally: Chromium and Firefox; WebKit in CI, which `all-green` needs
+   --run` runs the gates the change needs (README "Change-aware pre-push
+   gate"); CI runs the whole suite on every pull request. Locally: Chromium and Firefox; WebKit in CI, which `all-green` needs
    (the owner's decision of 2026-10-14, register F104; [e2e/CLAUDE.md](e2e/CLAUDE.md)).
 8. **No push without a passing change audit.** `/audit-change` must PASS for the
    exact tree being pushed: it maps the change's blast radius and tests it, not
@@ -108,7 +107,8 @@ records by size. Then:
      ([.claude/agents/change-auditor.md](.claude/agents/change-auditor.md)).
   2. The main session runs `node scripts/audit/record-pass.mjs <verdict.json>`,
      the only marker writer.
-  3. A normal `git push` (the pre-push hook runs rule 7 again), then the pull
+  3. A normal `git push` under the session's gate lock (the pre-push hook runs
+     rule 7 again, which can build and run Playwright), then the pull
      request, then CI's `all-green`: the whole suite, WebKit too.
 - Never `git push --no-verify`; the guard hook refuses it.
 - A pull request is ready only when it is pushed, `all-green` on its head, and
