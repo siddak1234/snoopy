@@ -64,6 +64,46 @@ is refused — both build into `.next` and serve on ports 3001 and 3443, so they
 share one lock, and a port anything already listens on is refused before either
 starts (the preflight binds each one; `lsof` cannot see a renamed `next-server`).
 
+**Change-aware pre-push gate.** A push does not run the whole of
+`npm run verify` every time. The pre-push hook runs
+`node scripts/change-class.mjs --run --worktree`, which reads what the pushed
+commits change from `origin/main` (plus anything staged, unstaged or
+untracked), prints its class, the commands and what it skips first, then runs
+them and stops at the first red. Three classes:
+
+- **docs** (Markdown only, outside `.claude/` and `.github/`; no app code
+  reads one): `format:check`, `check:docs`, `map -- --check`, the
+  document-reference check and `test:contracts` (no skipped or todo test).
+- **code** (`app/`, `components/`, `lib/` but `lib/generated/`, `hooks/`,
+  `public/`, `proxy.ts`, `instrumentation.ts`, `test/*.test.mjs`,
+  `e2e/*.spec.ts`): the eight fast gates (`format:check`, `check:docs`,
+  `map -- --check`, `lint`, `typecheck`, `audit:boundaries`, `test:contracts`,
+  `verify:platform-contracts`); then, for a changed screen, `build` with the
+  rewrite assertion and the browser specs that open it (the screen-to-spec map
+  in the script; a fixture spec runs the whole `test:browser:fixtures`). A
+  layout, a shared component, `lib/`, `hooks/`, `public/`, `proxy.ts` or a
+  route the map does not name runs every browser spec. A changed spec runs
+  itself.
+- **full**: `npm run verify`, then `npm audit --omit=dev --audit-level=high`.
+  The rails: a dependency or image file (`package.json`, the lockfile,
+  `.npmrc`, `.nvmrc`, `Dockerfile`, `compose.yml`, `.dockerignore`), the
+  contracts (`lib/generated/`, `platform-requirement.json`, the contract
+  scripts), the kit (`.claude/`, `scripts/kit/`), CI and the hooks
+  (`.github/`, `scripts/githooks/`), the test tooling (the Playwright, ESLint,
+  TypeScript, Prettier, Next and PostCSS configs, `e2e/helpers.ts`,
+  `e2e/fixtures/`, the test harnesses and data, `scripts/`), the classifier
+  itself, a deleted or renamed file that is not Markdown, any path it does not
+  know, and any error of its own. `--full` asks for it.
+
+If the classifier itself fails, the hook runs the full class: it never fails
+open. CI is unchanged: every pull request runs the whole suite
+(no paths filter) in all three engines and `all-green` is required; nightly
+runs it in full, and main runs a smoke or the whole suite (see "Useful scripts"
+below). Without `--run` the script prints the class only: the land step runs
+`node scripts/change-class.mjs` on the committed tree, and the push runs the
+set once (AGENTS.md "Gates and push"). `--files <path>...` or `--range A..B`
+prints the class of other changes.
+
 **The backend's contract, copied.** The generator, its check and the
 contract tests read six backend paths — `snoopy-backend/docs/openapi.yaml`,
 `snoopy-backend/docs/openapi/automations.yaml`,
@@ -86,7 +126,7 @@ contract tests fail when any test is skipped or left todo (TAP's `# skipped`
 and `# todo`, read with `set -o pipefail`; `test:contracts` asks for TAP by
 name, so a Node whose default reporter changes keeps it), there, in main's
 smoke, and locally in `npm run verify`, the pre-push hook and the change audit
-(`scripts/audit/preflight.mjs`, `scripts/githooks/pre-push`). The
+(`scripts/audit/preflight.mjs`, `scripts/change-class.mjs`). The
 browser suites collect only what they run (`playwright.config.ts`): the
 fixture specs only with the fixture Edge, the keyboard journey only with
 `KEYBOARD_JOURNEY=1`, the two touch-camera tests in Chromium alone by their
@@ -298,9 +338,8 @@ the built image, and its SBOM. On `main`, `.github/workflows/main.yml` runs a
 smoke (lint, format, typecheck, the contract tests) when the merged commit's
 tree is the one its pull request's all-green passed, and the whole suite
 otherwise. `npm run hooks:install` arms the pre-push hook
-(`scripts/githooks/pre-push`), which requires the change-audit marker and runs
-the seven fast gates `npm run verify` begins with (see "Verification"; ~30 s):
-every gate before its builds but the map's check, which `test:contracts` makes
-too (`test/kit-repo.test.mjs`). CI is the authority for the rest; its
-Architecture gates job runs `check:docs` and the map's check on the pull
-request's commits.
+(`scripts/githooks/pre-push`), which runs the gates the change needs
+(`scripts/change-class.mjs`; see "Change-aware pre-push gate") and then requires
+the change-audit marker. CI is the authority: every pull request runs the whole
+suite in all three engines; its Architecture gates job runs `check:docs` and
+the map's check on the pull request's commits.

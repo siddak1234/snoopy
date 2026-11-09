@@ -40,4 +40,5 @@ Copy into the pull request body and tick each line with its evidence.
 - [ ] README's spec count and its fixture-suite paragraph name the new spec;
       `docs/ARCHITECTURE.md` or `README.md` describes the page (docs-map rule `app`).
 - [ ] `npm run map` run and `docs/MAP.md` committed.
-- [ ] `npm run verify` green on the committed tree, then `/audit-change`.
+- [ ] `node scripts/change-class.mjs` on the committed tree, then `/audit-change`
+      passes and the push runs its gates once, green (AGENTS.md "Gates and push").

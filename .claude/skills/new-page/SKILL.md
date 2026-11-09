@@ -68,17 +68,18 @@ such as `test/build22-screens.test.mjs`, and `e2e/account-surfaces.spec.ts`.
      scripts/run-browser-fixtures.mjs test/verify-gate.test.mjs playwright.config.ts \
      docs/MAP.md README.md $ALSO && git commit
    git status --short        # nothing of this page's left behind
-   npm run verify
+   node scripts/change-class.mjs   # the class only; the push runs its gates once
    ```
 
-   then `/audit-change` ([skill](../audit-change/SKILL.md)).
+   then `/audit-change` ([skill](../audit-change/SKILL.md)) and the push
+   (AGENTS.md "Gates and push").
 
 ## Stop when
 
 - The operation is not in the generated contracts: stop and record a finding.
 - The page needs a secret, a database or a second fetch path: stop (AGENTS.md
   rules 4 and 5).
-- `npm run verify` is red: fix it before `/audit-change`, never push around it.
+- A gate is red, the change audit's or the push's: fix it, never push around it.
 
 ## Output
 
