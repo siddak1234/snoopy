@@ -73,10 +73,10 @@ records by size. Then:
    import is an unconditional failure.
 6. **Prisma is gone.** Rule 5's audit refuses it, a direct database import, or a
    Supabase SDK coming back.
-7. **The change's gates green before every push**: `node scripts/change-class.mjs
-   --run` runs the gates the change needs (README "Change-aware pre-push
-   gate"); CI runs the whole suite on every pull request. Locally: Chromium and Firefox; WebKit in CI, which `all-green` needs
-   (the owner's decision of 2026-10-14, register F104; [e2e/CLAUDE.md](e2e/CLAUDE.md)).
+7. **The change's gates green before every push**: the pre-push hook runs them once
+   (README "Change-aware pre-push gate"); CI runs the whole suite on every pull
+   request. Locally: Chromium and Firefox; WebKit in CI, which `all-green` needs (the
+   owner's decision of 2026-10-14, register F104; [e2e/CLAUDE.md](e2e/CLAUDE.md)).
 8. **No push without a passing change audit.** `/audit-change` must PASS for the
    exact tree being pushed: it maps the change's blast radius and tests it, not
    just the changed feature, with verify's gates. The Claude hook in
@@ -100,16 +100,16 @@ records by size. Then:
 - Work in a scratch clone, never a synced folder. Installs, `npm run verify`,
   Playwright and builds run one at a time, under the session's gate lock when
   it has one. Node: the exact version `.nvmrc` names; CI reads that file.
-- Commit first, then run `node scripts/change-class.mjs --run` on the
-  committed tree (rule 7; a full class is `npm run verify`).
+- Commit first, then `node scripts/change-class.mjs` (no `--run`) prints the class
+  only; step 3's push runs its gates, once (rule 7; full is `npm run verify`).
 - The push (the owner's option C, 2026-10-15):
   1. Review: `/audit-change` runs the `change-auditor` agent
      ([.claude/agents/change-auditor.md](.claude/agents/change-auditor.md)).
   2. The main session runs `node scripts/audit/record-pass.mjs <verdict.json>`,
      the only marker writer.
   3. A normal `git push` under the session's gate lock (the pre-push hook runs
-     rule 7 again, which can build and run Playwright), then the pull
-     request, then CI's `all-green`: the whole suite, WebKit too.
+     rule 7's gates, their only run, which can build and run Playwright), then
+     the pull request, then CI's `all-green`: the whole suite, WebKit too.
 - Never `git push --no-verify`; the guard hook refuses it.
 - A pull request is ready only when it is pushed, `all-green` on its head, and
   its body is final. The owner merges.

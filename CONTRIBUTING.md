@@ -31,9 +31,10 @@ database URL, or object-store credential to this repository.
 2. Create a focused branch; never commit directly to `main`.
 3. Stage only the files belonging to the change. Do not use `git add -A` in a
    mixed worktree without confirming every file belongs in the PR.
-4. Run `node scripts/change-class.mjs --run`: it runs the gates your change
-   needs (README "Change-aware pre-push gate"). `/audit-change` must pass for
-   the exact tree you push (`AGENTS.md` rule 8).
+4. Run `node scripts/change-class.mjs`: it prints the gates your change needs
+   (README "Change-aware pre-push gate"), and `git push` runs them once (the
+   pre-push hook). `/audit-change` must pass for the exact tree you push
+   (`AGENTS.md` rule 8).
 5. Include contract inputs, user impact, boundary impact, and exact commands in
    the PR body. Open a draft PR first unless it is explicitly ready for review.
 

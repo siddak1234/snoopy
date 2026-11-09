@@ -95,12 +95,14 @@ them and stops at the first red. Three classes:
   itself, a deleted or renamed file that is not Markdown, any path it does not
   know, and any error of its own. `--full` asks for it.
 
-A class that fails to run its classifier runs the full class from the hook:
-it never fails open. CI is unchanged: every pull request runs the whole suite
+If the classifier itself fails, the hook runs the full class: it never fails
+open. CI is unchanged: every pull request runs the whole suite
 (no paths filter) in all three engines and `all-green` is required; nightly
 runs it in full, and main runs a smoke or the whole suite (see "Useful scripts"
-below). `node scripts/change-class.mjs --files <path>...` or
-`--range A..B` prints a class without running it.
+below). Without `--run` the script prints the class only: the land step runs
+`node scripts/change-class.mjs` on the committed tree, and the push runs the
+set once (AGENTS.md "Gates and push"). `--files <path>...` or `--range A..B`
+prints the class of other changes.
 
 **The backend's contract, copied.** The generator, its check and the
 contract tests read six backend paths — `snoopy-backend/docs/openapi.yaml`,
