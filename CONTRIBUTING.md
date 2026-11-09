@@ -31,9 +31,11 @@ database URL, or object-store credential to this repository.
 2. Create a focused branch; never commit directly to `main`.
 3. Stage only the files belonging to the change. Do not use `git add -A` in a
    mixed worktree without confirming every file belongs in the PR.
-4. Run `npm run verify` (README) — it includes the browser baselines and the
-   loopback fixture suite. `/audit-change` must pass for the exact tree you
-   push (`AGENTS.md` rule 8).
+4. Run `node scripts/change-class.mjs --run` (README "Change-aware pre-push
+   gate"): the gates your change needs, `npm run verify` and the runtime
+   `npm audit` when it touches dependencies, contracts, CI or test tooling;
+   `--full` runs those always. CI runs the whole suite on the pull request.
+   `/audit-change` must pass for the exact tree you push (`AGENTS.md` rule 8).
 5. Include contract inputs, user impact, boundary impact, and exact commands in
    the PR body. Open a draft PR first unless it is explicitly ready for review.
 

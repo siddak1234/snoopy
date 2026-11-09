@@ -172,6 +172,7 @@
 - [scripts/audit/record-pass.mjs](../scripts/audit/record-pass.mjs): The ONLY writer of the change-audit PASS marker. Run by the main session,
 - [scripts/audit/run-gates.mjs](../scripts/audit/run-gates.mjs): Deterministic gate runner for the change audit. Runs the same gates CI runs
 - [scripts/backend-contract.mjs](../scripts/backend-contract.mjs): Where the backend's contract files are read from (Round 21 hardening, W1,
+- [scripts/change-class.mjs](../scripts/change-class.mjs): The change-aware pre-push gate: which of the website's gates a change needs,
 - [scripts/generate-platform-contracts.mjs](../scripts/generate-platform-contracts.mjs): no header
 - [scripts/hooks/require-change-audit.mjs](../scripts/hooks/require-change-audit.mjs): PreToolUse gate for Claude Code sessions: blocks a `git push` (or
 - [scripts/kit/check-docs.mjs](../scripts/kit/check-docs.mjs): D, docs always updated (STANDARD (e)): `npm run check:docs` reads
