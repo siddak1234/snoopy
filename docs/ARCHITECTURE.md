@@ -108,6 +108,16 @@ page reuses:
   in the card and sends nothing. Each file given is a pill, its name and an
   x that takes it out of the run ("Remove {name}"), several in one row that
   scrolls sideways; while a file uploads Start waits and no pill shows.
+- **A start form's files** (build 43, item 17; `RunFileField` `removable`,
+  `missingFile` in `lib/several-files.ts`): every start form (Home's card, a
+  flow's page, an item's page) draws the files a field holds, one or
+  several, as pills under its buttons, in one row that scrolls sideways:
+  the name, cut with an ellipsis, and an x ("Remove {name}") that takes
+  that file alone out of the run (a new run key; nothing deleted on the
+  server, the stored copy kept until retention). A press of Start with a
+  required file field holding none says "Add {title} first." and sends
+  nothing; an optional one starts as before. The filled Start and the
+  two-button row are the quick-access card's alone.
 - **A choice is a drop-down**: a flow's `select` field, a setup `select`
   (`app/account/flows/SelectField.tsx`) and a list's filter are the website's
   drop-down (`components/ui/Dropdown.tsx`) — a pill for a filter, a field's
@@ -158,14 +168,8 @@ page reuses:
   it. More than the field's `maxFiles` (absent, the platform's 50) says
   "Add up to {max} files at a time." and sends nothing: a choice past it
   empties the field, a photo past it keeps the files held. Since build 43,
-  item 17, every start form (Home's card, a flow's page, an item's page)
-  draws the files a field holds, one or several, as pills under its
-  buttons, in one row that scrolls sideways: the name, cut with an
-  ellipsis, and an x ("Remove {name}") that takes that file alone out of
-  the run (a new run key; nothing deleted on the server, the stored copy
-  kept until retention); a press of Start with a required file field
-  holding none says "Add {title} first." and sends nothing (`missingFile`,
-  `lib/several-files.ts`), an optional one starts as before. ~~Holding one
+  item 17, the start forms draw the files held as pills with an x (see "A
+  start form's files" in "Screen standards"). ~~Holding one
   file, a field of several says its "Ready:" line; a field of one its
   "Ready: {name} ({size})"~~ until build 43 in the start forms; the job
   upload card (`UploadItemCard`) keeps its "Ready:" line.
@@ -201,9 +205,9 @@ page reuses:
   readers only (`RunFileField` `compact`: its `<label>` `sr-only`, Start its
   `trailing`); on a phone or tablet whose field takes a photo Upload opens a
   small menu under it, Take photo then Choose file, closed by a row, a
-  press outside or Escape; under the row its uploading line, then its pills
-  (each file's name and an x), then the errors, "Add {title} first." for a
-  required file missing (see the quick-access card in "Screen standards").
+  press outside or Escape; under the row its uploading line, then its pills,
+  then the errors (see "The quick-access card" and "A start form's files"
+  in "Screen standards").
   ~~Take photo (a phone or tablet), Upload and Start on one row that wraps;
   its uploading or ready line~~ until build 43. Any other run input keeps
   its fields and their titles, then Start, filled. A flow without items:

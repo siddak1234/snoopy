@@ -6420,7 +6420,8 @@ test.describe("build 43, item 17 — the quick-access card's Upload and filled S
     await fixtureControl("run-file-required");
     await fixtureControl("manual-several");
     const form = await openFilledRun(page);
-    // Its own layout: the title over Take photo (a phone) and Upload.
+    // Its own layout: the field's title shows (not sr-only); the buttons'
+    // side-by-side layout is proven by the unit test (build43-item17).
     await expect(
       form.locator("label:not(.sr-only)", { hasText: "Invoice file" }),
     ).toBeVisible();

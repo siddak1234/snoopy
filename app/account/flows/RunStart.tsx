@@ -53,7 +53,8 @@ import { SPACING } from "@/lib/spacing";
  * gap is the card's inner one and the button says "Start", named "Start run"
  * while it waits (busy, its "Starting…" or "Uploading…" as everywhere). A run
  * input of exactly one file field puts Start at the end of that field's
- * button row — Take photo, Upload and Start on one row that wraps — with the
+ * button row (~~Take photo, Upload and Start on one row that wraps~~ until
+ * build 43; Upload and Start since, below) with the
  * field's title for screen readers only (`RunFileField` `compact`); any
  * other run input keeps its fields and their titles, then Start. ~~Start
  * run under the field, full width of its own row~~ until build 42, on Home;
