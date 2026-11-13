@@ -63,10 +63,9 @@ import { SPACING } from "@/lib/spacing";
  * buttons … upload start … start should be more bolded and colored"), that
  * row is Upload and Start alone (Take photo inside Upload's menu), and
  * Home's Start is the one filled button (`Button` `filled`, the owner's
- * decision of 2026-11-13); ~~Take photo, Upload and Start on one row~~ until
- * build 43. A flow's page's Start run and an item's page's Start stay the
- * accent outline (`primary`): whether they take the fill is the owner's open
- * question.
+ * decision of 2026-11-13). A flow's page's Start run and an item's page's
+ * Start stay the accent outline (`primary`): whether they take the fill is
+ * the owner's open question.
  *
  * **A required file first** (build 43, item 17: "start throws an error rather
  * than starting if nothing was uploaded when required. ensure this is a
