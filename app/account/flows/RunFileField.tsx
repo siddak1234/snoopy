@@ -104,7 +104,9 @@ const unknownOnServer = () => false;
  * buttons … upload start"), where the field can take a photo
  * (`offersCamera`) Upload opens a small menu under it (a disclosure, its
  * panel the `.bubble-soft` surface, drawn only while open): Take photo, the
- * camera, then Choose file, the chooser, each opened inside the press; a
+ * camera, then Choose file, the chooser, each opened inside the press and
+ * each named by its words alone, as the app's menu rows are (Upload, which
+ * opens it, is the one named for the field); a
  * row chosen, a press outside or Escape closes it, Escape putting focus back
  * on Upload. Elsewhere Upload opens the chooser at once. ~~Take photo
  * beside Upload on the card~~ until build 43; everywhere else Take photo and
@@ -535,7 +537,8 @@ export function RunFileField({
                   className={`justify-start ${SPACING.inner.gap}`}
                   onClick={() => pick(camera)}
                 >
-                  {takePhoto}
+                  <CameraIcon size={20} aria-hidden />
+                  {TAKE_PHOTO_LABEL}
                 </Button>
                 <Button
                   variant="ghost"
@@ -544,7 +547,6 @@ export function RunFileField({
                 >
                   <FileArrowUpIcon size={20} aria-hidden />
                   {CHOOSE_FILE_LABEL}
-                  <span className="sr-only"> for {field.title}</span>
                 </Button>
               </div>
             ) : null}

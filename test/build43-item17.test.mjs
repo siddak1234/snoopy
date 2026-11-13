@@ -315,7 +315,7 @@ function contrast(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-test("17 T7 (D1, D2): Home's card on a phone — exactly Upload then Start; Upload a closed disclosure; open, Take photo then Choose file, each named for the field", async () => {
+test("17 T7 (D1, D2): Home's card on a phone — exactly Upload then Start; Upload a closed disclosure; open, Take photo then Choose file, each named by its words alone", async () => {
   const RunStart = await runStart({ field: PHONE });
   const markup = draw(RunStart, props({ compact: true }));
   const row = nodes(markup).find((node) =>
@@ -344,10 +344,9 @@ test("17 T7 (D1, D2): Home's card on a phone — exactly Upload then Start; Uplo
   assert.equal(openUpload.attrs["aria-controls"], menu.attrs.id);
   const rows = elements(menu).filter((node) => node.tag === "button");
   assert.deepEqual(rows.map(visibleOf), ["Take photo", "Choose file"]);
-  assert.deepEqual(rows.map(textOf), [
-    "Take photo for Resume",
-    "Choose file for Resume",
-  ]);
+  // Named by their words alone, as the app's menu rows are (the parity
+  // check, 2026-11-13): no hidden " for {title}" on a row.
+  assert.deepEqual(rows.map(textOf), ["Take photo", "Choose file"]);
   const source = read(FILE_FIELD);
   assert.match(source, /onClick=\{\(\) => pick\(camera\)\}/u);
   assert.match(source, /onClick=\{\(\) => pick\(input\)\}/u);

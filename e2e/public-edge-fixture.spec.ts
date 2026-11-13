@@ -6515,8 +6515,8 @@ test.describe("build 43, item 17 — the quick-access card's Upload and filled S
       await upload.click();
       await expect(upload).toHaveAttribute("aria-expanded", "true");
       await expect(menu.getByRole("button")).toHaveText([
-        "Take photo for Document",
-        "Choose file for Document",
+        "Take photo",
+        "Choose file",
       ]);
       await expect(upload).toHaveAttribute(
         "aria-controls",
@@ -6533,7 +6533,7 @@ test.describe("build 43, item 17 — the quick-access card's Upload and filled S
       await upload.click();
       const [chooser] = await Promise.all([
         page.waitForEvent("filechooser"),
-        menu.getByRole("button", { name: "Choose file for Document" }).click(),
+        menu.getByRole("button", { name: "Choose file", exact: true }).click(),
       ]);
       expect(await chooser.element().getAttribute("capture")).toBeNull();
       await chooser.setFiles(invoicePdf);
@@ -6544,7 +6544,7 @@ test.describe("build 43, item 17 — the quick-access card's Upload and filled S
       await upload.click();
       const [camera] = await Promise.all([
         page.waitForEvent("filechooser"),
-        menu.getByRole("button", { name: "Take photo for Document" }).click(),
+        menu.getByRole("button", { name: "Take photo", exact: true }).click(),
       ]);
       expect(await camera.element().getAttribute("capture")).toBe(
         "environment",
