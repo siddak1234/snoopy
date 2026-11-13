@@ -160,9 +160,9 @@ page reuses:
   and the pages its links open are the platform's.
 - **Several files at once** (platform round 2's B2 as the batch addendum
   amends it): a run's file field that declares `multiple` (`RunFileField`)
-  lets the chooser take several files and the camera add each photo, sends
-  each as one file alone is sent, and shows each file as a pill with an x
-  (~~"{n} files selected"~~ until build 43, item 17); Start run
+  lets the chooser take several files and the camera add each photo, and
+  sends each as one file alone is sent (~~then says "{n} files selected"~~
+  until build 43, item 17); Start run
   then starts ONE run, its input that field's list of upload ids under the
   one key (`declaredValues` in `app/account/flows/actions.ts`), and opens
   it. More than the field's `maxFiles` (absent, the platform's 50) says
