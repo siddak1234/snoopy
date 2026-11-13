@@ -6,11 +6,12 @@ import type {
   RefAttributes,
 } from "react";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "filled" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
 
 const variantClass: Record<Variant, string> = {
   primary: "btn-primary",
+  filled: "btn-filled",
   secondary: "btn-secondary",
   ghost: "btn-ghost",
   danger: "btn-danger",
@@ -55,7 +56,12 @@ function classes(variant: Variant, size: Size, className: string) {
  * The one button. Emits the design-system classes from globals.css, so class
  * usage (legacy) and this primitive share a single style source.
  *
- * Nocturne rule: the primary action is an accent outline — never a fill.
+ * Nocturne rule: the primary action is an accent outline — never a fill —
+ * with one exception, the owner's decision of 2026-11-13 (build 43, item 17:
+ * "start should be more bolded and colored so easy to click"): `filled`, the
+ * accent fill with a semibold label, is the quick-access card's Start alone
+ * (Home's YOUR FLOWS, `RunStart` `compact`); every other primary stays an
+ * accent outline.
  */
 export function Button(props: ButtonProps) {
   if (props.href !== undefined) {

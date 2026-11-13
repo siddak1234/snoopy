@@ -427,6 +427,7 @@ html[data-theme="light"] .brand-mark {
 /* — buttons — */
 
 .btn-primary,
+.btn-filled,
 .btn-secondary {
   display: inline-flex;
   min-height: 2.75rem;
@@ -447,7 +448,8 @@ html[data-theme="light"] .brand-mark {
     color 150ms ease;
 }
 
-/* The primary action is an accent outline — never a fill. */
+/* The primary action is an accent outline — never a fill — but for
+   `.btn-filled` below (the owner's decision of 2026-11-13). */
 .btn-primary {
   border: 1px solid var(--color-accent);
   color: var(--color-accent-2);
@@ -459,6 +461,23 @@ html[data-theme="light"] .brand-mark {
 
 .btn-primary:active {
   background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+}
+
+/* The one filled button, the owner's decision of 2026-11-13 (build 43, item
+   17): the quick-access card's Start alone (Home's YOUR FLOWS). The label in
+   the page's background on the accent: 5.45:1 dark, 4.90:1 light; on
+   accent-400 8.55:1 dark, 5.88:1 light. */
+.btn-filled {
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-bg);
+  font-weight: 600;
+}
+
+.btn-filled:hover,
+.btn-filled:active {
+  border-color: var(--color-accent-400);
+  background: var(--color-accent-400);
 }
 
 .btn-secondary {
@@ -559,6 +578,7 @@ html[data-theme="light"] .brand-mark {
 }
 
 .btn-primary:disabled,
+.btn-filled:disabled,
 .btn-secondary:disabled,
 .btn-ghost:disabled,
 .btn-danger:disabled {
@@ -739,6 +759,7 @@ html[data-theme="light"] .brand-mark {
   .bubble-soft,
   .interactive-card,
   .btn-primary,
+  .btn-filled,
   .btn-secondary,
   .btn-danger {
     transition: none;

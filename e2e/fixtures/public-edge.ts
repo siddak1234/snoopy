@@ -254,6 +254,10 @@ function initialState() {
     // starts the next is refused at capacity (null: none is).
     manualSeveral: false,
     manualMaxFiles: undefined as number | undefined,
+    // Build 43, item 17: every run-input file field (the manual flow's, the
+    // item flow's, Invoice Processing's) is required, so a start form with none says "Add {title}
+    // first." and sends nothing.
+    runFileRequired: false,
     manualRunStarts: [] as { key: string; input: Json; status: number }[],
     // The batch addendum's P3: how many of the next run starts or item
     // makes are refused because the flow's queue is full (`queue_full`).
@@ -1161,7 +1165,7 @@ function invoiceV4Subscription(): Automations["Subscription"] {
         title: "Document",
         description: "A PDF or photo of bills or receipts.",
         control: "artifact",
-        required: false,
+        required: state.runFileRequired,
       },
     ],
     projectId: accountingTeamId,
@@ -1365,7 +1369,9 @@ function itemsSubscription(): Automations["Subscription"] {
     unmetConnections: [],
     triggerKind: "manual",
     setup: [],
-    runInput: itemsRunInput,
+    runInput: state.runFileRequired
+      ? itemsRunInput.map((field) => ({ ...field, required: true }))
+      : itemsRunInput,
     items: itemsDeclared,
     projectId: null,
     createdByUserId: userId,
@@ -2909,6 +2915,10 @@ const server = createServer(
         const max = url.searchParams.get("maxFiles");
         state.manualMaxFiles = max === null ? undefined : Number(max);
       },
+      // Build 43, item 17: every run-input file field required.
+      "/__fixture/run-file-required": () => {
+        state.runFileRequired = true;
+      },
       "/__fixture/run-queue-full-once": () => {
         state.queueFull = 1;
       },
@@ -4367,14 +4377,16 @@ const server = createServer(
       {
         ...manualSubscription,
         status: state.manualStatus,
-        ...(state.manualSeveral
+        ...(state.manualSeveral || state.runFileRequired
           ? {
               runInput: manualSubscription.runInput.map((field) =>
                 field.control === "artifact"
                   ? {
                       ...field,
-                      multiple: true,
-                      ...(state.manualMaxFiles === undefined
+                      ...(state.runFileRequired ? { required: true } : {}),
+                      ...(state.manualSeveral ? { multiple: true } : {}),
+                      ...(!state.manualSeveral ||
+                      state.manualMaxFiles === undefined
                         ? {}
                         : { maxFiles: state.manualMaxFiles }),
                     }

@@ -1037,7 +1037,7 @@ test.describe("a file for a run (backend FR-14)", () => {
     const dialog = await openFilledRun(page);
     await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
     await expect(
-      dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+      dialog.getByRole("button", { name: "Remove invoice.pdf" }),
     ).toBeVisible();
     expect(puts).toHaveLength(1);
     await expectNoAxeViolations(page);
@@ -1076,7 +1076,7 @@ test.describe("a file for a run (backend FR-14)", () => {
     ).toBeDisabled();
     release();
     await expect(
-      dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+      dialog.getByRole("button", { name: "Remove invoice.pdf" }),
     ).toBeVisible();
     await expect(
       dialog.getByRole("button", { name: "Start run" }),
@@ -1139,7 +1139,9 @@ test.describe("a file for a run (backend FR-14)", () => {
     await expect(dialog.getByRole("alert")).toHaveText(
       "The active workspace changed in another tab. Reload this page before continuing.",
     );
-    await expect(dialog.getByText(/^Ready: invoice\.pdf/u)).toHaveCount(0);
+    await expect(
+      dialog.getByRole("button", { name: "Remove invoice.pdf" }),
+    ).toHaveCount(0);
     expect(await fixtureFiles()).toEqual([]);
   });
 
@@ -1173,7 +1175,7 @@ test.describe("a file for a run (backend FR-14)", () => {
     await expect(start).toBeDisabled();
     second.release();
     await expect(
-      dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+      dialog.getByRole("button", { name: "Remove invoice.pdf" }),
     ).toBeVisible();
     await expect(start).toHaveText("Start run");
     await expect(start).toBeEnabled();
@@ -1211,20 +1213,22 @@ test.describe("a file for a run (backend FR-14)", () => {
     const dialog = await openFilledRun(page);
     await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
     await expect(
-      dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+      dialog.getByRole("button", { name: "Remove invoice.pdf" }),
     ).toBeVisible();
     await fixtureControl("files-collected");
     await dialog.getByRole("button", { name: "Start run" }).click();
     await expect(dialog.getByRole("alert")).toHaveText(
       "That file can no longer be used. Choose it again.",
     );
-    await expect(dialog.getByText(/^Ready:/u)).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: /^Remove / })).toHaveCount(
+      0,
+    );
     await expect(dialog.getByLabel("Invoice file")).toHaveValue("");
     // What was typed stays; the file chosen again starts the run with it.
     await expect(dialog.getByLabel("Vendor")).toHaveValue("Acme Supplies");
     await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
     await expect(
-      dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+      dialog.getByRole("button", { name: "Remove invoice.pdf" }),
     ).toBeVisible();
     // Agreed once already: not asked again.
     await dialog.getByRole("button", { name: "Start run" }).click();
@@ -1288,7 +1292,9 @@ test.describe("a file for a run (backend FR-14)", () => {
       "The file was not accepted. Choose it again.",
     );
     await expect(file).toHaveValue("");
-    await expect(dialog.getByText(/^Ready:/u)).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: /^Remove / })).toHaveCount(
+      0,
+    );
     await expect(
       dialog.getByRole("button", { name: "Start run" }),
     ).toBeEnabled();
@@ -1487,7 +1493,7 @@ test.describe("a file for a run (backend FR-14)", () => {
     ).toBeDisabled();
     // Asked again, it is measured: ready, nothing said, two completions in all.
     await expect(
-      dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+      dialog.getByRole("button", { name: "Remove invoice.pdf" }),
     ).toBeVisible();
     await expect(dialog.getByRole("alert")).toHaveCount(0);
     expect(await uploadCompletions()).toBe(2);
@@ -1548,7 +1554,7 @@ test.describe("a photo or an image for a run (backend BUILD-PLAN 25.8.5)", () =>
     const dialog = await openFilledRun(page);
     await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
     await expect(
-      dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+      dialog.getByRole("button", { name: "Remove invoice.pdf" }),
     ).toBeVisible();
     expect(await storedObjects()).toEqual([
       {
@@ -1574,7 +1580,7 @@ test.describe("a photo or an image for a run (backend BUILD-PLAN 25.8.5)", () =>
       buffer: scan,
     });
     await expect(
-      dialog.getByText(/^Ready: scan\.jpg \(\d+ KB\)$/u),
+      dialog.getByRole("button", { name: "Remove scan.jpg" }),
     ).toBeVisible();
     const [sent, ...others] = await storedObjects();
     expect(others).toEqual([]);
@@ -1615,7 +1621,7 @@ test.describe("a photo or an image for a run (backend BUILD-PLAN 25.8.5)", () =>
       buffer: await sidewaysPhoto(page),
     });
     await expect(
-      dialog.getByText(/^Ready: receipt\.jpg \(\d+ KB\)$/u),
+      dialog.getByRole("button", { name: "Remove receipt.jpg" }),
     ).toBeVisible();
     const [sent, ...others] = await storedObjects();
     expect(others).toEqual([]);
@@ -1659,7 +1665,9 @@ test.describe("a photo or an image for a run (backend BUILD-PLAN 25.8.5)", () =>
     // The upload it replaced was stopped: let through, it lands nothing.
     put.release();
     await page.waitForTimeout(1_000);
-    await expect(dialog.getByText(/^Ready:/u)).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: /^Remove / })).toHaveCount(
+      0,
+    );
     expect(await fixtureFiles()).toEqual([]);
   });
 
@@ -1709,7 +1717,7 @@ test.describe("a photo or an image for a run (backend BUILD-PLAN 25.8.5)", () =>
       );
       await file.setInputFiles(invoicePdf);
       await expect(
-        dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+        dialog.getByRole("button", { name: "Remove invoice.pdf" }),
       ).toBeVisible();
       const takePhoto = dialog.getByRole("button", {
         name: "Take photo for Invoice file",
@@ -1725,7 +1733,7 @@ test.describe("a photo or an image for a run (backend BUILD-PLAN 25.8.5)", () =>
       await closed.setFiles([]);
       await page.waitForTimeout(500);
       await expect(
-        dialog.getByText("Ready: invoice.pdf (24 bytes)"),
+        dialog.getByRole("button", { name: "Remove invoice.pdf" }),
       ).toBeVisible();
 
       const photo = await sidewaysPhoto(page);
@@ -1744,7 +1752,7 @@ test.describe("a photo or an image for a run (backend BUILD-PLAN 25.8.5)", () =>
         buffer: photo,
       });
       await expect(
-        dialog.getByText(/^Ready: image\.jpg \(\d+ KB\)$/u),
+        dialog.getByRole("button", { name: "Remove image.jpg" }),
       ).toBeVisible();
       // The chooser no longer names the PDF the photo replaced.
       await expect(file).toHaveValue("");
@@ -2985,7 +2993,9 @@ test.describe("Invoice Processing's page, Step 1 to its run (spec A6, A7; Build 
     ).toHaveAttribute("href", `${FLOWS.invoice}/setup`);
     await expectNoAxeViolations(page);
     await form.getByLabel("Document").setInputFiles(invoicePdf);
-    await expect(form.getByText("Ready: invoice.pdf (24 bytes)")).toBeVisible();
+    await expect(
+      form.getByRole("button", { name: "Remove invoice.pdf" }),
+    ).toBeVisible();
     await form.getByRole("button", { name: "Start run" }).click();
     await expect(page).toHaveURL(
       /\/account\/runs\/fixture-run-invoice-started\?from=flow$/,
@@ -5780,7 +5790,7 @@ test.describe("Round 21, platform round 2 (B2, as the batch addendum amends it) 
       { key: string; input: Record<string, unknown>; status: number }[]
     >("run-starts");
 
-  test("three files chosen at once: each sent, '3 files selected', then ONE run under the one key, its input the three upload ids with the same other inputs, and its page opened", async ({
+  test("three files chosen at once: each sent, a pill each (~~'3 files selected'~~ until build 43), then ONE run under the one key, its input the three upload ids with the same other inputs, and its page opened", async ({
     page,
   }) => {
     await fixtureControl("manual-several");
@@ -5788,7 +5798,9 @@ test.describe("Round 21, platform round 2 (B2, as the batch addendum amends it) 
     await dialog
       .getByLabel("Invoice file")
       .setInputFiles([pdf("a.pdf"), pdf("b.pdf"), pdf("c.pdf")]);
-    await expect(dialog.getByText("3 files selected")).toBeVisible();
+    await expect(dialog.getByRole("button", { name: /^Remove / })).toHaveCount(
+      3,
+    );
     // The key the press sends: a changed input is a new run, with a new key.
     const key = await dialog
       .locator('input[name="idempotencyKey"]')
@@ -5830,7 +5842,9 @@ test.describe("Round 21, platform round 2 (B2, as the batch addendum amends it) 
     await fixtureControl("manual-several");
     const dialog = await openFilledRun(page);
     await dialog.getByLabel("Invoice file").setInputFiles([pdf("a.pdf")]);
-    await expect(dialog.getByText(/^Ready: a\.pdf/u)).toBeVisible();
+    await expect(
+      dialog.getByRole("button", { name: "Remove a.pdf" }),
+    ).toBeVisible();
     await expect(dialog.locator('input[name="input:artifactId"]')).toHaveCount(
       1,
     );
@@ -5857,13 +5871,17 @@ test.describe("Round 21, platform round 2 (B2, as the batch addendum amends it) 
     await expect(dialog.getByRole("alert")).toHaveText(
       "Add up to 2 files at a time.",
     );
-    await expect(dialog.getByText(/files selected/u)).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: /^Remove / })).toHaveCount(
+      0,
+    );
     expect(await storedObjects()).toEqual([]);
     // Exactly maxFiles is taken.
     await dialog
       .getByLabel("Invoice file")
       .setInputFiles([pdf("a.pdf"), pdf("b.pdf")]);
-    await expect(dialog.getByText("2 files selected")).toBeVisible();
+    await expect(dialog.getByRole("button", { name: /^Remove / })).toHaveCount(
+      2,
+    );
     await expect(dialog.getByRole("alert")).toHaveCount(0);
     expect((await storedObjects()).map(({ filename }) => filename)).toEqual([
       "a.pdf",
@@ -5901,7 +5919,9 @@ test.describe("Round 21, platform round 2 (B2, as the batch addendum amends it) 
     await dialog
       .getByLabel("Invoice file")
       .setInputFiles([pdf("a.pdf"), pdf("b.pdf")]);
-    await expect(dialog.getByText("2 files selected")).toBeVisible();
+    await expect(dialog.getByRole("button", { name: /^Remove / })).toHaveCount(
+      2,
+    );
     const key = await keyField.inputValue();
     await fixtureControl("run-queue-full-once");
     await dialog.getByRole("button", { name: "Start run" }).click();
@@ -5912,7 +5932,9 @@ test.describe("Round 21, platform round 2 (B2, as the batch addendum amends it) 
       (await runStarts()).map(({ key: sent, status }) => [sent, status]),
     ).toEqual([[key, 429]]);
     await expect(page).toHaveURL(new RegExp(`${FLOWS.manual}$`, "u"));
-    await expect(dialog.getByText("2 files selected")).toBeVisible();
+    await expect(dialog.getByRole("button", { name: /^Remove / })).toHaveCount(
+      2,
+    );
     await expect(keyField).toHaveValue(key);
   });
 
@@ -5931,7 +5953,9 @@ test.describe("Round 21, platform round 2 (B2, as the batch addendum amends it) 
         await dialog
           .getByLabel("Invoice file")
           .setInputFiles([pdf("a.pdf"), pdf("b.pdf")]);
-        await expect(dialog.getByText("2 files selected")).toBeVisible();
+        await expect(
+          dialog.getByRole("button", { name: /^Remove / }),
+        ).toHaveCount(2);
         const [camera] = await Promise.all([
           page.waitForEvent("filechooser"),
           dialog
@@ -5943,7 +5967,9 @@ test.describe("Round 21, platform round 2 (B2, as the batch addendum amends it) 
           mimeType: "image/jpeg",
           buffer: await sidewaysPhoto(page),
         });
-        await expect(dialog.getByText("3 files selected")).toBeVisible();
+        await expect(
+          dialog.getByRole("button", { name: /^Remove / }),
+        ).toHaveCount(3);
         expect((await storedObjects()).map(({ filename }) => filename)).toEqual(
           ["a.pdf", "b.pdf", "image.jpg"],
         );
@@ -5962,7 +5988,9 @@ test.describe("Round 21, platform round 2 (B2, as the batch addendum amends it) 
         await dialog
           .getByLabel("Invoice file")
           .setInputFiles([pdf("a.pdf"), pdf("b.pdf")]);
-        await expect(dialog.getByText("2 files selected")).toBeVisible();
+        await expect(
+          dialog.getByRole("button", { name: /^Remove / }),
+        ).toHaveCount(2);
         const [camera] = await Promise.all([
           page.waitForEvent("filechooser"),
           dialog
@@ -5977,7 +6005,9 @@ test.describe("Round 21, platform round 2 (B2, as the batch addendum amends it) 
         await expect(dialog.getByRole("alert")).toHaveText(
           "Add up to 2 files at a time.",
         );
-        await expect(dialog.getByText("2 files selected")).toBeVisible();
+        await expect(
+          dialog.getByRole("button", { name: /^Remove / }),
+        ).toHaveCount(2);
         expect(await storedObjects()).toHaveLength(2);
         await expect(
           dialog.locator('input[name="input:artifactId"]'),
@@ -6279,5 +6309,251 @@ test.describe("backend §12.1 #319 step 2 — a run's steps face and its flow's 
     await expect(rows.nth(3).locator("p.font-medium")).not.toHaveText(
       "4 · QuickBooks updated",
     );
+  });
+});
+
+test.describe("build 43, item 17 — the quick-access card's Upload and filled Start, a pill per file with its x, and a required file first", () => {
+  // The browser PUTs each file straight to the fixture's object store, whose
+  // certificate is the fixture's own.
+  test.use({ ignoreHTTPSErrors: true });
+
+  const HOME_INVOICE = "home-flow-f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1";
+  const HOME_ITEMS = "home-flow-b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1";
+  const pdf = (name: string) => ({ ...invoicePdf, name });
+  const entryPdf = { ...invoicePdf, name: "entry.pdf" };
+  const runStarts = () =>
+    fixtureRead<
+      { key: string; input: Record<string, unknown>; status: number }[]
+    >("run-starts");
+  const itemStarts = async () =>
+    (await fixtureRead<{ runStarts: unknown[] }>("items")).runStarts;
+  const keyOf = (form: ReturnType<typeof runForm>) =>
+    form.locator('input[name="idempotencyKey"]').inputValue();
+
+  /** Home's Invoice Processing card, once the page answers (its search filters in the browser). */
+  async function invoiceCard(page: Page) {
+    await page.goto("/account");
+    const flows = page.getByTestId("home-your-flows");
+    await flows
+      .getByRole("searchbox", { name: "Search flows" })
+      .fill("Invoice Processing");
+    await expect(flows.locator('[data-testid^="home-flow-"]')).toHaveCount(1);
+    return flows.getByTestId(HOME_INVOICE).getByTestId("run-form");
+  }
+
+  test("Home's card of one file field: exactly Upload then Start, Start filled; Upload opens the picker at once off a phone; a flow's page keeps the outline", async ({
+    page,
+  }) => {
+    const form = await invoiceCard(page);
+    const all = form.getByRole("button");
+    await expect(all).toHaveCount(2);
+    await expect(all.nth(0)).toHaveAccessibleName("Upload for Document");
+    await expect(all.nth(1)).toHaveAccessibleName("Start run");
+    await expect(all.nth(1)).toHaveText("Start");
+    await expect(all.nth(1)).toHaveClass(/\bbtn-filled\b/u);
+    await expect(form.getByRole("button", { name: /Take photo/u })).toHaveCount(
+      0,
+    );
+    const upload = all.nth(0);
+    await expect(upload).not.toHaveAttribute("aria-expanded", /.*/u);
+    const [chooser] = await Promise.all([
+      page.waitForEvent("filechooser"),
+      upload.click(),
+    ]);
+    await chooser.setFiles(invoicePdf);
+    await expect(
+      form.getByRole("button", { name: "Remove invoice.pdf" }),
+    ).toBeVisible();
+    await expectNoAxeViolations(page);
+    // A flow's page: Start run stays the accent outline (the fill there is
+    // the owner's open question).
+    await page.goto(FLOWS.manual);
+    const start = runForm(page).getByRole("button", { name: "Start run" });
+    await expect(start).toHaveClass(/\bbtn-primary\b/u);
+    await expect(start).not.toHaveClass(/\bbtn-filled\b/u);
+  });
+
+  test("a required file missing: Start says 'Add {title} first.' and sends nothing; the file given, the line goes and its pill shows; its x takes it out (a new key) and Start refuses again; the same file again starts ONE run", async ({
+    page,
+  }) => {
+    await fixtureControl("items-flow");
+    await fixtureControl("run-file-required");
+    await page.goto("/account");
+    const card = page.getByTestId(HOME_ITEMS);
+    // Its items are read in the browser: the page answers.
+    await expect(card.getByRole("combobox", { name: "Batch" })).toHaveText(
+      "Autumn intake",
+    );
+    const form = card.getByTestId("run-form");
+    const start = form.getByRole("button", { name: "Start run" });
+    await start.click();
+    await expect(form.getByRole("alert")).toHaveText("Add Entry file first.");
+    await expect(start).toBeEnabled();
+    expect(await itemStarts()).toHaveLength(0);
+    await form.getByLabel("Entry file").setInputFiles(entryPdf);
+    await expect(form.getByRole("alert")).toHaveCount(0);
+    const x = form.getByRole("button", { name: "Remove entry.pdf" });
+    await expect(x).toBeVisible();
+    await expect(form.getByTestId("run-file-entryFile-pills")).toHaveText(
+      "entry.pdf",
+    );
+    const before = await keyOf(form);
+    await x.click();
+    await expect(x).toHaveCount(0);
+    await expect(form.locator('input[name="input:entryFile"]')).toHaveCount(0);
+    expect(await keyOf(form)).not.toBe(before);
+    await start.click();
+    await expect(form.getByRole("alert")).toHaveText("Add Entry file first.");
+    expect(await itemStarts()).toHaveLength(0);
+    await form.getByLabel("Entry file").setInputFiles(entryPdf);
+    await expect(
+      form.getByRole("button", { name: "Remove entry.pdf" }),
+    ).toBeVisible();
+    await start.click();
+    await expect(page).toHaveURL(/\/account\/runs\/[0-9a-f-]{36}\?from=item$/u);
+    expect(await itemStarts()).toHaveLength(1);
+  });
+
+  test("a flow's page: the same error, pills and x; several files a pill each in order, one taken out keeps the rest in order, and ONE run gets the rest", async ({
+    page,
+  }) => {
+    await fixtureControl("run-file-required");
+    await fixtureControl("manual-several");
+    const form = await openFilledRun(page);
+    // Its own layout: the title over Take photo (a phone) and Upload.
+    await expect(
+      form.locator("label:not(.sr-only)", { hasText: "Invoice file" }),
+    ).toBeVisible();
+    await form.getByRole("button", { name: "Start run" }).click();
+    await expect(form.getByRole("alert")).toHaveText("Add Invoice file first.");
+    expect(await runStarts()).toEqual([]);
+    await form
+      .getByLabel("Invoice file")
+      .setInputFiles([pdf("a.pdf"), pdf("b.pdf"), pdf("c.pdf")]);
+    const pills = form.getByTestId("run-file-artifactId-pills");
+    await expect(pills.locator("li")).toHaveText(["a.pdf", "b.pdf", "c.pdf"]);
+    await expect(form.getByRole("alert")).toHaveCount(0);
+    const before = await keyOf(form);
+    await form.getByRole("button", { name: "Remove b.pdf" }).click();
+    await expect(pills.locator("li")).toHaveText(["a.pdf", "c.pdf"]);
+    await expect(form.locator('input[name="input:artifactId"]')).toHaveCount(2);
+    const key = await keyOf(form);
+    expect(key).not.toBe(before);
+    await form.getByRole("button", { name: "Start run" }).click();
+    await expect(page).toHaveURL(
+      /\/account\/runs\/fixture-run-started\?from=flow$/u,
+    );
+    const starts = await runStarts();
+    expect(starts.map(({ key: sent, status }) => [sent, status])).toEqual([
+      [key, 201],
+    ]);
+    expect(starts[0]!.input.artifactId as string[]).toHaveLength(2);
+    // Nothing is deleted: b.pdf stays stored, given to no run.
+    expect(
+      (await fixtureFiles()).map(({ filename, runId }) => [
+        filename,
+        runId ?? null,
+      ]),
+    ).toEqual([
+      ["a.pdf", "fixture-run-started"],
+      ["b.pdf", null],
+      ["c.pdf", "fixture-run-started"],
+    ]);
+  });
+
+  test("a 320-px window: the pills' row scrolls sideways inside the form, a long name is cut, each x keeps its 44 target", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 700 });
+    await fixtureControl("manual-several");
+    const form = await openFilledRun(page);
+    const long = (n: number) =>
+      pdf(`quarterly-supplier-invoice-statement-${n}-with-a-long-name.pdf`);
+    await form
+      .getByLabel("Invoice file")
+      .setInputFiles([long(1), long(2), long(3)]);
+    const pills = form.getByTestId("run-file-artifactId-pills");
+    await expect(pills.locator("li")).toHaveCount(3);
+    expect(
+      await pills.evaluate((row) => row.scrollWidth > row.clientWidth),
+    ).toBe(true);
+    const row = (await pills.boundingBox())!;
+    const formBox = (await form.boundingBox())!;
+    expect(row.x + row.width).toBeLessThanOrEqual(
+      formBox.x + formBox.width + 1,
+    );
+    const first = pills.locator("li").first();
+    expect((await first.boundingBox())!.width).toBeLessThanOrEqual(
+      row.width + 1,
+    );
+    expect(
+      await first
+        .locator("span")
+        .evaluate((name) => name.scrollWidth > name.clientWidth),
+    ).toBe(true);
+    for (const x of await pills.getByRole("button").all()) {
+      const box = (await x.boundingBox())!;
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+    }
+    await expectNoAxeViolations(page);
+  });
+
+  test.describe("on a phone or a tablet", () => {
+    test.use({ hasTouch: true });
+
+    test("Home's Upload opens a menu — Take photo then Choose file; Escape closes it, focus back on Upload; a press outside closes it; Choose file opens the picker, Take photo the camera", async ({
+      page,
+    }) => {
+      const form = await invoiceCard(page);
+      await expect(form.getByRole("button")).toHaveCount(2);
+      const upload = form.getByRole("button", { name: "Upload for Document" });
+      await expect(upload).toHaveAttribute("aria-expanded", "false");
+      const menu = form.getByTestId("run-file-invoiceFile-menu");
+      await expect(menu).toHaveCount(0);
+      await upload.click();
+      await expect(upload).toHaveAttribute("aria-expanded", "true");
+      await expect(menu.getByRole("button")).toHaveText([
+        "Take photo for Document",
+        "Choose file for Document",
+      ]);
+      await expect(upload).toHaveAttribute(
+        "aria-controls",
+        (await menu.getAttribute("id"))!,
+      );
+      await expectNoAxeViolations(page);
+      await page.keyboard.press("Escape");
+      await expect(menu).toHaveCount(0);
+      await expect(upload).toBeFocused();
+      await upload.click();
+      await expect(menu).toBeVisible();
+      await page.getByTestId("home-your-flows").getByRole("searchbox").click();
+      await expect(menu).toHaveCount(0);
+      await upload.click();
+      const [chooser] = await Promise.all([
+        page.waitForEvent("filechooser"),
+        menu.getByRole("button", { name: "Choose file for Document" }).click(),
+      ]);
+      expect(await chooser.element().getAttribute("capture")).toBeNull();
+      await chooser.setFiles(invoicePdf);
+      await expect(menu).toHaveCount(0);
+      await expect(
+        form.getByRole("button", { name: "Remove invoice.pdf" }),
+      ).toBeVisible();
+      await upload.click();
+      const [camera] = await Promise.all([
+        page.waitForEvent("filechooser"),
+        menu.getByRole("button", { name: "Take photo for Document" }).click(),
+      ]);
+      expect(await camera.element().getAttribute("capture")).toBe(
+        "environment",
+      );
+      // Closed without a photo: the file held stays.
+      await camera.setFiles([]);
+      await expect(menu).toHaveCount(0);
+      await expect(
+        form.getByRole("button", { name: "Remove invoice.pdf" }),
+      ).toBeVisible();
+    });
   });
 });

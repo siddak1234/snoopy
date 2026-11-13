@@ -66,6 +66,14 @@ const SEARCH_FLOWS = fill(BLOCK_WORDS.searchItems, { items: "flows" });
  * - any other flow (a member's flow with items, one not answering): Open,
  *   to the flow's page.
  *
+ * Since build 43, item 17 (the owner's words of 2026-11-13: "for the compact
+ * card i want two buttons … upload start"), a run input of one file field
+ * has exactly Upload and Start in row 2: Upload offers Take photo or Choose
+ * file where the field can take a photo, Start is the filled primary, each
+ * file given is a pill with an x, and Start with a required file missing
+ * says "Add {title} first." (`RunStart`, `RunFileField`; nothing changes
+ * here). ~~Take photo, Upload and Start on one row~~ until build 43.
+ *
  * ~~The job drop-down a row of its own under its title~~ until build 42.
  *
  * ~~One card of divided rows, each opening in place with a caret; a flow's
