@@ -12,6 +12,7 @@ import {
   tooManyFiles,
   withoutFile,
 } from "../lib/several-files.ts";
+import { SPACING } from "../lib/spacing.ts";
 import {
   elements,
   loadModules,
@@ -344,6 +345,25 @@ test("17 T7 (D1, D2): Home's card on a phone — exactly Upload then Start; Uplo
   assert.equal(openUpload.attrs["aria-controls"], menu.attrs.id);
   const rows = elements(menu).filter((node) => node.tag === "button");
   assert.deepEqual(rows.map(visibleOf), ["Take photo", "Choose file"]);
+  // D2: each row's icon, Camera then FileArrowUp, as phosphor draws them.
+  const icon = (row) =>
+    elements(row)
+      .filter((node) => node.tag === "path")
+      .map((node) => node.attrs.d);
+  const drawn = (Icon) =>
+    elements(
+      parse(
+        server.renderToStaticMarkup(
+          react.createElement(Icon, { size: 20, "aria-hidden": true }),
+        ),
+      ),
+    )
+      .filter((node) => node.tag === "path")
+      .map((node) => node.attrs.d);
+  const { CameraIcon } = await import("@phosphor-icons/react/dist/ssr/Camera");
+  const { FileArrowUpIcon } =
+    await import("@phosphor-icons/react/dist/ssr/FileArrowUp");
+  assert.deepEqual(rows.map(icon), [drawn(CameraIcon), drawn(FileArrowUpIcon)]);
   // Named by their words alone, as the app's menu rows are (the parity
   // check, 2026-11-13): no hidden " for {title}" on a row.
   assert.deepEqual(rows.map(textOf), ["Take photo", "Choose file"]);
@@ -375,6 +395,75 @@ test("17 T7/T9 (D2): off a phone Upload opens the picker at once, no menu; a flo
   assert.ok(visibleWords(page).includes("Resume"));
 });
 
+test("17 T7 (D2): on a phone, Home's field that takes no photo (PDF only) — Upload opens the picker at once, no menu, no camera; the row exactly Upload then Start", async () => {
+  const RunStart = await runStart({ field: PHONE });
+  const markup = draw(
+    RunStart,
+    props({
+      compact: true,
+      runInput: [{ ...RESUME, acceptedContentTypes: ["application/pdf"] }],
+    }),
+  );
+  const row = nodes(markup).find((node) =>
+    (node.children ?? []).some((child) => child.attrs?.type === "submit"),
+  );
+  const rowButtons = elements(row).filter((node) => node.tag === "button");
+  assert.deepEqual(rowButtons.map(visibleOf), ["Upload", "Start"]);
+  assert.equal(rowButtons[0].attrs["aria-expanded"], undefined);
+  assert.ok(
+    !nodes(markup).some((node) => node.attrs.capture === "environment"),
+  );
+});
+
+test("17 (D5): on Home's card the lines sit under the buttons' row, not in it — Uploading {name}…, the pills, the field's error, then the form's error", async () => {
+  const RunStart = await runStart({
+    field: (source) =>
+      HOLDING({
+        kind: "ready",
+        artifactId: "a",
+        name: "cv.pdf",
+        sizeBytes: 2048,
+      })(source).replace(
+        "const [error, setError] = useState<string | null>(null);",
+        'const [error, setError] = useState<string | null>("Field error.");',
+      ),
+    start: (source) =>
+      source.replace(
+        "const [missing, setMissing] = useState<string | null>(null);",
+        'const [missing, setMissing] = useState<string | null>("Form error.");',
+      ),
+  });
+  const markup = draw(RunStart, props({ compact: true }));
+  const all = nodes(markup);
+  const row = all.find((node) =>
+    (node.children ?? []).some((child) => child.attrs?.type === "submit"),
+  );
+  const [pills] = byTestId(markup, "run-file-resume-pills");
+  assert.ok(pills, "the pills drawn");
+  assert.ok(!elements(row).includes(pills), "the pills are not in the row");
+  // The row's siblings after it, in order.
+  const field = all.find((node) => (node.children ?? []).includes(row));
+  const after = field.children
+    .slice(field.children.indexOf(row) + 1)
+    .filter((node) => node.tag);
+  assert.deepEqual(
+    after.map((node) => [
+      node.tag,
+      node.attrs["aria-live"] ?? node.attrs.role ?? node.attrs["data-testid"],
+    ]),
+    [
+      ["p", "polite"],
+      ["ul", "run-file-resume-pills"],
+      ["p", "alert"],
+    ],
+  );
+  assert.equal(textOf(after[2]), "Field error.");
+  // The form's error line comes after the whole field.
+  const alerts = all.filter((node) => node.attrs.role === "alert");
+  assert.deepEqual(alerts.map(textOf), ["Field error.", "Form error."]);
+  assert.ok(!elements(field).includes(alerts[1]));
+});
+
 test("17 T5/T10 (D5): a start form's file is a pill — its name cut at its end, an x named Remove {name} with a 44 target — and the hidden id follows; no Ready line", async () => {
   const RunStart = await runStart({
     field: HOLDING({
@@ -392,14 +481,17 @@ test("17 T5/T10 (D5): a start form's file is a pill — its name cut at its end,
     const [pills] = byTestId(markup, "run-file-resume-pills");
     assert.ok(pills, "the pills' row");
     assert.equal(pills.tag, "ul");
-    for (const name of ["flex", "overflow-x-auto"])
+    // D5: the space between pills is the spacing table's inner gap.
+    for (const name of ["flex", "overflow-x-auto", SPACING.inner.gap])
       assert.ok(classes(pills).includes(name), name);
     assert.ok(!classes(pills).includes("flex-wrap"), "one row, never wrapped");
     const items = elements(pills).filter((node) => node.tag === "li");
     assert.equal(items.length, 1);
     const [pill] = items;
+    // D5: a 1-px outline (`border`) in the ring's colour.
     for (const name of [
       "rounded-full",
+      "border",
       "border-[var(--ring)]",
       "min-h-11",
       "max-w-full",
@@ -408,17 +500,23 @@ test("17 T5/T10 (D5): a start form's file is a pill — its name cut at its end,
       assert.ok(classes(pill).includes(name), name);
     const label = elements(pill).find((node) => node.tag === "span");
     assert.equal(textOf(label), "cv.pdf");
-    for (const name of ["truncate", "min-w-0", "text-sm"])
+    // D5: the name in the text colour.
+    for (const name of ["truncate", "min-w-0", "text-sm", "text-[var(--text)]"])
       assert.ok(classes(label).includes(name), name);
     const x = elements(pill).find((node) => node.tag === "button");
     assert.equal(x.attrs.type, "button");
     assert.equal(x.attrs["aria-label"], "Remove cv.pdf");
+    // D5: the x's icon at 20 in the text colour.
     for (const name of [
       "min-h-11",
       "min-w-11",
+      "text-[var(--text)]",
       "hover:bg-[var(--surface-hover)]",
     ])
       assert.ok(classes(x).includes(name), name);
+    const [svg] = elements(x).filter((node) => node.tag === "svg");
+    assert.equal(svg.attrs.width, "20");
+    assert.equal(svg.attrs.height, "20");
     assert.ok(!/Ready:/u.test(markup), "no Ready line in a start form");
     assert.deepEqual(
       nodes(markup)

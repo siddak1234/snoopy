@@ -258,6 +258,10 @@ function initialState() {
     // item flow's, Invoice Processing's) is required, so a start form with none says "Add {title}
     // first." and sends nothing.
     runFileRequired: false,
+    // Build 43, item 17 (the parity check, finding 8f): Invoice Processing's
+    // one file field takes several, so Home's card shows its Upload menu on a
+    // field of several.
+    invoiceSeveral: false,
     manualRunStarts: [] as { key: string; input: Json; status: number }[],
     // The batch addendum's P3: how many of the next run starts or item
     // makes are refused because the flow's queue is full (`queue_full`).
@@ -1166,6 +1170,7 @@ function invoiceV4Subscription(): Automations["Subscription"] {
         description: "A PDF or photo of bills or receipts.",
         control: "artifact",
         required: state.runFileRequired,
+        ...(state.invoiceSeveral ? { multiple: true } : {}),
       },
     ],
     projectId: accountingTeamId,
@@ -2918,6 +2923,10 @@ const server = createServer(
       // Build 43, item 17: every run-input file field required.
       "/__fixture/run-file-required": () => {
         state.runFileRequired = true;
+      },
+      // Build 43, item 17: Invoice Processing's file field takes several.
+      "/__fixture/invoice-several": () => {
+        state.invoiceSeveral = true;
       },
       "/__fixture/run-queue-full-once": () => {
         state.queueFull = 1;

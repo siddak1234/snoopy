@@ -1210,6 +1210,8 @@ test.describe("a file for a run (backend FR-14)", () => {
     page,
   }) => {
     // `artifact_unavailable`: a file already given to a run, or gone.
+    // The file required (build 43, item 17), so a press with none is refused.
+    await fixtureControl("run-file-required");
     const dialog = await openFilledRun(page);
     await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
     await expect(
@@ -1224,12 +1226,19 @@ test.describe("a file for a run (backend FR-14)", () => {
       0,
     );
     await expect(dialog.getByLabel("Invoice file")).toHaveValue("");
+    // D4: the missing file's line takes the refusal's place, and the refusal
+    // does not come back once a file is given.
+    await dialog.getByRole("button", { name: "Start run" }).click();
+    await expect(dialog.getByRole("alert")).toHaveText(
+      "Add Invoice file first.",
+    );
     // What was typed stays; the file chosen again starts the run with it.
     await expect(dialog.getByLabel("Vendor")).toHaveValue("Acme Supplies");
     await dialog.getByLabel("Invoice file").setInputFiles(invoicePdf);
     await expect(
       dialog.getByRole("button", { name: "Remove invoice.pdf" }),
     ).toBeVisible();
+    await expect(dialog.getByRole("alert")).toHaveCount(0);
     // Agreed once already: not asked again.
     await dialog.getByRole("button", { name: "Start run" }).click();
     await expect(page).toHaveURL(
@@ -6523,13 +6532,23 @@ test.describe("build 43, item 17 — the quick-access card's Upload and filled S
         (await menu.getAttribute("id"))!,
       );
       await expectNoAxeViolations(page);
+      // D2: Escape, or a press outside, closes the menu with nothing done —
+      // no picker and no camera opened.
+      let opened = 0;
+      const onChooser = () => {
+        opened += 1;
+      };
+      page.on("filechooser", onChooser);
       await page.keyboard.press("Escape");
       await expect(menu).toHaveCount(0);
       await expect(upload).toBeFocused();
+      expect(opened).toBe(0);
       await upload.click();
       await expect(menu).toBeVisible();
       await page.getByTestId("home-your-flows").getByRole("searchbox").click();
       await expect(menu).toHaveCount(0);
+      expect(opened).toBe(0);
+      page.off("filechooser", onChooser);
       await upload.click();
       const [chooser] = await Promise.all([
         page.waitForEvent("filechooser"),
@@ -6556,5 +6575,55 @@ test.describe("build 43, item 17 — the quick-access card's Upload and filled S
         form.getByRole("button", { name: "Remove invoice.pdf" }),
       ).toBeVisible();
     });
+
+    test("Home's Upload menu on a field of several: Choose file replaces the files held, Take photo adds one more (D2)", async ({
+      page,
+    }) => {
+      await fixtureControl("invoice-several");
+      const form = await invoiceCard(page);
+      const upload = form.getByRole("button", { name: "Upload for Document" });
+      const menu = form.getByTestId("run-file-invoiceFile-menu");
+      const pills = form
+        .getByTestId("run-file-invoiceFile-pills")
+        .locator("li");
+      const fromMenu = async (row: "Take photo" | "Choose file") => {
+        await upload.click();
+        const [chooser] = await Promise.all([
+          page.waitForEvent("filechooser"),
+          menu.getByRole("button", { name: row, exact: true }).click(),
+        ]);
+        return chooser;
+      };
+      await (
+        await fromMenu("Choose file")
+      ).setFiles([pdf("a.pdf"), pdf("b.pdf")]);
+      await expect(pills).toHaveText(["a.pdf", "b.pdf"]);
+      await (
+        await fromMenu("Take photo")
+      ).setFiles({
+        name: "image.jpg",
+        mimeType: "image/jpeg",
+        buffer: await sidewaysPhoto(page),
+      });
+      await expect(pills).toHaveText(["a.pdf", "b.pdf", "image.jpg"]);
+      await (await fromMenu("Choose file")).setFiles([pdf("c.pdf")]);
+      await expect(pills).toHaveText(["c.pdf"]);
+    });
+  });
+
+  test("Turn on is not a start: a paused flow whose required file is empty turns on, and no 'Add {title} first.' is said (D4)", async ({
+    page,
+  }) => {
+    await fixtureControl("run-file-required");
+    await page.goto(FLOWS.manual);
+    const status = page.getByText(/^(live|paused)$/iu);
+    await page.getByRole("button", { name: "Pause" }).click();
+    await expect(status).toHaveText(/^paused$/iu);
+    const form = runForm(page);
+    await expect(form.getByLabel("Invoice file")).toHaveValue("");
+    await form.getByRole("button", { name: "Turn on" }).click();
+    await expect(status).toHaveText(/^live$/iu);
+    await expect(form.getByRole("button", { name: "Start run" })).toBeVisible();
+    await expect(form.getByRole("alert")).toHaveCount(0);
   });
 });
