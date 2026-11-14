@@ -22,11 +22,7 @@ import {
   offeredDecisions,
   reviewGroups,
 } from "../lib/run-progress.ts";
-import {
-  DEFAULT_MAX_FILES,
-  filesSelected,
-  tooManyFiles,
-} from "../lib/several-files.ts";
+import { DEFAULT_MAX_FILES, tooManyFiles } from "../lib/several-files.ts";
 import { TEAM_TYPES } from "../lib/team-types.ts";
 import {
   loadModules,
@@ -238,8 +234,9 @@ test("B1: the closed trigger says labels, never values", async () => {
   );
 });
 
-test('B2 (batch addendum): "{n} files selected"; "Add up to {max} files at a time."; the platform\'s default of 50', () => {
-  assert.equal(filesSelected(3), "3 files selected");
+// ~~"{n} files selected" (`filesSelected`)~~ until build 43, item 17: each
+// file a pill (test/build43-item17.test.mjs).
+test('B2 (batch addendum): "Add up to {max} files at a time."; the platform\'s default of 50', () => {
   assert.equal(tooManyFiles(3), "Add up to 3 files at a time.");
   assert.equal(DEFAULT_MAX_FILES, 50);
 });

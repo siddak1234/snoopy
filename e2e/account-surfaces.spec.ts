@@ -104,6 +104,11 @@ test("1 — Home's YOUR FLOWS (builds 37 and 39, item 8): the department drop-do
   await expect(form.getByRole("button", { name: "Start run" })).toHaveText(
     "Start",
   );
+  // Build 43, item 17: Home's Start is the filled primary; its file field,
+  // optional here, starts with no file.
+  await expect(form.getByRole("button", { name: "Start run" })).toHaveClass(
+    /\bbtn-filled\b/u,
+  );
   await expectNoAxeViolations(page);
   await form.getByLabel("Vendor").fill("Acme Supplies");
   await form.getByLabel("Amount").fill("120.50");

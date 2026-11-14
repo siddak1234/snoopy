@@ -437,7 +437,10 @@ test("an item's page: its runs ranked as the platform answers in compact rows th
   );
   await expect(add.getByText("PDF or Word file")).toBeVisible();
   await add.getByLabel("Entry file").setInputFiles(entryPdf);
-  await expect(add.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
+  // A start form's file is a pill (build 43, item 17; ~~its "Ready:" line~~).
+  await expect(
+    add.getByRole("button", { name: "Remove entry.pdf" }),
+  ).toBeVisible();
   await add.getByRole("button", { name: "Start" }).click();
   // The owner's G4: the new run's page opens, from the item, and its back
   // returns to it.
@@ -972,7 +975,10 @@ test("Start refused for a member says only an owner or admin can", async ({
   await page.goto(ITEM);
   const add = page.getByTestId("item-add");
   await add.getByLabel("Entry file").setInputFiles(entryPdf);
-  await expect(add.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
+  // A start form's file is a pill (build 43, item 17; ~~its "Ready:" line~~).
+  await expect(
+    add.getByRole("button", { name: "Remove entry.pdf" }),
+  ).toBeVisible();
   await presentSession(page, "member");
   await add.getByRole("button", { name: "Start" }).click();
   await expect(add.getByText(OWNERS_AND_ADMINS)).toBeVisible();
@@ -1052,7 +1058,7 @@ test("builds 37 and 39, items 5 and 8 — Home's YOUR FLOWS: a flow with items i
   ).toHaveCount(1);
   const start = form.getByRole("button", { name: "Start run" });
   await expect(start).toHaveText("Start");
-  await expect(form.getByText(/^Ready:/u)).toHaveCount(0);
+  await expect(form.getByRole("button", { name: /^Remove / })).toHaveCount(0);
   // The store's answer held, so the upload is seen: Start waits for it.
   let release = () => {};
   const held = new Promise<void>((done) => {
@@ -1066,8 +1072,12 @@ test("builds 37 and 39, items 5 and 8 — Home's YOUR FLOWS: a flow with items i
   const busy = form.getByRole("button", { name: "Uploading…" });
   await expect(busy).toBeDisabled();
   release();
+  // Its pill (build 43, item 17; ~~"Ready: entry.pdf ({size})"~~).
+  await expect(form.getByTestId("run-file-entryFile-pills")).toHaveText(
+    "entry.pdf",
+  );
   await expect(
-    form.getByText(/^Ready: entry\.pdf \(\d+ (?:bytes|KB|MB)\)$/u),
+    form.getByRole("button", { name: "Remove entry.pdf" }),
   ).toBeVisible();
   await expect(start).toBeEnabled();
   await expectNoAxeViolations(page);

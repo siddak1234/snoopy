@@ -14,7 +14,8 @@ import {
  * with jobs its job pill at the right; row 2 Take photo, Upload and Start on
  * one row, no visible field title for a run input of one file field, the
  * uploading or ready line under the row only once a file is picked. Every
- * other place the start form is drawn stays as it was.
+ * other place the start form is drawn stays as it was. Build 43, item 17
+ * changed (b) and (e): Take photo inside Upload's menu, and a file a pill.
  */
 
 const RUN_START = "app/account/flows/RunStart.tsx";
@@ -113,7 +114,10 @@ test("build 42, item 16 (a): Home's card, one file field — no visible field ti
   assert.ok(visibleWords(page).includes("Resume"));
 });
 
-test("build 42, item 16 (b): Take photo, Upload and Start share one row; Upload alone off a phone; two fields keep Start on its own", async () => {
+// ~~Take photo, Upload and Start on a phone's row~~ until build 43, item 17:
+// Upload and Start alone, Take photo inside Upload's menu
+// (test/build43-item17.test.mjs).
+test("build 42, item 16 (b): Upload and Start share one row (a phone: Take photo inside Upload's menu since build 43); two fields keep Start on its own", async () => {
   const rowOf = (markup) => {
     const row = nodes(markup).find((node) =>
       (node.children ?? []).some(
@@ -125,11 +129,15 @@ test("build 42, item 16 (b): Take photo, Upload and Start share one row; Upload 
       .map((button) => visibleWords(markupOf(button)).join(" "));
   };
   const phone = await runStart({ field: PHONE });
-  assert.deepEqual(rowOf(draw(phone, props({ compact: true }))), [
-    "Take photo",
-    "Upload",
-    "Start",
-  ]);
+  const phoneRow = nodes(draw(phone, props({ compact: true }))).find((node) =>
+    (node.children ?? []).some((child) => child.attrs?.type === "submit"),
+  );
+  assert.deepEqual(
+    elements(phoneRow)
+      .filter((node) => node.tag === "button")
+      .map((button) => visibleWords(markupOf(button)).join(" ")),
+    ["Upload", "Start"],
+  );
   const computer = await runStart();
   const markup = draw(computer, props({ compact: true }));
   assert.deepEqual(rowOf(markup), ["Upload", "Start"]);
@@ -197,7 +205,9 @@ test('build 42, item 16 (d): Home\'s Start says "Start", named "Start run" while
   assert.equal(held.attrs["aria-label"], undefined);
 });
 
-test("build 42, item 16 (e): before a pick the status line is there, empty, with no margin; once a file is ready it says so, under the row, with its margin", async () => {
+// ~~Once a file is ready the line says "Ready: cv.pdf (2 KB)"~~ until build
+// 43, item 17: in a start form the file is a pill, the line empty.
+test("build 42, item 16 (e): before a pick the status line is there, empty, with no margin; once a file is ready it is a pill, the line still empty", async () => {
   const status = (markup) =>
     nodes(markup).find((node) => node.attrs["aria-live"] === "polite");
   const RunStart = await runStart();
@@ -213,9 +223,11 @@ test("build 42, item 16 (e): before a pick the status line is there, empty, with
         '>({ kind: "ready", artifactId: "a", name: "cv.pdf", sizeBytes: 2048 });',
       ),
   });
-  const line = status(draw(ready, props({ compact: true })));
-  assert.equal(textOf(line), "Ready: cv.pdf (2 KB)");
-  assert.ok(classes(line).includes("mt-2"));
+  const markup = draw(ready, props({ compact: true }));
+  const line = status(markup);
+  assert.equal(textOf(line), "");
+  assert.ok(!classes(line).includes("mt-2"));
+  assert.equal(byTestId(markup, "run-file-resume-pills").length, 1);
 });
 
 /** Home's YOUR FLOWS with one flow with jobs, its list read as `list` says. */

@@ -96,6 +96,28 @@ page reuses:
   and its Set up keep "Department: {kind}" under their title (`place.ts`).
   ~~The website draws no flow icon~~ until then: a flow's icon is the
   catalog's, a department still has none.
+- **The quick-access card** (the owner's build 43, item 17, 2026-11-13;
+  `RunStart` `compact`, `RunFileField`): A quick-access card (Home's YOUR
+  FLOWS today, and any card added later that starts a run in place) is two
+  rows: the flow's icon and name (a job pill on their right where the flow
+  has jobs), then its actions. A run input of one file field has exactly two
+  buttons, Upload and Start. Upload offers Take photo or Choose file where
+  the field can take a photo, else it opens the file picker. Start is the
+  filled primary, the one filled button (the owner's decision of
+  2026-11-13). Start with a required file missing says "Add {title} first."
+  in the card and sends nothing. Each file given is a pill, its name and an
+  x that takes it out of the run ("Remove {name}"), several in one row that
+  scrolls sideways; while a file uploads Start waits and no pill shows.
+- **A start form's files** (build 43, item 17; `RunFileField` `removable`,
+  `missingFile` in `lib/several-files.ts`): every start form (Home's card, a
+  flow's page, an item's page) draws the files a field holds, one or
+  several, as pills under its buttons, in one row that scrolls sideways:
+  the name, cut with an ellipsis, and an x ("Remove {name}") that takes
+  that file alone out of the run (a new run key; nothing deleted on the
+  server, the stored copy kept until retention). A press of Start with a
+  required file field holding none says "Add {title} first." and sends
+  nothing; an optional one starts as before. The filled Start and the
+  two-button row are the quick-access card's alone.
 - **A choice is a drop-down**: a flow's `select` field, a setup `select`
   (`app/account/flows/SelectField.tsx`) and a list's filter are the website's
   drop-down (`components/ui/Dropdown.tsx`) — a pill for a filter, a field's
@@ -138,15 +160,19 @@ page reuses:
   and the pages its links open are the platform's.
 - **Several files at once** (platform round 2's B2 as the batch addendum
   amends it): a run's file field that declares `multiple` (`RunFileField`)
-  lets the chooser take several files and the camera add each photo, sends
-  each as one file alone is sent, and says "{n} files selected"; Start run
+  lets the chooser take several files and the camera add each photo, and
+  sends each as one file alone is sent (~~then says "{n} files selected"~~
+  until build 43, item 17); Start run
   then starts ONE run, its input that field's list of upload ids under the
   one key (`declaredValues` in `app/account/flows/actions.ts`), and opens
   it. More than the field's `maxFiles` (absent, the platform's 50) says
   "Add up to {max} files at a time." and sends nothing: a choice past it
-  empties the field, a photo past it keeps the files held. Holding one
-  file, a field of several says its "Ready:" line (the session's default;
-  the spec names only the count line). A field of one file is unchanged.
+  empties the field, a photo past it keeps the files held. Since build 43,
+  item 17, the start forms draw the files held as pills with an x (see "A
+  start form's files" in "Screen standards"). ~~Holding one
+  file, a field of several says its "Ready:" line; a field of one its
+  "Ready: {name} ({size})"~~ until build 43 in the start forms; the job
+  upload card (`UploadItemCard`) keeps its "Ready:" line.
 - **A full queue**: a run start, or an item made (which starts its run),
   refused 429 with `details.reason` `queue_full` says "Your queue is full.
   Wait for these to finish." and keeps the form, files and key; the older
@@ -171,12 +197,20 @@ page reuses:
   looks like big squares for a quick access"): row 1 the icon and name (the
   head, `flow-card-head`); row 2 the run's start, compact (`RunStart`
   `compact`, Home only: the form's gap `SPACING.inner.gap`, its button
-  "Start", named "Start run" while idle). A run input of exactly one file
-  field is Take photo (a phone or tablet), Upload and Start on one row that
-  wraps, the field's title for screen readers only (`RunFileField`
-  `compact`: its `<label>` `sr-only`, Start its `trailing`), its uploading
-  or ready line under the row only once a file is picked; any other run
-  input keeps its fields and their titles, then Start. A flow without items:
+  "Start", named "Start run" while idle, the filled primary, `Button`
+  `filled`, the owner's decision of 2026-11-13: the quick-access card's
+  Start is filled; every other primary stays an accent outline, never a
+  fill). A run input of exactly one file field is row 2's two buttons,
+  Upload then Start (build 43, item 17), the field's title for screen
+  readers only (`RunFileField` `compact`: its `<label>` `sr-only`, Start its
+  `trailing`); on a phone or tablet whose field takes a photo Upload opens a
+  small menu under it, Take photo then Choose file, closed by a row, a
+  press outside or Escape; under the row its uploading line, then its pills,
+  then the errors (see "The quick-access card" and "A start form's files"
+  in "Screen standards").
+  ~~Take photo (a phone or tablet), Upload and Start on one row that wraps;
+  its uploading or ready line~~ until build 43. Any other run input keeps
+  its fields and their titles, then Start, filled. A flow without items:
   that start. A flow with items, for an owner or admin: its items read as
   Home opens — each flow's alone, "Loading…" or "Unavailable" in the card —
   the job drop-down, a pill at the right of row 1 (`aside`, named by the
