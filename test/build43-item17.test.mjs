@@ -596,7 +596,13 @@ test("build 43 follow-up 3: a start form's field says its sentence in a polite l
   }
   const source = read(FILE_FIELD);
   const remove = /const remove = [\s\S]*?\n {2}\};/u.exec(source)?.[0] ?? "";
-  assert.match(remove, /setSpoken\(removedLine\(files\[at\]!\.name\)\)/u);
+  // Emptied first and set a frame later, so the same sentence twice is heard
+  // twice (the fixture suite's "two files of one name").
+  assert.match(remove, /sayAnew\(removedLine\(files\[at\]!\.name\)\)/u);
+  assert.match(
+    source,
+    /const sayAnew = [\s\S]*?hush\(\);[\s\S]*?requestAnimationFrame\(\(\) => \{[\s\S]*?setSpoken\(line\);/u,
+  );
   assert.match(source, /setSpoken\(uploadedLine\(sent\.name\)\)/u);
   assert.match(
     source,

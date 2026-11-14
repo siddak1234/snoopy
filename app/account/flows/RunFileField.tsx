@@ -101,22 +101,8 @@ const unknownOnServer = () => false;
  * flow's accepted types, and the uploading line and the error take their
  * margin only once they say something, so nothing stands empty under the
  * row before a pick. ~~The visible title over the buttons, and the line's
- * margin always~~ until build 42, on Home's card. Since build 43, item 17
- * (the owner's words of 2026-11-13: "for the compact card i want two
- * buttons … upload start"), the card's row is Upload then Start alone, and
- * since build 43's item 3 ("When upload is clicked it gives the apple
- * selection of take photo, photos library, or upload from files native
- * apple selection. The native apple one not ours.") its Upload always opens
- * the chooser at once — the field's accepted types and no `capture` — so on
- * an iPhone or an iPad Safari shows its own menu (Photo Library, Take Photo,
- * Choose File: WebKit's `WKFileUploadPanel.mm`) and a computer its own
- * dialog; the card draws no camera input. Every choice from Safari's menu
- * arrives through the one chooser, so on a field of several it replaces
- * the files held. Start stays after Upload: nothing starts by itself (the
- * owner's "1. Keep start after upload"). ~~Take photo beside Upload on the
- * card~~ until build 43; ~~Upload's own menu there, Take photo then Choose
- * file~~ until build 43's item 3. Off the card Take photo and Upload stay
- * side by side.
+ * margin always~~ until build 42, on Home's card. The card's row and its
+ * Upload since build 43: `docs/ARCHITECTURE.md`, "The quick-access card".
  *
  * **Pills** (`removable`, every start form's field — Home's card, a flow's
  * page, an item's page — since build 43, item 17: "the document should
@@ -130,16 +116,8 @@ const unknownOnServer = () => false;
  * retention. While a file uploads no pill shows. ~~"Ready: {name} ({size})"
  * and "{n} files selected"~~ until build 43 in the start forms; the job
  * upload card (`UploadItemCard`, no `removable`) keeps its "Ready:" line.
- * The x's keyboard ring is drawn inside it (`-outline-offset-2!`: important,
- * since `app/globals.css`'s `:focus-visible` is outside every layer and so
- * beats a utility), so the pills' scrolling row never cuts it and it never
- * covers the name; once an
- * x is pressed the focus goes to the x now in its place (the next file),
- * else the one before, else Upload — never the page. A field's hidden
- * polite line tells a screen reader what the pills show: "Uploaded
- * {name}." (one file chosen) or "Uploaded {n} files." (several at once)
- * as an upload ends, and "Removed {name}." as an x takes a file out
- * (`lib/several-files.ts`); nothing visible changes.
+ * The x's focus ring, the focus after an x and the hidden spoken line:
+ * `docs/ARCHITECTURE.md`, "A start form's files".
  *
  * An upload belongs to the field that started it: its busy state is reported
  * under the field's key, it stops when the field goes (the form closed), and an
@@ -211,6 +189,27 @@ export function RunFileField({
   const [error, setError] = useState<string | null>(null);
   // Said to a screen reader only, in a start form (`removable`).
   const [spoken, setSpoken] = useState("");
+  // A sentence said after an x: the line is emptied first and the sentence
+  // set a frame later, so a second "Removed image.jpg." is a change too.
+  const sayFrame = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (sayFrame.current !== null) cancelAnimationFrame(sayFrame.current);
+    },
+    [],
+  );
+  const hush = () => {
+    if (sayFrame.current !== null) cancelAnimationFrame(sayFrame.current);
+    sayFrame.current = null;
+    setSpoken("");
+  };
+  const sayAnew = (line: string) => {
+    hush();
+    sayFrame.current = requestAnimationFrame(() => {
+      sayFrame.current = null;
+      setSpoken(line);
+    });
+  };
 
   // One file sent: the platform's signed URL, the PUT, then completed —
   // nothing (`undefined`) once the upload it belongs to was aborted.
@@ -246,7 +245,7 @@ export function RunFileField({
 
   const choose = async (chosen: File | undefined, source: RunFileSource) => {
     setError(null);
-    setSpoken("");
+    hush();
     if (!chosen) {
       setState({ kind: "empty" });
       return;
@@ -318,7 +317,7 @@ export function RunFileField({
     source: RunFileSource,
   ) => {
     setError(null);
-    setSpoken("");
+    hush();
     // A photo is added to the files held; a choice replaces them.
     const kept = source === "camera" ? files : [];
     if (chosen.length === 0) {
@@ -398,7 +397,7 @@ export function RunFileField({
       rest.length > 0 ? { kind: "several", files: rest } : { kind: "empty" },
     );
     if (input.current) input.current.value = "";
-    setSpoken(removedLine(files[at]!.name));
+    sayAnew(removedLine(files[at]!.name));
     const next = rest[at] ?? rest[at - 1];
     (next ? xRefs.current.get(next.artifactId) : uploadRef.current)?.focus();
     onFilesChange?.(field.key);

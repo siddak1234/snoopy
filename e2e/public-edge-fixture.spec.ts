@@ -6724,6 +6724,47 @@ test.describe("build 43, item 17 — the quick-access card's Upload and filled S
     await expect(several).toHaveText("Removed b.pdf.");
   });
 
+  test("follow-up 3 — two files of one name, each heard going: the line is emptied before the second Removed {name}., so it changes again", async ({
+    page,
+  }) => {
+    await fixtureControl("manual-several");
+    const flow = await openFilledRun(page);
+    const several = flow.getByTestId("run-file-artifactId-spoken");
+    // Safari names every camera photo "image.jpg"; two files of one name.
+    await flow
+      .getByLabel("Invoice file")
+      .setInputFiles([pdf("scan.pdf"), pdf("scan.pdf")]);
+    await expect(several).toHaveText("Uploaded 2 files.");
+    // Every text the live region shows, as a screen reader is told of it.
+    await several.evaluate((region) => {
+      const said: string[] = [];
+      (window as unknown as { said: string[] }).said = said;
+      new MutationObserver(() => said.push(region.textContent ?? "")).observe(
+        region,
+        { childList: true, characterData: true, subtree: true },
+      );
+    });
+    const said = () =>
+      page.evaluate(() => (window as unknown as { said: string[] }).said);
+    const x = flow.getByRole("button", { name: "Remove scan.pdf" });
+    await expect(x).toHaveCount(2);
+    await x.first().click();
+    await expect(x).toHaveCount(1);
+    await expect(several).toHaveText("Removed scan.pdf.");
+    await x.click();
+    await expect(x).toHaveCount(0);
+    await expect
+      .poll(async () =>
+        (await said()).filter((line) => line === "Removed scan.pdf."),
+      )
+      .toHaveLength(2);
+    const lines = await said();
+    const second = lines.lastIndexOf("Removed scan.pdf.");
+    expect(
+      lines.slice(lines.indexOf("Removed scan.pdf.") + 1, second),
+    ).toContain("");
+  });
+
   test("C3 — Home's filled Start in both themes: the accent fill and the page's colour, semibold; accent-400 on hover; Uploading… at 0.45; axe on the card in the light theme", async ({
     page,
   }) => {

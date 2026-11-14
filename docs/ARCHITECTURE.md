@@ -139,7 +139,9 @@ page reuses:
   field's status line says "Uploaded {name}." (one file chosen) or
   "Uploaded {n} files." (several at once) as an upload ends and "Removed
   {name}." as an x takes a file out (`uploadedLine`, `uploadedCountLine`,
-  `removedLine`). Nothing visible changes; the job upload card keeps its
+  `removedLine`), the line emptied first and the sentence set a frame
+  later, so two files of one name (Safari names every camera photo
+  "image.jpg") are each heard going. Nothing visible changes; the job upload card keeps its
   "Ready:" line.
 - **A choice is a drop-down**: a flow's `select` field, a setup `select`
   (`app/account/flows/SelectField.tsx`) and a list's filter are the website's
