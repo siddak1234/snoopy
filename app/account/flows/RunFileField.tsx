@@ -158,7 +158,8 @@ export function RunFileField({
   const uploadRef = useRef<HTMLButtonElement>(null);
   // The x of each file held, by its id: the focus goes to one after an x.
   const xRefs = useRef(new Map<string, HTMLButtonElement>());
-  // Never on Home's card: Upload's chooser offers the camera there itself.
+  // Never in the compact row (Home's card whose run takes one file field, RunStart's `inRow`):
+  // Upload's chooser offers the camera there itself.
   const offersCamera =
     useSyncExternalStore(watchPointer, onPhoneOrTablet, unknownOnServer) &&
     takesPhotos(accepted) &&
