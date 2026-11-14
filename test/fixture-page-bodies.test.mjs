@@ -137,12 +137,9 @@ const candidates = [
     verdict: "negative",
   }),
   run({ id: "r3", itemId: ITEM, status: "running" }),
-  run({
-    id: "r4",
-    itemId: ITEM,
-    status: "failed",
-    failureReason: "The file had no text.",
-  }),
+  // A cancelled job, still a muted row: the platform sends no failed one to
+  // its item (backend ADR-0046's 2026-11-14 amendment, build 43's item 5).
+  run({ id: "r4", itemId: ITEM, status: "cancelled" }),
 ];
 
 /** The committed manifests' words (invoice-processing v7, candidate-reviewer v1 and v2). */

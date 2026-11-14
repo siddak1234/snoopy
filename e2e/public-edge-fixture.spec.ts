@@ -3304,7 +3304,6 @@ test("a figure the platform cannot answer reads Unavailable — once, in Today's
   expect(
     await unavailable.evaluate((line) => line.scrollWidth - line.clientWidth),
   ).toBe(0);
-  await expect(page.getByTestId("home-quick-actions")).toBeVisible();
   await expect(page.getByTestId("home-your-flows")).toBeVisible();
   await expect(
     page.getByRole("heading", {
@@ -3337,7 +3336,7 @@ test("Cancel on a run whose workspace was switched away in another tab says so, 
   await expect(page.locator("main").getByText(/^running$/i)).toBeVisible();
 });
 
-test("the dashboard reads top to bottom — Today's three tiles, Add a flow and Flows, YOUR FLOWS — with no Recent runs, Run a flow, Quick actions, Workspace overview, Get started, View teams or Connect integration (Build 22, W1; the owner's build 21 item 1; D4, D5; build 34's F5)", async ({
+test("the dashboard reads top to bottom — Today's three tiles, then YOUR FLOWS — with no Add a flow and Flows pair (build 43, item 2: the side nav's Flows is the way in), Recent runs, Run a flow, Quick actions, Workspace overview, Get started, View teams or Connect integration (Build 22, W1; the owner's build 21 item 1; D4, D5; build 34's F5)", async ({
   page,
 }) => {
   const runStats = observe(page, (request) =>
@@ -3356,7 +3355,6 @@ test("the dashboard reads top to bottom — Today's three tiles, Add a flow and 
     (await locator.boundingBox())?.y ?? Number.NaN;
   const order = [
     await at(main.getByTestId("home-stats")),
-    await at(main.getByTestId("home-quick-actions")),
     await at(main.getByTestId("home-your-flows")),
   ];
   expect([...order].sort((a, b) => a - b)).toEqual(order);
@@ -3374,11 +3372,19 @@ test("the dashboard reads top to bottom — Today's three tiles, Add a flow and 
   }
   // Nothing waits: no banner (the owner, build 13 #3).
   await expect(main.getByTestId("home-approvals")).toHaveCount(0);
-  // Add a flow and Flows, both to Flows.
-  const actions = main.getByTestId("home-quick-actions").getByRole("link");
-  await expect(actions).toHaveText(["Add a flow", "Flows"]);
-  for (const link of await actions.all())
-    await expect(link).toHaveAttribute("href", "/account/flows");
+  // ~~Add a flow and Flows, both to Flows~~ until build 43, item 2 ("We
+  // dont need the flows and add flow button on the home screen."): the side
+  // nav's Flows is the way in, the page where a flow is added.
+  await expect(main.getByTestId("home-quick-actions")).toHaveCount(0);
+  await expect(main.getByRole("link", { name: "Add a flow" })).toHaveCount(0);
+  await expect(
+    main.getByRole("link", { name: "Flows", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page
+      .getByRole("complementary", { name: "Dashboard navigation" })
+      .getByRole("link", { name: "Flows", exact: true }),
+  ).toHaveAttribute("href", "/account/flows");
   // Today: the platform's tally from the browser's midnight, each tile to
   // Activity from it (S27).
   const since = await page.evaluate(() => {
@@ -3439,9 +3445,8 @@ test("the dashboard's approvals banner, right after Today, while something waits
   await expect(banner).toHaveAttribute("href", "/account/approvals");
   const today = (await main.getByTestId("home-stats").boundingBox())!.y;
   const bannerAt = (await banner.boundingBox())!.y;
-  const actions = (await main.getByTestId("home-quick-actions").boundingBox())!
-    .y;
-  expect(today < bannerAt && bannerAt < actions).toBe(true);
+  const flows = (await main.getByTestId("home-your-flows").boundingBox())!.y;
+  expect(today < bannerAt && bannerAt < flows).toBe(true);
   await expectNoAxeViolations(page);
 });
 
@@ -3465,6 +3470,7 @@ test("the dashboard of a workspace with no flow yet: Today, then the first run's
     "/account/flows",
   );
   await expect(main.getByTestId("home-stats")).toBeVisible();
+  await expect(main.getByRole("link", { name: "Add a flow" })).toHaveCount(1);
   await expect(main.getByTestId("home-quick-actions")).toHaveCount(0);
   await expect(main.getByTestId("home-your-flows")).toHaveCount(0);
   await expectNoAxeViolations(page);
@@ -6512,103 +6518,351 @@ test.describe("build 43, item 17 — the quick-access card's Upload and filled S
   test.describe("on a phone or a tablet", () => {
     test.use({ hasTouch: true });
 
-    test("Home's Upload opens a menu — Take photo then Choose file; Escape closes it, focus back on Upload; a press outside closes it; Choose file opens the picker, Take photo the camera", async ({
+    test("build 43, item 3 — Home's Upload opens the browser's own chooser at once: exactly Upload then Start, no menu, no Take photo on the card; the chooser takes the field's types with no capture, so Safari offers Photo Library, Take Photo and Choose File", async ({
       page,
     }) => {
       const form = await invoiceCard(page);
-      await expect(form.getByRole("button")).toHaveCount(2);
-      const upload = form.getByRole("button", { name: "Upload for Document" });
-      await expect(upload).toHaveAttribute("aria-expanded", "false");
-      const menu = form.getByTestId("run-file-invoiceFile-menu");
-      await expect(menu).toHaveCount(0);
-      await upload.click();
-      await expect(upload).toHaveAttribute("aria-expanded", "true");
-      await expect(menu.getByRole("button")).toHaveText([
-        "Take photo",
-        "Choose file",
-      ]);
-      await expect(upload).toHaveAttribute(
-        "aria-controls",
-        (await menu.getAttribute("id"))!,
-      );
-      await expectNoAxeViolations(page);
-      // D2: Escape, or a press outside, closes the menu with nothing done —
-      // no picker and no camera opened.
-      let opened = 0;
-      const onChooser = () => {
-        opened += 1;
-      };
-      page.on("filechooser", onChooser);
-      await page.keyboard.press("Escape");
-      await expect(menu).toHaveCount(0);
-      await expect(upload).toBeFocused();
-      expect(opened).toBe(0);
-      await upload.click();
-      await expect(menu).toBeVisible();
-      await page.getByTestId("home-your-flows").getByRole("searchbox").click();
-      await expect(menu).toHaveCount(0);
-      expect(opened).toBe(0);
-      page.off("filechooser", onChooser);
-      await upload.click();
+      const all = form.getByRole("button");
+      await expect(all).toHaveCount(2);
+      await expect(all.nth(0)).toHaveAccessibleName("Upload for Document");
+      await expect(all.nth(1)).toHaveAccessibleName("Start run");
+      const upload = all.nth(0);
+      await expect(upload).not.toHaveAttribute("aria-expanded", /.*/u);
+      await expect(page.locator('[data-testid$="-menu"]')).toHaveCount(0);
+      await expect(form.getByText(/Take photo/u)).toHaveCount(0);
+      await expect(form.locator('input[type="file"]')).toHaveCount(1);
       const [chooser] = await Promise.all([
         page.waitForEvent("filechooser"),
-        menu.getByRole("button", { name: "Choose file", exact: true }).click(),
+        upload.click(),
       ]);
       expect(await chooser.element().getAttribute("capture")).toBeNull();
-      await chooser.setFiles(invoicePdf);
-      await expect(menu).toHaveCount(0);
-      await expect(
-        form.getByRole("button", { name: "Remove invoice.pdf" }),
-      ).toBeVisible();
-      await upload.click();
-      const [camera] = await Promise.all([
-        page.waitForEvent("filechooser"),
-        menu.getByRole("button", { name: "Take photo", exact: true }).click(),
-      ]);
-      expect(await camera.element().getAttribute("capture")).toBe(
-        "environment",
+      expect(await chooser.element().getAttribute("accept")).toBe(
+        "application/pdf,image/jpeg,image/png",
       );
-      // Closed without a photo: the file held stays.
-      await camera.setFiles([]);
-      await expect(menu).toHaveCount(0);
+      expect(chooser.isMultiple()).toBe(false);
+      await expect(page.locator('[data-testid$="-menu"]')).toHaveCount(0);
+      await chooser.setFiles(invoicePdf);
       await expect(
         form.getByRole("button", { name: "Remove invoice.pdf" }),
       ).toBeVisible();
+      // Start stays after Upload: nothing started by itself (the owner's
+      // "1. Keep start after upload").
+      expect(await runStarts()).toEqual([]);
+      await expectNoAxeViolations(page);
     });
 
-    test("Home's Upload menu on a field of several: Choose file replaces the files held, Take photo adds one more (D2)", async ({
+    test("build 43, item 3 — on a field of several, every choice from Home's Upload replaces the files held (Safari's Take Photo arrives through the same chooser)", async ({
       page,
     }) => {
       await fixtureControl("invoice-several");
       const form = await invoiceCard(page);
       const upload = form.getByRole("button", { name: "Upload for Document" });
-      const menu = form.getByTestId("run-file-invoiceFile-menu");
       const pills = form
         .getByTestId("run-file-invoiceFile-pills")
         .locator("li");
-      const fromMenu = async (row: "Take photo" | "Choose file") => {
-        await upload.click();
+      const choose = async () => {
         const [chooser] = await Promise.all([
           page.waitForEvent("filechooser"),
-          menu.getByRole("button", { name: row, exact: true }).click(),
+          upload.click(),
         ]);
+        expect(await chooser.element().getAttribute("capture")).toBeNull();
+        expect(chooser.isMultiple()).toBe(true);
         return chooser;
       };
-      await (
-        await fromMenu("Choose file")
-      ).setFiles([pdf("a.pdf"), pdf("b.pdf")]);
+      await (await choose()).setFiles([pdf("a.pdf"), pdf("b.pdf")]);
       await expect(pills).toHaveText(["a.pdf", "b.pdf"]);
       await (
-        await fromMenu("Take photo")
+        await choose()
       ).setFiles({
         name: "image.jpg",
         mimeType: "image/jpeg",
         buffer: await sidewaysPhoto(page),
       });
-      await expect(pills).toHaveText(["a.pdf", "b.pdf", "image.jpg"]);
-      await (await fromMenu("Choose file")).setFiles([pdf("c.pdf")]);
-      await expect(pills).toHaveText(["c.pdf"]);
+      await expect(pills).toHaveText(["image.jpg"]);
     });
+
+    test("off Home's card a flow's page keeps Take photo beside Upload: Upload opens the chooser with no capture, Take photo the camera (capture environment)", async ({
+      page,
+    }) => {
+      const form = await openFilledRun(page);
+      const upload = form.getByRole("button", {
+        name: "Upload for Invoice file",
+      });
+      await expect(upload).not.toHaveAttribute("aria-expanded", /.*/u);
+      const [chooser] = await Promise.all([
+        page.waitForEvent("filechooser"),
+        upload.click(),
+      ]);
+      expect(await chooser.element().getAttribute("capture")).toBeNull();
+      await chooser.setFiles(invoicePdf);
+      await expect(
+        form.getByRole("button", { name: "Remove invoice.pdf" }),
+      ).toBeVisible();
+      const [camera] = await Promise.all([
+        page.waitForEvent("filechooser"),
+        form
+          .getByRole("button", { name: "Take photo for Invoice file" })
+          .click(),
+      ]);
+      expect(await camera.element().getAttribute("capture")).toBe(
+        "environment",
+      );
+    });
+  });
+
+  test("follow-up 1 — the x's keyboard ring is drawn inside it: outline-offset -2px, the ring within the pills' row, which never cuts it", async ({
+    page,
+  }) => {
+    const form = await invoiceCard(page);
+    await form.getByLabel("Document").setInputFiles(invoicePdf);
+    const x = form.getByRole("button", { name: "Remove invoice.pdf" });
+    await expect(x).toBeVisible();
+    // Reached with the keyboard, so `:focus-visible` holds.
+    await x.focus();
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
+    await expect(x).toBeFocused();
+    expect(await x.evaluate((button) => button.matches(":focus-visible"))).toBe(
+      true,
+    );
+    const ring = await x.evaluate((button) => {
+      const style = getComputedStyle(button);
+      return {
+        offset: style.outlineOffset,
+        width: parseFloat(style.outlineWidth),
+        style: style.outlineStyle,
+      };
+    });
+    expect(ring.offset).toBe("-2px");
+    expect(ring.style).toBe("solid");
+    // The ring's outer edge: the x's box grown by offset + width.
+    const grow = parseFloat(ring.offset) + ring.width;
+    const box = (await x.boundingBox())!;
+    const row = (await form
+      .getByTestId("run-file-invoiceFile-pills")
+      .boundingBox())!;
+    expect(box.x - grow).toBeGreaterThanOrEqual(row.x - 0.5);
+    expect(box.y - grow).toBeGreaterThanOrEqual(row.y - 0.5);
+    expect(box.x + box.width + grow).toBeLessThanOrEqual(
+      row.x + row.width + 0.5,
+    );
+    expect(box.y + box.height + grow).toBeLessThanOrEqual(
+      row.y + row.height + 0.5,
+    );
+    // Nor over the file's name.
+    const name = (await form
+      .getByTestId("run-file-invoiceFile-pills")
+      .locator("li span")
+      .boundingBox())!;
+    expect(name.x + name.width).toBeLessThanOrEqual(box.x - grow + 0.5);
+  });
+
+  test("follow-up 2 — after an x the focus goes to the x now in its place, else the one before, else Upload; never the page, which stays — on a flow's page and on Home's card", async ({
+    page,
+  }) => {
+    await fixtureControl("manual-several");
+    await fixtureControl("invoice-several");
+    const flowPage = await openFilledRun(page);
+    const home = async () => invoiceCard(page);
+    for (const [open, label, key, title] of [
+      [async () => flowPage, "Invoice file", "artifactId", "Invoice file"],
+      [home, "Document", "invoiceFile", "Document"],
+    ] as const) {
+      const form = await open();
+      const url = page.url();
+      await form
+        .getByLabel(label)
+        .setInputFiles([pdf("a.pdf"), pdf("b.pdf"), pdf("c.pdf")]);
+      const pills = form.getByTestId(`run-file-${key}-pills`).locator("li");
+      await expect(pills).toHaveText(["a.pdf", "b.pdf", "c.pdf"]);
+      const x = (name: string) =>
+        form.getByRole("button", { name: `Remove ${name}` });
+      await x("b.pdf").focus();
+      await page.keyboard.press("Enter");
+      await expect(pills).toHaveText(["a.pdf", "c.pdf"]);
+      await expect(x("c.pdf")).toBeFocused();
+      await page.keyboard.press("Space");
+      await expect(pills).toHaveText(["a.pdf"]);
+      await expect(x("a.pdf")).toBeFocused();
+      await page.keyboard.press("Enter");
+      await expect(pills).toHaveCount(0);
+      await expect(
+        form.getByRole("button", { name: `Upload for ${title}` }),
+      ).toBeFocused();
+      expect(await page.evaluate(() => document.activeElement?.tagName)).toBe(
+        "BUTTON",
+      );
+      expect(page.url()).toBe(url);
+    }
+  });
+
+  test("follow-up 3 — a screen reader hears an upload end and a file go: Uploaded {name}., Uploaded {n} files., Removed {name}.; the visible line is as before", async ({
+    page,
+  }) => {
+    await fixtureControl("manual-several");
+    const form = await invoiceCard(page);
+    const spoken = form.getByTestId("run-file-invoiceFile-spoken");
+    await expect(spoken).toHaveAttribute("aria-live", "polite");
+    await expect(spoken).toHaveClass(/\bsr-only\b/u);
+    await expect(spoken).toHaveText("");
+    await form.getByLabel("Document").setInputFiles(invoicePdf);
+    await expect(spoken).toHaveText("Uploaded invoice.pdf.");
+    // The visible line says nothing once it is done, as before.
+    await expect(
+      form.locator('p[aria-live="polite"]:not(.sr-only)'),
+    ).toHaveText("");
+    await form.getByRole("button", { name: "Remove invoice.pdf" }).click();
+    await expect(spoken).toHaveText("Removed invoice.pdf.");
+    // Three in one choice, on a flow's page.
+    const flow = await openFilledRun(page);
+    const several = flow.getByTestId("run-file-artifactId-spoken");
+    await flow
+      .getByLabel("Invoice file")
+      .setInputFiles([pdf("a.pdf"), pdf("b.pdf"), pdf("c.pdf")]);
+    await expect(several).toHaveText("Uploaded 3 files.");
+    await flow.getByRole("button", { name: "Remove b.pdf" }).click();
+    await expect(several).toHaveText("Removed b.pdf.");
+  });
+
+  test("follow-up 3 — two files of one name, each heard going: the line is emptied before the second Removed {name}., so it changes again", async ({
+    page,
+  }) => {
+    await fixtureControl("manual-several");
+    const flow = await openFilledRun(page);
+    const several = flow.getByTestId("run-file-artifactId-spoken");
+    // Two files of one name.
+    await flow
+      .getByLabel("Invoice file")
+      .setInputFiles([pdf("scan.pdf"), pdf("scan.pdf")]);
+    await expect(several).toHaveText("Uploaded 2 files.");
+    // Every text the live region shows, as a screen reader is told of it.
+    await several.evaluate((region) => {
+      const said: string[] = [];
+      (window as unknown as { said: string[] }).said = said;
+      new MutationObserver(() => said.push(region.textContent ?? "")).observe(
+        region,
+        { childList: true, characterData: true, subtree: true },
+      );
+    });
+    const said = () =>
+      page.evaluate(() => (window as unknown as { said: string[] }).said);
+    const x = flow.getByRole("button", { name: "Remove scan.pdf" });
+    await expect(x).toHaveCount(2);
+    await x.first().click();
+    await expect(x).toHaveCount(1);
+    await expect(several).toHaveText("Removed scan.pdf.");
+    await x.click();
+    await expect(x).toHaveCount(0);
+    await expect
+      .poll(async () =>
+        (await said()).filter((line) => line === "Removed scan.pdf."),
+      )
+      .toHaveLength(2);
+    const lines = await said();
+    const second = lines.lastIndexOf("Removed scan.pdf.");
+    expect(
+      lines.slice(lines.indexOf("Removed scan.pdf.") + 1, second),
+    ).toContain("");
+  });
+
+  test("C3 — Home's filled Start in both themes: the accent fill and the page's colour, semibold; accent-400 on hover; Uploading… at 0.45; axe on the card in the light theme", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    for (const theme of ["dark", "light"] as const) {
+      await page.addInitScript(
+        (value) => localStorage.setItem("theme", value),
+        theme,
+      );
+      const form = await invoiceCard(page);
+      const start = form.getByRole("button", { name: "Start run" });
+      const token = (name: string) =>
+        page.evaluate((variable) => {
+          const probe = document.createElement("div");
+          probe.style.color = `var(${variable})`;
+          document.body.append(probe);
+          const value = getComputedStyle(probe).color;
+          probe.remove();
+          return value;
+        }, name);
+      const drawn = () =>
+        start.evaluate((button) => {
+          const style = getComputedStyle(button);
+          return {
+            background: style.backgroundColor,
+            color: style.color,
+            weight: style.fontWeight,
+          };
+        });
+      // The pointer away from Start, where the last page left it.
+      await page.mouse.move(0, 0);
+      const accent = await token("--color-accent");
+      const pageColour = await token("--color-bg");
+      // A stored theme fades in on load: read once it has settled.
+      await expect.poll(drawn).toEqual({
+        background: accent,
+        color: pageColour,
+        weight: "600",
+      });
+      await start.hover();
+      const strong = await token("--color-accent-400");
+      expect(strong).not.toBe(accent);
+      await expect.poll(async () => (await drawn()).background).toBe(strong);
+      // WCAG 2.2 AA on the card, in the light theme.
+      if (theme === "light") {
+        const results = await new AxeBuilder({ page })
+          .include(`[data-testid="${HOME_INVOICE}"]`)
+          .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+          .analyze();
+        expect(results.violations).toEqual([]);
+      }
+    }
+    const put = await holdRequest(
+      page,
+      "https://127.0.0.1:3443/__fixture/objects/**",
+      (request) => request.method() === "PUT",
+    );
+    const form = await invoiceCard(page);
+    await form.getByLabel("Document").setInputFiles(invoicePdf);
+    await put.arrived;
+    const uploading = form.getByRole("button", { name: "Uploading…" });
+    await expect(uploading).toBeDisabled();
+    expect(
+      await uploading.evaluate((button) => getComputedStyle(button).opacity),
+    ).toBe("0.45");
+    put.release();
+    await expect(form.getByRole("button", { name: "Start run" })).toBeEnabled();
+  });
+
+  test("C6 — a 320-px window and no search filter: no sideways page scroll, and a long-named pill stays inside its card, its name cut", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 800 });
+    await fixtureControl("items-flow");
+    await page.goto("/account");
+    const card = page.getByTestId(HOME_INVOICE);
+    const form = card.getByTestId("run-form");
+    await form
+      .getByLabel("Document")
+      .setInputFiles(
+        pdf("quarterly-supplier-invoice-statement-with-a-very-long-name.pdf"),
+      );
+    const pill = form.getByTestId("run-file-invoiceFile-pills").locator("li");
+    await expect(pill).toHaveCount(1);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(320);
+    const box = (await pill.boundingBox())!;
+    const cardBox = (await card.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(cardBox.x - 0.5);
+    expect(box.x + box.width).toBeLessThanOrEqual(
+      cardBox.x + cardBox.width + 0.5,
+    );
+    expect(
+      await pill
+        .locator("span")
+        .evaluate((name) => name.scrollWidth > name.clientWidth),
+    ).toBe(true);
   });
 
   test("Turn on is not a start: a paused flow whose required file is empty turns on, and no 'Add {title} first.' is said (D4)", async ({
