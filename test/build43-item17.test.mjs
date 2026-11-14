@@ -3,13 +3,15 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { after, before, test } from "node:test";
 import {
-  CHOOSE_FILE_LABEL,
   DEFAULT_MAX_FILES,
   TAKE_PHOTO_LABEL,
   addFileFirst,
   missingFile,
   removeFileLabel,
+  removedLine,
   tooManyFiles,
+  uploadedCountLine,
+  uploadedLine,
   withoutFile,
 } from "../lib/several-files.ts";
 import { SPACING } from "../lib/spacing.ts";
@@ -27,11 +29,12 @@ import {
  * bolded and colored so easy to click. start throws an error rather than
  * starting if nothing was uploaded when required … the document should
  * dynamically show up in a horizontal pill with the document name and an x
- * on the right side of the pill". Home's card: Upload (Take photo or Choose
- * file in its menu on a phone) and a filled Start; every start form: a pill
- * per file with its x, and "Add {title} first." for a required file missing.
- * The job upload card keeps its "Ready:" line. The presses themselves run in
- * the fixture suite (`e2e/public-edge-fixture.spec.ts`, "build 43, item 17").
+ * on the right side of the pill". Home's card: Upload (the browser's own
+ * chooser, build 43's item 3) and a filled Start; every start form: a pill
+ * per file with its x, its ring inside it, the focus kept after it, the
+ * spoken lines, and "Add {title} first." for a required file missing. The
+ * job upload card keeps its "Ready:" line. The presses themselves run in the
+ * fixture suite (`e2e/public-edge-fixture.spec.ts`, "build 43, item 17").
  */
 
 const root = resolve(import.meta.dirname, "..");
@@ -58,10 +61,11 @@ const PHONE = (source) =>
 /** The field's state at first: `kind` and the rest. */
 const HOLDING = (state) => (source) =>
   source.replace('>({ kind: "empty" });', `>(${JSON.stringify(state)});`);
-const OPEN_MENU = (source) =>
+/** The spoken line holding a sentence already. */
+const SAYING = (sentence) => (source) =>
   source.replace(
-    "const [menuOpen, setMenuOpen] = useState(false);",
-    "const [menuOpen, setMenuOpen] = useState(true);",
+    'const [spoken, setSpoken] = useState("");',
+    `const [spoken, setSpoken] = useState(${JSON.stringify(sentence)});`,
   );
 
 let react;
@@ -146,15 +150,20 @@ const fieldProps = (extra) => ({
   ...extra,
 });
 
-test("17 (D8): the words — Take photo, Choose file, Add {title} first., Remove {name}; Add up to {max} as today", () => {
+test("17 (D8): the words — Take photo, Add {title} first., Remove {name}; Add up to {max} as today", () => {
   assert.equal(TAKE_PHOTO_LABEL, "Take photo");
-  assert.equal(CHOOSE_FILE_LABEL, "Choose file");
   assert.equal(addFileFirst("Resume"), "Add Resume first.");
   assert.equal(removeFileLabel("cv.pdf"), "Remove cv.pdf");
   assert.equal(
     tooManyFiles(DEFAULT_MAX_FILES),
     "Add up to 50 files at a time.",
   );
+});
+
+test("build 43 follow-up 3: the spoken words — Uploaded {name}., Uploaded {n} files., Removed {name}.", () => {
+  assert.equal(uploadedLine("invoice.pdf"), "Uploaded invoice.pdf.");
+  assert.equal(uploadedCountLine(3), "Uploaded 3 files.");
+  assert.equal(removedLine("invoice.pdf"), "Removed invoice.pdf.");
 });
 
 test("17 T1/T5 (D4): missingFile — the first required file field holding no file, in run-input order; an optional one, or another control, never", () => {
@@ -316,7 +325,7 @@ function contrast(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-test("17 T7 (D1, D2): Home's card on a phone — exactly Upload then Start; Upload a closed disclosure; open, Take photo then Choose file, each named by its words alone", async () => {
+test("build 43, item 3: Home's card on a phone — exactly Upload then Start; Upload opens the field's chooser at once (its types, no capture), no menu and no camera input on the card", async () => {
   const RunStart = await runStart({ field: PHONE });
   const markup = draw(RunStart, props({ compact: true }));
   const row = nodes(markup).find((node) =>
@@ -325,54 +334,22 @@ test("17 T7 (D1, D2): Home's card on a phone — exactly Upload then Start; Uplo
   const rowButtons = elements(row).filter((node) => node.tag === "button");
   assert.deepEqual(rowButtons.map(visibleOf), ["Upload", "Start"]);
   const upload = rowButtons[0];
-  assert.equal(upload.attrs["aria-expanded"], "false");
+  assert.equal(upload.attrs["aria-expanded"], undefined);
   assert.equal(upload.attrs["aria-controls"], undefined);
-  assert.equal(
-    byTestId(markup, "run-file-resume-menu").length,
-    0,
-    "closed: not drawn",
-  );
-  // The camera's input is there, for Take photo to open.
-  assert.ok(nodes(markup).some((node) => node.attrs.capture === "environment"));
-
-  const opened = await runStart({ field: (s) => OPEN_MENU(PHONE(s)) });
-  const open = draw(opened, props({ compact: true }));
-  const [menu] = byTestId(open, "run-file-resume-menu");
-  assert.ok(menu, "open: drawn");
-  assert.ok(classes(menu).includes("bubble-soft"));
-  const openUpload = buttons(open).find((node) => node.attrs["aria-expanded"]);
-  assert.equal(openUpload.attrs["aria-expanded"], "true");
-  assert.equal(openUpload.attrs["aria-controls"], menu.attrs.id);
-  const rows = elements(menu).filter((node) => node.tag === "button");
-  assert.deepEqual(rows.map(visibleOf), ["Take photo", "Choose file"]);
-  // D2: each row's icon, Camera then FileArrowUp, as phosphor draws them.
-  const icon = (row) =>
-    elements(row)
-      .filter((node) => node.tag === "path")
-      .map((node) => node.attrs.d);
-  const drawn = (Icon) =>
-    elements(
-      parse(
-        server.renderToStaticMarkup(
-          react.createElement(Icon, { size: 20, "aria-hidden": true }),
-        ),
-      ),
-    )
-      .filter((node) => node.tag === "path")
-      .map((node) => node.attrs.d);
-  const { CameraIcon } = await import("@phosphor-icons/react/dist/ssr/Camera");
-  const { FileArrowUpIcon } =
-    await import("@phosphor-icons/react/dist/ssr/FileArrowUp");
-  assert.deepEqual(rows.map(icon), [drawn(CameraIcon), drawn(FileArrowUpIcon)]);
-  // Named by their words alone, as the app's menu rows are (the parity
-  // check, 2026-11-13): no hidden " for {title}" on a row.
-  assert.deepEqual(rows.map(textOf), ["Take photo", "Choose file"]);
+  assert.equal(byTestId(markup, "run-file-resume-menu").length, 0);
+  assert.ok(!visibleWords(markup).some((words) => /Take photo/u.test(words)));
+  // One file input on the card: the chooser, with the field's types and no
+  // capture, so Safari offers Photo Library, Take Photo and Choose File.
+  const inputs = nodes(markup).filter((node) => node.attrs.type === "file");
+  assert.equal(inputs.length, 1);
+  assert.equal(inputs[0].attrs.capture, undefined);
+  assert.equal(inputs[0].attrs.accept, "application/pdf,image/jpeg,image/png");
   const source = read(FILE_FIELD);
-  assert.match(source, /onClick=\{\(\) => pick\(camera\)\}/u);
-  assert.match(source, /onClick=\{\(\) => pick\(input\)\}/u);
+  assert.match(source, /onClick=\{\(\) => input\.current\?\.click\(\)\}/u);
+  assert.doesNotMatch(source, /menuOpen|aria-expanded|FileArrowUp/u);
 });
 
-test("17 T7/T9 (D2): off a phone Upload opens the picker at once, no menu; a flow's page on a phone keeps Take photo and Upload side by side", async () => {
+test("17 T7/T9 (D2): off a phone Upload opens the picker at once; a flow's page on a phone keeps Take photo and Upload side by side", async () => {
   const computer = await runStart();
   const home = draw(computer, props({ compact: true }));
   const upload = buttons(home).find((node) => visibleOf(node) === "Upload");
@@ -453,11 +430,14 @@ test("17 (D5): on Home's card the lines sit under the buttons' row, not in it �
     ]),
     [
       ["p", "polite"],
+      // The spoken line (build 43 follow-up 3), seen by no one.
+      ["p", "polite"],
       ["ul", "run-file-resume-pills"],
       ["p", "alert"],
     ],
   );
-  assert.equal(textOf(after[2]), "Field error.");
+  assert.ok(classes(after[1]).includes("sr-only"));
+  assert.equal(textOf(after[3]), "Field error.");
   // The form's error line comes after the whole field.
   const alerts = all.filter((node) => node.attrs.role === "alert");
   assert.deepEqual(alerts.map(textOf), ["Field error.", "Form error."]);
@@ -507,11 +487,13 @@ test("17 T5/T10 (D5): a start form's file is a pill — its name cut at its end,
     assert.equal(x.attrs.type, "button");
     assert.equal(x.attrs["aria-label"], "Remove cv.pdf");
     // D5: the x's icon at 20 in the text colour.
+    // Follow-up 1: its keyboard ring drawn inside it, never cut by the row.
     for (const name of [
       "min-h-11",
       "min-w-11",
       "text-[var(--text)]",
       "hover:bg-[var(--surface-hover)]",
+      "focus-visible:-outline-offset-2!",
     ])
       assert.ok(classes(x).includes(name), name);
     const [svg] = elements(x).filter((node) => node.tag === "svg");
@@ -587,6 +569,7 @@ test("17 T11 (D5): the job upload card's field (no removable) keeps its Ready li
   const markup = draw(RunFileField, fieldProps());
   assert.ok(visibleWords(markup).includes("Ready: jd.pdf (2 KB)"));
   assert.equal(byTestId(markup, "run-file-resume-pills").length, 0);
+  assert.equal(byTestId(markup, "run-file-resume-spoken").length, 0);
   assert.ok(
     !buttons(markup).some((node) =>
       node.attrs["aria-label"]?.startsWith("Remove"),
@@ -595,4 +578,28 @@ test("17 T11 (D5): the job upload card's field (no removable) keeps its Ready li
   // UploadItemCard passes no removable.
   const card = read("app/account/flows/UploadItemCard.tsx");
   assert.doesNotMatch(card, /removable/u);
+});
+
+test("build 43 follow-up 3: a start form's field says its sentence in a polite line no one sees — set as an upload ends and as an x takes a file out", async () => {
+  const RunStart = await runStart({ field: SAYING("Removed cv.pdf.") });
+  for (const markup of [
+    draw(RunStart, props({ compact: true })),
+    draw(RunStart, props()),
+    draw(RunStart, props({ itemPage: true, itemId: "i" })),
+  ]) {
+    const [line] = byTestId(markup, "run-file-resume-spoken");
+    assert.ok(line, "the spoken line");
+    assert.equal(line.attrs["aria-live"], "polite");
+    assert.ok(classes(line).includes("sr-only"));
+    assert.equal(textOf(line), "Removed cv.pdf.");
+    assert.ok(!visibleWords(markup).includes("Removed cv.pdf."));
+  }
+  const source = read(FILE_FIELD);
+  const remove = /const remove = [\s\S]*?\n {2}\};/u.exec(source)?.[0] ?? "";
+  assert.match(remove, /setSpoken\(removedLine\(files\[at\]!\.name\)\)/u);
+  assert.match(source, /setSpoken\(uploadedLine\(sent\.name\)\)/u);
+  assert.match(
+    source,
+    /chosen\.length === 1\s*\? uploadedLine\(sent\[sent\.length - 1\]!\.name\)\s*: uploadedCountLine\(chosen\.length\)/u,
+  );
 });

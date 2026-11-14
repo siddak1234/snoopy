@@ -101,8 +101,20 @@ page reuses:
   FLOWS today, and any card added later that starts a run in place) is two
   rows: the flow's icon and name (a job pill on their right where the flow
   has jobs), then its actions. A run input of one file field has exactly two
-  buttons, Upload and Start. Upload offers Take photo or Choose file where
-  the field can take a photo, else it opens the file picker. Start is the
+  buttons, Upload and Start. Upload opens the browser's own chooser at once,
+  with the field's accepted types and no `capture` (build 43, item 3, the
+  owner's words: "When upload is clicked it gives the apple selection of
+  take photo, photos library, or upload from files native apple selection.
+  The native apple one not ours."): on an iPhone or an iPad Safari shows its
+  own menu, Photo Library, Take Photo, Choose File ("Choose Files" for a
+  field of several; WebKit's `WKFileUploadPanel.mm` writes them, not this
+  site), on a computer the system's dialog; the card draws no camera input.
+  Every choice from that menu arrives through the one chooser, so on a
+  field of several it replaces the files held. Start stays after Upload and
+  nothing starts by itself (the owner's "1. Keep start after upload").
+  ~~Upload's own menu, Take photo then Choose file~~ until build 43's item
+  3. A flow's page and an item's page keep Take photo beside Upload (the
+  design's default, not the owner's choice). Start is the
   filled primary, the one filled button (the owner's decision of
   2026-11-13). Start with a required file missing says "Add {title} first."
   in the card and sends nothing. Each file given is a pill, its name and an
@@ -117,7 +129,18 @@ page reuses:
   server, the stored copy kept until retention). A press of Start with a
   required file field holding none says "Add {title} first." and sends
   nothing; an optional one starts as before. The filled Start and the
-  two-button row are the quick-access card's alone.
+  two-button row are the quick-access card's alone. For the keyboard and
+  a screen reader (build 43's follow-up): the x's focus ring is drawn
+  inside it (`focus-visible:-outline-offset-2!`, important since the site's
+  `:focus-visible` rule is outside every layer), so the pills' scrolling
+  row never cuts it and it never covers the name; once an x is pressed the
+  focus goes to the x now in its place, else the one before, else the
+  field's Upload, never the page; and a hidden polite line beside the
+  field's status line says "Uploaded {name}." (one file chosen) or
+  "Uploaded {n} files." (several at once) as an upload ends and "Removed
+  {name}." as an x takes a file out (`uploadedLine`, `uploadedCountLine`,
+  `removedLine`). Nothing visible changes; the job upload card keeps its
+  "Ready:" line.
 - **A choice is a drop-down**: a flow's `select` field, a setup `select`
   (`app/account/flows/SelectField.tsx`) and a list's filter are the website's
   drop-down (`components/ui/Dropdown.tsx`) — a pill for a filter, a field's
@@ -203,11 +226,9 @@ page reuses:
   fill). A run input of exactly one file field is row 2's two buttons,
   Upload then Start (build 43, item 17), the field's title for screen
   readers only (`RunFileField` `compact`: its `<label>` `sr-only`, Start its
-  `trailing`); on a phone or tablet whose field takes a photo Upload opens a
-  small menu under it, Take photo then Choose file, closed by a row, a
-  press outside or Escape; under the row its uploading line, then its pills,
-  then the errors (see "The quick-access card" and "A start form's files"
-  in "Screen standards").
+  `trailing`); Upload opens the browser's own chooser; under the row its
+  uploading line, then its pills, then the errors (see "The quick-access
+  card" and "A start form's files" in "Screen standards").
   ~~Take photo (a phone or tablet), Upload and Start on one row that wraps;
   its uploading or ready line~~ until build 43. Any other run input keeps
   its fields and their titles, then Start, filled. A flow without items:

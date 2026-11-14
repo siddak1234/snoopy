@@ -9,7 +9,6 @@ import {
   type ReactNode,
 } from "react";
 import { CameraIcon } from "@phosphor-icons/react/dist/ssr/Camera";
-import { FileArrowUpIcon } from "@phosphor-icons/react/dist/ssr/FileArrowUp";
 import { UploadSimpleIcon } from "@phosphor-icons/react/dist/ssr/UploadSimple";
 import { XIcon } from "@phosphor-icons/react/dist/ssr/X";
 import { Button } from "@/components/ui/Button";
@@ -30,12 +29,14 @@ import { completeRunUpload, openRunUpload } from "./upload-actions";
 import { completeWhenMeasured } from "./upload-completion";
 import { SPACING } from "@/lib/spacing";
 import {
-  CHOOSE_FILE_LABEL,
   DEFAULT_MAX_FILES,
   SEVERAL_FILES,
   TAKE_PHOTO_LABEL,
   removeFileLabel,
+  removedLine,
   tooManyFiles,
+  uploadedCountLine,
+  uploadedLine,
   withoutFile,
 } from "@/lib/several-files";
 
@@ -76,7 +77,8 @@ const unknownOnServer = () => false;
  * field that names its types (`acceptedContentTypes`, backend ADR-0046) offers
  * those, sends a Word file as it is, and offers Take photo only where a JPEG
  * is taken. The file is chosen with Upload; on a phone or a tablet the field
- * also offers Take photo, the camera (spec §3.D: icons 20 inside a button).
+ * also offers Take photo, the camera, off Home's card (see **Compact**; spec
+ * §3.D: icons 20 inside a button).
  * With `showTypes`, the accepted types in words beside it ("PDF, Word file or
  * photo"), as an item's file and its runs' show them (plan §5.2, §5.3).
  *
@@ -101,16 +103,20 @@ const unknownOnServer = () => false;
  * row before a pick. ~~The visible title over the buttons, and the line's
  * margin always~~ until build 42, on Home's card. Since build 43, item 17
  * (the owner's words of 2026-11-13: "for the compact card i want two
- * buttons … upload start"), where the field can take a photo
- * (`offersCamera`) Upload opens a small menu under it (a disclosure, its
- * panel the `.bubble-soft` surface, drawn only while open): Take photo, the
- * camera, then Choose file, the chooser, each opened inside the press and
- * each named by its words alone, as the app's menu rows are (Upload, which
- * opens it, is the one named for the field); a
- * row chosen, a press outside or Escape closes it, Escape putting focus back
- * on Upload. Elsewhere Upload opens the chooser at once. ~~Take photo
- * beside Upload on the card~~ until build 43; everywhere else Take photo and
- * Upload stay side by side.
+ * buttons … upload start"), the card's row is Upload then Start alone, and
+ * since build 43's item 3 ("When upload is clicked it gives the apple
+ * selection of take photo, photos library, or upload from files native
+ * apple selection. The native apple one not ours.") its Upload always opens
+ * the chooser at once — the field's accepted types and no `capture` — so on
+ * an iPhone or an iPad Safari shows its own menu (Photo Library, Take Photo,
+ * Choose File: WebKit's `WKFileUploadPanel.mm`) and a computer its own
+ * dialog; the card draws no camera input. Every choice from Safari's menu
+ * arrives through the one chooser, so on a field of several it replaces
+ * the files held. Start stays after Upload: nothing starts by itself (the
+ * owner's "1. Keep start after upload"). ~~Take photo beside Upload on the
+ * card~~ until build 43; ~~Upload's own menu there, Take photo then Choose
+ * file~~ until build 43's item 3. Off the card Take photo and Upload stay
+ * side by side.
  *
  * **Pills** (`removable`, every start form's field — Home's card, a flow's
  * page, an item's page — since build 43, item 17: "the document should
@@ -124,6 +130,16 @@ const unknownOnServer = () => false;
  * retention. While a file uploads no pill shows. ~~"Ready: {name} ({size})"
  * and "{n} files selected"~~ until build 43 in the start forms; the job
  * upload card (`UploadItemCard`, no `removable`) keeps its "Ready:" line.
+ * The x's keyboard ring is drawn inside it (`-outline-offset-2!`: important,
+ * since `app/globals.css`'s `:focus-visible` is outside every layer and so
+ * beats a utility), so the pills' scrolling row never cuts it and it never
+ * covers the name; once an
+ * x is pressed the focus goes to the x now in its place (the next file),
+ * else the one before, else Upload — never the page. A field's hidden
+ * polite line tells a screen reader what the pills show: "Uploaded
+ * {name}." (one file chosen) or "Uploaded {n} files." (several at once)
+ * as an upload ends, and "Removed {name}." as an x takes a file out
+ * (`lib/several-files.ts`); nothing visible changes.
  *
  * An upload belongs to the field that started it: its busy state is reported
  * under the field's key, it stops when the field goes (the form closed), and an
@@ -161,9 +177,14 @@ export function RunFileField({
   const accepted = field.acceptedContentTypes;
   const input = useRef<HTMLInputElement>(null);
   const camera = useRef<HTMLInputElement>(null);
+  const uploadRef = useRef<HTMLButtonElement>(null);
+  // The x of each file held, by its id: the focus goes to one after an x.
+  const xRefs = useRef(new Map<string, HTMLButtonElement>());
+  // Never on Home's card: Upload's chooser offers the camera there itself.
   const offersCamera =
     useSyncExternalStore(watchPointer, onPhoneOrTablet, unknownOnServer) &&
-    takesPhotos(accepted);
+    takesPhotos(accepted) &&
+    !compact;
   const inFlight = useRef<AbortController | null>(null);
   const report = useRef(onBusyChange);
   useEffect(() => {
@@ -188,6 +209,8 @@ export function RunFileField({
     | { kind: "several"; files: SentFile[] }
   >({ kind: "empty" });
   const [error, setError] = useState<string | null>(null);
+  // Said to a screen reader only, in a start form (`removable`).
+  const [spoken, setSpoken] = useState("");
 
   // One file sent: the platform's signed URL, the PUT, then completed —
   // nothing (`undefined`) once the upload it belongs to was aborted.
@@ -223,6 +246,7 @@ export function RunFileField({
 
   const choose = async (chosen: File | undefined, source: RunFileSource) => {
     setError(null);
+    setSpoken("");
     if (!chosen) {
       setState({ kind: "empty" });
       return;
@@ -259,6 +283,7 @@ export function RunFileField({
       const sent = await sendFile(file, upload);
       if (!sent) return;
       setState({ kind: "ready", ...sent });
+      setSpoken(uploadedLine(sent.name));
     } catch (failure) {
       if (upload.signal.aborted) return;
       setState({ kind: "empty" });
@@ -293,6 +318,7 @@ export function RunFileField({
     source: RunFileSource,
   ) => {
     setError(null);
+    setSpoken("");
     // A photo is added to the files held; a choice replaces them.
     const kept = source === "camera" ? files : [];
     if (chosen.length === 0) {
@@ -342,6 +368,11 @@ export function RunFileField({
         sent.push(one);
       }
       setState({ kind: "several", files: sent });
+      setSpoken(
+        chosen.length === 1
+          ? uploadedLine(sent[sent.length - 1]!.name)
+          : uploadedCountLine(chosen.length),
+      );
     } catch (failure) {
       if (upload.signal.aborted) return;
       empty(
@@ -358,49 +389,19 @@ export function RunFileField({
   };
 
   // The x: that one file out of the field, the rest kept in their order. The
-  // chooser is emptied so the same file can be chosen again.
+  // chooser is emptied so the same file can be chosen again. The focus goes
+  // to the x now in its place, else the one before, else Upload: each is
+  // drawn already, and React keeps a kept file's x (its key) as it is.
   const remove = (at: number) => {
-    const rest = withoutFile(files, at);
+    const rest = several ? withoutFile(files, at) : [];
     setState(
-      several && rest.length > 0
-        ? { kind: "several", files: rest }
-        : { kind: "empty" },
+      rest.length > 0 ? { kind: "several", files: rest } : { kind: "empty" },
     );
     if (input.current) input.current.value = "";
+    setSpoken(removedLine(files[at]!.name));
+    const next = rest[at] ?? rest[at - 1];
+    (next ? xRefs.current.get(next.artifactId) : uploadRef.current)?.focus();
     onFilesChange?.(field.key);
-  };
-
-  // Upload's menu on Home's card (Take photo, Choose file), where the field
-  // can take a photo.
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuId = useId();
-  const menuRef = useRef<HTMLDivElement>(null);
-  const uploadRef = useRef<HTMLButtonElement>(null);
-  const withMenu = compact && offersCamera;
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
-    };
-    // A capture on the document, before a dialog's own Escape hears it.
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      event.stopPropagation();
-      setMenuOpen(false);
-      uploadRef.current?.focus();
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [menuOpen]);
-  // Each row opens its input inside the press (the browser's user activation).
-  const pick = (from: typeof camera) => {
-    setMenuOpen(false);
-    from.current?.click();
   };
 
   // A start form's field shows its files as pills; elsewhere (the job upload
@@ -428,11 +429,7 @@ export function RunFileField({
       size="sm"
       className={`inline-flex items-center ${SPACING.inner.gap}`}
       disabled={state.kind === "uploading"}
-      onClick={() =>
-        withMenu ? setMenuOpen((open) => !open) : input.current?.click()
-      }
-      aria-expanded={withMenu ? menuOpen : undefined}
-      aria-controls={withMenu && menuOpen ? menuId : undefined}
+      onClick={() => input.current?.click()}
       aria-describedby={showTypes ? typesId : undefined}
     >
       <UploadSimpleIcon size={20} aria-hidden />
@@ -510,50 +507,18 @@ export function RunFileField({
                 } else if (photos[0]) void choose(photos[0], "camera");
               }}
             />
-            {withMenu ? null : (
-              <Button
-                variant="secondary"
-                size="sm"
-                className={`inline-flex items-center ${SPACING.inner.gap}`}
-                disabled={state.kind === "uploading"}
-                onClick={() => camera.current?.click()}
-              >
-                {takePhoto}
-              </Button>
-            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              className={`inline-flex items-center ${SPACING.inner.gap}`}
+              disabled={state.kind === "uploading"}
+              onClick={() => camera.current?.click()}
+            >
+              {takePhoto}
+            </Button>
           </>
         ) : null}
-        {withMenu ? (
-          <div ref={menuRef} className="relative">
-            {uploadButton}
-            {withMenu && menuOpen ? (
-              <div
-                id={menuId}
-                data-testid={`run-file-${field.key}-menu`}
-                className={`bubble-soft absolute top-full left-0 z-50 ${SPACING.inner.top} flex min-w-max flex-col ${SPACING.inner.py} shadow-[var(--shadow-md)]`}
-              >
-                <Button
-                  variant="ghost"
-                  className={`justify-start ${SPACING.inner.gap}`}
-                  onClick={() => pick(camera)}
-                >
-                  <CameraIcon size={20} aria-hidden />
-                  {TAKE_PHOTO_LABEL}
-                </Button>
-                <Button
-                  variant="ghost"
-                  className={`justify-start ${SPACING.inner.gap}`}
-                  onClick={() => pick(input)}
-                >
-                  <FileArrowUpIcon size={20} aria-hidden />
-                  {CHOOSE_FILE_LABEL}
-                </Button>
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          uploadButton
-        )}
+        {uploadButton}
         {trailing}
         {showTypes ? (
           <span id={typesId} className="text-xs text-[var(--muted)]">
@@ -564,6 +529,15 @@ export function RunFileField({
       <p aria-live="polite" className={`${lineTop}text-xs text-[var(--muted)]`}>
         {status}
       </p>
+      {removable ? (
+        <p
+          aria-live="polite"
+          data-testid={`run-file-${field.key}-spoken`}
+          className="sr-only"
+        >
+          {spoken}
+        </p>
+      ) : null}
       {removable && files.length > 0 ? (
         <ul
           data-testid={`run-file-${field.key}-pills`}
@@ -580,8 +554,12 @@ export function RunFileField({
               <button
                 type="button"
                 aria-label={removeFileLabel(file.name)}
+                ref={(x) => {
+                  if (x) xRefs.current.set(file.artifactId, x);
+                  else xRefs.current.delete(file.artifactId);
+                }}
                 onClick={() => remove(at)}
-                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-[var(--text)] hover:bg-[var(--surface-hover)] active:bg-[var(--surface-hover)]"
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-[var(--text)] hover:bg-[var(--surface-hover)] focus-visible:-outline-offset-2! active:bg-[var(--surface-hover)]"
               >
                 <XIcon size={20} aria-hidden />
               </button>
