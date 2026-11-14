@@ -479,6 +479,86 @@ test("an item's page: its runs ranked as the platform answers in compact rows th
   expect(Math.abs((rowHeight ?? 0) - (sectionHeight ?? 0))).toBeLessThan(1);
 });
 
+test("C17 — an item's page with its file required: Start says 'Add Entry file first.' and starts no run; the file's x takes it out and Start refuses again; the file again starts ONE run; Start the outline (build 43, item 17)", async ({
+  page,
+}) => {
+  await fixtureControl("run-file-required");
+  await page.goto(ITEM);
+  const add = page.getByTestId("item-add");
+  const start = add.getByRole("button", { name: "Start", exact: true });
+  await expect(start).toHaveClass(/\bbtn-primary\b/u);
+  const runStarts = async () =>
+    (await fixtureRead<{ runStarts: unknown[] }>("items")).runStarts;
+  await start.click();
+  await expect(add.getByRole("alert")).toHaveText("Add Entry file first.");
+  expect(await runStarts()).toHaveLength(0);
+  await add.getByLabel("Entry file").setInputFiles(entryPdf);
+  await add.getByRole("button", { name: "Remove entry.pdf" }).click();
+  await expect(add.locator('input[name="input:entryFile"]')).toHaveCount(0);
+  await start.click();
+  await expect(add.getByRole("alert")).toHaveText("Add Entry file first.");
+  expect(await runStarts()).toHaveLength(0);
+  await add.getByLabel("Entry file").setInputFiles(entryPdf);
+  await expect(
+    add.getByRole("button", { name: "Remove entry.pdf" }),
+  ).toBeVisible();
+  await start.click();
+  await expect(page).toHaveURL(/\/account\/runs\/[0-9a-f-]{36}\?from=item$/u);
+  expect(await runStarts()).toHaveLength(1);
+});
+
+test.describe("C20 — off Home's card Upload opens the chooser at once, with no capture (build 43, item 3)", () => {
+  test("an item's Add entry: Upload for Entry file opens the chooser, no disclosure and no capture; the file a pill", async ({
+    page,
+  }) => {
+    await page.goto(ITEM);
+    const add = page.getByTestId("item-add");
+    const upload = add.getByRole("button", { name: "Upload for Entry file" });
+    await expect(upload).not.toHaveAttribute("aria-expanded", /.*/u);
+    const [chooser] = await Promise.all([
+      page.waitForEvent("filechooser"),
+      upload.click(),
+    ]);
+    expect(await chooser.element().getAttribute("capture")).toBeNull();
+    await chooser.setFiles(entryPdf);
+    await expect(
+      add.getByRole("button", { name: "Remove entry.pdf" }),
+    ).toBeVisible();
+  });
+
+  test.describe("on a phone or a tablet", () => {
+    test.use({ hasTouch: true });
+
+    test("the upload card keeps its Ready line and no pills: Upload for Batch file opens the chooser with no capture, Take photo for Batch file the camera (capture environment)", async ({
+      page,
+    }) => {
+      await page.goto(FLOW);
+      await page.getByRole("button", { name: "Upload batch" }).click();
+      const card = page.getByTestId("item-upload");
+      const upload = card.getByRole("button", {
+        name: "Upload for Batch file",
+      });
+      await expect(upload).not.toHaveAttribute("aria-expanded", /.*/u);
+      const [chooser] = await Promise.all([
+        page.waitForEvent("filechooser"),
+        upload.click(),
+      ]);
+      expect(await chooser.element().getAttribute("capture")).toBeNull();
+      await chooser.setFiles(entryPdf);
+      await expect(card.getByText(/^Ready: /u)).toBeVisible();
+      await expect(card.locator('[data-testid$="-pills"]')).toHaveCount(0);
+      await expect(card.locator('[data-testid$="-spoken"]')).toHaveCount(0);
+      const [camera] = await Promise.all([
+        page.waitForEvent("filechooser"),
+        card.getByRole("button", { name: "Take photo for Batch file" }).click(),
+      ]);
+      expect(await camera.element().getAttribute("capture")).toBe(
+        "environment",
+      );
+    });
+  });
+});
+
 test("an item's ranked runs: each score in its verdict's colour, green for Keep and red for Drop, its word as a chip beside it, in one bordered card; Search finds a run by its name, and a miss says so (Round 21 v2, F2)", async ({
   page,
 }) => {

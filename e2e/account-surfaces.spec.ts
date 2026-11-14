@@ -138,6 +138,61 @@ test("1 — Home's YOUR FLOWS (builds 37 and 39, item 8): the department drop-do
   await expect(flows).toContainText('Nothing matches "zzz".');
 });
 
+test.describe("1, C10 — Home's card of several fields and a required file (build 43, item 17)", () => {
+  // The browser PUTs the file straight to the fixture's object store, whose
+  // certificate is the fixture's own.
+  test.use({ ignoreHTTPSErrors: true });
+
+  test("Start says 'Add Invoice file first.' and starts nothing; the file given, its pill; its x takes it out with a new key and Start refuses again; the file again starts ONE run with that key", async ({
+    page,
+  }) => {
+    await fixtureControl("run-file-required");
+    await page.goto("/account");
+    const form = page
+      .getByTestId("home-your-flows")
+      .locator('[data-testid^="home-flow-"]')
+      .filter({ hasText: "Manual input automation" })
+      .getByTestId("run-form");
+    await form.getByLabel("Vendor").fill("Acme Supplies");
+    await form.getByLabel("Amount").fill("120.50");
+    await form.getByLabel("Invoice reference").fill("INV-1001");
+    const start = form.getByRole("button", { name: "Start run" });
+    const runStarts = () =>
+      fixtureRead<{ key: string; status: number }[]>("run-starts");
+    const keyOf = () =>
+      form.locator('input[name="idempotencyKey"]').inputValue();
+    await start.click();
+    await expect(form.getByRole("alert")).toHaveText("Add Invoice file first.");
+    expect(await runStarts()).toEqual([]);
+    const pdf = {
+      name: "invoice.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4 fixture invoice"),
+    };
+    await form.getByLabel("Invoice file").setInputFiles(pdf);
+    const pills = form.getByTestId("run-file-artifactId-pills").locator("li");
+    await expect(pills).toHaveText(["invoice.pdf"]);
+    const before = await keyOf();
+    await form.getByRole("button", { name: "Remove invoice.pdf" }).click();
+    await expect(form.locator('input[name="input:artifactId"]')).toHaveCount(0);
+    expect(await keyOf()).not.toBe(before);
+    await start.click();
+    await expect(form.getByRole("alert")).toHaveText("Add Invoice file first.");
+    expect(await runStarts()).toEqual([]);
+    await form.getByLabel("Invoice file").setInputFiles(pdf);
+    await expect(pills).toHaveText(["invoice.pdf"]);
+    await expect(form.getByRole("alert")).toHaveCount(0);
+    const key = await keyOf();
+    await start.click();
+    await expect(page).toHaveURL(
+      /\/account\/runs\/fixture-run-started\?from=flow$/u,
+    );
+    expect(
+      (await runStarts()).map(({ key: sent, status }) => [sent, status]),
+    ).toEqual([[key, 201]]);
+  });
+});
+
 test("2 — YOUR FLOWS says Unavailable when the flows cannot be read, and the rest of the dashboard still shows (build 34's F5)", async ({
   page,
 }) => {
@@ -146,10 +201,15 @@ test("2 — YOUR FLOWS says Unavailable when the flows cannot be read, and the r
   await expect(page.getByTestId("home-your-flows")).toContainText(
     "Unavailable",
   );
-  // One read failing takes nothing else with it: Today's tiles, and Add a
-  // flow and Flows (Build 22, W1).
+  // One read failing takes nothing else with it: Today's tiles, and the side
+  // nav's Flows (~~Add a flow and Flows~~ until build 43, item 2).
   await expect(page.getByTestId("today-stat-Runs")).toHaveText("3");
-  await expect(page.getByTestId("home-quick-actions")).toBeVisible();
+  await expect(page.getByTestId("home-quick-actions")).toHaveCount(0);
+  await expect(
+    page
+      .getByRole("complementary", { name: "Dashboard navigation" })
+      .getByRole("link", { name: "Flows", exact: true }),
+  ).toHaveAttribute("href", "/account/flows");
 });
 
 test("Activity with no run is the app's empty screen, with the way to Flows (the owner's build 9)", async ({

@@ -10,11 +10,15 @@
  * Since build 43, item 17 (the owner's words of 2026-11-13: "start throws an
  * error rather than starting if nothing was uploaded when required … the
  * document should dynamically show up in a horizontal pill with the document
- * name and an x"), it holds every start form's file words too: Upload's two
- * rows on Home's card (`TAKE_PHOTO_LABEL`, `CHOOSE_FILE_LABEL`), the error
- * of a required file missing (`addFileFirst`, found by `missingFile`), and
- * each pill's x (`removeFileLabel`, `withoutFile`). ~~`filesSelected`, "{n}
- * files selected" under a field of several~~ until build 43: its pills.
+ * name and an x"), it holds every start form's file words too: Take photo
+ * beside Upload off Home's card (`TAKE_PHOTO_LABEL`), the error of a
+ * required file missing (`addFileFirst`, found by `missingFile`), each
+ * pill's x (`removeFileLabel`, `withoutFile`), and what a screen reader is
+ * told as an upload ends or an x takes a file out (`uploadedLine`,
+ * `uploadedCountLine`, `removedLine`). ~~`filesSelected`, "{n} files
+ * selected" under a field of several~~ until build 43: its pills. ~~Upload's
+ * menu row "Choose file" on Home's card (`CHOOSE_FILE_LABEL`)~~ until build
+ * 43, item 3: the browser's own chooser (`RunFileField`).
  *
  * Pure, and loaded by its unit test as it is: no React and no `@/` import. (`run-files.ts` is the files a run made; this is the files a run is given.)
  */
@@ -30,11 +34,23 @@ export function tooManyFiles(max: number): string {
 /** The control a field of several files posts. */
 export const SEVERAL_FILES = "artifact-multiple";
 
-/** The camera: a button beside Upload, or the first row of Upload's menu on Home's card. */
+/** The camera: a button beside Upload, on a phone or a tablet, off Home's card. */
 export const TAKE_PHOTO_LABEL = "Take photo";
 
-/** The file picker: the second row of Upload's menu on Home's card. */
-export const CHOOSE_FILE_LABEL = "Choose file";
+/** Spoken, not shown, when one file chosen has uploaded. */
+export function uploadedLine(name: string): string {
+  return `Uploaded ${name}.`;
+}
+
+/** Spoken, not shown, when several files chosen at once have uploaded. */
+export function uploadedCountLine(count: number): string {
+  return `Uploaded ${count} files.`;
+}
+
+/** Spoken, not shown, when a pill's x takes its file out. */
+export function removedLine(name: string): string {
+  return `Removed ${name}.`;
+}
 
 /** The start form's error when a required file field holds no file: the field's own title. */
 export function addFileFirst(title: string): string {
