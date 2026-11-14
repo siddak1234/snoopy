@@ -1,4 +1,4 @@
-// From snoopy-backend packages/contracts/fixtures/blocks/*.json, sha256 ba367c54181b39ebb890fb48da3580e9f927718ef64a9a0e9d71f94e2cc63f74.
+// From snoopy-backend packages/contracts/fixtures/blocks/*.json, sha256 7de40839acf5f6555d1c21d99807e566da385f0a6610f289bfbde8880630012b.
 // Regenerate with `npm run generate:platform-contracts`; never edit by hand.
 /** A page body and its visible words in reading order, closed sections left out. */
 export type BlockFixture = {
@@ -720,7 +720,7 @@ export const BLOCK_FIXTURES: readonly BlockFixture[] = [
           },
           {
             lead: "4",
-            title: "Failed",
+            title: "Cancelled",
             muted: true,
             open: { target: "run", runId: "r4" },
           },
@@ -738,7 +738,7 @@ export const BLOCK_FIXTURES: readonly BlockFixture[] = [
       "3",
       "Reading…",
       "4",
-      "Failed",
+      "Cancelled",
     ],
   },
   {
@@ -1030,7 +1030,7 @@ export const BLOCK_FIXTURES: readonly BlockFixture[] = [
   {
     name: "reviewer-item-scores",
     about:
-      "An item whose page lists scores: 3 scored runs, 1 running and 1 failed, as one bar chart",
+      "An item whose page lists scores: 3 scored runs, 1 running and 1 cancelled, as one bar chart",
     blockSetVersion: 5,
     blocks: [
       {
@@ -1099,7 +1099,7 @@ export const BLOCK_FIXTURES: readonly BlockFixture[] = [
           },
           {
             lead: "5",
-            title: "Failed",
+            title: "Cancelled",
             muted: true,
             open: { target: "run", runId: "s5" },
           },
@@ -1141,7 +1141,7 @@ export const BLOCK_FIXTURES: readonly BlockFixture[] = [
       "4",
       "Reading…",
       "5",
-      "Failed",
+      "Cancelled",
       "Candidates by score",
       "Dana Whitfield",
       "88",
@@ -1269,7 +1269,7 @@ export const BLOCK_FIXTURES: readonly BlockFixture[] = [
           },
           {
             lead: "4",
-            title: "Failed",
+            title: "Cancelled",
             muted: true,
             open: { target: "run", runId: "r4" },
           },
@@ -1297,7 +1297,7 @@ export const BLOCK_FIXTURES: readonly BlockFixture[] = [
       "3",
       "Reading…",
       "4",
-      "Failed",
+      "Cancelled",
     ],
   },
   {
@@ -1352,7 +1352,7 @@ export const BLOCK_FIXTURES: readonly BlockFixture[] = [
           },
           {
             lead: "4",
-            title: "Failed",
+            title: "Cancelled",
             muted: true,
             open: { target: "run", runId: "r4" },
           },
@@ -1372,7 +1372,7 @@ export const BLOCK_FIXTURES: readonly BlockFixture[] = [
       "3",
       "Reading…",
       "4",
-      "Failed",
+      "Cancelled",
     ],
   },
   {

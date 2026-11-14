@@ -176,12 +176,14 @@ a catalog with nothing to add; the one flow card, its icon and
 description, on the Flows cards and the archived rows, with no department
 line), the dashboard (Today's three tiles, counted
 from the browser's midnight and each opening Activity from it; the approvals
-banner while something waits; Add a flow and Flows; YOUR FLOWS, its
+banner while something waits; no Add a flow and Flows pair, the side nav's
+Flows the way in — build 43, item 2; YOUR FLOWS, its
 department drop-down and Search flows over a card per flow, always open —
 the compact flow card in two rows (icon and name, a flow with items its job
 pill beside them, at most half the row, a long title cut short and measured at
 375 px; then one file's Upload and Start (Start filled), no field title —
-build 42, item 16, and build 43, item 17), its run opening
+build 42, item 16, and build 43, item 17; Upload the browser's own chooser
+with no `capture` — item 3), its run opening
 from the flow; a flow with items read as Home opens, on its newest ready
 item, its run opening from that item, back to it and then its flow; a
 member's Open — and a workspace with no flow yet), a flow's page (its live Dashboard, its five

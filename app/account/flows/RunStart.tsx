@@ -61,7 +61,8 @@ import { SPACING } from "@/lib/spacing";
  * a flow's page and an item's page draw it as before. Since build 43, item
  * 17 (the owner's words of 2026-11-13: "for the compact card i want two
  * buttons … upload start … start should be more bolded and colored"), that
- * row is Upload and Start alone (Take photo inside Upload's menu), and
+ * row is Upload and Start alone (~~Take photo inside Upload's menu~~ until
+ * build 43's item 3; docs/ARCHITECTURE.md "The quick-access card"), and
  * Home's Start is the one filled button (`Button` `filled`, the owner's
  * decision of 2026-11-13). A flow's page's Start run and an item's page's
  * Start stay the accent outline (`primary`): whether they take the fill is

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { CaretRightIcon } from "@phosphor-icons/react/dist/ssr/CaretRight";
-import { FlowArrowIcon } from "@phosphor-icons/react/dist/ssr/FlowArrow";
 import { HandPalmIcon } from "@phosphor-icons/react/dist/ssr/HandPalm";
 import { PlusIcon } from "@phosphor-icons/react/dist/ssr/Plus";
 import { SparkleIcon } from "@phosphor-icons/react/dist/ssr/Sparkle";
@@ -68,8 +67,8 @@ async function readHome(workspaceId: string | undefined) {
           )
         : null,
     // With no flow set up, ever — the catalog's flag, so a catalog that could
-    // not be read claims nothing — the first run takes the place of the
-    // buttons and the runs below (the app's HomeFirstRun).
+    // not be read claims nothing — the first run takes the place of YOUR
+    // FLOWS (the app's HomeFirstRun).
     firstRun:
       catalog !== null &&
       !catalog.automations.some((entry) => entry.subscribed),
@@ -110,8 +109,10 @@ function getFirstName(name?: string | null): string | null {
  *    opening Activity for them (`TodayTiles`);
  * 2. the approvals banner, only while something waits — right after Today
  *    (D6, the session's suggestion the owner approved), in the app's words;
- * 3. **Add a flow** and **Flows**, both to Flows, the website's one page for
- *    adding and for the flows added;
+ * 3. ~~**Add a flow** and **Flows**, both to Flows~~ until build 43, item 2
+ *    (the owner's words: "We dont need the flows and add flow button on the
+ *    home screen."): the side nav's Flows (`DashboardNav`) is the way in, the
+ *    website's one page for adding a flow and for the flows added;
  * 4. **YOUR FLOWS** (the owner's build 34 F5), only while the workspace has
  *    a live flow — its department drop-down and search, then each flow a
  *    card of its own, always open, with its run's first step and Start run
@@ -119,8 +120,8 @@ function getFirstName(name?: string | null): string | null {
  *    See all, four rows~~ until build 34; ~~a row per flow that opened in
  *    place~~ until builds 37 and 39.
  *
- * With no flow set up, ever, the first run takes the place of 3 and 4 — the
- * app's words, and its one way in. ~~Run a flow, Quick actions (Browse flows,
+ * With no flow set up, ever, the first run takes the place of 4 — the app's
+ * words, and its one way in, its own Add a flow. ~~Run a flow, Quick actions (Browse flows,
  * View teams, Connect integration), the Workspace overview and Get started~~
  * until Build 22 ("overflow" is the overview: the session's D4, approved by
  * the owner).
@@ -197,48 +198,19 @@ export default async function AccountDashboardPage() {
           }
         />
       ) : home ? (
-        <>
-          <div data-testid="home-quick-actions" className={GROUP_BAND}>
-            <div
-              className={`grid grid-cols-2 ${SPACING.inner.gap} sm:max-w-md`}
-            >
-              <Button
-                href="/account/flows"
-                prefetch={false}
-                className={`inline-flex items-center justify-center ${SPACING.inner.gap}`}
-              >
-                <PlusIcon aria-hidden size={20} />
-                Add a flow
-              </Button>
-              <Button
-                href="/account/flows"
-                variant="secondary"
-                prefetch={false}
-                className={`inline-flex items-center justify-center ${SPACING.inner.gap}`}
-              >
-                <FlowArrowIcon aria-hidden size={20} />
-                Flows
-              </Button>
-            </div>
-          </div>
-
-          {/* YOUR FLOWS draws its own title, with its department
-              drop-down beside it (the owner's builds 37 and 39, item 8). */}
-          {home.flows === null ? (
-            <Group
-              title={YOUR_FLOWS}
-              titleId="your-flows-title"
-              testId="home-your-flows"
-            >
-              <p className="text-sm text-[var(--muted)]">Unavailable</p>
-            </Group>
-          ) : home.flows.length > 0 ? (
-            <YourFlows
-              workspaceId={home.workspaceId}
-              departments={home.flows}
-            />
-          ) : null}
-        </>
+        // YOUR FLOWS draws its own title, with its department drop-down
+        // beside it (the owner's builds 37 and 39, item 8).
+        home.flows === null ? (
+          <Group
+            title={YOUR_FLOWS}
+            titleId="your-flows-title"
+            testId="home-your-flows"
+          >
+            <p className="text-sm text-[var(--muted)]">Unavailable</p>
+          </Group>
+        ) : home.flows.length > 0 ? (
+          <YourFlows workspaceId={home.workspaceId} departments={home.flows} />
+        ) : null
       ) : null}
     </SectionCard>
   );
