@@ -9,6 +9,7 @@ import { FormError } from "@/components/ui/FormError";
 import type { AutomationRunInputField } from "@/lib/automations";
 import type { AgreementOffer } from "@/lib/health-agreement";
 import { FROM_ITEM, runPagePath, type RunFrom } from "@/lib/run-progress";
+import { addFileFirst, missingFile } from "@/lib/several-files";
 import { FLOW_CHANGE_ADMIN_ONLY } from "@/lib/subscription-entitlements";
 import { setSubscriptionStatus, startRun } from "./actions";
 import { HealthAgreementDialog } from "./HealthAgreementDialog";
@@ -52,11 +53,31 @@ import { SPACING } from "@/lib/spacing";
  * gap is the card's inner one and the button says "Start", named "Start run"
  * while it waits (busy, its "Starting…" or "Uploading…" as everywhere). A run
  * input of exactly one file field puts Start at the end of that field's
- * button row — Take photo, Upload and Start on one row that wraps — with the
+ * button row (~~Take photo, Upload and Start on one row that wraps~~ until
+ * build 43; Upload and Start since, below) with the
  * field's title for screen readers only (`RunFileField` `compact`); any
  * other run input keeps its fields and their titles, then Start. ~~Start
  * run under the field, full width of its own row~~ until build 42, on Home;
- * a flow's page and an item's page draw it as before.
+ * a flow's page and an item's page draw it as before. Since build 43, item
+ * 17 (the owner's words of 2026-11-13: "for the compact card i want two
+ * buttons … upload start … start should be more bolded and colored"), that
+ * row is Upload and Start alone (Take photo inside Upload's menu), and
+ * Home's Start is the one filled button (`Button` `filled`, the owner's
+ * decision of 2026-11-13). A flow's page's Start run and an item's page's
+ * Start stay the accent outline (`primary`): whether they take the fill is
+ * the owner's open question.
+ *
+ * **A required file first** (build 43, item 17: "start throws an error rather
+ * than starting if nothing was uploaded when required. ensure this is a
+ * standard"): in every start form a press of Start with a required file
+ * field (`artifact`, `required`) holding no uploaded file — none of its
+ * `input:<key>` values in the form — says "Add {title} first." in the form's
+ * error line, in place of any other, and sends nothing (`missingFile`); Start
+ * stays pressable. The line goes once an upload starts, and is asked again at
+ * the next press. An optional file field left empty starts as before; the
+ * platform's 422 stays the backstop. Each file is a pill with an x
+ * (`RunFileField` `removable`); a file taken out is a changed input, so a new
+ * key (`onFilesChange`).
  *
  * Turning a flow on is a change only an owner or admin makes (backend §12.1
  * #180): to a member Turn on is read-only, with "Only an owner or admin can
@@ -115,6 +136,8 @@ export function RunStart({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // A required file missing at the press: shown in the error line's place.
+  const [missing, setMissing] = useState<string | null>(null);
   const [runKey, setRunKey] = useState(initialKey);
   const newRunKey = () => setRunKey(`run-${crypto.randomUUID()}`);
   // A file field uploads as soon as a file is chosen; the run waits for every
@@ -125,6 +148,8 @@ export function RunStart({
   );
   const uploading = uploadingFields.size > 0;
   const onUploadingChange = useCallback((key: string, busy: boolean) => {
+    // A file given to the form: the missing file's line goes.
+    if (busy) setMissing(null);
     setUploadingFields((current) => {
       if (busy === current.has(key)) return current;
       const next = new Set(current);
@@ -176,8 +201,15 @@ export function RunStart({
     event.preventDefault();
     if (!canRun || uploading) return;
     const data = new FormData(event.currentTarget);
-    data.set("workspaceId", workspaceId);
     setError(null);
+    // A required file field holding no uploaded file: said, and nothing sent.
+    // Only its hidden `input:<key>` values count (the chooser has no name).
+    const absent = missingFile(runInput, (key) =>
+      data.getAll(`input:${key}`).some((value) => value !== ""),
+    );
+    setMissing(absent ? addFileFirst(absent.title) : null);
+    if (absent) return;
+    data.set("workspaceId", workspaceId);
     startTransition(async () => {
       setError(await send(data));
     });
@@ -208,6 +240,7 @@ export function RunStart({
 
   const turnOn = () => {
     setError(null);
+    setMissing(null);
     startTransition(async () => {
       setError(await sendTurnOn());
     });
@@ -218,6 +251,7 @@ export function RunStart({
   const start = live ? (
     <Button
       type="submit"
+      variant={compact ? "filled" : "primary"}
       disabled={pending || uploading}
       aria-label={compact && !pending && !uploading ? "Start run" : undefined}
       className={`inline-flex items-center ${SPACING.inner.gap}`}
@@ -262,9 +296,11 @@ export function RunStart({
             showTypes={itemId !== undefined}
             compact={inRow}
             trailing={inRow ? start : undefined}
+            removable
+            onFilesChange={newRunKey}
           />
         ) : null}
-        <FormError message={error} />
+        <FormError message={missing ?? error} />
         {inRow ? null : (
           <div>
             {start ?? (

@@ -206,7 +206,8 @@ export function SetupFields({
  * A manual run's input fields. An `artifact` field is a file the run reads: it
  * is uploaded when chosen (backend FR-14) and carried as the file's id.
  * `compact` and `trailing` go to each file field as they are (`RunStart`
- * `compact`).
+ * `compact`); so do `removable` and `onFilesChange` (every start form's file
+ * field draws its files as pills with an x; build 43, item 17).
  */
 export function RunInputFields({
   runInput,
@@ -217,6 +218,8 @@ export function RunInputFields({
   showTypes = false,
   compact = false,
   trailing,
+  removable = false,
+  onFilesChange,
 }: {
   runInput: AutomationRunInputField[];
   /** The workspace the page showed, which a file's upload is checked against. */
@@ -231,6 +234,10 @@ export function RunInputFields({
   compact?: boolean;
   /** At the end of each file field's button row (Home's card: its Start). */
   trailing?: ReactNode;
+  /** Each file field's files as pills with an x (a start form's). */
+  removable?: boolean;
+  /** A file taken out with its x, under its field's key. */
+  onFilesChange?: (key: string) => void;
 }) {
   return (
     <div className={`flex flex-col ${SPACING.group.gap}`}>
@@ -245,6 +252,8 @@ export function RunInputFields({
             showTypes={showTypes}
             compact={compact}
             trailing={trailing}
+            removable={removable}
+            onFilesChange={onFilesChange}
           />
         ) : (
           <ManifestFieldInput
