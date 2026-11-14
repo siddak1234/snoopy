@@ -108,7 +108,8 @@ page reuses:
   The native apple one not ours."): on an iPhone or an iPad Safari shows its
   own menu, Photo Library, Take Photo, Choose File ("Choose Files" for a
   field of several; WebKit's `WKFileUploadPanel.mm` writes them, not this
-  site), on a computer the system's dialog; the card draws no camera input.
+  site), where the field takes photos (else the Files picker directly), on
+  a computer the system's dialog; the card draws no camera input.
   Every choice from that menu arrives through the one chooser, so on a
   field of several it replaces the files held. Start stays after Upload and
   nothing starts by itself (the owner's "1. Keep start after upload").
@@ -138,10 +139,10 @@ page reuses:
   field's Upload, never the page; and a hidden polite line beside the
   field's status line says "Uploaded {name}." (one file chosen) or
   "Uploaded {n} files." (several at once) as an upload ends and "Removed
-  {name}." as an x takes a file out (`uploadedLine`, `uploadedCountLine`,
+  {name}." as an x takes a file out (the design's words, its default; the
+  owner did not choose them) (`uploadedLine`, `uploadedCountLine`,
   `removedLine`), the line emptied first and the sentence set a frame
-  later, so two files of one name (Safari names every camera photo
-  "image.jpg") are each heard going. Nothing visible changes; the job upload card keeps its
+  later, so two files of one name are each heard going. Nothing visible changes; the job upload card keeps its
   "Ready:" line.
 - **A choice is a drop-down**: a flow's `select` field, a setup `select`
   (`app/account/flows/SelectField.tsx`) and a list's filter are the website's

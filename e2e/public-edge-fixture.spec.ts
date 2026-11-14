@@ -6730,7 +6730,7 @@ test.describe("build 43, item 17 — the quick-access card's Upload and filled S
     await fixtureControl("manual-several");
     const flow = await openFilledRun(page);
     const several = flow.getByTestId("run-file-artifactId-spoken");
-    // Safari names every camera photo "image.jpg"; two files of one name.
+    // Two files of one name.
     await flow
       .getByLabel("Invoice file")
       .setInputFiles([pdf("scan.pdf"), pdf("scan.pdf")]);

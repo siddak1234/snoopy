@@ -68,8 +68,9 @@ const SEARCH_FLOWS = fill(BLOCK_WORDS.searchItems, { items: "flows" });
  *
  * Since build 43, item 17 (the owner's words of 2026-11-13: "for the compact
  * card i want two buttons … upload start"), a run input of one file field
- * has exactly Upload and Start in row 2: Upload offers Take photo or Choose
- * file where the field can take a photo, Start is the filled primary, each
+ * has exactly Upload and Start in row 2: Upload opens the browser's own
+ * chooser (build 43, item 3; ~~Upload offers Take photo or Choose file where
+ * the field can take a photo~~ until then), Start is the filled primary, each
  * file given is a pill with an x, and Start with a required file missing
  * says "Add {title} first." (`RunStart`, `RunFileField`; nothing changes
  * here). ~~Take photo, Upload and Start on one row~~ until build 43.

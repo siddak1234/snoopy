@@ -15,7 +15,8 @@ import {
  * one row, no visible field title for a run input of one file field, the
  * uploading or ready line under the row only once a file is picked. Every
  * other place the start form is drawn stays as it was. Build 43, item 17
- * changed (b) and (e): Take photo inside Upload's menu, and a file a pill.
+ * changed (b) and (e): Upload and Start alone, and a file a pill; since build
+ * 43's item 3 Upload opens the browser's own chooser on the card.
  */
 
 const RUN_START = "app/account/flows/RunStart.tsx";
@@ -115,9 +116,9 @@ test("build 42, item 16 (a): Home's card, one file field — no visible field ti
 });
 
 // ~~Take photo, Upload and Start on a phone's row~~ until build 43, item 17:
-// Upload and Start alone, Take photo inside Upload's menu
-// (test/build43-item17.test.mjs).
-test("build 42, item 16 (b): Upload and Start share one row (a phone: Take photo inside Upload's menu since build 43); two fields keep Start on its own", async () => {
+// Upload and Start alone; since build 43's item 3 Upload opens the browser's
+// own chooser on the card (test/build43-item17.test.mjs).
+test("build 42, item 16 (b): Upload and Start share one row (on the card Upload opens the browser's chooser since build 43's item 3); two fields keep Start on its own", async () => {
   const rowOf = (markup) => {
     const row = nodes(markup).find((node) =>
       (node.children ?? []).some(
