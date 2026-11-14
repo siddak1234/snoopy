@@ -102,7 +102,7 @@ const unknownOnServer = () => false;
  * margin only once they say something, so nothing stands empty under the
  * row before a pick. ~~The visible title over the buttons, and the line's
  * margin always~~ until build 42, on Home's card. The card's row and its
- * Upload since build 43: `docs/ARCHITECTURE.md`, "The quick-access card".
+ * Upload since build 43: docs/ARCHITECTURE.md "The quick-access card".
  *
  * **Pills** (`removable`, every start form's field — Home's card, a flow's
  * page, an item's page — since build 43, item 17: "the document should
@@ -117,7 +117,7 @@ const unknownOnServer = () => false;
  * and "{n} files selected"~~ until build 43 in the start forms; the job
  * upload card (`UploadItemCard`, no `removable`) keeps its "Ready:" line.
  * The x's focus ring, the focus after an x and the hidden spoken line:
- * `docs/ARCHITECTURE.md`, "A start form's files".
+ * docs/ARCHITECTURE.md "A start form's files".
  *
  * An upload belongs to the field that started it: its busy state is reported
  * under the field's key, it stops when the field goes (the form closed), and an
