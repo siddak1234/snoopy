@@ -1,8 +1,11 @@
 /**
- * The response headers every path of this site sends (the owner's security
- * plan, item 7, 2026-11-15): `next.config.ts`'s `headers()` sends these on
- * every route, page, file and API alike. Strict-Transport-Security is not
- * here: Vercel sends it. A route's own headers (the file routes'
+ * The response headers this site sends on everything it serves itself (the
+ * owner's security plan, item 7, 2026-11-15): `next.config.ts`'s `headers()`
+ * puts them on pages, file routes, its own API routes, 404s and static files.
+ * Two kinds pass through without them, pinned by the browser suite: the
+ * config's redirects (a 308 with no body) and the `/api/platform` proxy to the
+ * platform (JSON, never framed or shown as a page). Strict-Transport-Security
+ * is not here: Vercel sends it. A route's own headers (the file routes'
  * `frame-ancestors 'self'` policy, `lib/file-view.ts`) stay as they are.
  *
  * The policy is report-only: the browser reports what breaks it and blocks

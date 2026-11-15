@@ -197,7 +197,7 @@ test.describe("the content security policy, report-only", () => {
   }
 
   test(
-    "every path sends the five security headers, and a file route keeps its own policy",
+    "everything the site serves itself sends the five security headers, and a file route keeps its own policy",
     { tag: "@chromium-only" },
     async ({ page }) => {
       const sent = securityHeaders();
@@ -230,6 +230,27 @@ test.describe("the content security policy, report-only", () => {
           undefined,
         );
       }
+      // A 404 and a built static file are served by the site too: the five.
+      const missing = await page.request.get("/no-such-page-for-headers");
+      expect(missing.status()).toBe(404);
+      expectSent(missing.headersArray(), "a 404");
+      const home = await (await page.request.get("/")).text();
+      const asset = /\/_next\/static\/[^"']+\.js/.exec(home)?.[0];
+      expect(asset, "a static script on the home page").toBeTruthy();
+      const built = await page.request.get(asset as string);
+      expect(built.status()).toBe(200);
+      expectSent(built.headersArray(), "a static file");
+      // Two kinds pass through without them (docs/ARCHITECTURE.md, "Response
+      // headers"): a config redirect (a 308 with no body) and the platform
+      // proxy (JSON, never framed or shown as a page). Pinned, so a change
+      // either way is seen and the docs follow.
+      const moved = await page.request.get("/solutions/healthcare", {
+        maxRedirects: 0,
+      });
+      expect(moved.status()).toBe(308);
+      expect(moved.headers()["x-content-type-options"]).toBe(undefined);
+      const proxied = await page.request.get("/api/platform/v1/session");
+      expect(proxied.headers()["x-content-type-options"]).toBe(undefined);
       // A file route, as the package page reads it (it answers this site's
       // pages alone): the five, and its own enforced policy, which frames it
       // on this site alone.
