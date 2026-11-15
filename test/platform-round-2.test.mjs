@@ -49,7 +49,7 @@ const STUBS = {
   "@/app/account/flows/actions":
     "export const decideApproval = async () => ({ ok: true });",
   "./upload-actions":
-    "export const openRunUpload = async () => ({ ok: false, error: 'x' }); export const completeRunUpload = async () => ({ ok: false, error: 'x' });",
+    "export const openRunUpload = async () => ({ ok: false, error: 'x' }); export const completeRunUpload = async () => ({ ok: false, error: 'x' }); export const discardRunUpload = async () => undefined;",
   "next/navigation":
     "export const useRouter = () => ({ push() {}, refresh() {}, replace() {} });",
 };

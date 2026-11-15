@@ -25,7 +25,11 @@ import {
   typesInWords,
   type RunFileSource,
 } from "./run-file-image";
-import { completeRunUpload, openRunUpload } from "./upload-actions";
+import {
+  completeRunUpload,
+  discardRunUpload,
+  openRunUpload,
+} from "./upload-actions";
 import { completeWhenMeasured } from "./upload-completion";
 import { SPACING } from "@/lib/spacing";
 import {
@@ -60,6 +64,22 @@ const onPhoneOrTablet = () => window.matchMedia(PHONE_OR_TABLET).matches;
 // The server cannot know: Take photo is drawn once the browser says it is a
 // phone or a tablet.
 const unknownOnServer = () => false;
+
+/**
+ * The files a field let go of before any run was given them, deleted at once
+ * (the owner's decision 17 of 2026-11-15, "delete at once"; the app's
+ * `discardFiles`): each sent in the background for the workspace the page
+ * showed — every upload from the field went there — and nothing said whatever
+ * the platform answers (`discardRunUpload`).
+ */
+export function discardFiles(
+  workspaceId: string,
+  artifactIds: readonly string[],
+): void {
+  for (const artifactId of artifactIds) {
+    void discardRunUpload(workspaceId, artifactId).catch(() => undefined);
+  }
+}
 
 /**
  * A run's file field (backend FR-14, ADR-0030's `artifact` control).
@@ -112,16 +132,29 @@ const unknownOnServer = () => false;
  * {name}", that takes that file alone out of the field (and so out of the
  * form: its hidden `input:<key>` goes with it) and tells the form
  * (`onFilesChange`, a new run key); several in one row that scrolls
- * sideways. Nothing is deleted on the server: the stored copy stays until
- * retention. While a file uploads no pill shows. ~~"Ready: {name} ({size})"
+ * sideways. While a file uploads no pill shows. ~~"Ready: {name} ({size})"
  * and "{n} files selected"~~ until build 43 in the start forms; the job
  * upload card (`UploadItemCard`, no `removable`) keeps its "Ready:" line.
  * The x's focus ring, the focus after an x and the hidden spoken line:
  * docs/ARCHITECTURE.md "A start form's files".
  *
+ * **Deleted at once** (the owner's decision 17 of 2026-11-15, "delete at
+ * once"; `discardFiles`): a file the field lets go of before any run was
+ * given it is discarded on the platform in the background, nothing said —
+ * the one an x takes out; a held file a new choice replaces; the files a
+ * choice that empties the field held (one refused, past `maxFiles`, a type
+ * refused, a failed upload); and a file whose upload ends after the field
+ * stopped waiting for it. A photo that adds discards nothing, nor does a
+ * field drawn away (a page left, a file the platform no longer takes).
+ * ~~Nothing is deleted on the server: the stored copy stays until
+ * retention~~ until then. **`starting`**: the form's Start (or the job
+ * card's Upload) is pending, so the x, Upload, Take photo and their inputs
+ * are held — no file is replaced or discarded under the run being started.
+ *
  * An upload belongs to the field that started it: its busy state is reported
  * under the field's key, it stops when the field goes (the form closed), and an
- * answer that arrives for one no longer in flight changes nothing.
+ * answer that arrives for one no longer in flight changes nothing — but the
+ * file it made is discarded.
  */
 export function RunFileField({
   field,
@@ -133,6 +166,7 @@ export function RunFileField({
   trailing,
   removable = false,
   onFilesChange,
+  starting = false,
 }: {
   field: AutomationRunInputField;
   /** The workspace the page showed; the upload is refused once it is not active. */
@@ -149,6 +183,8 @@ export function RunFileField({
   removable?: boolean;
   /** A file was taken out with its x (a removal fires no form `change`). */
   onFilesChange?: (key: string) => void;
+  /** The form's Start (or the job card's Upload) is pending: the x and the file buttons held. */
+  starting?: boolean;
 }) {
   const inputId = useId();
   const typesId = useId();
@@ -235,7 +271,11 @@ export function RunFileField({
       () => completeRunUpload(workspaceId, uploadSessionId),
       upload.signal,
     );
-    if (upload.signal.aborted) return;
+    if (upload.signal.aborted) {
+      // Completed after the field stopped waiting for it: never held, so discarded.
+      if (completed.ok) discardFiles(workspaceId, [completed.file.artifactId]);
+      return;
+    }
     if (!completed.ok) throw new Error(completed.error);
     return {
       artifactId: completed.file.artifactId,
@@ -247,6 +287,9 @@ export function RunFileField({
   const choose = async (chosen: File | undefined, source: RunFileSource) => {
     setError(null);
     hush();
+    // Every choice lets go of the file held — a new one, a refused one or
+    // none: that one is discarded at once (decision 17).
+    if (state.kind === "ready") discardFiles(workspaceId, [state.artifactId]);
     if (!chosen) {
       setState({ kind: "empty" });
       return;
@@ -319,13 +362,24 @@ export function RunFileField({
   ) => {
     setError(null);
     hush();
-    // A photo is added to the files held; a choice replaces them.
+    // A photo is added to the files held; a choice replaces them. The files
+    // a choice lets go of are discarded at once (decision 17).
     const kept = source === "camera" ? files : [];
+    const letGo = (gone: readonly SentFile[]) =>
+      discardFiles(
+        workspaceId,
+        gone.map((file) => file.artifactId),
+      );
     if (chosen.length === 0) {
-      if (source === "chooser") setState({ kind: "empty" });
+      if (source === "chooser") {
+        letGo(files);
+        setState({ kind: "empty" });
+      }
       return;
     }
-    const empty = (message: string) => {
+    // Nothing held, and why: the files let go of (those held, unless named) discarded.
+    const empty = (message: string, gone: readonly SentFile[] = files) => {
+      letGo(gone);
       setState({ kind: "empty" });
       if (input.current) input.current.value = "";
       setError(message);
@@ -351,7 +405,12 @@ export function RunFileField({
     const upload = new AbortController();
     inFlight.current = upload;
     onBusyChange(field.key, true);
+    // The files held and not kept are replaced.
+    letGo(files.filter((file) => !kept.includes(file)));
     const sent: SentFile[] = [...kept];
+    // This choice's own files, sent before the field stopped waiting for it:
+    // never held, so discarded.
+    const abandon = () => letGo(sent.slice(kept.length));
     try {
       for (const [at, chosenFile] of chosen.entries()) {
         const plan = plans[at];
@@ -362,9 +421,9 @@ export function RunFileField({
         });
         const file =
           plan === "re-encode" ? await reencodeImage(chosenFile) : chosenFile;
-        if (upload.signal.aborted) return;
+        if (upload.signal.aborted) return abandon();
         const one = await sendFile(file, upload);
-        if (!one) return;
+        if (!one) return abandon();
         sent.push(one);
       }
       setState({ kind: "several", files: sent });
@@ -374,11 +433,13 @@ export function RunFileField({
           : uploadedCountLine(chosen.length),
       );
     } catch (failure) {
-      if (upload.signal.aborted) return;
+      if (upload.signal.aborted) return abandon();
+      // The field empties: the files kept and this choice's sent ones go with it.
       empty(
         failure instanceof Error
           ? failure.message
           : "The file could not be sent.",
+        sent,
       );
     } finally {
       if (inFlight.current === upload) {
@@ -391,8 +452,10 @@ export function RunFileField({
   // The x: that one file out of the field, the rest kept in their order. The
   // chooser is emptied so the same file can be chosen again. The focus goes
   // to the x now in its place, else the one before, else Upload: each is
-  // drawn already, and React keeps a kept file's x (its key) as it is.
+  // drawn already, and React keeps a kept file's x (its key) as it is. The
+  // file goes from the platform too, at once and unsaid (decision 17).
   const remove = (at: number) => {
+    discardFiles(workspaceId, [files[at]!.artifactId]);
     const rest = several ? withoutFile(files, at) : [];
     setState(
       rest.length > 0 ? { kind: "several", files: rest } : { kind: "empty" },
@@ -403,6 +466,10 @@ export function RunFileField({
     (next ? xRefs.current.get(next.artifactId) : uploadRef.current)?.focus();
     onFilesChange?.(field.key);
   };
+
+  // Upload, Take photo and their inputs wait for an upload, and for the
+  // form's Start (`starting`), so nothing is replaced under a run.
+  const busy = state.kind === "uploading" || starting;
 
   // A start form's field shows its files as pills; elsewhere (the job upload
   // card) one file's "Ready:" line, as before.
@@ -428,7 +495,7 @@ export function RunFileField({
       variant="secondary"
       size="sm"
       className={`inline-flex items-center ${SPACING.inner.gap}`}
-      disabled={state.kind === "uploading"}
+      disabled={busy}
       onClick={() => input.current?.click()}
       aria-describedby={showTypes ? typesId : undefined}
     >
@@ -472,7 +539,7 @@ export function RunFileField({
         accept={fileAccept(accepted)}
         multiple={several}
         hidden
-        disabled={state.kind === "uploading"}
+        disabled={busy}
         onChange={(event) =>
           several
             ? void chooseSeveral(
@@ -496,7 +563,7 @@ export function RunFileField({
               capture="environment"
               hidden
               multiple={several}
-              disabled={state.kind === "uploading"}
+              disabled={busy}
               onChange={(event) => {
                 const photos = Array.from(event.currentTarget.files ?? []);
                 // Emptied at once: every photo is a new choice. Closing the
@@ -511,7 +578,7 @@ export function RunFileField({
               variant="secondary"
               size="sm"
               className={`inline-flex items-center ${SPACING.inner.gap}`}
-              disabled={state.kind === "uploading"}
+              disabled={busy}
               onClick={() => camera.current?.click()}
             >
               {takePhoto}
@@ -559,7 +626,8 @@ export function RunFileField({
                   else xRefs.current.delete(file.artifactId);
                 }}
                 onClick={() => remove(at)}
-                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-[var(--text)] hover:bg-[var(--surface-hover)] focus-visible:-outline-offset-2! active:bg-[var(--surface-hover)]"
+                disabled={starting}
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-[var(--text)] hover:bg-[var(--surface-hover)] focus-visible:-outline-offset-2! active:bg-[var(--surface-hover)] disabled:opacity-60"
               >
                 <XIcon size={20} aria-hidden />
               </button>

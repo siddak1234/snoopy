@@ -366,6 +366,40 @@ export async function completeUpload(
   return response.artifact;
 }
 
+/**
+ * `discardUpload` (`DELETE /v1/workspaces/{workspaceId}/uploads/{artifactId}`,
+ * the platform's BUILD-PLAN 30.18.1; the owner's decision 17 of 2026-11-15,
+ * "delete at once"), typed by hand from the platform's branch
+ * `round-22/phase-a-platform` (snoopy-backend #289,
+ * `snoopy-backend/docs/openapi/automations.yaml`): its route is not yet on
+ * the platform's `main`, so not in
+ * `lib/generated/`. Once it merges, `npm run generate:platform-contracts`
+ * brings it in and these two types become
+ * `operations["discardUpload"]["parameters"]["path"]` and its 204. No body
+ * either way, and no `Idempotency-Key`: a repeat is the same success.
+ */
+export type DiscardUploadPath = { workspaceId: string; artifactId: string };
+/** 204: the file is deleted, now or already. */
+export type DiscardUploadResponse = void;
+
+/**
+ * The bytes of a file this person uploaded and no run has been given,
+ * deleted now rather than by retention. 204, again for a file already gone;
+ * 400 an id that is not a UUID; 401; 404 another person's file or one this
+ * workspace never held; 409 `file_in_use`, a run holds it; 503 the store
+ * could not delete it yet (the next retention pass does). Same-origin
+ * applies: the cookie and the Origin are forwarded (`platformServerJson`).
+ */
+export async function discardUpload({
+  workspaceId,
+  artifactId,
+}: DiscardUploadPath): Promise<DiscardUploadResponse> {
+  await platformServerJson<null>(
+    `${scope(workspaceId)}/uploads/${encodeURIComponent(artifactId)}`,
+    { method: "DELETE" },
+  );
+}
+
 /** The key is the caller's: a resubmitted run form must reuse its own. */
 export function createRun(
   workspaceId: string,

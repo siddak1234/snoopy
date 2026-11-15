@@ -264,11 +264,11 @@ test("a field that goes stops the waiting at once, and nothing more is asked", a
   });
 });
 
-test("the Run window completes through it with the upload's own signal, and drops an answer once that is aborted", () => {
+test("the Run window completes through it with the upload's own signal, and drops an answer once that is aborted — discarding the file it made (the owner's decision 17 of 2026-11-15)", () => {
   const field = read("app/account/flows/RunFileField.tsx");
   assert.match(
     field,
-    /const \{ uploadSessionId \} = opened\.ticket;\s*const completed = await completeWhenMeasured\(\s*\(\) => completeRunUpload\(workspaceId, uploadSessionId\),\s*upload\.signal,\s*\);\s*if \(upload\.signal\.aborted\) return;\s*if \(!completed\.ok\) throw new Error\(completed\.error\);/u,
+    /const \{ uploadSessionId \} = opened\.ticket;\s*const completed = await completeWhenMeasured\(\s*\(\) => completeRunUpload\(workspaceId, uploadSessionId\),\s*upload\.signal,\s*\);\s*if \(upload\.signal\.aborted\) \{\s*\/\/[^\n]*\n\s*if \(completed\.ok\) discardFiles\(workspaceId, \[completed\.file\.artifactId\]\);\s*return;\s*\}\s*if \(!completed\.ok\) throw new Error\(completed\.error\);/u,
   );
   assert.equal(
     (field.match(/completeRunUpload\(/gu) ?? []).length,

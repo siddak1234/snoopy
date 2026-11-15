@@ -126,8 +126,10 @@ page reuses:
   flow's page, an item's page) draws the files a field holds, one or
   several, as pills under its buttons, in one row that scrolls sideways:
   the name, cut with an ellipsis, and an x ("Remove {name}") that takes
-  that file alone out of the run (a new run key; nothing deleted on the
-  server, the stored copy kept until retention). A press of Start with a
+  that file alone out of the run (a new run key) and deletes it on the
+  platform at once (see **Deleted at once**, below; ~~nothing deleted on the
+  server, the stored copy kept until retention~~ until the owner's decision
+  17 of 2026-11-15). A press of Start with a
   required file field holding none says "Add {title} first." and sends
   nothing; an optional one starts as before. The filled Start and the
   two-button row are the quick-access card's alone. For the keyboard and
@@ -144,6 +146,58 @@ page reuses:
   `removedLine`), the line emptied first and the sentence set a frame
   later, so two files of one name are each heard going. Nothing visible changes; the job upload card keeps its
   "Ready:" line.
+- **Deleted at once** (the owner's decision 17 of 2026-11-15, verbatim:
+  "delete at once"; `discardFiles` in `RunFileField.tsx`, the server action
+  `discardRunUpload`, `discardUpload` in `lib/automations.ts`: `DELETE
+  /v1/workspaces/{workspaceId}/uploads/{artifactId}`, the platform's
+  BUILD-PLAN 30.18.1): the x on a pill — Home's card, a flow's page, an
+  item's page; one file or several — takes it out at once, as before, and
+  sends the discard in the background, saying nothing whatever comes back
+  (204, again for a file already gone; 400; 401; 404 not the uploader's;
+  409 `file_in_use`; 503; no answer: retention deletes what a discard
+  could not). The session's reading of "delete at once", the app's defaults
+  too, not the owner's words: a held file a new choice replaces is
+  discarded; the job upload card's file when its Cancel closes it — and
+  Escape or a press outside, the website's way of dismissing it, which is
+  Cancel (the app's system back); a choice that empties a field of several
+  (past `maxFiles`, a type refused, a failed upload) discards the files it
+  held, and on a field of one file any choice lets the held one go (the
+  website's field empties for a refused type, where the app's keeps it); an
+  upload that completes after its field stopped waiting is discarded; a
+  photo that adds, a field drawn away (a page left, the fields emptied for a
+  file the platform no longer takes) and an item made discard nothing; while
+  Start, or the job card's Upload, is pending, the x, Upload, Take photo and
+  their inputs are disabled (`starting`; Turn on pending holds nothing). A
+  discard goes to the workspace the page showed only while it is still the
+  active one (register F28); after a switch in another tab nothing is sent.
+  The route is not on the platform's `main` yet: its two types are typed by
+  hand in `lib/automations.ts` from the platform branch's
+  `snoopy-backend/docs/openapi/automations.yaml`, and `lib/generated/` is untouched; once
+  it merges, `npm run generate:platform-contracts` brings `discardUpload` in
+  and the hand types go.
+- **The app aligned** (the owner's decision 19 of 2026-11-15, verbatim:
+  "19. align a-d no assumptions and no laziness"; the session's parity check
+  of the app at `7cc471e` against this site at `6973352`): (a) Upload off
+  Home's card — this site's is the browser's chooser with no `capture`
+  (Safari's own menu on an iPhone or iPad) and Take photo,
+  `capture="environment"`, beside it on a phone (`RunFileField.tsx`); the app
+  now opens Apple's sheet there on iOS. No change here. (b) Photo names —
+  this site sends the browser's `File.name`, an image re-encoded under its
+  own name ending `.jpg` (`jpegName`), and a file with no name as
+  `image.jpg`; the app now does the same. No change here. (c) Spoken names
+  — "Take photo for {title}" and "Upload for {title}" on every form (Home's
+  card, a flow's page, an item's page, the job upload card), one file or
+  several: already this site's; the app now says them. (d) Take photo
+  (`takesPhotos`) — offered where no accept list is named, or where one
+  names `image/jpeg` in any case; an empty list takes no photo, since the
+  platform's wire schema says "An empty list accepts nothing" and a
+  manifest declaring one is refused (~~an empty list took photos~~ here
+  until then); both clients changed. (a)–(d) are the owner's "align a-d";
+  (e), the app's stale comment on Upload's menu, is the session's
+  recommendation and the app's alone. Found and left as it is: a field with
+  an empty list is otherwise drawn here as one naming no types (PDF, JPEG or
+  PNG accepted, `fileAccept`, `planRunFile`), where the app and the platform
+  accept nothing — a list no valid manifest publishes.
 - **A choice is a drop-down**: a flow's `select` field, a setup `select`
   (`app/account/flows/SelectField.tsx`) and a list's filter are the website's
   drop-down (`components/ui/Dropdown.tsx`) — a pill for a filter, a field's
@@ -721,7 +775,9 @@ the values typed before (`listItems`' `choices`, each held by its words, so a
 re-read while the card is open never changes the pick) and "Other", whose own
 box, labelled Other, takes 40 characters; a text box; the file, uploaded
 through a run's own upload path; then `createItem` with a key made with the
-card ("Nothing was uploaded…", and a refused field under its field). An item's
+card ("Nothing was uploaded…", and a refused field under its field). Its
+Cancel — or Escape or a press outside — discards the file it held (decision
+17, "Screen standards", **Deleted at once**). An item's
 page, `/account/flows/[subscriptionId]/items/[itemId]`, shows its header,
 then its body as the platform's blocks ("Screen standards"): its tiles —
 Total, then the flow's verdict words with the item's tallies, green and red

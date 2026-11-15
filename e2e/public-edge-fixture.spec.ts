@@ -861,6 +861,16 @@ function fixtureFiles() {
   );
 }
 
+// The discards the website sent (the owner's decision 17 of 2026-11-15,
+// "delete at once"), read at the fixture: each is sent in the background and
+// no page shows it. The name is the file's, or null for one the workspace
+// does not hold.
+function fixtureDiscards() {
+  return fixtureRead<
+    { artifactId: string; filename: string | null; status: number }[]
+  >("discards");
+}
+
 // How many completions of an upload the platform was asked for: a file waiting
 // to be measured is completed again by itself (Round 17's B5), and no page
 // shows how often.
@@ -1785,14 +1795,21 @@ test.describe("a photo or an image for a run (backend BUILD-PLAN 25.8.5)", () =>
       await expect(page).toHaveURL(
         /\/account\/runs\/fixture-run-started\?from=flow$/,
       );
+      // The PDF the photo replaced is discarded at once (the owner's decision
+      // 17 of 2026-11-15); ~~kept, given to no run, until retention~~ until then.
       expect(await fixtureFiles()).toEqual([
-        { filename: "invoice.pdf", sizeBytes: 24 },
         {
           filename: "image.jpg",
           sizeBytes: Buffer.from(taken!.bytes, "base64").byteLength,
           runId: "fixture-run-started",
         },
       ]);
+      expect(
+        (await fixtureDiscards()).map(({ filename, status }) => [
+          filename,
+          status,
+        ]),
+      ).toEqual([["invoice.pdf", 204]]);
     });
   });
 });
@@ -3473,6 +3490,31 @@ test("the dashboard of a workspace with no flow yet: Today, then the first run's
   await expect(main.getByRole("link", { name: "Add a flow" })).toHaveCount(1);
   await expect(main.getByTestId("home-quick-actions")).toHaveCount(0);
   await expect(main.getByTestId("home-your-flows")).toHaveCount(0);
+  await expectNoAxeViolations(page);
+});
+
+test("the dashboard of a workspace whose flows are set up and none live: Today alone — no YOUR FLOWS, no first run's words, no Add a flow; the side nav's Flows is the way in (build 43, item 2; PR #84's recorded debt 1)", async ({
+  page,
+}) => {
+  await fixtureControl("flows-paused");
+  await page.goto("/account");
+  const main = page.locator("main");
+  await expect(main.getByRole("heading", { level: 1 })).toHaveText(
+    "Welcome, Fixture!",
+  );
+  await expect(main.getByTestId("home-stats")).toBeVisible();
+  await expect(main.getByRole("heading", { level: 2 })).toHaveText(["Today"]);
+  await expect(main.getByTestId("home-your-flows")).toHaveCount(0);
+  await expect(
+    main.getByRole("heading", { name: "Nothing automated. Yet." }),
+  ).toHaveCount(0);
+  await expect(main.getByRole("link", { name: "Add a flow" })).toHaveCount(0);
+  await expect(main.getByTestId("run-form")).toHaveCount(0);
+  await expect(
+    page
+      .getByRole("complementary", { name: "Dashboard navigation" })
+      .getByRole("link", { name: "Flows", exact: true }),
+  ).toHaveAttribute("href", "/account/flows");
   await expectNoAxeViolations(page);
 });
 
@@ -6333,6 +6375,9 @@ test.describe("build 43, item 17 — the quick-access card's Upload and filled S
   test.use({ ignoreHTTPSErrors: true });
 
   const HOME_INVOICE = "home-flow-f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1";
+  // The items flow's ready job, whose page starts a run of one Entry file.
+  const ITEM_PAGE =
+    "/account/flows/b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1/items/b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2";
   const HOME_ITEMS = "home-flow-b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1";
   const pdf = (name: string) => ({ ...invoicePdf, name });
   const entryPdf = { ...invoicePdf, name: "entry.pdf" };
@@ -6429,7 +6474,7 @@ test.describe("build 43, item 17 — the quick-access card's Upload and filled S
     expect(await itemStarts()).toHaveLength(1);
   });
 
-  test("a flow's page: the same error, pills and x; several files a pill each in order, one taken out keeps the rest in order, and ONE run gets the rest", async ({
+  test("a flow's page: the same error, pills and x; several files a pill each in order, one taken out keeps the rest in order and is discarded at once, and ONE run gets the rest", async ({
     page,
   }) => {
     await fixtureControl("run-file-required");
@@ -6464,7 +6509,16 @@ test.describe("build 43, item 17 — the quick-access card's Upload and filled S
       [key, 201],
     ]);
     expect(starts[0]!.input.artifactId as string[]).toHaveLength(2);
-    // Nothing is deleted: b.pdf stays stored, given to no run.
+    // b.pdf's x discarded it at once (the owner's decision 17 of
+    // 2026-11-15, "delete at once"): one discard, answered 204, and the two
+    // left given to the run. ~~Nothing is deleted: b.pdf stays stored, given
+    // to no run~~ until then.
+    expect(
+      (await fixtureDiscards()).map(({ filename, status }) => [
+        filename,
+        status,
+      ]),
+    ).toEqual([["b.pdf", 204]]);
     expect(
       (await fixtureFiles()).map(({ filename, runId }) => [
         filename,
@@ -6472,7 +6526,6 @@ test.describe("build 43, item 17 — the quick-access card's Upload and filled S
       ]),
     ).toEqual([
       ["a.pdf", "fixture-run-started"],
-      ["b.pdf", null],
       ["c.pdf", "fixture-run-started"],
     ]);
   });
@@ -6765,6 +6818,133 @@ test.describe("build 43, item 17 — the quick-access card's Upload and filled S
     ).toContain("");
   });
 
+  test("follow-up 2 (PR #84's recorded debt 2) — a one-file field: after its x, by Enter, Space or a click, the focus is on Upload, never the page — Home's card, a flow's page and an item's page", async ({
+    page,
+  }) => {
+    for (const [open, title] of [
+      [() => invoiceCard(page), "Document"],
+      [() => openFilledRun(page), "Invoice file"],
+      [
+        async () => {
+          await fixtureControl("items-flow");
+          await page.goto(ITEM_PAGE);
+          return page.getByTestId("item-add");
+        },
+        "Entry file",
+      ],
+    ] as const) {
+      const form = await open();
+      const url = page.url();
+      for (const press of ["Enter", "Space", "click"] as const) {
+        await form.getByLabel(title).setInputFiles(invoicePdf);
+        const x = form.getByRole("button", { name: "Remove invoice.pdf" });
+        await expect(x).toBeVisible();
+        if (press === "click") await x.click();
+        else {
+          await x.focus();
+          await page.keyboard.press(press);
+        }
+        await expect(x).toHaveCount(0);
+        await expect(
+          form.getByRole("button", { name: `Upload for ${title}` }),
+        ).toBeFocused();
+        expect(page.url()).toBe(url);
+      }
+    }
+  });
+
+  test("follow-up 2 (PR #84's recorded debt 2) — on a field of several a click on an x moves the focus as Enter does: to the x now in its place, else the one before, else Upload", async ({
+    page,
+  }) => {
+    await fixtureControl("manual-several");
+    const form = await openFilledRun(page);
+    await form
+      .getByLabel("Invoice file")
+      .setInputFiles([pdf("a.pdf"), pdf("b.pdf"), pdf("c.pdf")]);
+    const pills = form.getByTestId("run-file-artifactId-pills").locator("li");
+    await expect(pills).toHaveText(["a.pdf", "b.pdf", "c.pdf"]);
+    const x = (name: string) =>
+      form.getByRole("button", { name: `Remove ${name}` });
+    await x("b.pdf").click();
+    await expect(pills).toHaveText(["a.pdf", "c.pdf"]);
+    await expect(x("c.pdf")).toBeFocused();
+    await x("c.pdf").click();
+    await expect(pills).toHaveText(["a.pdf"]);
+    await expect(x("a.pdf")).toBeFocused();
+    await x("a.pdf").click();
+    await expect(pills).toHaveCount(0);
+    await expect(
+      form.getByRole("button", { name: "Upload for Invoice file" }),
+    ).toBeFocused();
+  });
+
+  test("follow-up 3 (PR #84's recorded debt 3) — the spoken line's other branches: an item's page says Uploaded and Removed; one file into a field of several says Uploaded {name}.; a refused type and a refused upload empty it, their alert saying why", async ({
+    page,
+  }) => {
+    await fixtureControl("items-flow");
+    await page.goto(ITEM_PAGE);
+    const add = page.getByTestId("item-add");
+    const said = add.getByTestId("run-file-entryFile-spoken");
+    await expect(said).toHaveText("");
+    await add.getByLabel("Entry file").setInputFiles(pdf("entry.pdf"));
+    await expect(said).toHaveText("Uploaded entry.pdf.");
+    await add.getByRole("button", { name: "Remove entry.pdf" }).click();
+    await expect(said).toHaveText("Removed entry.pdf.");
+
+    await fixtureControl("manual-several");
+    const flow = await openFilledRun(page);
+    const spoken = flow.getByTestId("run-file-artifactId-spoken");
+    const pick = flow.getByLabel("Invoice file");
+    await pick.setInputFiles([pdf("a.pdf")]);
+    await expect(spoken).toHaveText("Uploaded a.pdf.");
+    // A refused type: nothing sent, the line emptied, the alert says why.
+    await pick.setInputFiles([
+      { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("x") },
+    ]);
+    await expect(flow.getByRole("alert")).toHaveText(
+      "Choose a PDF, JPEG or PNG file.",
+    );
+    await expect(spoken).toHaveText("");
+    // A refused upload: the same.
+    await pick.setInputFiles([pdf("b.pdf")]);
+    await expect(spoken).toHaveText("Uploaded b.pdf.");
+    await fixtureControl(
+      "upload-refused?stage=complete&status=400&reason=file_unreadable",
+    );
+    await pick.setInputFiles([pdf("c.pdf")]);
+    await expect(flow.getByRole("alert")).toHaveCount(1);
+    await expect(spoken).toHaveText("");
+  });
+
+  test.describe("on a phone or a tablet, the spoken line", () => {
+    test.use({ hasTouch: true });
+
+    test("follow-up 3 (PR #84's recorded debt 3) — a photo taken says Uploaded image.jpg., on a field of one file and on a field of several", async ({
+      page,
+    }) => {
+      for (const several of [false, true]) {
+        if (several) await fixtureControl("manual-several");
+        const form = await openFilledRun(page);
+        const spoken = form.getByTestId("run-file-artifactId-spoken");
+        const [camera] = await Promise.all([
+          page.waitForEvent("filechooser"),
+          form
+            .getByRole("button", { name: "Take photo for Invoice file" })
+            .click(),
+        ]);
+        await camera.setFiles({
+          name: "image.jpg",
+          mimeType: "image/jpeg",
+          buffer: await sidewaysPhoto(page),
+        });
+        await expect(spoken).toHaveText("Uploaded image.jpg.");
+        await expect(
+          form.getByRole("button", { name: "Remove image.jpg" }),
+        ).toBeVisible();
+      }
+    });
+  });
+
   test("C3 — Home's filled Start in both themes: the accent fill and the page's colour, semibold; accent-400 on hover; Uploading… at 0.45; axe on the card in the light theme", async ({
     page,
   }) => {
@@ -6879,5 +7059,197 @@ test.describe("build 43, item 17 — the quick-access card's Upload and filled S
     await expect(status).toHaveText(/^live$/iu);
     await expect(form.getByRole("button", { name: "Start run" })).toBeVisible();
     await expect(form.getByRole("alert")).toHaveCount(0);
+  });
+
+  // The owner's decision 17 of 2026-11-15, "delete at once": a file a start
+  // form lets go of before any run was given it is discarded on the platform
+  // at once, in the background, nothing said. Which lettings-go discard is the
+  // session's reading and the app's (docs/ARCHITECTURE.md "A start form's
+  // files"), not the owner's words.
+  test.describe("decision 17 — delete at once", () => {
+    /** Each discard the website sent, as [file name, answer]. */
+    const discarded = async () =>
+      (await fixtureDiscards()).map(({ filename, status }) => [
+        filename,
+        status,
+      ]);
+    const textFile = {
+      name: "notes.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("not an invoice"),
+    };
+
+    test("Home's card, one file: the x discards it at once, saying nothing; a new choice discards the one it replaces; a refused type empties the field and discards what it held", async ({
+      page,
+    }) => {
+      const form = await invoiceCard(page);
+      const pick = form.getByLabel("Document");
+      const x = (name: string) =>
+        form.getByRole("button", { name: `Remove ${name}` });
+      await pick.setInputFiles(pdf("a.pdf"));
+      await expect(x("a.pdf")).toBeVisible();
+      expect(await discarded()).toEqual([]);
+      // A new choice: a.pdf replaced, so discarded.
+      await pick.setInputFiles(pdf("b.pdf"));
+      await expect(x("b.pdf")).toBeVisible();
+      await expect.poll(discarded).toEqual([["a.pdf", 204]]);
+      // The x: b.pdf out of the run and off the platform, nothing said.
+      await x("b.pdf").click();
+      await expect(x("b.pdf")).toHaveCount(0);
+      await expect.poll(discarded).toEqual([
+        ["a.pdf", 204],
+        ["b.pdf", 204],
+      ]);
+      await expect(form.getByRole("alert")).toHaveCount(0);
+      await expect(form.getByTestId("run-file-invoiceFile-spoken")).toHaveText(
+        "Removed b.pdf.",
+      );
+      // A refused type empties the field: c.pdf, held, is discarded.
+      await pick.setInputFiles(pdf("c.pdf"));
+      await expect(x("c.pdf")).toBeVisible();
+      await pick.setInputFiles(textFile);
+      await expect(form.getByRole("alert")).toHaveText(
+        "Choose a PDF, JPEG or PNG file.",
+      );
+      await expect(x("c.pdf")).toHaveCount(0);
+      await expect.poll(discarded).toEqual([
+        ["a.pdf", 204],
+        ["b.pdf", 204],
+        ["c.pdf", 204],
+      ]);
+      expect(await fixtureFiles()).toEqual([]);
+      expect(await runStarts()).toEqual([]);
+    });
+
+    test("a flow's page, several files: a choice past maxFiles, a refused type and a failed upload each empty the field and discard what it held; a new choice discards the files it replaces", async ({
+      page,
+    }) => {
+      await fixtureControl("manual-several?maxFiles=2");
+      const form = await openFilledRun(page);
+      const pick = form.getByLabel("Invoice file");
+      const pills = form.getByTestId("run-file-artifactId-pills").locator("li");
+      await pick.setInputFiles([pdf("a.pdf"), pdf("b.pdf")]);
+      await expect(pills).toHaveText(["a.pdf", "b.pdf"]);
+      // Past maxFiles: nothing sent, the field emptied, a.pdf and b.pdf discarded.
+      await pick.setInputFiles([pdf("c.pdf"), pdf("d.pdf"), pdf("e.pdf")]);
+      await expect(form.getByRole("alert")).toHaveText(
+        "Add up to 2 files at a time.",
+      );
+      await expect(pills).toHaveCount(0);
+      await expect.poll(discarded).toEqual([
+        ["a.pdf", 204],
+        ["b.pdf", 204],
+      ]);
+      // A new choice replaces: c.pdf discarded once d.pdf is chosen.
+      await pick.setInputFiles([pdf("c.pdf")]);
+      await expect(pills).toHaveText(["c.pdf"]);
+      await pick.setInputFiles([pdf("d.pdf")]);
+      await expect(pills).toHaveText(["d.pdf"]);
+      await expect
+        .poll(async () => (await discarded()).at(-1))
+        .toEqual(["c.pdf", 204]);
+      // A refused type: d.pdf discarded.
+      await pick.setInputFiles([textFile]);
+      await expect(form.getByRole("alert")).toHaveText(
+        "Choose a PDF, JPEG or PNG file.",
+      );
+      await expect(pills).toHaveCount(0);
+      await expect
+        .poll(async () => (await discarded()).at(-1))
+        .toEqual(["d.pdf", 204]);
+      // A failed upload: the store refuses the second file's PUT, so the
+      // field empties and f.pdf, which this choice sent, is discarded.
+      let puts = 0;
+      await page.route(
+        "https://127.0.0.1:3443/__fixture/objects/**",
+        (route) =>
+          route.request().method() === "PUT" && ++puts === 2
+            ? route.abort()
+            : route.fallback(),
+      );
+      await pick.setInputFiles([pdf("f.pdf"), pdf("g.pdf")]);
+      await expect(form.getByRole("alert")).toHaveCount(1);
+      await expect(pills).toHaveCount(0);
+      await expect
+        .poll(async () => (await discarded()).at(-1))
+        .toEqual(["f.pdf", 204]);
+      expect(await discarded()).toHaveLength(5);
+      expect(await fixtureFiles()).toEqual([]);
+    });
+
+    test("while Start is pending the x, Upload and the chooser are held, so nothing is replaced or discarded under the run; the run gets the file", async ({
+      page,
+    }) => {
+      const form = await openFilledRun(page);
+      await form.getByLabel("Invoice file").setInputFiles(invoicePdf);
+      const x = form.getByRole("button", { name: "Remove invoice.pdf" });
+      await expect(x).toBeEnabled();
+      const start = await holdRequest(
+        page,
+        `**${FLOWS.manual}`,
+        (request) =>
+          isServerAction(request) &&
+          (request.postData() ?? "").includes("idempotencyKey"),
+      );
+      await form.getByRole("button", { name: "Start run" }).click();
+      await start.arrived;
+      await expect(x).toBeDisabled();
+      await expect(
+        form.getByRole("button", { name: "Upload for Invoice file" }),
+      ).toBeDisabled();
+      await expect(form.getByLabel("Invoice file")).toBeDisabled();
+      start.release();
+      await expect(page).toHaveURL(
+        /\/account\/runs\/fixture-run-started\?from=flow$/u,
+      );
+      expect(await fixtureDiscards()).toEqual([]);
+      expect(await fixtureFiles()).toEqual([
+        {
+          filename: "invoice.pdf",
+          sizeBytes: 24,
+          runId: "fixture-run-started",
+        },
+      ]);
+    });
+
+    test.describe("on a phone or a tablet", () => {
+      test.use({ hasTouch: true });
+
+      test("a photo added to a field of several discards nothing; a photo past maxFiles keeps the files held and discards nothing", async ({
+        page,
+      }) => {
+        await fixtureControl("manual-several?maxFiles=2");
+        const form = await openFilledRun(page);
+        const pills = form
+          .getByTestId("run-file-artifactId-pills")
+          .locator("li");
+        await form.getByLabel("Invoice file").setInputFiles([pdf("a.pdf")]);
+        await expect(pills).toHaveText(["a.pdf"]);
+        const takePhoto = form.getByRole("button", {
+          name: "Take photo for Invoice file",
+        });
+        const photo = async () => {
+          const [camera] = await Promise.all([
+            page.waitForEvent("filechooser"),
+            takePhoto.click(),
+          ]);
+          await camera.setFiles({
+            name: "image.jpg",
+            mimeType: "image/jpeg",
+            buffer: await sidewaysPhoto(page),
+          });
+        };
+        await photo();
+        await expect(pills).toHaveText(["a.pdf", "image.jpg"]);
+        await photo();
+        await expect(form.getByRole("alert")).toHaveText(
+          "Add up to 2 files at a time.",
+        );
+        await expect(pills).toHaveText(["a.pdf", "image.jpg"]);
+        // Asked after a beat: a discard is sent in the background.
+        await page.waitForTimeout(500);
+        expect(await fixtureDiscards()).toEqual([]);
+      });
+    });
   });
 });
