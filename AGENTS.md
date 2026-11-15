@@ -113,13 +113,12 @@ records by size. Then:
 - Never `git push --no-verify`; the guard hook refuses it.
 - A pull request is ready only when it is pushed, `all-green` on its head, and
   its body is final. The owner merges.
-- Hooks (`.claude/settings.json`): `guard.mjs` refuses `--no-verify`, a forced
-  recursive `rm` outside the repo or scratch, and installs or builds in a
-  synced folder (any npm script that runs one, e.g. `npm run release:ios`,
-  too), and asks the owner first before a Write or Edit outside the scratch
-  root and a project's memory, a Bash write into Downloads, Desktop,
-  Documents or iCloud Drive, or an Artifact publish or delete (the
-  backend's [router rule 11](../snoopy-backend/CLAUDE.md));
+- Hooks (`.claude/settings.json`): `guard.mjs` refuses `--no-verify`, a forced recursive `rm` outside the repo or scratch,
+  and installs or builds in a synced folder (any npm script that runs one, e.g. `npm run release:ios`, too), and asks
+  the owner first before a Write or Edit outside the scratch root and a project's memory, a Bash write into Downloads,
+  Desktop, Documents or iCloud Drive, or an Artifact publish or delete (the backend's
+  [router rule 11](../snoopy-backend/CLAUDE.md)); inside the scratch root it refuses any write outside a repository
+  copy and a session's `docker-config` (row 10, the owner's "Strict one place", BUILD-PLAN 30.17);
   `session-start.mjs` prints the repo's state; `stop-check.mjs` warns of
   processes left behind. The cases: `.claude/hooks/cases.json`.
 
@@ -139,7 +138,7 @@ records by size. Then:
 - List every process, server, container, worktree and temp folder you start;
   stop or remove each before you return, and report anything left.
 - Stop every `next` server you start: a held port 3001 or 3443 refuses the
-  next gate. The Stop hook warns of processes left under the session's scratch folder.
+  next gate. The Stop hook warns of processes left under the session's scratch folder, and shows the owner the loose files a turn left outside a repository copy.
 
 ## Records
 
