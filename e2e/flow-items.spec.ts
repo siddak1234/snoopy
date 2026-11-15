@@ -1364,44 +1364,60 @@ test.describe("decision 17 — the job upload card discards what it held", () =>
       >("discards")
     ).map(({ filename, status }) => [filename, status]);
   const openCard = async (page: Page) => {
-    await page.getByRole("button", { name: "Upload batch" }).click();
+    await page
+      .getByRole("button", { name: "Upload batch" })
+      .click({ timeout: 10_000 });
     const card = page.getByTestId("item-upload");
     await expect(card).toBeVisible();
     return card;
   };
 
-  test("Cancel, Escape and a press outside each close the card and discard its file, saying nothing; an item made discards nothing; while Upload is pending the field and Cancel are held", async ({
+  // One scenario per test, each from a fresh page: on Linux WebKit the five as one test timed out in a full
+  // fixture run (CI twice, CI's image locally once), passed alone and with tracing on; the cause is not
+  // proven. Each click has its own limit, so a recurrence names the step that waited.
+  const ACT = { timeout: 10_000 };
+  const holdFile = async (page: Page, file: typeof entryPdf, ready: RegExp) => {
+    await page.goto(FLOW);
+    const card = await openCard(page);
+    await card.getByLabel("Batch file").setInputFiles(file);
+    await expect(card.getByText(ready)).toBeVisible();
+    return card;
+  };
+
+  test("Cancel closes the card and discards its file, saying nothing", async ({
+    page,
+  }) => {
+    const card = await holdFile(page, entryPdf, /^Ready: entry\.pdf/u);
+    await card.getByRole("button", { name: "Cancel" }).click(ACT);
+    await expect(card).toHaveCount(0);
+    await expect.poll(discarded).toEqual([["entry.pdf", 204]]);
+  });
+
+  test("Escape is Cancel: it closes the card and discards its file", async ({
+    page,
+  }) => {
+    const card = await holdFile(page, wordFile, /^Ready: delta\.docx/u);
+    await card.getByLabel("Name").focus(ACT);
+    await page.keyboard.press("Escape");
+    await expect(card).toHaveCount(0);
+    await expect.poll(discarded).toEqual([["delta.docx", 204]]);
+  });
+
+  test("a press outside the card is Cancel: it closes the card and discards its file", async ({
+    page,
+  }) => {
+    const card = await holdFile(page, entryPdf, /^Ready: entry\.pdf/u);
+    await page.mouse.click(4, 4);
+    await expect(card).toHaveCount(0);
+    await expect.poll(discarded).toEqual([["entry.pdf", 204]]);
+  });
+
+  test("an item made discards nothing; while Upload is pending the field and Cancel are held", async ({
     page,
   }) => {
     await page.goto(FLOW);
-    let card = await openCard(page);
-    await card.getByLabel("Batch file").setInputFiles(entryPdf);
-    await expect(card.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
-    await card.getByRole("button", { name: "Cancel" }).click();
-    await expect(card).toHaveCount(0);
-    await expect.poll(discarded).toEqual([["entry.pdf", 204]]);
-    // Escape: Cancel.
-    card = await openCard(page);
-    await card.getByLabel("Batch file").setInputFiles(wordFile);
-    await expect(card.getByText(/^Ready: delta\.docx/u)).toBeVisible();
-    await card.getByLabel("Name").focus();
-    await page.keyboard.press("Escape");
-    await expect(card).toHaveCount(0);
-    await expect.poll(discarded).toEqual([
-      ["entry.pdf", 204],
-      ["delta.docx", 204],
-    ]);
-    // A press outside the card: Cancel.
-    card = await openCard(page);
-    await card.getByLabel("Batch file").setInputFiles(entryPdf);
-    await expect(card.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
-    await page.mouse.click(4, 4);
-    await expect(card).toHaveCount(0);
-    await expect.poll(async () => (await discarded()).length).toBe(3);
-    // An item made: nothing discarded. While Upload is pending its field is
-    // held, so its file is never replaced under the item being made.
-    card = await openCard(page);
-    await card.getByLabel("Name").fill("Kept list");
+    const card = await openCard(page);
+    await card.getByLabel("Name").fill("Kept list", ACT);
     await card.getByLabel("Batch file").setInputFiles(entryPdf);
     await expect(card.getByText(/^Ready: entry\.pdf/u)).toBeVisible();
     const made = await holdRequest(
@@ -1411,7 +1427,7 @@ test.describe("decision 17 — the job upload card discards what it held", () =>
         isServerAction(request) &&
         (request.postData() ?? "").includes("idempotencyKey"),
     );
-    await card.getByRole("button", { name: "Upload", exact: true }).click();
+    await card.getByRole("button", { name: "Upload", exact: true }).click(ACT);
     await made.arrived;
     await expect(
       card.getByRole("button", { name: "Upload for Batch file" }),
@@ -1423,7 +1439,7 @@ test.describe("decision 17 — the job upload card discards what it held", () =>
     const { creates } = await fixtureRead<{ creates: unknown[] }>("items");
     expect(creates).toHaveLength(1);
     await page.waitForTimeout(500);
-    expect(await discarded()).toHaveLength(3);
+    expect(await discarded()).toHaveLength(0);
   });
 
   test("a file whose upload ends after Cancel closed the card is discarded: it was never held", async ({
