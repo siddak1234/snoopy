@@ -130,7 +130,7 @@ const SIGNED = {
   signerName: " Dana Owner ",
   signerTitle: "Practice manager",
   authorized: "true",
-  agreementKey: "agreement-0123456789abcdef",
+  agreementKey: "agreement-0123456789abcdef", // gitleaks:allow — a made-up form key, not a secret
   workspaceId: "w1",
 };
 
