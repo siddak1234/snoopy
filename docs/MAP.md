@@ -15,6 +15,7 @@
 - **lib**: `lib/**` → [docs/ARCHITECTURE.md](ARCHITECTURE.md)
 - **verification**: `e2e/**`, `playwright.config.ts`, `scripts/**`, `.github/**` → [README.md](../README.md), [CONTRIBUTING.md](../CONTRIBUTING.md)
 - **claude**: `.claude/**` → [AGENTS.md](../AGENTS.md)
+- **policies**: `SECURITY.md`, `LICENSE` → [README.md](../README.md)
 
 ## Folders
 

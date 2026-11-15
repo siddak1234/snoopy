@@ -16,6 +16,14 @@ identity-provider, object-store, or connector-secret owner.
 See [Architecture](docs/ARCHITECTURE.md) and
 [Repository structure](docs/REPO-STRUCTURE.md) for the current ownership model.
 
+## Security and license
+
+A vulnerability is reported privately, never in a public issue:
+[SECURITY.md](SECURITY.md) says how. The code is Snoopy LLC's, all rights
+reserved, and no license is granted ([LICENSE](LICENSE)).
+`.github/CODEOWNERS` names the owner; a code owner's review is not required
+to merge (the owner's choice of 2026-11-15).
+
 ## Local development
 
 ```bash

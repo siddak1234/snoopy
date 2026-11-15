@@ -50,6 +50,12 @@
       "code": [".claude/**"],
       "docs": ["AGENTS.md"],
       "need": "any"
+    },
+    {
+      "id": "policies",
+      "code": ["SECURITY.md", "LICENSE"],
+      "docs": ["README.md"],
+      "need": "any"
     }
   ],
   "facts": [
