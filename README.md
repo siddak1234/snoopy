@@ -146,7 +146,9 @@ dev-dependency audit and its report of vulnerabilities with no fix stay
 report-only by design; the runtime audit and the fixable CRITICAL/HIGH scan block.
 
 **Pinned, and kept current.** Every action in the workflows is pinned by commit
-with its `# vX.Y.Z`, the Dockerfile's Node image by index digest with its
+with its `# vX.Y.Z` (a call to this repository's own `ci.yml` is
+`$/.github/workflows/ci.yml`, GitHub's self-repository form: this repository at
+the running commit, never the workspace's files), the Dockerfile's Node image by index digest with its
 exact version for a tag (`node:<x.y.z>-alpine`, one image in all three
 stages; the security plan's item 19), the Playwright image the browser jobs
 run in by its tag and digest, and Node by `.nvmrc`. `.github/dependabot.yml`
@@ -167,7 +169,8 @@ comments the run on the open one; that job alone may write issues.
 (`permissions: {}`) and writes nothing: `verdict` reads `contents`,
 `pull-requests` and `checks` (the merged pull request and its head's
 all-green), `smoke` and `full` read `contents`, and `main-green` has no grant
-(the security plan's item 13). GitHub's limits
+(the security plan's item 13). Every checkout drops its token
+(`persist-credentials: false`): no step fetches or pushes with git. GitHub's limits
 stand: a night can start late, or be dropped at high load. In a public
 repository a scheduled workflow is switched off after 60 days with no
 activity; then no night runs and no issue opens until
@@ -363,11 +366,15 @@ tree is the one its pull request's all-green passed, and the whole suite
 otherwise. `npm run hooks:install` arms two hooks. The pre-commit hook
 (`scripts/githooks/pre-commit`) runs the kit's private-data scan on the staged
 content (AGENTS.md rule 9). The pre-push hook (`scripts/githooks/pre-push`)
-runs the same scan on the commits since origin/main, to any remote, then the gates
-the change needs (`scripts/change-class.mjs`; see "Change-aware pre-push gate"),
+runs the same scan on the commits since origin/main and then the kit's workflow
+lint, to any remote, then the gates the change needs (`scripts/change-class.mjs`; see "Change-aware pre-push gate"),
 and then requires the change-audit marker. CI's Architecture gates job runs the
 scan on every tracked file, with the client-name pattern from a repository
 secret, never a tracked file; ci.yml requires it when called, and main.yml and
-nightly.yml pass it. CI is the authority: every pull request runs the whole
+nightly.yml pass it. The same job then runs the workflow lint
+(`node scripts/kit/workflow-lint.mjs`): zizmor 1.32.0, pinned by sha256, offline
+and with no token, over `.github/workflows/`; exit 1 on a finding, which is fixed
+by its rule, or ignored with its reason in zizmor's config file beside the
+workflows (none yet). CI is the authority: every pull request runs the whole
 suite in all three engines; its Architecture gates job runs `check:docs` and
 the map's check on the pull request's commits.

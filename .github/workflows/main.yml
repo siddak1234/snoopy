@@ -18,7 +18,8 @@ on:
     branches: [main]
 
 # No grant by default: each job names the least it reads, and nothing here
-# writes (the security plan's item 13).
+# writes (the security plan's item 13). Each checkout drops its token
+# (`persist-credentials: false`): the verdict reads the API with `gh`, not git.
 permissions: {}
 
 jobs:
@@ -38,6 +39,8 @@ jobs:
       suite: ${{ steps.decide.outputs.suite }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: The pull request that landed this commit proved this tree
         id: decide
         env:
@@ -92,6 +95,7 @@ jobs:
         # The contract tests read the whole history, as in ci.yml's gates job.
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
@@ -116,10 +120,11 @@ jobs:
     needs: verdict
     if: needs.verdict.outputs.suite == 'full'
     # Read-only: a called workflow gets at most what its caller grants, and
-    # ci.yml asks for no more.
+    # ci.yml asks for no more. `$/` is this repository at the running commit,
+    # never the workspace's files (GitHub's self-repository form).
     permissions:
       contents: read
-    uses: ./.github/workflows/ci.yml
+    uses: $/.github/workflows/ci.yml
     # The private-data scan's pattern, the one secret ci.yml takes.
     secrets:
       CLIENT_DENY_PATTERN: ${{ secrets.CLIENT_DENY_PATTERN }}

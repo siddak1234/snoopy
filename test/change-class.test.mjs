@@ -402,7 +402,7 @@ test("unchanged: CI runs the whole suite on every pull request in three engines,
   for (const caller of ["main.yml", "nightly.yml"]) {
     assert.match(
       read(`.github/workflows/${caller}`),
-      /uses: \.\/\.github\/workflows\/ci\.yml/u,
+      /uses: \$\/\.github\/workflows\/ci\.yml/u,
       caller,
     );
   }

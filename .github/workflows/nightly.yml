@@ -16,10 +16,11 @@ jobs:
   ci:
     name: CI
     # A called workflow gets at most what its caller grants; ci.yml is
-    # read-only on its own too.
+    # read-only on its own too. `$/` is this repository at the running commit
+    # (GitHub's self-repository form).
     permissions:
       contents: read
-    uses: ./.github/workflows/ci.yml
+    uses: $/.github/workflows/ci.yml
     # The private-data scan's pattern, the one secret ci.yml takes.
     secrets:
       CLIENT_DENY_PATTERN: ${{ secrets.CLIENT_DENY_PATTERN }}
