@@ -20,6 +20,37 @@ lookups forward the request's cookies to Edge as `name=value` pairs and nothing
 else (register F51); the Edge's host-only session cookies are the only cookies
 this origin holds.
 
+## Response headers
+
+Every path — page, file route, API route and the `/api/platform` rewrite —
+sends five headers from `next.config.ts`'s `headers()`, their values in
+`lib/security-headers.ts` (the security plan's item 7):
+`X-Content-Type-Options: nosniff`,
+`Referrer-Policy: strict-origin-when-cross-origin`,
+`Permissions-Policy: camera=(), microphone=(), geolocation=(), browsing-topics=()`
+(the site asks for none; a file input's `capture` opens the device's camera,
+which no policy governs), `X-Frame-Options: SAMEORIGIN`, and a
+`Content-Security-Policy-Report-Only` the site already keeps:
+
+```text
+default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';
+img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https:;
+frame-src 'self' blob:; worker-src 'self'; object-src 'none'; base-uri 'self';
+form-action 'self'; frame-ancestors 'self'
+```
+
+Report-only: it blocks nothing, and Chromium's fixture run reads every page
+for a report (`e2e/accessibility-authenticated.spec.ts`), so a later round
+can enforce it on that evidence. Why each source: Next's inline scripts carry
+no nonce; React and Framer Motion write style attributes; a file or a run
+package is shown from an object URL (`blob:`); an upload goes straight to the
+store at the platform's signed URL, whose host the platform picks
+(`connect-src https:`). `next dev` alone adds `'unsafe-eval'`. Frames are
+`'self'`, never `'none'`: the site frames its own files. Vercel sends
+Strict-Transport-Security; nothing here does. A route's own headers stay its
+own: the file routes add `frame-ancestors 'self'` as an enforced policy
+(`lib/file-view.ts`, `app/account/runs/[runId]/package/file/route.ts`).
+
 ## Rules enforced in this repository
 
 - Browser calls use `lib/platform-api.ts`; server calls use

@@ -139,6 +139,7 @@
 - [lib/run-files.ts](../lib/run-files.ts): A run's or an item's uploaded file, as the website shows it (Round 19,
 - [lib/run-progress.ts](../lib/run-progress.ts): A run's STEPS (Build 21, spec A7; the session's S14; the owner's build 20
 - [lib/run-verdict.ts](../lib/run-verdict.ts): A run's verdict, as its page names and colours it (the owner's F1 and Q5,
+- [lib/security-headers.ts](../lib/security-headers.ts): The response headers every path of this site sends (the owner's security
 - [lib/session-contract.ts](../lib/session-contract.ts): no header
 - [lib/several-files.ts](../lib/several-files.ts): Several files in one upload (Round 21, platform round 2's B2 as the batch
 - [lib/signed-link.ts](../lib/signed-link.ts): A signed link the browser goes to (Build 25, the review's R5c 2): the run
@@ -194,7 +195,7 @@
 
 ### Tests
 
-- `test/`: account, automation, billing, block, blocks, boundaries, brand, browser, build21, build22, build24, build28, build34, build42, build43, builds37, change, connection, connections, deployed, doc, export, fb39, fixture, flow, global, kit, new, no, picture, platform, pre, repo, round19, round21, round22, run, session, signed, spacing, structure, tenancy, upload, v2, vendor, verify
+- `test/`: account, automation, billing, block, blocks, boundaries, brand, browser, build21, build22, build24, build28, build34, build42, build43, builds37, change, connection, connections, deployed, doc, export, fb39, fixture, flow, global, kit, new, no, picture, platform, pre, repo, round19, round21, round22, run, security, session, signed, spacing, structure, tenancy, upload, v2, vendor, verify
 
 ## Skills, agents and hooks
 

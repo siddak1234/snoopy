@@ -1,10 +1,21 @@
 import type { NextConfig } from "next";
 import { backendApiOrigin } from "./lib/backend-origin";
+import { securityHeaders } from "./lib/security-headers";
 
 const nextConfig: NextConfig = {
   output: "standalone",
   turbopack: {
     root: __dirname,
+  },
+  // Every path's security headers (lib/security-headers.ts); a route's own
+  // headers are its own.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: securityHeaders(process.env.NODE_ENV === "development"),
+      },
+    ];
   },
   async rewrites() {
     const origin = backendApiOrigin();
@@ -85,8 +96,8 @@ const nextConfig: NextConfig = {
       },
       // 2026-10 the owner's build 14 feedback #6: the platform's notification
       // emails link to `/runs/<id>` and `/approvals/<id>` on this origin
-      // (`PRODUCT_ORIGIN`, backend `apps/runs/src/notifications.ts`), which no
-      // page here served — every mailed link answered 404. A run's page and the
+      // (`PRODUCT_ORIGIN`, `snoopy-backend/apps/runs/src/notifications.ts`),
+      // which no page here served — every mailed link answered 404. A run's page and the
       // decisions waiting are in the account area; an email already sent lands
       // there too.
       {

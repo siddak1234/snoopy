@@ -129,8 +129,8 @@ smoke, and locally in `npm run verify`, the pre-push hook and the change audit
 (`scripts/audit/preflight.mjs`, `scripts/change-class.mjs`). The
 browser suites collect only what they run (`playwright.config.ts`): the
 fixture specs only with the fixture Edge, the keyboard journey only with
-`KEYBOARD_JOURNEY=1`, the two touch-camera tests in Chromium alone by their
-`@chromium-only` tag. Under CI a committed `test.only` fails (`forbidOnly`),
+`KEYBOARD_JOURNEY=1`, the two touch-camera tests and the content security
+policy's evidence in Chromium alone by their `@chromium-only` tag. Under CI a committed `test.only` fails (`forbidOnly`),
 and `scripts/no-skipped-browser-tests.mjs` fails the browser job, each
 fixture leg, and verify's and the change audit's `test:browser`, when
 Playwright's JSON report (`test-results/`, emptied by each run) counts a skip. The scan job's
@@ -253,7 +253,11 @@ complete export (its link followed only when https), account deletion, and the p
 without real accounts or credentials, and each test starts from the fixture's
 first state. Nine specs: `e2e/accessibility.spec.ts`,
 `e2e/accessibility-authenticated.spec.ts` (every page behind sign-in,
-scanned with axe), `e2e/keyboard-journey.spec.ts` (below),
+scanned with axe; and, in Chromium, every public page, every page behind
+sign-in and the three that frame a file from an object URL read with no
+report from the report-only content security policy, and the five security
+headers on a page, `/api/health` and a file route, which keeps its own
+policy: docs/ARCHITECTURE.md "Response headers"), `e2e/keyboard-journey.spec.ts` (below),
 `e2e/public-edge-fixture.spec.ts`, `e2e/account-surfaces.spec.ts` (every
 surface a change audit probed and no test asserted — Round 21 v2's among them:
 the image block, a group of drop-downs, a long list's and table's search, sort
