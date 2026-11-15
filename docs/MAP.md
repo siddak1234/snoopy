@@ -15,6 +15,7 @@
 - **lib**: `lib/**` → [docs/ARCHITECTURE.md](ARCHITECTURE.md)
 - **verification**: `e2e/**`, `playwright.config.ts`, `scripts/**`, `.github/**` → [README.md](../README.md), [CONTRIBUTING.md](../CONTRIBUTING.md)
 - **claude**: `.claude/**` → [AGENTS.md](../AGENTS.md)
+- **policies**: `SECURITY.md`, `LICENSE` → [README.md](../README.md)
 
 ## Folders
 
@@ -139,6 +140,7 @@
 - [lib/run-files.ts](../lib/run-files.ts): A run's or an item's uploaded file, as the website shows it (Round 19,
 - [lib/run-progress.ts](../lib/run-progress.ts): A run's STEPS (Build 21, spec A7; the session's S14; the owner's build 20
 - [lib/run-verdict.ts](../lib/run-verdict.ts): A run's verdict, as its page names and colours it (the owner's F1 and Q5,
+- [lib/security-headers.ts](../lib/security-headers.ts): The response headers this site sends on everything it serves itself (the
 - [lib/session-contract.ts](../lib/session-contract.ts): no header
 - [lib/several-files.ts](../lib/several-files.ts): Several files in one upload (Round 21, platform round 2's B2 as the batch
 - [lib/signed-link.ts](../lib/signed-link.ts): A signed link the browser goes to (Build 25, the review's R5c 2): the run
@@ -179,6 +181,11 @@
 - [scripts/kit/guard-cases.test.mjs](../scripts/kit/guard-cases.test.mjs): The guard's tests (STANDARD (h) rows 1–10), imported by kit.test.mjs, so every repository's
 - [scripts/kit/kit.test.mjs](../scripts/kit/kit.test.mjs): The kit's own tests (node:test, Node built-ins only). The guard's cases run from
 - [scripts/kit/map.mjs](../scripts/kit/map.mjs): `npm run map` (STANDARD (c)): builds docs/MAP.md from the `map` and `rules`
+- [scripts/kit/private-data-scan-run.test.mjs](../scripts/kit/private-data-scan-run.test.mjs): The private-data scan run whole (BUILD-PLAN 30.19.8, 30.19.9, 30.19.11), imported by kit.test.mjs: main(),
+- [scripts/kit/private-data-scan.mjs](../scripts/kit/private-data-scan.mjs): The private-data scan (the owner's security review, 2026-11-15: "no pii in public repos
+- [scripts/kit/private-data-scan.test.mjs](../scripts/kit/private-data-scan.test.mjs): The private-data scan's tests, imported by kit.test.mjs, so every repository's runner runs them.
+- [scripts/kit/workflow-lint.mjs](../scripts/kit/workflow-lint.mjs): The workflows' lint (the owner's security review, 2026-11-15: "scanner, safe, not bulky";
+- [scripts/kit/workflow-lint.test.mjs](../scripts/kit/workflow-lint.test.mjs): The workflow lint's tests, imported by kit.test.mjs. The pure parts; main() in scratch git repos with zizmor's
 - [scripts/no-skipped-browser-tests.mjs](../scripts/no-skipped-browser-tests.mjs): No silent skips in the browser suites (Round 21 hardening, W17): after a
 - [scripts/probe-no-backend.mjs](../scripts/probe-no-backend.mjs): Serves the build `npm run build:no-backend` left in `.next`, with no
 - [scripts/repo-facts.mjs](../scripts/repo-facts.mjs): What this repository reports about itself, in the shape snoopy-backend's
@@ -189,11 +196,12 @@
 
 ### Git hooks
 
-- [scripts/githooks/pre-push](../scripts/githooks/pre-push): Native pre-push gate: every push of this repository — from any tool or
+- [scripts/githooks/pre-commit](../scripts/githooks/pre-commit): Native pre-commit gate: every commit of this public repository runs the kit's
+- [scripts/githooks/pre-push](../scripts/githooks/pre-push): Native pre-push gate: every push, to any remote, first runs the kit's
 
 ### Tests
 
-- `test/`: account, automation, billing, block, blocks, boundaries, brand, browser, build21, build22, build24, build28, build34, build42, build43, builds37, change, connection, connections, deployed, doc, export, fb39, fixture, flow, global, kit, new, no, picture, platform, pre, repo, round19, round21, round22, run, session, signed, spacing, structure, tenancy, upload, v2, vendor, verify
+- `test/`: account, automation, billing, block, blocks, boundaries, brand, browser, build21, build22, build24, build28, build34, build42, build43, builds37, change, connection, connections, deployed, doc, export, fb39, fixture, flow, global, kit, new, no, picture, platform, pre, repo, round19, round21, round22, run, security, session, signed, spacing, structure, tenancy, upload, v2, vendor, verify
 
 ## Skills, agents and hooks
 
@@ -215,17 +223,14 @@
 
 ### Under 100 KB
 
-- [AGENTS.archive.md](../AGENTS.archive.md) (archive)
 - [AGENTS.md](../AGENTS.md) (doc)
 - [CONTRIBUTING.md](../CONTRIBUTING.md) (doc)
 - [README.md](../README.md) (doc)
 - [docs/ARCHITECTURE.md](ARCHITECTURE.md) (doc)
-- [docs/REPO-STRUCTURE.archive.md](REPO-STRUCTURE.archive.md) (archive)
-- [docs/audits/2026-08-06-backend-boundary-cutover.md](audits/2026-08-06-backend-boundary-cutover.md) (archive)
 
 ### 100 KB to 1 MB
 
-- [docs/audits/2026-08-11-round-5-phase-1-status.md](audits/2026-08-11-round-5-phase-1-status.md) (archive)
+- none
 
 ### Over 1 MB: grep only
 

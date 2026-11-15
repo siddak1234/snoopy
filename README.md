@@ -16,6 +16,14 @@ identity-provider, object-store, or connector-secret owner.
 See [Architecture](docs/ARCHITECTURE.md) and
 [Repository structure](docs/REPO-STRUCTURE.md) for the current ownership model.
 
+## Security and license
+
+A vulnerability is reported privately, never in a public issue:
+[SECURITY.md](SECURITY.md) says how. The code is Snoopy LLC's, all rights
+reserved, and no license is granted ([LICENSE](LICENSE)).
+`.github/CODEOWNERS` names the owner; a code owner's review is not required
+to merge (the owner's choice of 2026-11-15).
+
 ## Local development
 
 ```bash
@@ -57,7 +65,7 @@ which every gate ran green ends by emitting
 this repository's facts file to `.autom8x/repo-facts/snoopy.json` (gitignored;
 `snoopy-backend` commits it as `snoopy-backend/docs/repo-facts/snoopy.json`). Run it on the
 exact Node version `.nvmrc` names: every CI job reads that file, and the container's
-`node:22-alpine` is the same major. Vercel builds and serves production on its
+`node:<x.y.z>-alpine` is the same major. Vercel builds and serves production on its
 own latest 22.x (`engines` `22.x`; it offers majors only), so the Node CI tests
 and the Node production runs can differ within 22.x (a minor or a patch). Running it while `/audit-change` runs, or the reverse,
 is refused — both build into `.next` and serve on ports 3001 and 3443, so they
@@ -129,8 +137,8 @@ smoke, and locally in `npm run verify`, the pre-push hook and the change audit
 (`scripts/audit/preflight.mjs`, `scripts/change-class.mjs`). The
 browser suites collect only what they run (`playwright.config.ts`): the
 fixture specs only with the fixture Edge, the keyboard journey only with
-`KEYBOARD_JOURNEY=1`, the two touch-camera tests in Chromium alone by their
-`@chromium-only` tag. Under CI a committed `test.only` fails (`forbidOnly`),
+`KEYBOARD_JOURNEY=1`, the two touch-camera tests and the content security
+policy's evidence in Chromium alone by their `@chromium-only` tag. Under CI a committed `test.only` fails (`forbidOnly`),
 and `scripts/no-skipped-browser-tests.mjs` fails the browser job, each
 fixture leg, and verify's and the change audit's `test:browser`, when
 Playwright's JSON report (`test-results/`, emptied by each run) counts a skip. The scan job's
@@ -138,11 +146,14 @@ dev-dependency audit and its report of vulnerabilities with no fix stay
 report-only by design; the runtime audit and the fixable CRITICAL/HIGH scan block.
 
 **Pinned, and kept current.** Every action in the workflows is pinned by commit
-with its `# vX.Y.Z`, the Dockerfile's `node:22-alpine` by index digest with its
-tag, the Playwright image the browser jobs run in by its tag and digest, and
-Node by `.nvmrc`. `.github/dependabot.yml` moves two of them weekly: one pull
-request for the actions, one for the Dockerfile's image (a new Node major is
-ignored); the docs check lets a Dependabot commit that touches only bump files
+with its `# vX.Y.Z` (a call to this repository's own `ci.yml` is
+`$/.github/workflows/ci.yml`, GitHub's self-repository form: this repository at
+the running commit, never the workspace's files), the Dockerfile's Node image by index digest with its
+exact version for a tag (`node:<x.y.z>-alpine`, one image in all three
+stages; the security plan's item 19), the Playwright image the browser jobs
+run in by its tag and digest, and Node by `.nvmrc`. `.github/dependabot.yml`
+moves two of them weekly: one pull request for the actions, one for the
+Dockerfile's image, tag and digest together (a new Node major is ignored); the docs check lets a Dependabot commit that touches only bump files
 through (`scripts/kit/check-docs.mjs`). The rest move by hand, in the round's
 deliberate dependency step (backend §12.1 #278), which also carries the npm
 bumps Dependabot does not make (its security updates stay on): `.nvmrc`, with
@@ -154,9 +165,12 @@ so the two move in one commit.
 09:27 UTC on `main`'s tip, calling it as main.yml's `full` does. When that
 run is not green, its own `Nightly red` job opens one "Nightly red" issue, or
 comments the run on the open one; that job alone may write issues.
-`ci.yml` grants `contents: read`; `main.yml` writes nothing: its `full` job is
-`contents: read`, and its other jobs use the repository's read-only default
-token. GitHub's limits
+`ci.yml` grants `contents: read`; `main.yml` grants nothing at its top
+(`permissions: {}`) and writes nothing: `verdict` reads `contents`,
+`pull-requests` and `checks` (the merged pull request and its head's
+all-green), `smoke` and `full` read `contents`, and `main-green` has no grant
+(the security plan's item 13). Every checkout drops its token
+(`persist-credentials: false`): no step fetches or pushes with git. GitHub's limits
 stand: a night can start late, or be dropped at high load. In a public
 repository a scheduled workflow is switched off after 60 days with no
 activity; then no night runs and no issue opens until
@@ -250,7 +264,11 @@ complete export (its link followed only when https), account deletion, and the p
 without real accounts or credentials, and each test starts from the fixture's
 first state. Nine specs: `e2e/accessibility.spec.ts`,
 `e2e/accessibility-authenticated.spec.ts` (every page behind sign-in,
-scanned with axe), `e2e/keyboard-journey.spec.ts` (below),
+scanned with axe; and, in Chromium, every public page, every page behind
+sign-in and the three that frame a file from an object URL read with no
+report from the report-only content security policy, and the five security
+headers on a page, `/api/health` and a file route, which keeps its own
+policy: docs/ARCHITECTURE.md "Response headers"), `e2e/keyboard-journey.spec.ts` (below),
 `e2e/public-edge-fixture.spec.ts`, `e2e/account-surfaces.spec.ts` (every
 surface a change audit probed and no test asserted — Round 21 v2's among them:
 the image block, a group of drop-downs, a long list's and table's search, sort
@@ -345,9 +363,18 @@ plus what `npm run verify` cannot run offline: the dependency audit, a scan of
 the built image, and its SBOM. On `main`, `.github/workflows/main.yml` runs a
 smoke (lint, format, typecheck, the contract tests) when the merged commit's
 tree is the one its pull request's all-green passed, and the whole suite
-otherwise. `npm run hooks:install` arms the pre-push hook
-(`scripts/githooks/pre-push`), which runs the gates the change needs
-(`scripts/change-class.mjs`; see "Change-aware pre-push gate") and then requires
-the change-audit marker. CI is the authority: every pull request runs the whole
+otherwise. `npm run hooks:install` arms two hooks. The pre-commit hook
+(`scripts/githooks/pre-commit`) runs the kit's private-data scan on the staged
+content (AGENTS.md rule 9). The pre-push hook (`scripts/githooks/pre-push`)
+runs the same scan on the commits since origin/main and then the kit's workflow
+lint, to any remote, then the gates the change needs (`scripts/change-class.mjs`; see "Change-aware pre-push gate"),
+and then requires the change-audit marker. CI's Architecture gates job runs the
+scan on every tracked file, with the client-name pattern from a repository
+secret, never a tracked file; ci.yml requires it when called, and main.yml and
+nightly.yml pass it. The same job then runs the workflow lint
+(`node scripts/kit/workflow-lint.mjs`): zizmor 1.32.0, pinned by sha256, offline
+and with no token, over `.github/workflows/`; exit 1 on a finding, which is fixed
+by its rule, or ignored with its reason in zizmor's config file beside the
+workflows (none yet). CI is the authority: every pull request runs the whole
 suite in all three engines; its Architecture gates job runs `check:docs` and
 the map's check on the pull request's commits.

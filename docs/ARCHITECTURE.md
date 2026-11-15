@@ -20,6 +20,40 @@ lookups forward the request's cookies to Edge as `name=value` pairs and nothing
 else (register F51); the Edge's host-only session cookies are the only cookies
 this origin holds.
 
+## Response headers
+
+Every response the site serves itself — pages, file routes, its own API
+routes, 404s and static files — sends five headers from `next.config.ts`'s
+`headers()`. Two kinds pass through without them, and the browser suite pins
+both: the config's redirects (307 or 308, no page) and the `/api/platform` proxy
+to the platform (JSON, never framed or shown as a page). Their values are in
+`lib/security-headers.ts` (the security plan's item 7):
+`X-Content-Type-Options: nosniff`,
+`Referrer-Policy: strict-origin-when-cross-origin`,
+`Permissions-Policy: camera=(), microphone=(), geolocation=(), browsing-topics=()`
+(the site asks for none; a file input's `capture` opens the device's camera,
+which no policy governs), `X-Frame-Options: SAMEORIGIN`, and a
+`Content-Security-Policy-Report-Only` the site already keeps:
+
+```text
+default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';
+img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https:;
+frame-src 'self' blob:; worker-src 'self'; object-src 'none'; base-uri 'self';
+form-action 'self'; frame-ancestors 'self'
+```
+
+Report-only: it blocks nothing, and Chromium's fixture run reads every page
+for a report (`e2e/accessibility-authenticated.spec.ts`), so a later round
+can enforce it on that evidence. Why each source: Next's inline scripts carry
+no nonce; React and Framer Motion write style attributes; a file or a run
+package is shown from an object URL (`blob:`); an upload goes straight to the
+store at the platform's signed URL, whose host the platform picks
+(`connect-src https:`). `next dev` alone adds `'unsafe-eval'`. Frames are
+`'self'`, never `'none'`: the site frames its own files. Vercel sends
+Strict-Transport-Security; nothing here does. A route's own headers stay its
+own: the file routes add `frame-ancestors 'self'` as an enforced policy
+(`lib/file-view.ts`, `app/account/runs/[runId]/package/file/route.ts`).
+
 ## Rules enforced in this repository
 
 - Browser calls use `lib/platform-api.ts`; server calls use
@@ -824,10 +858,11 @@ deployment concerns. This repository deliberately proves the interfaces with
 typed, credential-free fixtures rather than storing local resource settings.
 
 What each round changed is recorded in the backend-owned BUILD-PLAN; this
-repository's findings and their dispositions are the register in
-`docs/audits/2026-08-11-round-5-phase-1-status.md`. A screen or control the
-app has and this website does not is a parity finding there (Build 23: F105,
-Activity's time range and outcome pickers).
+repository's findings and their dispositions are the register kept only in
+the private backend, `snoopy-backend/docs/records/snoopy/` (the Round 5 status
+record, 2026-08-11). A screen or control the app has and this website does not
+is a parity finding there (Build 23: F105, Activity's time range and outcome
+pickers).
 
 ## Verification
 

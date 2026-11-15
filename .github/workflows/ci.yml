@@ -11,8 +11,16 @@ name: CI
 on:
   pull_request:
   workflow_call:
+    # The private-data scan's client-name pattern (the gates job's "No salvaged
+    # client data"): a called workflow sees only the secrets its caller passes,
+    # so main.yml and nightly.yml each pass this one.
+    secrets:
+      CLIENT_DENY_PATTERN:
+        required: true
 
-# Read-only, whoever triggers or calls this workflow: no job here writes.
+# Read-only, whoever triggers or calls this workflow: no job here writes. Every
+# checkout drops its token (`persist-credentials: false`, zizmor's artipacked):
+# no later step fetches or pushes with git.
 permissions:
   contents: read
 
@@ -27,6 +35,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
@@ -50,6 +60,7 @@ jobs:
         # one-commit clone has no history to show.
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
@@ -80,24 +91,28 @@ jobs:
             exit 1
           fi
       - name: No salvaged client data
+        # The client-name pattern is a repository secret, never written in a
+        # tracked file; the kit's scanner reads it from this variable.
+        env:
+          CLIENT_DENY_PATTERN: ${{ secrets.CLIENT_DENY_PATTERN }}
         run: |
           # `_salvage/` lives in the workspace folder, outside every repository. It
           # holds the recovered n8n workflows and the legacy database archive: real
           # customer email addresses, vendor names, and dollar amounts. This
           # repository is public and git history is permanent, so deleting such a
           # file in a later commit does not remove it — the only workable control is
-          # to never let it land.
-          if git ls-files | grep -i '_salvage'; then
-            echo "FAIL: a _salvage path is tracked in this repository."
-            exit 1
-          fi
-          # Excludes .github/workflows: this file necessarily names the identifiers
-          # it searches for.
-          if git grep -Iln -iE 'client-a|client-b' -- . ':(exclude).github/workflows/*'; then
-            echo "FAIL: a real client identifier appears in tracked content."
-            exit 1
-          fi
+          # to never let it land. The kit's private-data scan of every tracked
+          # file (the same scan the pre-commit and pre-push hooks run) refuses a
+          # tracked `_salvage` path or process record, a client's name and
+          # personal data: exit 1 on a finding, 2 on an error.
+          node scripts/kit/private-data-scan.mjs --tree
           echo "No salvaged client data: PASS"
+      # The kit's workflow lint (the prevention plan's "zizmor in CI: every
+      # workflow declares its permissions"): zizmor 1.32.0, pinned by sha256,
+      # offline and with no token, over .github/workflows/; exit 1 on a finding,
+      # 2 on an error. The pre-push hook runs the same command.
+      - name: Workflow lint
+        run: node scripts/kit/workflow-lint.mjs
 
   build:
     name: Build
@@ -111,6 +126,8 @@ jobs:
       BACKEND_API_ORIGIN: https://backend.invalid
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
@@ -146,6 +163,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
@@ -161,6 +180,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
@@ -185,6 +206,8 @@ jobs:
       HOME: /root
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
@@ -224,6 +247,8 @@ jobs:
       HOME: /root
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
@@ -244,6 +269,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
@@ -341,6 +368,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc

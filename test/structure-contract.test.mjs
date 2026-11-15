@@ -699,7 +699,9 @@ test("every action is pinned by commit with its version, the image's base by dig
     for (const [line, ref] of workflow.matchAll(
       /^\s+(?:- )?uses: (\S+.*)$/gmu,
     )) {
-      if (ref.startsWith("./")) continue;
+      // This repository's own workflow, at the running commit (`$/`): pinned
+      // by the run itself. A workspace-relative `./` is not, and fails below.
+      if (ref.startsWith("$/")) continue;
       assert.match(
         ref,
         /^[\w.-]+\/[\w.-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$/u,
@@ -741,6 +743,21 @@ test("every action is pinned by commit with its version, the image's base by dig
   assert.match(
     docker,
     /^ {4}ignore:\n {6}- dependency-name: node\n {8}update-types: \["version-update:semver-major"\]$/mu,
+  );
+});
+
+test("the image's base is one exact Node version by its digest, in every stage — not a floating major (the security plan's item 19)", () => {
+  // `node:22-alpine` named whichever 22.x the digest happened to be; the tag
+  // now says it, and Dependabot's refresh moves tag and digest together.
+  const froms = [...read("Dockerfile").matchAll(/^FROM (\S+)/gmu)].map(
+    (m) => m[1],
+  );
+  assert.equal(froms.length, 3, "dependencies, builder and runner");
+  assert.equal(new Set(froms).size, 1, "every stage is the same image");
+  assert.match(
+    froms[0],
+    /^node:\d+\.\d+\.\d+-alpine@sha256:[0-9a-f]{64}$/u,
+    froms[0],
   );
 });
 
@@ -793,7 +810,7 @@ test("the nightly is its own workflow: it calls ci.yml on main, and its own job,
     ["ci", "report"],
   );
   const [called, report] = jobs;
-  assert.match(called, /^ {4}uses: \.\/\.github\/workflows\/ci\.yml$/mu);
+  assert.match(called, /^ {4}uses: \$\/\.github\/workflows\/ci\.yml$/mu);
   assert.match(called, /^ {4}permissions:\n {6}contents: read\n {4}uses:/mu);
   assert.match(report, /^ {4}needs: ci$/mu);
   // Whatever ci did, and only when it was not "success".
@@ -944,7 +961,7 @@ test("main runs a smoke on the tree its pull request's all-green proved, and the
   const full = job("full");
   assert.ok(full, "main.yml has no full job");
   assert.match(full, /^ {4}if: needs\.verdict\.outputs\.suite == 'full'$/mu);
-  assert.match(full, /^ {4}uses: \.\/\.github\/workflows\/ci\.yml$/mu);
+  assert.match(full, /^ {4}uses: \$\/\.github\/workflows\/ci\.yml$/mu);
 
   // main-green, in all-green's shape: needs every other job, runs whatever
   // they did, and passes only when the verdict was made, the suite it chose
@@ -969,6 +986,42 @@ test("main runs a smoke on the tree its pull request's all-green proved, and the
     /full\)\n\s+\[ "\$full" = "success" \] \|\| fail[^\n]*\n\s+\[ "\$smoke" = "skipped" \] \|\| fail/u,
   );
   assert.match(green, /\*\)\n\s+fail/u, "no suite chosen is red");
+});
+
+test("main.yml grants nothing by default, and each job only the reads it makes (the security plan's item 13)", () => {
+  // Not the repository's default token: whatever that default becomes, a job
+  // here reads what it names and writes nothing.
+  const main = read(".github/workflows/main.yml");
+  assert.match(main, /^permissions: \{\}\n\njobs:\n/mu);
+  const jobs = main
+    .slice(main.indexOf("\njobs:\n"))
+    .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
+    .slice(1);
+  const grants = Object.fromEntries(
+    jobs.map((job) => {
+      const id = job.slice(0, job.indexOf(":"));
+      const block =
+        /^ {4}permissions:(?: (\{\})|\n((?: {6}[\w-]+: \w+\n)+))/mu.exec(job);
+      assert.ok(block, `${id} names no permissions`);
+      const named = block[1]
+        ? {}
+        : Object.fromEntries(
+            [...block[2].matchAll(/^ {6}([\w-]+): (\w+)$/gmu)].map((m) => [
+              m[1],
+              m[2],
+            ]),
+          );
+      return [id, named];
+    }),
+  );
+  assert.deepEqual(grants, {
+    // The checkout, the merged pull request and its head's all-green.
+    verdict: { contents: "read", "pull-requests": "read", checks: "read" },
+    smoke: { contents: "read" },
+    full: { contents: "read" },
+    "main-green": {},
+  });
+  assert.doesNotMatch(main, /: write$/mu, "main.yml writes");
 });
 
 test("the committed platform types are checked against the deployed platform's contract — in CI before a merge, and after every production deploy — and fail closed (register F94)", () => {
@@ -1229,4 +1282,67 @@ test("a browser run with any test skipped, or no report, fails; forbidOnly and t
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("the private-data scan reads its client-name pattern from a secret, never a tracked file, on every trigger: the gates job runs it, ci.yml's workflow_call requires the secret, and main.yml and nightly.yml pass that one (security wave 1)", () => {
+  const ci = read(".github/workflows/ci.yml");
+  const triggers = ci.slice(ci.indexOf("\non:\n"), ci.indexOf("\njobs:\n"));
+  assert.match(
+    triggers,
+    /^ {2}workflow_call:\n(?: {4}#.*\n)* {4}secrets:\n {6}CLIENT_DENY_PATTERN:\n {8}required: true$/mu,
+  );
+  const step = ci.slice(ci.indexOf("- name: No salvaged client data"));
+  assert.match(
+    step,
+    /^- name: No salvaged client data\n(?: {8}#.*\n)* {8}env:\n {10}CLIENT_DENY_PATTERN: \$\{\{ secrets\.CLIENT_DENY_PATTERN \}\}\n {8}run: \|\n/u,
+  );
+  assert.match(
+    step.slice(0, step.indexOf("\n\n")),
+    /^ {10}node scripts\/kit\/private-data-scan\.mjs --tree$/mu,
+  );
+  for (const caller of ["main.yml", "nightly.yml"]) {
+    const text = read(`.github/workflows/${caller}`);
+    assert.match(
+      text,
+      /^ {4}uses: \$\/\.github\/workflows\/ci\.yml\n(?: {4}#.*\n)* {4}secrets:\n {6}CLIENT_DENY_PATTERN: \$\{\{ secrets\.CLIENT_DENY_PATTERN \}\}$/mu,
+      `${caller} passes the scan's pattern`,
+    );
+    assert.doesNotMatch(text, /secrets: inherit/u, `${caller} passes all`);
+  }
+});
+
+test("every checkout drops its token, a call to this repository's own workflow is `$/`, and the gates job runs the kit's workflow lint after the private-data scan (the prevention plan's zizmor)", () => {
+  // No step here fetches or pushes with git, so no checkout keeps the token
+  // in .git/config for a later step or an uploaded artifact (artipacked).
+  let checkouts = 0;
+  for (const file of readdirSync(".github/workflows")) {
+    const text = read(`.github/workflows/${file}`);
+    for (const [, , rest] of text.matchAll(
+      /^( +)- uses: actions\/checkout@.*\n((?:\1 {2}.*\n)*)/gmu,
+    )) {
+      checkouts += 1;
+      assert.match(
+        rest,
+        /^ +persist-credentials: false$/mu,
+        `${file}: a checkout keeps its token`,
+      );
+    }
+    // GitHub's self-repository form: never the workspace's files (self-repository).
+    assert.doesNotMatch(
+      text,
+      /^\s+(?:- )?uses: \.\//mu,
+      `${file}: a workspace-relative uses:`,
+    );
+  }
+  assert.ok(checkouts > 0, "no checkout found: this test is blind");
+  const gates = read(".github/workflows/ci.yml")
+    .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
+    .find((entry) => entry.startsWith("gates:"));
+  assert.ok(gates, "CI has no gates job");
+  const scan = gates.indexOf("- name: No salvaged client data");
+  const lint = gates.search(
+    /^ {6}- name: Workflow lint\n {8}run: node scripts\/kit\/workflow-lint\.mjs$/mu,
+  );
+  assert.ok(scan > 0, "the gates job has no scan");
+  assert.ok(lint > scan, "the gates job runs the workflow lint after the scan");
 });

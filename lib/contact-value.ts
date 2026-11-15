@@ -14,7 +14,7 @@
  * (`mailto:` + the text). A PHONE is only "+", digits, spaces, ".", "-",
  * "(" and ")", with 10 to 15 digits, or 8 to 15 when it starts with "+";
  * and when it does not start with "+", its runs of digits after the first
- * have 3 or more digits each and its last run 4 or more ("555-0142",
+ * have 3 or more digits each and its last run 4 or more ("415-555-0142",
  * never a date, a time or an address like "10.5.2025 14.30" or
  * "192.168.10.100") — `tel:` + "+" when it starts with one + its digits.
  * Anything else is words.
