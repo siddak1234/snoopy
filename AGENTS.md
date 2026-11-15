@@ -106,7 +106,7 @@ records by size. Then:
   1. Review: `/audit-change` runs the `change-auditor` agent
      ([.claude/agents/change-auditor.md](.claude/agents/change-auditor.md)).
   2. The main session runs `node scripts/audit/record-pass.mjs <verdict.json>`,
-     the only marker writer.
+     the only marker writer; the verdict is in the clone's `.autom8x/audit/`.
   3. A normal `git push` under the session's gate lock (the pre-push hook runs
      rule 7's gates, their only run, which can build and run Playwright), then
      the pull request, then CI's `all-green`: the whole suite, WebKit too.
