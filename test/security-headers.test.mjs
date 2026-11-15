@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 /**
- * Every path's security headers (the owner's security plan, item 7): what
+ * The config's security-header rule (the owner's security plan, item 7): what
  * `next.config.ts`'s `headers()` returns, read from the config itself as Next
  * reads it. The config imports its modules without an extension, as Next
  * resolves them; here a relative import with none is the `.ts` file beside
@@ -49,7 +49,7 @@ async function sent(nodeEnv) {
   }
 }
 
-test("every path gets the five security headers, the policy report-only, and frames from this site alone (security plan item 7)", async () => {
+test("the config's rule covers every path with the five security headers, the policy report-only, and frames from this site alone (security plan item 7)", async () => {
   for (const nodeEnv of [undefined, "production", "test"]) {
     assert.deepEqual(
       await sent(nodeEnv),

@@ -3,7 +3,7 @@
  * owner's security plan, item 7, 2026-11-15): `next.config.ts`'s `headers()`
  * puts them on pages, file routes, its own API routes, 404s and static files.
  * Two kinds pass through without them, pinned by the browser suite: the
- * config's redirects (a 308 with no body) and the `/api/platform` proxy to the
+ * config's redirects (307 or 308, no page) and the `/api/platform` proxy to the
  * platform (JSON, never framed or shown as a page). Strict-Transport-Security
  * is not here: Vercel sends it. A route's own headers (the file routes'
  * `frame-ancestors 'self'` policy, `lib/file-view.ts`) stay as they are.

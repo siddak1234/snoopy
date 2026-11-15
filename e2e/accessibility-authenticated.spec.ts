@@ -11,7 +11,7 @@ import { fixtureControl, presentSession } from "./helpers";
 // a run, and a run that did skip would fail (scripts/no-skipped-browser-tests.mjs).
 // Below them, the report-only content security policy's evidence (the
 // security plan's item 7): every public page and every page here, read in
-// Chromium, breaks it nowhere — and the headers every path sends.
+// Chromium, breaks it nowhere — and the headers the site sends on what it serves itself.
 test.skip(
   process.env.E2E_PUBLIC_EDGE_FIXTURE !== "1",
   "requires the local public Edge fixture",
@@ -241,7 +241,7 @@ test.describe("the content security policy, report-only", () => {
       expect(built.status()).toBe(200);
       expectSent(built.headersArray(), "a static file");
       // Two kinds pass through without them (docs/ARCHITECTURE.md, "Response
-      // headers"): a config redirect (a 308 with no body) and the platform
+      // headers"): a config redirect (307 or 308, no page) and the platform
       // proxy (JSON, never framed or shown as a page). Pinned, so a change
       // either way is seen and the docs follow.
       const moved = await page.request.get("/solutions/healthcare", {

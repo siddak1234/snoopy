@@ -25,7 +25,7 @@ this origin holds.
 Every response the site serves itself — pages, file routes, its own API
 routes, 404s and static files — sends five headers from `next.config.ts`'s
 `headers()`. Two kinds pass through without them, and the browser suite pins
-both: the config's redirects (a 308 with no body) and the `/api/platform` proxy
+both: the config's redirects (307 or 308, no page) and the `/api/platform` proxy
 to the platform (JSON, never framed or shown as a page). Their values are in
 `lib/security-headers.ts` (the security plan's item 7):
 `X-Content-Type-Options: nosniff`,

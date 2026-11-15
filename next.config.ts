@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
-  // Every path's security headers (lib/security-headers.ts); a route's own
+  // The site's security headers (lib/security-headers.ts); a route's own
   // headers are its own.
   async headers() {
     return [
