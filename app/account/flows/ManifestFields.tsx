@@ -207,7 +207,8 @@ export function SetupFields({
  * is uploaded when chosen (backend FR-14) and carried as the file's id.
  * `compact` and `trailing` go to each file field as they are (`RunStart`
  * `compact`); so do `removable` and `onFilesChange` (every start form's file
- * field draws its files as pills with an x; build 43, item 17).
+ * field draws its files as pills with an x; build 43, item 17), and
+ * `starting` (Start pending: the x and the file buttons held; decision 17).
  */
 export function RunInputFields({
   runInput,
@@ -220,6 +221,7 @@ export function RunInputFields({
   trailing,
   removable = false,
   onFilesChange,
+  starting = false,
 }: {
   runInput: AutomationRunInputField[];
   /** The workspace the page showed, which a file's upload is checked against. */
@@ -238,6 +240,8 @@ export function RunInputFields({
   removable?: boolean;
   /** A file taken out with its x, under its field's key. */
   onFilesChange?: (key: string) => void;
+  /** Start is pending: each file field's x and buttons held. */
+  starting?: boolean;
 }) {
   return (
     <div className={`flex flex-col ${SPACING.group.gap}`}>
@@ -254,6 +258,7 @@ export function RunInputFields({
             trailing={trailing}
             removable={removable}
             onFilesChange={onFilesChange}
+            starting={starting}
           />
         ) : (
           <ManifestFieldInput

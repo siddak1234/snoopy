@@ -176,7 +176,8 @@
 - [scripts/generate-platform-contracts.mjs](../scripts/generate-platform-contracts.mjs): no header
 - [scripts/hooks/require-change-audit.mjs](../scripts/hooks/require-change-audit.mjs): PreToolUse gate for Claude Code sessions: blocks a `git push` (or
 - [scripts/kit/check-docs.mjs](../scripts/kit/check-docs.mjs): D, docs always updated (STANDARD (e)): `npm run check:docs` reads
-- [scripts/kit/kit.test.mjs](../scripts/kit/kit.test.mjs): The kit's own tests (node:test, Node built-ins only). Every cases.json row runs
+- [scripts/kit/guard-cases.test.mjs](../scripts/kit/guard-cases.test.mjs): The guard's tests (STANDARD (h) rows 1–10), imported by kit.test.mjs, so every repository's
+- [scripts/kit/kit.test.mjs](../scripts/kit/kit.test.mjs): The kit's own tests (node:test, Node built-ins only). The guard's cases run from
 - [scripts/kit/map.mjs](../scripts/kit/map.mjs): `npm run map` (STANDARD (c)): builds docs/MAP.md from the `map` and `rules`
 - [scripts/no-skipped-browser-tests.mjs](../scripts/no-skipped-browser-tests.mjs): No silent skips in the browser suites (Round 21 hardening, W17): after a
 - [scripts/probe-no-backend.mjs](../scripts/probe-no-backend.mjs): Serves the build `npm run build:no-backend` left in `.next`, with no
@@ -192,17 +193,17 @@
 
 ### Tests
 
-- `test/`: account, automation, billing, block, blocks, boundaries, brand, browser, build21, build22, build24, build28, build34, build42, build43, builds37, change, connection, connections, deployed, doc, export, fb39, fixture, flow, global, kit, new, no, picture, platform, pre, repo, round19, round21, run, session, signed, spacing, structure, tenancy, upload, v2, vendor, verify
+- `test/`: account, automation, billing, block, blocks, boundaries, brand, browser, build21, build22, build24, build28, build34, build42, build43, builds37, change, connection, connections, deployed, doc, export, fb39, fixture, flow, global, kit, new, no, picture, platform, pre, repo, round19, round21, round22, run, session, signed, spacing, structure, tenancy, upload, v2, vendor, verify
 
 ## Skills, agents and hooks
 
 - skill `audit-change`: Run the pre-push change audit — blast-radius analysis, full gate suite, and probes for uncovered surfaces — and record the PASS marker the push hooks require. … ([.claude/skills/audit-change/SKILL.md](../.claude/skills/audit-change/SKILL.md))
 - skill `new-page`: Add a signed-in page to the website: the page from the dashboard's parts, its contract test, and its fixture e2e spec with an axe scan, from the templates here… ([.claude/skills/new-page/SKILL.md](../.claude/skills/new-page/SKILL.md))
-- agent `builder`: Builds one lane from its brief in a scratch clone, heavy steps under the gate lock, docs in the same commit. Returns a leftovers list and the path of a summary… ([.claude/agents/builder.md](../.claude/agents/builder.md))
+- agent `builder`: Builds one lane from its brief in a scratch clone, heavy steps under the gate lock, docs in the same commit. Returns its summary (2 KB or less) and leftovers l… ([.claude/agents/builder.md](../.claude/agents/builder.md))
 - agent `change-auditor`: Audits a pending change end to end before push — maps the blast radius of every changed export/env-var/route, builds a coverage table against the real test sui… ([.claude/agents/change-auditor.md](../.claude/agents/change-auditor.md))
 - agent `explorer`: Read-only search. Use to find where something lives or is described before reading or editing; returns path:line findings and what was not found. Never edits. ([.claude/agents/explorer.md](../.claude/agents/explorer.md))
 - agent `researcher`: Researches one lens of a flow idea on the web and in the given clones, read-only. Every finding is a URL, an exact quote and a source tier; "not found" is a va… ([.claude/agents/researcher.md](../.claude/agents/researcher.md))
-- agent `reviewer`: Single-pass review of a branch before it lands. Checks correctness, docs kept true (D) and leftovers (A); writes a PASS, FAIL or UNKNOWN verdict with 10 findin… ([.claude/agents/reviewer.md](../.claude/agents/reviewer.md))
+- agent `reviewer`: Single-pass review of a branch before it lands. Checks correctness, docs kept true (D) and leftovers (A); returns a PASS, FAIL or UNKNOWN verdict with 10 findi… ([.claude/agents/reviewer.md](../.claude/agents/reviewer.md))
 - hook `PreToolUse` (`Bash`): `node "$CLAUDE_PROJECT_DIR/scripts/hooks/require-change-audi…`
 - hook `PreToolUse` (`Bash`): `node "$CLAUDE_PROJECT_DIR/scripts/hooks/require-change-audi…`
 - hook `PreToolUse` (`Bash|Write|Edit|NotebookEdit|Artifact`): `guard.mjs`

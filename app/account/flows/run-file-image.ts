@@ -30,12 +30,18 @@ export function fileAccept(accepted?: readonly string[]): string {
   return accepted && accepted.length > 0 ? accepted.join(",") : RUN_FILE_ACCEPT;
 }
 
-/** Whether Take photo is offered: a photo is sent as a JPEG, so only where a JPEG is taken. */
+/**
+ * Whether Take photo is offered: a photo is sent as a JPEG, so only where a
+ * JPEG is taken — a field that names no types, or one whose types include
+ * "image/jpeg" in any case, as the platform compares a type. An empty list
+ * accepts nothing on the platform (its wire schema: "An empty list accepts
+ * nothing"; a manifest cannot declare one), so it takes no photo (the owner's
+ * decision 19 (d) of 2026-11-15, "align a-d", the app's rule too).
+ * ~~An empty list took photos~~ until then.
+ */
 export function takesPhotos(accepted?: readonly string[]): boolean {
   return (
-    !accepted ||
-    accepted.length === 0 ||
-    accepted.some((type) => type.toLowerCase() === "image/jpeg")
+    !accepted || accepted.some((type) => type.toLowerCase() === "image/jpeg")
   );
 }
 

@@ -78,7 +78,11 @@ import { SPACING } from "@/lib/spacing";
  * the next press. An optional file field left empty starts as before; the
  * platform's 422 stays the backstop. Each file is a pill with an x
  * (`RunFileField` `removable`); a file taken out is a changed input, so a new
- * key (`onFilesChange`).
+ * key (`onFilesChange`), and is discarded on the platform at once (the
+ * owner's decision 17 of 2026-11-15, "delete at once"). While Start is
+ * pending the file fields are `starting`: the x and the file buttons held,
+ * so no file is discarded or replaced under the run being started; Turn on
+ * pending holds nothing.
  *
  * Turning a flow on is a change only an owner or admin makes (backend §12.1
  * #180): to a member Turn on is read-only, with "Only an owner or admin can
@@ -135,7 +139,10 @@ export function RunStart({
   compact?: boolean;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  // Start's and Turn on's own: only Start's holds the file fields (`starting`).
+  const [starting, startRunTransition] = useTransition();
+  const [turningOn, startTurnOnTransition] = useTransition();
+  const pending = starting || turningOn;
   const [error, setError] = useState<string | null>(null);
   // A required file missing at the press: shown in the error line's place.
   const [missing, setMissing] = useState<string | null>(null);
@@ -211,7 +218,7 @@ export function RunStart({
     setMissing(absent ? addFileFirst(absent.title) : null);
     if (absent) return;
     data.set("workspaceId", workspaceId);
-    startTransition(async () => {
+    startRunTransition(async () => {
       setError(await send(data));
     });
   };
@@ -242,7 +249,7 @@ export function RunStart({
   const turnOn = () => {
     setError(null);
     setMissing(null);
-    startTransition(async () => {
+    startTurnOnTransition(async () => {
       setError(await sendTurnOn());
     });
   };
@@ -299,6 +306,7 @@ export function RunStart({
             trailing={inRow ? start : undefined}
             removable
             onFilesChange={newRunKey}
+            starting={starting}
           />
         ) : null}
         <FormError message={missing ?? error} />

@@ -51,7 +51,7 @@ const STUBS = {
   "./actions":
     "export const beginConnectionAuthorization = async () => ({ ok: false }); export const connectProviderWithKey = async () => ({ ok: false }); export const disconnectConnection = async () => ({ ok: false }); export const subscribeToAutomation = async () => ({ ok: true }); export const archiveSubscription = async () => ({ ok: true }); export const setSubscriptionStatus = async () => ({ ok: true }); export const startRun = async () => ({ ok: true });",
   "./upload-actions":
-    "export const openRunUpload = async () => ({ ok: false, error: 'x' }); export const completeRunUpload = async () => ({ ok: false, error: 'x' });",
+    "export const openRunUpload = async () => ({ ok: false, error: 'x' }); export const completeRunUpload = async () => ({ ok: false, error: 'x' }); export const discardRunUpload = async () => undefined;",
 };
 
 /** A router where no app router is mounted: what a client page's hooks read here. */

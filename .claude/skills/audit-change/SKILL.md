@@ -16,7 +16,7 @@ Audit the change that is about to be pushed, and record the result the push hook
    - Empty, or HEAD tree equals the base tree → report "nothing new ships" and stop; pushes of an already-merged tree are allowed without a marker.
    - All changed paths in `docs/**` or `**/*.md` (and none in `.github/**`) → **docs-only**: run `node scripts/audit/run-gates.mjs` (lint, format:check, the document-reference check, `check:docs` and `map -- --check`), then `node scripts/audit/record-pass.mjs --docs-only`.
    - Anything else → **full audit**: spawn the `change-auditor` agent (Agent tool, subagent_type `change-auditor`) with the branch context. Do not run the suites yourself in parallel with it — the ports are exclusive.
-3. **Record**: only if the agent's verdict is PASS, run `node scripts/audit/record-pass.mjs <verdict-file-path>`. That script is the sole marker writer and re-verifies everything; if it refuses, treat the refusal as a finding, fix, and re-audit. Never edit the marker, the evidence file, or the verdict file by hand — a hand-edited audit trail is worse than no audit.
+3. **Record**: only if the agent's verdict is PASS, run `node scripts/audit/record-pass.mjs <verdict-file-path>`, the path the agent named: its verdict is in the clone's git-ignored `.autom8x/audit/` folder (`verdict-<HEAD tree>.json`), with its probe scripts — never the session scratchpad or anywhere outside the clone (the owner's rule, "Strict one place"). That script is the sole marker writer and re-verifies everything; if it refuses, treat the refusal as a finding, fix, and re-audit. Never edit the marker, the evidence file, or the verdict file by hand — a hand-edited audit trail is worse than no audit.
 4. **Report**: verdict; the coverage table; `required_tests` (these are debt to schedule even on PASS); the marker path and its expiry. If the verdict is FAIL: the findings, then fix code or add the named tests and re-run this skill from step 1.
 
 ## --live mode (after a merge to main has deployed)
@@ -31,5 +31,6 @@ Not a push gate — a post-deploy verification that the change works where users
 ## Notes
 
 - Markers live in `.git/autom8x-audit/` (per-clone, never committed), keyed by `git rev-parse HEAD^{tree}`, and expire after 24h — untracked inputs like `.env.local` and `node_modules` are invisible to the tree hash, so a stale green must re-earn itself.
+- The agent's verdict and probe scripts live in `.autom8x/audit/` (per-clone, git-ignored, never linted: `eslint.config.mjs` ignores `.autom8x/`); remove the folder when the clone is done with, as any other leftover.
 - Amending only a commit message keeps the tree, and the marker stays valid; any content change moves the tree and the push blocks again. That is correct, not a bug.
 - Manual pushes outside Claude sessions hit the same marker check via `scripts/githooks/pre-push` (armed once per clone with `bash scripts/install-git-hooks.sh`; deliberate bypass is `git push --no-verify`).

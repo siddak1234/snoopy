@@ -17,7 +17,7 @@
     "docs": "the documents themselves, which the rules point at",
     "test-results": "Playwright's output, gitignored",
     ".next": "the build's output, gitignored",
-    ".autom8x": "the repo-facts JSON npm run verify writes (generated, gitignored)"
+    ".autom8x": "the repo-facts JSON npm run verify writes, and the change audit's verdict and probe scripts in .autom8x/audit/ (generated, gitignored)"
   },
   "rules": [
     {
