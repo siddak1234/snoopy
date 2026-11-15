@@ -57,7 +57,7 @@ which every gate ran green ends by emitting
 this repository's facts file to `.autom8x/repo-facts/snoopy.json` (gitignored;
 `snoopy-backend` commits it as `snoopy-backend/docs/repo-facts/snoopy.json`). Run it on the
 exact Node version `.nvmrc` names: every CI job reads that file, and the container's
-`node:22-alpine` is the same major. Vercel builds and serves production on its
+`node:<x.y.z>-alpine` is the same major. Vercel builds and serves production on its
 own latest 22.x (`engines` `22.x`; it offers majors only), so the Node CI tests
 and the Node production runs can differ within 22.x (a minor or a patch). Running it while `/audit-change` runs, or the reverse,
 is refused — both build into `.next` and serve on ports 3001 and 3443, so they
@@ -138,11 +138,12 @@ dev-dependency audit and its report of vulnerabilities with no fix stay
 report-only by design; the runtime audit and the fixable CRITICAL/HIGH scan block.
 
 **Pinned, and kept current.** Every action in the workflows is pinned by commit
-with its `# vX.Y.Z`, the Dockerfile's `node:22-alpine` by index digest with its
-tag, the Playwright image the browser jobs run in by its tag and digest, and
-Node by `.nvmrc`. `.github/dependabot.yml` moves two of them weekly: one pull
-request for the actions, one for the Dockerfile's image (a new Node major is
-ignored); the docs check lets a Dependabot commit that touches only bump files
+with its `# vX.Y.Z`, the Dockerfile's Node image by index digest with its
+exact version for a tag (`node:<x.y.z>-alpine`, one image in all three
+stages; the security plan's item 19), the Playwright image the browser jobs
+run in by its tag and digest, and Node by `.nvmrc`. `.github/dependabot.yml`
+moves two of them weekly: one pull request for the actions, one for the
+Dockerfile's image, tag and digest together (a new Node major is ignored); the docs check lets a Dependabot commit that touches only bump files
 through (`scripts/kit/check-docs.mjs`). The rest move by hand, in the round's
 deliberate dependency step (backend §12.1 #278), which also carries the npm
 bumps Dependabot does not make (its security updates stay on): `.nvmrc`, with

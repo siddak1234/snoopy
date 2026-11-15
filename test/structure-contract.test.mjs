@@ -744,6 +744,21 @@ test("every action is pinned by commit with its version, the image's base by dig
   );
 });
 
+test("the image's base is one exact Node version by its digest, in every stage — not a floating major (the security plan's item 19)", () => {
+  // `node:22-alpine` named whichever 22.x the digest happened to be; the tag
+  // now says it, and Dependabot's refresh moves tag and digest together.
+  const froms = [...read("Dockerfile").matchAll(/^FROM (\S+)/gmu)].map(
+    (m) => m[1],
+  );
+  assert.equal(froms.length, 3, "dependencies, builder and runner");
+  assert.equal(new Set(froms).size, 1, "every stage is the same image");
+  assert.match(
+    froms[0],
+    /^node:\d+\.\d+\.\d+-alpine@sha256:[0-9a-f]{64}$/u,
+    froms[0],
+  );
+});
+
 test("the Playwright image CI's browser jobs run in is named by its tag and pinned by digest, and the tag is the lockfile's @playwright/test (Round 21 hardening, W-1)", () => {
   // Nothing moves this image but a hand, so the tag says which version the
   // digest is, and a bump of @playwright/test without the image is red here.
