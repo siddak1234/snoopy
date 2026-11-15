@@ -12,8 +12,8 @@ import { elements, loadModules, parse } from "./blocks-harness.mjs";
  * - 17, "delete at once": a file a start form or the job upload card lets go
  *   of before any run was given it is discarded on the platform at once, in
  *   the background, nothing said (`discardUpload`, DELETE
- *   /v1/workspaces/{workspaceId}/uploads/{artifactId}; its type is the
- *   platform branch's, by hand, until the route merges). Which lettings-go
+ *   /v1/workspaces/{workspaceId}/uploads/{artifactId}; its types are the
+ *   generated contract's since snoopy-backend #289 merged). Which lettings-go
  *   discard is the session's reading and the app's (docs/ARCHITECTURE.md "A
  *   start form's files"), not the owner's words.
  * - 19 (c): every form's file buttons say "Take photo for {title}" and
@@ -162,7 +162,7 @@ function body(source, opening) {
   return source.slice(start, end);
 }
 
-test("17: discardUpload — DELETE /v1/workspaces/{workspaceId}/uploads/{artifactId}, each id encoded, no body and no Idempotency-Key, typed by hand from the platform's branch until its route merges", async () => {
+test("17: discardUpload — DELETE /v1/workspaces/{workspaceId}/uploads/{artifactId}, each id encoded, no body and no Idempotency-Key, its types the generated contract's", async () => {
   const automations = await load(AUTOMATIONS, {
     stubs: {
       "@/lib/platform-server": `

@@ -170,11 +170,9 @@ page reuses:
   their inputs are disabled (`starting`; Turn on pending holds nothing). A
   discard goes to the workspace the page showed only while it is still the
   active one (register F28); after a switch in another tab nothing is sent.
-  The route is not on the platform's `main` yet: its two types are typed by
-  hand in `lib/automations.ts` from the platform branch's
-  `snoopy-backend/docs/openapi/automations.yaml`, and `lib/generated/` is untouched; once
-  it merges, `npm run generate:platform-contracts` brings `discardUpload` in
-  and the hand types go.
+  The route merged with snoopy-backend #289 (`d3e01d0`, 2026-11-15):
+  `npm run generate:platform-contracts` brought `discardUpload` into
+  `lib/generated/`, and `lib/automations.ts` takes its types from there.
 - **The app aligned** (the owner's decision 19 of 2026-11-15, verbatim:
   "19. align a-d no assumptions and no laziness"; the session's parity check
   of the app at `7cc471e` against this site at `6973352`): (a) Upload off

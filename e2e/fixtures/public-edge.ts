@@ -5210,7 +5210,7 @@ const server = createServer(
       } satisfies AutomationOperations["completeUpload"]["responses"][200]["content"]["application/json"]);
     }
     // The owner's decision 17 of 2026-11-15 ("delete at once"; the platform's
-    // `discardUpload`, BUILD-PLAN 30.18.1, as its branch publishes it): a file
+    // `discardUpload`, BUILD-PLAN 30.18.1, merged as snoopy-backend #289): a file
     // its uploader let go of, deleted now — 204, and 204 again for one already
     // deleted; 400 an id that is not a UUID; 404 one this workspace never
     // held; 409 `file_in_use` once a run was given it, which keeps it.
