@@ -369,16 +369,12 @@ export async function completeUpload(
 /**
  * `discardUpload` (`DELETE /v1/workspaces/{workspaceId}/uploads/{artifactId}`,
  * the platform's BUILD-PLAN 30.18.1; the owner's decision 17 of 2026-11-15,
- * "delete at once"), typed by hand from the platform's branch
- * `round-22/phase-a-platform` (snoopy-backend #289,
- * `snoopy-backend/docs/openapi/automations.yaml`): its route is not yet on
- * the platform's `main`, so not in
- * `lib/generated/`. Once it merges, `npm run generate:platform-contracts`
- * brings it in and these two types become
- * `operations["discardUpload"]["parameters"]["path"]` and its 204. No body
- * either way, and no `Idempotency-Key`: a repeat is the same success.
+ * "delete at once"), from the generated contract (snoopy-backend #289, merged
+ * 2026-11-15 as `d3e01d0`; `npm run generate:platform-contracts`). No body,
+ * and no `Idempotency-Key`: a repeat is the same success.
  */
-export type DiscardUploadPath = { workspaceId: string; artifactId: string };
+export type DiscardUploadPath =
+  operations["discardUpload"]["parameters"]["path"];
 /** 204: the file is deleted, now or already. */
 export type DiscardUploadResponse = void;
 

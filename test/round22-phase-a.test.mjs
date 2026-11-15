@@ -181,17 +181,14 @@ test("17: discardUpload — DELETE /v1/workspaces/{workspaceId}/uploads/{artifac
   assert.deepEqual(asked.platform, [
     ["/v1/workspaces/w%2F1/uploads/a%20b", { method: "DELETE" }],
   ]);
-  // The hand type names the platform branch and the regeneration that drops it.
+  // The route's types are the generated contract's (snoopy-backend #289, merged).
   const source = read(AUTOMATIONS);
   assert.match(
     source,
-    /export type DiscardUploadPath = \{ workspaceId: string; artifactId: string \};/u,
+    /export type DiscardUploadPath =\s+operations\["discardUpload"\]\["parameters"\]\["path"\];/u,
   );
   assert.match(source, /export type DiscardUploadResponse = void;/u);
-  assert.match(source, /round-22\/phase-a-platform/u);
-  assert.match(source, /npm run generate:platform-contracts/u);
-  // Not in the generated contract yet: nothing under lib/generated/ was edited.
-  assert.doesNotMatch(
+  assert.match(
     read("lib/generated/platform-contracts/automations.d.ts"),
     /discardUpload/u,
   );
