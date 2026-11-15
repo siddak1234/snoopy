@@ -479,7 +479,7 @@ test("the private-data scan runs first on a push to any remote, given git's ref 
     assert.equal(found.exit, 1, `a finding refuses a push to ${url}`);
     assert.match(
       found.stderr,
-      /found private data in the commits being pushed/u,
+      /found private data in the commits since origin\/main/u,
     );
     assert.deepEqual(fixture.ran(), [], "no gate runs after a finding");
   }

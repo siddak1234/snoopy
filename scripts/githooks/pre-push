@@ -1,6 +1,6 @@
 #!/bin/sh
 # Native pre-push gate: every push, to any remote, first runs the kit's
-# private-data scan of the commits being pushed (AGENTS.md rule 9). Then every
+# private-data scan of the commits since origin/main (AGENTS.md rule 9). Then every
 # push of this repository — from any tool or terminal — runs the gates its
 # change needs (scripts/change-class.mjs: docs, code or full; README
 # "Verification"; register F93), so a push that would turn CI red is refused
@@ -12,7 +12,8 @@
 # git calls this with: $1=remote name, $2=remote url, and stdin lines of
 # "<local_ref> <local_sha> <remote_ref> <remote_sha>".
 
-# The ref lines, read once: the scan reads them, then the gate below.
+# The ref lines, read once: handed on to the scan's stdin (it reads the commits
+# since origin/main itself), then read by the gate below.
 ref_lines="$(cat)"
 
 # A fork or a mirror is as public as this repository, so the scan gates a push
@@ -26,7 +27,7 @@ fi
 printf '%s\n' "$ref_lines" | (cd "$top" && node scripts/kit/private-data-scan.mjs --push) >&2
 scan=$?
 if [ "$scan" -eq 1 ]; then
-  echo "pre-push: the private-data scan found private data in the commits being pushed — refused. Rewrite them with reserved values (AGENTS.md rule 9)." >&2
+  echo "pre-push: the private-data scan found private data in the commits since origin/main — refused. Rewrite them with reserved values (AGENTS.md rule 9)." >&2
   exit 1
 elif [ "$scan" -ne 0 ]; then
   echo "pre-push: the private-data scan could not run (exit $scan) — refused." >&2

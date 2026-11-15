@@ -96,13 +96,10 @@ jobs:
           # customer email addresses, vendor names, and dollar amounts. This
           # repository is public and git history is permanent, so deleting such a
           # file in a later commit does not remove it — the only workable control is
-          # to never let it land.
-          if git ls-files | grep -i '_salvage'; then
-            echo "FAIL: a _salvage path is tracked in this repository."
-            exit 1
-          fi
-          # The kit's private-data scan of every tracked file (the same scan the
-          # pre-commit and pre-push hooks run): exit 1 on a finding, 2 on an error.
+          # to never let it land. The kit's private-data scan of every tracked
+          # file (the same scan the pre-commit and pre-push hooks run) refuses a
+          # tracked `_salvage` path or process record, a client's name and
+          # personal data: exit 1 on a finding, 2 on an error.
           node scripts/kit/private-data-scan.mjs --tree
           echo "No salvaged client data: PASS"
 
