@@ -181,6 +181,8 @@
 - [scripts/kit/guard-cases.test.mjs](../scripts/kit/guard-cases.test.mjs): The guard's tests (STANDARD (h) rows 1–10), imported by kit.test.mjs, so every repository's
 - [scripts/kit/kit.test.mjs](../scripts/kit/kit.test.mjs): The kit's own tests (node:test, Node built-ins only). The guard's cases run from
 - [scripts/kit/map.mjs](../scripts/kit/map.mjs): `npm run map` (STANDARD (c)): builds docs/MAP.md from the `map` and `rules`
+- [scripts/kit/private-data-scan.mjs](../scripts/kit/private-data-scan.mjs): The private-data scan (the owner's security review, 2026-11-15: "no pii in public repos
+- [scripts/kit/private-data-scan.test.mjs](../scripts/kit/private-data-scan.test.mjs): The private-data scan's tests, imported by kit.test.mjs, so every repository's runner runs them.
 - [scripts/no-skipped-browser-tests.mjs](../scripts/no-skipped-browser-tests.mjs): No silent skips in the browser suites (Round 21 hardening, W17): after a
 - [scripts/probe-no-backend.mjs](../scripts/probe-no-backend.mjs): Serves the build `npm run build:no-backend` left in `.next`, with no
 - [scripts/repo-facts.mjs](../scripts/repo-facts.mjs): What this repository reports about itself, in the shape snoopy-backend's
