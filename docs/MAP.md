@@ -189,7 +189,8 @@
 
 ### Git hooks
 
-- [scripts/githooks/pre-push](../scripts/githooks/pre-push): Native pre-push gate: every push of this repository — from any tool or
+- [scripts/githooks/pre-commit](../scripts/githooks/pre-commit): Native pre-commit gate: every commit of this public repository runs the kit's
+- [scripts/githooks/pre-push](../scripts/githooks/pre-push): Native pre-push gate: every push, to any remote, first runs the kit's
 
 ### Tests
 
@@ -215,17 +216,14 @@
 
 ### Under 100 KB
 
-- [AGENTS.archive.md](../AGENTS.archive.md) (archive)
 - [AGENTS.md](../AGENTS.md) (doc)
 - [CONTRIBUTING.md](../CONTRIBUTING.md) (doc)
 - [README.md](../README.md) (doc)
 - [docs/ARCHITECTURE.md](ARCHITECTURE.md) (doc)
-- [docs/REPO-STRUCTURE.archive.md](REPO-STRUCTURE.archive.md) (archive)
-- [docs/audits/2026-08-06-backend-boundary-cutover.md](audits/2026-08-06-backend-boundary-cutover.md) (archive)
 
 ### 100 KB to 1 MB
 
-- [docs/audits/2026-08-11-round-5-phase-1-status.md](audits/2026-08-11-round-5-phase-1-status.md) (archive)
+- none
 
 ### Over 1 MB: grep only
 

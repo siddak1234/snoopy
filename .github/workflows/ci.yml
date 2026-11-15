@@ -80,6 +80,10 @@ jobs:
             exit 1
           fi
       - name: No salvaged client data
+        # The client-name pattern is a repository secret, never written in a
+        # tracked file; the kit's scanner reads it from this variable.
+        env:
+          CLIENT_DENY_PATTERN: ${{ secrets.CLIENT_DENY_PATTERN }}
         run: |
           # `_salvage/` lives in the workspace folder, outside every repository. It
           # holds the recovered n8n workflows and the legacy database archive: real
@@ -91,12 +95,9 @@ jobs:
             echo "FAIL: a _salvage path is tracked in this repository."
             exit 1
           fi
-          # Excludes .github/workflows: this file necessarily names the identifiers
-          # it searches for.
-          if git grep -Iln -iE 'gideontoal|clarossolutions' -- . ':(exclude).github/workflows/*'; then
-            echo "FAIL: a real client identifier appears in tracked content."
-            exit 1
-          fi
+          # The kit's private-data scan of every tracked file (the same scan the
+          # pre-commit and pre-push hooks run): exit 1 on a finding, 2 on an error.
+          node scripts/kit/private-data-scan.mjs --tree
           echo "No salvaged client data: PASS"
 
   build:

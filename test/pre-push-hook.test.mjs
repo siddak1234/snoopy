@@ -2,7 +2,9 @@
 // driven exactly as git drives it: remote name + url as args, ref lines on
 // stdin. The repository carries the real classifier (scripts/change-class.mjs)
 // and its checks (scripts/audit/preflight.mjs); `npm` is a stub first on PATH
-// that notes each command it is asked for and exits as the test says.
+// that notes each command it is asked for and exits as the test says, and the
+// kit's private-data scan a stub that notes its arguments and stdin. The last
+// test drives the pre-commit hook beside it through a real `git commit`.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
@@ -66,6 +68,7 @@ function makeRepo({ change = "README.md", origin = true, classifier } = {}) {
   const repo = join(base, "snoopy");
   const bin = join(base, "bin");
   const log = join(base, "npm.log");
+  const scanLog = join(base, "scan.log");
   // The stub npm: `npm run <name> ...` and `npm audit ...` note their name
   // (and the GIT_DIR and arguments they saw), go red when FAKE_RED names them,
   // test:contracts prints FAKE_TAP's TAP summary, and build writes a routes
@@ -113,6 +116,12 @@ exit 0
     join(repo, "scripts/audit-doc-references.mjs"),
     `import { appendFileSync } from "node:fs";\nappendFileSync(${JSON.stringify(log)}, "doc-references\\n");\n`,
   );
+  // The kit's private-data scan, a stub: notes its arguments and the ref lines
+  // on its stdin, and exits FAKE_SCAN (0, clean, by default).
+  write(
+    join(repo, "scripts/kit/private-data-scan.mjs"),
+    `import { appendFileSync, readFileSync } from "node:fs";\nconst input = readFileSync(0, "utf8");\nappendFileSync(${JSON.stringify(scanLog)}, JSON.stringify({ args: process.argv.slice(2), input }) + "\\n");\nprocess.exit(Number(process.env.FAKE_SCAN ?? 0));\n`,
+  );
   write(join(repo, "README.md"), "# one\n");
   git(repo, "add", ".");
   git(repo, "commit", "-q", "-m", "one");
@@ -131,7 +140,17 @@ exit 0
       existsSync(log)
         ? readFileSync(log, "utf8").split("\n").filter(Boolean)
         : [],
-    reset: () => rmSync(log, { force: true }),
+    scans: () =>
+      existsSync(scanLog)
+        ? readFileSync(scanLog, "utf8")
+            .split("\n")
+            .filter(Boolean)
+            .map((line) => JSON.parse(line))
+        : [],
+    reset: () => {
+      rmSync(log, { force: true });
+      rmSync(scanLog, { force: true });
+    },
   };
 }
 
@@ -141,6 +160,7 @@ function runHook(fixture, url, lines, extraEnv = {}) {
   delete env.FAKE_RED;
   delete env.FAKE_TAP;
   delete env.FAKE_NO_REWRITE;
+  delete env.FAKE_SCAN;
   Object.assign(env, extraEnv);
   env.PATH = `${fixture.bin}:${env.PATH}`;
   const run = spawnSync("sh", [hook, "origin", url], {
@@ -426,4 +446,107 @@ test("a push from a linked worktree runs the gates without git's repository vari
     const seen = join(fixture.base, `git-dir-${gate.replace(":", "-")}`);
     assert.equal(readFileSync(seen, "utf8"), "unset", `${gate} saw GIT_DIR`);
   }
+});
+
+test("the private-data scan runs first on a push to any remote, given git's ref lines, and a finding, a failure or a missing scan refuses the push (AGENTS.md rule 9)", (t) => {
+  const fixture = makeRepo();
+  const { repo, tree, refLine } = fixture;
+  t.after(() => rmSync(fixture.base, { recursive: true, force: true }));
+  mark(repo, tree, inAnHour());
+
+  const elsewhere = runHook(
+    fixture,
+    "https://github.com/other/elsewhere.git",
+    refLine,
+  );
+  assert.equal(elsewhere.exit, 0, elsewhere.stderr);
+  assert.deepEqual(
+    fixture.scans(),
+    [{ args: ["--push"], input: refLine }],
+    "another remote is scanned, with git's ref lines",
+  );
+  assert.deepEqual(fixture.ran(), [], "and not gated");
+  fixture.reset();
+
+  const clean = runHook(fixture, SNOOPY_URL, refLine);
+  assert.equal(clean.exit, 0, clean.stderr);
+  assert.deepEqual(fixture.scans(), [{ args: ["--push"], input: refLine }]);
+  assert.deepEqual(fixture.ran(), DOCS, "a clean scan, then the gates");
+  fixture.reset();
+
+  for (const url of [SNOOPY_URL, "https://github.com/other/elsewhere.git"]) {
+    const found = runHook(fixture, url, refLine, { FAKE_SCAN: "1" });
+    assert.equal(found.exit, 1, `a finding refuses a push to ${url}`);
+    assert.match(
+      found.stderr,
+      /found private data in the commits being pushed/u,
+    );
+    assert.deepEqual(fixture.ran(), [], "no gate runs after a finding");
+  }
+  const broken = runHook(fixture, SNOOPY_URL, refLine, { FAKE_SCAN: "2" });
+  assert.equal(broken.exit, 1, "a scan that cannot run never fails open");
+  assert.match(broken.stderr, /private-data scan could not run \(exit 2\)/u);
+
+  rmSync(join(repo, "scripts/kit/private-data-scan.mjs"));
+  const missing = runHook(fixture, SNOOPY_URL, refLine);
+  assert.equal(missing.exit, 1, "a missing scan refuses the push");
+  assert.match(missing.stderr, /private-data scan is missing/u);
+  assert.deepEqual(fixture.ran(), []);
+});
+
+// The pre-commit hook, driven by a real `git commit` with this repository's
+// hooks directory armed, in the same throwaway repository.
+function commit(fixture, extraEnv = {}) {
+  const env = { ...process.env };
+  delete env.FAKE_SCAN;
+  Object.assign(env, extraEnv);
+  write(join(fixture.repo, "notes.md"), `${Math.random()}\n`);
+  git(fixture.repo, "add", "notes.md");
+  const run = spawnSync(
+    "git",
+    [
+      "-c",
+      "user.email=t@t",
+      "-c",
+      "user.name=t",
+      "-c",
+      `core.hooksPath=${dirname(hook)}`,
+      "commit",
+      "-q",
+      "-m",
+      "three",
+    ],
+    { cwd: fixture.repo, encoding: "utf8", env },
+  );
+  return { exit: run.status, stderr: run.stderr };
+}
+
+test("the pre-commit hook scans the staged content and refuses a commit on a finding, a failure or a missing scan (AGENTS.md rule 9)", (t) => {
+  const fixture = makeRepo();
+  t.after(() => rmSync(fixture.base, { recursive: true, force: true }));
+  const head = () => git(fixture.repo, "rev-parse", "HEAD");
+
+  const before = head();
+  const clean = commit(fixture);
+  assert.equal(clean.exit, 0, clean.stderr);
+  assert.notEqual(head(), before, "a clean scan lets the commit land");
+  assert.deepEqual(fixture.scans(), [{ args: ["--staged"], input: "" }]);
+
+  for (const [code, message] of [
+    ["1", /found private data in the staged content/u],
+    ["2", /private-data scan could not run \(exit 2\)/u],
+  ]) {
+    const at = head();
+    const refused = commit(fixture, { FAKE_SCAN: code });
+    assert.notEqual(refused.exit, 0, `scan exit ${code} refuses the commit`);
+    assert.match(refused.stderr, message);
+    assert.equal(head(), at, "nothing was committed");
+  }
+
+  rmSync(join(fixture.repo, "scripts/kit/private-data-scan.mjs"));
+  const at = head();
+  const missing = commit(fixture);
+  assert.notEqual(missing.exit, 0, "a missing scan refuses the commit");
+  assert.match(missing.stderr, /private-data scan is missing/u);
+  assert.equal(head(), at);
 });

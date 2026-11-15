@@ -51,7 +51,7 @@ records by size. Then:
 | Review a branch before it lands | the `reviewer` agent ([.claude/agents/reviewer.md](.claude/agents/reviewer.md)) |
 | Build a lane from a brief | the `builder` agent ([.claude/agents/builder.md](.claude/agents/builder.md)) |
 | Research one lens of a flow idea on the web | the `researcher` agent ([.claude/agents/researcher.md](.claude/agents/researcher.md)); snoopy-automations' `/create-flow` runs it, never this repository's work |
-| A finding's history (F-numbers) | grep `docs/audits/` ("Records" below) |
+| A finding's history (F-numbers), a closed record | the private backend's `snoopy-backend/docs/records/snoopy/` ("Records" below) |
 
 ## Rules
 
@@ -83,6 +83,9 @@ records by size. Then:
    `.claude/settings.json` and the native hook (`scripts/githooks/pre-push`,
    armed once per clone via `bash scripts/install-git-hooks.sh`) both enforce
    the marker; the native hook first runs the change's gates (rule 7).
+9. **Reserved test data only.** Tests and docs use `example.com` or `.test` addresses, phones 555-0100 to 555-0199, IPs
+   in 192.0.2.0/24, 198.51.100.0/24 or 203.0.113.0/24, and made-up names. A client's name is never in a tracked file, and
+   process records live only in the private backend. The private-data scan runs on commit and push (`npm run hooks:install`), and in CI.
 
 ## Invariants
 
@@ -142,8 +145,6 @@ records by size. Then:
 
 ## Records
 
-- Current: this router, `README.md`, `docs/ARCHITECTURE.md`,
-  `docs/REPO-STRUCTURE.md`. Archive (closed, dated, grep-only): `docs/audits/`
-  (the register of findings, F-numbers) and every `*.archive.md`, such as
-  [AGENTS.archive.md](AGENTS.archive.md), this router's earlier text.
+- Current: this router, `README.md`, `docs/ARCHITECTURE.md`, `docs/REPO-STRUCTURE.md`. Closed records (the register of
+  findings, F-numbers; this router's earlier text) live only in the private `snoopy-backend/docs/records/snoopy/` (rule 9).
 - Grep any file over 100 KB (MAP "Records by size"); never Read one whole.

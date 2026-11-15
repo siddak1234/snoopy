@@ -2,7 +2,8 @@
 
 The folders, routes, scripts, specs and records are listed in the generated
 [MAP.md](MAP.md) (`npm run map`). This page keeps why each part is where it is.
-The tree it held before: [REPO-STRUCTURE.archive.md](REPO-STRUCTURE.archive.md).
+The tree it held before is a record kept only in the private backend
+(`snoopy-backend/docs/records/snoopy/`).
 
 | Part | Why it is here |
 | --- | --- |
@@ -27,5 +28,5 @@ The tree it held before: [REPO-STRUCTURE.archive.md](REPO-STRUCTURE.archive.md).
 | Browser regression | `e2e/`; fixture-only tests must stay disabled outside their local runner |
 
 The gate is `npm run verify` (README). Findings about this repository and their
-dispositions are the register in
-[the audit record](audits/2026-08-11-round-5-phase-1-status.md).
+dispositions are the register kept only in the private backend
+(`snoopy-backend/docs/records/snoopy/`, the Round 5 status record).

@@ -6,10 +6,11 @@ import { test } from "@playwright/test";
 // as the owner, and hands the browser over. Run it alone, headed:
 //   KEYBOARD_JOURNEY=1 node scripts/run-browser-fixtures.mjs --headed --grep "keyboard journey"
 // Resume in the Playwright Inspector ends it. The route list is in the Round 5
-// audit (docs/audits/2026-08-11-round-5-phase-1-status.md). playwright.config.ts
-// collects this file only with KEYBOARD_JOURNEY=1 and the fixture Edge
-// (E2E_PUBLIC_EDGE_FIXTURE=1), so no other run lists it as skipped (Round 21
-// hardening, W15); the skip below never fires in a run.
+// audit, a record kept only in the private backend
+// (snoopy-backend/docs/records/snoopy/, 2026-08-11-round-5-phase-1-status.md).
+// playwright.config.ts collects this file only with KEYBOARD_JOURNEY=1 and
+// the fixture Edge (E2E_PUBLIC_EDGE_FIXTURE=1), so no other run lists it as
+// skipped (Round 21 hardening, W15); the skip below never fires in a run.
 test.use({ storageState: process.env.PLAYWRIGHT_AUTH_STORAGE_STATE });
 test.skip(
   process.env.E2E_PUBLIC_EDGE_FIXTURE !== "1",

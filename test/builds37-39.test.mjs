@@ -441,13 +441,13 @@ test("item 11: a row's text that is one email or one phone, whole, is a way to r
 test("item 11: the phone and email table both clients share (snoopy-mobile's contact-value test holds the same rows): a number as people write one is a phone; a date, a time, an address or a short number is words", () => {
   const table = {
     phone: [
-      "(214) 983-2568",
-      "214-983-2568",
-      "214.983.2568",
-      "2149832568",
+      "(214) 555-0142",
+      "214-555-0142",
+      "214.555.0142",
+      "2145550142",
       "1-800-555-1234",
       "+44 20 7946 0958",
-      "+1 214 983 2568",
+      "+1 214 555 0142",
     ],
     notPhone: [
       "555-1234",
@@ -459,9 +459,9 @@ test("item 11: the phone and email table both clients share (snoopy-mobile's con
       "192.168.10.100",
       "555 12 34",
       "12 34 56 78",
-      "Call 214-983-2568",
+      "Call 214-555-0142",
     ],
-    email: ["akulaggarwal05@gmail.com"],
+    email: ["casey.morgan@example.com"],
     notEmail: ["a@b", "mail me at x@y.com"],
   };
   for (const text of table.phone)

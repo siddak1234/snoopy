@@ -345,9 +345,13 @@ plus what `npm run verify` cannot run offline: the dependency audit, a scan of
 the built image, and its SBOM. On `main`, `.github/workflows/main.yml` runs a
 smoke (lint, format, typecheck, the contract tests) when the merged commit's
 tree is the one its pull request's all-green passed, and the whole suite
-otherwise. `npm run hooks:install` arms the pre-push hook
-(`scripts/githooks/pre-push`), which runs the gates the change needs
-(`scripts/change-class.mjs`; see "Change-aware pre-push gate") and then requires
-the change-audit marker. CI is the authority: every pull request runs the whole
+otherwise. `npm run hooks:install` arms two hooks. The pre-commit hook
+(`scripts/githooks/pre-commit`) runs the kit's private-data scan on the staged
+content (AGENTS.md rule 9). The pre-push hook (`scripts/githooks/pre-push`)
+runs the same scan on the commits being pushed, to any remote, then the gates
+the change needs (`scripts/change-class.mjs`; see "Change-aware pre-push gate"),
+and then requires the change-audit marker. CI's Architecture gates job runs the
+scan on every tracked file, with the client-name pattern from a repository
+secret, never a tracked file. CI is the authority: every pull request runs the whole
 suite in all three engines; its Architecture gates job runs `check:docs` and
 the map's check on the pull request's commits.

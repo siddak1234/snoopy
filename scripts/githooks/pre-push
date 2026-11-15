@@ -1,14 +1,37 @@
 #!/bin/sh
-# Native pre-push gate: every push of this repository — from any tool or
-# terminal — runs the gates its change needs (scripts/change-class.mjs: docs,
-# code or full; README "Verification"; register F93), so a push that would turn
-# CI red is refused here instead of costing a run; and then requires a PASS
-# marker from /audit-change for the exact tree being pushed.
+# Native pre-push gate: every push, to any remote, first runs the kit's
+# private-data scan of the commits being pushed (AGENTS.md rule 9). Then every
+# push of this repository — from any tool or terminal — runs the gates its
+# change needs (scripts/change-class.mjs: docs, code or full; README
+# "Verification"; register F93), so a push that would turn CI red is refused
+# here instead of costing a run; and then requires a PASS marker from
+# /audit-change for the exact tree being pushed.
 # Installed via `npm run hooks:install` (bash scripts/install-git-hooks.sh:
 # git config core.hooksPath scripts/githooks). Deliberate bypass: --no-verify.
 #
 # git calls this with: $1=remote name, $2=remote url, and stdin lines of
 # "<local_ref> <local_sha> <remote_ref> <remote_sha>".
+
+# The ref lines, read once: the scan reads them, then the gate below.
+ref_lines="$(cat)"
+
+# A fork or a mirror is as public as this repository, so the scan gates a push
+# to any remote. A finding (exit 1) or a scan that cannot run (any other
+# non-zero exit) refuses the push: it never fails open.
+top="$(git rev-parse --show-toplevel)" || exit 1
+if [ ! -f "$top/scripts/kit/private-data-scan.mjs" ]; then
+  echo "pre-push: the kit's private-data scan is missing from this clone — refused." >&2
+  exit 1
+fi
+printf '%s\n' "$ref_lines" | (cd "$top" && node scripts/kit/private-data-scan.mjs --push) >&2
+scan=$?
+if [ "$scan" -eq 1 ]; then
+  echo "pre-push: the private-data scan found private data in the commits being pushed — refused. Rewrite them with reserved values (AGENTS.md rule 9)." >&2
+  exit 1
+elif [ "$scan" -ne 0 ]; then
+  echo "pre-push: the private-data scan could not run (exit $scan) — refused." >&2
+  exit 1
+fi
 
 remote_url="$2"
 case "$remote_url" in
@@ -24,6 +47,7 @@ gated=""
 pushed=""
 
 while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "$local_sha" ] && continue # no ref line
   [ "$local_sha" = "$zero" ] && continue # deletion push
 
   tree="$(git rev-parse "${local_sha}^{tree}")" || exit 1
@@ -35,7 +59,9 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 
   gated="$gated $tree:$local_ref"
   pushed="$pushed --head $local_sha"
-done
+done <<EOF
+$ref_lines
+EOF
 
 [ -n "$gated" ] || exit 0
 
