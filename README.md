@@ -352,6 +352,7 @@ runs the same scan on the commits being pushed, to any remote, then the gates
 the change needs (`scripts/change-class.mjs`; see "Change-aware pre-push gate"),
 and then requires the change-audit marker. CI's Architecture gates job runs the
 scan on every tracked file, with the client-name pattern from a repository
-secret, never a tracked file. CI is the authority: every pull request runs the whole
+secret, never a tracked file; ci.yml requires it when called, and main.yml and
+nightly.yml pass it. CI is the authority: every pull request runs the whole
 suite in all three engines; its Architecture gates job runs `check:docs` and
 the map's check on the pull request's commits.

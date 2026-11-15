@@ -11,6 +11,12 @@ name: CI
 on:
   pull_request:
   workflow_call:
+    # The private-data scan's client-name pattern (the gates job's "No salvaged
+    # client data"): a called workflow sees only the secrets its caller passes,
+    # so main.yml and nightly.yml each pass this one.
+    secrets:
+      CLIENT_DENY_PATTERN:
+        required: true
 
 # Read-only, whoever triggers or calls this workflow: no job here writes.
 permissions:

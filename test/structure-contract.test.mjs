@@ -1230,3 +1230,30 @@ test("a browser run with any test skipped, or no report, fails; forbidOnly and t
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("the private-data scan reads its client-name pattern from a secret, never a tracked file, on every trigger: the gates job runs it, ci.yml's workflow_call requires the secret, and main.yml and nightly.yml pass that one (security wave 1)", () => {
+  const ci = read(".github/workflows/ci.yml");
+  const triggers = ci.slice(ci.indexOf("\non:\n"), ci.indexOf("\njobs:\n"));
+  assert.match(
+    triggers,
+    /^ {2}workflow_call:\n(?: {4}#.*\n)* {4}secrets:\n {6}CLIENT_DENY_PATTERN:\n {8}required: true$/mu,
+  );
+  const step = ci.slice(ci.indexOf("- name: No salvaged client data"));
+  assert.match(
+    step,
+    /^- name: No salvaged client data\n(?: {8}#.*\n)* {8}env:\n {10}CLIENT_DENY_PATTERN: \$\{\{ secrets\.CLIENT_DENY_PATTERN \}\}\n {8}run: \|\n/u,
+  );
+  assert.match(
+    step.slice(0, step.indexOf("\n\n")),
+    /^ {10}node scripts\/kit\/private-data-scan\.mjs --tree$/mu,
+  );
+  for (const caller of ["main.yml", "nightly.yml"]) {
+    const text = read(`.github/workflows/${caller}`);
+    assert.match(
+      text,
+      /^ {4}uses: \.\/\.github\/workflows\/ci\.yml\n(?: {4}#.*\n)* {4}secrets:\n {6}CLIENT_DENY_PATTERN: \$\{\{ secrets\.CLIENT_DENY_PATTERN \}\}$/mu,
+      `${caller} passes the scan's pattern`,
+    );
+    assert.doesNotMatch(text, /secrets: inherit/u, `${caller} passes all`);
+  }
+});
