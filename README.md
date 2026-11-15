@@ -154,9 +154,11 @@ so the two move in one commit.
 09:27 UTC on `main`'s tip, calling it as main.yml's `full` does. When that
 run is not green, its own `Nightly red` job opens one "Nightly red" issue, or
 comments the run on the open one; that job alone may write issues.
-`ci.yml` grants `contents: read`; `main.yml` writes nothing: its `full` job is
-`contents: read`, and its other jobs use the repository's read-only default
-token. GitHub's limits
+`ci.yml` grants `contents: read`; `main.yml` grants nothing at its top
+(`permissions: {}`) and writes nothing: `verdict` reads `contents`,
+`pull-requests` and `checks` (the merged pull request and its head's
+all-green), `smoke` and `full` read `contents`, and `main-green` has no grant
+(the security plan's item 13). GitHub's limits
 stand: a night can start late, or be dropped at high load. In a public
 repository a scheduled workflow is switched off after 60 days with no
 activity; then no night runs and no issue opens until

@@ -17,6 +17,10 @@ on:
   push:
     branches: [main]
 
+# No grant by default: each job names the least it reads, and nothing here
+# writes (the security plan's item 13).
+permissions: {}
+
 jobs:
   # Which suite this tree needs. Every answer the API cannot give is "full":
   # this job decides and never fails, and main-green holds the suite it chose.
@@ -24,6 +28,12 @@ jobs:
     name: Tested as a PR
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    # The checkout and the commit's tree (contents), the pull request that
+    # landed it (pull-requests) and its head's all-green (checks).
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
     outputs:
       suite: ${{ steps.decide.outputs.suite }}
     steps:
@@ -74,6 +84,9 @@ jobs:
     if: needs.verdict.outputs.suite == 'smoke'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    # The checkout alone; setup-node's cache is the runner's, not the token's.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         # The contract tests read the whole history, as in ci.yml's gates job.
@@ -123,6 +136,8 @@ jobs:
       - full
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    # Reads only the other jobs' results: no grant.
+    permissions: {}
     steps:
       - name: The chosen suite succeeded
         env:

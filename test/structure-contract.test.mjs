@@ -971,6 +971,42 @@ test("main runs a smoke on the tree its pull request's all-green proved, and the
   assert.match(green, /\*\)\n\s+fail/u, "no suite chosen is red");
 });
 
+test("main.yml grants nothing by default, and each job only the reads it makes (the security plan's item 13)", () => {
+  // Not the repository's default token: whatever that default becomes, a job
+  // here reads what it names and writes nothing.
+  const main = read(".github/workflows/main.yml");
+  assert.match(main, /^permissions: \{\}\n\njobs:\n/mu);
+  const jobs = main
+    .slice(main.indexOf("\njobs:\n"))
+    .split(/^ {2}(?=[a-z][\w-]*:$)/mu)
+    .slice(1);
+  const grants = Object.fromEntries(
+    jobs.map((job) => {
+      const id = job.slice(0, job.indexOf(":"));
+      const block =
+        /^ {4}permissions:(?: (\{\})|\n((?: {6}[\w-]+: \w+\n)+))/mu.exec(job);
+      assert.ok(block, `${id} names no permissions`);
+      const named = block[1]
+        ? {}
+        : Object.fromEntries(
+            [...block[2].matchAll(/^ {6}([\w-]+): (\w+)$/gmu)].map((m) => [
+              m[1],
+              m[2],
+            ]),
+          );
+      return [id, named];
+    }),
+  );
+  assert.deepEqual(grants, {
+    // The checkout, the merged pull request and its head's all-green.
+    verdict: { contents: "read", "pull-requests": "read", checks: "read" },
+    smoke: { contents: "read" },
+    full: { contents: "read" },
+    "main-green": {},
+  });
+  assert.doesNotMatch(main, /: write$/mu, "main.yml writes");
+});
+
 test("the committed platform types are checked against the deployed platform's contract — in CI before a merge, and after every production deploy — and fail closed (register F94)", () => {
   // CI: a job all-green needs (the F88 test) that runs the check and can fail.
   const job = read(".github/workflows/ci.yml")
