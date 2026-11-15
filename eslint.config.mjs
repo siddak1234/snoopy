@@ -6,8 +6,10 @@ import prettier from "eslint-config-prettier";
 const eslintConfig = defineConfig([
   // The common kit is byte-identical in all four repositories and checked by
   // its own tests (scripts/kit/kit.test.mjs); a lint fix to one copy would
-  // make it drift, so neither folder is linted here.
-  globalIgnores([".claude/hooks/", "scripts/kit/"]),
+  // make it drift, so neither folder is linted here. `.autom8x/` is git-ignored
+  // output: the facts `npm run verify` writes, and the change audit's verdict
+  // and probe scripts (.claude/agents/change-auditor.md).
+  globalIgnores([".claude/hooks/", "scripts/kit/", ".autom8x/"]),
   ...nextVitals,
   ...nextTs,
   prettier,

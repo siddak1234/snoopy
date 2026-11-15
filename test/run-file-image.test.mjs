@@ -75,6 +75,18 @@ test("a field that names its types (acceptedContentTypes, backend ADR-0046) offe
   assert.match(field, /takesPhotos\(accepted\)/u);
 });
 
+test("Take photo where a JPEG is taken: no list, or one naming image/jpeg in any case; an empty list, which accepts nothing on the platform, takes no photo (the owner's decision 19 (d) of 2026-11-15, the app's rule)", () => {
+  assert.equal(takesPhotos(undefined), true);
+  assert.equal(takesPhotos(["image/jpeg"]), true);
+  assert.equal(takesPhotos(["application/pdf", "IMAGE/JPEG"]), true);
+  assert.equal(takesPhotos(["Image/Jpeg"]), true);
+  // An empty list accepts nothing (the platform's wire schema, `minItems: 1`;
+  // a manifest that declares one is refused), so no photo is offered.
+  assert.equal(takesPhotos([]), false);
+  assert.equal(takesPhotos(["image/png"]), false);
+  assert.equal(takesPhotos(["application/pdf", WORD_FILE]), false);
+});
+
 test("a PDF is sent as it is, a JPEG or a PNG is drawn again, and anything else is refused", () => {
   for (const source of ["chooser", "camera"]) {
     assert.equal(planRunFile("application/pdf", source), "send");
@@ -146,6 +158,9 @@ test("an image is sent under its own name ending .jpg, as a high-quality JPEG", 
   assert.equal(jpegName("march.invoice.png"), "march.invoice.jpg");
   assert.equal(jpegName("no-extension"), "no-extension.jpg");
   assert.equal(jpegName(".png"), "image.jpg");
+  // A file given with no name (decision 19 (b), the app's rule too): the only
+  // name the website ever gives a file is an image's, and none is image.jpg.
+  assert.equal(jpegName(""), "image.jpg");
   assert.equal(IMAGE_JPEG_QUALITY, 0.9);
   const image = read("app/account/flows/run-file-image.ts");
   assert.match(

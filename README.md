@@ -186,7 +186,11 @@ build 42, item 16, and build 43, item 17; Upload the browser's own chooser
 with no `capture` — item 3), its run opening
 from the flow; a flow with items read as Home opens, on its newest ready
 item, its run opening from that item, back to it and then its flow; a
-member's Open — and a workspace with no flow yet), a flow's page (its live Dashboard, its five
+member's Open — a workspace with no flow yet, and one whose flows are set up
+and none live: Today alone), a file a start form lets go of discarded at once
+(the owner's decision 17 of 2026-11-15: the x's, a choice that replaces or
+empties the field, Start pending holding the x and the file buttons; the
+fixture answers `discardUpload` and lists what it was sent), a flow's page (its live Dashboard, its five
 Steps — titles only, Step 1 holding the run's fields and Start run, step 2 its
 integration, step 4 titled by the flow's choice, step 5 who gets the email —
 and Edit setup; no Connections and no move to another version), its Set up
@@ -279,7 +283,9 @@ by the clinic's host)
 and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: the Flows
 list by department A–Z; its items grouped A–Z under its group filter, the
 website's drop-down, on its page with no Dashboard, no Steps and no run start
-form, searched, and past 25 sorted and paged; the upload card's drop-down, "Other" and the values typed before; an
+form, searched, and past 25 sorted and paged; the upload card's drop-down, "Other" and the values typed before, and its
+Cancel, Escape or a press outside discarding the file it held, as an upload
+ending after it closed is (decision 17); an
 item's runs ranked in one card of divided rows, each as tall as a closed section's bar, each score in
 its verdict's colour with its word as a chip, searched, its tiles and
 its file page — the file in place, its route for this site's pages alone,

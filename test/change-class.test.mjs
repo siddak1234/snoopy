@@ -4,6 +4,7 @@
 // whole suite in all three engines).
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import {
   existsSync,
   mkdtempSync,
@@ -409,4 +410,68 @@ test("unchanged: CI runs the whole suite on every pull request in three engines,
   // equal to the change audit's), and the change audit is untouched.
   assert.match(read("scripts/verify.mjs"), /name: "test:browser:fixtures"/u);
   assert.match(read("scripts/audit/run-gates.mjs"), /const docsOnly =/u);
+});
+
+// Backend SYSTEM-MANIFEST §12.1 #359, the recorded debt of `snoopy` #82's
+// change audit: "a test ... that every command a plan can emit is a real
+// `package.json` script, and that the `test:browser` spec arguments collect
+// only the mapped specs". Every plan the classifier can make — each class,
+// each screen, a shared path, a changed spec, a contract test, Markdown with
+// code — is made here, and each of its commands checked: an `npm run` names a
+// script, a `node` a file, and `npm audit` is npm's own. Each spec argument is
+// read by Playwright's own filter (`createFiltersFromArguments`, the one its
+// CLI uses: the argument a case-blind pattern over the file's full path), so
+// it must collect its spec and no other, and none the public suite ignores.
+test("every command a plan can emit is a real script or file, and test:browser's spec arguments collect only the mapped specs, as Playwright reads them (backend §12.1 #359)", () => {
+  const { scripts } = JSON.parse(read("package.json"));
+  const playwright = createRequire(import.meta.url)(
+    join(root, "node_modules/playwright/lib/common/index.js"),
+  );
+  const collects = (arg) => {
+    const { fileFilter } = playwright.suiteUtils.createFiltersFromArguments([
+      arg,
+    ]);
+    return SPECS.filter((spec) => fileFilter(join(root, "e2e", spec)));
+  };
+  const screens = Object.keys(SCREEN_SPECS).map((key) =>
+    key.endsWith("/") ? `${key}page.tsx` : key,
+  );
+  const plans = [
+    classify([], { full: true }),
+    classify([]),
+    classify(modified("package.json")),
+    classify(modified("README.md")),
+    classify(modified("README.md", "components/x.tsx")),
+    classify(modified("test/x.test.mjs")),
+    ...SPECS.map((spec) => classify(modified(`e2e/${spec}`))),
+    ...screens.map((path) => classify(modified(path))),
+    ...screens.map((path) => classify(modified(path, "docs/ARCHITECTURE.md"))),
+  ];
+  let browserArgs = 0;
+  for (const plan of plans) {
+    for (const { argv } of plan.commands) {
+      const [tool, verb, name] = argv;
+      if (tool === "npm" && verb === "run") {
+        assert.ok(Object.hasOwn(scripts, name), `npm run ${name} is a script`);
+      } else if (tool === "npm") {
+        assert.equal(verb, "audit", argv.join(" "));
+      } else {
+        assert.equal(tool, "node", argv.join(" "));
+        assert.ok(existsSync(join(root, verb)), `${verb} exists`);
+      }
+      if (name !== "test:browser" || !argv.includes("--")) continue;
+      for (const arg of argv.slice(argv.indexOf("--") + 1)) {
+        const spec = arg.replace(/^e2e\//u, "");
+        assert.ok(!FIXTURE_ONLY.includes(spec), `${arg} is not fixture-only`);
+        assert.deepEqual(collects(arg), [spec], `${arg} collects itself alone`);
+        browserArgs += 1;
+      }
+    }
+  }
+  assert.ok(browserArgs >= 10, `${browserArgs} spec arguments checked`);
+  // The filter is Playwright's: a prefix would collect a neighbour.
+  assert.deepEqual(collects("e2e/accessibility"), [
+    "accessibility-authenticated.spec.ts",
+    "accessibility.spec.ts",
+  ]);
 });

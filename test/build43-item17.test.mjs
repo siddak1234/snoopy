@@ -45,7 +45,7 @@ const STUBS = {
   "./actions":
     "export const setSubscriptionStatus = async () => ({ ok: true }); export const startRun = async () => ({ ok: true });",
   "./upload-actions":
-    "export const openRunUpload = async () => ({ ok: false, error: 'x' }); export const completeRunUpload = async () => ({ ok: false, error: 'x' });",
+    "export const openRunUpload = async () => ({ ok: false, error: 'x' }); export const completeRunUpload = async () => ({ ok: false, error: 'x' }); export const discardRunUpload = async () => undefined;",
 };
 const NO_ROUTER = (source) =>
   source.replace(
@@ -210,7 +210,7 @@ test("17 T1 (D4): Start checks for a required file first — said in the form's 
   const check = submit.indexOf("missingFile(runInput");
   assert.ok(check > submit.indexOf("if (!canRun || uploading) return;"));
   assert.ok(
-    check < submit.indexOf("startTransition("),
+    check < submit.indexOf("startRunTransition("),
     "before anything is sent",
   );
   assert.match(

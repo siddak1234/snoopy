@@ -172,6 +172,9 @@ function initialState() {
     // build 12, #4): the archived one stays archived.
     archivableAgain: null as Automations["Subscription"] | null,
     manualStatus: "live" as "live" | "paused",
+    // Every flow the workspace set up is paused: flows set up, none live
+    // (PR #84's recorded debt 1, Home with no YOUR FLOWS and no first run).
+    flowsPaused: false,
     connectionAttemptKey: null as string | null,
     fixtureConnectionCreated: false,
     exportCount: 0,
@@ -236,6 +239,16 @@ function initialState() {
       string,
       { filename: string; sizeBytes: number; runId?: string }
     >(),
+    // The owner's decision 17 of 2026-11-15 ("delete at once"): every discard
+    // the website sent, in order — the id, the name of the file it named (none
+    // for one this workspace does not hold) and the answer — and the ids
+    // deleted, so a repeat is answered 204 again.
+    discards: [] as {
+      artifactId: string;
+      filename: string | null;
+      status: number;
+    }[],
+    discarded: new Set<string>(),
     // Backend §12.1 #91: the address once issued, and how many secrets so far.
     webhookSecrets: 0,
     // Backend §12.1 #240: every issue asked for, with the key it carried and
@@ -2786,6 +2799,9 @@ const server = createServer(
       "/__fixture/invoice-paused": () => {
         state.invoiceStatus = "paused";
       },
+      "/__fixture/flows-paused": () => {
+        state.flowsPaused = true;
+      },
       "/__fixture/invoice-batch": () => {
         state.invoiceBatch = true;
       },
@@ -3246,6 +3262,15 @@ const server = createServer(
         "cache-control": "no-store",
       });
       return response.end(JSON.stringify(state.manualRunStarts));
+    }
+    // Decision 17: every discard the website sent, read by a test at the
+    // fixture — it is sent in the background and no page shows it.
+    if (request.method === "GET" && url.pathname === "/__fixture/discards") {
+      response.writeHead(200, {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+      });
+      return response.end(JSON.stringify(state.discards));
     }
     if (request.method === "GET" && url.pathname === "/__fixture/files") {
       response.writeHead(200, {
@@ -4429,10 +4454,16 @@ const server = createServer(
         return respond(response, 200, {
           subscriptions: archivedSubscriptions(),
         } satisfies AutomationOperations["listSubscriptions"]["responses"][200]["content"]["application/json"]);
+      // Flows set up and none live: each one listed paused.
+      const listed = liveSubscriptions().map((row) =>
+        state.flowsPaused && row.status === "live"
+          ? { ...row, status: "paused" as const }
+          : row,
+      );
       return respond(response, 200, {
         subscriptions: state.listWithoutSetup
-          ? liveSubscriptions().map((row) => ({ ...row, setup: undefined }))
-          : liveSubscriptions(),
+          ? listed.map((row) => ({ ...row, setup: undefined }))
+          : listed,
         ...(state.overPlan ? { flowAllowance: { allowed: 2, live: 4 } } : {}),
       } satisfies AutomationOperations["listSubscriptions"]["responses"][200]["content"]["application/json"]);
     }
@@ -5177,6 +5208,41 @@ const server = createServer(
           sizeBytes: upload.received,
         },
       } satisfies AutomationOperations["completeUpload"]["responses"][200]["content"]["application/json"]);
+    }
+    // The owner's decision 17 of 2026-11-15 ("delete at once"; the platform's
+    // `discardUpload`, BUILD-PLAN 30.18.1, merged as snoopy-backend #289): a file
+    // its uploader let go of, deleted now — 204, and 204 again for one already
+    // deleted; 400 an id that is not a UUID; 404 one this workspace never
+    // held; 409 `file_in_use` once a run was given it, which keeps it.
+    const uploadDiscard = new RegExp(
+      `^/v1/workspaces/${workspaceId}/uploads/([^/]+)$`,
+      "u",
+    ).exec(pathname);
+    if (method === "DELETE" && uploadDiscard) {
+      const artifactId = uploadDiscard[1] ?? "";
+      const file = state.files.get(artifactId);
+      const status =
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+          artifactId,
+        )
+          ? 400
+          : file?.runId
+            ? 409
+            : file || state.discarded.has(artifactId)
+              ? 204
+              : 404;
+      state.discards.push({
+        artifactId,
+        filename: file?.filename ?? null,
+        status,
+      });
+      if (status === 409)
+        return respond(response, 409, refusal(409, "file_in_use"));
+      if (status !== 204) return respond(response, status, refusal(status));
+      state.files.delete(artifactId);
+      state.discarded.add(artifactId);
+      response.writeHead(204, { "cache-control": "no-store" });
+      return response.end();
     }
     // Backend §12.1 #39: the complete export — running on its first read,
     // ready with a signed link after, and expired when the fixture says so.

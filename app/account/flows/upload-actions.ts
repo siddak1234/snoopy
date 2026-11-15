@@ -3,6 +3,7 @@
 import { PlatformServerError } from "@/lib/platform-server";
 import {
   completeUpload,
+  discardUpload,
   openUpload,
   type UploadedFile,
   type UploadTicket,
@@ -15,10 +16,13 @@ import { uploadRefusalMessage } from "./upload-refusals";
  * A file for a run (FR-14). The bytes never pass through here: `open` answers
  * a signed URL the browser PUTs the file to directly, and `complete` asks the
  * platform what arrived. Only the file's id reaches the run's input.
+ * `discard` deletes a file the field let go of before any run was given it
+ * (the owner's decision 17 of 2026-11-15, "delete at once"; `discardUpload`).
  *
- * Both act on the workspace the page showed (register F28, F70): after a switch
- * in another tab, the file is neither opened in nor completed against another
- * workspace, and the refusal is said in words.
+ * Each acts on the workspace the page showed (register F28, F70): after a
+ * switch in another tab, the file is neither opened in nor completed against
+ * another workspace, and the refusal is said in words; a discard then sends
+ * nothing, and retention deletes the file as it did before.
  */
 
 export type OpenUploadResult =
@@ -101,5 +105,27 @@ export async function completeRunUpload(
       };
     }
     return answer;
+  }
+}
+
+/**
+ * A file the field let go of before any run was given it — its x, a choice
+ * that replaced or emptied it, an upload that ended after the field stopped
+ * waiting, the job upload card's Cancel — deleted at once, in the background
+ * (`discardFiles` in `RunFileField.tsx`). It says nothing whatever the
+ * platform answers (204; 400, 404, 409 `file_in_use`, 503) or if it cannot be
+ * reached: the file is already out of the form, and retention deletes what a
+ * discard could not.
+ */
+export async function discardRunUpload(
+  shownWorkspaceId: string,
+  artifactId: string,
+): Promise<void> {
+  try {
+    const workspaceId = await activeWorkspaceIfShown(shownWorkspaceId);
+    if (!workspaceId) return;
+    await discardUpload({ workspaceId, artifactId });
+  } catch {
+    // Nothing is said: see above.
   }
 }

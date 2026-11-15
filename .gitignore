@@ -65,4 +65,6 @@ _salvage/
 
 # The facts file `npm run verify` emits (scripts/repo-facts.mjs). Never committed
 # here: it would restate this repository's own HEAD. snoopy-backend commits it.
+# And the change audit's verdict and probe scripts (`.autom8x/audit/`,
+# .claude/agents/change-auditor.md): inside the clone, never committed.
 /.autom8x/

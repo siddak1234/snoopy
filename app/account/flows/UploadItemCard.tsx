@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { FormError } from "@/components/ui/FormError";
@@ -26,7 +26,7 @@ import {
 import type { AgreementOffer } from "@/lib/health-agreement";
 import { createItem } from "./actions";
 import { HealthAgreementDialog } from "./HealthAgreementDialog";
-import { RunFileField } from "./RunFileField";
+import { RunFileField, discardFiles } from "./RunFileField";
 import { SPACING } from "@/lib/spacing";
 
 /** Under a field the platform refused. */
@@ -58,6 +58,16 @@ type ItemInput = Parameters<typeof createItem>[0];
  * beside the card, never in its form, whose "Accept and start run" sends the
  * same item again under the same key; anyone else sees "Ask your workspace
  * owner to accept the health data agreement." on the card.
+ *
+ * **Cancel discards the file** (the owner's decision 17 of 2026-11-15, as
+ * the session read "delete at once"): Cancel with a file held — or Escape or
+ * a press outside the card, the website's way of dismissing it, which is
+ * Cancel — closes the card and discards that file on the platform at once,
+ * in the background, saying nothing (`discardFiles`): no item will be made
+ * from it. An item made closes the card and discards nothing; a new choice
+ * replaces and discards the file held, as in every file field. While Upload
+ * is pending the field is held (`starting`), so its file is never replaced
+ * under the item being made, and Cancel waits as before.
  */
 export function UploadItemCard({
   workspaceId,
@@ -76,6 +86,7 @@ export function UploadItemCard({
   onMade: (item: Item) => void;
 }) {
   const titleId = useId();
+  const form = useRef<HTMLFormElement>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [refused, setRefused] = useState<readonly string[]>([]);
@@ -160,19 +171,32 @@ export function UploadItemCard({
     return result.error;
   };
 
+  /** Cancel: the card closes, and the file it held — no item will be made from it — is discarded. */
+  const cancel = () => {
+    if (form.current) {
+      const held = new FormData(form.current)
+        .getAll(`input:${declared.file.key}`)
+        .map(String)
+        .filter((artifactId) => artifactId !== "");
+      discardFiles(workspaceId, held);
+    }
+    onClose();
+  };
+
   const fieldError = (field: AutomationItemField) =>
     refused.includes(field.key) ? CHECK_THIS : undefined;
 
   return (
     <>
       <Modal
-        onClose={onClose}
+        onClose={cancel}
         bubble
         ariaLabelledBy={titleId}
         zIndex={100}
         dismissible={!pending}
       >
         <form
+          ref={form}
           data-testid="item-upload"
           onSubmit={submit}
           onChange={newItemKey}
@@ -224,13 +248,14 @@ export function UploadItemCard({
             subscriptionId={subscriptionId}
             onBusyChange={(_, busy) => setFileBusy(busy)}
             showTypes
+            starting={pending}
           />
           <FormError message={error} />
           <div className={`flex flex-wrap justify-end ${SPACING.inner.gap}`}>
             <Button
               type="button"
               variant="ghost"
-              onClick={onClose}
+              onClick={cancel}
               disabled={pending}
             >
               Cancel
