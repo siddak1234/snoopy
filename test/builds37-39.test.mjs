@@ -441,13 +441,13 @@ test("item 11: a row's text that is one email or one phone, whole, is a way to r
 test("item 11: the phone and email table both clients share (snoopy-mobile's contact-value test holds the same rows): a number as people write one is a phone; a date, a time, an address or a short number is words", () => {
   const table = {
     phone: [
-      "(214) 555-0142",
-      "214-555-0142",
-      "214.555.0142",
-      "2145550142",
-      "1-800-555-1234",
+      "(415) 555-0142",
+      "415-555-0142",
+      "415.555.0142",
+      "4155550142",
+      "1-800-555-0199",
       "+44 20 7946 0958",
-      "+1 214 555 0142",
+      "+1 415 555 0142",
     ],
     notPhone: [
       "555-1234",
@@ -455,11 +455,11 @@ test("item 11: the phone and email table both clients share (snoopy-mobile's con
       "123-45-6789",
       "10.5.2025 14.30",
       "2025.11.06 12.00",
-      "12.34.56.78",
+      "10.20.30.40",
       "192.168.10.100",
       "555 12 34",
-      "12 34 56 78",
-      "Call 214-555-0142",
+      "10 20 30 40",
+      "Call 415-555-0142",
     ],
     email: ["casey.morgan@example.com"],
     notEmail: ["a@b", "mail me at x@y.com"],
@@ -470,6 +470,15 @@ test("item 11: the phone and email table both clients share (snoopy-mobile's con
     assert.equal(contactValue(text)?.kind, "email", text);
   for (const text of [...table.notPhone, ...table.notEmail])
     assert.equal(contactValue(text), null, text);
+});
+
+test('item 11: beyond the shared table, two bounds of the rule no row of it reaches (snoopy-mobile\'s test holds the same): without a "+", the last run of digits has at least 4; with one, the runs are not looked at', () => {
+  assert.equal(contactValue("4155 550 142"), null);
+  assert.deepEqual(contactValue("+4155 550 142"), {
+    kind: "phone",
+    value: "+4155 550 142",
+    href: "tel:+4155550142",
+  });
 });
 
 test("item 11: a list row's email is a mailto: link and its phone a tel: link, each with Copy; Copy writes the value itself", async () => {
