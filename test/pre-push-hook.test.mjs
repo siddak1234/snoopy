@@ -522,8 +522,8 @@ test("the workflow lint runs after the scan on a push to any remote, and a findi
     assert.equal(clean.exit, 0, clean.stderr);
     assert.deepEqual(
       fixture.lints(),
-      [{ args: [], input: "" }],
-      `the lint runs once, with no arguments, on a push to ${url}`,
+      [{ args: ["--pre-push"], input: `${refLine.trimEnd()}\n` }],
+      `the lint runs once, with --pre-push and git's ref lines (each pushed commit's own .github/, never the working tree: BUILD-PLAN 30.19.15), on a push to ${url}`,
     );
     fixture.reset();
   }

@@ -367,13 +367,15 @@ otherwise. `npm run hooks:install` arms two hooks. The pre-commit hook
 (`scripts/githooks/pre-commit`) runs the kit's private-data scan on the staged
 content (AGENTS.md rule 9). The pre-push hook (`scripts/githooks/pre-push`)
 runs the same scan on the commits since origin/main and then the kit's workflow
-lint, to any remote, then the gates the change needs (`scripts/change-class.mjs`; see "Change-aware pre-push gate"),
+lint on the `.github/` of each commit the push names, each ref's tip
+(`workflow-lint.mjs --pre-push`, given git's ref lines: never the working tree), to any remote, then the gates the change needs (`scripts/change-class.mjs`; see "Change-aware pre-push gate"),
 and then requires the change-audit marker. CI's Architecture gates job runs the
 scan on every tracked file, with the client-name pattern from a repository
 secret, never a tracked file; ci.yml requires it when called, and main.yml and
 nightly.yml pass it. The same job then runs the workflow lint
 (`node scripts/kit/workflow-lint.mjs`): zizmor 1.32.0, pinned by sha256, offline
-and with no token, over `.github/workflows/`; exit 1 on a finding, which is fixed
+and with no token, over `.github/workflows/`; it fails closed (`--strict-collection`:
+a workflow zizmor cannot load is a failure); exit 1 on a finding, which is fixed
 by its rule, or ignored with its reason in zizmor's config file beside the
 workflows (none yet). CI is the authority: every pull request runs the whole
 suite in all three engines; its Architecture gates job runs `check:docs` and

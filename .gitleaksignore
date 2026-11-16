@@ -1,6 +1,6 @@
 # The private-data scan's reviewed history findings (BUILD-PLAN 30.19.3 and 30.19.16, 2026-11-16):
 # each line is one finding's exact gitleaks fingerprint (commit:file:rule:line) in a commit
-# before the 2026-11-16 history rewrite, never its value. These 8 are the owner's own address (1), two connection-string placeholders, a fictional 555 number, a fake test IP and three placeholder or test keys:
+# before the 2026-11-16 history rewrite, never its value. These 8 are the owner's own address (1), two connection-string placeholders, a fictional 555 number, a fake test IP, two empty variable names gitleaks read as keys and one test key:
 # no client, test-user or outside person's data (the owner, 2026-11-15: "what is not fine is
 # external users or test user or client info"). Any finding not listed here still fails.
 349e2183a8d82fe05418d7611a5332c6d1a4e5af:lib/resume-candidates.ts:autom8x-email:95
