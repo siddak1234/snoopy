@@ -1,7 +1,8 @@
 #!/bin/sh
 # Native pre-push gate: every push, to any remote, first runs the kit's
 # private-data scan of the commits since origin/main (AGENTS.md rule 9) and the
-# kit's workflow lint (zizmor, offline, over .github/workflows/). Then every
+# kit's workflow lint (zizmor, offline, over the .github/workflows/ of each
+# commit the push names, each ref's tip, never the working tree). Then every
 # push of this repository — from any tool or terminal — runs the gates its
 # change needs (scripts/change-class.mjs: docs, code or full; README
 # "Verification"; register F93), so a push that would turn CI red is refused
@@ -14,7 +15,8 @@
 # "<local_ref> <local_sha> <remote_ref> <remote_sha>".
 
 # The ref lines, read once: handed on to the scan's stdin (it reads the commits
-# since origin/main itself), then read by the gate below.
+# since origin/main itself), then to the workflow lint (`--pre-push`), then read
+# by the gate below.
 ref_lines="$(cat)"
 
 # A fork or a mirror is as public as this repository, so the scan gates a push
@@ -35,15 +37,17 @@ elif [ "$scan" -ne 0 ]; then
   exit 1
 fi
 
-# The workflow lint, as CI's Architecture gates job runs it: zizmor over the
-# working tree's .github/workflows/, a few seconds once its pinned binary is
+# The workflow lint, as CI's Architecture gates job runs it, over each commit
+# the push names: the ref lines go to `workflow-lint.mjs --pre-push`, which
+# lints the .github/ of each ref's tip, never the working tree (BUILD-PLAN
+# 30.19.15, snoopy-backend); a few seconds a commit once its pinned binary is
 # cached. A finding (exit 1), a lint that cannot run (any other non-zero exit)
 # or a missing lint refuses the push, as the scan does.
 if [ ! -f "$top/scripts/kit/workflow-lint.mjs" ]; then
   echo "pre-push: the kit's workflow lint is missing from this clone — refused." >&2
   exit 1
 fi
-(cd "$top" && node scripts/kit/workflow-lint.mjs </dev/null) >&2
+printf '%s\n' "$ref_lines" | (cd "$top" && node scripts/kit/workflow-lint.mjs --pre-push) >&2
 lint=$?
 if [ "$lint" -eq 1 ]; then
   echo "pre-push: the workflow lint found a finding (its rule is above) — refused. Fix it, or ignore it in .github/zizmor.yml with its reason." >&2

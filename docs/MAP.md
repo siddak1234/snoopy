@@ -181,7 +181,7 @@
 - [scripts/kit/guard-cases.test.mjs](../scripts/kit/guard-cases.test.mjs): The guard's tests (STANDARD (h) rows 1–10), imported by kit.test.mjs, so every repository's
 - [scripts/kit/kit.test.mjs](../scripts/kit/kit.test.mjs): The kit's own tests (node:test, Node built-ins only). The guard's cases run from
 - [scripts/kit/map.mjs](../scripts/kit/map.mjs): `npm run map` (STANDARD (c)): builds docs/MAP.md from the `map` and `rules`
-- [scripts/kit/private-data-scan-run.test.mjs](../scripts/kit/private-data-scan-run.test.mjs): The private-data scan run whole (BUILD-PLAN 30.19.8, 30.19.9, 30.19.11), imported by kit.test.mjs: main(),
+- [scripts/kit/private-data-scan-run.test.mjs](../scripts/kit/private-data-scan-run.test.mjs): The private-data scan run whole (BUILD-PLAN 30.19.8, 30.19.9, 30.19.11, 30.19.13), imported by kit.test.mjs:
 - [scripts/kit/private-data-scan.mjs](../scripts/kit/private-data-scan.mjs): The private-data scan (the owner's security review, 2026-11-15: "no pii in public repos
 - [scripts/kit/private-data-scan.test.mjs](../scripts/kit/private-data-scan.test.mjs): The private-data scan's tests, imported by kit.test.mjs, so every repository's runner runs them.
 - [scripts/kit/workflow-lint.mjs](../scripts/kit/workflow-lint.mjs): The workflows' lint (the owner's security review, 2026-11-15: "scanner, safe, not bulky";
