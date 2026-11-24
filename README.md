@@ -368,7 +368,7 @@ otherwise. `npm run hooks:install` arms two hooks. The pre-commit hook
 content (AGENTS.md rule 9). The pre-push hook (`scripts/githooks/pre-push`)
 runs the same scan on the commits since origin/main and then the kit's workflow
 lint on the `.github/` of each commit the push names, each ref's tip
-(`workflow-lint.mjs --pre-push`, given git's ref lines: never the working tree), to any remote, then the gates the change needs (`scripts/change-class.mjs`; see "Change-aware pre-push gate"),
+(`workflow-lint.mjs --pre-push`, given git's ref lines: never the working tree; a tip with no `.github/workflows` is clean, a symlink or submodule there is named, not linted, and a `.github/workflows` that is one, or holds only those, fails), to any remote, then the gates the change needs (`scripts/change-class.mjs`; see "Change-aware pre-push gate"),
 and then requires the change-audit marker. CI's Architecture gates job runs the
 scan on every tracked file, with the client-name pattern from a repository
 secret, never a tracked file; ci.yml requires it when called, and main.yml and
