@@ -18,6 +18,7 @@ import {
 import {
   CONNECTIONS_MANAGED_BY,
   DISCONNECT_LABEL,
+  actionLabel,
   connectionAction,
   connectionFor,
   connectionLine,
@@ -27,9 +28,14 @@ import {
   isKeyless,
 } from "@/lib/connection-rows";
 import type { Connection, OfferedProvider } from "@/lib/connections";
-import { opensKeyForm } from "@/lib/smart-backend";
+import {
+  ehrSignInReturn,
+  opensKeyForm,
+  opensSignInForm,
+} from "@/lib/smart-backend";
 import { connectProviderWithKey, disconnectConnection } from "./actions";
 import { KeyFields } from "./KeyFields";
+import { SignInForm } from "./SignInForm";
 import {
   PENDING_CONNECT,
   takeConnectReturn,
@@ -57,8 +63,9 @@ const noSubscription = () => () => {};
  * Connect, Reconnect or Disconnect. ~~What connecting it lets flows do, "Used
  * by N live flows", Available connections, Intuit's Connect button image,
  * "Disconnect from QuickBooks" and Replace account~~ until Build 21 (the
- * platform's replace route stays, unused; the owner's ~04:15Z: "we will list
- * on apples app store not intuits. so we do not need that").
+ * owner's ~04:15Z: "we will list on apples app store not intuits. so we do
+ * not need that"); the platform's replace route is used only by an EHR
+ * sign-in's Replace, in its form (`SignInForm`, backend ADR-0054).
  *
  * `canManage` is the page's reading of the platform's rule: connecting or
  * disconnecting supersedes the account every flow in the workspace acts
@@ -66,9 +73,13 @@ const noSubscription = () => () => {};
  * told who can change them (register F8); the server refuses them either way.
  *
  * Connect and Reconnect go through the provider at once — Reconnect keeps the
- * account (backend ADR-0019 §4) — and a key provider's, or the EHR's (backend
- * ADR-0050), opens its key form (`KeyFields`). A
- * connect started on a flow's page (`returnTo`) comes back to it. **Disconnect
+ * account (backend ADR-0019 §4) — and a key provider's, or a SMART Backend
+ * Services EHR's (backend ADR-0050), opens its key form (`KeyFields`); an EHR
+ * a person signs in to (`smart-launch`, ADR-0054) opens its sign-in form
+ * (`SignInForm`), and its Reconnect is "Sign in again". A
+ * connect started on a flow's page (`returnTo`) comes back to it, and a sign-in
+ * refused for a reason a person can act on says it in the spec's words
+ * (`ehrSignInReturn`), here or on that page. **Disconnect
  * asks first**, saying what it stops: "{n} live flows use it. They stop until
  * you connect it again."
  */
@@ -77,6 +88,7 @@ export function ConnectionsPanel({
   providers,
   canManage,
   callbackStatus,
+  callbackReason = null,
   workspaceId,
   returnTo,
 }: {
@@ -86,6 +98,8 @@ export function ConnectionsPanel({
   canManage: boolean;
   /** Back from a vendor's sign-in, as the platform's callback said it ended. */
   callbackStatus: "connected" | "error" | null;
+  /** A refused EHR sign-in's reason, one with words (`ehrSignInReturn`); else null. */
+  callbackReason?: string | null;
   /** The workspace this page shows; every action is refused once it is not active. */
   workspaceId: string;
   /** Where a connect started here comes back to: a flow's page. */
@@ -126,8 +140,9 @@ export function ConnectionsPanel({
   useEffect(() => {
     if (!callbackStatus) return;
     const back = takeConnectReturn();
-    if (back) router.replace(withCallbackStatus(back, callbackStatus));
-  }, [callbackStatus, router]);
+    if (back)
+      router.replace(withCallbackStatus(back, callbackStatus, callbackReason));
+  }, [callbackStatus, callbackReason, router]);
 
   const close = () => {
     setSelectedProvider(null);
@@ -175,7 +190,7 @@ export function ConnectionsPanel({
       setDisconnecting(provider);
       return;
     }
-    if (opensKeyForm(provider.authType)) {
+    if (opensKeyForm(provider.authType) || opensSignInForm(provider.authType)) {
       // This is intentionally browser-memory only: it identifies one explicit
       // connect intent, but neither it nor any credential is persisted.
       setConnectionIntentKey(`connection-${crypto.randomUUID()}`);
@@ -262,9 +277,10 @@ export function ConnectionsPanel({
           role="alert"
           className={`${SPACING.group.bottom} text-sm text-[var(--error-text)]`}
         >
-          {stillActive
-            ? "The new authorization didn't complete, so nothing changed — your existing connection is still active. Try again or contact an owner."
-            : "The connection could not be completed. Try again or contact an owner."}
+          {ehrSignInReturn(callbackReason) ??
+            (stillActive
+              ? "The new authorization didn't complete, so nothing changed — your existing connection is still active. Try again or contact an owner."
+              : "The connection could not be completed. Try again or contact an owner.")}
         </p>
       ) : null}
 
@@ -285,7 +301,7 @@ export function ConnectionsPanel({
               provider.authType,
               provider.displayName,
             );
-            const action = connectionAction(state);
+            const action = connectionAction(state, provider.authType);
             const failed = rowError?.providerId === provider.providerId;
             return (
               <li key={provider.providerId}>
@@ -316,7 +332,7 @@ export function ConnectionsPanel({
                         variant="secondary"
                         size="sm"
                         disabled={pending}
-                        aria-label={`${action} ${provider.displayName}`}
+                        aria-label={actionLabel(action, provider.displayName)}
                         onClick={() => press(provider)}
                       >
                         {busyProvider === provider.providerId && pending
@@ -397,7 +413,11 @@ export function ConnectionsPanel({
           onClose={close}
           bubble
           ariaLabelledBy="connect-provider-title"
-          ariaDescribedBy="connect-provider-description"
+          ariaDescribedBy={
+            opensSignInForm(selectedProvider.authType)
+              ? undefined
+              : "connect-provider-description"
+          }
           zIndex={100}
         >
           <h2
@@ -406,63 +426,83 @@ export function ConnectionsPanel({
           >
             Connect {selectedProvider.displayName}
           </h2>
-          <p
-            id="connect-provider-description"
-            className={`${SPACING.title.top} text-sm text-[var(--muted)]`}
-          >
-            Provide the connection details supplied by this provider.
-          </p>
-          <form
-            onSubmit={submitKeyForm}
-            className={`${SPACING.group.top} flex flex-col ${SPACING.group.gap}`}
-          >
-            <input
-              type="hidden"
-              name="providerId"
-              value={selectedProvider.providerId}
+          {opensSignInForm(selectedProvider.authType) ? (
+            <SignInForm
+              provider={selectedProvider}
+              workspaceId={workspaceId}
+              replaces={connectionOf(selectedProvider.providerId)?.id}
+              returnTo={returnTo}
+              onAlready={(connectedAs) => {
+                setNotice(
+                  `${selectedProvider.displayName} is already connected as ${connectedAs}, with everything it needs — there is nothing to authorize.`,
+                );
+                close();
+                router.refresh();
+              }}
+              onCancel={close}
+              onReread={() => router.refresh()}
             />
-            <input
-              type="hidden"
-              name="idempotencyKey"
-              value={connectionIntentKey ?? ""}
-            />
-            <KeyFields provider={selectedProvider} />
-            <FormError message={error} />
-            {retryWithSameIntent ? (
-              <p className="text-xs text-[var(--muted)]">
-                This request may still be in progress. Retry with the same
-                details or refresh the connection list; a new connection request
-                was not created.
-              </p>
-            ) : null}
-            <div className={`flex flex-wrap ${SPACING.inner.gap}`}>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={close}
-                disabled={pending}
+          ) : (
+            <>
+              <p
+                id="connect-provider-description"
+                className={`${SPACING.title.top} text-sm text-[var(--muted)]`}
               >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={pending}>
-                {pending
-                  ? "Verifying…"
-                  : retryWithSameIntent
-                    ? "Retry verification"
-                    : "Verify and connect"}
-              </Button>
-              {retryWithSameIntent ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={pending}
-                  onClick={() => router.refresh()}
-                >
-                  Refresh connections
-                </Button>
-              ) : null}
-            </div>
-          </form>
+                Provide the connection details supplied by this provider.
+              </p>
+              <form
+                onSubmit={submitKeyForm}
+                className={`${SPACING.group.top} flex flex-col ${SPACING.group.gap}`}
+              >
+                <input
+                  type="hidden"
+                  name="providerId"
+                  value={selectedProvider.providerId}
+                />
+                <input
+                  type="hidden"
+                  name="idempotencyKey"
+                  value={connectionIntentKey ?? ""}
+                />
+                <KeyFields provider={selectedProvider} />
+                <FormError message={error} />
+                {retryWithSameIntent ? (
+                  <p className="text-xs text-[var(--muted)]">
+                    This request may still be in progress. Retry with the same
+                    details or refresh the connection list; a new connection
+                    request was not created.
+                  </p>
+                ) : null}
+                <div className={`flex flex-wrap ${SPACING.inner.gap}`}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={close}
+                    disabled={pending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={pending}>
+                    {pending
+                      ? "Verifying…"
+                      : retryWithSameIntent
+                        ? "Retry verification"
+                        : "Verify and connect"}
+                  </Button>
+                  {retryWithSameIntent ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={pending}
+                      onClick={() => router.refresh()}
+                    >
+                      Refresh connections
+                    </Button>
+                  ) : null}
+                </div>
+              </form>
+            </>
+          )}
         </Modal>
       ) : null}
     </Group>

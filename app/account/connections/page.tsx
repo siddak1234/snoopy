@@ -6,6 +6,7 @@ import {
   listConnectionProviders,
   listConnections,
 } from "@/lib/connections";
+import { ehrSignInReturn } from "@/lib/smart-backend";
 import {
   administers,
   resolveActiveWorkspaceId,
@@ -20,7 +21,7 @@ export default async function ConnectionsPage({
 }: PageProps<"/account/connections">) {
   const session = await getAppSession();
   const workspaceId = await resolveActiveWorkspaceId(session);
-  const { status } = await searchParams;
+  const { status, reason } = await searchParams;
 
   if (!workspaceId) {
     return (
@@ -53,6 +54,11 @@ export default async function ConnectionsPage({
         canManage={administers(role)}
         callbackStatus={
           status === "connected" || status === "error" ? status : null
+        }
+        callbackReason={
+          status === "error" && ehrSignInReturn(reason) !== null
+            ? String(reason)
+            : null
         }
       />
     </SectionCard>

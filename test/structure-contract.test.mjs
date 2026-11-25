@@ -1073,20 +1073,40 @@ test("signing in from a join link returns to the organization it named", () => {
   );
 });
 
-test("Replace account is off the connection row, and nothing names a connection to replace (Build 21, spec A4)", () => {
+test("Replace account is off the connection row, and nothing names a connection to replace but an EHR sign-in's Replace (Build 21, spec A4; Round 22)", () => {
   // The owner's build 20 items 6 and 7: one standard row — mark, name, the
-  // account's email, one button. The platform's replace route stays, unused.
-  for (const path of [
-    "app/account/connections/ConnectionsPanel.tsx",
-    "app/account/connections/actions.ts",
-    "app/account/flows/VendorRows.tsx",
-  ]) {
-    // Code only: the comments may say what was removed.
-    const code = read(path)
+  // account's email, one button. The platform's replace route stays, unused
+  // by any row. Round 22 (backend ADR-0054, the session's design): the one
+  // connection named to replace is an EHR sign-in's, in its sign-in form,
+  // answering the platform's 409 `account_mismatch` ("… Replace it?").
+  // Code only: the comments may say what was removed.
+  const code = (path) =>
+    read(path)
       .replace(/\/\*[\s\S]*?\*\//gu, "")
       .replace(/^\s*\/\/.*$/gmu, "");
-    assert.doesNotMatch(code, /Replace account|replaceConnectionId/u, path);
-  }
+  for (const path of [
+    "app/account/connections/ConnectionsPanel.tsx",
+    "app/account/flows/VendorRows.tsx",
+  ])
+    assert.doesNotMatch(
+      code(path),
+      /Replace account|replaceConnectionId/u,
+      path,
+    );
+  for (const path of [
+    "app/account/connections/actions.ts",
+    "app/account/connections/SignInForm.tsx",
+  ])
+    assert.doesNotMatch(code(path), /Replace account/u, path);
+  const actions = code("app/account/connections/actions.ts");
+  assert.deepEqual(
+    actions.match(/replaceConnectionId[^,;)]*/gu),
+    [
+      "replaceConnectionId?: string",
+      "replaceConnectionId\n        ? { replaceConnectionId: signIn.replaceConnectionId }\n        : {}",
+    ],
+    "only an EHR sign-in's begin names a connection to replace",
+  );
 });
 
 test("the signed-in pages and onboarding say department and flow, never team, project, automation, solution or pipeline (BUILD-PLAN 24.11.11; Build 23's B1; 25.4.24's spec words since build 25)", () => {

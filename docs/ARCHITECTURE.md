@@ -395,7 +395,12 @@ page reuses:
   **result face** once it succeeded: its title and score (a candidate) or
   its flow's name, its body — what it read first, under "{Run word}
   details", in its result line's place — the package's buttons, View flow,
-  and the Run details row last. A run that succeeds while its steps are in
+  and the Run details row last. On either face, a run a clinic's EHR
+  started (`startedBy` `provider-event`, backend ADR-0053) says so over its
+  body, "Started from your EHR", as its Activity row does under its id
+  (`startedByLine`); any other start says nothing new, and nothing reads a
+  flow's list of ways to start, which the subscription names only by its
+  first (`triggerKind`). A run that succeeds while its steps are in
   front turns in place. Its details page, `/account/runs/[runId]/details`,
   is its metadata alone: Duration, Steps done, Started, Ended, Trigger and
   the Run ID. Its back goes to Activity; opened from its job's page — a
@@ -541,19 +546,61 @@ static `/quickbooks/disconnected` ("QuickBooks is disconnected", its
 "Reconnect QuickBooks" opening Connections), which the owner sets at
 Intuit; it reads nothing.
 
-The EHR (backend ADR-0050, D1: `authType` `smart-backend`, SMART Backend
-Services) is connected through Connections' key form, as a pasted-key
-provider is (`opensKeyForm` in `lib/smart-backend.ts`): its fields from
-`credentialFields`, the clinic's FHIR address and its help, and its vendor —
-a picker of radios only when the platform lists two or more `vendors`, the
-one it lists sent unseen otherwise (`app/account/connections/KeyFields.tsx`).
-Nothing secret is pasted: the platform signs with its own key for that
-vendor. An address it will not use is said by its reason ("Use the https
-address your EHR team gave you.", "That address didn't answer as a FHIR
-server.", "Your EHR hasn't turned on Autom8x yet. Ask your EHR team to
-activate it."; `smartBackendRefusal`; the app's too), and its row, connected, names the
-clinic's host (`connectionLine`). A flow step that offers the EHR sends an
-owner or admin to Connections, as any vendor that is not OAuth.
+The EHR is a SMART provider (`lib/smart-backend.ts`), of either kind the
+contract names, and its form's fields are one: its `credentialFields`, the
+clinic's FHIR address and its help, and its vendor — a picker of radios only
+when the platform lists two or more `vendors`, the one it lists sent unseen
+otherwise (`app/account/connections/KeyFields.tsx`). Nothing secret is typed.
+
+- **A person's sign-in** (backend ADR-0054: `authType` `smart-launch`, the
+  EHR since snoopy-backend #305): Connect opens the sign-in form
+  (`opensSignInForm`, `app/account/connections/SignInForm.tsx`), whose one
+  button is named by the vendor chosen from the platform's whole label —
+  "Sign in with Epic (test system)", "Sign in with Epic" — and is "Sign in"
+  until one is picked; none is picked for the person from two or more
+  (`signInLabel`; the session's D1, Round 22). It begins as an OAuth
+  connect does (`startConnect`), with `credentials` `{vendor, fhirBaseUrl}`,
+  and the browser goes to the EHR's own sign-in page and comes back through
+  the same return (`app/connections/page.tsx`): "Connection completed
+  successfully.", the row naming the clinic's host. One sign-in serves every
+  flow in the workspace. Every refusal is said in the words the backend's
+  [connections.yaml](../lib/generated/snoopy-backend/docs/openapi/connections.yaml)
+  defines once, kept in one place here,
+  [`lib/smart-backend.ts`](../lib/smart-backend.ts), and named below by
+  its reason only: at the begin, in the form with what was typed kept, a 400's
+  `fhir_address_refused`, `fhir_not_answering` or `ehr_sign_in_unsupported`
+  (`EHR_SIGN_IN_REFUSALS`, `ehrSignInRefusal`); another address than the
+  workspace's sign-in, the 409 `account_mismatch` (`EHR_ACCOUNT_MISMATCH`),
+  whose question Replace answers — beginning again with what the form holds
+  now and naming the live connection (`replaceConnectionId`). A change to
+  any field takes the question back; while the live connection is not known
+  to the page, the form says the first sentence alone and reads the
+  connections again (`accountMismatch`; the session's D3). On the way back,
+  by the callback's `reason`: `no_refresh_token` and the two address reasons
+  (`EHR_SIGN_IN_RETURNS`, `ehrSignInReturn`). The return keeps only a
+  reason that has words here, and takes it on to the flow page a sign-in
+  started on, whose Set up says it. A sign-in the platform asks for again
+  (`reauthorization-required`) is "Needs attention" with "Sign in again" in
+  Reconnect's place (`connectionAction`; a screen reader's "Sign in again
+  to EHR", `actionLabel`), and signing in again to the same address begins
+  at once, with no question.
+- **SMART Backend Services** (backend ADR-0050, D1: `authType`
+  `smart-backend`, which no provider file uses since #305): Connect opens
+  the key form, as a pasted-key provider's (`opensKeyForm`), and the
+  platform signs with its own key for that vendor. An address it will not
+  use is said by its reason ("Use the https address your EHR team gave
+  you.", "That address didn't answer as a FHIR server.", "Your EHR hasn't
+  turned on Autom8x yet. Ask your EHR team to activate it.";
+  `smartBackendRefusal`; the app's too).
+
+Connected, either kind's row names the clinic's host (`connectionLine`). A
+flow step that offers the EHR — ICD-10 Code Check v6's optional EHR, in its
+own Connections section, through the one connection field (backend
+ADR-0040) — opens the sign-in form for an owner or admin right on Set up (or
+Connect integration; `VendorRows`, its option's `signIn`), and the sign-in
+comes back to that page with the EHR chosen, as an OAuth vendor's connect
+does (the owner's build 20 item 2; the session's D4). A key provider's step
+still sends them to Connections.
 
 A person who holds a sign-in outside a domain-only organization's verified
 domains (backend §12.1 #221, option b′) sees, in the account area while that

@@ -63,7 +63,12 @@ test("D1: the EHR's Connect opens the key form, as a pasted key's does; OAuth an
   for (const authType of ["oauth2", "none", undefined])
     assert.equal(opensKeyForm(authType), false);
   const panel = code("app/account/connections/ConnectionsPanel.tsx");
-  assert.match(panel, /if \(opensKeyForm\(provider\.authType\)\) \{/u);
+  // Round 22: or the sign-in form, for an EHR a person signs in to
+  // (`round22-epic-sign-in.test.mjs`).
+  assert.match(
+    panel,
+    /if \(opensKeyForm\(provider\.authType\) \|\| opensSignInForm\(provider\.authType\)\) \{/u,
+  );
   assert.match(panel, /<KeyFields provider=\{selectedProvider\} \/>/u);
 });
 

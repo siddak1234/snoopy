@@ -72,6 +72,7 @@ import {
   runPackagePath,
   runPagePath,
   runLabel,
+  startedByLine,
   stepsDone,
   trackerRows,
   type DeclaredStep,
@@ -402,10 +403,20 @@ export function RunLive({
     </PageRow>
   );
   // The body, as the platform sent it: the run's files, its result line and
-  // what is to decide, then what it read (ADR-0048). Over it, an approval a
-  // disconnect expired says so (§12.1 #252).
+  // what is to decide, then what it read (ADR-0048). Over it, a run a
+  // clinic's EHR started says so (`startedByLine`, ADR-0053), and an approval
+  // a disconnect expired says so (§12.1 #252).
+  const started = startedByLine(run.startedBy);
   const body = (
     <Group>
+      {started ? (
+        <p
+          data-testid="run-started-by"
+          className={`${SPACING.group.bottom} text-sm text-[var(--muted)]`}
+        >
+          {started}
+        </p>
+      ) : null}
       {expired ? (
         <div
           data-testid="run-expired"
