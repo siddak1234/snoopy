@@ -75,8 +75,10 @@ export const SIGN_IN = "Sign in";
 
 /**
  * The sign-in form's button, named by the vendor chosen — "Sign in with
- * Epic" — from the platform's own label for it, so another EHR's is its
- * own; "Sign in" until one is picked (the session's wording, Round 22).
+ * Epic", "Sign in with Epic (test system)" — from the platform's whole label
+ * for it, so a clinic sees which system it signs in to and another EHR's is
+ * its own; "Sign in" until one is picked, and none is picked for the person
+ * from two or more (the session's D1, Round 22).
  */
 export function signInLabel(
   vendors: readonly Vendor[] | undefined,
@@ -119,13 +121,26 @@ export const EHR_SIGN_IN_REFUSALS: Record<string, string> = {
     "That EHR doesn't offer the sign-in Autom8x uses. Ask your EHR team.",
 };
 
+/** The 409 `account_mismatch`'s first sentence: what is so, without the question. */
+const EHR_ACCOUNT_MISMATCH_SAID =
+  "This workspace is signed in to another EHR address.";
+
 /**
  * The begin's 409 `account_mismatch`: another address than the one the
  * workspace is signed in to. Nothing was started; its question is answered
  * by Replace, which begins again naming the live connection.
  */
-export const EHR_ACCOUNT_MISMATCH =
-  "This workspace is signed in to another EHR address. Replace it?";
+export const EHR_ACCOUNT_MISMATCH = `${EHR_ACCOUNT_MISMATCH_SAID} Replace it?`;
+
+/**
+ * The 409's words in the sign-in form: its question only while Replace can
+ * answer it — the live connection known to the form — and its first
+ * sentence alone while the connections are read again (the session's D3,
+ * Round 22).
+ */
+export function accountMismatch(canReplace: boolean): string {
+  return canReplace ? EHR_ACCOUNT_MISMATCH : EHR_ACCOUNT_MISMATCH_SAID;
+}
 
 /** The button that answers it (the session's wording, Round 22). */
 export const EHR_REPLACE = "Replace";

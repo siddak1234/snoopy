@@ -231,13 +231,17 @@ export function connectionAction(
   return CONNECT_LABEL;
 }
 
-/** The row's button as a screen reader names it: "Connect EHR", "Sign in to EHR again". */
+/**
+ * The row's button as a screen reader names it: "Connect EHR", "Sign in again
+ * to EHR" — its visible words first, so a person who says them reaches it
+ * (WCAG 2.5.3).
+ */
 export function actionLabel(
   action: ReturnType<typeof connectionAction>,
   name: string,
 ): string {
   return action === SIGN_IN_AGAIN_LABEL
-    ? `Sign in to ${name} again`
+    ? `${action} to ${name}`
     : `${action} ${name}`;
 }
 

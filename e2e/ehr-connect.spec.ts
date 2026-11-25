@@ -14,8 +14,10 @@ import {
  * vendors, each refusal in words, and the row named by the clinic's host.
  * Round 22: the EHR a person signs in to (ADR-0054) — the same fields, a
  * button named by the vendor, the platform's return, each refusal at the
- * begin and on the way back, Sign in again and Replace; a flow in ICD-10 Code
- * Check v6's shape choosing the EHR on Set up; and a run an EHR started,
+ * begin and on the way back, Sign in again (to the same address, no question)
+ * and Replace (only for the values refused, and only once the connection it
+ * names is known); a flow in ICD-10 Code Check v6's shape choosing the EHR on
+ * Set up, signed in to from Set up and back to it; and a run an EHR started,
  * said on Activity and its page (ADR-0053). Every word is the spec's
  * (`lib/smart-backend.ts`, `lib/run-progress.ts`) or the platform's (the
  * provider's own fields). The health data agreement (C3) is
@@ -262,7 +264,7 @@ test("R22: a sign-in the platform asks for again says Sign in again; another add
   await expect(row.getByRole("button", { name: "Reconnect EHR" })).toHaveCount(
     0,
   );
-  const again = row.getByRole("button", { name: "Sign in to EHR again" });
+  const again = row.getByRole("button", { name: "Sign in again to EHR" });
   await expect(again).toHaveText("Sign in again");
   await again.click();
   const dialog = page.getByRole("dialog", { name: "Connect EHR" });
@@ -292,6 +294,117 @@ test("R22: a sign-in the platform asks for again says Sign in again; another add
     vendor: "epic",
     fhirBaseUrl: "https://fhir.other.example.test/api/FHIR/R4",
   });
+});
+
+/** Connections' EHR row needing its sign-in again, pressed: the sign-in form, open. */
+async function openSignInAgain(page: Page) {
+  await page.goto("/account/connections");
+  await connectionRow(page, "ehr-fhir")
+    .getByRole("button", { name: "Sign in again to EHR" })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Connect EHR" });
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
+test("R22: signing in again to the same address asks nothing — no Replace — and it is connected again", async ({
+  page,
+}) => {
+  await fixtureControl("ehr-sign-in-again");
+  const dialog = await openSignInAgain(page);
+  await dialog.getByRole("radio", { name: "Epic", exact: true }).check();
+  await dialog.getByLabel("FHIR address").fill(ADDRESS);
+  await dialog
+    .getByRole("button", { name: "Sign in with Epic", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/account\/connections\?status=connected$/u);
+  const row = connectionRow(page, "ehr-fhir");
+  await expect(row).toContainText("fhir.clinic.example.test");
+  await expect(
+    row.getByRole("button", { name: "Disconnect EHR" }),
+  ).toBeVisible();
+  expect((await health()).ehrSignIns).toEqual([
+    { credentials: { vendor: "epic", fhirBaseUrl: ADDRESS } },
+  ]);
+});
+
+test("R22: Replace answers only the values refused — a change to a field takes the question back, and Replace sends what the form holds now (the session's D3)", async ({
+  page,
+}) => {
+  await fixtureControl("ehr-sign-in-again");
+  const dialog = await openSignInAgain(page);
+  const address = dialog.getByLabel("FHIR address");
+  const signIn = dialog.getByRole("button", {
+    name: "Sign in with Epic",
+    exact: true,
+  });
+  await dialog.getByRole("radio", { name: "Epic", exact: true }).check();
+  await address.fill("https://fhir.other.example.test/api/FHIR/R4");
+  await signIn.click();
+  await expect(dialog.getByRole("button", { name: "Replace" })).toBeVisible();
+  await address.fill("https://fhir.third.example.test/api/FHIR/R4");
+  await expect(dialog.getByRole("button", { name: "Replace" })).toHaveCount(0);
+  await expect(dialog.getByRole("alert")).toHaveCount(0);
+  await signIn.click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "This workspace is signed in to another EHR address. Replace it?",
+  );
+  await dialog.getByRole("button", { name: "Replace" }).click();
+  await expect(page).toHaveURL(/\/account\/connections\?status=connected$/u);
+  await expect(connectionRow(page, "ehr-fhir")).toContainText(
+    "fhir.third.example.test",
+  );
+  const signIns = (await health()).ehrSignIns;
+  expect(signIns).toHaveLength(3);
+  expect(signIns[2]).toEqual({
+    credentials: {
+      vendor: "epic",
+      fhirBaseUrl: "https://fhir.third.example.test/api/FHIR/R4",
+    },
+    replaceConnectionId: "e4e4e4e4-e4e4-4e4e-8e4e-e4e4e4e4e4e4",
+  });
+});
+
+test("R22: a 409 for a sign-in this page did not know of says the first sentence alone, reads the connections again, then asks Replace it? — and Replace names that connection (the session's D3)", async ({
+  page,
+}) => {
+  await fixtureControl("ehr-offered?vendors=2");
+  const dialog = await openEhrForm(page);
+  // Signed in elsewhere since this page read the connections.
+  await fixtureControl("ehr-connected");
+  // The read again is held until the words before it are seen.
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/account/connections**", async (route) => {
+    const request = route.request();
+    if (request.method() === "GET" && request.headers()["rsc"] === "1")
+      await held;
+    await route.continue();
+  });
+  await dialog.getByRole("radio", { name: "Epic", exact: true }).check();
+  await dialog
+    .getByLabel("FHIR address")
+    .fill("https://fhir.other.example.test/api/FHIR/R4");
+  await dialog
+    .getByRole("button", { name: "Sign in with Epic", exact: true })
+    .click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "This workspace is signed in to another EHR address.",
+  );
+  await expect(dialog.getByRole("button", { name: "Replace" })).toHaveCount(0);
+  release();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "This workspace is signed in to another EHR address. Replace it?",
+  );
+  await dialog.getByRole("button", { name: "Replace" }).click();
+  await expect(page).toHaveURL(/\/account\/connections\?status=connected$/u);
+  const signIns = (await health()).ehrSignIns;
+  expect(signIns.map((signIn) => signIn.replaceConnectionId ?? null)).toEqual([
+    null,
+    "e4e4e4e4-e4e4-4e4e-8e4e-e4e4e4e4e4e4",
+  ]);
 });
 
 const EHR_FLOW_SETUP =
@@ -328,7 +441,7 @@ test("R22: a flow in v6's shape draws its optional EHR in its Connections sectio
   expect(ehrFlowSaves[0].ehr).toBe("ehr-fhir");
 });
 
-test("R22: in v6's shape, an EHR not yet signed in to is not connected, and an owner's tap goes to Connections to sign in", async ({
+test("R22: in v6's shape, an EHR not yet signed in to is not connected; an owner's tap opens the sign-in on Set up, which comes back to Set up with the EHR chosen, and Save saves it (the session's D4)", async ({
   page,
 }) => {
   await fixtureControl("ehr-offered?vendors=2");
@@ -341,12 +454,76 @@ test("R22: in v6's shape, an EHR not yet signed in to is not connected, and an o
     "Not connected",
   );
   await choice.getByRole("radio", { name: "EHR" }).click();
-  await expect(page).toHaveURL(/\/account\/connections$/u);
+  const dialog = page.getByRole("dialog", { name: "Connect EHR" });
+  await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/\/setup$/u);
   await expect(
-    connectionRow(page, "ehr-fhir").getByRole("button", {
-      name: "Connect EHR",
-    }),
+    dialog.getByRole("button", { name: "Sign in", exact: true }),
   ).toBeVisible();
+  await expectNoAxeViolations(page);
+  await dialog.getByRole("radio", { name: "Epic", exact: true }).check();
+  await dialog.getByLabel("FHIR address").fill(ADDRESS);
+  await dialog
+    .getByRole("button", { name: "Sign in with Epic", exact: true })
+    .click();
+  await expect(page).toHaveURL(
+    /\/account\/flows\/c6c6c6c6-[^/]+\/setup\?status=connected$/u,
+  );
+  await expect(page.locator("main").getByRole("status")).toHaveText(
+    "Connection completed successfully.",
+  );
+  const ehr = page
+    .getByRole("group", { name: "Connections" })
+    .getByRole("radiogroup", { name: "EHR" })
+    .getByRole("radio", { name: "EHR" });
+  await expect(ehr).toHaveAttribute("aria-checked", "true");
+  await expect(ehr).toContainText("fhir.clinic.example.test");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page).toHaveURL(/\/account\/flows\/c6c6c6c6-[^/]+$/u);
+  const { ehrFlowSaves } = await fixtureRead<{
+    ehrFlowSaves: Record<string, unknown>[];
+  }>("counts");
+  expect(ehrFlowSaves).toHaveLength(1);
+  expect(ehrFlowSaves[0].ehr).toBe("ehr-fhir");
+  expect((await health()).ehrSignIns).toEqual([
+    { credentials: { vendor: "epic", fhirBaseUrl: ADDRESS } },
+  ]);
+});
+
+test("R22: a sign-in started on Set up and refused on the way back comes back to Set up, saying why in the spec's words; nothing is chosen", async ({
+  page,
+}) => {
+  await fixtureControl("ehr-offered?vendors=1");
+  await fixtureControl("ehr-flow");
+  await page.goto(EHR_FLOW_SETUP);
+  await page
+    .getByRole("group", { name: "Connections" })
+    .getByRole("radiogroup", { name: "EHR" })
+    .getByRole("radio", { name: "EHR" })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Connect EHR" });
+  await dialog
+    .getByLabel("FHIR address")
+    .fill("https://no-refresh.example.test/fhir");
+  await dialog
+    .getByRole("button", { name: "Sign in with Epic (test system)" })
+    .click();
+  await expect(page).toHaveURL(
+    /\/account\/flows\/c6c6c6c6-[^/]+\/setup\?status=error&reason=no_refresh_token$/u,
+  );
+  await expect(page.locator("main").getByRole("alert")).toHaveText(
+    "Your EHR team needs to allow a lasting sign-in for Autom8x. Ask them, then sign in again.",
+  );
+  const choice = page
+    .getByRole("group", { name: "Connections" })
+    .getByRole("radiogroup", { name: "EHR" });
+  await expect(choice.getByRole("radio", { name: "EHR" })).toContainText(
+    "Not connected",
+  );
+  await expect(choice.getByRole("radio", { name: "None" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
 });
 
 test("R22: a run an EHR started says so on Activity and on its page, steps or result; a person's start says nothing new", async ({

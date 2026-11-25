@@ -11,6 +11,7 @@ import {
   listConnections,
 } from "@/lib/connections";
 import { connectionFor } from "@/lib/connection-rows";
+import { opensSignInForm } from "@/lib/smart-backend";
 import {
   chosenVendor,
   connectionFields,
@@ -102,8 +103,11 @@ export default async function VendorPage(
       providerId: connection.providerId,
       displayName: provider?.displayName ?? connection.displayName,
       icon: provider?.icon ?? null,
-      // OAuth only on this page: a pasted key is connected on Connections.
+      // OAuth here, and the EHR's sign-in: a pasted key is connected on Connections.
       connectable: provider?.authType === "oauth2",
+      ...(provider && opensSignInForm(provider.authType)
+        ? { signIn: provider }
+        : {}),
       authType: provider?.authType,
       connection:
         connectionFor(connections.connections, connection.providerId) ?? null,

@@ -16,7 +16,10 @@ import {
   type RowConnection,
   VENDOR_MEMBER_NOTE,
 } from "@/lib/connection-rows";
+import type { OfferedProvider } from "@/lib/connections";
 import { NONE } from "@/lib/flow-steps";
+import Modal from "@/components/ui/Modal";
+import { SignInForm } from "@/app/account/connections/SignInForm";
 import { startConnect } from "@/app/account/connections/start-connect";
 import { SPACING } from "@/lib/spacing";
 
@@ -28,6 +31,8 @@ export type VendorOption = {
   icon: string | null;
   /** Whether it connects through the vendor's consent page, here. */
   connectable: boolean;
+  /** The EHR a person signs in to (`smart-launch`, backend ADR-0054): its provider, whose sign-in form opens here. */
+  signIn?: OfferedProvider;
   /** The provider's `authType`: `none` is a public service, always connected (platform round 2's B5). */
   authType?: ProviderAuthType;
   /** The workspace's connection to it, or none. */
@@ -53,9 +58,11 @@ export const VENDOR_SAVING = "Saving…";
  * or admin, a vendor not connected is connected first through the vendor's
  * sign-in — the browser comes back to `returnTo`, where it is chosen (the
  * owner's build 20 item 2: "If i need to connect then after i click and
- * connection happens then it shoukd take me back"); one that takes a pasted
- * key, or the EHR's sign-in (backend ADR-0054), is connected where its form
- * is, Connections. For a member a
+ * connection happens then it shoukd take me back"). The EHR a person signs
+ * in to (`signIn`, backend ADR-0054) opens its sign-in form (`SignInForm`)
+ * right here, and its sign-in comes back to `returnTo` the same way, where it
+ * is chosen (the session's D4, Round 22); one that takes a pasted key is
+ * connected where its form is, Connections. For a member a
  * vendor not connected is no choice: "Ask an owner or admin to connect it."
  *
  * `readOnly` is a member who may not change the integration (Build 23's B3;
@@ -102,11 +109,14 @@ export function VendorRows({
     providerId: string;
     message: string;
   } | null>(null);
+  // The EHR whose sign-in form is open.
+  const [signingIn, setSigningIn] = useState<VendorOption | null>(null);
   const busy = saving ?? (connecting ? connectingFor : null);
   // Each row is named by its vendor alone and described by its line — its
   // state, "Saving…", or who connects it — so a screen reader says both.
   const lineIds = useId();
   const lineId = (choice: string) => `${lineIds}-${choice}`;
+  const signInTitle = `${lineIds}-sign-in`;
 
   const connect = (option: VendorOption) => {
     setConnectingFor(option.providerId);
@@ -140,6 +150,10 @@ export function VendorRows({
       return;
     }
     if (!canManage) return;
+    if (option.signIn) {
+      setSigningIn(option);
+      return;
+    }
     if (!option.connectable) {
       router.push("/account/connections");
       return;
@@ -230,6 +244,34 @@ export function VendorRows({
         >
           {VENDOR_MEMBER_NOTE}
         </p>
+      ) : null}
+      {signingIn?.signIn ? (
+        <Modal
+          onClose={() => setSigningIn(null)}
+          bubble
+          ariaLabelledBy={signInTitle}
+          zIndex={100}
+        >
+          <h2
+            id={signInTitle}
+            className="text-xl font-semibold text-[var(--text)]"
+          >
+            Connect {signingIn.displayName}
+          </h2>
+          <SignInForm
+            provider={signingIn.signIn}
+            workspaceId={workspaceId}
+            replaces={signingIn.connection?.id}
+            returnTo={returnTo}
+            onAlready={() => {
+              setSigningIn(null);
+              onChoose(signingIn.providerId);
+              router.refresh();
+            }}
+            onCancel={() => setSigningIn(null)}
+            onReread={() => router.refresh()}
+          />
+        </Modal>
       ) : null}
     </div>
   );

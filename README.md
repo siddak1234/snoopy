@@ -300,8 +300,8 @@ picker only for two or more vendors, each refusal in words, the row named
 by the clinic's host — as a key form, and since Round 22 as a sign-in: its
 button named by the vendor, the platform's return, each refusal at the begin
 and on the way back, Sign in again and Replace; a flow in ICD-10 Code Check
-v6's shape choosing its optional EHR on Set up; and a run an EHR started,
-said on Activity and its page)
+v6's shape choosing its optional EHR on Set up, signed in to from there and
+back there; and a run an EHR started, said on Activity and its page)
 and `e2e/flow-items.spec.ts` (a made-up flow with items, Round 19: the Flows
 list by department A–Z; its items grouped A–Z under its group filter, the
 website's drop-down, on its page with no Dashboard, no Steps and no run start

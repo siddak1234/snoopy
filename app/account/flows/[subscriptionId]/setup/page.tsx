@@ -17,7 +17,7 @@ import {
   listConnectionProviders,
   listConnections,
 } from "@/lib/connections";
-import { ehrSignInReturn } from "@/lib/smart-backend";
+import { ehrSignInReturn, opensSignInForm } from "@/lib/smart-backend";
 import { connectionFor, isKeyless } from "@/lib/connection-rows";
 import {
   chosenVendor,
@@ -59,7 +59,8 @@ import { SetupForm, type SetupVendorField } from "./SetupForm";
  * step's vendor choice (one `connection` field per step, backend ADR-0040),
  * drawn right here: each vendor the step names, then None; a tap chooses, and
  * a vendor not connected is connected first, for an owner or admin, through
- * its sign-in, which comes back here; then each account the flow cannot run
+ * its sign-in — the EHR's sign-in form opening on this page — which comes back
+ * here; then each account the flow cannot run
  * without, the one connection row with its Connect. Then its settings by the
  * manifest's sections, the title and the input only — no help line: its own
  * `setupSections` when it declares them, each vendor choice in the section it
@@ -210,6 +211,10 @@ export default async function SetupPage(
         displayName: provider?.displayName ?? connection.displayName,
         icon: provider?.icon ?? null,
         connectable: provider?.authType === "oauth2",
+        // The EHR's sign-in opens here, and comes back here (the session's D4).
+        ...(provider && opensSignInForm(provider.authType)
+          ? { signIn: provider }
+          : {}),
         authType: provider?.authType,
         connection:
           connectionFor(connections.connections, connection.providerId) ?? null,

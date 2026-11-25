@@ -57,7 +57,8 @@ function failure(error: unknown): ConnectionActionResult {
  * Starts a connection — Connect, or Reconnect, which keeps the account
  * (backend ADR-0019 §4) — for an owner or admin. ~~Replace account, with the
  * exact id of the live connection (backend ADR-0026)~~ is off the row since
- * Build 21 (spec A4); the platform's route stays, unused.
+ * Build 21 (spec A4); only an EHR sign-in's Replace names a connection to
+ * replace (`signIn.replaceConnectionId`, backend ADR-0054).
  *
  * The platform answers one of two outcomes (backend §12.1 #172): a live grant
  * that already holds every permission the provider asks for is `reused`, and no

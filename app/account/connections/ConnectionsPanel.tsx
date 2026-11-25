@@ -63,8 +63,9 @@ const noSubscription = () => () => {};
  * Connect, Reconnect or Disconnect. ~~What connecting it lets flows do, "Used
  * by N live flows", Available connections, Intuit's Connect button image,
  * "Disconnect from QuickBooks" and Replace account~~ until Build 21 (the
- * platform's replace route stays, unused; the owner's ~04:15Z: "we will list
- * on apples app store not intuits. so we do not need that").
+ * owner's ~04:15Z: "we will list on apples app store not intuits. so we do
+ * not need that"); the platform's replace route is used only by an EHR
+ * sign-in's Replace, in its form (`SignInForm`, backend ADR-0054).
  *
  * `canManage` is the page's reading of the platform's rule: connecting or
  * disconnecting supersedes the account every flow in the workspace acts
@@ -439,6 +440,7 @@ export function ConnectionsPanel({
                 router.refresh();
               }}
               onCancel={close}
+              onReread={() => router.refresh()}
             />
           ) : (
             <>

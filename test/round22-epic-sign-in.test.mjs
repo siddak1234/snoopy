@@ -10,6 +10,7 @@ import { STARTED_FROM_EHR, startedByLine } from "../lib/run-progress.ts";
 import {
   EHR_ACCOUNT_MISMATCH,
   EHR_SIGN_IN_REFUSALS,
+  accountMismatch,
   EHR_SIGN_IN_RETURNS,
   ehrSignInRefusal,
   ehrSignInReturn,
@@ -163,6 +164,14 @@ test("R22: the sign-in form draws the key form's fields and its one button: Sign
   );
   assert.ok(nodes.some((node) => node.attrs.name === "credential:fhirBaseUrl"));
   assert.equal(nodes.filter((node) => node.attrs.type === "submit").length, 1);
+  // From two or more, none is chosen for the person (the session's D1).
+  assert.equal(
+    nodes.filter(
+      (node) =>
+        node.attrs.name === "credential:vendor" && "checked" in node.attrs,
+    ).length,
+    0,
+  );
   const one = draw(SignInForm, {
     ...props,
     provider: { ...EHR, vendors: EHR.vendors.slice(0, 1) },
@@ -303,6 +312,73 @@ test("R22: each begin refusal is the spec's words — 400 by its reason, 409 acc
   );
 });
 
+test("R22: the 409 asks Replace it? only while the connection to replace is known; else its first sentence alone, and the connections are read again (the session's D3)", () => {
+  assert.equal(accountMismatch(true), EHR_ACCOUNT_MISMATCH);
+  assert.equal(
+    accountMismatch(false),
+    "This workspace is signed in to another EHR address.",
+  );
+  assert.ok(prose.includes(`("${accountMismatch(false)} Replace it?")`));
+  const form = code("app/account/connections/SignInForm.tsx");
+  // Replace sends what the form holds now — never what a refused begin sent.
+  assert.match(
+    form,
+    /const begin = \(replaceConnectionId\?: string\) => \{\s*if \(!form\.current\) return;\s*const credentials = postedCredentials\(new FormData\(form\.current\)\);/u,
+  );
+  assert.doesNotMatch(form, /\bsent\b|setSent/u);
+  // Any change to a field takes the question back.
+  assert.match(
+    form,
+    /setVendor\(typeof picked === "string" \? picked : null\);\s*setMismatch\(false\);/u,
+  );
+  // Not known here: the first sentence alone, the connections read again.
+  assert.match(
+    form,
+    /if \(started\.replaceable\) \{\s*setMismatch\(true\);\s*if \(!replaces\) onReread\(\);\s*return;\s*\}/u,
+  );
+  assert.match(
+    form,
+    /message=\{mismatch \? accountMismatch\(Boolean\(replaces\)\) : error\}/u,
+  );
+  assert.match(form, /\{mismatch && replaces \? \(/u);
+  assert.match(form, /onClick=\{\(\) => begin\(replaces\)\}/u);
+  for (const caller of [
+    "app/account/connections/ConnectionsPanel.tsx",
+    "app/account/flows/VendorRows.tsx",
+  ])
+    assert.match(
+      code(caller),
+      /onReread=\{\(\) => router\.refresh\(\)\}/u,
+      caller,
+    );
+});
+
+test("R22: a sign-in started from a flow's Set up opens there and comes back there, the EHR chosen — never sent to Connections (the session's D4)", () => {
+  const rows = code("app/account/flows/VendorRows.tsx");
+  assert.match(
+    rows,
+    /if \(!canManage\) return;\s*if \(option\.signIn\) \{\s*setSigningIn\(option\);\s*return;\s*\}\s*if \(!option\.connectable\) \{/u,
+  );
+  assert.match(
+    rows,
+    /<SignInForm\s+provider=\{signingIn\.signIn\}\s+workspaceId=\{workspaceId\}\s+replaces=\{signingIn\.connection\?\.id\}\s+returnTo=\{returnTo\}/u,
+  );
+  for (const page of [
+    "app/account/flows/[subscriptionId]/setup/page.tsx",
+    "app/account/flows/[subscriptionId]/vendor/page.tsx",
+  ])
+    assert.match(
+      code(page),
+      /\.\.\.\(provider && opensSignInForm\(provider\.authType\)\s*\? \{ signIn: provider \}\s*: \{\}\)/u,
+      page,
+    );
+  // In a dialog over Set up's own form, its submit is its own.
+  assert.match(
+    code("app/account/connections/SignInForm.tsx"),
+    /event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*begin\(\);/u,
+  );
+});
+
 test("R22: a sign-in refused on the way back is said by its reason in the spec's words; any other token, none", () => {
   for (const words of Object.values(EHR_SIGN_IN_RETURNS))
     assert.ok(prose.includes(`"${words}"`), `the spec defines "${words}"`);
@@ -368,9 +444,12 @@ test("R22: an EHR sign-in to do again says Sign in again, its row named for a sc
     assert.equal(connectionAction("attention", authType), "Reconnect");
   assert.equal(connectionAction("not-connected", "smart-launch"), "Connect");
   assert.equal(connectionAction("connected", "smart-launch"), "Disconnect");
-  assert.equal(actionLabel("Sign in again", "EHR"), "Sign in to EHR again");
+  assert.equal(actionLabel("Sign in again", "EHR"), "Sign in again to EHR");
   assert.equal(actionLabel("Connect", "EHR"), "Connect EHR");
   assert.equal(actionLabel("Disconnect", "EHR"), "Disconnect EHR");
+  // Each name begins with the button's visible words (WCAG 2.5.3).
+  for (const action of ["Connect", "Reconnect", "Sign in again", "Disconnect"])
+    assert.ok(actionLabel(action, "EHR").startsWith(`${action} `), action);
   const connection = {
     id: "c1",
     providerId: "ehr-fhir",
