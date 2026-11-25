@@ -84,6 +84,12 @@ export function SignInForm({
       if (started.status === "already") onAlready(started.connectedAs);
       if (started.status !== "refused") return;
       if (started.replaceable) {
+        // A field changed while the begin was asked: Replace answers the values refused, so
+        // a 409 for values the form no longer holds offers nothing (the session's D3).
+        const now = form.current
+          ? JSON.stringify(postedCredentials(new FormData(form.current)))
+          : null;
+        if (now !== JSON.stringify(credentials)) return;
         setMismatch(true);
         if (!replaces) onReread();
         return;

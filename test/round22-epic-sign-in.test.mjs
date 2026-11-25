@@ -326,6 +326,11 @@ test("R22: the 409 asks Replace it? only while the connection to replace is know
     /const begin = \(replaceConnectionId\?: string\) => \{\s*if \(!form\.current\) return;\s*const credentials = postedCredentials\(new FormData\(form\.current\)\);/u,
   );
   assert.doesNotMatch(form, /\bsent\b|setSent/u);
+  // A 409 that arrives after a field changed offers no Replace: the form must still hold what was refused.
+  assert.match(
+    form,
+    /if \(started\.replaceable\) \{[\s\S]*?if \(now !== JSON\.stringify\(credentials\)\) return;\s*setMismatch\(true\);/u,
+  );
   // Any change to a field takes the question back.
   assert.match(
     form,
@@ -334,7 +339,7 @@ test("R22: the 409 asks Replace it? only while the connection to replace is know
   // Not known here: the first sentence alone, the connections read again.
   assert.match(
     form,
-    /if \(started\.replaceable\) \{\s*setMismatch\(true\);\s*if \(!replaces\) onReread\(\);\s*return;\s*\}/u,
+    /if \(started\.replaceable\) \{[\s\S]*?setMismatch\(true\);\s*if \(!replaces\) onReread\(\);\s*return;\s*\}/u,
   );
   assert.match(
     form,
