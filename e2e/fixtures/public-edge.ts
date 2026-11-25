@@ -26,7 +26,9 @@ const { itemBody, runBlocks } = (await import(
 // Round 21, Stage 2's health data surfaces, by their own path as well.
 const {
   agreementRefusal,
+  ehrAuthorize,
   ehrConnections,
+  ehrProviderId,
   ehrProviders,
   healthControls,
   healthRoute,
@@ -491,6 +493,15 @@ function initialState() {
     packageFailing: false,
     // Round 21, Stage 2 (e2e/fixtures/health-data.ts).
     health: healthState(),
+    // Round 22 (backend ADR-0053, ADR-0054): a made-up flow in ICD-10 Code
+    // Check v6's shape — a person's upload first among its ways to start, and
+    // an optional EHR connection field in its Connections section — off until
+    // a test turns it on, so no other test meets it; its config and every
+    // save. And the listed runs carrying how each started (`startedBy`).
+    ehrFlow: false,
+    ehrFlowConfig: { ehr: "none" } as Json,
+    ehrFlowSaves: [] as Json[],
+    runsStartedBy: false,
   };
 }
 let state = initialState();
@@ -1267,6 +1278,7 @@ function fixtureCatalog(): Automations["AutomationCatalogResponse"] {
           : {}),
       },
       ...(state.itemsFlow ? [itemsAutomation] : []),
+      ...(state.ehrFlow ? [ehrFlowAutomation] : []),
     ],
     categories: ["All", "Accounting", "Operations"],
   };
@@ -1391,6 +1403,87 @@ function itemsSubscription(): Automations["Subscription"] {
       ? itemsRunInput.map((field) => ({ ...field, required: true }))
       : itemsRunInput,
     items: itemsDeclared,
+    projectId: null,
+    createdByUserId: userId,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+// Round 22: ICD-10 Code Check v6's shape, made up (the website names no
+// flow's things): its ways to start a person's upload, then an EHR's hook
+// (`triggers`, backend ADR-0053) — which the subscription read names only by
+// the first, `triggerKind` — and the EHR an optional connection, chosen in
+// its own Connections section (ADR-0040, ADR-0048 amendment 5).
+const ehrFlowSubscriptionId = "c6c6c6c6-c6c6-4c6c-8c6c-c6c6c6c6c6c6";
+const ehrFlowSetup = [
+  {
+    section: "connections",
+    sectionId: "connections",
+    key: "ehr",
+    title: "EHR",
+    description: "Where visits come from.",
+    control: "connection",
+    defaultValue: "none",
+    required: false,
+    providers: ["ehr-fhir"],
+  },
+  {
+    section: "rules",
+    sectionId: "rules",
+    key: "reviewer",
+    title: "Reviewer",
+    description: "Who reviews each visit.",
+    control: "text",
+    required: false,
+  },
+] satisfies Automations["AutomationSetupField"][];
+const ehrFlowSections = [
+  { id: "connections", title: "Connections" },
+  { id: "rules", title: "Rules" },
+] satisfies Automations["AutomationSetupSectionDeclaration"][];
+const ehrFlowAutomation = {
+  ...automation("fixture-visit-check", "Visit check"),
+  version: 6,
+  category: "Healthcare",
+  subscribed: true,
+  usesAi: true,
+  requiredConnections: [
+    {
+      providerId: "ehr-fhir",
+      displayName: "EHR",
+      purpose: "Starts a check when a visit opens.",
+      optional: true,
+    },
+  ],
+  setup: ehrFlowSetup,
+  setupSections: ehrFlowSections,
+} satisfies Automations["AutomationCatalogEntry"];
+
+function ehrFlowSubscription(): Automations["Subscription"] {
+  const chosen = state.ehrFlowConfig.ehr;
+  return {
+    id: ehrFlowSubscriptionId,
+    workspaceId,
+    templateId: ehrFlowAutomation.templateId,
+    templateVersion: 6,
+    name: "Visit check",
+    status: "live",
+    config: state.ehrFlowConfig,
+    unmetConnections:
+      chosen === "ehr-fhir" && !state.health.ehrHost ? ["ehr-fhir"] : [],
+    triggerKind: "manual",
+    setup: ehrFlowSetup,
+    setupSections: ehrFlowSections,
+    runInput: [
+      {
+        key: "visitNotes",
+        title: "Visit notes",
+        description: "For doctors and coders.",
+        control: "artifact",
+        required: true,
+      },
+    ],
     projectId: null,
     createdByUserId: userId,
     createdAt: now,
@@ -2100,8 +2193,16 @@ function fixtureRun(runId: string): Automations["Run"] {
     };
   }
   const failed = runId === failedRunId;
+  // Round 22 (backend ADR-0053): how each listed run started, once a test
+  // asks — the running and the succeeded one by an EHR's hook, the failed
+  // one by a person; absent otherwise, as on a run made before it was kept.
+  const startedBy: Partial<Pick<Automations["Run"], "startedBy">> =
+    state.runsStartedBy
+      ? { startedBy: failed ? "manual" : "provider-event" }
+      : {};
   if (runId === runningRunId) {
     return {
+      ...startedBy,
       id: runId,
       workspaceId,
       subscriptionId: manualSubscriptionId,
@@ -2118,6 +2219,7 @@ function fixtureRun(runId: string): Automations["Run"] {
     };
   }
   return {
+    ...startedBy,
     id: runId,
     workspaceId,
     subscriptionId: manualSubscriptionId,
@@ -2983,6 +3085,12 @@ const server = createServer(
       // run's start is refused with the numbers.
       // Round 19: the flow with items, listed; and every item being read,
       // read — as the run that reads its file ends.
+      "/__fixture/ehr-flow": () => {
+        state.ehrFlow = true;
+      },
+      "/__fixture/runs-started-by": () => {
+        state.runsStartedBy = true;
+      },
       "/__fixture/items-flow": () => {
         state.itemsFlow = true;
         state.items = fixtureItems();
@@ -3157,6 +3265,7 @@ const server = createServer(
         // as saved, every save, and QuickBooks.
         invoiceConfig: state.invoiceConfig,
         invoiceSaves: state.invoiceSaves,
+        ehrFlowSaves: state.ehrFlowSaves,
         quickbooksConnected: state.quickbooksConnected,
         // Build 22: every list of extra email addresses saved, in order.
         emailSaves: state.emailSaves,
@@ -4253,7 +4362,22 @@ const server = createServer(
       const body = (await requestJson(request)) as {
         providerId?: string;
         replaceConnectionId?: string;
+        credentials?: Record<string, unknown>;
       };
+      // The EHR: a person's sign-in (backend ADR-0054,
+      // e2e/fixtures/health-data.ts).
+      if (body.providerId === ehrProviderId && state.health.ehrVendors > 0) {
+        return ehrAuthorize(
+          state.health,
+          body,
+          workspaceId,
+          (status, answer) => respond(response, status, answer),
+          problem,
+        );
+      }
+      // `credentials` on any other provider is refused (the contract).
+      if (body.credentials !== undefined)
+        return respond(response, 400, problem(400, "Bad Request"));
       // QuickBooks: reused once connected; otherwise its consent, which the
       // fixture grants at once — the browser is sent straight to the
       // platform's callback landing, as Intuit sends it back, connected.
@@ -4408,6 +4532,7 @@ const server = createServer(
       ...state.projectAutomationScopes.map(projectAutomationSubscription),
       ...(state.invoiceAdded ? [invoiceSubscription()] : []),
       ...(state.itemsFlow ? [itemsSubscription()] : []),
+      ...(state.ehrFlow ? [ehrFlowSubscription()] : []),
       {
         ...manualSubscription,
         status: state.manualStatus,
@@ -4595,6 +4720,40 @@ const server = createServer(
     // replaces them; Set up's Turn on sends both in one change. A flow turned
     // or kept on cannot choose a vendor that is not connected (422
     // `unmet_connections`).
+    // The v6-shaped flow's save (Round 22): its two settings only, the EHR
+    // `none` or the EHR, and the EHR chosen only once it is connected (422
+    // `unmet_connections`, as the platform refuses a live flow).
+    if (
+      state.ehrFlow &&
+      method === "PATCH" &&
+      isWorkspacePath(pathname, `/subscriptions/${ehrFlowSubscriptionId}`)
+    ) {
+      const body = (await requestJson(request)) as { config?: Json };
+      const config = body.config;
+      if (!request.headers["idempotency-key"] || !config)
+        return respond(response, 422, problem(422, "Unprocessable Entity"));
+      const declared = new Set(ehrFlowSetup.map((field) => field.key));
+      if (
+        Object.keys(config).some((key) => !declared.has(key)) ||
+        (config.ehr !== undefined &&
+          config.ehr !== "none" &&
+          config.ehr !== "ehr-fhir")
+      )
+        return respond(response, 422, {
+          ...problem(422, "Unprocessable Entity"),
+          details: { reason: "invalid_config" },
+        } satisfies Platform["ApiProblem"]);
+      if (config.ehr === "ehr-fhir" && !state.health.ehrHost)
+        return respond(response, 422, {
+          ...problem(422, "Unprocessable Entity"),
+          details: { reason: "unmet_connections" },
+        } satisfies Platform["ApiProblem"]);
+      state.ehrFlowConfig = config;
+      state.ehrFlowSaves.push(config);
+      return respond(response, 200, {
+        subscription: ehrFlowSubscription(),
+      } satisfies AutomationOperations["updateSubscription"]["responses"][200]["content"]["application/json"]);
+    }
     if (
       method === "PATCH" &&
       isWorkspacePath(pathname, `/subscriptions/${invoiceSubscriptionId}`)

@@ -3,8 +3,10 @@
  * `public-edge.ts`, which owns its state and calls `healthRoute` before its
  * own key and run routes: the health data agreement, a workspace's
  * acceptance of it (ADR-0049 amendment 2) and its Documents (backend
- * ADR-0049, C3), and the EHR, a SMART Backend Services
- * provider (ADR-0050, D1); and S1-8b's Approve that a disconnect expired.
+ * ADR-0049, C3), and the EHR — a person's sign-in (`smart-launch`, ADR-0054),
+ * as the platform offers it now, or a SMART Backend Services provider
+ * (`smart-backend`, ADR-0050, D1) — and S1-8b's Approve that a disconnect
+ * expired.
  * Each is off until a test's control turns it on,
  * but for the one signed document the organization starts with, so no other
  * test meets them. Made-up text and addresses only: this repository is public.
@@ -93,10 +95,15 @@ export function healthState() {
     acceptances: [] as { key: string | null; body: Json }[],
     documents: [signedDocument] as Platform["WorkspaceDocument"][],
     // The EHR: how many vendors this deployment holds a key for (0: not
-    // offered), the host it is connected to, and every connect sent.
+    // offered), its kind, the host it is connected to and whether that
+    // sign-in needs doing again, every key connect sent and every sign-in
+    // begun.
     ehrVendors: 0,
+    ehrAuth: "smart-launch" as "smart-launch" | "smart-backend",
     ehrHost: null as string | null,
+    ehrSignInAgain: false,
     ehrConnects: [] as { key: string | null; credentials: Json }[],
+    ehrSignIns: [] as { credentials: Json; replaceConnectionId?: string }[],
     // S1-8b: while set, an Approve is refused 409 approval_expired, its
     // approval expired by this provider's disconnect.
     approvalDisconnected: null as string | null,
@@ -145,8 +152,25 @@ export function healthControls(
     },
     "/__fixture/ehr-offered": () => {
       const vendors = Number(url.searchParams.get("vendors") ?? "2");
+      const auth = url.searchParams.get("auth") ?? "smart-launch";
       if (vendors !== 1 && vendors !== 2) return false;
+      if (auth !== "smart-launch" && auth !== "smart-backend") return false;
       health.ehrVendors = vendors;
+      health.ehrAuth = auth;
+    },
+    // The EHR signed in to already (backend ADR-0054).
+    "/__fixture/ehr-connected": () => {
+      health.ehrVendors = 2;
+      health.ehrAuth = "smart-launch";
+      health.ehrHost = "fhir.clinic.example.test";
+    },
+    // An EHR sign-in the platform asks to be done again (backend ADR-0054:
+    // migration 0015's `no_refresh_token`, or a refresh refused).
+    "/__fixture/ehr-sign-in-again": () => {
+      health.ehrVendors = 2;
+      health.ehrAuth = "smart-launch";
+      health.ehrHost = "fhir.clinic.example.test";
+      health.ehrSignInAgain = true;
     },
   };
 }
@@ -156,15 +180,24 @@ export function ehrProviders(
   health: HealthState,
 ): Connections["ConnectionProvider"][] {
   if (health.ehrVendors === 0) return [];
+  const signIn = health.ehrAuth === "smart-launch";
   return [
     {
       providerId: ehrProviderId,
       displayName: "EHR",
-      description:
-        "Reads visit notes from your EHR. It never changes your records.",
+      description: signIn
+        ? "Reads and writes visit notes in your EHR, once someone at your clinic signs in."
+        : "Reads visit notes from your EHR. It never changes your records.",
       icon: "FirstAid",
-      scopes: ["system/DocumentReference.read"],
-      authType: "smart-backend",
+      scopes: signIn
+        ? [
+            "openid",
+            "fhirUser",
+            "offline_access",
+            "user/DocumentReference.read",
+          ]
+        : ["system/DocumentReference.read"],
+      authType: health.ehrAuth,
       credentialFields: [
         {
           name: "fhirBaseUrl",
@@ -190,12 +223,99 @@ export function ehrConnections(
       providerId: ehrProviderId,
       workspaceId,
       externalAccount: { displayName: health.ehrHost },
-      status: "connected",
+      status: health.ehrSignInAgain ? "reauthorization-required" : "connected",
+      ...(health.ehrSignInAgain ? { errorCode: "no_refresh_token" } : {}),
       requiredScopes: [],
       grantedScopes: [],
       usedByCount: 0,
     },
   ];
+}
+
+/**
+ * An EHR sign-in's begin (backend ADR-0054), from `public-edge.ts`'s
+ * authorize: a vendor it lists and the clinic's FHIR address. Each address
+ * the platform refuses at begin is refused by its reason; another address
+ * over the workspace's sign-in is 409 `account_mismatch` unless it names
+ * that connection; the same address, signed in, is reused; any other begins,
+ * and the fixture signs in at once — the browser is sent straight to the
+ * platform's return, connected, or refused for the reason each made-up
+ * address stands for.
+ */
+export function ehrAuthorize(
+  health: HealthState,
+  body: Json,
+  workspaceId: string,
+  answer: (status: number, body: Json) => void,
+  problem: (status: number, title: string, details?: Json) => Json,
+): void {
+  const credentials = body.credentials as Json | undefined;
+  const replaceConnectionId =
+    typeof body.replaceConnectionId === "string"
+      ? body.replaceConnectionId
+      : undefined;
+  health.ehrSignIns.push({
+    credentials: credentials ?? {},
+    ...(replaceConnectionId ? { replaceConnectionId } : {}),
+  });
+  const vendor = credentials?.vendor;
+  const address = String(credentials?.fhirBaseUrl ?? "");
+  // `credentials` on another kind, none on this one, or a vendor not listed.
+  if (
+    health.ehrAuth !== "smart-launch" ||
+    !credentials ||
+    !EHR_VENDORS.slice(0, health.ehrVendors).some(({ id }) => id === vendor)
+  )
+    return answer(400, {
+      ...problem(400, "Bad Request"),
+      details: { reason: "credential_invalid" },
+    });
+  const refusedAtBegin: Record<string, string> = {
+    "https://silent.example.test/fhir": "fhir_not_answering",
+    "https://unsupported.example.test/fhir": "ehr_sign_in_unsupported",
+  };
+  const refused = address.startsWith("https://")
+    ? refusedAtBegin[address]
+    : "fhir_address_refused";
+  if (refused)
+    return answer(400, {
+      ...problem(400, "Bad Request"),
+      details: { reason: refused },
+    });
+  const host = new URL(address).host;
+  if (
+    replaceConnectionId !== undefined &&
+    replaceConnectionId !== ehrConnectionId
+  )
+    return answer(409, problem(409, "Conflict"));
+  if (health.ehrHost && health.ehrHost !== host && !replaceConnectionId)
+    return answer(409, {
+      ...problem(409, "Conflict"),
+      details: { reason: "account_mismatch" },
+    });
+  if (health.ehrHost === host && !health.ehrSignInAgain && !replaceConnectionId)
+    return answer(200, {
+      outcome: "reused",
+      connection: ehrConnections(health, workspaceId)[0],
+    });
+  // Refused when the EHR answers, on the way back (the callback's reasons).
+  const refusedOnReturn: Record<string, string> = {
+    "https://no-refresh.example.test/fhir": "no_refresh_token",
+    "https://token-refused.example.test/fhir": "fhir_address_refused",
+    "https://token-silent.example.test/fhir": "fhir_not_answering",
+  };
+  const returned = refusedOnReturn[address];
+  if (!returned) {
+    health.ehrHost = host;
+    health.ehrSignInAgain = false;
+  }
+  answer(200, {
+    outcome: "authorization-required",
+    authorizationUrl: returned
+      ? `http://127.0.0.1:3001/connections?status=error&reason=${returned}`
+      : `http://127.0.0.1:3001/connections?status=connected&provider=${ehrProviderId}`,
+    expiresAt: "2026-08-12T12:10:00.000Z",
+  });
 }
 
 /** The 403 a run start, an item or a turn-on answers before the owner accepted. */
@@ -437,6 +557,7 @@ export async function healthRoute(input: {
     const address = String(credentials.fhirBaseUrl ?? "");
     if (
       health.ehrVendors === 0 ||
+      health.ehrAuth !== "smart-backend" ||
       !EHR_VENDORS.slice(0, health.ehrVendors).some(({ id }) => id === vendor)
     ) {
       respond(response, 400, problem(400, "Bad Request"));

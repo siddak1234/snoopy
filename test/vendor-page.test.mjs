@@ -118,7 +118,7 @@ test("Connections goes back to the page the connect started on, with how the sig
   const panel = read("app/account/connections/ConnectionsPanel.tsx");
   assert.match(
     panel,
-    /if \(!callbackStatus\) return;\s*const back = takeConnectReturn\(\);\s*if \(back\) router\.replace\(withCallbackStatus\(back, callbackStatus\)\);/u,
+    /if \(!callbackStatus\) return;\s*const back = takeConnectReturn\(\);\s*if \(back\)\s*router\.replace\(withCallbackStatus\(back, callbackStatus, callbackReason\)\);/u,
   );
   // Both rows start a connect the one way (Build 25, the review's R5c 5):
   // the way back kept, then the vendor's consent page.

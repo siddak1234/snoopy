@@ -112,6 +112,7 @@ export function SetupForm({
   canManage,
   returnTo,
   callbackStatus,
+  callbackRefusal = null,
   contract = null,
 }: {
   /** The workspace this page shows; every action is refused once it is not active. */
@@ -132,6 +133,8 @@ export function SetupForm({
   /** This page, for a connect's way back. */
   returnTo: string;
   callbackStatus: "connected" | "error" | null;
+  /** A refused EHR sign-in's words, by its reason (`ehrSignInReturn`); else null. */
+  callbackRefusal?: string | null;
   /** The health data agreement's section, for a flow that carries health data; else null. */
   contract?: ContractView | null;
 }) {
@@ -345,7 +348,8 @@ export function SetupForm({
       ) : null}
       {callbackStatus === "error" ? (
         <p role="alert" className="text-sm text-[var(--error-text)]">
-          The connection could not be completed. Try again or contact an owner.
+          {callbackRefusal ??
+            "The connection could not be completed. Try again or contact an owner."}
         </p>
       ) : null}
 

@@ -21,6 +21,8 @@ export const CONNECTION_NOT_CONNECTED = "Not connected";
 export const CONNECTION_ATTENTION = "Needs attention";
 export const CONNECT_LABEL = "Connect";
 export const RECONNECT_LABEL = "Reconnect";
+/** An EHR sign-in's Reconnect (backend ADR-0054): its sign-in again. */
+export const SIGN_IN_AGAIN_LABEL = "Sign in again";
 export const DISCONNECT_LABEL = "Disconnect";
 export const DISCONNECTING_LABEL = "Disconnecting…";
 
@@ -89,7 +91,8 @@ export type ConnectionRowState = "connected" | "attention" | "not-connected";
 
 /**
  * A provider's `authType` as the client reads it: the contract's `oauth2`,
- * `api-key` or `smart-backend` (the EHR, backend ADR-0050), or `none` — a
+ * `api-key`, `smart-backend` (backend ADR-0050) or `smart-launch` (the EHR,
+ * a person's sign-in, ADR-0054), or `none` — a
  * public service (platform round 2's B5), which the platform lists in
  * `publicProviders`, never in `providers` (the backend's connections
  * contract), and `keylessProviders` gives `none`.
@@ -172,8 +175,8 @@ export function connectionFor<C extends RowConnection>(
  * `externalAccount.displayName` carrying an `@` — else, connected, the
  * company the grant belongs to (`companyName`, backend §12.1 #283: QuickBooks
  * names no email), else the state in a word; the EHR (`authType`
- * `smart-backend`, backend ADR-0050), connected, the clinic's host, which the
- * platform keeps as its account's name;
+ * `smart-backend` or `smart-launch`, backend ADR-0050, ADR-0054), connected,
+ * the clinic's host, which the platform keeps as its account's name;
  * "Needs attention" in the warning colour; a public service (`isKeyless`),
  * "Connected"; one disconnected at the provider, "Disconnected in
  * {provider}" (`disconnectedName`) in the warning colour, its button Reconnect.
@@ -196,7 +199,11 @@ export function connectionLine(
   const name = connection?.externalAccount.displayName ?? "";
   if (state !== "not-connected" && name.includes("@"))
     return { text: name, tone: "muted" };
-  if (state === "connected" && authType === "smart-backend" && name)
+  if (
+    state === "connected" &&
+    (authType === "smart-backend" || authType === "smart-launch") &&
+    name
+  )
     return { text: name, tone: "muted" };
   // No email, as QuickBooks sends none: the company the grant belongs to,
   // when the platform read one at connect (§12.1 #283), in "Connected"'s place.
@@ -209,13 +216,29 @@ export function connectionLine(
   return { text: CONNECTION_NOT_CONNECTED, tone: "muted" };
 }
 
-/** The row's one button, for an owner or admin: Connect, Reconnect, or Disconnect. */
+/**
+ * The row's one button, for an owner or admin: Connect, Reconnect, or
+ * Disconnect — an EHR sign-in's Reconnect (`authType` `smart-launch`, backend
+ * ADR-0054) is "Sign in again", since that is what it asks of the person.
+ */
 export function connectionAction(
   state: ConnectionRowState,
-): "Connect" | "Reconnect" | "Disconnect" {
+  authType?: ProviderAuthType | null,
+): "Connect" | "Reconnect" | "Sign in again" | "Disconnect" {
   if (state === "connected") return DISCONNECT_LABEL;
-  if (state === "attention") return RECONNECT_LABEL;
+  if (state === "attention")
+    return authType === "smart-launch" ? SIGN_IN_AGAIN_LABEL : RECONNECT_LABEL;
   return CONNECT_LABEL;
+}
+
+/** The row's button as a screen reader names it: "Connect EHR", "Sign in to EHR again". */
+export function actionLabel(
+  action: ReturnType<typeof connectionAction>,
+  name: string,
+): string {
+  return action === SIGN_IN_AGAIN_LABEL
+    ? `Sign in to ${name} again`
+    : `${action} ${name}`;
 }
 
 /** Disconnect's question (spec A4). */

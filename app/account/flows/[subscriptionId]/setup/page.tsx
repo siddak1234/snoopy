@@ -17,6 +17,7 @@ import {
   listConnectionProviders,
   listConnections,
 } from "@/lib/connections";
+import { ehrSignInReturn } from "@/lib/smart-backend";
 import { connectionFor, isKeyless } from "@/lib/connection-rows";
 import {
   chosenVendor,
@@ -141,7 +142,7 @@ export default async function SetupPage(
   props: PageProps<"/account/flows/[subscriptionId]/setup">,
 ) {
   const { subscriptionId } = await props.params;
-  const { status } = await props.searchParams;
+  const { status, reason } = await props.searchParams;
   const session = await getAppSession();
   const workspaceId = await resolveActiveWorkspaceId(session);
   if (!workspaceId) notFound();
@@ -255,6 +256,7 @@ export default async function SetupPage(
         callbackStatus={
           status === "connected" || status === "error" ? status : null
         }
+        callbackRefusal={status === "error" ? ehrSignInReturn(reason) : null}
         contract={contract}
       />
     </SectionCard>

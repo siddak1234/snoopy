@@ -54,7 +54,8 @@ export const VENDOR_SAVING = "Saving…";
  * sign-in — the browser comes back to `returnTo`, where it is chosen (the
  * owner's build 20 item 2: "If i need to connect then after i click and
  * connection happens then it shoukd take me back"); one that takes a pasted
- * key is connected where its key is pasted, Connections. For a member a
+ * key, or the EHR's sign-in (backend ADR-0054), is connected where its form
+ * is, Connections. For a member a
  * vendor not connected is no choice: "Ask an owner or admin to connect it."
  *
  * `readOnly` is a member who may not change the integration (Build 23's B3;

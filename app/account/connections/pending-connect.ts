@@ -66,10 +66,18 @@ export function takeConnectReturn(): string | null {
   }
 }
 
-/** That page again, saying how the sign-in ended (`connected` or `error`). */
+/**
+ * That page again, saying how the sign-in ended (`connected` or `error`) and,
+ * for an EHR sign-in refused for a reason a person can act on, that reason —
+ * one the caller has already found words for (`ehrSignInReturn`), so only a
+ * token the website knows is ever carried.
+ */
 export function withCallbackStatus(
   path: string,
   status: "connected" | "error",
+  reason?: string | null,
 ): string {
-  return `${path}${path.includes("?") ? "&" : "?"}status=${status}`;
+  const said =
+    status === "error" && reason ? `&reason=${encodeURIComponent(reason)}` : "";
+  return `${path}${path.includes("?") ? "&" : "?"}status=${status}${said}`;
 }

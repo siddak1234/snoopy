@@ -21,7 +21,7 @@ import {
   BLOCK_SEARCH,
   BLOCK_WORDS,
 } from "@/lib/generated/platform-contracts/block-rules";
-import { runLabel } from "@/lib/run-progress";
+import { runLabel, startedByLine } from "@/lib/run-progress";
 import { SPACING } from "@/lib/spacing";
 import { resolveActiveWorkspaceId } from "@/lib/tenancy";
 import { ActivityControls, ActivityPager } from "./ActivityControls";
@@ -38,6 +38,8 @@ import { ActivityControls, ActivityPager } from "./ActivityControls";
  * id rather than rendering blank. Each run is named by its FULL id under its
  * flow's name — "{when} · Run {id}" (Build 21, spec A8; the owner's D4 and
  * AM2: "runs should have the full ID"; ~~"· v{version}"~~ until Build 21).
+ * A run a clinic's EHR started says so under it, "Started from your EHR"
+ * (`startedByLine`; backend ADR-0053); any other start says nothing new.
  *
  * A flow page's Dashboard opens this list for one flow (`?flow=`), and for its
  * successes or failures (`&status=`), as the app's Activity is filtered (spec
@@ -159,8 +161,9 @@ export default async function RunsPage(props: PageProps<"/account/runs">) {
   );
 }
 
-/** A run's row (`PageRow`): its flow, then when and its full id; its status at its end. */
+/** A run's row (`PageRow`): its flow, then when and its full id, then how it started when an EHR started it; its status at its end. */
 function RunRow({ run, name }: { run: Run; name: string }) {
+  const started = startedByLine(run.startedBy);
   return (
     <PageRow
       href={`/account/runs/${run.id}`}
@@ -173,6 +176,14 @@ function RunRow({ run, name }: { run: Run; name: string }) {
         <span className="text-xs break-all text-[var(--muted)]">
           {formatWhen(run.createdAt)} · {runLabel(run.id)}
         </span>
+        {started ? (
+          <span
+            data-testid="run-started-by"
+            className="text-xs text-[var(--muted)]"
+          >
+            {started}
+          </span>
+        ) : null}
       </span>
     </PageRow>
   );

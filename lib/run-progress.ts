@@ -762,6 +762,21 @@ export function runLabel(id: string): string {
   return `Run ${id}`;
 }
 
+/** A run a clinic's EHR started (backend ADR-0053), as its row and its page say it. */
+export const STARTED_FROM_EHR = "Started from your EHR";
+
+/**
+ * How a run started, in words, where that is news to the person: only a run
+ * an EHR's hook started (`startedBy` `provider-event`, backend ADR-0053) —
+ * a person's start, a schedule's, a webhook's or an older run with none say
+ * nothing new. Activity's row and the run's page draw it.
+ */
+export function startedByLine(
+  startedBy: Schemas["Run"]["startedBy"] | undefined,
+): string | null {
+  return startedBy === "provider-event" ? STARTED_FROM_EHR : null;
+}
+
 /**
  * The row at the foot of every run's page, and the page it opens (the owner's
  * build 28 item 9: "a standard where run details is a component with an

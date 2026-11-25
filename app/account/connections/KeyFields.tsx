@@ -6,9 +6,10 @@ import { vendorField } from "@/lib/smart-backend";
 import { SPACING } from "@/lib/spacing";
 
 /**
- * The key form's fields (`ConnectionsPanel`'s Connect): a pasted-key
- * provider's `credentialFields`, each required; and for the EHR, a SMART
- * Backend Services provider (backend ADR-0050, D1), its vendor first — the
+ * The key form's fields (`ConnectionsPanel`'s Connect), and the EHR's
+ * sign-in form's (`SignInForm`): a pasted-key provider's `credentialFields`,
+ * each required; and for the EHR, a SMART provider (backend ADR-0050, D1;
+ * ADR-0054), its vendor first — the
  * vendors as one choice of radios when the platform lists two or more, the
  * one it lists sent unseen otherwise (`vendorField`) — then its fields, the
  * clinic's FHIR address. Each value is posted as `credential:<name>`, the
