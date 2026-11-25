@@ -109,8 +109,11 @@ export function VendorRows({
     providerId: string;
     message: string;
   } | null>(null);
-  // The EHR whose sign-in form is open.
-  const [signingIn, setSigningIn] = useState<VendorOption | null>(null);
+  // The EHR whose sign-in form is open, by its id: drawn from the options
+  // as read now, so a read again brings the connection Replace names.
+  const [signingInFor, setSigningInFor] = useState<string | null>(null);
+  const signingIn =
+    options.find((option) => option.providerId === signingInFor) ?? null;
   const busy = saving ?? (connecting ? connectingFor : null);
   // Each row is named by its vendor alone and described by its line — its
   // state, "Saving…", or who connects it — so a screen reader says both.
@@ -151,7 +154,7 @@ export function VendorRows({
     }
     if (!canManage) return;
     if (option.signIn) {
-      setSigningIn(option);
+      setSigningInFor(option.providerId);
       return;
     }
     if (!option.connectable) {
@@ -247,7 +250,7 @@ export function VendorRows({
       ) : null}
       {signingIn?.signIn ? (
         <Modal
-          onClose={() => setSigningIn(null)}
+          onClose={() => setSigningInFor(null)}
           bubble
           ariaLabelledBy={signInTitle}
           zIndex={100}
@@ -264,11 +267,11 @@ export function VendorRows({
             replaces={signingIn.connection?.id}
             returnTo={returnTo}
             onAlready={() => {
-              setSigningIn(null);
+              setSigningInFor(null);
               onChoose(signingIn.providerId);
               router.refresh();
             }}
-            onCancel={() => setSigningIn(null)}
+            onCancel={() => setSigningInFor(null)}
             onReread={() => router.refresh()}
           />
         </Modal>

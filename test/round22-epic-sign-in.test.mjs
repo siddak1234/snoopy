@@ -357,7 +357,12 @@ test("R22: a sign-in started from a flow's Set up opens there and comes back the
   const rows = code("app/account/flows/VendorRows.tsx");
   assert.match(
     rows,
-    /if \(!canManage\) return;\s*if \(option\.signIn\) \{\s*setSigningIn\(option\);\s*return;\s*\}\s*if \(!option\.connectable\) \{/u,
+    /if \(!canManage\) return;\s*if \(option\.signIn\) \{\s*setSigningInFor\(option\.providerId\);\s*return;\s*\}\s*if \(!option\.connectable\) \{/u,
+  );
+  // The option as read now — a read again brings the connection Replace names.
+  assert.match(
+    rows,
+    /const signingIn =\s*options\.find\(\(option\) => option\.providerId === signingInFor\) \?\? null;/u,
   );
   assert.match(
     rows,

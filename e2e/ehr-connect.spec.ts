@@ -526,6 +526,61 @@ test("R22: a sign-in started on Set up and refused on the way back comes back to
   );
 });
 
+test("R22: on Set up too, a 409 for a sign-in the page did not know of reads the connections again, then asks Replace it?, and Replace comes back to Set up with the EHR chosen", async ({
+  page,
+}) => {
+  await fixtureControl("ehr-offered?vendors=2");
+  await fixtureControl("ehr-flow");
+  await page.goto(EHR_FLOW_SETUP);
+  await page
+    .getByRole("group", { name: "Connections" })
+    .getByRole("radiogroup", { name: "EHR" })
+    .getByRole("radio", { name: "EHR" })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Connect EHR" });
+  await expect(dialog).toBeVisible();
+  await fixtureControl("ehr-connected");
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/account/flows/*/setup**", async (route) => {
+    const request = route.request();
+    if (request.method() === "GET" && request.headers()["rsc"] === "1")
+      await held;
+    await route.continue();
+  });
+  await dialog.getByRole("radio", { name: "Epic", exact: true }).check();
+  await dialog
+    .getByLabel("FHIR address")
+    .fill("https://fhir.other.example.test/api/FHIR/R4");
+  await dialog
+    .getByRole("button", { name: "Sign in with Epic", exact: true })
+    .click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "This workspace is signed in to another EHR address.",
+  );
+  release();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "This workspace is signed in to another EHR address. Replace it?",
+  );
+  await dialog.getByRole("button", { name: "Replace" }).click();
+  await expect(page).toHaveURL(
+    /\/account\/flows\/c6c6c6c6-[^/]+\/setup\?status=connected$/u,
+  );
+  await expect(
+    page
+      .getByRole("group", { name: "Connections" })
+      .getByRole("radiogroup", { name: "EHR" })
+      .getByRole("radio", { name: "EHR" }),
+  ).toHaveAttribute("aria-checked", "true");
+  const signIns = (await health()).ehrSignIns;
+  expect(signIns.map((signIn) => signIn.replaceConnectionId ?? null)).toEqual([
+    null,
+    "e4e4e4e4-e4e4-4e4e-8e4e-e4e4e4e4e4e4",
+  ]);
+});
+
 test("R22: a run an EHR started says so on Activity and on its page, steps or result; a person's start says nothing new", async ({
   page,
 }) => {
