@@ -4,6 +4,8 @@ import {
   expectNoAxeViolations,
   fixtureControl,
   fixtureRead,
+  holdRequest,
+  isServerAction,
 } from "./helpers";
 
 /**
@@ -13,12 +15,14 @@ import {
  * form with the clinic's FHIR address, a vendor picker only for two or more
  * vendors, each refusal in words, and the row named by the clinic's host.
  * Round 22: the EHR a person signs in to (ADR-0054) — the same fields, a
- * button named by the vendor, the platform's return, each refusal at the
- * begin and on the way back, Sign in again (to the same address, no question)
- * and Replace (only for the values refused, and only once the connection it
- * names is known); a flow in ICD-10 Code Check v6's shape choosing the EHR on
- * Set up, signed in to from Set up and back to it; and a run an EHR started,
- * said on Activity and its page (ADR-0053). Every word is the spec's
+ * button named by the vendor, the platform's return, Cancel, a sign-in the
+ * platform reuses, each refusal at the begin and on the way back, Sign in
+ * again (to the same address, no question) and Replace (only for the values
+ * refused, never for values changed while the begin was asked, and only once
+ * the connection it names is known); a flow in ICD-10 Code Check v6's shape
+ * choosing the EHR on Set up, signed in to from Set up and back to it, and on
+ * Connect integration, signed in to there and saved; and a run an EHR
+ * started, said on Activity and its page (ADR-0053). Every word is the spec's
  * (`lib/smart-backend.ts`, `lib/run-progress.ts`) or the platform's (the
  * provider's own fields). The health data agreement (C3) is
  * `e2e/health-data.spec.ts`.
@@ -407,8 +411,8 @@ test("R22: a 409 for a sign-in this page did not know of says the first sentence
   ]);
 });
 
-const EHR_FLOW_SETUP =
-  "/account/flows/c6c6c6c6-c6c6-4c6c-8c6c-c6c6c6c6c6c6/setup";
+const EHR_FLOW = "/account/flows/c6c6c6c6-c6c6-4c6c-8c6c-c6c6c6c6c6c6";
+const EHR_FLOW_SETUP = `${EHR_FLOW}/setup`;
 
 test("R22: a flow in v6's shape draws its optional EHR in its Connections section with the generic code; connected, the EHR is chosen and Save saves it", async ({
   page,
@@ -578,6 +582,166 @@ test("R22: on Set up too, a 409 for a sign-in the page did not know of reads the
   expect(signIns.map((signIn) => signIn.replaceConnectionId ?? null)).toEqual([
     null,
     "e4e4e4e4-e4e4-4e4e-8e4e-e4e4e4e4e4e4",
+  ]);
+});
+
+/** Set up's EHR choice, in its Connections section. */
+const setupEhrChoice = (page: Page) =>
+  page
+    .getByRole("group", { name: "Connections" })
+    .getByRole("radiogroup", { name: "EHR" });
+
+test("R22: the sign-in form's Cancel closes it and begins nothing — on Connections, the EHR still not connected, and on Set up, None still chosen", async ({
+  page,
+}) => {
+  await fixtureControl("ehr-offered?vendors=2");
+  await fixtureControl("ehr-flow");
+  const dialog = await openEhrForm(page);
+  await dialog.getByRole("radio", { name: "Epic", exact: true }).check();
+  await dialog.getByLabel("FHIR address").fill(ADDRESS);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(connectionRow(page, "ehr-fhir")).toContainText("Not connected");
+  expect((await health()).ehrSignIns).toEqual([]);
+
+  await page.goto(EHR_FLOW_SETUP);
+  const choice = setupEhrChoice(page);
+  await choice.getByRole("radio", { name: "EHR" }).click();
+  const setupDialog = page.getByRole("dialog", { name: "Connect EHR" });
+  await expect(setupDialog).toBeVisible();
+  await setupDialog.getByRole("radio", { name: "Epic", exact: true }).check();
+  await setupDialog.getByLabel("FHIR address").fill(ADDRESS);
+  await setupDialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(setupDialog).toHaveCount(0);
+  await expect(page).toHaveURL(/\/setup$/u);
+  await expect(choice.getByRole("radio", { name: "None" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  await expect(choice.getByRole("radio", { name: "EHR" })).toHaveAttribute(
+    "aria-checked",
+    "false",
+  );
+  expect((await health()).ehrSignIns).toEqual([]);
+});
+
+test("R22: a sign-in the platform reuses — signed in elsewhere since the page read the connections — closes the form and says as whom on Connections; on Set up it closes the form with the EHR chosen", async ({
+  page,
+}) => {
+  await fixtureControl("ehr-offered?vendors=2");
+  const dialog = await openEhrForm(page);
+  // Signed in elsewhere, to this address, since this page read the connections.
+  await fixtureControl("ehr-connected");
+  await dialog.getByRole("radio", { name: "Epic", exact: true }).check();
+  await dialog.getByLabel("FHIR address").fill(ADDRESS);
+  await dialog
+    .getByRole("button", { name: "Sign in with Epic", exact: true })
+    .click();
+  await expect(page.locator("main").getByRole("status")).toHaveText(
+    "EHR is already connected as fhir.clinic.example.test, with everything it needs — there is nothing to authorize.",
+  );
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(/\/account\/connections$/u);
+  const row = connectionRow(page, "ehr-fhir");
+  await expect(row).toContainText("fhir.clinic.example.test");
+  await expect(
+    row.getByRole("button", { name: "Disconnect EHR" }),
+  ).toBeVisible();
+  expect((await health()).ehrSignIns).toEqual([
+    { credentials: { vendor: "epic", fhirBaseUrl: ADDRESS } },
+  ]);
+
+  // Set up, from the fixture's first state.
+  await fixtureControl("reset");
+  await fixtureControl("ehr-offered?vendors=2");
+  await fixtureControl("ehr-flow");
+  await page.goto(EHR_FLOW_SETUP);
+  const ehr = setupEhrChoice(page).getByRole("radio", { name: "EHR" });
+  await expect(ehr).toContainText("Not connected");
+  await ehr.click();
+  const setupDialog = page.getByRole("dialog", { name: "Connect EHR" });
+  await expect(setupDialog).toBeVisible();
+  await fixtureControl("ehr-connected");
+  await setupDialog.getByRole("radio", { name: "Epic", exact: true }).check();
+  await setupDialog.getByLabel("FHIR address").fill(ADDRESS);
+  await setupDialog
+    .getByRole("button", { name: "Sign in with Epic", exact: true })
+    .click();
+  await expect(setupDialog).toHaveCount(0);
+  await expect(page).toHaveURL(/\/setup$/u);
+  await expect(ehr).toHaveAttribute("aria-checked", "true");
+  await expect(ehr).toContainText("fhir.clinic.example.test");
+  expect((await health()).ehrSignIns).toEqual([
+    { credentials: { vendor: "epic", fhirBaseUrl: ADDRESS } },
+  ]);
+});
+
+test("R22: on Connect integration, an owner's tap on the EHR not yet signed in to opens its sign-in there; back connected, the EHR is saved and the page goes back to the flow", async ({
+  page,
+}) => {
+  await fixtureControl("ehr-offered?vendors=2");
+  await fixtureControl("ehr-flow");
+  await page.goto(`${EHR_FLOW}/vendor?field=ehr`);
+  const ehr = page
+    .getByRole("radiogroup", { name: "Connect integration" })
+    .getByRole("radio", { name: "EHR" });
+  await expect(ehr).toContainText("Not connected");
+  await ehr.click();
+  const dialog = page.getByRole("dialog", { name: "Connect EHR" });
+  await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/\/vendor\?field=ehr$/u);
+  await dialog.getByRole("radio", { name: "Epic", exact: true }).check();
+  await dialog.getByLabel("FHIR address").fill(ADDRESS);
+  await dialog
+    .getByRole("button", { name: "Sign in with Epic", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/account\/flows\/c6c6c6c6-[^/]+$/u);
+  const { ehrFlowSaves } = await fixtureRead<{
+    ehrFlowSaves: Record<string, unknown>[];
+  }>("counts");
+  expect(ehrFlowSaves).toHaveLength(1);
+  expect(ehrFlowSaves[0].ehr).toBe("ehr-fhir");
+  expect((await health()).ehrSignIns).toEqual([
+    { credentials: { vendor: "epic", fhirBaseUrl: ADDRESS } },
+  ]);
+});
+
+test("R22: a 409 for values changed while the begin was asked offers nothing — no Replace, no words — and the form keeps what was typed since (the session's D3)", async ({
+  page,
+}) => {
+  await fixtureControl("ehr-sign-in-again");
+  const dialog = await openSignInAgain(page);
+  const address = dialog.getByLabel("FHIR address");
+  const signIn = dialog.getByRole("button", {
+    name: "Sign in with Epic",
+    exact: true,
+  });
+  await dialog.getByRole("radio", { name: "Epic", exact: true }).check();
+  await address.fill("https://fhir.other.example.test/api/FHIR/R4");
+  // The begin is held until the address has changed under it.
+  const begin = await holdRequest(
+    page,
+    "**/account/connections**",
+    isServerAction,
+  );
+  await signIn.click();
+  await begin.arrived;
+  await address.fill("https://fhir.third.example.test/api/FHIR/R4");
+  begin.release();
+  // The begin's answer is in once the button is itself again.
+  await expect(signIn).toBeEnabled();
+  await expect(dialog.getByRole("button", { name: "Replace" })).toHaveCount(0);
+  await expect(dialog.getByRole("alert")).toHaveCount(0);
+  await expect(address).toHaveValue(
+    "https://fhir.third.example.test/api/FHIR/R4",
+  );
+  expect((await health()).ehrSignIns).toEqual([
+    {
+      credentials: {
+        vendor: "epic",
+        fhirBaseUrl: "https://fhir.other.example.test/api/FHIR/R4",
+      },
+    },
   ]);
 });
 
